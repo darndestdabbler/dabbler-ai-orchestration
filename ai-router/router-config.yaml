@@ -1,0 +1,559 @@
+# ============================================================
+# AI Router Configuration
+# ============================================================
+# All model info, pricing, thresholds, and behavior in one file.
+# API keys are NEVER stored here — use environment variables.
+#
+# This YAML is the single source of truth for every tunable knob.
+# The former router-tuning.json overlay was removed in Session 2 of
+# BATON v2. If you need to change a value, change it here.
+# ============================================================
+
+# --- Metadata ---
+# pricing_reviewed:      ISO date — last time a human verified the
+#                         input/output costs below against provider
+#                         pricing pages.
+# review_frequency_days: Soft threshold. If the YAML is older than
+#                         this, config.py prints a warning at load
+#                         time (does not block execution).
+metadata:
+  pricing_reviewed: "2026-04-20"
+  review_frequency_days: 30
+
+# --- Provider Configuration ---
+providers:
+  anthropic:
+    api_key_env: ANTHROPIC_API_KEY
+    base_url: https://api.anthropic.com/v1/messages
+    api_version: "2023-06-01"
+    rate_limit:
+      requests_per_minute: 50
+      tokens_per_minute: 80000
+    timeout_seconds: 600
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2  # exponential: 2s, 4s
+
+  google:
+    api_key_env: GEMINI_API_KEY
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    timeout_seconds: 300
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2
+
+  openai:
+    api_key_env: OPENAI_API_KEY
+    base_url: https://api.openai.com/v1
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    timeout_seconds: 300
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2
+
+# --- Model Registry ---
+# Each model has a tier (1=cheap/fast, 2=balanced, 3=powerful/expensive),
+# pricing, context limits, and a reference to its prompt template.
+#
+# Two eligibility flags control where a model can be used:
+#   is_enabled               — included in the generator pool at all.
+#                              Default: true (omit to accept default).
+#   is_enabled_as_verifier   — trusted to verify other models' output.
+#                              Default: true. Set to false when adding
+#                              a new model so it can be evaluated as a
+#                              generator first; promote by flipping to
+#                              true once calibration data supports it.
+# The two flags exist so adding a cheap new model does not silently
+# enroll it in verifier duty. See docs/planning/project-guidance.md
+# (workflow-expectations) for the promotion criterion.
+models:
+  gemini-flash:
+    provider: google
+    model_id: gemini-2.5-flash
+    tier: 1
+    is_enabled: true
+    is_enabled_as_verifier: true
+    input_cost_per_1m: 0.15
+    output_cost_per_1m: 0.60
+    max_context_tokens: 1048576
+    max_output_tokens: 65536
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Best for simple analysis, formatting, boilerplate generation"
+    # Default API parameters sent with every call. Can be overridden
+    # per-task-type under task_type_params below.
+    # For Gemini 2.5 models: thinking_budget is an integer cap on
+    # thinking tokens. -1 = dynamic, 0 = off, positive = hard cap.
+    # For Gemini 3.x models: use thinking_level (MINIMAL|LOW|MEDIUM|HIGH).
+    generation_params:
+      thinking_budget: 0          # Flash tier: thinking off by default
+
+  gemini-pro:
+    provider: google
+    model_id: gemini-2.5-pro
+    tier: 2
+    is_enabled: true
+    is_enabled_as_verifier: true
+    input_cost_per_1m: 1.25
+    output_cost_per_1m: 10.00
+    max_context_tokens: 1048576
+    max_output_tokens: 65536
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Good for medium-complexity analysis, documentation, code review"
+    generation_params:
+      thinking_budget: -1         # dynamic; Gemini picks how deep to think
+
+  sonnet:
+    provider: anthropic
+    model_id: claude-sonnet-4-6
+    tier: 2
+    is_enabled: true
+    is_enabled_as_verifier: true
+    input_cost_per_1m: 3.00
+    output_cost_per_1m: 15.00
+    max_context_tokens: 200000
+    max_output_tokens: 16000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Use when Anthropic quality needed but Opus overkill"
+    # Sonnet 4.6 defaults to effort=high internally if effort is unset,
+    # which burns tokens on every call. Explicitly setting effort here
+    # avoids that. Adaptive thinking is opt-in; when disabled, the model
+    # responds without thinking blocks (fastest, cheapest).
+    generation_params:
+      effort: medium              # low|medium|high|xhigh
+      thinking:
+        enabled: false            # set true to send thinking:{type:adaptive}
+        type: adaptive
+
+  opus:
+    provider: anthropic
+    model_id: claude-opus-4-6
+    tier: 3
+    is_enabled: true
+    is_enabled_as_verifier: true
+    input_cost_per_1m: 15.00
+    output_cost_per_1m: 75.00
+    max_context_tokens: 200000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Reserved for complex architectural reasoning"
+    # Opus is only invoked for tier-3 tasks (architecture, security review,
+    # session verification). Adaptive thinking is on by default because
+    # those tasks benefit from deep reasoning. Override per task type below
+    # if a specific tier-3 task should skip thinking.
+    generation_params:
+      effort: high                # architecture-class work gets high effort
+      thinking:
+        enabled: true
+        type: adaptive
+    # NOTE: To upgrade to Opus 4.7, change model_id to claude-opus-4-7.
+    # Opus 4.7 supports task_budget (beta) — a token budget that spans
+    # the full agentic loop. Adds ~1-1.35x tokens due to new tokenizer.
+    # When upgrading, bump max_output_tokens to at least 64000.
+
+  # --- OpenAI GPT-5.x family -----------------------------------------------
+  # Added as verification models initially. Used by the cross-provider map
+  # to independently review work from Anthropic and Google models. Once you
+  # have data on how well they verify, consider promoting them to generator
+  # slots in tier_assignments.
+  gpt-5-4:
+    provider: openai
+    model_id: gpt-5.4
+    tier: 3
+    is_enabled: true
+    is_enabled_as_verifier: true
+    input_cost_per_1m: 2.50
+    output_cost_per_1m: 15.00
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Frontier OpenAI model. Used to verify Opus output (cross-provider)
+      and as a cheaper frontier alternative for session verification of
+      implementation-heavy work. Opus-class quality at ~60% of Opus cost."
+    generation_params:
+      reasoning_effort: high
+    # NOTE: Prompts over 272K input tokens trigger 2x input + 1.5x output
+    # pricing for the full session. The router caps input at 80% of
+    # max_context_tokens, which keeps you under that ceiling by default.
+
+  gpt-5-4-mini:
+    provider: openai
+    model_id: gpt-5.4-mini
+    tier: 2
+    is_enabled: true
+    is_enabled_as_verifier: true
+    input_cost_per_1m: 0.75
+    output_cost_per_1m: 4.50
+    max_context_tokens: 400000
+    max_output_tokens: 16000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Small OpenAI model. Used to verify Gemini Pro output
+      (cross-provider). Cheaper than Sonnet ($3/$15) and Claude Haiku
+      ($1/$5) with a larger context window."
+    generation_params:
+      reasoning_effort: medium
+
+# --- Routing Thresholds ---
+# Complexity score 1-100 mapped to tiers.
+routing:
+  tier1_max_complexity: 30    # score ≤ 30 → tier 1 (Flash)
+  tier2_max_complexity: 65    # score 31–65 → tier 2 (Pro or Sonnet)
+  default_tier: 2             # fallback when estimation is uncertain
+
+  # Which model to use for each tier
+  tier_assignments:
+    1: gemini-flash
+    2: gemini-pro
+    3: opus
+
+  # Override: force a specific model for specific task types
+  task_type_overrides:
+    # Force Sonnet for code review -- Anthropic models are stronger at
+    # careful line-by-line reasoning and catching subtle issues.
+    code-review: sonnet
+    # Force Opus for architecture. Short architecture prompts can score
+    # below the Tier-3 threshold and route to Tier 2 (gemini-pro), which
+    # produced a 100% verifier rejection rate in early metrics — the
+    # task type is always high-stakes regardless of prompt length.
+    architecture: opus
+    # UAT checklist generation and its coverage audit are high-stakes
+    # governance gates; route them straight to Tier 3 rather than relying
+    # on heuristic scoring to land there indirectly.
+    uat-plan-generation: opus
+    uat-coverage-review: opus
+    # End-of-session cross-provider verification. Pinned to gpt-5-4
+    # (OpenAI) so a Claude (Anthropic) orchestrator gets a genuinely
+    # cross-provider review by calling route() per the workflow doc
+    # verbatim — without this override, route() would default to opus
+    # (Anthropic = the orchestrator's own provider) and miss the
+    # cross-provider intent. Calibrated for the Claude orchestrator;
+    # if a Codex (OpenAI) or Gemini (Google) orchestrator runs a
+    # session, swap this value so it lands on a different-provider
+    # Tier-3 model (opus for Codex/Gemini, gpt-5-4 stays correct for
+    # Claude). See docs/planning/lessons-learned.md.
+    session-verification: gpt-5-4
+
+# --- Delegation ---
+# Guidance for orchestrators (Claude Code / Codex / Gemini) on which
+# task types must always go through route() rather than being handled
+# directly. The orchestrator reads this list at session start.
+delegation:
+  always_route_task_types:
+    - code-review
+    - security-review
+    - architecture
+    - planning
+    - uat-plan-generation
+    - uat-coverage-review
+    - analysis
+    - session-verification
+    - documentation
+    - test-generation
+
+# --- Per-Task-Type Generation Parameter Overrides ---
+# Structure: task_type_params.<task_type>.<model_name> = {params to override}
+# These override the model-level generation_params above. Missing entries
+# fall back to model defaults.
+task_type_params:
+  # Cheap, mechanical tasks: no thinking, low effort.
+  formatting:
+    sonnet:     { effort: low, thinking: { enabled: false } }
+    opus:       { effort: low, thinking: { enabled: false } }
+    gemini-flash: { thinking_budget: 0 }
+    gemini-pro: { thinking_budget: 0 }
+    gpt-5-4-mini: { reasoning_effort: none }
+    gpt-5-4:    { reasoning_effort: none }
+  summarization:
+    sonnet:     { effort: low, thinking: { enabled: false } }
+    opus:       { effort: low, thinking: { enabled: false } }
+    gemini-flash: { thinking_budget: 0 }
+    gemini-pro: { thinking_budget: 0 }
+    gpt-5-4-mini: { reasoning_effort: none }
+    gpt-5-4:    { reasoning_effort: low }
+  documentation:
+    sonnet:     { effort: low, thinking: { enabled: false } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4-mini: { reasoning_effort: low }
+
+  # Medium tasks: adaptive thinking, medium effort.
+  test-generation:
+    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4-mini: { reasoning_effort: medium }
+  code-review:
+    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4-mini: { reasoning_effort: medium }
+  analysis:
+    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4-mini: { reasoning_effort: medium }
+  refactoring:
+    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4-mini: { reasoning_effort: medium }
+
+  # Heavy tasks: high effort, deep thinking. These are the places
+  # where you actually want the model to spend tokens.
+  session-verification:
+    sonnet:     { effort: high, thinking: { enabled: true, type: adaptive } }
+    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4:    { reasoning_effort: high }
+    gpt-5-4-mini: { reasoning_effort: high }
+  security-review:
+    sonnet:     { effort: high, thinking: { enabled: true, type: adaptive } }
+    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4:    { reasoning_effort: high }
+  architecture:
+    opus:       { effort: max, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4:    { reasoning_effort: xhigh }
+  planning:
+    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4:    { reasoning_effort: high }
+  uat-plan-generation:
+    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4:    { reasoning_effort: high }
+  uat-coverage-review:
+    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4:    { reasoning_effort: high }
+
+  # Verification task type used by the internal verify() path. Kept
+  # separate from 'session-verification' so per-task-type overrides
+  # won't bleed across them. Default is medium reasoning for the verifier.
+  verification:
+    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
+    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
+    gemini-pro: { thinking_budget: -1 }
+    gpt-5-4:    { reasoning_effort: high }
+    gpt-5-4-mini: { reasoning_effort: medium }
+
+# --- Complexity Estimation Weights ---
+# These weights control how the complexity score is calculated.
+# Adjust based on observed results.
+#
+# DELIBERATE NON-GOAL: Do not invest further engineering in tightening
+# this heuristic (e.g., embeddings, ML-based complexity prediction).
+# The current heuristic + 2-try escalation safety net is the intended
+# stopping point. If the score misjudges a task, escalation catches it
+# and the metrics log shows the pattern. Spending effort to save a few
+# pennies on retried calls is a false economy. This decision is
+# ratified in docs/planning/lessons-learned.md under "Heuristics that
+# earn their keep".
+complexity:
+  weights:
+    context_length: 0.30      # longer prompts = more complex
+    keyword_signals: 0.35     # content-based signals
+    task_type: 0.20           # some task types are inherently harder
+    explicit_hint: 0.15       # caller can provide a hint (1-100)
+
+  # Context length breakpoints → sub-scores
+  context_length_scores:
+    - { max_chars: 500, score: 10 }
+    - { max_chars: 2000, score: 25 }
+    - { max_chars: 5000, score: 45 }
+    - { max_chars: 10000, score: 65 }
+    - { max_chars: 999999, score: 85 }
+
+  # Task type base scores
+  task_type_scores:
+    code-review: 40
+    documentation: 25
+    analysis: 55
+    test-generation: 35
+    planning: 70
+    uat-plan-generation: 70
+    uat-coverage-review: 70
+    formatting: 10
+    summarization: 20
+    architecture: 80
+    security-review: 75
+    refactoring: 65
+    session-verification: 70
+    general: 50
+
+  # Keywords that push complexity up (+3 each, capped at +15)
+  high_complexity_keywords:
+    - architect
+    - security
+    - performance
+    - concurrency
+    - migration
+    - breaking change
+    - cross-cutting
+    - distributed
+    - race condition
+    - backward compatible
+    - critical
+    - complex
+    - authentication
+    - authorization
+    - permission
+    - injection
+    - XSS
+    - CSRF
+    - token
+    - encryption
+
+  # Keywords that push complexity down (-3 each, capped at -15)
+  low_complexity_keywords:
+    - rename
+    - typo
+    - format
+    - lint
+    - boilerplate
+    - simple
+    - straightforward
+    - placeholder
+    - stub
+    - comment
+    - log
+    - copy
+
+# --- Escalation ---
+escalation:
+  enabled: true
+  max_escalations: 2          # tier 1 → 2 → 3, then give up
+  triggers:
+    empty_response: true
+    max_tokens_hit: true       # response truncated
+    min_output_tokens: 30      # suspiciously short response
+    refusal_detection: true    # model declined the task
+  refusal_phrases:
+    - "i can't help with"
+    - "i'm unable to"
+    - "i cannot assist"
+    - "beyond my capabilities"
+    - "i don't have enough context"
+
+# --- Verification (IV&V) ---
+# Cross-provider verification: a model from a different provider
+# checks the work of the original model to catch provider-specific
+# blind spots and biases.
+verification:
+  enabled: true
+
+  # Verifier selection is RULE-BASED, not map-based. A candidate
+  # verifier must be:
+  #   1. From a different provider than the generator.
+  #   2. is_enabled (in the active model pool).
+  #   3. is_enabled_as_verifier (trusted to verify, not just to generate).
+  #   4. Same tier as the generator, or one tier higher.
+  # Among survivors, cheapest output cost wins.
+  #
+  # preferred_pairings below is an OPTIONAL tiebreaker layer — if the
+  # listed pairing survives the rules, it is used; otherwise the rules
+  # decide. This means a model can be swapped or retired by editing the
+  # models: section alone, without hunting through a pairing table.
+  #
+  # Consequence: verifier selection is cost-sensitive at runtime. If a
+  # new model enters the pool at a lower price, the rules may start
+  # preferring it over the listed pairing. The metrics log records the
+  # exact verifier used for every call (router-metrics.jsonl), so the
+  # audit trail remains complete. New models should be added with
+  # is_enabled_as_verifier: false until their reliability is
+  # demonstrated against real generation work.
+  #
+  # The legacy key name cross_provider_map is still accepted by
+  # verification.py for backward compatibility with older branches.
+  preferred_pairings:
+    # Anthropic ↔ Google
+    sonnet: gemini-pro
+    # Google → OpenAI (distributes verifier load across all three providers)
+    gemini-flash: gpt-5-4-mini
+    gemini-pro: gpt-5-4-mini
+    # Anthropic Opus (expensive) → OpenAI frontier (rules-engine also
+    # lands here on cost; preference just documents the intent)
+    opus: gpt-5-4
+    # OpenAI → Anthropic (closes the triangle)
+    gpt-5-4-mini: sonnet
+    gpt-5-4: opus
+
+  # Which task types are auto-verified when using route().
+  # If a task type is listed here, route() automatically calls verify()
+  # after getting the initial response. No extra code needed.
+  auto_verify_task_types:
+    - code-review
+    - security-review
+    - architecture
+    - uat-plan-generation
+    - uat-coverage-review
+    - documentation           # Sonnet verifies Gemini's doc output (uses weekly Sonnet credits)
+    # - test-generation       # uncomment to auto-verify test generation
+    # - analysis              # uncomment to auto-verify general analysis
+
+  # Verification behavior
+  settings:
+    # What the verifier checks for
+    check_categories:
+      - correctness            # factual and logical errors
+      - completeness           # missing items the original should have caught
+      - false_positives        # issues flagged by the original that aren't real
+
+    # If the verifier finds issues, what happens?
+    # Global default — applies to any task type NOT listed in
+    # on_disagreement_by_task_type below.
+    on_disagreement: merge     # "merge" | "flag" | "re-route"
+                                # merge:    combine original + verifier feedback into final output
+                                # flag:     return both responses, let Claude Code decide
+                                # re-route: send to a Tier 3 model as tiebreaker
+
+    # Per-task-type override of on_disagreement.
+    # Merge is sound for task types where generator and verifier outputs
+    # combine naturally (code review: "here are the bugs — here are the
+    # ones the verifier would add"). Merge is NOT sound for task types
+    # where a disagreement signals a logic divergence — synthesizing
+    # two different architectural recommendations into one produces a
+    # hallucinated compromise. For those, flag instead and force the
+    # orchestrator to adjudicate under the Step 7 human-decision
+    # procedure.
+    on_disagreement_by_task_type:
+      code-review:      merge
+      security-review:  merge
+      test-generation:  merge
+      documentation:    merge
+      formatting:       merge
+      summarization:    merge
+      analysis:         flag
+      planning:         flag
+      architecture:     flag
+      refactoring:      flag
+
+    # Tier 3 tiebreaker model (used when on_disagreement = "re-route")
+    tiebreaker_model: opus
+
+    # Maximum cost multiplier for verification.
+    # If verification would cost more than this multiplier × original cost,
+    # skip verification for this call.
+    max_cost_multiplier: 3.0
+
+    # Verification prompt template
+    prompt_template_file: prompt-templates/verification.md
+
+# --- Metrics ---
+# Controls the append-only metrics log read by report.py (Session 4).
+# Disable if you want to stop collecting. Retention note: log is
+# append-only JSON lines; rotate manually when it gets large.
+metrics:
+  enabled: true
+  log_filename: router-metrics.jsonl
+
+# --- State Database ---
+state:
+  db_path: router-state.db       # relative to ai-router/
+  log_prompts: false           # if true, stores full prompts (large!)
+  log_responses: true          # store full responses for review
+
+# --- Output ---
+output:
+  cost_report_on_exit: true    # print cost summary when session ends
+  verbose: false               # detailed logging of each API call

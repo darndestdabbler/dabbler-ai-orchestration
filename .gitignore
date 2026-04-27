@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*.pyc
+.venv/
+node_modules/
+*.vsix
+router-metrics.jsonl

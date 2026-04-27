@@ -1,0 +1,190 @@
+{
+  "name": "dabbler-session-sets",
+  "displayName": "Session Set Explorer",
+  "description": "Activity-bar tree view of session-set state for any Dabbler AI-led-workflow repo, with optional UAT-checklist and E2E-test integrations.",
+  "version": "0.8.0",
+  "publisher": "darndestdabbler",
+  "private": true,
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darndestdabbler/dabbler-ai-orchestration.git"
+  },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": [
+    "workspaceContains:docs/session-sets",
+    "onView:dabblerSessionSets"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dabblerSessionSetsContainer",
+          "title": "Session Set Explorer",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "dabblerSessionSetsContainer": [
+        {
+          "id": "dabblerSessionSets",
+          "name": "Session Sets",
+          "contextualTitle": "Session Set Explorer"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dabblerSessionSets.refresh",
+        "title": "Refresh Session Set Explorer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dabblerSessionSets.openSpec",
+        "title": "Open Spec"
+      },
+      {
+        "command": "dabblerSessionSets.openActivityLog",
+        "title": "Open Activity Log"
+      },
+      {
+        "command": "dabblerSessionSets.openChangeLog",
+        "title": "Open Change Log"
+      },
+      {
+        "command": "dabblerSessionSets.openAiAssignment",
+        "title": "Open AI Assignment"
+      },
+      {
+        "command": "dabblerSessionSets.openUatChecklist",
+        "title": "Open UAT Checklist"
+      },
+      {
+        "command": "dabblerSessionSets.revealPlaywrightTests",
+        "title": "Reveal Playwright Tests for This Set"
+      },
+      {
+        "command": "dabblerSessionSets.openFolder",
+        "title": "Reveal Folder"
+      },
+      {
+        "command": "dabblerSessionSets.copyStartCommand.default",
+        "title": "Copy: Start next session"
+      },
+      {
+        "command": "dabblerSessionSets.copyStartCommand.parallel",
+        "title": "Copy: Start next parallel session"
+      },
+      {
+        "command": "dabblerSessionSets.copyStartCommand.maxoutClaude",
+        "title": "Copy: Start next session — maxout Claude"
+      },
+      {
+        "command": "dabblerSessionSets.copySlug",
+        "title": "Copy: Slug only"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "dabblerSessionSets.openUatChecklist",
+          "when": "dabblerSessionSets.uatSupportActive"
+        },
+        {
+          "command": "dabblerSessionSets.revealPlaywrightTests",
+          "when": "dabblerSessionSets.e2eSupportActive"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "dabblerSessionSets.refresh",
+          "when": "view == dabblerSessionSets",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "dabblerSessionSets.openSpec",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "dabblerSessionSets.openActivityLog",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "dabblerSessionSets.openChangeLog",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@3"
+        },
+        {
+          "command": "dabblerSessionSets.openAiAssignment",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@4"
+        },
+        {
+          "command": "dabblerSessionSets.openUatChecklist",
+          "when": "view == dabblerSessionSets && viewItem =~ /:uat($|:)/ && dabblerSessionSets.uatSupportActive",
+          "group": "1_open@5"
+        },
+        {
+          "command": "dabblerSessionSets.revealPlaywrightTests",
+          "when": "view == dabblerSessionSets && viewItem =~ /:e2e($|:)/ && dabblerSessionSets.e2eSupportActive",
+          "group": "1_open@6"
+        },
+        {
+          "command": "dabblerSessionSets.openFolder",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "2_navigate@1"
+        },
+        {
+          "command": "dabblerSessionSets.copyStartCommand.default",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:(in-progress|not-started)/",
+          "group": "3_copy@1"
+        },
+        {
+          "command": "dabblerSessionSets.copyStartCommand.parallel",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:(in-progress|not-started)/",
+          "group": "3_copy@2"
+        },
+        {
+          "command": "dabblerSessionSets.copyStartCommand.maxoutClaude",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:(in-progress|not-started)/",
+          "group": "3_copy@3"
+        },
+        {
+          "command": "dabblerSessionSets.copySlug",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "4_copy_meta@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Session Set Explorer",
+      "properties": {
+        "dabblerSessionSets.uatSupport.enabled": {
+          "type": "string",
+          "enum": ["auto", "always", "never"],
+          "default": "auto",
+          "markdownDescription": "Controls whether UAT-related commands and badges are shown.\n\n- `auto` (default): show UAT features only when at least one spec in the workspace declares `requiresUAT: true`.\n- `always`: always show UAT features.\n- `never`: hide UAT features regardless of spec contents. Useful for repos that have no UI/UAT concerns and want to keep the command palette clean."
+        },
+        "dabblerSessionSets.e2eSupport.enabled": {
+          "type": "string",
+          "enum": ["auto", "always", "never"],
+          "default": "auto",
+          "markdownDescription": "Controls whether E2E-related commands (e.g., 'Reveal Playwright Tests for This Set') are shown.\n\n- `auto` (default): show E2E features only when at least one spec in the workspace declares `requiresE2E: true`.\n- `always`: always show E2E features.\n- `never`: hide E2E features regardless of spec contents."
+        },
+        "dabblerSessionSets.e2e.testDirectory": {
+          "type": "string",
+          "default": "tests",
+          "markdownDescription": "Root directory (relative to workspace root) to search for E2E test files when the 'Reveal Playwright Tests for This Set' command is invoked. Defaults to `tests/`. Set to the project-specific Playwright directory (e.g., `tests/MyApp.Playwright`) to narrow the search."
+        }
+      }
+    }
+  }
+}

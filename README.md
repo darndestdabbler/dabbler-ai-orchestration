@@ -92,10 +92,15 @@ runtime mechanics live in [docs/ai-led-session-workflow.md](docs/ai-led-session-
 ### 2. Cost-minded orchestration
 
 Inside each session, work is split between an **orchestrator** AI and
-the **router**. The orchestrator is a coding-assistant agent
-(Claude Code, Codex, or Gemini) running inside VS Code with bounded
-read/write/execute access to the file system; it owns mechanics
-(file edits, shell, git) and dispatch. The router (`ai-router/`) owns
+the **router**. The orchestrator is a coding-assistant agent running
+inside VS Code with bounded read/write/execute access to the file
+system; it owns mechanics (file edits, shell, git) and dispatch. Four
+orchestrator agents are supported, each reading its own instruction
+file at the repo root: Claude Code reads [CLAUDE.md](CLAUDE.md),
+Codex (OpenAI) and GitHub Copilot read [AGENTS.md](AGENTS.md), and
+Gemini Code Assistant reads [GEMINI.md](GEMINI.md). All three files
+describe the same role and rules — only the agent-specific bootstrap
+(API key export syntax, etc.) differs. The router (`ai-router/`) owns
 reasoning: code review, security review, analysis, architecture,
 documentation, test generation, and the mandatory end-of-session
 verification all go to `route()`, which estimates complexity, picks the
@@ -257,10 +262,10 @@ E2E gate already caught them.
   Nothing is ever deleted — items only move, with rationale.
 - **Provider-agnostic orchestrator handoff.** The
   `activity-log.json` + `spec.md` + `session-state.json` triple carries
-  enough state that any of the three orchestrators can pick up where
-  another left off. The human can run Session 1 with Claude, Session 2
-  with Codex, and Session 3 with Gemini — switching mid-set requires
-  no migration step.
+  enough state that any of the four supported orchestrators can pick
+  up where another left off. The human can run Session 1 with Claude
+  Code, Session 2 with Codex or GitHub Copilot, and Session 3 with
+  Gemini Code Assistant — switching mid-set requires no migration step.
 
 ---
 
@@ -543,7 +548,9 @@ covered elsewhere in this README.
 | Path | Purpose |
 |---|---|
 | [README.md](README.md) | This file. The entry point for humans and AI agents discovering the repo. |
-| [CLAUDE.md](CLAUDE.md) | Project instructions Claude Code reads automatically. Defines the curator-and-normalizer role this repo plays for downstream consumers, the portability rule, and the extension version baseline. |
+| [CLAUDE.md](CLAUDE.md) | Project instructions **Claude Code** reads automatically. Defines the curator-and-normalizer role this repo plays for downstream consumers, the portability rule, and the extension version baseline. |
+| [AGENTS.md](AGENTS.md) | Same content as `CLAUDE.md`, addressed to **Codex (OpenAI)** and **GitHub Copilot** — the two agents that look for `AGENTS.md` at the repo root. Agent-specific bootstrap (API key export, router import) is included so a session can be started without consulting either of the other two files. |
+| [GEMINI.md](GEMINI.md) | Same content as `CLAUDE.md`, addressed to **Gemini Code Assistant**. Carries the same agent-specific bootstrap. |
 
 ### `ai-router/` — multi-provider routing module
 

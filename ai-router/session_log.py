@@ -70,7 +70,9 @@ def find_active_session_set(base_dir: str = "docs/session-sets") -> str:
         listing = "\n".join(f"  - {p}" for p in in_progress)
         raise SystemExit(
             f"Multiple in-progress session sets found:\n{listing}\n\n"
-            "Set the 'Active Session Set Override' in CLAUDE.md to specify which one."
+            "Set the 'Active Session Set Override' in your orchestrator's "
+            "instruction file (CLAUDE.md, AGENTS.md, or GEMINI.md) to "
+            "specify which one."
         )
 
     # No in-progress — check not-started
@@ -81,7 +83,9 @@ def find_active_session_set(base_dir: str = "docs/session-sets") -> str:
         listing = "\n".join(f"  - {p}" for p in not_started)
         raise SystemExit(
             f"Multiple unstarted session sets found:\n{listing}\n\n"
-            "Set the 'Active Session Set Override' in CLAUDE.md to specify which one to start."
+            "Set the 'Active Session Set Override' in your orchestrator's "
+            "instruction file (CLAUDE.md, AGENTS.md, or GEMINI.md) to "
+            "specify which one to start."
         )
 
     raise SystemExit(

@@ -50,7 +50,8 @@ Orchestrator (Claude / Codex / Gemini)
   |    |     +-- auto-verification for code-review/security-review
   |    |-- logs every step to activity-log.json
   |
-  |-- runs repo build && test suite (TODO: set build command in CLAUDE.md)
+  |-- runs repo build && test suite (TODO: set build command in
+  |                                    CLAUDE.md / AGENTS.md / GEMINI.md)
   |
   |-- MANDATORY: end-of-session verification
   |     |-- sends all work to a DIFFERENT AI provider
@@ -1002,8 +1003,8 @@ the orchestrator to follow this same workflow.
 | Agent | Instruction File | Global Config |
 |---|---|---|
 | Claude Code | `CLAUDE.md` (repo root) | `~/.claude/CLAUDE.md` |
-| Codex (OpenAI) | `AGENTS.md` (repo root) | `~/.codex/instructions.md` |
-| Gemini | `GEMINI.md` (repo root) | Varies by tool |
+| Codex (OpenAI) and GitHub Copilot | `AGENTS.md` (repo root) | `~/.codex/instructions.md` (Codex); Copilot reads project file |
+| Gemini Code Assistant | `GEMINI.md` (repo root) | Varies by tool |
 
 The human chooses which agent to use for each session. The agent reads its
 own instruction file. Each instruction file keeps only agent-specific

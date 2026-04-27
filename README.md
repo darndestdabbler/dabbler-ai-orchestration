@@ -21,6 +21,7 @@ their own forks of either piece.
 - [What this repo is for](#what-this-repo-is-for)
 - [Highlighted features](#highlighted-features)
 - [The Session Set Explorer in action](#the-session-set-explorer-in-action)
+- [Prerequisites: tools and accounts](#prerequisites-tools-and-accounts)
 - [Installing the VS Code extension (the reliable way)](#installing-the-vs-code-extension-the-reliable-way)
 - [Adopting `ai-router` in a project](#adopting-ai-router-in-a-project)
 - [Repos that need UAT and/or E2E support — and repos that don't](#repos-that-need-uat-andor-e2e-support--and-repos-that-dont)
@@ -295,6 +296,79 @@ For the full feature list of the extension (worktree auto-discovery,
 UAT badges, Playwright reveal, the various copy-as-trigger-phrase
 commands, the `dabblerSessionSets.*` settings), see
 [tools/vscode-session-sets/README.md](tools/vscode-session-sets/README.md).
+
+---
+
+## Prerequisites: tools and accounts
+
+You need three things before this framework is useful: **VS Code**, at
+least one **orchestrator agent** installed as a VS Code extension, and
+**API-key accounts** for all three model providers (the router needs
+all three so cross-provider verification has somewhere to route to).
+Links to the canonical online resources for each:
+
+### VS Code
+
+- **Download VS Code:** [code.visualstudio.com](https://code.visualstudio.com/) — pick the installer for your OS.
+- **Getting-started docs:** [code.visualstudio.com/docs](https://code.visualstudio.com/docs) — covers installing extensions, settings, the integrated terminal, and the command palette. The Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`) is what you'll use to install the Session Set Explorer in the next section.
+
+### Orchestrator agents (install at least one)
+
+Pick whichever AI agent you want to drive sessions. You can install
+more than one and switch mid-set — the framework is provider-agnostic
+(see the *Provider-agnostic orchestrator handoff* feature above).
+
+- **Claude Code (Anthropic)** — reads [CLAUDE.md](CLAUDE.md).
+  - Product page and install instructions: [claude.com/product/claude-code](https://www.claude.com/product/claude-code)
+  - Documentation: [docs.claude.com/en/docs/claude-code/overview](https://docs.claude.com/en/docs/claude-code/overview)
+  - The VS Code extension is installed automatically the first time you run `claude` inside VS Code's integrated terminal. It can also be found on the marketplace by searching "Claude Code."
+- **Codex (OpenAI)** — reads [AGENTS.md](AGENTS.md).
+  - OpenAI Codex page: [openai.com/codex](https://openai.com/codex/)
+  - Open-source CLI repo (also installs the IDE integration): [github.com/openai/codex](https://github.com/openai/codex)
+- **GitHub Copilot** — reads [AGENTS.md](AGENTS.md).
+  - Product page and plans: [github.com/features/copilot](https://github.com/features/copilot)
+  - Quickstart: [docs.github.com/en/copilot/quickstart](https://docs.github.com/en/copilot/quickstart)
+  - VS Code extension: search "GitHub Copilot" in the Extensions view, or install from [the marketplace listing](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot).
+- **Gemini Code Assist (Google)** — reads [GEMINI.md](GEMINI.md).
+  - Product page: [codeassist.google](https://codeassist.google/) (a free tier is available).
+  - Documentation: [cloud.google.com/gemini/docs/codeassist/overview](https://cloud.google.com/gemini/docs/codeassist/overview)
+  - VS Code extension: search "Gemini Code Assist" in the Extensions view.
+
+### API-key accounts (all three required for the router)
+
+The router calls all three providers — Anthropic for Claude
+Sonnet/Opus, Google for Gemini Flash/Pro, OpenAI for GPT-5.4 / GPT-5.4
+Mini — and cross-provider verification needs at least two providers
+live to be meaningful. In practice, expect to set up all three.
+
+- **Anthropic Console** — for `ANTHROPIC_API_KEY` (Claude Sonnet, Opus):
+  [console.anthropic.com](https://console.anthropic.com/). Sign up,
+  add billing, create a key under *Settings → API Keys*.
+- **Google AI Studio** — for `GEMINI_API_KEY` (Gemini Flash, Pro):
+  [aistudio.google.com](https://aistudio.google.com/). The free tier
+  is generous; the *Get API key* button is in the left rail. Google
+  Cloud billing is only required for higher rate limits.
+- **OpenAI Platform** — for `OPENAI_API_KEY` (GPT-5.4, GPT-5.4 Mini):
+  [platform.openai.com](https://platform.openai.com/). Create a
+  project, add a payment method, then mint a key at
+  [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
+
+Set each key as a Windows User environment variable (the
+agent-bootstrap snippets in [CLAUDE.md](CLAUDE.md) /
+[AGENTS.md](AGENTS.md) / [GEMINI.md](GEMINI.md) read them via
+PowerShell on session start). On macOS / Linux, export them in your
+shell profile.
+
+### Optional: Pushover for end-of-session phone notifications
+
+- [pushover.net](https://pushover.net/) — sign up for an account,
+  install the mobile app, and create an application. Set
+  `PUSHOVER_API_KEY` (the application token) and `PUSHOVER_USER_KEY`
+  (your user key) in the same place as the model API keys.
+
+If Pushover is not configured the orchestrator skips the notify and
+prints the cost report and stop message to the console as usual — no
+errors, no degraded behavior.
 
 ---
 

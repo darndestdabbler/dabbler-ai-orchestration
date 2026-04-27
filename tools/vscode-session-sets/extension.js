@@ -303,11 +303,16 @@ function readAllSessionSets() {
 }
 
 function progressText(set) {
+  if (set.state === "done") {
+    // Done sets show actual sessions run as both numerator and denominator.
+    // totalSessions is a planning estimate and may exceed sessionsCompleted
+    // when optional buffer sessions are not needed.
+    return set.sessionsCompleted > 0
+      ? `${set.sessionsCompleted}/${set.sessionsCompleted}`
+      : "";
+  }
   if (set.totalSessions && set.totalSessions > 0) {
     return `${set.sessionsCompleted}/${set.totalSessions}`;
-  }
-  if (set.state === "done" && set.sessionsCompleted > 0) {
-    return `${set.sessionsCompleted}/${set.sessionsCompleted}`;
   }
   if (set.sessionsCompleted > 0) {
     return `${set.sessionsCompleted} done`;

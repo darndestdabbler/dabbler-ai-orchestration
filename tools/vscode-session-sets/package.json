@@ -2,7 +2,7 @@
   "name": "dabbler-session-sets",
   "displayName": "Session Set Explorer",
   "description": "Activity-bar tree view of session-set state for any Dabbler AI-led-workflow repo, with optional UAT-checklist and E2E-test integrations.",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "publisher": "darndestdabbler",
   "private": true,
   "engines": {

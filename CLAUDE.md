@@ -56,3 +56,12 @@ npx vsce package
 cd ai-router
 python -m pytest  # if tests are added
 ```
+
+## Repo layout standard
+
+The bare-repo + flat-worktree layout is the dabbler standard for new
+repos and the migration target for existing ones. See
+`docs/planning/repo-worktree-layout.md` for the layout, fresh-repo
+setup recipe, migration recipe (for repos still on the legacy
+sibling-worktree pattern), and gotchas. Consumer repos point their own
+agent-instruction files at this doc.

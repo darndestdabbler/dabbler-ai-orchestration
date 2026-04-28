@@ -362,13 +362,20 @@ The human starts a session with one of these phrases:
   working tree, but pinned to the named session set rather than
   whichever set `find_active_session_set()` would have picked.
 - **`Start the next parallel session of <slug>.`** — runs the session in
-  an isolated git worktree at `../<repo>-<slug>` on a
-  `session-set/<slug>` branch. Multiple parallel sessions on different
-  sets do not contend for the working tree. The set's last session
-  merges `origin/main` back into the session-set branch (resolving
-  conflicts), then merges into main and pushes. `router-metrics.jsonl`
-  is the predictable merge-noise file — expect one reconciliation
-  commit per completed parallel set.
+  an isolated git worktree on a `session-set/<slug>` branch. The
+  worktree path depends on the repo's layout:
+  - **Bare-repo + flat-worktree layout (standard going forward,** see
+    `docs/planning/repo-worktree-layout.md`**):** worktree lives at
+    `<container>/<slug>` — a sibling of `<container>/main/`.
+  - **Legacy sibling-worktree layout:** worktree lives at
+    `../<repo>-<slug>` as a top-level sibling of the main repo dir.
+
+  Multiple parallel sessions on different sets do not contend for the
+  working tree. The set's last session merges `origin/main` back into
+  the session-set branch (resolving conflicts), then merges into main
+  and pushes. `router-metrics.jsonl` is the predictable merge-noise
+  file — expect one reconciliation commit per completed parallel set.
+  After merge, the worktree is removed (see Step 8 cleanup).
 
 Any of these may be suffixed with **`— maxout <engine>`** (e.g.,
 `Start the next session of role-administration. — maxout Claude`) to
@@ -508,7 +515,10 @@ The `find_active_session_set()` function auto-detects:
 If the trigger phrase named a specific slug (e.g., "Start the next
 session of `<slug>`"), use that slug directly rather than calling
 `find_active_session_set()`. For a parallel-trigger phrase, switch
-into the `../<repo>-<slug>` worktree before proceeding.
+into the session-set worktree before proceeding — `<container>/<slug>`
+under the bare-repo + flat-worktree layout, or `../<repo>-<slug>` under
+the legacy sibling-worktree layout. See
+`docs/planning/repo-worktree-layout.md`.
 
 ```python
 from ai_router.session_log import find_active_session_set, SessionLog
@@ -922,6 +932,36 @@ except Exception as exc:
 
 If notification delivery fails, report it, but do not undo or fail an
 otherwise successful session.
+
+#### Last session only — worktree and branch cleanup
+
+When the session being closed is the **last** session of the set AND the
+set ran in a parallel worktree (i.e., the trigger phrase was "Start the
+next parallel session of …"), clean up the worktree and the
+session-set branch after the merge-and-push completes:
+
+```bash
+# from inside the container root (one level up from the worktree)
+git worktree remove <slug>
+git branch -d session-set/<slug>
+git push origin --delete session-set/<slug>
+```
+
+A worktree is a tool for in-flight work, not a record of past work.
+The merged commits live on `main` and on the remote forever — the
+worktree directory and the branch are scaffolding the set has outgrown.
+
+If `git worktree remove` refuses due to untracked or modified files,
+**stop and inspect** what's there before forcing — those are usually
+either session-time scratch (safe to discard) or genuine uncommitted
+work the human needs to decide on. Don't `--force` blindly.
+
+For sequential-trigger sessions (no parallel worktree was created),
+this step is a no-op — the work happened in the main worktree and
+there is nothing to remove.
+
+The bare-repo + flat-worktree layout that makes this cleanup natural
+is documented in `docs/planning/repo-worktree-layout.md`.
 
 ### Step 9: Last Session Only — Reorganization Proposals (Post-Notify)
 

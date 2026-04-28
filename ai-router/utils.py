@@ -1,8 +1,8 @@
 """
 utils.py — Small in-process helpers for ai-router.
 
-Consolidates four previously-separate helper modules into one file. None of
-these helpers make external network calls; they are internal utilities that
+Consolidates previously-separate helper modules into one file. None of these
+helpers make external network calls; they are internal utilities that
 reviewers do not need to audit individually.
 
 Sections:
@@ -10,12 +10,17 @@ Sections:
     2. Rate limiting      — per-provider token-bucket
     3. API key loading    — Windows user-env → process-env shim (dev helper)
     4. conhost cleanup    — Windows orphaned-process cleanup (dev helper)
+    5. Dev orphan cleanup — Windows broader orphan cleanup (dev helper)
 
-The Windows helpers (sections 3 and 4) are developer-workflow conveniences,
-not production code paths. They are runnable from the command line via:
+The Windows helpers (sections 3, 4, and 5) are developer-workflow
+conveniences, not production code paths. They are runnable from the
+command line via:
 
-    python -m ai-router.utils load-env
-    python -m ai-router.utils kill-conhost-processes [--dry-run]
+    python -m ai_router.utils load-env
+    python -m ai_router.utils kill-conhost [--dry-run]
+    python -m ai_router.utils kill-stale-claude-polls [--dry-run] [--match-path PATTERN]
+    python -m ai_router.utils kill-dotnet-build-servers [--dry-run]
+    python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--match-path PATTERN]
 """
 
 from __future__ import annotations
@@ -301,28 +306,249 @@ def kill_conhost_processes(dry_run: bool = False) -> int:
 
 
 # ======================================================================
+# 5. Dev orphan cleanup (Windows developer helper)
+# ----------------------------------------------------------------------
+# Broader orphan-process cleanup learned during the worktree-layout
+# migration on 2026-04-28. Targets two recurring orphan classes that
+# survive an "I closed the IDE" pass and block file-system operations:
+#
+#   - Stale Claude Code background bash polling loops. When a Claude
+#     Code session exits while a background `bash -c "until [ -f ... ];
+#     do sleep 5; done"` is still running (typical for parallel
+#     session-set monitoring), the bash stays alive forever, polling
+#     for a file that may no longer exist, and pins the cwd of
+#     whatever directory it was spawned in. Diagnosed via cmdline
+#     scan; the giveaway is `shell-snapshots/snapshot-bash-` plus
+#     `until [` plus `do sleep`.
+#   - Persistent .NET build server workers. `dotnet` leaves MSBuild
+#     worker nodes (`/nodemode:1`) and `VBCSCompiler.exe` running
+#     between builds for caching. They hold file handles in the
+#     directories they last worked in. The canonical release is
+#     `dotnet build-server shutdown`, which sends a graceful shutdown
+#     and lets them respawn on next build.
+#
+# These compose with the existing kill_conhost helper (section 4) into
+# a single `cleanup-dev-orphans` entry point. Each individual category
+# is also runnable on its own.
+#
+# A `--match-path PATTERN` filter applies to the polling-loop case so
+# the operator does not accidentally kill an unrelated bash session
+# whose cmdline happens to contain `until`.
+# ======================================================================
+
+# Markers used to identify a stale Claude Code background polling loop.
+# All three must appear in the cmdline of a bash.exe process.
+_CLAUDE_POLL_MARKERS = (
+    "shell-snapshots/snapshot-bash-",  # Claude Code shell-snapshot loader
+    "until [",                          # the until-loop opener
+    "do sleep",                         # the polling sleep
+)
+
+
+def _get_processes_with_cmdline(image_name: str) -> list[tuple[int, str]]:
+    """Return [(pid, cmdline)] for every running process matching image_name.
+
+    Uses PowerShell + Get-CimInstance because tasklist does not expose
+    the command line. Filters at the WMI layer for speed.
+    """
+    if sys.platform != "win32":
+        return []
+
+    ps_script = (
+        f"Get-CimInstance Win32_Process -Filter \"Name='{image_name}'\" "
+        f"| ForEach-Object {{ \"$($_.ProcessId)`t$($_.CommandLine)\" }}"
+    )
+    result = subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
+        capture_output=True, text=True,
+    )
+    rows: list[tuple[int, str]] = []
+    for line in result.stdout.splitlines():
+        if "\t" not in line:
+            continue
+        pid_str, _, cmdline = line.partition("\t")
+        try:
+            rows.append((int(pid_str.strip()), cmdline))
+        except ValueError:
+            pass
+    return rows
+
+
+def find_stale_claude_polls(match_path: str | None = None) -> list[int]:
+    """Return PIDs of bash.exe processes that look like orphan Claude polls.
+
+    A process qualifies if its cmdline contains all of
+    ``_CLAUDE_POLL_MARKERS`` (Claude Code shell snapshot + until-loop +
+    sleep). If ``match_path`` is given, the cmdline must additionally
+    contain that substring — useful to scope the kill to a specific
+    repo or container.
+    """
+    pids: list[int] = []
+    for pid, cmdline in _get_processes_with_cmdline("bash.exe"):
+        if not all(m in cmdline for m in _CLAUDE_POLL_MARKERS):
+            continue
+        if match_path and match_path not in cmdline:
+            continue
+        pids.append(pid)
+    return pids
+
+
+def kill_stale_claude_polls(
+    dry_run: bool = False,
+    match_path: str | None = None,
+) -> int:
+    """Kill orphan Claude Code background bash polling loops.
+
+    Returns process exit code. Prints progress to stdout.
+    """
+    if sys.platform != "win32":
+        print("ERROR: kill-stale-claude-polls is Windows-only.")
+        return 1
+
+    pids = find_stale_claude_polls(match_path=match_path)
+    if not pids:
+        scope = f" matching {match_path!r}" if match_path else ""
+        print(f"No stale Claude polling loops found{scope}.")
+        return 0
+
+    scope = f" (filtered by path={match_path!r})" if match_path else ""
+    print(f"Found {len(pids)} stale Claude polling loop(s){scope}: {pids}")
+    if dry_run:
+        print("Dry-run mode — no processes will be killed.\n")
+
+    killed = failed = 0
+    for pid in pids:
+        ok, msg = kill_tree(pid, dry_run=dry_run)
+        status = "OK" if ok else "FAILED"
+        print(f"  PID {pid}: [{status}] {msg}")
+        if ok:
+            killed += 1
+        else:
+            failed += 1
+
+    print(f"\nDone. {killed} loop(s) terminated, {failed} failed.")
+    return 1 if failed else 0
+
+
+def kill_dotnet_build_servers(dry_run: bool = False) -> int:
+    """Gracefully shut down all .NET build servers (MSBuild + Roslyn + Razor).
+
+    Wraps `dotnet build-server shutdown`. Servers respawn automatically on
+    the next dotnet build invocation, so this is non-destructive — it
+    just releases any file handles and worker nodes the build infrastructure
+    is holding. Returns process exit code.
+    """
+    if dry_run:
+        print("[dry-run] would run: dotnet build-server shutdown")
+        return 0
+
+    try:
+        result = subprocess.run(
+            ["dotnet", "build-server", "shutdown"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except FileNotFoundError:
+        print("ERROR: dotnet not found in PATH.", file=sys.stderr)
+        return 1
+    except subprocess.TimeoutExpired:
+        print("ERROR: dotnet build-server shutdown timed out after 60s.",
+              file=sys.stderr)
+        return 1
+
+    output = (result.stdout + result.stderr).strip()
+    if output:
+        print(output)
+    return result.returncode
+
+
+def cleanup_dev_orphans(
+    dry_run: bool = False,
+    match_path: str | None = None,
+) -> int:
+    """Run all dev-orphan cleanup categories in sequence.
+
+    Order: build servers → stale Claude polls → conhost. Build servers
+    first because shutting them down can release downstream conhosts;
+    polls before conhost for the same reason. Returns the worst exit
+    code from any category (1 if any failed, 0 if all clean).
+    """
+    if sys.platform != "win32":
+        print("ERROR: cleanup-dev-orphans is Windows-only.")
+        return 1
+
+    print("=== dotnet build servers ===")
+    rc1 = kill_dotnet_build_servers(dry_run=dry_run)
+    print()
+
+    print("=== stale Claude Code polling loops ===")
+    rc2 = kill_stale_claude_polls(dry_run=dry_run, match_path=match_path)
+    print()
+
+    print("=== orphan conhost.exe ===")
+    rc3 = kill_conhost_processes(dry_run=dry_run)
+
+    return max(rc1, rc2, rc3)
+
+
+# ======================================================================
 # Command-line dispatcher
 # ----------------------------------------------------------------------
-# Lets developers run either Windows helper as before, via:
+# Lets developers run any Windows helper from the command line:
 #     python -m ai_router.utils load-env
 #     python -m ai_router.utils kill-conhost [--dry-run]
+#     python -m ai_router.utils kill-stale-claude-polls [--dry-run] [--match-path PATTERN]
+#     python -m ai_router.utils kill-dotnet-build-servers [--dry-run]
+#     python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--match-path PATTERN]
 # ======================================================================
+
+_USAGE = (
+    "Usage: python -m ai_router.utils <command> [options]\n"
+    "Commands:\n"
+    "  load-env\n"
+    "  kill-conhost [--dry-run]\n"
+    "  kill-stale-claude-polls [--dry-run] [--match-path PATTERN]\n"
+    "  kill-dotnet-build-servers [--dry-run]\n"
+    "  cleanup-dev-orphans [--dry-run] [--match-path PATTERN]"
+)
+
+
+def _extract_match_path(argv: list[str]) -> str | None:
+    """Extract --match-path PATTERN from argv. Returns None if absent."""
+    if "--match-path" not in argv:
+        return None
+    idx = argv.index("--match-path")
+    if idx + 1 >= len(argv):
+        return None
+    return argv[idx + 1]
+
 
 def _cli_main(argv: list[str]) -> int:
     if len(argv) < 1:
-        print("Usage: python -m ai_router.utils "
-              "<load-env | kill-conhost [--dry-run]>",
-              file=sys.stderr)
+        print(_USAGE, file=sys.stderr)
         return 2
 
     command = argv[0]
+    rest = argv[1:]
+    dry_run = "--dry-run" in rest
+
     if command == "load-env":
         return 0 if load_api_keys() else 1
     if command == "kill-conhost":
-        dry_run = "--dry-run" in argv[1:]
         return kill_conhost_processes(dry_run=dry_run)
+    if command == "kill-stale-claude-polls":
+        return kill_stale_claude_polls(
+            dry_run=dry_run,
+            match_path=_extract_match_path(rest),
+        )
+    if command == "kill-dotnet-build-servers":
+        return kill_dotnet_build_servers(dry_run=dry_run)
+    if command == "cleanup-dev-orphans":
+        return cleanup_dev_orphans(
+            dry_run=dry_run,
+            match_path=_extract_match_path(rest),
+        )
 
-    print(f"Unknown command: {command}", file=sys.stderr)
+    print(f"Unknown command: {command}\n\n{_USAGE}", file=sys.stderr)
     return 2
 
 

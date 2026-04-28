@@ -192,6 +192,24 @@ Common holders that survive an "I closed the IDE" pass:
 If diagnosis takes more than a few minutes, **a reboot is the cleanest
 fix** — both the old and new containers are safe across a restart.
 
+**First thing to try before manual diagnosis:**
+
+```bash
+python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--match-path PATTERN]
+```
+
+(Run from inside any worktree where `ai-router/` is importable.) This
+helper, in `dabbler-ai-orchestration/ai-router/utils.py` Section 5,
+shuts down all `dotnet` build servers (MSBuild `/nodemode:1` workers
+and `VBCSCompiler.exe`), kills stale Claude Code background polling
+loops (the `bash -c "until [...]; do sleep 5; done"` zombies that
+survive an exited Claude session), and cleans up orphan `conhost.exe`
+processes — the three orphan classes most likely to be holding the
+lock. The optional `--match-path` filter narrows the polling-loop
+kill to a specific repo or container. Each category is also runnable
+on its own (`kill-dotnet-build-servers`, `kill-stale-claude-polls`,
+`kill-conhost`).
+
 ## TODO
 
 - Add `tools/init-worktree-repo.sh` automating the fresh-repo recipe

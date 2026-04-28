@@ -18,9 +18,15 @@ command line via:
 
     python -m ai_router.utils load-env
     python -m ai_router.utils kill-conhost [--dry-run]
-    python -m ai_router.utils kill-stale-claude-polls [--dry-run] [--match-path PATTERN]
-    python -m ai_router.utils kill-dotnet-build-servers [--dry-run]
-    python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--match-path PATTERN]
+    python -m ai_router.utils kill-stale-claude-polls [--dry-run] [--yes] [--match-path PATTERN]
+    python -m ai_router.utils kill-dotnet-build-servers [--dry-run] [--yes]
+    python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--yes] [--match-path PATTERN]
+
+The cleanup helpers (sections 4 and 5) prompt for confirmation by
+default — important because shutting down dotnet build servers or
+killing conhost processes can disrupt unrelated work in other VS Code
+windows or terminals. Pass --yes for scripted use; --dry-run to see
+what would happen without prompting.
 """
 
 from __future__ import annotations
@@ -270,11 +276,45 @@ def kill_tree(pid: int, dry_run: bool = False) -> tuple[bool, str]:
     return succeeded, output
 
 
-def kill_conhost_processes(dry_run: bool = False) -> int:
+def _confirm(prompt: str) -> bool:
+    """Interactive y/N prompt to stderr.
+
+    Used by the cleanup helpers (sections 4 and 5) before any
+    destructive action. Stderr is chosen so the prompt is visible even
+    when stdout is piped or redirected. Empty response defaults to N.
+    EOF (e.g., piped input with no answer) also defaults to N -- the
+    safe choice when no human is at the terminal.
+    """
+    while True:
+        sys.stderr.write(f"{prompt} [y/N]: ")
+        sys.stderr.flush()
+        try:
+            response = input().strip().lower()
+        except EOFError:
+            sys.stderr.write("\n(no response, treating as N)\n")
+            return False
+        if response in ("y", "yes"):
+            return True
+        if response in ("", "n", "no"):
+            return False
+        sys.stderr.write("Please answer y or n.\n")
+
+
+def kill_conhost_processes(
+    dry_run: bool = False,
+    assume_yes: bool = False,
+) -> int:
     """Kill every orphaned conhost.exe process tree.
 
-    Returns the process exit code (0 = success, 1 = Windows required or
-    some kills failed). Prints human-readable progress to stdout.
+    Prompts for confirmation by default unless ``assume_yes`` is True
+    or ``dry_run`` is True. Returns the process exit code (0 = success
+    or skipped, 1 = Windows required or some kills failed). Prints
+    progress to stdout, prompts to stderr.
+
+    NOTE: conhost.exe backs every console window. Killing all of them
+    will close any active terminal sessions, debug consoles, and
+    interactive shells you have open -- not just orphans. The prompt
+    exists so the human can review the count before agreeing.
     """
     if sys.platform != "win32":
         print("ERROR: kill_conhost is Windows-only (uses tasklist/taskkill).")
@@ -288,7 +328,15 @@ def kill_conhost_processes(dry_run: bool = False) -> int:
 
     print(f"Found {len(pids)} conhost.exe process(es): {pids}")
     if dry_run:
-        print("Dry-run mode — no processes will be killed.\n")
+        print("Dry-run mode -- no processes will be killed.\n")
+    elif not assume_yes:
+        if not _confirm(
+            f"Kill all {len(pids)} conhost.exe process tree(s)? "
+            "This will close every active terminal/console window "
+            "(not just orphans)."
+        ):
+            print("Skipped.")
+            return 0
 
     killed = 0
     failed = 0
@@ -395,11 +443,17 @@ def find_stale_claude_polls(match_path: str | None = None) -> list[int]:
 
 def kill_stale_claude_polls(
     dry_run: bool = False,
+    assume_yes: bool = False,
     match_path: str | None = None,
 ) -> int:
     """Kill orphan Claude Code background bash polling loops.
 
-    Returns process exit code. Prints progress to stdout.
+    Prompts for confirmation by default unless ``assume_yes`` is True
+    or ``dry_run`` is True. The cmdline match (snapshot loader + until
+    + sleep) is precise, but a Claude session you actually want to
+    keep running could be polling for a legitimate reason -- the
+    prompt is the safety net. Use ``match_path`` to scope to one
+    repo's polls. Returns process exit code.
     """
     if sys.platform != "win32":
         print("ERROR: kill-stale-claude-polls is Windows-only.")
@@ -414,7 +468,13 @@ def kill_stale_claude_polls(
     scope = f" (filtered by path={match_path!r})" if match_path else ""
     print(f"Found {len(pids)} stale Claude polling loop(s){scope}: {pids}")
     if dry_run:
-        print("Dry-run mode — no processes will be killed.\n")
+        print("Dry-run mode -- no processes will be killed.\n")
+    elif not assume_yes:
+        if not _confirm(
+            f"Kill {len(pids)} bash polling loop(s)?"
+        ):
+            print("Skipped.")
+            return 0
 
     killed = failed = 0
     for pid in pids:
@@ -430,17 +490,59 @@ def kill_stale_claude_polls(
     return 1 if failed else 0
 
 
-def kill_dotnet_build_servers(dry_run: bool = False) -> int:
+def _count_dotnet_build_servers() -> int:
+    """Return the count of currently-running dotnet build server processes.
+
+    Detects MSBuild worker nodes (dotnet.exe with /nodemode in cmdline)
+    and the Roslyn VBCSCompiler. Used purely for the prompt -- the
+    actual shutdown is delegated to "dotnet build-server shutdown".
+    """
+    if sys.platform != "win32":
+        return 0
+    count = 0
+    for pid, cmdline in _get_processes_with_cmdline("dotnet.exe"):
+        if "/nodemode" in cmdline.lower():
+            count += 1
+    for pid, cmdline in _get_processes_with_cmdline("VBCSCompiler.exe"):
+        count += 1
+    return count
+
+
+def kill_dotnet_build_servers(
+    dry_run: bool = False,
+    assume_yes: bool = False,
+) -> int:
     """Gracefully shut down all .NET build servers (MSBuild + Roslyn + Razor).
 
-    Wraps `dotnet build-server shutdown`. Servers respawn automatically on
-    the next dotnet build invocation, so this is non-destructive — it
-    just releases any file handles and worker nodes the build infrastructure
-    is holding. Returns process exit code.
+    Wraps `dotnet build-server shutdown`. Servers respawn automatically
+    on the next dotnet build invocation, so this is non-destructive in
+    isolation -- but the shutdown is **machine-wide**, not scoped to
+    this repo. Any active build in another VS Code window or terminal
+    will lose its build server mid-flight (the build will error, then
+    succeed on retry once the server respawns). The prompt exists so
+    the human can confirm no other builds are in progress.
+
+    Returns process exit code.
     """
+    server_count = _count_dotnet_build_servers()
+
+    if server_count == 0:
+        print("No dotnet build server processes are running.")
+        return 0
+
+    print(f"Found {server_count} dotnet build server process(es) "
+          "(MSBuild workers and/or VBCSCompiler).")
     if dry_run:
         print("[dry-run] would run: dotnet build-server shutdown")
         return 0
+    if not assume_yes:
+        if not _confirm(
+            "Run 'dotnet build-server shutdown'? This is machine-wide "
+            "and will interrupt any active dotnet build in other VS "
+            "Code windows or terminals."
+        ):
+            print("Skipped.")
+            return 0
 
     try:
         result = subprocess.run(
@@ -463,29 +565,37 @@ def kill_dotnet_build_servers(dry_run: bool = False) -> int:
 
 def cleanup_dev_orphans(
     dry_run: bool = False,
+    assume_yes: bool = False,
     match_path: str | None = None,
 ) -> int:
     """Run all dev-orphan cleanup categories in sequence.
 
-    Order: build servers → stale Claude polls → conhost. Build servers
-    first because shutting them down can release downstream conhosts;
-    polls before conhost for the same reason. Returns the worst exit
-    code from any category (1 if any failed, 0 if all clean).
+    Order: build servers -> stale Claude polls -> conhost. Build
+    servers first because shutting them down can release downstream
+    conhosts; polls before conhost for the same reason.
+
+    Each category prompts independently (unless ``assume_yes`` or
+    ``dry_run``). The user can confirm one category and skip another
+    -- e.g., agree to kill the polls but decline the conhost sweep
+    when other terminals are open. Returns the worst exit code from
+    any category (1 if any failed, 0 if all clean or skipped).
     """
     if sys.platform != "win32":
         print("ERROR: cleanup-dev-orphans is Windows-only.")
         return 1
 
     print("=== dotnet build servers ===")
-    rc1 = kill_dotnet_build_servers(dry_run=dry_run)
+    rc1 = kill_dotnet_build_servers(dry_run=dry_run, assume_yes=assume_yes)
     print()
 
     print("=== stale Claude Code polling loops ===")
-    rc2 = kill_stale_claude_polls(dry_run=dry_run, match_path=match_path)
+    rc2 = kill_stale_claude_polls(
+        dry_run=dry_run, assume_yes=assume_yes, match_path=match_path
+    )
     print()
 
     print("=== orphan conhost.exe ===")
-    rc3 = kill_conhost_processes(dry_run=dry_run)
+    rc3 = kill_conhost_processes(dry_run=dry_run, assume_yes=assume_yes)
 
     return max(rc1, rc2, rc3)
 
@@ -505,10 +615,14 @@ _USAGE = (
     "Usage: python -m ai_router.utils <command> [options]\n"
     "Commands:\n"
     "  load-env\n"
-    "  kill-conhost [--dry-run]\n"
-    "  kill-stale-claude-polls [--dry-run] [--match-path PATTERN]\n"
-    "  kill-dotnet-build-servers [--dry-run]\n"
-    "  cleanup-dev-orphans [--dry-run] [--match-path PATTERN]"
+    "  kill-conhost [--dry-run] [--yes]\n"
+    "  kill-stale-claude-polls [--dry-run] [--yes] [--match-path PATTERN]\n"
+    "  kill-dotnet-build-servers [--dry-run] [--yes]\n"
+    "  cleanup-dev-orphans [--dry-run] [--yes] [--match-path PATTERN]\n"
+    "\n"
+    "Cleanup commands prompt for confirmation by default. Pass --yes to\n"
+    "skip prompts (for scripted use), or --dry-run to see what would\n"
+    "happen without prompting or acting."
 )
 
 
@@ -530,21 +644,26 @@ def _cli_main(argv: list[str]) -> int:
     command = argv[0]
     rest = argv[1:]
     dry_run = "--dry-run" in rest
+    assume_yes = "--yes" in rest
 
     if command == "load-env":
         return 0 if load_api_keys() else 1
     if command == "kill-conhost":
-        return kill_conhost_processes(dry_run=dry_run)
+        return kill_conhost_processes(dry_run=dry_run, assume_yes=assume_yes)
     if command == "kill-stale-claude-polls":
         return kill_stale_claude_polls(
             dry_run=dry_run,
+            assume_yes=assume_yes,
             match_path=_extract_match_path(rest),
         )
     if command == "kill-dotnet-build-servers":
-        return kill_dotnet_build_servers(dry_run=dry_run)
+        return kill_dotnet_build_servers(
+            dry_run=dry_run, assume_yes=assume_yes
+        )
     if command == "cleanup-dev-orphans":
         return cleanup_dev_orphans(
             dry_run=dry_run,
+            assume_yes=assume_yes,
             match_path=_extract_match_path(rest),
         )
 

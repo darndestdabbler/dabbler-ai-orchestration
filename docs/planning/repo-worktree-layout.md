@@ -195,7 +195,7 @@ fix** — both the old and new containers are safe across a restart.
 **First thing to try before manual diagnosis:**
 
 ```bash
-python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--match-path PATTERN]
+python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--yes] [--match-path PATTERN]
 ```
 
 (Run from inside any worktree where `ai-router/` is importable.) This
@@ -209,6 +209,15 @@ lock. The optional `--match-path` filter narrows the polling-loop
 kill to a specific repo or container. Each category is also runnable
 on its own (`kill-dotnet-build-servers`, `kill-stale-claude-polls`,
 `kill-conhost`).
+
+**Each category prompts for confirmation by default** — important
+because shutting down dotnet build servers is machine-wide (any active
+build in another VS Code window will lose its server mid-flight) and
+killing all conhost.exe closes every active terminal you have open,
+not just orphans. Review the count and the prompt text before
+agreeing. Pass `--yes` to skip prompts when you know the state is
+safe (e.g., scripted use or fresh-boot cleanup); pass `--dry-run` to
+see what would happen without prompting or acting.
 
 ## TODO
 

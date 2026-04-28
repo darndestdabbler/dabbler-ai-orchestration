@@ -1,0 +1,7 @@
+{
+  "slug": "vscode-extension-phase-1-command-palette-python-integration",
+  "status": "not-started",
+  "createdAt": "2026-04-28T22:30:00Z",
+  "sessions": [],
+  "notes": "Phase 1 of VS Code Session Set Explorer expansion: command-palette integration for Python utilities (spend reports, cleanup-dev-orphans, key loading). Minimal extension code, maximal value from existing scripts."
+}

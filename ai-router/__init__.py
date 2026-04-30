@@ -1089,34 +1089,7 @@ def _tiebreaker_reroute(
     return route_result
 
 
-def get_costs(session_set_dir: str) -> dict:
-    """Return cost summary from a session set's activity log."""
-    log = SessionLog(session_set_dir)
-    return log.get_cost_summary()
-
-
-def print_cost_report(session_set_dir: str):
-    """Print a formatted cost report for a session set."""
-    log = SessionLog(session_set_dir)
-    costs = log.get_cost_summary()
-
-    print("\n" + "=" * 60)
-    print("AI ROUTER — COST REPORT")
-    print(f"Session Set: {log._data['sessionSetName']}")
-    print("=" * 60)
-    print(f"Sessions completed: {costs['sessions_completed']} "
-          f"of {log.total_sessions}")
-    print(f"Sessions remaining: {costs['sessions_remaining']}")
-    print(f"Total routed API calls: {costs['total_calls']}")
-    print(f"Total routed cost:      ${costs['total_cost']:.4f}")
-    print()
-
-    if costs["by_model"]:
-        print("By model:")
-        for model, data in costs["by_model"].items():
-            print(f"  {model:20s}  {data['calls']:3d} calls"
-                  f"  ${data['cost']:.4f}")
-    print("=" * 60 + "\n")
+from .cost_report import get_costs, print_cost_report
 
 
 def print_session_set_status(base_dir: str = "docs/session-sets") -> None:

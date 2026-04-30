@@ -1,0 +1,104 @@
+{
+  "sessionSetName": "004-cost-enforcement-and-capacity",
+  "createdDate": "2026-04-30T13:07:33.196367-04:00",
+  "totalSessions": 4,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-1/read-guidance",
+      "dateTime": "2026-04-30T13:07:51.076687-04:00",
+      "description": "Read spec.md for set 004 and identified Session 1 as next: dual-sourced print_cost_report with discrepancy flagging, --format json, backward-compatible get_costs, and required test scenarios. User instructed: no external routing this session except cross-provider verification, with Gemini Pro as verifier.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-1/register-start",
+      "dateTime": "2026-04-30T13:07:51.077205-04:00",
+      "description": "Registered session-state.json for session 1 with orchestrator metadata.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-1/extract-cost-report-module",
+      "dateTime": "2026-04-30T13:07:51.077205-04:00",
+      "description": "Moved get_costs() and print_cost_report() out of ai-router/__init__.py into a new module ai-router/cost_report.py, re-exported from __init__.py. Reason: __init__.py has transitive API-key-dependent imports (verifier_role, orchestrator_role, providers, etc.) so unit tests cannot import from the package without setting API keys; cost_report.py is a leaf module that can be imported under the test conftest's sys.path entry.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-1/dual-source-implementation",
+      "dateTime": "2026-04-30T13:07:51.077205-04:00",
+      "description": "Implemented _load_routed_metrics_for_session_set() that reads ai-router/router-metrics.jsonl filtered by session_set (canonical billing-grade), aggregating total_cost, total_calls, by_model. Filter handles Windows backslashes via _canonicalize_session_set_path() and accepts basename matches (relying on the repo convention that session-set basenames are unique under docs/session-sets/<unique-slug>). Honors AI_ROUTER_METRICS_PATH env override so tests can redirect without API keys. Updated get_costs() to layer routed-canonical + activity-supplemental + delta_usd + discrepancy on top of the existing activity-log shape \u2014 every old top-level key (total_calls, total_cost, by_model, sessions_completed, sessions_remaining) preserved.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/print-cost-report-update",
+      "dateTime": "2026-04-30T13:07:51.078210-04:00",
+      "description": "Updated print_cost_report() to print both totals side-by-side with the spec-required labels ('Routed-model spend (canonical):' / 'Activity-log adjustments (supplemental):'), warn on |delta| > $0.01 with direction-labeled WARNING (more vs less), surface missing metrics file or activity log to the operator, and added format='text'|'json' parameter. JSON output rounds floats to 6 dp and uses sort_keys=True for stable diffs.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/unit-tests",
+      "dateTime": "2026-04-30T13:07:51.078714-04:00",
+      "description": "Wrote tests/test_cost_report.py with 23 tests across TestMatchesSessionSet, TestGetCosts (matching, mismatched, threshold edges, missing metrics, missing activity-log, both missing, cross-set filter, Windows-path canonicalization, by-model aggregation), TestPrintCostReportText (both totals, warning directions, missing-file note), TestPrintCostReportJson (parseable, invalid format raises), and TestIntegration (end-to-end round trip).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-1/cross-provider-verification-round-1",
+      "dateTime": "2026-04-30T13:07:51.078714-04:00",
+      "description": "Cross-provider verification routed to gemini-pro per user instruction. Result: ISSUES_FOUND. (1 Major) basename matching could risk cross-set contamination; (2 Minor) activity_log_present always True because SessionLog constructor creates the missing file. See session-reviews/session-001.md for full review.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "provider": "google",
+          "costUsd": 0.026,
+          "callType": "code-review"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-1/address-verifier-findings",
+      "dateTime": "2026-04-30T13:07:51.079426-04:00",
+      "description": "Addressed both findings. Finding 1: documented the basename-uniqueness assumption in _matches_session_set rather than removing basename matching (removal would break the production flow where records carry relative paths but consumers may pass absolute paths); the verifier's strict-fix recommendation was rejected with a documented rationale in session-reviews/session-001.md. Finding 2: probe os.path.isfile(activity_path) BEFORE constructing SessionLog so the missing-log diagnostic state is correctly surfaced. Added two regression tests (test_activity_log_present_false_when_file_absent, test_activity_log_present_true_when_file_exists).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-1/full-test-suite",
+      "dateTime": "2026-04-30T13:07:51.079426-04:00",
+      "description": "Full ai-router test suite: 479 passed (was 477; +2 regression tests). No regressions.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-1/save-verifier-output",
+      "dateTime": "2026-04-30T13:07:51.079426-04:00",
+      "description": "Wrote session-reviews/session-001.md with the verifier's full review, both findings, and the resolution + rationale for each.",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "category": "Spec Deviation",
+    "severity": "Major",
+    "description": "--reason-file flag was parsed by argparse but never consumed within run(). Spec called for reading narrative fields from the file.",
+    "status": "fixed",
+    "resolution": "Added _read_reason_file() helper that returns (text, error). run() now reads the file before emitting closeout_requested and includes the contents in the event payload as the \"reason\" field. A failed read (missing path, decode error) is treated as an invalid invocation (exit 2)."
+  },
+  {
+    "id": 2,
+    "category": "Test Coverage",
+    "severity": "Minor",
+    "description": "closeout_failed event emission path was not tested. The branch was unreachable via real flow because all skeleton stubs pass.",
+    "status": "fixed",
+    "resolution": "Added test_gate_failure_emits_closeout_failed_event using monkeypatch on _run_gate_checks to inject a failing GateResult. Verifies result==gate_failed, exit==1, both closeout_requested and closeout_failed land on disk, closeout_succeeded does not, and failed_checks payload field captures the failing-gate name."
+  },
+  {
+    "id": 3,
+    "category": "Test Coverage",
+    "severity": "Minor",
+    "description": "Fallback to session_number=0 when session-state.json is absent was not tested.",
+    "status": "fixed",
+    "resolution": "Added test_events_emitted_with_session_zero_when_state_file_absent that builds disposition.json without ever calling register_session_start, runs close-out, and asserts both events land with session_number==0 in the events ledger."
+  }
+]

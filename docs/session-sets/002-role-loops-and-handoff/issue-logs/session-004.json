@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "severity": "Minor",
+    "category": "Precision",
+    "description": "failure_reason for max-attempts lease exhaustion is the queue's literal column value 'lease expired without heartbeat' rather than a synthesized 'max_attempts_exceeded'.",
+    "location": "ai-router/tests/test_failure_injection.py:test_repeated_lease_expiry_transitions_to_timed_out",
+    "verifier_proposed_fix": "Modify QueueDB.reclaim_expired() to write failure_reason='max_attempts_exceeded' when transitioning to timed_out, and update the assertion accordingly.",
+    "status": "deferred",
+    "resolution_reason": "The test asserts the queue's actual production contract (failure_reason='lease expired without heartbeat') established and verified twice in Set 1. Changing it would require modifying queue_db.py from set 001 - already shipped, already cross-provider VERIFIED twice (sessions 1 and 5 of set 001) - which lies outside the scope of set 002 session 4 and is not a Critical or Major regression. The verifier acknowledged the current value is 'technically true'. The state column ('timed_out') already encodes 'max_attempts_exceeded' semantics; the failure_reason describes the immediate cause (lease expiry without heartbeat). Surfacing for human review per workflow disagreement protocol; can be revisited at Step 9 reorganization review or as a Set 1 follow-up."
+  },
+  {
+    "id": 2,
+    "severity": "Minor",
+    "category": "Maintainability",
+    "description": "Provider name 'openai' is hardcoded in multiple test bodies.",
+    "location": "ai-router/tests/test_failure_injection.py (multiple)",
+    "verifier_proposed_fix": "Extract a TEST_PROVIDER module-level constant.",
+    "status": "fixed",
+    "resolution_reason": "Applied: introduced TEST_PROVIDER = 'openai' near the top of the file and replaced 17 inline 'openai' uses inside test bodies (left the comment in the constant's docstring intact for context)."
+  },
+  {
+    "id": 3,
+    "severity": "Minor",
+    "category": "Documentation",
+    "description": "Scenario 6 docstring did not call out that the test exercises the static-configuration form of the spec's 'drift' narrative.",
+    "location": "ai-router/tests/test_failure_injection.py:TestScenario6ModeSwitchMidSet docstring",
+    "verifier_proposed_fix": "Add a leading paragraph stating the deviation and why the static-config form is the practical interpretation.",
+    "status": "fixed",
+    "resolution_reason": "Applied: prepended a paragraph describing the spec's drift framing and noting that the drift case degrades to the static-config case because no enqueue path exists when validate_mode_config rejects the spec."
+  }
+]

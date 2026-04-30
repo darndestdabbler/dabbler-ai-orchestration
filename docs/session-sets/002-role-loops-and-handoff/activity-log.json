@@ -340,6 +340,112 @@
       "description": "Per durable user instruction (memory: feedback_ai_router_usage), skipped routed next-orchestrator recommendation; ai-router restricted to end-of-session verification only this session.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-4/read-guidance",
+      "dateTime": "2026-04-30T09:52:50.826348-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, session-set-authoring-guide.md, ai-led-session-workflow.md, spec.md (Session 4 plan), session-state.json, activity-log.json. Read existing test_verifier_role.py and test_orchestrator_role.py subprocess integration patterns plus queue_db.py state machine for reclaim semantics. User instruction: ai-router restricted to end-of-session verification only this session, route verification to gemini-pro. Sessions 1-3 of this set already closed VERIFIED.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-4/register-start",
+      "dateTime": "2026-04-30T09:52:50.827335-04:00",
+      "description": "register_session_start wrote session-state.json (currentSession=4, lifecycleState=work_in_progress, orchestrator=claude-code/claude-opus-4-7@high, totalSessions=4).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-4/skip-ai-assignment",
+      "dateTime": "2026-04-30T09:52:50.828334-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), skipped routed authoring of ai-assignment.md; consistent with set 001 sessions and set 002 sessions 1-3.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-4/add-failure-injection-marker",
+      "dateTime": "2026-04-30T09:56:14.748497-04:00",
+      "description": "Added [pytest] markers section to pytest.ini registering failure_injection marker so Set 6 audit can re-run scenarios via pytest -m failure_injection without UnknownMarker warnings.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-4/write-failure-injection-tests",
+      "dateTime": "2026-04-30T09:56:14.749526-04:00",
+      "description": "Created ai-router/tests/test_failure_injection.py with 7 tests across 7 classes, all module-tagged @pytest.mark.failure_injection. Helpers: _wait_for (deadline-bounded poller), _hard_kill (cross-platform SIGKILL/TerminateProcess that bypasses daemon finally), _shutdown_proc (graceful with hard-kill fallback), _write_verifier_driver (parameterised driver-script emitter monkey-patching run_verification), _spawn_verifier (compressed-time subprocess launcher). Scenario 1 (lease expiration): kill claiming daemon, wait past 2x lease, second daemon completes; asserts payload/idempotency_key/from_provider/to_provider/task_type/session_set/session_number all preserved across recovery, attempts >= 1, claimed_by changed. Scenario 2 (heartbeat timeout escalation): manually clamp lease_expires_at into the past via direct sqlite3 connection over MAX_ATTEMPTS rounds, run reclaim_expired each time; asserts terminal state=timed_out (queue spelling for max-attempts lease exhaustion - documented in test docstring as same semantics as spec verbiage failed/max_attempts_exceeded), attempts==MAX_ATTEMPTS, failure_reason=lease expired without heartbeat, claim metadata cleared. Scenario 3 (WAL replay): SIGKILL daemon mid-complete, observe state in {claimed, completed} only; on claimed, second daemon recovers; asserts COUNT(*)==1 by idempotency_key (no duplicate insert), final state==completed, verdict==VERIFIED. Scenario 4 (CLI session reset): same shape as scenario 1 but framed as the spec narrative - hung CLI subprocess + restart-driven recovery; asserts new daemon completes with restart-marker payload. Scenario 5 (concurrent claims): two threads sync on threading.Barrier then race claim() with distinct worker_ids; asserts exactly one returns a message and the other returns None, DB ends with state=claimed and claimed_by==winner. Scenario 6 (mode-switch mid-set): writes a session-set with outsourceMode: last but no verifierRole, calls _resolve_outsource_mode, asserts ValueError naming the spec path and the missing role; clears AI_ROUTER_OUTSOURCE_MODE env var around the test to avoid masking. Smoke: VerifierDaemon.run_one happy path with injected fake verifier (catches gross regressions cheap before the slower subprocess scenarios run). Compressed-time defaults: lease_seconds=1-2, heartbeat_interval=0.05s, poll_interval=0.05s - keeps total runtime well under spec 60s budget.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-4/run-tests",
+      "dateTime": "2026-04-30T09:56:14.750557-04:00",
+      "description": "pytest: 348/348 passed (341 prior + 7 new failure-injection) in 12.62s. Marker filter pytest -m failure_injection cleanly selects all 7 (341 deselected).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-4/verify-round-1",
+      "dateTime": "2026-04-30T09:59:42.495444-04:00",
+      "description": "End-of-session verification routed via gemini-pro per user instruction (override of router-config default gpt-5-4 for this session). Verifier emitted prose rather than the structured JSON envelope - opening line stated \"This submission is accepted\" but parser fell back to ISSUES_FOUND on missing JSON. Three issues raised, all Minor: (1) failure_reason precision (queue contract change in queue_db.py from Set 1 - DEFERRED, surfaced for human review per orchestrator-disagreement protocol; the failed_with_recovery semantics already live in state==timed_out), (2) TEST_PROVIDER constant for hardcoded openai - APPLIED, (3) Scenario 6 docstring drift-vs-static-config clarification - APPLIED. Saved issues-004.json with status/resolution_reason for each.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 8045,
+          "outputTokens": 1078,
+          "costUsd": 0.02083625
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-4/apply-minor-issues",
+      "dateTime": "2026-04-30T09:59:42.496947-04:00",
+      "description": "Applied verifier issues 2 and 3: introduced TEST_PROVIDER module constant (17 substitutions across test bodies, comment intact), expanded TestScenario6ModeSwitchMidSet docstring to acknowledge the drift-vs-static-config framing. Re-ran failure-injection suite: 7/7 passed in 6.28s.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "session-4/verify-round-2",
+      "dateTime": "2026-04-30T10:00:58.809508-04:00",
+      "description": "Re-verified round 2 via gemini-pro after applying minor refinements + deferring queue contract change. Verdict: VERIFIED. Verifier explicitly approved the deferral (\"Deferral Approved...The developers reasoning is sound\") and confirmed both applied fixes (TEST_PROVIDER + Scenario 6 docstring). Closing line: \"This submission is accepted.\"",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 9403,
+          "outputTokens": 237,
+          "costUsd": 0.014123750000000001
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 10,
+      "stepKey": "session-4/final-test-run",
+      "dateTime": "2026-04-30T10:00:58.810515-04:00",
+      "description": "Final pytest run after round-2 verification: 348/348 passed in 12.23s. Failure-injection marker filter (pytest -m failure_injection) cleanly selects the 7 new scenarios.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

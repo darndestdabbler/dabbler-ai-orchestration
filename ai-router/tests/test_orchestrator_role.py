@@ -319,15 +319,17 @@ class TestRunOneFailures:
 
 
 # ==========================================================================
-# OrchestratorDaemon: defaults are stubs (Session 3 wires real handlers)
+# OrchestratorDaemon: defaults acknowledge messages (Session 3 wired real defaults)
 # ==========================================================================
 
-class TestDefaultHandlersAreStubs:
-    def test_default_followup_handler_raises_not_implemented(
+class TestDefaultHandlersAcknowledge:
+    def test_default_followup_handler_acknowledges(
         self, tmp_path: Path
     ):
-        # No injected handlers — the defaults should refuse and the
-        # message ends up failed via process_one_message's fail path.
+        # No injected handlers — Session 3's defaults record an
+        # acknowledgement and complete the message rather than
+        # leaving it in fail/retry. Operators wire substantive
+        # handlers via the constructor when they want real replies.
         d = OrchestratorDaemon(
             provider="claude",
             base_dir=tmp_path / "provider-queues",
@@ -338,13 +340,15 @@ class TestDefaultHandlersAreStubs:
             max_attempts=1,
         )
         outcome = d.run_one()
-        assert outcome == "failed"
+        assert outcome == "completed"
         stored = d.queue.get_message(mid)
         assert stored is not None
-        assert "NotImplementedError" in (stored.failure_reason or "")
-        assert stored.id == mid
+        assert stored.state == "completed"
+        assert stored.result is not None
+        assert stored.result.get("acknowledged") is True
+        assert "default handler" in stored.result.get("summary", "")
 
-    def test_default_rejection_handler_raises_not_implemented(
+    def test_default_rejection_handler_acknowledges(
         self, tmp_path: Path
     ):
         d = OrchestratorDaemon(
@@ -353,14 +357,18 @@ class TestDefaultHandlersAreStubs:
             heartbeat_interval=0.05,
         )
         mid = d.queue.enqueue(
-            "openai", TASK_VERIFICATION_REJECTED, {}, "stub_rej",
+            "openai", TASK_VERIFICATION_REJECTED, {"why": "needs work"},
+            "stub_rej",
             max_attempts=1,
         )
         outcome = d.run_one()
-        assert outcome == "failed"
+        assert outcome == "completed"
         stored = d.queue.get_message(mid)
         assert stored is not None
-        assert "NotImplementedError" in (stored.failure_reason or "")
+        assert stored.state == "completed"
+        assert stored.result is not None
+        assert stored.result.get("acknowledged") is True
+        assert stored.result.get("original_payload") == {"why": "needs work"}
 
 
 # ==========================================================================

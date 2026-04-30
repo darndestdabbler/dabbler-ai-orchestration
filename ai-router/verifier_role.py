@@ -106,6 +106,11 @@ try:
         QueueDB,
         QueueMessage,
     )
+    from daemon_pid import (  # type: ignore[import-not-found]
+        VERIFIER_ROLE,
+        remove_pid_file,
+        write_pid_file,
+    )
 except ImportError:
     from .queue_db import (  # type: ignore[no-redef]
         ConcurrencyError,
@@ -113,6 +118,11 @@ except ImportError:
         DEFAULT_MAX_FOLLOWUP_ROUNDS,
         QueueDB,
         QueueMessage,
+    )
+    from .daemon_pid import (  # type: ignore[no-redef]
+        VERIFIER_ROLE,
+        remove_pid_file,
+        write_pid_file,
     )
 
 
@@ -274,22 +284,147 @@ def _stop_heartbeat(thread: _HeartbeatThread, stop_event: threading.Event,
 def run_verification(msg: QueueMessage) -> dict:
     """Run one verification job and return its result.
 
-    The default implementation raises ``NotImplementedError`` because
-    the production wiring (``pick_verifier_model`` + ``call_model``)
-    lands in Session 3 of this set, alongside the mode-aware
-    ``route()`` that produces the messages this consumes. Tests
-    monkey-patch this module attribute with their own callable.
+    Production implementation. The message payload (built by
+    :func:`ai_router._enqueue_route_message`) carries the content the
+    orchestrator wants verified plus enough metadata to reproduce its
+    intent: ``content``, ``context``, ``task_type``, ``complexity_hint``,
+    ``max_tier``, ``session_set``, ``session_number``. This function:
 
-    Override semantics: any callable that takes a :class:`QueueMessage`
-    and returns a JSON-serialisable dict will work. To request
-    follow-up clarification, raise :class:`FollowUpRequested`. Any
-    other exception is treated as a failure and feeds the queue's
-    retry/fail machinery.
+    1. Loads the router config (cached on first call).
+    2. Picks a verifier model on this daemon's provider — the daemon
+       represents a verifier provider, so we constrain pick_verifier_model
+       to that provider via ``exclude_providers``-style selection. In
+       outsource-last mode the spec guarantees the verifier role is the
+       frontier-tier provider, so simply picking the cheapest model
+       within ``to_provider`` matches the spec's intent.
+    3. Builds a verification prompt via
+       :func:`verification.build_verification_prompt`.
+    4. Calls the chosen model via :func:`providers.call_model`.
+    5. Parses verdict + issues via
+       :func:`verification.parse_verification_response`.
+    6. Returns a dict the queue can persist.
+
+    A follow-up question from the verifier is signalled via
+    :class:`FollowUpRequested`; the caller persists it via
+    ``add_follow_up`` and leaves the message claimed for the
+    orchestrator daemon to respond. This implementation does not
+    proactively raise FollowUpRequested — the underlying call_model
+    may produce a clarifying-question response, and a future tightening
+    can detect that pattern. For now any verifier output is treated
+    as a verdict.
+
+    Tests still monkey-patch this attribute when they want a
+    handler-free run loop.
     """
-    raise NotImplementedError(
-        "verifier_role.run_verification is a stub; the real implementation "
-        "lands in Session 3 of session set 002 (mode-aware route()/verify())"
+    # Imports deferred to call time so module-import order stays cheap
+    # and circular-import-safe (ai_router/__init__.py imports this
+    # module).
+    try:
+        from config import load_config  # type: ignore[import-not-found]
+        from providers import call_model  # type: ignore[import-not-found]
+        from verification import (  # type: ignore[import-not-found]
+            build_verification_prompt,
+            parse_verification_response,
+        )
+        from config import resolve_generation_params  # type: ignore[import-not-found]
+    except ImportError:
+        from .config import load_config  # type: ignore[no-redef]
+        from .providers import call_model  # type: ignore[no-redef]
+        from .verification import (  # type: ignore[no-redef]
+            build_verification_prompt,
+            parse_verification_response,
+        )
+        from .config import resolve_generation_params  # type: ignore[no-redef]
+
+    payload = msg.payload or {}
+    content = payload.get("content", "")
+    context = payload.get("context", "")
+    task_type = payload.get("task_type", msg.task_type)
+
+    config = load_config(os.environ.get("AI_ROUTER_CONFIG"))
+
+    # Find the verifier model. Constrain to the daemon's provider
+    # (msg.to_provider == this daemon's provider). The router config's
+    # rule-based pick already filters by enabled+verifier flags and
+    # tier; we re-implement the local "must be on provider X" filter
+    # because pick_verifier_model is generator-pivoted, not
+    # provider-pivoted. Pick the cheapest output-priced enabled
+    # verifier on the target provider.
+    candidates = []
+    for name, cfg in (config.get("models") or {}).items():
+        if cfg.get("provider") != msg.to_provider:
+            continue
+        if not cfg.get("is_enabled", True):
+            continue
+        if not cfg.get("is_enabled_as_verifier", True):
+            continue
+        candidates.append((cfg.get("output_cost_per_1m", 0.0), name, cfg))
+    if not candidates:
+        # No eligible verifier on this provider. Fail the job — the
+        # queue's retry/timeout machinery will handle it; an operator
+        # has to fix the config.
+        raise RuntimeError(
+            f"no enabled verifier model on provider {msg.to_provider!r} "
+            f"in router-config.yaml"
+        )
+    candidates.sort()
+    _, verifier_name, verifier_cfg = candidates[0]
+    verifier_provider = verifier_cfg["provider"]
+
+    # Build the verification prompt. The "original task" is the
+    # content; the verifier sees task_type as context.
+    template = config.get("_verification_template", "")
+    user_message = build_verification_prompt(
+        original_task=content,
+        original_response=content,
+        task_type=task_type,
+        template=template,
     )
+    system_prompt = verifier_cfg.get(
+        "_system_prompt",
+        "You are an independent code verifier. Be precise and objective.",
+    )
+
+    gen_params = resolve_generation_params(
+        verifier_name, "verification", config
+    )
+
+    api_result = call_model(
+        provider_name=verifier_provider,
+        model_id=verifier_cfg["model_id"],
+        system_prompt=system_prompt,
+        user_message=user_message,
+        max_tokens=verifier_cfg["max_output_tokens"],
+        config=config["providers"][verifier_provider],
+        generation_params=gen_params,
+    )
+
+    verdict, issues = parse_verification_response(api_result.content)
+
+    # Cost calculation matches the formula used in __init__.py to keep
+    # billable totals consistent across both code paths.
+    cost = (
+        api_result.input_tokens / 1_000_000
+        * verifier_cfg.get("input_cost_per_1m", 0.0)
+        + api_result.output_tokens / 1_000_000
+        * verifier_cfg.get("output_cost_per_1m", 0.0)
+    )
+
+    return {
+        "verdict": verdict,
+        "verified": verdict == "VERIFIED",
+        "issues": issues,
+        "verifier_model": verifier_name,
+        "verifier_provider": verifier_provider,
+        "verifier_input_tokens": api_result.input_tokens,
+        "verifier_output_tokens": api_result.output_tokens,
+        "verifier_cost_usd": cost,
+        "raw_response": api_result.content,
+        "stop_reason": api_result.stop_reason,
+        "task_type": task_type,
+        "session_set": payload.get("session_set"),
+        "session_number": payload.get("session_number"),
+    }
 
 
 # --------------------------------------------------------------------------
@@ -382,6 +517,7 @@ class VerifierDaemon:
         verifier: Optional[Callable[[QueueMessage], dict]] = None,
     ):
         self.provider = provider
+        self.base_dir = str(base_dir)
         self.queue = QueueDB(provider=provider, base_dir=base_dir)
         self.worker_id = worker_id or make_worker_id(provider)
         self.poll_interval_seconds = poll_interval_seconds
@@ -531,6 +667,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         heartbeat_interval=args.heartbeat_interval,
     )
     daemon.install_signal_handlers()
+
+    # Write the pid file so role_status / restart_role can find this
+    # daemon. Removed in finally so a graceful shutdown leaves nothing
+    # behind; a hard kill leaves the file for is_pid_alive to mark stale.
+    write_pid_file(
+        VERIFIER_ROLE,
+        args.provider,
+        worker_id=daemon.worker_id,
+        lease_seconds=args.lease_seconds,
+        heartbeat_interval=args.heartbeat_interval,
+        base_dir=args.base_dir,
+    )
+
     print(
         f"[verifier_role] worker_id={daemon.worker_id} "
         f"polling provider={args.provider} "
@@ -541,6 +690,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         daemon.run_forever()
     finally:
+        remove_pid_file(VERIFIER_ROLE, args.provider, base_dir=args.base_dir)
         print("[verifier_role] shutdown complete", file=sys.stderr, flush=True)
     return 0
 

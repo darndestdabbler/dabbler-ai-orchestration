@@ -189,6 +189,157 @@
       "description": "Per durable user instruction (memory: feedback_ai_router_usage), skipped routed next-orchestrator recommendation; ai-router restricted to end-of-session verification only this session.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/read-guidance",
+      "dateTime": "2026-04-30T08:43:01.228797-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, session-set-authoring-guide.md, ai-led-session-workflow.md, spec.md (Session 3 plan), session-state.json, activity-log.json. User instruction: ai-router restricted to end-of-session verification only this session, route verification to gemini-pro. Sessions 1-2 of this set already closed VERIFIED.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/register-start",
+      "dateTime": "2026-04-30T08:43:01.230664-04:00",
+      "description": "register_session_start wrote session-state.json (currentSession=3, lifecycleState=work_in_progress, orchestrator=claude-code/claude-opus-4-7@high, totalSessions=4).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/skip-ai-assignment",
+      "dateTime": "2026-04-30T08:43:01.231799-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), skipped routed authoring of ai-assignment.md; consistent with set 001 sessions and set 002 sessions 1-2.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/implement-daemon-pid",
+      "dateTime": "2026-04-30T08:54:30.768190-04:00",
+      "description": "Created ai-router/daemon_pid.py: pid_file_path/<role>.daemon-pid layout, write_pid_file with atomic os.replace via .tmp sibling, read_pid_file tolerant of missing/malformed files, remove_pid_file best-effort, is_pid_alive cross-platform (POSIX os.kill(pid,0) + Windows OpenProcess+GetExitCodeProcess via ctypes). VALID_ROLES=(\"verifier\",\"orchestrator\").",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/wire-pid-into-daemons",
+      "dateTime": "2026-04-30T08:54:30.768698-04:00",
+      "description": "Wired daemon_pid into VerifierDaemon.main() and OrchestratorDaemon.main(): write pid file before run_forever(), remove in finally. Added base_dir attribute to both daemon classes for downstream introspection.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/implement-role-status",
+      "dateTime": "2026-04-30T08:54:30.769376-04:00",
+      "description": "Created ai-router/role_status.py: collect_status() iterates provider-queues subdirectories, reads pid files, reads claimed messages by worker_id from queue.db (sqlite3 direct read), computes health (alive/unhealthy/stale/stopped) using STALE_HEARTBEAT_MULTIPLIER=2.0 against last heartbeat. render_text() emits ASCII-only report (cp1252-safe per lessons-learned), render_json() for machine consumers. CLI: --provider (repeatable), --base-dir, --json.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/implement-restart-role",
+      "dateTime": "2026-04-30T08:54:30.770427-04:00",
+      "description": "Created ai-router/restart_role.py: send_shutdown_signal tries CTRL_BREAK_EVENT then SIGTERM on Windows, plain SIGTERM on POSIX; wait_for_shutdown polls until pid file disappears OR pid is no longer alive (timeout returns False); restart() reads pid file, signals, waits, removes orphaned pid file (Windows TerminateProcess fallback does not run daemon finally), optional --start spawns a detached subprocess via CREATE_NEW_PROCESS_GROUP+DETACHED_PROCESS on Windows / start_new_session on POSIX. CLI: --role, --provider, --base-dir, --shutdown-timeout, --start.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/implement-mode-aware-route",
+      "dateTime": "2026-04-30T08:54:30.771611-04:00",
+      "description": "Modified ai-router/__init__.py: added _resolve_outsource_mode() with explicit-arg > AI_ROUTER_OUTSOURCE_MODE env > spec.md ModeConfig > DEFAULT_OUTSOURCE_MODE precedence; invalid env value warned-and-ignored; invalid spec config raises (no silent fallback); _enqueue_route_message() builds idempotency_key=sha256(session_set|session_number|task_type|content|context) and calls QueueDB.enqueue with DuplicateIdempotencyKeyError caught for enqueue-or-fetch. RouteResult gained pending/message_id/queue_provider fields; VerificationResult got the same plus PENDING verdict. route() forks at outsource-last + non-forced-sync task: builds payload, enqueues, returns pending RouteResult with zeroed cost fields. _FORCE_SYNC_TASK_TYPES={\"session-verification\"} forces sync regardless of mode. verify() short-circuits to a pending VerificationResult when route_result.pending. Added mode= and queue_base_dir= kwargs to route().",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/export-symbols",
+      "dateTime": "2026-04-30T08:54:30.772673-04:00",
+      "description": "Re-exported QueueDB, QueueMessage, DuplicateIdempotencyKeyError, QUEUE_DEFAULT_BASE_DIR, ORCHESTRATOR_ROLE, VERIFIER_ROLE, is_pid_alive, pid_file_path, read_pid_file, remove_pid_file, write_pid_file from ai-router/__init__.py.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-3/write-tests",
+      "dateTime": "2026-04-30T08:54:30.773199-04:00",
+      "description": "Created 4 new test files / 68 new tests across 22 classes: test_daemon_pid (19 tests: path layout, write/read round-trip with default vs explicit pid/started_at, atomic .tmp cleanup, remove returns true/false, malformed/non-dict json => None, is_pid_alive for self/pid<=0/dead pid, VALID_ROLES); test_role_status (18 tests: empty base dir, provider discovery via queue.db OR pid file, provider filter, alive with no claims, alive with fresh heartbeat, stale via dead pid, stopped sans pid file, unhealthy via monkeypatched _parse_iso time travel, queue counts reflect state, claimed_messages filtered to worker_id, render_text ASCII-only and contains role/provider, render_json valid json, CLI runs empty + --json, STALE_HEARTBEAT_MULTIPLIER pinned 2.0); test_restart_role (14 tests: send_shutdown_signal pid<=0/dead, wait_for_shutdown returns true on pid file disappearing in another thread / on dead pid even with file present / false on timeout, restart no-pid returns 1, stale pid removed and returns 1, invalid role raises, --start path spawns even without prior pid (monkeypatched spawn), real subprocess integration: spawn verifier_role daemon end-to-end, restart() returns 0, pid file gone after restart; same for orchestrator_role; CLI argparser validates --role and required --provider); test_mode_aware_route (17 tests: _resolve_outsource_mode default first, explicit overrides spec+env, env overrides spec, env typo falls back, spec read when no env, invalid spec config raises, route outsource-last returns pending RouteResult with zero costs, message lands on verifier queue with payload+session metadata, idempotent re-route returns same message_id, session-verification forced sync, verify on pending returns pending VerificationResult, first mode/no session set unchanged synchronous path).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "session-3/run-tests",
+      "dateTime": "2026-04-30T08:54:30.774253-04:00",
+      "description": "pytest: 335/335 passed (267 prior + 68 new) in 5.89s. Initial run had one failure on the Windows real-daemon restart test - SIGTERM fallback used TerminateProcess which does not run the daemon finally - fixed restart() to remove the orphaned pid file after wait_for_shutdown succeeds, converging graceful and hard-kill shutdown to the same post-restart state.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "session-3/verify-round-1",
+      "dateTime": "2026-04-30T09:00:29.742743-04:00",
+      "description": "End-of-session verification routed via gemini-pro per user instruction (override of router-config default for this session). Round 1 verdict: ISSUES_FOUND. One Critical Completeness finding: verifier_role.run_verification was still a NotImplementedError stub, breaking the end-to-end outsource-last loop. Per Step 7, fix-and-re-verify rather than dismiss (the finding is correct - Session 1 deferred run_verification to Session 3 and Session 3 must now wire it).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 45142,
+          "outputTokens": 437,
+          "costUsd": 0.060798
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 13,
+      "stepKey": "session-3/fix-critical-issue",
+      "dateTime": "2026-04-30T09:00:29.744250-04:00",
+      "description": "Implemented production run_verification (verifier_role.py) using pick-cheapest-eligible-verifier-on-this-provider rules: filter models on msg.to_provider with is_enabled and is_enabled_as_verifier flags, sort by output_cost_per_1m ascending, pick cheapest; build verification prompt via verification.build_verification_prompt; call_model via providers.call_model; parse via parse_verification_response; return dict with verdict/verified/issues/verifier_model/verifier_provider/token-counts/cost/raw_response/task_type/session_set/session_number. Replaced orchestrator_role default handlers with acknowledged-and-completed pattern (operators wire substantive handlers via OrchestratorDaemon constructor when needed). Added test_verifier_run_verification.py (6 tests: cheapest pick, cost calc, session metadata pass-through, ISSUES_FOUND parsing, no-eligible-verifier raise, is_enabled_as_verifier=False filter). Updated test_orchestrator_role.py TestDefaultHandlersAreStubs -> TestDefaultHandlersAcknowledge (2 tests). pytest 341/341 passed in 5.62s.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 14,
+      "stepKey": "session-3/verify-round-2",
+      "dateTime": "2026-04-30T09:00:29.744250-04:00",
+      "description": "Re-verified round 2 via gemini-pro after fixing the Critical issue. Verdict: VERIFIED, zero issues. Verifier explicitly affirmed \"The Round-2 notes indicate a critical completeness issue from a prior attempt (stubbed daemon logic) was successfully addressed.\"",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 57697,
+          "outputTokens": 227,
+          "costUsd": 0.074391
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 15,
+      "stepKey": "session-3/skip-next-orc-recommendation",
+      "dateTime": "2026-04-30T09:00:29.744250-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), skipped routed next-orchestrator recommendation; ai-router restricted to end-of-session verification only this session.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

@@ -74,6 +74,21 @@ from .session_state import (
     read_mode_config,
     validate_mode_config,
 )
+from .queue_db import (
+    DEFAULT_BASE_DIR as QUEUE_DEFAULT_BASE_DIR,
+    DuplicateIdempotencyKeyError,
+    QueueDB,
+    QueueMessage,
+)
+from .daemon_pid import (
+    ORCHESTRATOR_ROLE,
+    VERIFIER_ROLE,
+    is_pid_alive,
+    pid_file_path,
+    read_pid_file,
+    remove_pid_file,
+    write_pid_file,
+)
 from .disposition import (
     DISPOSITION_FILENAME,
     DISPOSITION_STATUSES,
@@ -169,7 +184,7 @@ def _init():
 
 @dataclass
 class VerificationResult:
-    verdict: str               # "VERIFIED" or "ISSUES_FOUND"
+    verdict: str               # "VERIFIED" or "ISSUES_FOUND" or "PENDING"
     verified: bool             # True if verdict == "VERIFIED"
     issues: list               # list of issue dicts if any
     verifier_model: str        # which model verified
@@ -180,6 +195,12 @@ class VerificationResult:
     verifier_output_tokens: int
     verifier_cost_usd: float
     raw_response: str          # full verifier response text
+    # Outsource-last fields. ``pending=True`` means the verification
+    # was enqueued and has not yet completed; ``message_id`` is the
+    # queue row id the close-out script will poll on.
+    pending: bool = False
+    message_id: Optional[str] = None
+    queue_provider: Optional[str] = None
 
 
 @dataclass
@@ -205,6 +226,169 @@ class RouteResult:
     # this flag before logging a routed call as successful.
     truncated: bool = False
     verification: Optional[VerificationResult] = None  # populated if verified
+    # Outsource-last fields. ``pending=True`` means the call was
+    # enqueued to a verifier provider's queue rather than synchronously
+    # executed; ``message_id`` is the queue row id, ``queue_provider``
+    # is the verifier-provider name the message was enqueued to. The
+    # close-out script (Set 3) will block on the queue until the
+    # message reaches a terminal state.
+    pending: bool = False
+    message_id: Optional[str] = None
+    queue_provider: Optional[str] = None
+
+
+# --------------------------------------------------------------------------
+# Outsource-mode resolution
+# --------------------------------------------------------------------------
+
+# Task types that always run synchronously regardless of outsource mode.
+# These are the cross-provider session checkpoint and orchestrator-internal
+# analyses; routing them through the queue would defeat their purpose
+# (close-out is the sole synchronization barrier for outsource-last and
+# can never itself be outsource-last) or block a session indefinitely
+# while the worker is offline. Keep the list narrow — adding a task type
+# here is a permanent commitment that the queue path is not its home.
+_FORCE_SYNC_TASK_TYPES = frozenset({
+    "session-verification",
+})
+
+
+def _resolve_outsource_mode(
+    session_set: Optional[str],
+    explicit_mode: Optional[str],
+) -> tuple[str, Optional[str], Optional[str]]:
+    """Decide which outsource mode applies and which provider to enqueue to.
+
+    Resolution order:
+
+    1. Explicit ``mode=`` argument to ``route()`` / ``verify()`` — overrides
+       everything else. This is the test/debug path; production callers
+       leave it ``None``.
+    2. ``AI_ROUTER_OUTSOURCE_MODE`` env var (one of ``"first" | "last"``).
+       If set, takes precedence over the spec — the spec describes
+       *intent* and the env var is the operator override for cases like
+       a UAT-only ramp.
+    3. ``Session Set Configuration`` block in ``<session_set>/spec.md``,
+       parsed via :func:`read_mode_config`. This is the production path.
+    4. :data:`DEFAULT_OUTSOURCE_MODE` — ``"first"`` (the legacy /
+       no-config shape).
+
+    Returns ``(mode, orchestrator_role, verifier_role)``. The role
+    fields are populated only from the spec block; explicit mode and
+    env-var paths leave them ``None``.
+    """
+    if explicit_mode is not None:
+        if explicit_mode not in OUTSOURCE_MODES:
+            allowed = ", ".join(sorted(OUTSOURCE_MODES))
+            raise ValueError(
+                f"explicit mode must be one of {allowed} "
+                f"(got {explicit_mode!r})"
+            )
+        return explicit_mode, None, None
+
+    env_mode = os.environ.get("AI_ROUTER_OUTSOURCE_MODE")
+    if env_mode:
+        if env_mode not in OUTSOURCE_MODES:
+            # Don't crash routed calls over a typo'd env var; warn-by-stderr
+            # and fall through to the spec.
+            print(
+                f"[ai_router] AI_ROUTER_OUTSOURCE_MODE={env_mode!r} is "
+                f"not one of {sorted(OUTSOURCE_MODES)}; ignoring",
+                file=__import__("sys").stderr,
+            )
+        else:
+            return env_mode, None, None
+
+    if session_set and os.path.isdir(session_set):
+        cfg = read_mode_config(session_set)
+        ok, errors = validate_mode_config(cfg)
+        if not ok:
+            # Mode config is invalid (e.g. last mode without verifier_role).
+            # The orchestrator surfaced the same errors in Step 2; here we
+            # refuse to enqueue rather than silently fall back to first
+            # mode, because silent fallback turns a config bug into a
+            # spend-controlled-but-unverified routed call.
+            raise ValueError(
+                f"invalid mode config in {session_set}/spec.md: "
+                + "; ".join(errors)
+            )
+        return cfg.outsource_mode, cfg.orchestrator_role, cfg.verifier_role
+
+    return DEFAULT_OUTSOURCE_MODE, None, None
+
+
+def _enqueue_route_message(
+    *,
+    content: str,
+    task_type: str,
+    context: str,
+    complexity_hint: Optional[int],
+    max_tier: int,
+    session_set: Optional[str],
+    session_number: Optional[int],
+    orchestrator_role: Optional[str],
+    verifier_role: str,
+    base_dir: str = QUEUE_DEFAULT_BASE_DIR,
+) -> tuple[str, str]:
+    """Enqueue an outsource-last verification job. Returns ``(message_id, queue_provider)``.
+
+    The message is addressed to ``verifier_role``'s queue. ``payload``
+    carries everything the verifier daemon needs to reproduce the call:
+    content, context, task type, complexity hint, max tier, and
+    session metadata. ``idempotency_key`` is derived from the
+    session_set+session_number+task_type+content-hash so that a
+    re-run of the same step within a session is a no-op fetch rather
+    than a duplicate enqueue.
+
+    Discussion of from_provider: outsource-last specs always declare
+    both roles, so ``orchestrator_role`` (the caller-side provider)
+    is the natural ``from_provider``. When the resolver path produced
+    no role names (e.g. env-var override without a spec), default
+    to ``"unknown"`` — the queue accepts any string for from_provider
+    and the audit trail still records who claimed it.
+    """
+    import hashlib
+
+    h = hashlib.sha256()
+    h.update((session_set or "-").encode("utf-8"))
+    h.update(b"|")
+    h.update(str(session_number or 0).encode("utf-8"))
+    h.update(b"|")
+    h.update(task_type.encode("utf-8"))
+    h.update(b"|")
+    h.update(content.encode("utf-8"))
+    h.update(b"|")
+    h.update(context.encode("utf-8"))
+    idempotency_key = h.hexdigest()
+
+    payload = {
+        "task_type": task_type,
+        "content": content,
+        "context": context,
+        "complexity_hint": complexity_hint,
+        "max_tier": max_tier,
+        "session_set": session_set,
+        "session_number": session_number,
+    }
+
+    queue = QueueDB(provider=verifier_role, base_dir=base_dir)
+
+    # Enqueue-or-fetch: a duplicate idempotency_key returns the existing
+    # row's id rather than raising, so an orchestrator that re-runs the
+    # same logical step does not create a duplicate.
+    try:
+        message_id = queue.enqueue(
+            from_provider=orchestrator_role or "unknown",
+            task_type=task_type,
+            payload=payload,
+            idempotency_key=idempotency_key,
+            session_set=session_set,
+            session_number=session_number,
+        )
+    except DuplicateIdempotencyKeyError as exc:
+        message_id = exc.existing_id
+
+    return message_id, verifier_role
 
 
 def route(
@@ -215,6 +399,8 @@ def route(
     max_tier: int = 3,
     session_set: Optional[str] = None,
     session_number: Optional[int] = None,
+    mode: Optional[str] = None,
+    queue_base_dir: str = QUEUE_DEFAULT_BASE_DIR,
 ) -> RouteResult:
     """
     Route a task to the best model based on complexity estimation.
@@ -235,8 +421,72 @@ def route(
     Returns:
         RouteResult with the AI response and metadata.
         The caller is responsible for logging via SessionLog.log_step().
+
+    Mode behavior:
+        ``outsourceMode: first`` (default) — synchronous: select model,
+        call API, return populated RouteResult. Behavior is unchanged
+        from the pre-Set-002 path.
+
+        ``outsourceMode: last`` — asynchronous: enqueue a message to
+        the spec-declared verifier provider's queue and return a
+        RouteResult with ``pending=True`` and ``message_id`` set.
+        Generation cost / model name fields are zero/empty because no
+        synchronous call ran. The verifier daemon picks up the message,
+        runs the verification, and writes results back; the close-out
+        script (Set 3) blocks on completion.
+
+        Task types in :data:`_FORCE_SYNC_TASK_TYPES` always run
+        synchronously regardless of mode — ``session-verification``
+        is the canonical example, since the close-out gate is what
+        consumes outsource-last queue results in the first place.
     """
     _init()
+
+    resolved_mode, orchestrator_role, verifier_role = _resolve_outsource_mode(
+        session_set, mode
+    )
+
+    if (
+        resolved_mode == "last"
+        and task_type not in _FORCE_SYNC_TASK_TYPES
+    ):
+        if not verifier_role:
+            raise ValueError(
+                "outsourceMode='last' requires a verifierRole declared in the "
+                "spec's Session Set Configuration block (or an explicit mode "
+                "override paired with a queue path); none was found."
+            )
+        message_id, queue_provider = _enqueue_route_message(
+            content=content,
+            task_type=task_type,
+            context=context,
+            complexity_hint=complexity_hint,
+            max_tier=max_tier,
+            session_set=session_set,
+            session_number=session_number,
+            orchestrator_role=orchestrator_role,
+            verifier_role=verifier_role,
+            base_dir=queue_base_dir,
+        )
+        return RouteResult(
+            content="",
+            model_name="",
+            model_id="",
+            tier=0,
+            input_tokens=0,
+            output_tokens=0,
+            cost_usd=0.0,
+            total_cost_usd=0.0,
+            complexity_score=complexity_hint or 0,
+            escalated=False,
+            escalation_history=[],
+            elapsed_seconds=0.0,
+            truncated=False,
+            verification=None,
+            pending=True,
+            message_id=message_id,
+            queue_provider=queue_provider,
+        )
 
     # 1. Estimate complexity
     full_prompt_text = f"{content}\n{context}"
@@ -525,9 +775,37 @@ def verify(
         session_number: Optional session number for metrics.
 
     Returns:
-        VerificationResult with verdict, issues, and cost.
+        VerificationResult with verdict, issues, and cost. When
+        ``route_result.pending`` is True, the returned VerificationResult
+        is also pending — verification cannot run synchronously against
+        a queued routed call. The close-out script (Set 3) blocks on
+        the queue and re-reads the result before computing its
+        verification verdict.
     """
     _init()
+
+    # Outsource-last short-circuit: a pending RouteResult has no content
+    # to verify yet. Return a pending VerificationResult immediately so
+    # callers never block on a queue inside route()/verify(). Close-out
+    # synchronization is the close-out script's job, per Set 3.
+    if route_result.pending:
+        return VerificationResult(
+            verdict="PENDING",
+            verified=False,
+            issues=[],
+            verifier_model="",
+            verifier_provider="",
+            generator_model=route_result.model_name,
+            generator_provider="",
+            verifier_input_tokens=0,
+            verifier_output_tokens=0,
+            verifier_cost_usd=0.0,
+            raw_response="",
+            pending=True,
+            message_id=route_result.message_id,
+            queue_provider=route_result.queue_provider,
+        )
+
     result = _run_verification(
         route_result, original_task, task_type,
         session_set=session_set, session_number=session_number

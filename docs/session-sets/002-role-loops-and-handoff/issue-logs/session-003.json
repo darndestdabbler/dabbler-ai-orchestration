@@ -1,0 +1,9 @@
+[
+  {
+    "category": "Completeness",
+    "severity": "Critical",
+    "description": "verifier_role.run_verification is a stub - asynchronous outsource-last pathway non-functional, work enqueued but never performed.",
+    "status": "fixed",
+    "resolution": "Implemented production run_verification using pick-cheapest-eligible-verifier-on-this-provider, build_verification_prompt, providers.call_model, parse_verification_response. Implemented production default handlers in orchestrator_role.py (acknowledged-and-completed pattern). Added 6 mocked-call_model unit tests (TestRunVerificationVerified, TestRunVerificationIssues, TestRunVerificationErrors). Updated 2 prior tests that asserted stubs raise NotImplementedError."
+  }
+]

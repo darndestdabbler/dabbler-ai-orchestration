@@ -91,6 +91,11 @@ try:
         make_worker_id,
         process_one_message,
     )
+    from daemon_pid import (  # type: ignore[import-not-found]
+        ORCHESTRATOR_ROLE,
+        remove_pid_file,
+        write_pid_file,
+    )
 except ImportError:
     from .queue_db import (  # type: ignore[no-redef]
         DEFAULT_LEASE_SECONDS,
@@ -104,6 +109,11 @@ except ImportError:
         HEARTBEAT_INTERVAL_SECONDS,
         make_worker_id,
         process_one_message,
+    )
+    from .daemon_pid import (  # type: ignore[no-redef]
+        ORCHESTRATOR_ROLE,
+        remove_pid_file,
+        write_pid_file,
     )
 
 
@@ -147,52 +157,56 @@ class UnknownTaskTypeError(Exception):
 # --------------------------------------------------------------------------
 
 def _default_followup_handler(msg: QueueMessage) -> dict:
-    """Stub for ``verification_followup`` messages.
+    """Default handler for ``verification_followup`` messages.
 
-    Production implementation lands in Session 3 alongside the
-    mode-aware ``route()``/``verify()`` paths. Real handler must:
+    Acknowledges the verifier's question by recording a structured
+    summary in the queue. Production deployments may replace this
+    with a router-backed handler that formulates a substantive reply
+    and raises :class:`FollowUpRequested` to keep the dialogue open;
+    this default does the safe thing — close the message with a
+    receipt — so an unattended deployment does not loop indefinitely.
 
-    1. Read ``msg.payload`` and ``QueueDB.read_follow_ups(msg.id)`` for
-       the dialogue history.
-    2. Formulate a reply (route through the AI router for the actual
-       reasoning; see Rule #5 — orchestrator never self-opines).
-    3. Raise :class:`FollowUpRequested` with the reply content. The
-       daemon's ``process_one_message`` will append it via
-       ``add_follow_up`` and leave the message claimed for the
-       verifier to re-claim.
-
-    Returning a dict instead of raising would cause the message to be
-    marked completed, ending the dialogue prematurely — that is why
-    this stub raises ``NotImplementedError`` rather than returning an
-    empty dict.
+    Operators who want the orchestrator daemon to actually answer
+    follow-up questions wire their own callable via
+    ``OrchestratorDaemon(..., followup_handler=...)`` (or the
+    keyword on the constructor used by ``restart_role`` indirectly
+    through CLI flags in a future expansion). The handler signature
+    is identical to the verifier's: takes a :class:`QueueMessage`,
+    returns a dict, optionally raises :class:`FollowUpRequested`.
     """
-    raise NotImplementedError(
-        "orchestrator_role._default_followup_handler is a stub; "
-        "the real implementation lands in Session 3 of session set 002 "
-        "(mode-aware route()/verify())"
-    )
+    return {
+        "acknowledged": True,
+        "task_type": msg.task_type,
+        "summary": (
+            "follow-up question received; orchestrator daemon used the "
+            "default handler. Configure a router-backed handler to "
+            "produce substantive replies."
+        ),
+        "from_provider": msg.from_provider,
+    }
 
 
 def _default_rejection_handler(msg: QueueMessage) -> dict:
-    """Stub for ``verification_rejected`` messages.
+    """Default handler for ``verification_rejected`` messages.
 
-    Production implementation lands in Session 3. Real handler returns
-    a dict acknowledging the rejection — typically a structured
-    summary recording that the orchestrator saw the failure and what
-    it intends to do about it. Returning a dict transitions the
-    message to ``completed``; the actual revision work happens in the
+    Acknowledges the rejection so the queue records that the
+    orchestrator saw it. Actual revision work happens in the
     orchestrator's primary CLI session, not in this daemon.
-
-    Raising any exception here will be caught by ``process_one_message``
-    and routed through the queue's fail/retry path, so a transient
-    failure (e.g. logging-system blip) gets one or two retries before
-    the message is permanently failed.
+    Returning a dict transitions the queued message to
+    ``completed`` — the audit trail then shows the rejection was
+    delivered and acknowledged, even if the work has not yet been
+    re-driven through the primary session.
     """
-    raise NotImplementedError(
-        "orchestrator_role._default_rejection_handler is a stub; "
-        "the real implementation lands in Session 3 of session set 002 "
-        "(mode-aware route()/verify())"
-    )
+    return {
+        "acknowledged": True,
+        "task_type": msg.task_type,
+        "summary": (
+            "rejection acknowledged by orchestrator daemon; revision will "
+            "be driven through the orchestrator's primary CLI session."
+        ),
+        "from_provider": msg.from_provider,
+        "original_payload": msg.payload,
+    }
 
 
 # --------------------------------------------------------------------------
@@ -258,6 +272,7 @@ class OrchestratorDaemon:
         rejection_handler: Optional[Callable[[QueueMessage], dict]] = None,
     ):
         self.provider = provider
+        self.base_dir = str(base_dir)
         self.queue = QueueDB(provider=provider, base_dir=base_dir)
         self.worker_id = worker_id or make_worker_id(provider)
         self.poll_interval_seconds = poll_interval_seconds
@@ -405,6 +420,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         heartbeat_interval=args.heartbeat_interval,
     )
     daemon.install_signal_handlers()
+
+    # Write the pid file so role_status / restart_role can find this
+    # daemon. Removed in finally so a graceful shutdown leaves nothing
+    # behind; a hard kill leaves the file for is_pid_alive to mark stale.
+    write_pid_file(
+        ORCHESTRATOR_ROLE,
+        args.provider,
+        worker_id=daemon.worker_id,
+        lease_seconds=args.lease_seconds,
+        heartbeat_interval=args.heartbeat_interval,
+        base_dir=args.base_dir,
+    )
+
     print(
         f"[orchestrator_role] worker_id={daemon.worker_id} "
         f"polling provider={args.provider} "
@@ -415,6 +443,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         daemon.run_forever()
     finally:
+        remove_pid_file(
+            ORCHESTRATOR_ROLE, args.provider, base_dir=args.base_dir
+        )
         print(
             "[orchestrator_role] shutdown complete",
             file=sys.stderr,

@@ -364,6 +364,104 @@
       "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed next-orchestrator recommendation skipped \u2014 router is restricted to end-of-session verification only this session.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-4/read-guidance",
+      "dateTime": "2026-04-30T07:47:27.553974-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, ai-led-session-workflow.md, spec.md; reviewed prior session reviews; user instructed router restricted to end-of-session verification only this session and to use Gemini Pro as the verifier.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-4/register-start",
+      "dateTime": "2026-04-30T07:47:27.554980-04:00",
+      "description": "Wrote session-state.json marking session 4 in-progress (currentSession=4, lifecycleState=work_in_progress, orchestrator=claude-code/claude-opus-4-7@high).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-4/skip-ai-assignment",
+      "dateTime": "2026-04-30T07:47:27.556493-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed ai-assignment.md authoring intentionally skipped; sessions 1, 2, 3 also skipped this for consistency.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-4/implement-disposition",
+      "dateTime": "2026-04-30T07:52:42.860654-04:00",
+      "description": "Created ai-router/disposition.py: Disposition dataclass (status/summary/files_changed/verification_method/verification_message_ids/next_orchestrator/blockers); disposition_to_dict/disposition_from_dict round-trip; write_disposition (atomic via tempfile + os.replace, idempotent); read_disposition (graceful None on missing/malformed); validate_disposition with cross-field rules including verification_method=queue requires non-empty message_ids, api requires empty message_ids, next_orchestrator required when status=completed and not final session, blockers required when reason.code=switch-due-to-blocker.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-4/implement-schema",
+      "dateTime": "2026-04-30T07:52:42.860654-04:00",
+      "description": "Created ai-router/schemas/disposition.schema.json: JSON Schema draft 2020-12 mirroring the Disposition dataclass with NextOrchestrator ; allOf conditional rules for queue-needs-ids, api-empty-ids, and switch-due-to-blocker-needs-blockers; rejects unknown top-level keys (additionalProperties=false). Added jsonschema>=4.0.0 to ai-router/requirements.txt for schema-parity testing.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-4/export-symbols",
+      "dateTime": "2026-04-30T07:52:42.860654-04:00",
+      "description": "Re-exported DISPOSITION_FILENAME, DISPOSITION_STATUSES, VERIFICATION_METHODS, Disposition, disposition_from_dict, disposition_to_dict, read_disposition, validate_disposition, write_disposition from ai-router/__init__.py.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-4/write-tests",
+      "dateTime": "2026-04-30T07:52:42.860654-04:00",
+      "description": "Created ai-router/tests/test_disposition.py with 56 tests across round-trip (dataclass<->dict, write/read, idempotency, overwrite), atomic-write (temp-file cleanup, simulated mid-write crash leaves prior file intact, type/dir guards), read_disposition (missing, malformed JSON, non-object root, partial file with defaults), validate_disposition (status enum, summary, files_changed, verification_method enum, queue/api message_ids cross-rule, next_orchestrator required-when-completed-and-not-final, validate_next_orchestrator propagation, blockers required when switch-due-to-blocker, optional otherwise, type guards), JSON Schema parity (valid api/queue/failed pass; rejects unknown status, queue-without-ids, api-with-ids, short specifics, bad reason code, blocker-switch-without-blockers, unknown top-level fields, accepts null next_orchestrator), and public surface (constants).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-4/run-tests",
+      "dateTime": "2026-04-30T07:52:42.867162-04:00",
+      "description": "pytest: 176/176 passed (120 prior + 56 new) in 2.42s.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "session-4/verify",
+      "dateTime": "2026-04-30T07:55:30.937327-04:00",
+      "description": "End-of-session verification routed via gemini-pro per user instruction (override of router-config default gpt-5-4 for this session). Verdict: VERIFIED on round 1. One minor noted issue (validate_disposition adds an api->empty-message_ids strictness rule not explicitly in the spec); verifier explicitly stated no code change required.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 12450,
+          "outputTokens": 594,
+          "costUsd": 0.021503
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 10,
+      "stepKey": "session-4/skip-next-orc-recommendation",
+      "dateTime": "2026-04-30T07:55:52.624901-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed next-orchestrator recommendation skipped \u2014 router restricted to end-of-session verification only this session.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

@@ -74,6 +74,17 @@ from .session_state import (
     read_mode_config,
     validate_mode_config,
 )
+from .disposition import (
+    DISPOSITION_FILENAME,
+    DISPOSITION_STATUSES,
+    VERIFICATION_METHODS,
+    Disposition,
+    disposition_from_dict,
+    disposition_to_dict,
+    read_disposition,
+    validate_disposition,
+    write_disposition,
+)
 from .utils import (
     RateLimiter,
     should_escalate,

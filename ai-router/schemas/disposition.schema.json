@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dabbler.ai/schemas/disposition.schema.json",
+  "title": "Disposition",
+  "description": "Per-session structured outcome record. Mirrors ai-router/disposition.py::Disposition. Cross-field rules that depend on the closing session being final-or-not are enforced by validate_disposition() in code rather than by this schema, since 'is the final session' is not a property of the document itself.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "files_changed",
+    "verification_method",
+    "verification_message_ids",
+    "next_orchestrator",
+    "blockers"
+  ],
+  "properties": {
+    "status": {
+      "enum": ["completed", "failed", "requires_review"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "files_changed": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "verification_method": {
+      "enum": ["api", "queue"]
+    },
+    "verification_message_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "next_orchestrator": {
+      "oneOf": [
+        { "type": "null" },
+        { "$ref": "#/$defs/NextOrchestrator" }
+      ]
+    },
+    "blockers": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "verification_method": { "const": "queue" } },
+        "required": ["verification_method"]
+      },
+      "then": {
+        "properties": {
+          "verification_message_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "verification_method": { "const": "api" } },
+        "required": ["verification_method"]
+      },
+      "then": {
+        "properties": {
+          "verification_message_ids": {
+            "type": "array",
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": {
+          "next_orchestrator": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "object",
+                "properties": {
+                  "code": { "const": "switch-due-to-blocker" }
+                },
+                "required": ["code"]
+              }
+            },
+            "required": ["reason"]
+          }
+        },
+        "required": ["next_orchestrator"]
+      },
+      "then": {
+        "properties": {
+          "blockers": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "NextOrchestrator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "provider", "model", "effort", "reason"],
+      "properties": {
+        "engine":   { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "model":    { "type": "string", "minLength": 1 },
+        "effort":   { "type": "string", "minLength": 1 },
+        "reason": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "specifics"],
+          "properties": {
+            "code": {
+              "enum": [
+                "continue-current-trajectory",
+                "switch-due-to-blocker",
+                "switch-due-to-cost",
+                "other"
+              ]
+            },
+            "specifics": {
+              "type": "string",
+              "minLength": 30
+            }
+          }
+        }
+      }
+    }
+  }
+}

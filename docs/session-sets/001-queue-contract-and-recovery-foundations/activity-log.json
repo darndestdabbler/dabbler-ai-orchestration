@@ -116,6 +116,86 @@
       "description": "Removed PRAGMA synchronous=NORMAL override; added regression test asserting synchronous >= FULL. pytest 41/41 green.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/read-guidance",
+      "dateTime": "2026-04-30T07:02:18.534782-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, ai-led-session-workflow.md, spec.md; confirmed Session 1 complete with all 3 verification rounds resolved.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-04-30T07:02:18.535899-04:00",
+      "description": "Wrote session-state.json marking session 2 in-progress (currentSession=2, status=in-progress, orchestrator=claude-opus-4-7@high).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/skip-ai-assignment",
+      "dateTime": "2026-04-30T07:02:18.535899-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), router calls are restricted to end-of-session verification only; Step 3.5 routed ai-assignment.md authoring intentionally skipped (Session 1 also skipped it, so this stays consistent).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/implement-followups",
+      "dateTime": "2026-04-30T07:02:18.535899-04:00",
+      "description": "Extended queue_db.py: FollowUp dataclass; QueueDB.add_follow_up()/read_follow_ups()/count_follow_ups(); MaxFollowUpRoundsExceeded with default rounds=3; on overflow, message transitioned to state='failed' with reason='max_followup_rounds_exceeded' (no attempts bump; terminal states left alone). Two-phase commit-then-raise pattern keeps the failure transition durable.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/implement-jsonl-cli",
+      "dateTime": "2026-04-30T07:02:18.536908-04:00",
+      "description": "Added export_jsonl()/export_jsonl_to_path()/import_jsonl()/import_jsonl_from_path() and an argparse-based main() exposing 'export-jsonl' and 'import-jsonl' subcommands. Export is deterministic (sort_keys + compact separators, message-then-its-followups grouping). Import refuses non-empty target via ImportNotAllowedError (recovery semantics, not merge).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/write-and-run-tests",
+      "dateTime": "2026-04-30T07:02:18.537907-04:00",
+      "description": "Created ai-router/tests/test_queue_followups.py with 21 unit tests covering round-trip, max-rounds default + custom + zero, overflow does-not-bump-attempts, terminal-state preservation, deterministic export, decoded payload/result, full export-then-import round-trip, refuse non-empty target, blank/comment line handling, unknown record type rejection, CLI via main(), CLI via subprocess. pytest: 64/64 passed (23 from session 1 + 21 from session 2 + 20 parametric variants).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/verify",
+      "dateTime": "2026-04-30T07:04:27.440271-04:00",
+      "description": "End-of-session verification routed via gpt-5-4",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 13375,
+          "outputTokens": 5926,
+          "costUsd": 0.1223275
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/skip-next-orc-recommendation",
+      "dateTime": "2026-04-30T07:04:53.140969-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed next-orchestrator recommendation skipped \u2014 router is restricted to end-of-session verification only this session.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

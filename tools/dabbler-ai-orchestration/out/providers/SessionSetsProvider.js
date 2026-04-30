@@ -160,7 +160,7 @@ class SessionSetsProvider {
         }
         const group = element;
         if (group.contextValue === "group") {
-            let subset = all.filter((s) => s.state === group.groupKey);
+            const subset = all.filter((s) => s.state === group.groupKey);
             if (group.groupKey === "in-progress" || group.groupKey === "done") {
                 subset.sort((a, b) => (b.lastTouched || "").localeCompare(a.lastTouched || ""));
             }

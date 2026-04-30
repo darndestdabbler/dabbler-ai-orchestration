@@ -81,6 +81,85 @@
       "description": "Fixes: (1) force_reclaim now sets failure_reason = NULL on the state='new' transition and a comment explains why operator audit trail lives in command history, not in the row; (2) heartbeat_status collapsed the redundant if/else to a single providers = [provider_filter] assignment; (3) _print_text in heartbeat_status now derives n from info['lookback_minutes'] inside the loop, falling back to the function argument only as a default. All 34 module tests still pass after fixes.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-04-30T16:00:00-04:00",
+      "description": "Bumped session-state.json currentSession from 1 to 2 and reread spec for Session 2 deliverables (ProviderQueuesProvider TS module, refresh + auto-poll, right-click context menu commands for Open Payload, Mark Failed, Force Reclaim, tests).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/python-runner-util",
+      "dateTime": "2026-04-30T16:00:00-04:00",
+      "description": "Added src/utils/pythonRunner.ts: spawn helper for python -m <module>. Resolves the configured python executable via dabblerProviderQueues.pythonPath setting; relative paths are workspace-relative so a checked-in .venv works without machine-specific config. Always resolves with {stdout, stderr, exitCode, signal, timedOut}; never throws so the tree-view caller can render an error info node without try/catch noise. 10s default timeoutMs.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/queues-provider",
+      "dateTime": "2026-04-30T16:00:00-04:00",
+      "description": "Added src/providers/ProviderQueuesProvider.ts implementing vscode.TreeDataProvider. Tree shape: root -> providers (alphabetic) -> state buckets (lifecycle order: new, claimed, completed, failed, timed_out) -> message nodes. Spec risk-mitigation: 5s result cache (CACHE_TTL_MS) so a tree expand/collapse cycle doesn't re-spawn Python; concurrent getChildren() calls fold onto a single in-flight promise. State-bucket message lists are filtered from the per-provider message slice; if the count exceeds the slice size (Python --limit), an info node 'N more not shown' is appended so the operator never assumes the queue is shorter than reality. Codicons by state (circle-large-outline, sync, pass, error, watch). Tooltip on each message includes id, task_type, session_set, attempts, claimed_by, lease_expires_at, completed_at. Single-click on a message routes to dabblerProviderQueues.openPayload (same as right-click). parseFetchResult helper exported for testing.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/queue-action-commands",
+      "dateTime": "2026-04-30T16:00:00-04:00",
+      "description": "Added src/commands/queueActions.ts with three commands and a content provider. Open Payload: shells out to queue_status --get-payload, renders the JSON into a dabbler-queue-payload:// virtual document (read-only by construction; payloads must not be mutated mid-flight). Mark Failed: modal confirmation dialog + queue_status --mark-failed; refuses non-existent or terminal messages via the Python helper's existing checks. Force Reclaim: modal confirmation + queue_status --force-reclaim; refuses non-claimed messages. Both interventions surface success/failure via VS Code information/error messages and refresh the tree.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/extension-wiring",
+      "dateTime": "2026-04-30T16:00:00-04:00",
+      "description": "Wired src/extension.ts: registered ProviderQueuesProvider against the dabblerProviderQueues view, registered the dabblerProviderQueues.refresh command, set up a configurable auto-poll (dabblerProviderQueues.autoRefreshSeconds, default 15s; 0 disables; rebinds on settings change). Registered the three queue-action commands via registerQueueActionCommands.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/unit-tests",
+      "dateTime": "2026-04-30T16:00:00-04:00",
+      "description": "Wrote src/test/suite/providerQueues.test.ts covering: tree shape contract (alphabetic provider order, absent-queue info node, lifecycle-ordered state buckets, message-state isolation, 'more not shown' overflow node, empty-payload guidance, fetch-failure error node), tree-item rendering (description totals, openPayload command on message items, expand/collapse heuristic for completed vs claimed buckets), and parseFetchResult JSON parser (valid, timeout, non-zero exit, malformed JSON, missing providers field). 14 new tests written.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/build-verification",
+      "dateTime": "2026-04-30T16:00:00-04:00",
+      "description": "TypeScript type-check (npx tsc --noEmit) clean. esbuild bundle (npm run compile) clean. vsce ls validates the manifest. The Electron-based test harness (@vscode/test-electron) is blocked by a pre-existing Windows launcher problem unrelated to this session: Code.exe rejects the test runner's --no-sandbox / --user-data-dir flags. Same harness was non-functional during Set 4. Tracked as a follow-up; tests are written against the same suite()/test() shape as the existing metrics/fileSystem tests and will run once the harness is unstuck.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/cross-provider-verification",
+      "dateTime": "2026-04-30T16:00:00-04:00",
+      "description": "Cross-provider verification routed to gemini-pro per session instruction. Result: VERIFIED. Verifier flagged correctness (tree view, data fetch, caching, all spec'd context menu actions including confirmation dialogs and view refreshing; robust error handling on the subprocess), completeness (all spec deliverables present; tests cover key logic paths), and code quality (notable: in-flight-promise dedupe in _getPayload and configurable settings). No issues to address. See session-reviews/session-002.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "provider": "google",
+          "costUsd": 0.0173,
+          "callType": "code-review"
+        }
+      ]
     }
   ]
 }

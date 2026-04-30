@@ -2,11 +2,13 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { SessionSetsProvider } from "./providers/SessionSetsProvider";
+import { ProviderQueuesProvider } from "./providers/ProviderQueuesProvider";
 import { discoverRoots, readAllSessionSets } from "./utils/fileSystem";
 import { registerOpenFileCommands } from "./commands/openFile";
 import { registerCopyCommands } from "./commands/copyCommand";
 import { registerGitScaffoldCommand } from "./commands/gitScaffold";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
+import { registerQueueActionCommands } from "./commands/queueActions";
 import { registerWizardCommands } from "./wizard/WizardPanel";
 import { registerCostDashboardCommand } from "./dashboard/CostDashboard";
 import { SessionSet } from "./types";
@@ -103,6 +105,51 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
   );
+
+  // --- Provider Queues view ---
+  const queuesProvider = new ProviderQueuesProvider({
+    getWorkspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+  });
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider("dabblerProviderQueues", queuesProvider),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand("dabblerProviderQueues.refresh", () =>
+      queuesProvider.refresh(),
+    ),
+  );
+
+  // Auto-refresh; settings-configurable, 0 disables.
+  let queuesPoll: NodeJS.Timeout | undefined;
+  const rebindQueuesPoll = () => {
+    if (queuesPoll) clearInterval(queuesPoll);
+    const seconds = vscode.workspace
+      .getConfiguration("dabblerProviderQueues")
+      .get<number>("autoRefreshSeconds", 15);
+    if (seconds > 0) {
+      queuesPoll = setInterval(() => queuesProvider.refresh(), seconds * 1000);
+    } else {
+      queuesPoll = undefined;
+    }
+  };
+  rebindQueuesPoll();
+  context.subscriptions.push({
+    dispose: () => {
+      if (queuesPoll) clearInterval(queuesPoll);
+    },
+  });
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("dabblerProviderQueues.autoRefreshSeconds")) {
+        rebindQueuesPoll();
+      }
+    }),
+  );
+
+  registerQueueActionCommands(context, {
+    getWorkspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    refreshView: () => queuesProvider.refresh(),
+  });
 
   // --- Register feature command groups ---
   registerOpenFileCommands(context);

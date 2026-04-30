@@ -199,6 +199,25 @@ def test_validate_negative_timeout_rejected():
     assert err is not None
 
 
+def test_validate_manual_verify_without_attestation_source_rejected():
+    """``--manual-verify`` alone (no --interactive, no --reason-file) is
+    a silent bypass — defeats the audit trail. Reject.
+    """
+    err = _validate_args(_ns(manual_verify=True))
+    assert err is not None
+    assert "manual-verify" in err
+
+
+def test_validate_manual_verify_with_interactive_passes():
+    assert _validate_args(_ns(manual_verify=True, interactive=True)) is None
+
+
+def test_validate_manual_verify_with_reason_file_passes():
+    assert _validate_args(
+        _ns(manual_verify=True, reason_file="reason.md")
+    ) is None
+
+
 def test_validate_clean_args_pass():
     assert _validate_args(_ns()) is None
 

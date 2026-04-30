@@ -330,6 +330,32 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _prompt_manual_attestation(
+    prompt_fn: Callable[[str], str] = input,
+) -> Optional[str]:
+    """Prompt for a manual-verify attestation on stdin.
+
+    Returns the trimmed attestation text, or ``None`` if the operator
+    aborted (Ctrl-C / EOF). Empty input is treated as no attestation
+    (also returns ``None``) — silently accepting an empty string would
+    defeat the audit-trail purpose of the prompt. The caller turns
+    ``None`` into an ``invalid_invocation`` so the operator gets a
+    clear error rather than a quietly-bypassed gate.
+
+    The prompt callable is injectable so the integration tests can
+    drive the interactive path without real stdin attachment.
+    """
+    try:
+        text = prompt_fn(
+            "Manual verification attestation (one line, "
+            "describing how verification was performed out-of-band): "
+        )
+    except (EOFError, KeyboardInterrupt):
+        return None
+    text = (text or "").strip()
+    return text if text else None
+
+
 def _read_reason_file(path: Optional[str]) -> tuple[Optional[str], Optional[str]]:
     """Read the contents of ``--reason-file`` if provided.
 
@@ -369,6 +395,13 @@ def _validate_args(args: argparse.Namespace) -> Optional[str]:
       detect.
     * ``--apply`` is meaningful only under ``--repair``; using it alone
       is almost certainly a typo and should fail loudly.
+    * ``--manual-verify`` is the bootstrapping-window escape hatch — it
+      bypasses queue blocking on the operator's word. The operator's
+      attestation must come from somewhere: either ``--interactive``
+      (prompt on stdin) or ``--reason-file`` (file contents become the
+      attestation). Refusing the silent-bypass case keeps the audit
+      trail honest; an operator who genuinely has nothing to say can
+      put a one-line reason in a file.
     * ``--timeout`` must be positive (a zero or negative timeout would
       either skip the wait entirely or hang forever depending on
       implementation; both are footguns).
@@ -381,6 +414,11 @@ def _validate_args(args: argparse.Namespace) -> Optional[str]:
         return "--force and --repair are incompatible"
     if args.apply and not args.repair:
         return "--apply requires --repair"
+    if args.manual_verify and not args.interactive and not args.reason_file:
+        return (
+            "--manual-verify requires either --interactive (prompt for "
+            "attestation) or --reason-file (file containing attestation)"
+        )
     if args.timeout is not None and args.timeout <= 0:
         return f"--timeout must be a positive integer (got {args.timeout})"
     return None
@@ -724,23 +762,200 @@ def _run_repair(
     session_set_dir: str,
     *,
     apply_changes: bool,
+    queue_base_dir: str = QUEUE_DEFAULT_BASE_DIR,
 ) -> tuple[bool, List[str]]:
     """Walk the session set's state and report (or fix) detectable drift.
 
-    Returns ``(drift_detected, messages)``. Skeleton: never detects drift.
-    Session 4 replaces the body with the real walk that compares
-    ``session-events.jsonl``, ``disposition.json``, the queue, and git
-    state.
+    Returns ``(drift_detected, messages)``. ``drift_detected`` is True
+    iff at least one drift case fired; ``messages`` is the
+    human-readable narrative the repair branch surfaces in
+    ``outcome.messages`` and prints to stdout.
 
-    ``apply_changes`` is a no-op in the skeleton but accepted in the
-    signature so downstream sessions can switch behavior without
-    touching the call site.
+    Drift cases detected (cross-checking
+    ``session-events.jsonl`` ↔ ``session-state.json`` ↔
+    ``disposition.json`` ↔ queue messages):
+
+    1. **State-says-closed-but-no-closeout-event.** Bootstrapping-window
+       drift: ``session-state.json`` reports ``lifecycleState: closed``
+       (or v1 ``status: complete``) but ``session-events.jsonl`` has no
+       ``closeout_succeeded`` event for the current session. The old
+       Step 8 path committed without emitting terminal lifecycle
+       events. Repair: with ``--apply``, append a synthetic
+       ``closeout_requested`` (if missing) and ``closeout_succeeded``
+       so the events ledger is internally consistent and the
+       reconciler stops considering the set "stranded".
+
+    2. **Closeout-succeeded-but-state-not-closed.** The reverse drift:
+       events ledger says the session closed, but
+       ``session-state.json`` is still ``work_in_progress`` /
+       ``work_verified``. Repair: with ``--apply``, call
+       ``mark_session_complete`` so the snapshot tracks the ledger.
+
+    3. **Disposition references missing queue messages.**
+       ``disposition.json`` cites ``verification_message_ids`` that the
+       queue databases do not contain. Reported but not auto-fixed —
+       we cannot synthesize a verifier verdict, and the orchestrator
+       must rebuild the disposition manually.
+
+    4. **Stranded mid-closeout** (``closeout_requested`` without a
+       terminal companion). Reported only. Recovery is the
+       reconciler's job (re-run the gate); ``--repair --apply`` does
+       not re-run the gate from inside itself.
+
+    Never modifies git state. Never reaches into the queue databases
+    (read-only inspection). Idempotent under repeat invocation: a set
+    with no drift returns ``(False, ["repair: no drift detected"])``;
+    a set whose drift is corrected by ``--apply`` reports
+    ``(False, ["repair: ..."])`` on the next pass.
     """
-    _ = session_set_dir
-    _ = apply_changes
-    return False, [
-        "repair: skeleton implementation; Session 4 will populate this walk"
-    ]
+    messages: List[str] = []
+    drift_detected = False
+
+    # Best-effort reads. A repair walk on a half-initialized set
+    # should still produce a useful drift summary; missing files are
+    # data points, not exceptions.
+    events = read_events(session_set_dir)
+    lifecycle = current_lifecycle_state(events)
+    state = read_session_state(session_set_dir)
+    disposition = read_disposition(session_set_dir)
+
+    state_lifecycle = (state or {}).get("lifecycleState")
+    state_session_number = (state or {}).get("currentSession")
+    if not isinstance(state_session_number, int):
+        state_session_number = None
+
+    most_recent_session = max(
+        (e.session_number for e in events), default=None,
+    )
+    target_session = state_session_number or most_recent_session
+
+    # Helpers — gated by *apply_changes* so a diagnostic run never
+    # touches the ledger.
+    def _append(event_type: str, **fields) -> None:
+        if target_session is None:
+            return
+        append_event(
+            session_set_dir, event_type, target_session, **fields,
+        )
+
+    def _has_event(event_type: str, session_number: Optional[int]) -> bool:
+        if session_number is None:
+            return False
+        return any(
+            ev.event_type == event_type and ev.session_number == session_number
+            for ev in events
+        )
+
+    # Case 1: state says closed, but events don't reflect it.
+    state_says_closed = (
+        state_lifecycle == SessionLifecycleState.CLOSED.value
+        or (state or {}).get("status") == "complete"
+    )
+    if state_says_closed and lifecycle != SessionLifecycleState.CLOSED:
+        drift_detected = True
+        messages.append(
+            "repair drift: session-state.json reports closed/complete but "
+            "session-events.jsonl has no closeout_succeeded for the "
+            f"current session (session {target_session})"
+        )
+        if apply_changes and target_session is not None:
+            if not _has_event("closeout_requested", target_session):
+                _append(
+                    "closeout_requested",
+                    repaired=True,
+                    repair_reason="state_says_closed_but_no_closeout_event",
+                )
+                messages.append(
+                    "repair applied: appended synthetic closeout_requested "
+                    f"for session {target_session}"
+                )
+            if not _has_event("closeout_succeeded", target_session):
+                _append(
+                    "closeout_succeeded",
+                    repaired=True,
+                    repair_reason="state_says_closed_but_no_closeout_event",
+                )
+                messages.append(
+                    "repair applied: appended synthetic closeout_succeeded "
+                    f"for session {target_session}"
+                )
+
+    # Case 2: events say closed, state has not caught up.
+    elif lifecycle == SessionLifecycleState.CLOSED and not state_says_closed:
+        drift_detected = True
+        messages.append(
+            "repair drift: session-events.jsonl shows closeout_succeeded "
+            "but session-state.json is not flipped to closed/complete"
+        )
+        if apply_changes:
+            try:
+                # Local import to avoid a top-level cycle: session_state
+                # is already imported elsewhere via read_session_state,
+                # but mark_session_complete is only used here.
+                try:
+                    from session_state import mark_session_complete  # type: ignore[import-not-found]
+                except ImportError:
+                    from .session_state import mark_session_complete  # type: ignore[no-redef]
+                if mark_session_complete(session_set_dir) is not None:
+                    messages.append(
+                        "repair applied: flipped session-state.json to "
+                        "complete/closed via mark_session_complete"
+                    )
+            except Exception as exc:  # pragma: no cover — defensive
+                messages.append(
+                    f"repair could not apply state fix: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
+    # Case 4: stranded mid-closeout. Reported only — the reconciler
+    # owns recovery here. Skip when case 1 already reported (their
+    # symptoms overlap and the case-1 message is more actionable).
+    if (
+        not state_says_closed
+        and lifecycle in (
+            SessionLifecycleState.CLOSEOUT_PENDING,
+            SessionLifecycleState.CLOSEOUT_BLOCKED,
+        )
+    ):
+        drift_detected = True
+        messages.append(
+            f"repair drift: session {target_session} is in "
+            f"{lifecycle.value} — closeout did not reach a terminal "
+            "state. Recovery via reconciler / re-run close_session; "
+            "--repair does not re-run the gate."
+        )
+
+    # Case 3: disposition cites message ids the queue does not contain.
+    # Skip when case 1 already covered the set — a closed-but-
+    # missing-events set is the bootstrapping case, and the queue
+    # checks don't add information there.
+    if (
+        disposition is not None
+        and disposition.verification_method == "queue"
+        and disposition.verification_message_ids
+        and not state_says_closed
+    ):
+        providers = _discover_queue_providers(queue_base_dir)
+        unresolved: List[str] = []
+        for mid in disposition.verification_message_ids:
+            msg, _provider = _lookup_message(mid, queue_base_dir, providers)
+            if msg is None:
+                unresolved.append(mid)
+        if unresolved:
+            drift_detected = True
+            joined = ", ".join(unresolved)
+            messages.append(
+                f"repair drift: disposition.json references queue "
+                f"message ids that do not resolve under "
+                f"{queue_base_dir!r}: {joined}. "
+                "Auto-repair declined — verifier verdicts cannot be "
+                "synthesized; rebuild the disposition manually."
+            )
+
+    if not drift_detected:
+        messages.append("repair: no drift detected")
+
+    return drift_detected, messages
 
 
 # ---------------------------------------------------------------------------
@@ -827,6 +1042,7 @@ def run(
     poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
     sleep: Optional[Callable[[float], None]] = None,
     monotonic: Optional[Callable[[], float]] = None,
+    prompt_fn: Callable[[str], str] = input,
 ) -> CloseoutOutcome:
     """Execute the close-out flow for the given parsed args.
 
@@ -881,7 +1097,9 @@ def run(
         try:
             outcome.messages.extend(lock_handle.warnings)
             drift, messages = _run_repair(
-                session_set_dir, apply_changes=args.apply,
+                session_set_dir,
+                apply_changes=args.apply,
+                queue_base_dir=queue_base_dir,
             )
             outcome.messages.extend(messages)
             if drift and not args.apply:
@@ -932,6 +1150,27 @@ def run(
         outcome.messages.append(reason_err)
         return outcome
 
+    # Manual-verify attestation. ``--manual-verify`` bypasses the queue
+    # wait entirely on the operator's word, so the audit trail must
+    # record *what* the operator attested to. Source priority: reason
+    # file (if already read above) wins; otherwise the interactive
+    # prompt fires. ``_validate_args`` already rejected the
+    # neither-source case, so reaching this branch with both empty
+    # means the operator aborted the prompt mid-way.
+    manual_attestation: Optional[str] = None
+    if args.manual_verify:
+        if reason_text is not None:
+            manual_attestation = reason_text
+        else:
+            manual_attestation = _prompt_manual_attestation(prompt_fn)
+        if not manual_attestation:
+            outcome.result = "invalid_invocation"
+            outcome.messages.append(
+                "--manual-verify requires a non-empty attestation; "
+                "got empty / aborted input"
+            )
+            return outcome
+
     # Acquire the concurrency lock around the rest of the flow. Two
     # close_session invocations on the same set must not interleave —
     # they would race on event emission and (eventually, in Set 4) on
@@ -960,6 +1199,11 @@ def run(
         }
         if reason_text is not None:
             request_fields["reason"] = reason_text
+        if manual_attestation is not None and reason_text is None:
+            # Reason came from the interactive prompt rather than a
+            # file — record it on the request event so the attestation
+            # is part of the audit trail from t-zero.
+            request_fields["manual_attestation"] = manual_attestation
         _emit_event(
             session_set_dir,
             "closeout_requested",
@@ -1035,6 +1279,26 @@ def run(
                     queue_state=mo.state,
                     failure_reason=mo.failure_reason,
                 )
+
+        # Manual-verify path: emit a single ``verification_completed``
+        # event carrying the operator attestation. EVENT_TYPES is a
+        # frozen Set 1 enum (per session 3 review), so the manual case
+        # rides on the same event type as queue-mediated completions
+        # — the ``method`` and ``attestation`` fields disambiguate.
+        # Without this, the events ledger would jump from
+        # ``closeout_requested`` straight to ``closeout_succeeded`` on
+        # ``--manual-verify``, leaving a hole where the verification
+        # decision should be.
+        if method == "manual" and manual_attestation is not None:
+            _emit_event(
+                session_set_dir,
+                "verification_completed",
+                outcome.session_number,
+                outcome,
+                method="manual",
+                attestation=manual_attestation,
+                verdict="manual_attestation",
+            )
 
         # If the wait timed out (deadline exceeded with non-terminal
         # messages OR any message ended in timed_out), surface a

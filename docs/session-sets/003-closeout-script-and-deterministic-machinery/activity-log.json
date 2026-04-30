@@ -374,6 +374,104 @@
       "description": "Marked session 3 complete in session-state.json with verdict=VERIFIED. Emitted verification_completed and work_verified events.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-4/read-guidance",
+      "dateTime": "2026-04-30T12:38:26.479020-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, ai-led-session-workflow.md, and spec.md. User instructed: no external provider routing this session except cross-provider verification routed to Gemini Pro.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-4/register-start",
+      "dateTime": "2026-04-30T12:38:26.480020-04:00",
+      "description": "Wrote session-state.json marking session 4 of set 003 in-progress (currentSession=4, lifecycleState=work_in_progress, orchestrator=claude-code/claude-opus-4-7@high). Appended work_started event to session-events.jsonl.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-4/skip-ai-assignment",
+      "dateTime": "2026-04-30T12:38:26.480020-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed ai-assignment.md authoring intentionally skipped this session.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-4/implement-manual-verify",
+      "dateTime": "2026-04-30T12:46:00.383897-04:00",
+      "description": "Wired --manual-verify in close_session.py: added _prompt_manual_attestation helper for the interactive path; _validate_args now rejects --manual-verify without --interactive or --reason-file (silent-bypass blocker); run() collects attestation from reason file or interactive prompt, rejects empty/aborted input; closeout_requested event payload now carries manual_attestation when sourced from prompt vs reason when sourced from --reason-file; emits a single verification_completed event with method=manual, attestation=<text>, verdict=manual_attestation after the wait short-circuits (rides on existing event type per session 3 EVENT_TYPES-is-frozen rationale); run() signature takes optional prompt_fn for test injection. Updated existing test_manual_verify_skips_queue_wait to pass --reason-file (new validation rule).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-4/implement-repair",
+      "dateTime": "2026-04-30T12:46:00.385399-04:00",
+      "description": "Replaced _run_repair skeleton with real drift walk in close_session.py. Cross-checks session-events.jsonl, session-state.json, disposition.json, and queue databases. Four drift cases: (1) state-says-closed-but-no-closeout-event (bootstrapping legacy path) \u2014 auto-fixed with --apply by appending synthetic closeout_requested + closeout_succeeded carrying repaired=true and repair_reason=state_says_closed_but_no_closeout_event; (2) closeout_succeeded-in-events-but-state-not-flipped \u2014 auto-fixed by calling mark_session_complete; (3) stranded mid-closeout (closeout_requested without terminal companion) \u2014 reported only, recovery is reconciler's job; (4) disposition references missing queue messages \u2014 reported only, refuses to fabricate verdicts. Idempotent under repeat invocation. Uses _discover_queue_providers/_lookup_message helpers from the wait code; never modifies git state.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-4/tests-session4",
+      "dateTime": "2026-04-30T12:46:00.386402-04:00",
+      "description": "Wrote ai-router/tests/test_close_session_session4.py with 14 tests in 3 groups. Group 1 (manual-verify): attestation event lands with method=manual + attestation text + verdict=manual_attestation; interactive prompt path captures attestation onto closeout_requested as manual_attestation; missing-source rejected; empty/aborted input rejected. Group 2 (repair): no-drift clean session; state-says-closed-but-no-event diagnostic+apply+idempotent; event-says-closed-but-state-lagging diagnostic+apply; stranded mid-closeout reported but not auto-fixed; missing-queue-messages reported and refuses to synthesize verdicts; --apply-without-repair rejected end-to-end. Group 3 (4 e2e scenarios from Set 3 acceptance): outsource-first happy path; outsource-last happy path with verifier completing during wait; bootstrapping recovery via --repair --apply; manual-verify skips queue and gate runs and session closes. Also added 3 skeleton-level validation tests (manual_verify_without_attestation_source, manual_verify_with_interactive_passes, manual_verify_with_reason_file_passes).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-4/full-suite-green",
+      "dateTime": "2026-04-30T12:46:00.386402-04:00",
+      "description": "Full pytest: 454 passed in ~45s on Windows (was 437 in Session 3 baseline; +17 net new tests: 14 session4 + 3 skeleton).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-4/cross-provider-verification",
+      "dateTime": "2026-04-30T12:48:39.787700-04:00",
+      "description": "Routed end-of-session verification to gemini-pro per user instruction (overrode session-verification task_type_override which defaults to gpt-5-4; pinned max_tier=2 per lessons-learned to block auto-escalation). Verdict: VERIFIED on round 1 with no issues across all 5 evaluation areas. Cost $0.0502, in=34444t out=712t. Saved to session-reviews/session-004.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 34444,
+          "outputTokens": 712,
+          "costUsd": 0.050175
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "session-4/change-log",
+      "dateTime": "2026-04-30T12:50:02.921964-04:00",
+      "description": "Authored docs/session-sets/003-closeout-script-and-deterministic-machinery/change-log.md directly per user instruction this session (no external provider routing except cross-provider verification). Documents all four sessions deliverables, test counts (374/415/437/454), all six acceptance criteria checked, risks-and-mitigations, and Set 4 follow-ups.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 10,
+      "stepKey": "session-4/mark-complete",
+      "dateTime": "2026-04-30T12:50:02.923140-04:00",
+      "description": "Marked session 4 complete in session-state.json with verdict=VERIFIED. Set 003 lifecycleState now closed. Emitted closeout_requested + closeout_succeeded events.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

@@ -434,9 +434,16 @@ def test_manual_verify_skips_queue_wait(
     ))
     _commit_and_push_set(closeable_set)
 
+    reason_path = tmp_path / "manual-attestation.md"
+    reason_path.write_text(
+        "verified out-of-band via paired live walkthrough",
+        encoding="utf-8",
+    )
+
     args = _ns(
         session_set_dir=str(closeable_set),
         manual_verify=True,
+        reason_file=str(reason_path),
         timeout=1,
     )
 

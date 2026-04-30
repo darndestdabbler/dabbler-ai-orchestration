@@ -85,6 +85,17 @@ from .disposition import (
     validate_disposition,
     write_disposition,
 )
+from .session_events import (
+    SESSION_EVENTS_FILENAME,
+    EVENT_TYPES,
+    Event,
+    append_event,
+    read_events,
+    hash_existing_prefix,
+    current_lifecycle_state,
+    backfill_events_for_session_set,
+    backfill_all_session_sets,
+)
 from .utils import (
     RateLimiter,
     should_escalate,

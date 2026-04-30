@@ -462,6 +462,131 @@
       "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed next-orchestrator recommendation skipped \u2014 router restricted to end-of-session verification only this session.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 1,
+      "stepKey": "session-5/read-guidance",
+      "dateTime": "2026-04-30T08:00:27.127463-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, ai-led-session-workflow.md, spec.md; reviewed prior session reviews; user instructed router restricted to end-of-session verification only this session and to use Gemini Pro as the verifier.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 2,
+      "stepKey": "session-5/register-start",
+      "dateTime": "2026-04-30T08:00:27.128463-04:00",
+      "description": "Wrote session-state.json marking session 5 in-progress (currentSession=5, lifecycleState=work_in_progress, orchestrator=claude-code/claude-opus-4-7@high).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "session-5/skip-ai-assignment",
+      "dateTime": "2026-04-30T08:00:27.129463-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed ai-assignment.md authoring intentionally skipped; sessions 1-4 also skipped this for consistency.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 4,
+      "stepKey": "session-5/implement-session-events",
+      "dateTime": "2026-04-30T08:06:00.734433-04:00",
+      "description": "Created ai-router/session_events.py: Event dataclass (frozen); EVENT_TYPES tuple of 9 lifecycle events; append_event() append-only writer with file-create-on-first-call, UTC ISO 8601 timestamps with Z suffix, unknown-event-type and non-int session_number guards; read_events() with malformed-line tolerance (skip with warning) and required-field validation; hash_existing_prefix() SHA-256 helper for append-only invariant verification.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "session-5/implement-lifecycle-derivation",
+      "dateTime": "2026-04-30T08:06:00.735433-04:00",
+      "description": "current_lifecycle_state(events) walks the highest-numbered session events in order to derive SessionLifecycleState: work_started -> work_in_progress; verification_completed with verdict=VERIFIED OR explicit work_verified -> work_verified; closeout_requested -> closeout_pending; closeout_failed -> closeout_blocked; closeout_succeeded -> closed. ISSUES_FOUND verdicts and verification_claimed/timed_out events are observability-only and do not advance state. Empty event list returns None (the not-started case has no SessionLifecycleState member).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "session-5/implement-backfill",
+      "dateTime": "2026-04-30T08:06:00.736812-04:00",
+      "description": "backfill_events_for_session_set(): reads activity-log.json + session-state.json, reconstructs events via _reconstruct_events_from_activity. Each session emits work_started at first entry timestamp; verify steps with session-verification routedApiCalls emit verification_requested + verification_completed (verdict=unknown, since the activity log does not preserve a machine-readable verdict). Highest session: emits work_verified+closeout_requested+closeout_succeeded if change-log.md exists, otherwise reflects session-state.json lifecycleState. Best-effort: malformed inputs warn and skip. Atomic write via tempfile + os.replace. backfill_all_session_sets(base_dir) walks the workspace.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "session-5/export-symbols",
+      "dateTime": "2026-04-30T08:06:00.738385-04:00",
+      "description": "Re-exported SESSION_EVENTS_FILENAME, EVENT_TYPES, Event, append_event, read_events, hash_existing_prefix, current_lifecycle_state, backfill_events_for_session_set, backfill_all_session_sets from ai-router/__init__.py.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 8,
+      "stepKey": "session-5/write-tests",
+      "dateTime": "2026-04-30T08:06:00.739389-04:00",
+      "description": "Created ai-router/tests/test_session_events.py with 46 tests across append (file-create, append-multiple, extra-fields, explicit-timestamp, unknown-event-type/non-int/bool-session-number rejection, missing-dir), read (missing-file, round-trip, blank-line, malformed-line, required-fields), append-only invariant (prefix-hash-unchanged-after-append, hash_existing_prefix on missing/present file), all 9 lifecycle transitions plus not-started/most-recent-session-only, backfill single set (no-activity-log, existing-ledger-left-alone, overwrite-flag, in-progress-state, verify-step-emits-pair, backfilled-marker, completed-with-changelog, work_verified/closeout_blocked/closeout_pending state round-trip, malformed-activity-log), backfill walker (only-with-spec, missing-base), real-world parse against the live set-001 directory, and public surface (event-types-tuple, filename, to_dict-shadowing).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 9,
+      "stepKey": "session-5/run-tests",
+      "dateTime": "2026-04-30T08:06:00.740421-04:00",
+      "description": "pytest: 222/222 passed (176 prior + 46 new) in 2.50s.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 10,
+      "stepKey": "session-5/verify",
+      "dateTime": "2026-04-30T08:07:05.954063-04:00",
+      "description": "End-of-session verification routed via gemini-pro per user instruction (override of router-config default for this session). Verdict: VERIFIED on round 1. Zero issues. All three Session 5 acceptance criteria pass.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 14990,
+          "outputTokens": 478,
+          "costUsd": 0.023518
+        }
+      ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 11,
+      "stepKey": "session-5/skip-next-orc-recommendation",
+      "dateTime": "2026-04-30T08:08:31.139712-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed next-orchestrator recommendation skipped (set is closing this session anyway, so a next-orc recommendation would be moot).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 12,
+      "stepKey": "session-5/author-changelog-direct",
+      "dateTime": "2026-04-30T08:08:31.141155-04:00",
+      "description": "Authored docs/session-sets/001-.../change-log.md directly (without router) per the same router-restriction memory. Documents the deviations from default workflow and the deliverables of all 5 sessions.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 13,
+      "stepKey": "session-5/skip-next-set-recommendation",
+      "dateTime": "2026-04-30T08:08:31.142652-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed next-session-set recommendation skipped. The repo plan already lists Sets 2-6 in priority order; the human will pick the next one without a routed advisor.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

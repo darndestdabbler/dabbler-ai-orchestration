@@ -1,0 +1,62 @@
+[
+  {
+    "round": 1,
+    "verifier": "gpt-5-4",
+    "severity": "minor",
+    "category": "spec-deviation",
+    "location": "ai-router/session_state.py — NextOrchestratorReason dataclass",
+    "description": "NextOrchestratorReason.code was annotated as `str`, not as the spec-required `Literal[\"continue-current-trajectory\", \"switch-due-to-blocker\", \"switch-due-to-cost\", \"other\"]`. Runtime validation enforced the values, but the dataclass typing deliverable was not fully implemented as specified.",
+    "fix": "Added a `NextOrchestratorReasonCode = Literal[...]` type alias and changed the annotation. Imported `Literal` from `typing`.",
+    "status": "fixed"
+  },
+  {
+    "round": 1,
+    "verifier": "gpt-5-4",
+    "severity": "minor",
+    "category": "parsing-ambiguity",
+    "location": "ai-router/session_state.py — _extract_session_set_configuration_block()",
+    "description": "parse_mode_config() could match the first fenced YAML block anywhere after the `Session Set Configuration` heading, including a code fence belonging to a later section (Risks, References, etc.).",
+    "fix": "Bounded the fence search to the configuration section: slice from heading to the next markdown heading or horizontal rule, then search for a YAML fence within that slice. Added two regression tests (test_fence_in_later_section_is_not_misread, test_section_without_fence_then_later_fence_is_not_misread).",
+    "status": "fixed"
+  },
+  {
+    "round": 1,
+    "verifier": "gpt-5-4",
+    "severity": "minor",
+    "category": "parsing-robustness",
+    "location": "ai-router/session_state.py — _extract_session_set_configuration_block() heading regex",
+    "description": "A BOM-prefixed spec.md would not match the heading regex (because the BOM precedes the leading anchor), causing a valid config block at file start to be ignored and outsourceMode to silently default to 'first'.",
+    "fix": "Strip a leading UTF-8 BOM via `spec_text.lstrip('\\ufeff')` before regex matching. Added a regression test (test_bom_prefixed_spec_parses).",
+    "status": "fixed"
+  },
+  {
+    "round": 2,
+    "verifier": "gpt-5-4",
+    "severity": "minor",
+    "category": "config-parsing",
+    "location": "ai-router/session_state.py — _extract_session_set_configuration_block()",
+    "description": "Section-boundary detection wasn't fence-aware. A YAML comment line (`# ...`) inside the fenced config matched the `#{1,6}\\s` heading pattern, truncating the section before fence detection ran and dropping later keys. A `---` document separator inside the fence had a similar risk.",
+    "fix": "Reordered logic: search for the fence first against the unbounded `after_heading`, then compare the fence-open position to the first section terminator. Use the fence body iff the fence opens before any terminator. This makes terminator detection moot inside fenced bodies. Added 2 regression tests (test_fenced_yaml_with_internal_comment_keeps_all_keys, test_fenced_yaml_with_internal_dashes_is_not_truncated_early).",
+    "status": "fixed"
+  },
+  {
+    "round": 3,
+    "verifier": "gpt-5-4",
+    "severity": "minor",
+    "category": "config-validation",
+    "location": "ai-router/session_state.py — parse_mode_config() / validate_mode_config()",
+    "description": "Round-3 verifier passed all 7 acceptance criteria. Flagged: parse_mode_config() coerced invalid outsourceMode values to default, so validate_mode_config() could never see them — contradicting the docstring's claim that invalid configs surface via the validator.",
+    "fix": "Removed coercion from parse_mode_config — invalid values now pass through as-is. validate_mode_config flags them. Updated tests test_unknown_outsource_mode_falls_back_to_default and test_unknown_role_value_becomes_none to assert the new behavior (raw value preserved, validator rejects).",
+    "status": "fixed"
+  },
+  {
+    "round": 3,
+    "verifier": "gpt-5-4",
+    "severity": "minor",
+    "category": "config-parsing",
+    "location": "ai-router/session_state.py — _extract_session_set_configuration_block()",
+    "description": "If the configuration section had multiple fences (e.g., a leading unlabeled example fence followed by the real yaml-labeled config fence), the parser took the first fence regardless of label.",
+    "fix": "Prefer a yaml/yml-labeled fence; fall back to the first unlabeled fence only when no labeled fence exists. Added 2 tests (test_yaml_labeled_fence_preferred_over_unlabeled, test_unlabeled_fence_used_when_only_option).",
+    "status": "fixed"
+  }
+]

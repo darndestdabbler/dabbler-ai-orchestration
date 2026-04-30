@@ -1,16 +1,17 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sessionSetName": "001-queue-contract-and-recovery-foundations",
-  "currentSession": 2,
+  "currentSession": 3,
   "totalSessions": 5,
   "status": "complete",
-  "startedAt": "2026-04-30T06:58:04.292859-04:00",
-  "completedAt": "2026-04-30T07:04:53.141970-04:00",
+  "startedAt": "2026-04-30T07:08:11.054307-04:00",
+  "completedAt": "2026-04-30T07:25:58.131009-04:00",
   "verificationVerdict": "VERIFIED",
   "orchestrator": {
     "engine": "claude-code",
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "lifecycleState": "closed"
 }

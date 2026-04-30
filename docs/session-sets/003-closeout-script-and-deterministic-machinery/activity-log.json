@@ -250,6 +250,130 @@
       "description": "Marked session 2 complete in session-state.json with verdict=VERIFIED. Emitted verification_completed and work_verified events.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/read-guidance",
+      "dateTime": "2026-04-30T12:01:12.198352-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, ai-led-session-workflow.md, and spec.md. User instructed: no external provider routing this session except cross-provider verification routed to Gemini Pro.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/register-start",
+      "dateTime": "2026-04-30T12:01:12.199579-04:00",
+      "description": "Wrote session-state.json marking session 3 of set 003 in-progress (currentSession=3, lifecycleState=work_in_progress, orchestrator=claude-code/claude-opus-4-7@high). Appended work_started event to session-events.jsonl.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/skip-ai-assignment",
+      "dateTime": "2026-04-30T12:01:12.199579-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed ai-assignment.md authoring intentionally skipped this session.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/implement-verification-wait",
+      "dateTime": "2026-04-30T12:09:23.021884-04:00",
+      "description": "Implemented _wait_for_verifications in close_session.py: queue-mode polling against queue_db. Discovers per-provider queues under provider-queues base dir, polls every poll_interval_seconds (default 5s) until each verification_message_id reaches a TERMINAL state, capped by --timeout minutes. Returns (method, wait_outcome, message_ids, _MessageOutcome list). wait_outcome is completed/failed/timed_out; missing message ids in any provider queue are treated as failed (drift surface). Injectable sleep/monotonic let tests avoid wall-clock waits. Wired into run(): emits one verification_completed (or verification_timed_out) event per message with queue_provider/queue_state/failure_reason payloads. Outcome routing: timed_out -> verification_timeout exit 4 + closeout_failed event; failed/missing -> gate_failed exit 1 with synthetic verification_completed gate result. --force still short-circuits the wait; --manual-verify already short-circuited.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/create-reconciler",
+      "dateTime": "2026-04-30T12:09:23.021884-04:00",
+      "description": "Wrote ai-router/reconciler.py: walks docs/session-sets, derives lifecycle state via current_lifecycle_state(read_events()), picks STRANDED_STATES (CLOSEOUT_PENDING/CLOSEOUT_BLOCKED) older than DEFAULT_QUIET_WINDOW_MINUTES=5, re-invokes close_session.run() per stranded set. ReconcileEntry/ReconcileSummary dataclasses; action enum: skipped_no_events/skipped_not_stranded/skipped_too_recent/rerun_succeeded/rerun_gate_failed/rerun_verification_timeout/rerun_lock_contention/rerun_other/error. Per-set runner exceptions caught -> action=error, sweep continues. register_sweeper_hook() builds the orchestrator-startup callable Set 6 will wire. CLI: python -m ai_router.reconciler with --base-dir/--quiet-window-minutes/--json. Default runner uses timeout=1 so the sweep stays responsive (real outage surfaces as rerun_verification_timeout next sweep).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/tests-verification-wait",
+      "dateTime": "2026-04-30T12:09:23.021884-04:00",
+      "description": "Wrote ai-router/tests/test_close_session_verification_wait.py: 5 integration tests against real git repo + bare remote. Outsource-first (api method) skips queue wait (no verification_completed events emitted). Outsource-last happy path: fake_sleep drives queue forward (claim then complete) between poll cycles; close_session blocks until message terminates, then succeeds; verification_completed event emitted with queue_provider=gpt-5-4-mini. Timeout case: monotonic clock injected to jump past deadline; result=verification_timeout exit 4; verification_timed_out + closeout_failed events emitted. Verifier rejection: drove message to failed via 3x claim/fail; result=gate_failed; verification_completed gate names the failure. --manual-verify with pending message + sleep raising AssertionError confirms the wait is bypassed.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/tests-reconciler",
+      "dateTime": "2026-04-30T12:09:23.021884-04:00",
+      "description": "Wrote ai-router/tests/test_reconciler.py: 17 tests. Walk filters by spec.md presence; missing base_dir returns empty summary. work_started-only set is skipped_not_stranded; closeout_succeeded is skipped_not_stranded (closed); fresh-without-events is skipped_no_events; recently-stranded under quiet window is skipped_too_recent. Backdating last event timestamp 30m makes a stranded set eligible: rerun_succeeded path records close_session result+messages. Parametrized action mapping for noop_already_closed/gate_failed/verification_timeout/lock_contention/repair_drift. RuntimeError in runner is captured per-set without aborting the sweep. register_sweeper_hook callback receives ReconcileSummary. format_summary renders entries; CLI --json emits structured payload. End-to-end: real git repo + close_session runner recovers a stranded api-mode session (closeout_requested without closeout_succeeded backdated) -> rerun_succeeded, closeout_succeeded event lands.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/full-suite-green",
+      "dateTime": "2026-04-30T12:09:23.021884-04:00",
+      "description": "Full pytest: 437 passed in ~35s on Windows (was 415 in Session 2 baseline; +22 net new tests: 5 verification-wait + 17 reconciler).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/cross-provider-verification",
+      "dateTime": "2026-04-30T12:13:09.022558-04:00",
+      "description": "Routed end-of-session verification to gemini-pro per user instruction (overrode session-verification task_type_override which defaults to gpt-5-4; pinned max_tier=2 per lessons-learned to block auto-escalation). Round 1: ISSUES_FOUND with 3 Minor items (1 event-naming suggestion, 1 gate-check naming, 1 test gap). Cost $0.0425, in=27276t out=840t. Saved to session-reviews/session-003.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 27276,
+          "outputTokens": 840,
+          "costUsd": 0.0425
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-3/handle-issues",
+      "dateTime": "2026-04-30T12:13:09.023558-04:00",
+      "description": "Handled round-1 findings: (1) rejected event-rename (verification_completed -> verification_failed) with documented rationale: EVENT_TYPES is a fixed Set-1 enum and verification_completed.docstring already says verdict lives in payload (queue_state=failed, failure_reason=...) \u2014 adding a new event type is out of scope. (2) Accepted gate-check rename: verification_completed -> verification_passed in close_session.py:1070; closeout_failed.failed_checks now reads [\"verification_passed\"]. (3) Accepted test gap fix: test_verifier_failed_terminates_with_gate_failed now asserts the per-message verification_completed event with queue_state=failed and ISSUES_FOUND in failure_reason, plus closeout_failed.failed_checks payload. All 55 close_session tests still green.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "session-3/cross-provider-verification-round2",
+      "dateTime": "2026-04-30T12:13:09.024557-04:00",
+      "description": "Routed round-2 re-verify to gemini-pro with max_tier=2 (no escalation triggered \u2014 short response heuristic stayed within Gemini per lessons-learned). Verdict: \"ISSUES_FOUND: NO\" with empty issues array \u2014 substantively VERIFIED, non-standard verdict wording. Confirms fixes are correct and item-1 rejection is sound. Cost $0.0234, in=17299t out=177t. Appended to session-reviews/session-003.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 17299,
+          "outputTokens": 177,
+          "costUsd": 0.0234
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "session-3/mark-complete",
+      "dateTime": "2026-04-30T12:13:16.040387-04:00",
+      "description": "Marked session 3 complete in session-state.json with verdict=VERIFIED. Emitted verification_completed and work_verified events.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

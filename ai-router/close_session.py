@@ -85,9 +85,10 @@ import argparse
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, Iterable, List, Optional
 
 if __name__ == "__main__" and __package__ in (None, ""):
     # Production CLI path: invoked as ``python -m ai_router.close_session``
@@ -115,6 +116,12 @@ try:
         acquire_lock,
         release_lock,
     )
+    from queue_db import (  # type: ignore[import-not-found]
+        DEFAULT_BASE_DIR as QUEUE_DEFAULT_BASE_DIR,
+        TERMINAL_STATES,
+        QueueDB,
+        QueueMessage,
+    )
 except ImportError:
     from .disposition import (  # type: ignore[no-redef]
         Disposition,
@@ -133,6 +140,18 @@ except ImportError:
         acquire_lock,
         release_lock,
     )
+    from .queue_db import (  # type: ignore[no-redef]
+        DEFAULT_BASE_DIR as QUEUE_DEFAULT_BASE_DIR,
+        TERMINAL_STATES,
+        QueueDB,
+        QueueMessage,
+    )
+
+
+# Default poll interval (seconds) for the queue verification wait. Tests
+# pass a smaller value via :func:`run` so the integration suite does not
+# spend real wall-clock time on the wait.
+DEFAULT_POLL_INTERVAL_SECONDS = 5.0
 
 
 # ---------------------------------------------------------------------------
@@ -466,8 +485,86 @@ def _run_gate_checks(
 
 
 # ---------------------------------------------------------------------------
-# Verification wait skeleton (Session 3 fills in queue polling)
+# Verification wait (queue-mode polling)
 # ---------------------------------------------------------------------------
+
+
+@dataclass
+class _MessageOutcome:
+    """Snapshot of one queue message at the moment polling terminated.
+
+    ``state`` is the terminal queue state (``completed`` / ``failed`` /
+    ``timed_out``) when ``terminal`` is True, or the last observed
+    non-terminal state when the wait timed out before resolution.
+    ``failure_reason`` is set for the ``failed`` / ``timed_out`` cases
+    and is ``None`` otherwise (including for ``completed`` and for
+    "still pending at timeout"). ``provider`` records which
+    per-provider queue directory the message resolved under, since the
+    disposition records only the message id.
+    """
+
+    message_id: str
+    provider: Optional[str]
+    state: str
+    terminal: bool
+    failure_reason: Optional[str] = None
+
+
+def _discover_queue_providers(queue_base_dir: str) -> List[str]:
+    """Return the list of per-provider subdirectories under ``queue_base_dir``.
+
+    The queue layout is ``<base>/<provider>/queue.db``. We don't know
+    up front which provider holds a given message id (the disposition
+    records only the id), so the wait logic enumerates providers and
+    asks each. Empty list is acceptable — the caller treats it as "no
+    queues exist; messages cannot resolve".
+
+    Filters to directories containing a ``queue.db`` so an unrelated
+    folder dropped under the queue root doesn't get probed. Returns
+    providers in sorted order so the search is deterministic across
+    runs (helps debugging and test stability).
+    """
+    if not os.path.isdir(queue_base_dir):
+        return []
+    out: List[str] = []
+    try:
+        entries = sorted(os.listdir(queue_base_dir))
+    except OSError:
+        return []
+    for name in entries:
+        candidate = os.path.join(queue_base_dir, name, "queue.db")
+        if os.path.isfile(candidate):
+            out.append(name)
+    return out
+
+
+def _lookup_message(
+    message_id: str,
+    queue_base_dir: str,
+    providers: Iterable[str],
+) -> tuple[Optional[QueueMessage], Optional[str]]:
+    """Search every per-provider queue for *message_id*.
+
+    Returns ``(message, provider_name)``. Both are ``None`` when the
+    id is not present in any queue (treat as a logical drift — the
+    disposition references an id we cannot resolve). Errors opening a
+    specific provider's database are swallowed: the goal is "find this
+    id somewhere", and a single corrupted queue should not blind us to
+    the others.
+    """
+    for provider in providers:
+        try:
+            qdb = QueueDB(provider=provider, base_dir=queue_base_dir)
+        except (ValueError, OSError):
+            continue
+        try:
+            msg = qdb.get_message(message_id)
+        except Exception:  # pragma: no cover — defensive
+            continue
+        if msg is not None:
+            return msg, provider
+    return None, None
+
 
 def _wait_for_verifications(
     session_set_dir: str,
@@ -475,42 +572,148 @@ def _wait_for_verifications(
     *,
     manual_verify: bool,
     timeout_minutes: int,
-) -> tuple[str, str, List[str]]:
+    queue_base_dir: str = QUEUE_DEFAULT_BASE_DIR,
+    poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
+    sleep: Optional[Callable[[float], None]] = None,
+    monotonic: Optional[Callable[[], float]] = None,
+) -> tuple[str, str, List[str], List[_MessageOutcome]]:
     """Wait for queued verifications to reach a terminal state.
 
-    Returns ``(method, wait_outcome, message_ids)``:
+    Returns ``(method, wait_outcome, message_ids, outcomes)``:
 
     * ``method`` — ``"api"`` (synchronous; nothing to wait on),
       ``"queue"`` (waited on the queue), ``"manual"``
       (``--manual-verify`` skipped the wait), or ``"skipped"`` (no
       disposition; nothing to do — the gate-failure path catches this
       separately).
-    * ``wait_outcome`` — Session 3 will populate with ``"completed"`` /
-      ``"failed"`` / ``"timed_out"`` depending on terminal queue state.
-      Skeleton always returns ``"not_run"``.
-    * ``message_ids`` — passed through from the disposition for the
-      JSON output. Empty in the skeleton's stub.
+    * ``wait_outcome`` — one of ``"not_run"`` (api / manual / skipped /
+      empty queue list), ``"completed"`` (every queued message ended
+      in ``completed``), ``"failed"`` (any message ended in ``failed``),
+      ``"timed_out"`` (any message ended in ``timed_out`` OR the wait
+      itself timed out before all messages resolved).
+    * ``message_ids`` — verbatim copy of
+      ``disposition.verification_message_ids`` (so the JSON output
+      carries the audit trail even when the wait was skipped).
+    * ``outcomes`` — per-message :class:`_MessageOutcome` snapshots,
+      used by :func:`run` to emit ``verification_completed`` /
+      ``verification_timed_out`` ledger events with structured
+      payloads. Empty list when the wait did not run.
 
-    Session 3 implements the actual blocking poll against
-    ``queue_db.get_message_state`` and uses ``timeout_minutes`` as the
-    upper bound. Until then we return immediately, regardless of the
-    ``verification_method`` declared in the disposition — the skeleton
-    is documentation that the wait would happen here.
+    Polling cadence is ``poll_interval_seconds`` (default 5 s) and the
+    overall budget is ``timeout_minutes`` (multiplied by 60 to get
+    seconds). The two clock primitives ``sleep`` and ``monotonic`` are
+    injectable so tests don't pay real wall-clock latency for the wait.
     """
-    # Reference parameters so future sessions can plug in without the
-    # signature changing.
-    _ = session_set_dir
-    _ = timeout_minutes
+    sleep_fn = sleep if sleep is not None else time.sleep
+    clock = monotonic if monotonic is not None else time.monotonic
 
     if manual_verify:
-        return "manual", "skipped_via_manual_verify", []
+        return "manual", "skipped_via_manual_verify", [], []
 
     if disposition is None:
-        return "skipped", "no_disposition", []
+        return "skipped", "no_disposition", [], []
 
     method = disposition.verification_method or "skipped"
     message_ids = list(disposition.verification_message_ids)
-    return method, "not_run", message_ids
+
+    # outsource-first / synchronous API path: verification result is
+    # already on disk by the time close-out runs. Nothing to wait on.
+    if method != "queue":
+        return method, "not_run", message_ids, []
+
+    # outsource-last / queue-mediated path. An empty message list with
+    # method=queue is a malformed disposition (validate_disposition
+    # rejects it), but defensively we still return "not_run" rather
+    # than spinning a zero-length poll loop.
+    if not message_ids:
+        return method, "not_run", message_ids, []
+
+    providers = _discover_queue_providers(queue_base_dir)
+    deadline = clock() + max(0, timeout_minutes) * 60.0
+
+    # Per-message terminal outcome cache. As soon as a message reaches
+    # a terminal state we record it and stop re-polling that id —
+    # terminal states cannot transition back, so further reads would
+    # waste DB roundtrips.
+    resolved: dict[str, _MessageOutcome] = {}
+
+    while True:
+        for mid in message_ids:
+            if mid in resolved:
+                continue
+            msg, provider = _lookup_message(mid, queue_base_dir, providers)
+            if msg is None:
+                # The id isn't present in any queue we can see. Record
+                # a synthetic timed-out outcome with a reason naming
+                # the drift; the caller treats this as a verification
+                # failure surface (gate_failed) at the top of run().
+                resolved[mid] = _MessageOutcome(
+                    message_id=mid,
+                    provider=None,
+                    state="missing",
+                    terminal=True,
+                    failure_reason=(
+                        f"queue message {mid!r} not found in any "
+                        f"provider under {queue_base_dir!r}"
+                    ),
+                )
+                continue
+            if msg.state in TERMINAL_STATES:
+                resolved[mid] = _MessageOutcome(
+                    message_id=mid,
+                    provider=provider,
+                    state=msg.state,
+                    terminal=True,
+                    failure_reason=msg.failure_reason,
+                )
+
+        if len(resolved) == len(message_ids):
+            break
+
+        # Some messages still in flight. Sleep up to one full poll
+        # interval, but never past the overall deadline — capping the
+        # sleep at the remaining budget keeps the timeout sharp.
+        remaining = deadline - clock()
+        if remaining <= 0:
+            break
+        sleep_fn(min(poll_interval_seconds, remaining))
+
+    # Decide the aggregate outcome based on the per-message states.
+    # Order of severity (most severe wins): timed_out > failed > completed.
+    # A "still pending at deadline" message is recorded as a synthetic
+    # timed_out outcome below so the aggregate reflects "we couldn't
+    # finish the wait".
+    outcomes: List[_MessageOutcome] = []
+    saw_failed = False
+    saw_timed_out = False
+    for mid in message_ids:
+        out = resolved.get(mid)
+        if out is None:
+            # Wait deadline expired while this message was still
+            # non-terminal. Reflect that as a synthetic timed_out
+            # outcome rather than a missing record so the aggregate
+            # logic treats it consistently.
+            out = _MessageOutcome(
+                message_id=mid,
+                provider=None,
+                state="pending_at_deadline",
+                terminal=False,
+                failure_reason="close_session timeout exceeded",
+            )
+        outcomes.append(out)
+        if out.state == "failed" or out.state == "missing":
+            saw_failed = True
+        elif out.state == "timed_out" or not out.terminal:
+            saw_timed_out = True
+
+    if saw_timed_out:
+        wait_outcome = "timed_out"
+    elif saw_failed:
+        wait_outcome = "failed"
+    else:
+        wait_outcome = "completed"
+
+    return method, wait_outcome, message_ids, outcomes
 
 
 # ---------------------------------------------------------------------------
@@ -617,13 +820,25 @@ def _emit_output(outcome: CloseoutOutcome, *, json_mode: bool) -> None:
 # Main flow
 # ---------------------------------------------------------------------------
 
-def run(args: argparse.Namespace) -> CloseoutOutcome:
+def run(
+    args: argparse.Namespace,
+    *,
+    queue_base_dir: str = QUEUE_DEFAULT_BASE_DIR,
+    poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
+    sleep: Optional[Callable[[float], None]] = None,
+    monotonic: Optional[Callable[[], float]] = None,
+) -> CloseoutOutcome:
     """Execute the close-out flow for the given parsed args.
 
-    Composed so callers (the reconciler in Session 3, integration tests
-    in Session 4) can build an ``argparse.Namespace`` directly and skip
-    the CLI parsing layer. Returns the :class:`CloseoutOutcome` rather
-    than calling ``sys.exit`` so callers can inspect / re-emit it.
+    Composed so callers (the reconciler, integration tests) can build
+    an ``argparse.Namespace`` directly and skip the CLI parsing layer.
+    Returns the :class:`CloseoutOutcome` rather than calling
+    ``sys.exit`` so callers can inspect / re-emit it.
+
+    The keyword-only knobs ``queue_base_dir``, ``poll_interval_seconds``,
+    ``sleep``, and ``monotonic`` are injection points for the
+    integration tests — production callers (the CLI ``main`` and the
+    reconciler) leave them at their defaults.
     """
     session_set_dir = _resolve_session_set_dir(args.session_set_dir)
     outcome = CloseoutOutcome(
@@ -753,16 +968,135 @@ def run(args: argparse.Namespace) -> CloseoutOutcome:
             **request_fields,
         )
 
-        # Verification wait (Session 3 fills in real polling).
-        method, wait_outcome, message_ids = _wait_for_verifications(
-            session_set_dir,
-            disposition,
-            manual_verify=args.manual_verify,
-            timeout_minutes=args.timeout,
-        )
+        # Verification wait. ``--force`` short-circuits this entirely —
+        # bypassing the gate is the point of ``--force``, and waiting on
+        # queued verifications when the operator has already chosen to
+        # skip the gate would just wedge the close-out unnecessarily.
+        if args.force:
+            method = "skipped"
+            wait_outcome = "not_run"
+            message_ids: List[str] = []
+            wait_outcomes: List[_MessageOutcome] = []
+        else:
+            method, wait_outcome, message_ids, wait_outcomes = (
+                _wait_for_verifications(
+                    session_set_dir,
+                    disposition,
+                    manual_verify=args.manual_verify,
+                    timeout_minutes=args.timeout,
+                    queue_base_dir=queue_base_dir,
+                    poll_interval_seconds=poll_interval_seconds,
+                    sleep=sleep,
+                    monotonic=monotonic,
+                )
+            )
         outcome.verification_method = method
         outcome.verification_wait_outcome = wait_outcome
         outcome.verification_message_ids = message_ids
+
+        # Emit per-message ledger events for the queue path. One event
+        # per message keeps the audit trail at message granularity so
+        # observers (the reconciler, the VS Code extension) can answer
+        # "which verification round terminated when" by walking the
+        # ledger alone.
+        for mo in wait_outcomes:
+            if mo.state == "completed":
+                _emit_event(
+                    session_set_dir,
+                    "verification_completed",
+                    outcome.session_number,
+                    outcome,
+                    message_id=mo.message_id,
+                    queue_provider=mo.provider,
+                    queue_state=mo.state,
+                )
+            elif mo.state == "timed_out" or not mo.terminal:
+                _emit_event(
+                    session_set_dir,
+                    "verification_timed_out",
+                    outcome.session_number,
+                    outcome,
+                    message_id=mo.message_id,
+                    queue_provider=mo.provider,
+                    queue_state=mo.state,
+                    failure_reason=mo.failure_reason,
+                )
+            else:
+                # ``failed`` and the synthetic ``missing`` state both
+                # fall here — both are verifier-side rejections that
+                # the close-out gate must surface as failures.
+                _emit_event(
+                    session_set_dir,
+                    "verification_completed",
+                    outcome.session_number,
+                    outcome,
+                    message_id=mo.message_id,
+                    queue_provider=mo.provider,
+                    queue_state=mo.state,
+                    failure_reason=mo.failure_reason,
+                )
+
+        # If the wait timed out (deadline exceeded with non-terminal
+        # messages OR any message ended in timed_out), surface a
+        # verification_timeout result and stop. The session does not
+        # transition to closed; the reconciler / a re-run picks it up
+        # once the verifier finishes.
+        if wait_outcome == "timed_out":
+            outcome.result = "verification_timeout"
+            reasons = [
+                mo.failure_reason or mo.state
+                for mo in wait_outcomes
+                if mo.state == "timed_out" or not mo.terminal
+            ]
+            joined = "; ".join(reasons) if reasons else "wait deadline exceeded"
+            outcome.messages.append(
+                f"verification timed out after {args.timeout} minute(s): "
+                f"{joined}"
+            )
+            _emit_event(
+                session_set_dir,
+                "closeout_failed",
+                outcome.session_number,
+                outcome,
+                reason="verification_timeout",
+                wait_outcome=wait_outcome,
+            )
+            return outcome
+
+        # Verifier-side rejection (any message failed or went missing).
+        # This is a gate failure — the work did not pass independent
+        # review — so we surface it through the gate_failed exit code
+        # rather than verification_timeout. ``failed`` is a verifier
+        # decision; ``timed_out`` is an infrastructure outcome; they
+        # deserve distinct exit codes so consumers can react
+        # appropriately.
+        if wait_outcome == "failed":
+            outcome.result = "gate_failed"
+            reasons = [
+                mo.failure_reason or mo.state
+                for mo in wait_outcomes
+                if mo.state in ("failed", "missing")
+            ]
+            joined = "; ".join(r for r in reasons if r) or "verifier rejected"
+            outcome.messages.append(
+                f"verification failed: {joined}"
+            )
+            outcome.gate_results = [
+                GateResult(
+                    check="verification_passed",
+                    passed=False,
+                    remediation=joined,
+                )
+            ]
+            _emit_event(
+                session_set_dir,
+                "closeout_failed",
+                outcome.session_number,
+                outcome,
+                reason="verification_failed",
+                failed_checks=["verification_passed"],
+            )
+            return outcome
 
         # Gate checks. ``--force`` skips the gate run entirely; we still
         # record an empty gate_results list so the JSON shape is

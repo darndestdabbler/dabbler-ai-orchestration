@@ -116,6 +116,15 @@ from .verification import (
     pick_verifier_model, build_verification_prompt,
     parse_verification_response, VerifierSelection,
 )
+from .verifier_role import (
+    FollowUpRequested,
+    HEARTBEAT_INTERVAL_SECONDS,
+    DEFAULT_POLL_INTERVAL_SECONDS,
+    VerifierDaemon,
+    make_worker_id,
+    process_one_message,
+    run_verification,
+)
 
 from dataclasses import dataclass, field
 from typing import Optional

@@ -99,6 +99,157 @@
           "costUsd": 0.020325
         }
       ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/read-guidance",
+      "dateTime": "2026-04-30T10:34:14.548542-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, ai-led-session-workflow.md, and spec.md. User instructed: no external provider routing this session except cross-provider verification routed to Gemini Pro.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-04-30T10:34:14.548542-04:00",
+      "description": "Wrote session-state.json marking session 2 of set 003 in-progress (currentSession=2, lifecycleState=work_in_progress, orchestrator=claude-code/claude-opus-4-7@high). Appended work_started event to session-events.jsonl.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/skip-ai-assignment",
+      "dateTime": "2026-04-30T10:34:14.549552-04:00",
+      "description": "Per durable user instruction (memory: feedback_ai_router_usage), routed ai-assignment.md authoring intentionally skipped this session.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/implement-gate-checks",
+      "dateTime": "2026-04-30T10:34:14.549552-04:00",
+      "description": "Created ai-router/gate_checks.py: 5 deterministic gate predicates with shared (passed, remediation) shape. check_working_tree_clean (scoped to session-set dir + files_changed allowlist + universal ignore patterns including .DS_Store/*.swp/.close_session.lock/session-events.jsonl, uses git status --porcelain -uall to defeat directory collapse). check_pushed_to_remote (enumerates detached HEAD, missing upstream, ahead-of-upstream, non-fast-forward, branch protection via git push --dry-run signal matching). check_activity_log_entry (verifies entry for currentSession exists). check_next_orchestrator_present (final-session shortcut; otherwise routes through validate_next_orchestrator). check_change_log_fresh (final-session-only; passes via mtime>=startedAt OR session-number reference in body). GATE_CHECKS registry preserves skeleton order.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/implement-close-lock",
+      "dateTime": "2026-04-30T10:34:14.549552-04:00",
+      "description": "Created ai-router/close_lock.py: file-based concurrency lock at <set>/.close_session.lock. acquire_lock uses O_CREAT|O_EXCL atomic create. Stale-lock reclaim via TTL (10 min) OR dead-PID detection. Cross-platform _pid_running: POSIX os.kill(pid, 0); Windows OpenProcess via ctypes with proper argtypes/restype and use_last_error=True for ERROR_INVALID_PARAMETER vs ERROR_ACCESS_DENIED disambiguation. release_lock is no-op when foreign PID holds the file. close_session_lock context manager.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/wire-into-close-session",
+      "dateTime": "2026-04-30T10:34:14.551063-04:00",
+      "description": "Replaced _run_gate_checks stub in close_session.py to iterate GATE_CHECKS registry; predicate exceptions become failed-gate remediation rather than crashing the flow. Wrapped run() main path and repair branch in acquire_lock/release_lock; lock contention surfaces result=lock_contention exit code 3. Lock reclaim warnings flow into outcome.messages.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/tests-gate-checks",
+      "dateTime": "2026-04-30T10:34:14.551063-04:00",
+      "description": "Wrote ai-router/tests/test_gate_checks.py: 24 tests. Helpers create real git repos with bare remotes. Coverage: clean tree pass, untracked-in-scope fail, universal pattern ignore (.DS_Store/.swp), out-of-scope filtering, not-a-git-repo fail; clean push pass, missing upstream, detached HEAD, ahead-of-upstream needs-push, divergent non-fast-forward; activity log present, missing state, missing log, no-matching-session; next_orchestrator final-skip, missing on non-final, malformed specifics, valid; change-log nonfinal-skip, missing on final, fresh-by-mtime, fresh-by-content-reference, stale-fail; registry order stability.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/tests-close-lock",
+      "dateTime": "2026-04-30T10:34:14.552073-04:00",
+      "description": "Wrote ai-router/tests/test_close_lock.py: 10 tests. Acquire creates file with PID/worker_id/timestamp, release removes file. Second acquire raises LockContention. Stale by TTL reclaimed with warning. Stale by dead PID reclaimed with warning. Foreign-PID release is no-op (does not remove peer file). Already-gone release is no-op. Context manager acquires/releases on success and on exception; propagates LockContention.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/tests-close-session-integration",
+      "dateTime": "2026-04-30T10:34:14.553071-04:00",
+      "description": "Wrote ai-router/tests/test_close_session_integration.py: 7 end-to-end tests against real git repo + real session-set fixtures. Real close-out succeeds. Concurrent peer triggers lock_contention exit 3. Stale lock from dead PID is reclaimed; close-out proceeds with warning in messages. Uncommitted in-scope file triggers gate_failed exit 1 naming working_tree_clean. Final session without change-log triggers gate_failed naming change_log_fresh. --force still bypasses gates but still acquires the lock; --force is blocked by a live peer.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-2/update-skeleton-tests",
+      "dateTime": "2026-04-30T10:34:14.553682-04:00",
+      "description": "Updated test_close_session_skeleton.py to monkeypatch _run_gate_checks in the started_with_disposition fixture and the session-zero test, since the skeleton tests were previously written against a stub-passes-everything implementation. Skeleton tests now isolate flow-control concerns from gate-check correctness; gate correctness lives in test_gate_checks.py.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-2/full-suite-green",
+      "dateTime": "2026-04-30T10:34:14.554693-04:00",
+      "description": "Full pytest suite: 415 passed in ~30s on Windows (was 374 in Session 1 baseline; +41 net new tests).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "session-2/cross-provider-verification",
+      "dateTime": "2026-04-30T10:37:36.086856-04:00",
+      "description": "Routed end-of-session verification to gemini-pro per user instruction (overrode session-verification task_type_override which defaults to gpt-5-4). Round 1: Gemini Pro returned substantive pass with all 6 acceptance criteria affirmed Met, but used non-standard verdict wording (\"**Verdict:** pass\") that the orchestrator-side parser does not recognize. Cost $0.0519, in=34416t out=888t. Saved to session-reviews/session-002.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 34416,
+          "outputTokens": 888,
+          "costUsd": 0.0519
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 13,
+      "stepKey": "session-2/cross-provider-verification-round2",
+      "dateTime": "2026-04-30T10:37:36.087860-04:00",
+      "description": "Round 2 re-verify with explicit schema instruction. Router auto-escalated past Gemini to Opus because Gemini response was short (21 tokens output) and tripped the truncation/short-response escalation heuristic. Round 2 verdict: VERIFIED (single line + summary, no issues). Escalation surfaced an unintended Anthropic spend ($0.5434) on top of the user instruction restricting routing this session \u2014 flagging transparently. Cost $0.5434, in=36124t out=21t. Appended to session-reviews/session-002.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "opus",
+          "taskType": "session-verification",
+          "inputTokens": 36124,
+          "outputTokens": 21,
+          "costUsd": 0.5434
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 14,
+      "stepKey": "session-2/lessons-learned-add",
+      "dateTime": "2026-04-30T11:21:32.496773-04:00",
+      "description": "Added lessons-learned entry: \"Schema-Only Re-Verifies Need max_tier Pinned To Block Auto-Escalation\". Captures the round-2 re-verify failure mode where a wording-only re-verify against Gemini Pro escalated to Opus due to short-response heuristic, costing an unintended Anthropic call. Action: future schema-only re-verifies must pass max_tier=<verifier_tier>.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 15,
+      "stepKey": "session-2/mark-complete",
+      "dateTime": "2026-04-30T11:21:32.497837-04:00",
+      "description": "Marked session 2 complete in session-state.json with verdict=VERIFIED. Emitted verification_completed and work_verified events.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

@@ -93,6 +93,32 @@
   the workflow doc makes this explicit.
 - **Action for future sessions:** Never self-opine on which model is cheaper.
 
+## Schema-Only Re-Verifies Need `max_tier` Pinned To Block Auto-Escalation
+
+- **Context:** Round 2 of cross-provider session verification when the
+  Round 1 response was substantively correct but used non-standard
+  verdict wording (e.g., `**Verdict:** pass` rather than `VERIFIED`).
+  The orchestrator re-routes to the same verifier with a "fix the
+  wording, keep the substance" instruction.
+- **Failure or friction:** A schema-only re-verify legitimately
+  produces a very short response (a single verdict token plus a
+  one-line summary). The router's short-response escalation heuristic
+  fires on that brevity and re-issues the call against the next tier —
+  which is a different provider. In one observed case, a Gemini Pro
+  re-verify escalated to Opus and added a $0.54 Anthropic spend the
+  user had explicitly excluded for the session.
+- **Lesson:** Re-verifies that exist only to fix wording must pin
+  `max_tier` to the verifier's own tier (or pass `complexity_hint`
+  alongside escalation-suppressing instructions in the prompt). For
+  Gemini Pro that means `max_tier=2`. The escalation logic exists for
+  the substantive-failure case; it is wrong for the
+  parser-friendliness case.
+- **Action for future sessions:** When re-verifying for schema reasons
+  only, pass `max_tier=<verifier_tier>` to `route()` so the router
+  cannot cross-provider on its own. If the substantive re-verify is
+  itself the goal, normal escalation is correct — only pin when the
+  re-verify is wording-only.
+
 ## Per-Session-Set E2E/UAT Configuration Is Spec-Declared, Not Inferred
 
 - **Context:** Authoring a new session-set spec or onboarding a set.

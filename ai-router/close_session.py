@@ -109,6 +109,12 @@ try:
         read_events,
     )
     from session_state import read_session_state  # type: ignore[import-not-found]
+    from gate_checks import GATE_CHECKS  # type: ignore[import-not-found]
+    from close_lock import (  # type: ignore[import-not-found]
+        LockContention,
+        acquire_lock,
+        release_lock,
+    )
 except ImportError:
     from .disposition import (  # type: ignore[no-redef]
         Disposition,
@@ -121,6 +127,12 @@ except ImportError:
         read_events,
     )
     from .session_state import read_session_state  # type: ignore[no-redef]
+    from .gate_checks import GATE_CHECKS  # type: ignore[no-redef]
+    from .close_lock import (  # type: ignore[no-redef]
+        LockContention,
+        acquire_lock,
+        release_lock,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -411,16 +423,9 @@ def _read_disposition_or_none(session_set_dir: str) -> Optional[Disposition]:
 # Gate-check skeleton (Session 2 fills in real checks)
 # ---------------------------------------------------------------------------
 
-# Names of the gate checks Session 2 will implement. Listed here so the
-# skeleton's stub output is shape-stable and downstream JSON consumers
-# can rely on the keys appearing in the same order regardless of session.
-_GATE_CHECK_NAMES = (
-    "working_tree_clean",
-    "pushed_to_remote",
-    "activity_log_entry",
-    "next_orchestrator_present",
-    "change_log_fresh",
-)
+# Names of the gate checks. Kept for backwards reference; the real
+# (name, predicate) registry lives in :mod:`gate_checks`.
+_GATE_CHECK_NAMES = tuple(name for name, _fn in GATE_CHECKS)
 
 
 def _run_gate_checks(
@@ -429,33 +434,35 @@ def _run_gate_checks(
     *,
     allow_empty_commit: bool,
 ) -> List[GateResult]:
-    """Run the deterministic gate checks. Skeleton: every check passes.
+    """Run the deterministic gate checks against the session set.
 
-    Session 2 replaces the stubbed body with real predicates. Each real
-    check returns ``(passed, remediation)``; the wrapper here just turns
-    that into a :class:`GateResult`. Until then we emit a passing
-    GateResult for each named check so downstream callers (and the JSON
-    output schema) see the shape they expect.
-
-    Why a stub rather than skipping outright: skipping would make the
-    JSON output's ``gate_results`` list empty during the skeleton phase
-    and then non-empty in Session 2, which would force every consumer to
-    handle two shapes. The stub stays shape-stable from day one.
+    Each predicate from :data:`gate_checks.GATE_CHECKS` is invoked with
+    the same three arguments. A predicate that raises is recorded as a
+    failed gate with the exception text in the remediation — gates must
+    not crash the close-out flow because a single buggy predicate could
+    otherwise wedge every set in the repo. The wrapper preserves the
+    declared order of :data:`gate_checks.GATE_CHECKS` so the JSON
+    output's ``gate_results`` list is shape-stable across runs.
     """
-    # Disposition-derived checks are deferred to Session 2; we just
-    # acknowledge the parameters here so the signature is stable.
-    _ = disposition
-    _ = allow_empty_commit
-    _ = session_set_dir
-
-    return [
-        GateResult(
-            check=name,
-            passed=True,
-            remediation="",
+    results: List[GateResult] = []
+    for name, predicate in GATE_CHECKS:
+        try:
+            passed, remediation = predicate(
+                session_set_dir,
+                disposition,
+                allow_empty_commit=allow_empty_commit,
+            )
+        except Exception as exc:  # pragma: no cover — defensive
+            passed = False
+            remediation = f"gate predicate raised {type(exc).__name__}: {exc}"
+        results.append(
+            GateResult(
+                check=name,
+                passed=bool(passed),
+                remediation=remediation,
+            )
         )
-        for name in _GATE_CHECK_NAMES
-    ]
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -646,16 +653,28 @@ def run(args: argparse.Namespace) -> CloseoutOutcome:
 
     # Repair branch: short-circuits the gate flow. ``--repair`` is a
     # diagnostic / corrective tool that bypasses the normal close-out
-    # gate; we run the repair walk and exit on its result.
+    # gate; we run the repair walk and exit on its result. The lock is
+    # held across the repair walk so a repair cannot race with a normal
+    # close-out on the same set (and vice versa).
     if args.repair:
-        drift, messages = _run_repair(
-            session_set_dir, apply_changes=args.apply,
-        )
-        outcome.messages.extend(messages)
-        if drift and not args.apply:
-            outcome.result = "repair_drift"
-        else:
-            outcome.result = "succeeded"
+        try:
+            lock_handle = acquire_lock(session_set_dir)
+        except LockContention as exc:
+            outcome.result = "lock_contention"
+            outcome.messages.append(str(exc))
+            return outcome
+        try:
+            outcome.messages.extend(lock_handle.warnings)
+            drift, messages = _run_repair(
+                session_set_dir, apply_changes=args.apply,
+            )
+            outcome.messages.extend(messages)
+            if drift and not args.apply:
+                outcome.result = "repair_drift"
+            else:
+                outcome.result = "succeeded"
+        finally:
+            release_lock(lock_handle)
         return outcome
 
     # Idempotency check before reading disposition — if the session is
@@ -698,74 +717,92 @@ def run(args: argparse.Namespace) -> CloseoutOutcome:
         outcome.messages.append(reason_err)
         return outcome
 
-    # Emit the start-of-closeout event before the gate runs so a crash
-    # mid-gate leaves an auditable "we started" record. ``--force``
-    # still emits this — the event is "we attempted close-out", not
-    # "the gates passed". The reason text (if any) is captured in the
-    # event payload so the audit trail records the operator's
-    # narrative — this is what ``--reason-file`` is for.
-    request_fields = {
-        "force": args.force,
-        "manual_verify": args.manual_verify,
-    }
-    if reason_text is not None:
-        request_fields["reason"] = reason_text
-    _emit_event(
-        session_set_dir,
-        "closeout_requested",
-        outcome.session_number,
-        outcome,
-        **request_fields,
-    )
+    # Acquire the concurrency lock around the rest of the flow. Two
+    # close_session invocations on the same set must not interleave —
+    # they would race on event emission and (eventually, in Set 4) on
+    # mark_session_complete. Lock contention surfaces as result
+    # ``lock_contention`` / exit code 3; the reclaim path emits
+    # warnings into outcome.messages so the operator sees that a stale
+    # lock was reclaimed.
+    try:
+        lock_handle = acquire_lock(session_set_dir)
+    except LockContention as exc:
+        outcome.result = "lock_contention"
+        outcome.messages.append(str(exc))
+        return outcome
+    outcome.messages.extend(lock_handle.warnings)
 
-    # Verification wait (Session 3 fills in real polling).
-    method, wait_outcome, message_ids = _wait_for_verifications(
-        session_set_dir,
-        disposition,
-        manual_verify=args.manual_verify,
-        timeout_minutes=args.timeout,
-    )
-    outcome.verification_method = method
-    outcome.verification_wait_outcome = wait_outcome
-    outcome.verification_message_ids = message_ids
-
-    # Gate checks (Session 2 fills in real checks). ``--force`` skips
-    # the gate run entirely; we still record an empty gate_results list
-    # so the JSON shape is unambiguous in that case.
-    if args.force:
-        outcome.gate_results = []
-    else:
-        outcome.gate_results = _run_gate_checks(
-            session_set_dir,
-            disposition,
-            allow_empty_commit=args.allow_empty_commit,
-        )
-
-    failed = [g for g in outcome.gate_results if not g.passed]
-    if failed:
-        outcome.result = "gate_failed"
-        for g in failed:
-            outcome.messages.append(
-                f"gate {g.check} failed: {g.remediation}"
-            )
+    try:
+        # Emit the start-of-closeout event before the gate runs so a crash
+        # mid-gate leaves an auditable "we started" record. ``--force``
+        # still emits this — the event is "we attempted close-out", not
+        # "the gates passed". The reason text (if any) is captured in the
+        # event payload so the audit trail records the operator's
+        # narrative — this is what ``--reason-file`` is for.
+        request_fields = {
+            "force": args.force,
+            "manual_verify": args.manual_verify,
+        }
+        if reason_text is not None:
+            request_fields["reason"] = reason_text
         _emit_event(
             session_set_dir,
-            "closeout_failed",
+            "closeout_requested",
             outcome.session_number,
             outcome,
-            failed_checks=[g.check for g in failed],
+            **request_fields,
+        )
+
+        # Verification wait (Session 3 fills in real polling).
+        method, wait_outcome, message_ids = _wait_for_verifications(
+            session_set_dir,
+            disposition,
+            manual_verify=args.manual_verify,
+            timeout_minutes=args.timeout,
+        )
+        outcome.verification_method = method
+        outcome.verification_wait_outcome = wait_outcome
+        outcome.verification_message_ids = message_ids
+
+        # Gate checks. ``--force`` skips the gate run entirely; we still
+        # record an empty gate_results list so the JSON shape is
+        # unambiguous in that case.
+        if args.force:
+            outcome.gate_results = []
+        else:
+            outcome.gate_results = _run_gate_checks(
+                session_set_dir,
+                disposition,
+                allow_empty_commit=args.allow_empty_commit,
+            )
+
+        failed = [g for g in outcome.gate_results if not g.passed]
+        if failed:
+            outcome.result = "gate_failed"
+            for g in failed:
+                outcome.messages.append(
+                    f"gate {g.check} failed: {g.remediation}"
+                )
+            _emit_event(
+                session_set_dir,
+                "closeout_failed",
+                outcome.session_number,
+                outcome,
+                failed_checks=[g.check for g in failed],
+            )
+            return outcome
+
+        outcome.result = "succeeded"
+        _emit_event(
+            session_set_dir,
+            "closeout_succeeded",
+            outcome.session_number,
+            outcome,
+            method=method,
         )
         return outcome
-
-    outcome.result = "succeeded"
-    _emit_event(
-        session_set_dir,
-        "closeout_succeeded",
-        outcome.session_number,
-        outcome,
-        method=method,
-    )
-    return outcome
+    finally:
+        release_lock(lock_handle)
 
 
 def main(argv: Optional[List[str]] = None) -> int:

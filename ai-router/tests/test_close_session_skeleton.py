@@ -80,11 +80,16 @@ def started_session_set(session_set_dir: str) -> str:
 
 
 @pytest.fixture
-def started_with_disposition(started_session_set: str) -> str:
+def started_with_disposition(started_session_set: str, monkeypatch) -> str:
     """A session set with a valid api-mode disposition.json present.
 
-    Suitable for the happy-path skeleton test: skeleton gate checks all
-    pass, so we expect ``result == "succeeded"`` and exit 0.
+    These tests focus on the close-out *flow* (idempotency, JSON shape,
+    event emission, lock acquisition) rather than gate-check
+    correctness — the dedicated gate-check tests in
+    ``test_gate_checks.py`` cover predicate behavior. We stub the gate
+    runner to "all pass" so a happy-path flow test does not need to
+    construct a real git repo with the right HEAD/upstream/working tree
+    state.
     """
     disp = Disposition(
         status="completed",
@@ -95,11 +100,15 @@ def started_with_disposition(started_session_set: str) -> str:
         next_orchestrator=None,
         blockers=[],
     )
-    # status==completed without is_final_session would normally require
-    # next_orchestrator, but skeleton gate doesn't enforce that yet.
-    # Bypass by passing is_final_session=True via direct write (the
-    # skeleton's gate stub does not run validate_disposition).
     write_disposition(started_session_set, disp)
+
+    monkeypatch.setattr(
+        close_session, "_run_gate_checks",
+        lambda *_a, **_kw: [
+            GateResult(check=name, passed=True, remediation="")
+            for name in close_session._GATE_CHECK_NAMES
+        ],
+    )
     return started_session_set
 
 
@@ -427,7 +436,7 @@ def test_gate_failure_emits_closeout_failed_event(
 
 
 def test_events_emitted_with_session_zero_when_state_file_absent(
-    session_set_dir, tmp_path
+    session_set_dir, tmp_path, monkeypatch,
 ):
     """A set with disposition but no session-state.json defaults events to session 0."""
     # Build the disposition without ever calling register_session_start —
@@ -443,6 +452,16 @@ def test_events_emitted_with_session_zero_when_state_file_absent(
         blockers=[],
     )
     write_disposition(session_set_dir, disp)
+
+    # Real gate checks would fail without git/state; this test cares
+    # about session_number defaulting, not gate correctness.
+    monkeypatch.setattr(
+        close_session, "_run_gate_checks",
+        lambda *_a, **_kw: [
+            GateResult(check=name, passed=True, remediation="")
+            for name in close_session._GATE_CHECK_NAMES
+        ],
+    )
 
     args = _ns(session_set_dir=session_set_dir)
     outcome = run(args)

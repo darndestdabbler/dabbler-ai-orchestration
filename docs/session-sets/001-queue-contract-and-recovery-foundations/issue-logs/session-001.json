@@ -1,0 +1,57 @@
+[
+  {
+    "round": 1,
+    "id": "r1-1",
+    "category": "Correctness",
+    "severity": "Major",
+    "description": "enqueue() with duplicate idempotency_key returned existing id silently; spec line 91 says \"rejects duplicate\".",
+    "status": "fixed",
+    "fix": "Added DuplicateIdempotencyKeyError; enqueue raises on duplicate. Exception carries existing_id for enqueue-or-fetch callers."
+  },
+  {
+    "round": 1,
+    "id": "r1-2",
+    "category": "Completeness",
+    "severity": "Major",
+    "description": "heartbeat_seen state from spec narrative (line 27) not implemented; claim() set last_heartbeat_at immediately, losing the \"claimed-not-yet-heartbeated\" distinction.",
+    "status": "fixed",
+    "fix": "Spec is internally inconsistent (line 27 lists 6 states; line 68 SQL DDL lists 5). Human adjudicated: keep 5-state DDL. claim() leaves last_heartbeat_at NULL; heartbeat() populates it. Test added."
+  },
+  {
+    "round": 1,
+    "id": "r1-3",
+    "category": "Completeness",
+    "severity": "Minor",
+    "description": "Acceptance line 100 asks for concurrent-process tests; round 1 only had thread-based tests.",
+    "status": "fixed",
+    "fix": "Added subprocess-based test that spawns 4 worker processes and asserts exactly one wins. (Round 2 tightened it with a release barrier.)"
+  },
+  {
+    "round": 2,
+    "id": "r2-1",
+    "category": "Correctness",
+    "severity": "Major",
+    "description": "Provider validation accepted \".\", \"..\", and other traversal-like names, allowing escape from per-provider queue root.",
+    "status": "fixed",
+    "fix": "Tightened to regex ^[A-Za-z0-9_-]+$ + defense-in-depth Path.resolve() containment check. 11 parameterized rejection tests + 6 acceptance tests."
+  },
+  {
+    "round": 2,
+    "id": "r2-2",
+    "category": "Correctness",
+    "severity": "Minor",
+    "description": "Multi-process claim test had no start barrier; could pass under serial execution without exercising real contention.",
+    "status": "fixed",
+    "fix": "Each subprocess opens QueueDB up-front, busy-waits on shared time.time() release timestamp 1s in the future, then calls claim() simultaneously."
+  },
+  {
+    "round": 3,
+    "id": "r3-1",
+    "category": "Correctness",
+    "severity": "Major",
+    "description": "PRAGMA synchronous = NORMAL weakened durability against OS crash / power loss below the queue's contract.",
+    "status": "fixed",
+    "fix": "Removed the NORMAL override. SQLite default of FULL applies, which is the right durability floor for the canonical record of in-flight work. Added test_synchronous_not_downgraded_below_full asserting PRAGMA synchronous >= FULL.",
+    "note": "Round 3 was the final allowed verification retry per workflow Step 7. Fix is mechanical (single line removed, plus a regression test) and is deemed safe to commit without re-verification."
+  }
+]

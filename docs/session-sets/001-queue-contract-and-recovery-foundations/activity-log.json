@@ -1,0 +1,121 @@
+{
+  "sessionSetName": "001-queue-contract-and-recovery-foundations",
+  "createdDate": "2026-04-30T05:24:06.062958-04:00",
+  "totalSessions": 5,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-1/read-guidance",
+      "dateTime": "2026-04-30T05:24:06.074663-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, ai-led-session-workflow.md, spec.md",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-1/register-start",
+      "dateTime": "2026-04-30T05:24:06.074663-04:00",
+      "description": "Wrote session-state.json marking session 1 in-progress",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-1/implement-queue-db",
+      "dateTime": "2026-04-30T05:24:06.074663-04:00",
+      "description": "Created ai-router/queue_db.py: SQLite schema (messages, follow_ups), WAL mode, QueueDB class with enqueue/claim/heartbeat/complete/fail/reclaim_expired and read helpers",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-1/write-tests",
+      "dateTime": "2026-04-30T05:24:06.074663-04:00",
+      "description": "Created ai-router/tests/test_queue_db.py with 23 unit tests covering all spec acceptance criteria; added pytest.ini with import-mode=importlib (hyphenated ai-router/ otherwise breaks pytest collection)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/run-tests",
+      "dateTime": "2026-04-30T05:24:06.074663-04:00",
+      "description": "pytest: 23 passed in 0.36s",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/verify",
+      "dateTime": "2026-04-30T05:27:08.079018-04:00",
+      "description": "End-of-session verification routed via gpt-5-4",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 9142,
+          "outputTokens": 7331,
+          "costUsd": 0.13282
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-1/fix-issues",
+      "dateTime": "2026-04-30T05:56:14.338453-04:00",
+      "description": "Applied fixes for verifier-flagged issues 1, 2, 3 from round 1; pytest 25/25 green.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-1/verify-round-2",
+      "dateTime": "2026-04-30T05:59:33.584461-04:00",
+      "description": "End-of-session verification (round 2) routed via gpt-5-4",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 9996,
+          "outputTokens": 9861,
+          "costUsd": 0.17290499999999998
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-1/verify-round-3",
+      "dateTime": "2026-04-30T06:05:55.088551-04:00",
+      "description": "End-of-session verification (round 3, final retry) routed via gpt-5-4",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 10663,
+          "outputTokens": 10826,
+          "costUsd": 0.1890475
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-1/fix-round-3",
+      "dateTime": "2026-04-30T06:07:24.265381-04:00",
+      "description": "Removed PRAGMA synchronous=NORMAL override; added regression test asserting synchronous >= FULL. pytest 41/41 green.",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

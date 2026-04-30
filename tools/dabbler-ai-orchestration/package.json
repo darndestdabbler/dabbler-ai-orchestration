@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Project wizard, session-set explorer, and cost dashboard for the Dabbler AI-led workflow.",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -43,6 +43,16 @@
         {
           "id": "dabblerSessionSets",
           "name": "Session Sets",
+          "contextualTitle": "Dabbler AI Orchestration"
+        },
+        {
+          "id": "dabblerProviderQueues",
+          "name": "Provider Queues",
+          "contextualTitle": "Dabbler AI Orchestration"
+        },
+        {
+          "id": "dabblerProviderHeartbeats",
+          "name": "Provider Heartbeats",
           "contextualTitle": "Dabbler AI Orchestration"
         }
       ]
@@ -142,6 +152,33 @@
         "title": "Show Cost Dashboard",
         "category": "Dabbler",
         "icon": "$(graph)"
+      },
+      {
+        "command": "dabblerProviderQueues.refresh",
+        "title": "Refresh Provider Queues",
+        "category": "Dabbler",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dabblerProviderQueues.openPayload",
+        "title": "Open Payload",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerProviderQueues.markFailed",
+        "title": "Mark Failed",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerProviderQueues.forceReclaim",
+        "title": "Force Reclaim",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerProviderHeartbeats.refresh",
+        "title": "Refresh Provider Heartbeats",
+        "category": "Dabbler",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -170,6 +207,16 @@
           "command": "dabbler.getStarted",
           "when": "view == dabblerSessionSets",
           "group": "navigation@3"
+        },
+        {
+          "command": "dabblerProviderQueues.refresh",
+          "when": "view == dabblerProviderQueues",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dabblerProviderHeartbeats.refresh",
+          "when": "view == dabblerProviderHeartbeats",
+          "group": "navigation@1"
         }
       ],
       "view/item/context": [
@@ -227,6 +274,21 @@
           "command": "dabblerSessionSets.copySlug",
           "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
           "group": "4_copy_meta@1"
+        },
+        {
+          "command": "dabblerProviderQueues.openPayload",
+          "when": "view == dabblerProviderQueues && viewItem =~ /^queueMessage:/",
+          "group": "1_inspect@1"
+        },
+        {
+          "command": "dabblerProviderQueues.markFailed",
+          "when": "view == dabblerProviderQueues && viewItem =~ /^queueMessage:(new|claimed)/",
+          "group": "9_danger@1"
+        },
+        {
+          "command": "dabblerProviderQueues.forceReclaim",
+          "when": "view == dabblerProviderQueues && viewItem =~ /^queueMessage:claimed/",
+          "group": "9_danger@2"
         }
       ]
     },
@@ -249,6 +311,41 @@
           "type": "string",
           "default": "tests",
           "markdownDescription": "Root directory (relative to workspace root) to search for E2E test files. Defaults to `tests/`."
+        },
+        "dabblerProviderQueues.autoRefreshSeconds": {
+          "type": "number",
+          "default": 15,
+          "minimum": 0,
+          "markdownDescription": "Auto-refresh interval (seconds) for the Provider Queues view. Set to `0` to disable auto-refresh; manual refresh remains available via the toolbar button."
+        },
+        "dabblerProviderQueues.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "markdownDescription": "Python executable used to invoke `python -m ai_router.queue_status`. Override if your environment requires a virtualenv path (e.g. `.venv/Scripts/python.exe`)."
+        },
+        "dabblerProviderQueues.messageLimit": {
+          "type": "number",
+          "default": 50,
+          "minimum": 1,
+          "markdownDescription": "Maximum number of messages fetched per provider per refresh."
+        },
+        "dabblerProviderHeartbeats.autoRefreshSeconds": {
+          "type": "number",
+          "default": 15,
+          "minimum": 0,
+          "markdownDescription": "Auto-refresh interval (seconds) for the Provider Heartbeats view. Set to `0` to disable auto-refresh."
+        },
+        "dabblerProviderHeartbeats.lookbackMinutes": {
+          "type": "number",
+          "default": 60,
+          "minimum": 1,
+          "markdownDescription": "Lookback window (minutes) for the heartbeats view's completion / token counts. **Observational only** — this does not predict subscription-window exhaustion."
+        },
+        "dabblerProviderHeartbeats.silentWarningMinutes": {
+          "type": "number",
+          "default": 30,
+          "minimum": 1,
+          "markdownDescription": "Show a silent-provider warning when a provider's last completion was more than this many minutes ago."
         }
       }
     }

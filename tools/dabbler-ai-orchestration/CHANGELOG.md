@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-04-30
+
+### Added
+- `Provider Queues` and `Provider Heartbeats` view containers in the
+  activity-bar (Set 5 / Session 1). Tree implementations land in
+  Sessions 2–3; this release wires the manifest-side scaffold so the
+  extension still loads while the providers are stubbed.
+- Configuration settings for both views: `dabblerProviderQueues.*`
+  (auto-refresh interval, Python path, message limit) and
+  `dabblerProviderHeartbeats.*` (auto-refresh interval, lookback
+  window, silent-provider warning threshold).
+- Command IDs for queue refresh, payload inspection, mark-failed,
+  force-reclaim, and heartbeat refresh. The extension shells out to
+  two new helpers — `python -m ai_router.queue_status` and
+  `python -m ai_router.heartbeat_status` — rather than embedding a
+  SQLite client of its own.
+
 ## [0.9.0] — 2026-04-29
 
 ### Added

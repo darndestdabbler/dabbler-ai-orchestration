@@ -29,6 +29,7 @@ Schema versions
 """
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass
@@ -41,6 +42,54 @@ import yaml
 
 SESSION_STATE_FILENAME = "session-state.json"
 SCHEMA_VERSION = 2
+
+
+_logger = logging.getLogger("ai_router.session_state")
+if not _logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(message)s"))
+    _logger.addHandler(_handler)
+_logger.setLevel(logging.WARNING)
+_logger.propagate = False
+
+
+@dataclass(frozen=True)
+class GateCheckFailure:
+    """One failed gate check, surfaced through :class:`CloseoutGateFailure`.
+
+    ``check`` is the gate predicate name (e.g. ``"working_tree_clean"``,
+    ``"pushed_to_remote"``); ``remediation`` is a one-line hint the
+    operator can act on. Mirrors :class:`close_session.GateResult` but
+    is defined here so callers that catch the exception do not need to
+    reach into ``close_session`` for the type.
+    """
+
+    check: str
+    remediation: str
+
+
+class CloseoutGateFailure(Exception):
+    """Raised by :func:`mark_session_complete` when one or more gates fail.
+
+    Carries the structured failure list on ``failures`` so callers can
+    pretty-print remediations or filter by check name. The ``str()`` form
+    is a human-readable summary suitable for logging or surfacing to the
+    operator without further wrangling.
+
+    Catch this exception, NOT ``Exception`` — the gate is the only path
+    that surfaces this type, and catching it broadly would mask the
+    structured failure information.
+    """
+
+    def __init__(self, failures: List[GateCheckFailure]) -> None:
+        self.failures: List[GateCheckFailure] = list(failures)
+        bullets = "\n".join(
+            f"  - {f.check}: {f.remediation}" for f in self.failures
+        ) or "  (no failures recorded)"
+        super().__init__(
+            f"close-out gate rejected {len(self.failures)} check(s):\n"
+            f"{bullets}"
+        )
 
 
 class SessionLifecycleState(str, Enum):
@@ -157,15 +206,20 @@ def _propagate_total_sessions(session_set: str, total: int) -> None:
         json.dump(data, f, indent=2)
 
 
-def mark_session_complete(
+def _flip_state_to_closed(
     session_set: str,
     verification_verdict: Optional[str] = None,
 ) -> Optional[str]:
-    """Flip ``session-state.json`` ``status`` to ``complete`` for the current session.
+    """Internal: flip ``session-state.json`` to closed without running the gate.
 
-    Called at the end of Step 8, just before ``git commit``, so the committed
-    file reflects the completed-and-verified state. Returns the path if
-    updated, ``None`` if no state file existed.
+    Used by :func:`mark_session_complete` after the gate passes (or is
+    bypassed via ``force=True``), and by ``close_session._run_repair``
+    when it needs to catch up a snapshot to an events ledger that
+    already records ``closeout_succeeded``. Callers that must enforce
+    the gate use the public :func:`mark_session_complete` entry point.
+
+    Returns the file path if it existed and was updated, ``None`` if no
+    state file existed.
     """
     path = _state_path(session_set)
     if not os.path.isfile(path):
@@ -194,6 +248,116 @@ def mark_session_complete(
         _finalize_total_sessions_from_entries(session_set)
 
     return path
+
+
+def mark_session_complete(
+    session_set: str,
+    verification_verdict: Optional[str] = None,
+    *,
+    force: bool = False,
+) -> Optional[str]:
+    """Run the close-out gate, then flip ``session-state.json`` to ``complete``.
+
+    Called at the end of Step 8, just before ``git commit``, so the
+    committed file reflects the completed-and-verified state. Returns
+    the path if updated, ``None`` if no state file existed.
+
+    Gate enforcement (Set 4 Session 3 wiring)
+    -----------------------------------------
+    Before flipping, the deterministic gate from Set 3 runs via
+    :func:`close_session.run_gate_checks`. The contract:
+
+    * **All gates pass** → flip the snapshot, append a
+      ``closeout_succeeded`` event to ``session-events.jsonl`` (with
+      ``forced=False``), return the path.
+    * **One or more gates fail and ``force=False``** → raise
+      :class:`CloseoutGateFailure` carrying the structured failure list.
+      The snapshot is NOT flipped. No event is appended (the close-out
+      didn't succeed, and emitting ``closeout_failed`` here would
+      duplicate what a future ``close_session`` invocation would emit
+      against the same set of failures).
+    * **One or more gates fail and ``force=True``** → log a loud
+      DEPRECATION warning, append ``closeout_succeeded`` with
+      ``forced=True`` and the failed-check names, and proceed with the
+      flip. The ``--force`` path is transitional and will be tightened
+      in a future set; relying on it now incurs an audit-trail marker.
+
+    The event-emission step is best-effort with respect to a missing
+    session-set directory or a transient I/O hiccup: a write failure
+    raises out of ``append_event`` and the flip itself does not happen,
+    so the snapshot and the ledger never disagree on success.
+    """
+    if not os.path.isfile(_state_path(session_set)):
+        return None
+
+    state_before = read_session_state(session_set)
+    session_number = (
+        state_before.get("currentSession")
+        if isinstance(state_before, dict)
+        else None
+    )
+    if not isinstance(session_number, int):
+        session_number = 0
+
+    # Run the gate. Lazy import to avoid a top-level cycle: close_session
+    # imports session_state for read_session_state and (in the repair
+    # path) for _flip_state_to_closed.
+    try:
+        from close_session import run_gate_checks  # type: ignore[import-not-found]
+    except ImportError:
+        from .close_session import run_gate_checks  # type: ignore[no-redef]
+
+    gate_results = run_gate_checks(session_set)
+    failures = [
+        GateCheckFailure(check=g.check, remediation=g.remediation)
+        for g in gate_results
+        if not g.passed
+    ]
+
+    if failures and not force:
+        raise CloseoutGateFailure(failures)
+
+    if failures and force:
+        bullets = "; ".join(
+            f"{f.check}: {f.remediation}" for f in failures
+        )
+        _logger.warning(
+            "DEPRECATION: mark_session_complete(force=True) bypassed "
+            "%d failing gate(s) on %s — %s. The --force / force=True "
+            "path is transitional and will be tightened in a future set.",
+            len(failures), session_set, bullets,
+        )
+
+    # Append the audit-trail event before the flip so that a failure
+    # appending the event leaves the snapshot un-flipped — that way the
+    # snapshot and the ledger never disagree on success. Lazy import
+    # again to keep session_state import-light at module load time.
+    try:
+        from session_events import append_event  # type: ignore[import-not-found]
+    except ImportError:
+        from .session_events import append_event  # type: ignore[no-redef]
+
+    event_fields = {
+        "forced": bool(failures and force),
+        "method": "snapshot_flip",
+    }
+    if failures and force:
+        event_fields["failed_checks"] = [f.check for f in failures]
+    if verification_verdict is not None:
+        event_fields["verdict"] = verification_verdict
+    if os.path.isdir(session_set):
+        # session-events.jsonl lives under the session set; if the
+        # directory doesn't exist we can't write the event. The flip
+        # itself reads/writes session-state.json which we already
+        # confirmed exists, so the flip is still safe to attempt.
+        append_event(
+            session_set,
+            "closeout_succeeded",
+            session_number,
+            **event_fields,
+        )
+
+    return _flip_state_to_closed(session_set, verification_verdict)
 
 
 def _finalize_total_sessions_from_entries(session_set: str) -> None:

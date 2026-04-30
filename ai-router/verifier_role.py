@@ -111,6 +111,7 @@ try:
         remove_pid_file,
         write_pid_file,
     )
+    from capacity import write_capacity_signal  # type: ignore[import-not-found]
 except ImportError:
     from .queue_db import (  # type: ignore[no-redef]
         ConcurrencyError,
@@ -124,6 +125,7 @@ except ImportError:
         remove_pid_file,
         write_pid_file,
     )
+    from .capacity import write_capacity_signal  # type: ignore[no-redef]
 
 
 # --------------------------------------------------------------------------
@@ -487,9 +489,62 @@ def process_one_message(
             queue.complete(msg.id, worker_id, result)
         except ConcurrencyError:
             return "concurrency-lost"
+        # Capacity heartbeat (Set 004 / Session 2). Best-effort,
+        # fire-and-forget — write_capacity_signal already swallows
+        # OSError so a transient FS hiccup cannot wedge the loop. We
+        # still wrap in a broad except as a final belt + suspenders
+        # against an unexpected error from a future addition (e.g., a
+        # JSON-encode failure on a payload with a non-serializable
+        # element).
+        try:
+            _emit_capacity_signal(queue, msg, result)
+        except Exception:  # noqa: BLE001
+            pass
         return "completed"
     finally:
         _stop_heartbeat(hb_thread, hb_stop)
+
+
+def _emit_capacity_signal(
+    queue: QueueDB,
+    msg: QueueMessage,
+    result: dict,
+) -> None:
+    """Write one capacity-signal record after a successful ``complete()``.
+
+    Inspects the verifier-shaped result dict for token counts and the
+    chosen model. Fields the verifier doesn't populate (e.g., the
+    orchestrator daemon's default-handler dict, which has no token
+    counts) come through as ``None`` — the signal-writer stores them
+    as null and ``read_capacity_summary`` accumulates zero for those
+    records. Heartbeat presence still records "this provider produced
+    a completion at time T".
+
+    The provider-and-base-dir for the signal file mirror the queue's
+    own — verifier and orchestrator daemons each own their provider
+    directory, and their capacity log lives alongside ``queue.db``.
+    """
+    completion_metadata = {
+        "task_type": msg.task_type,
+        "tokens_input": (
+            result.get("verifier_input_tokens")
+            or result.get("tokens_input")
+        ),
+        "tokens_output": (
+            result.get("verifier_output_tokens")
+            or result.get("tokens_output")
+        ),
+        "elapsed_seconds": result.get("elapsed_seconds"),
+        "model_name": (
+            result.get("verifier_model")
+            or result.get("model_name")
+        ),
+    }
+    write_capacity_signal(
+        queue.provider,
+        completion_metadata,
+        base_dir=str(queue.base_dir),
+    )
 
 
 # --------------------------------------------------------------------------

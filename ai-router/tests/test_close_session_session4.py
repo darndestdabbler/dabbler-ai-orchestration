@@ -50,6 +50,7 @@ from session_events import (
 from session_state import (
     NextOrchestrator,
     NextOrchestratorReason,
+    _flip_state_to_closed,
     mark_session_complete,
     read_session_state,
     register_session_start,
@@ -342,8 +343,11 @@ def test_repair_detects_state_says_closed_but_no_event(
     """
     # Simulate the old close-out path: orchestrator wrote
     # session-state.json complete but never emitted the closeout
-    # ledger trio.
-    mark_session_complete(str(closeable_set), verification_verdict="VERIFIED")
+    # ledger trio. Use the gate-bypass internal flip helper so we
+    # actually reproduce the legacy "snapshot flipped, ledger silent"
+    # drift case — the post-Set 4 mark_session_complete writes a
+    # closeout_succeeded event itself, which would defeat the test.
+    _flip_state_to_closed(str(closeable_set), verification_verdict="VERIFIED")
 
     # Diagnostic: drift surfaces, exit 5, ledger untouched.
     args = _ns(session_set_dir=str(closeable_set), repair=True)
@@ -592,8 +596,10 @@ def test_e2e_bootstrapping_recovery_via_repair_apply(
     events trio. ``--repair --apply`` brings the ledger into agreement
     so the reconciler / dashboards stop treating the set as stranded.
     """
-    # Legacy close-out: state-only, no events.
-    mark_session_complete(str(closeable_set), verification_verdict="VERIFIED")
+    # Legacy close-out: state-only, no events. Use the gate-bypass
+    # internal flip helper to faithfully reproduce the legacy drift —
+    # mark_session_complete itself would now emit closeout_succeeded.
+    _flip_state_to_closed(str(closeable_set), verification_verdict="VERIFIED")
     events_before = read_events(str(closeable_set))
     assert not any(
         e.event_type == "closeout_succeeded" for e in events_before

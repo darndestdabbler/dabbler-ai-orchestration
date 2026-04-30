@@ -128,7 +128,12 @@ class TestMarkSessionCompleteV2:
             orchestrator_engine="claude-code",
             orchestrator_model="claude-opus-4-7",
         )
-        mark_session_complete(session_set_dir, verification_verdict="VERIFIED")
+        # force=True bypasses the gate — this test asserts the snapshot
+        # flip mechanics, not gate enforcement (covered separately in
+        # test_mark_session_complete_gate.py).
+        mark_session_complete(
+            session_set_dir, verification_verdict="VERIFIED", force=True,
+        )
         path = os.path.join(session_set_dir, SESSION_STATE_FILENAME)
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
@@ -177,7 +182,11 @@ class TestLazyMigrationOnRead:
     def test_mark_complete_rewrites_v1_as_v2(self, session_set_dir):
         """Next legitimate write must produce a v2 file from a v1 input."""
         _write_v1_state(session_set_dir, status="in-progress")
-        mark_session_complete(session_set_dir, verification_verdict="VERIFIED")
+        # force=True bypasses the gate; this test asserts schema rewrite,
+        # not gate enforcement.
+        mark_session_complete(
+            session_set_dir, verification_verdict="VERIFIED", force=True,
+        )
         with open(os.path.join(session_set_dir, SESSION_STATE_FILENAME), encoding="utf-8") as f:
             data = json.load(f)
         assert data["schemaVersion"] == 2

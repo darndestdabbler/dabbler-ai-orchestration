@@ -522,6 +522,45 @@ def _run_gate_checks(
     return results
 
 
+def run_gate_checks(
+    session_set_dir: str,
+    *,
+    allow_empty_commit: bool = False,
+) -> List[GateResult]:
+    """Run the deterministic close-out gates and return their results.
+
+    Public entry point used by ``mark_session_complete`` (Set 4 Session 3
+    wiring). Mirrors the gate-only portion of :func:`run` — no lock, no
+    event emission, no queue wait — so callers that already own those
+    concerns (the snapshot-flip path) can probe the gate verdict
+    directly without acquiring the close-out lock or appending duplicate
+    ledger events.
+
+    A missing ``disposition.json`` is surfaced as a synthetic gate
+    failure named ``disposition_present`` rather than as an exception:
+    callers want a single uniform "list of failures" surface so they can
+    serialize all remediations in one error message.
+    """
+    disposition = read_disposition(session_set_dir)
+    if disposition is None:
+        return [
+            GateResult(
+                check="disposition_present",
+                passed=False,
+                remediation=(
+                    "disposition.json is required for close-out — write it "
+                    "before calling mark_session_complete (or pass force=True "
+                    "to bypass the gate; transitional only)."
+                ),
+            )
+        ]
+    return _run_gate_checks(
+        session_set_dir,
+        disposition,
+        allow_empty_commit=allow_empty_commit,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Verification wait (queue-mode polling)
 # ---------------------------------------------------------------------------
@@ -889,17 +928,22 @@ def _run_repair(
         )
         if apply_changes:
             try:
-                # Local import to avoid a top-level cycle: session_state
-                # is already imported elsewhere via read_session_state,
-                # but mark_session_complete is only used here.
+                # Local import to avoid a top-level cycle. Use the
+                # gate-bypass internal flip helper rather than the
+                # public mark_session_complete: the events ledger
+                # already records closeout_succeeded for this session,
+                # so re-running the gate here would either redundantly
+                # validate or, worse, fail on transient drift the gate
+                # would surface (the work is already verified — we're
+                # just resyncing the snapshot to the ledger).
                 try:
-                    from session_state import mark_session_complete  # type: ignore[import-not-found]
+                    from session_state import _flip_state_to_closed  # type: ignore[import-not-found]
                 except ImportError:
-                    from .session_state import mark_session_complete  # type: ignore[no-redef]
-                if mark_session_complete(session_set_dir) is not None:
+                    from .session_state import _flip_state_to_closed  # type: ignore[no-redef]
+                if _flip_state_to_closed(session_set_dir) is not None:
                     messages.append(
                         "repair applied: flipped session-state.json to "
-                        "complete/closed via mark_session_complete"
+                        "complete/closed via _flip_state_to_closed"
                     )
             except Exception as exc:  # pragma: no cover — defensive
                 messages.append(

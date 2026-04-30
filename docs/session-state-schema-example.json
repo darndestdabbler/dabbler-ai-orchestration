@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "sessionSetName": "example-session-set",
+  "currentSession": 2,
+  "totalSessions": 4,
+  "status": "complete",
+  "lifecycleState": "closed",
+  "startedAt": "2026-04-30T13:00:00-04:00",
+  "completedAt": "2026-04-30T14:30:00-04:00",
+  "verificationVerdict": "VERIFIED",
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high"
+  },
+  "nextOrchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 verified clean; the same orchestrator is well-positioned to continue with Session 3."
+    }
+  }
+}

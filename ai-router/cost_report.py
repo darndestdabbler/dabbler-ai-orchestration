@@ -31,8 +31,18 @@ from typing import Any, Optional
 
 try:
     from session_log import SessionLog  # type: ignore[import-not-found]
+    from session_state import read_mode_config  # type: ignore[import-not-found]
+    from capacity import (  # type: ignore[import-not-found]
+        DEFAULT_LOOKBACK_MINUTES,
+        read_capacity_summary,
+    )
 except ImportError:
     from .session_log import SessionLog  # type: ignore[no-redef]
+    from .session_state import read_mode_config  # type: ignore[no-redef]
+    from .capacity import (  # type: ignore[no-redef]
+        DEFAULT_LOOKBACK_MINUTES,
+        read_capacity_summary,
+    )
 
 
 # Anything below this absolute USD threshold counts as "matching" for
@@ -41,6 +51,21 @@ _COST_DISCREPANCY_THRESHOLD_USD = 0.01
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_METRICS_PATH = os.path.join(_THIS_DIR, "router-metrics.jsonl")
+
+# The Anthropic Claude Pro subscription resets in 5-hour rolling
+# windows. The other subscription providers (ChatGPT Plus, Gemini
+# Advanced) use other window shapes. We use 5 hours as the display
+# default because the heaviest user (orchestrator role on Claude Pro)
+# is the one for whom this signal is most actionable; consumers on
+# other providers should read the utilization summary as
+# "completions over the last 5 hours" without ascribing throttle
+# meaning to it. See module/capacity.py for the heartbeat-only
+# framing that this report inherits.
+SUBSCRIPTION_WINDOW_MINUTES = 5 * 60
+
+# Default base directory for the per-provider capacity-signal logs.
+# Mirrors the daemon defaults; overridable via env for tests.
+_DEFAULT_QUEUES_BASE_DIR = "provider-queues"
 
 
 def _canonicalize_session_set_path(value: Optional[str]) -> Optional[str]:
@@ -232,7 +257,99 @@ def get_costs(session_set_dir: str) -> dict:
     summary["activity_supplemental"] = activity_supplemental
     summary["delta_usd"] = delta
     summary["discrepancy"] = discrepancy
+
+    # Mode-aware: when the session set is outsource-last, attach a
+    # subscription-utilization summary for the orchestrator role's
+    # provider. The orchestrator role on outsource-last is the
+    # subscription model — that's the side whose burn we care about.
+    # Failures to read mode (e.g., spec.md missing) leave the field
+    # absent rather than crash; outsource-first sets simply don't
+    # carry this key.
+    try:
+        mode = read_mode_config(session_set_dir)
+    except Exception:  # noqa: BLE001
+        mode = None
+    if (
+        mode is not None
+        and mode.outsource_mode == "last"
+        and mode.orchestrator_role
+    ):
+        summary["outsource_mode"] = "last"
+        summary["subscription_utilization"] = (
+            _build_subscription_utilization(mode.orchestrator_role)
+        )
+    elif mode is not None:
+        summary["outsource_mode"] = mode.outsource_mode
+
     return summary
+
+
+def _resolve_queues_base_dir() -> str:
+    """Path to ``provider-queues/``. Honors ``AI_ROUTER_QUEUES_BASE_DIR``
+    so tests can redirect to a fixture directory without spinning up
+    real daemons.
+    """
+    return os.environ.get(
+        "AI_ROUTER_QUEUES_BASE_DIR", _DEFAULT_QUEUES_BASE_DIR
+    )
+
+
+def _build_subscription_utilization(
+    orchestrator_provider: str,
+    *,
+    base_dir: Optional[str] = None,
+    window_minutes: int = SUBSCRIPTION_WINDOW_MINUTES,
+    rate_lookback_minutes: int = DEFAULT_LOOKBACK_MINUTES,
+) -> dict:
+    """Build a subscription-utilization summary for an outsource-last
+    session set's orchestrator provider.
+
+    Two reads are performed against
+    ``provider-queues/<orchestrator_provider>/capacity_signal.jsonl``:
+
+      * ``window_summary`` — completions and tokens over the
+        subscription's natural window (5h for Claude Pro). This is the
+        "sessions completed in the current 5-hour window" line.
+      * ``rate_summary`` — completions and tokens over a shorter
+        lookback (default 60 min). The token-burn-rate line uses this
+        so a heavy 5-hour window doesn't dilute a "right now" rate.
+
+    Both values are observed-only — no throttling, headroom, or
+    capacity prediction is implied. The framing comes through into
+    the printed report verbatim.
+    """
+    base = base_dir or _resolve_queues_base_dir()
+
+    window_summary = read_capacity_summary(
+        orchestrator_provider,
+        lookback_minutes=window_minutes,
+        base_dir=base,
+    )
+    rate_summary = read_capacity_summary(
+        orchestrator_provider,
+        lookback_minutes=rate_lookback_minutes,
+        base_dir=base,
+    )
+
+    rate_minutes = rate_summary.lookback_minutes
+    rate_tokens_per_min: Optional[float] = None
+    if rate_minutes > 0:
+        rate_tokens_per_min = rate_summary.tokens_in_window / rate_minutes
+
+    return {
+        "provider": orchestrator_provider,
+        "subscription_window_minutes": window_summary.lookback_minutes,
+        "completions_in_subscription_window": (
+            window_summary.completions_in_window
+        ),
+        "tokens_in_subscription_window": window_summary.tokens_in_window,
+        "rate_lookback_minutes": rate_minutes,
+        "tokens_in_rate_lookback": rate_summary.tokens_in_window,
+        "tokens_per_minute": rate_tokens_per_min,
+        "last_completion_at": window_summary.last_completion_at,
+        "time_since_last_seconds": window_summary.time_since_last_seconds,
+        "signal_file_present": window_summary.signal_file_present,
+    }
 
 
 def _build_json_output(session_set_dir: str, summary: dict) -> dict:
@@ -265,7 +382,29 @@ def _build_json_output(session_set_dir: str, summary: dict) -> dict:
         },
         "delta_usd": round(summary["delta_usd"], 6),
         "discrepancy": summary["discrepancy"],
+        "outsource_mode": summary.get("outsource_mode"),
+        "subscription_utilization": _round_utilization(
+            summary.get("subscription_utilization")
+        ),
     }
+
+
+def _round_utilization(util: Optional[dict]) -> Optional[dict]:
+    """Round utilization floats to 6 dp so JSON diffs are stable.
+
+    ``None`` passes through — outsource-first session sets simply
+    omit the field.
+    """
+    if util is None:
+        return None
+    out = dict(util)
+    rate = out.get("tokens_per_minute")
+    if rate is not None:
+        out["tokens_per_minute"] = round(rate, 6)
+    tsls = out.get("time_since_last_seconds")
+    if tsls is not None:
+        out["time_since_last_seconds"] = round(tsls, 6)
+    return out
 
 
 def print_cost_report(session_set_dir: str, format: str = "text") -> None:
@@ -300,6 +439,10 @@ def print_cost_report(session_set_dir: str, format: str = "text") -> None:
             _build_json_output(session_set_dir, summary),
             indent=2, sort_keys=True,
         ))
+        return
+
+    if summary.get("outsource_mode") == "last":
+        _print_outsource_last_report(session_set_dir, summary)
         return
 
     log = SessionLog(session_set_dir)
@@ -357,4 +500,101 @@ def print_cost_report(session_set_dir: str, format: str = "text") -> None:
         print(f"  {direction}")
         print()
 
+    print("=" * 60 + "\n")
+
+
+def _format_minutes_ago(seconds: Optional[float]) -> str:
+    """Render ``time_since_last_seconds`` as a short human label."""
+    if seconds is None:
+        return "never (no completions recorded)"
+    minutes = seconds / 60.0
+    if minutes < 1.0:
+        return f"{seconds:.0f} seconds ago"
+    if minutes < 60.0:
+        return f"{minutes:.1f} minutes ago"
+    hours = minutes / 60.0
+    return f"{hours:.1f} hours ago"
+
+
+def _print_outsource_last_report(session_set_dir: str, summary: dict) -> None:
+    """Render the outsource-last (subscription-utilization) cost report.
+
+    Replaces the USD-based report with utilization metrics. Framing
+    is explicitly observational — every numeric field is something
+    that already happened, not a prediction. The block ends with the
+    heartbeat-only caveat so a reader who reaches for the throttle
+    interpretation gets a friction at exactly the wrong moment.
+
+    The activity-log adjustments block is still rendered below the
+    utilization block: when the orchestrator chooses to record
+    non-routed costs (manual edits etc.) into the activity log they
+    are still real money, even on a subscription set, and we don't
+    want them silently dropped.
+    """
+    log = SessionLog(session_set_dir)
+    util = summary.get("subscription_utilization") or {}
+    activity = summary["activity_supplemental"]
+    routed = summary["routed_canonical"]
+
+    print("\n" + "=" * 60)
+    print("AI ROUTER — COST REPORT (outsource-last; subscription utilization)")
+    print(f"Session Set: {log._data['sessionSetName']}")
+    print("=" * 60)
+    print(f"Sessions completed: {summary['sessions_completed']} "
+          f"of {log.total_sessions}")
+    print(f"Sessions remaining: {summary['sessions_remaining']}")
+    print()
+    print(f"Orchestrator role provider: {util.get('provider', '?')}")
+
+    if not util.get("signal_file_present"):
+        print("  (capacity_signal.jsonl not found — no role-loop "
+              "completions have been recorded yet for this provider)")
+        print()
+
+    window_min = util.get("subscription_window_minutes") or 0
+    window_hours = window_min / 60.0 if window_min else 0.0
+    rate_min = util.get("rate_lookback_minutes") or 0
+    print(
+        f"Sessions completed in current "
+        f"{window_hours:.1f}-hour window: "
+        f"{util.get('completions_in_subscription_window', 0)}"
+    )
+    rate = util.get("tokens_per_minute")
+    rate_str = f"{rate:.1f}" if rate is not None else "n/a"
+    print(
+        f"Token burn rate: {rate_str} tokens/min over last "
+        f"{rate_min} min"
+    )
+    print(
+        f"Last activity: "
+        f"{_format_minutes_ago(util.get('time_since_last_seconds'))}"
+    )
+    print()
+    print(
+        "NOTE: this is a backward-looking heartbeat, not a routing or "
+        "capacity prediction. Subscription providers may throttle "
+        "without prior warning; treat the numbers above strictly as "
+        "'what already happened' and consult the provider's own "
+        "dashboard for live limits."
+    )
+    print()
+
+    # Even on outsource-last sets, manual / non-routed activity-log
+    # entries are still real spend — surface them so they don't go
+    # silently unreported. ``routed_canonical`` is also surfaced for
+    # the cross-provider verifier-call costs that show up in the
+    # metrics log even when the orchestrator is on a subscription.
+    print("Routed-model spend (canonical):")
+    if not routed["metrics_file_present"]:
+        print("  (router-metrics.jsonl not found at "
+              f"{routed['metrics_path']} — totals are zero)")
+    print(f"  Total routed API calls: {routed['total_calls']}")
+    print(f"  Total cost:             ${routed['total_cost']:.4f}")
+    print()
+    print("Activity-log adjustments (supplemental):")
+    if not activity["activity_log_present"]:
+        print("  (activity-log.json not found — totals are zero)")
+    print(f"  Total logged calls:     {activity['total_calls']}")
+    print(f"  Total cost:             ${activity['total_cost']:.4f}")
+    print()
     print("=" * 60 + "\n")

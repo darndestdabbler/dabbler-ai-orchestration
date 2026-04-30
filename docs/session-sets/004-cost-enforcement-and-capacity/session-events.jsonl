@@ -1,0 +1,1 @@
+{"timestamp": "2026-04-30T18:15:18.867008Z", "session_number": 3, "event_type": "closeout_succeeded", "forced": true, "method": "snapshot_flip", "failed_checks": ["disposition_present"], "verdict": "VERIFIED"}

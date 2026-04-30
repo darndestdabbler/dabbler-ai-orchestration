@@ -57,6 +57,8 @@ from .session_log import SessionLog
 from .session_state import (
     SESSION_STATE_FILENAME,
     SCHEMA_VERSION as SESSION_STATE_SCHEMA_VERSION,
+    CloseoutGateFailure,
+    GateCheckFailure,
     SessionLifecycleState,
     NextOrchestrator,
     NextOrchestratorReason,

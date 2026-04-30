@@ -99,6 +99,342 @@
       "description": "Wrote session-reviews/session-001.md with the verifier's full review, both findings, and the resolution + rationale for each.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/read-guidance",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Read spec.md Session 2 deliverables: capacity.py module (write_capacity_signal + read_capacity_summary), role-loop wiring after each complete(), and outsource-last subscription-utilization heuristic with explicit heartbeat-only framing. User instruction reaffirmed: no external routing this session except cross-provider verification, with Gemini Pro as verifier.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Registered session-state.json for session 2 with orchestrator metadata.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/capacity-module",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Created ai-router/capacity.py with write_capacity_signal(provider, completion_metadata, *, base_dir='provider-queues') and read_capacity_summary(provider, *, lookback_minutes=60, base_dir='provider-queues', now=None) -> CapacitySummary. JSON Lines storage at provider-queues/<provider>/capacity_signal.jsonl with a fixed schema (timestamp, provider, task_type, tokens_input, tokens_output, elapsed_seconds, model_name) — unknown metadata keys are dropped, missing keys serialize as JSON null. Heartbeat is best-effort: OSError is swallowed so a transient FS hiccup cannot wedge the role-loop. Module + dataclass + read function docstrings repeat the heartbeat-only framing four times so a downstream reader cannot misinterpret the values as predictive.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/role-loop-wiring",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Wired write_capacity_signal into ai-router/verifier_role.py:process_one_message after a successful queue.complete(). orchestrator_role.py imports and reuses process_one_message, so this single wire point covers both daemons. Added _emit_capacity_signal() helper that pulls verifier-shaped result keys (verifier_input_tokens, verifier_output_tokens, verifier_model) with fallbacks to the orchestrator default-handler shape (which carries no token data — those become null). Wrapped in a belt-and-suspenders try/except so an unexpected encoder error cannot poison a successful completion.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/outsource-last-cost-report",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Extended ai-router/cost_report.py with mode-aware reporting: get_costs() reads spec.md via read_mode_config(), attaches outsource_mode and (when mode=last) subscription_utilization for the orchestrator role provider. Added _build_subscription_utilization() that queries read_capacity_summary twice — once over the 5-hour subscription window (5h = SUBSCRIPTION_WINDOW_MINUTES, exposed as a constant), once over a 60-min rate lookback — and computes tokens-per-minute. print_cost_report() branches: outsource-last sessions get a utilization-led report (sessions in 5h window, tokens/min over last 60 min, last-activity-ago) with a NOTE block reasserting heartbeat-only framing; outsource-first sessions are unchanged. JSON output rounds floats to 6 dp for stable diffs and surfaces outsource_mode + subscription_utilization at the top level. AI_ROUTER_QUEUES_BASE_DIR env override added so tests can redirect without spinning up real daemons.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/unit-tests",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Wrote three test files: tests/test_capacity.py (14 tests across write_capacity_signal, empty/single/multi reads, robustness, round-trip), tests/test_capacity_signal_wiring.py (5 tests covering verifier-shaped + orchestrator-shaped result wiring, no-signal-on-failure, no-signal-on-followup, signal-write failure does not poison completion), tests/test_cost_report_outsource_last.py (14 tests covering mode detection, 5-hour window math, 60-min rate lookback, text/JSON output, missing signal file, outsource-first stays unchanged). 33 new tests, all passing.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/full-test-suite-pre-verification",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Full ai-router test suite: 512 passed (was 479; +33). No regressions.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/cross-provider-verification-round-1",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Cross-provider verification routed to gemini-pro per user instruction (102725-char prompt: spec excerpt + capacity.py + verifier_role wiring excerpt + cost_report.py + all three new test files). Result: ISSUES_FOUND with 1 Minor finding — read_capacity_summary's timezone-normalization block had a dual-return path that the verifier flagged as confusing. See session-reviews/session-002.md for the full review.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "provider": "google",
+          "costUsd": 0.0488,
+          "callType": "code-review"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/address-verifier-finding",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Addressed the Minor finding by normalizing naive `now` to UTC once at the top of read_capacity_summary, after which the in-window comparison and the time-since-last subtraction collapse to single-path arithmetic. Investigation also surfaced a related latent bug: the in-window comparison `ts_dt >= cutoff` would have raised TypeError on a naive `now` even before the verifier's recommended cleanup — production callers always pass _utc_now() so the hole was never hit, but the new normalization closes it. Added regression test test_naive_now_against_aware_record_does_not_crash.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-2/full-test-suite-post-fix",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Full ai-router test suite after the verifier-finding fix: 513 passed (was 479; +34: 33 new + 1 regression). No regressions.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-2/save-verifier-output",
+      "dateTime": "2026-04-30T13:30:00.000000-04:00",
+      "description": "Wrote session-reviews/session-002.md with the verifier's full review, the Minor finding, the resolution including the related latent-bug discovery, and the regression-test pointer.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/read-guidance",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Read spec.md Session 3 deliverables: wire mark_session_complete() to invoke close_session's gate (Set 3); on failure raise CloseoutGateFailure with structured failure list; add transitional force=False parameter that emits a loud DEPRECATION warning, appends a forced=true closeout_succeeded event, and proceeds with the flip. User instruction reaffirmed: no external routing this session except cross-provider verification, which routes to Gemini Pro.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/register-start",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Registered session-state.json for session 3 with orchestrator metadata.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/add-public-run-gate-checks",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Added a new public function run_gate_checks(session_set_dir, *, allow_empty_commit=False) -> List[GateResult] in ai-router/close_session.py. It is the gate-only entry point that mark_session_complete invokes — no lock, no event emission, no queue wait, no force handling — so the snapshot-flip caller can probe gate verdicts without acquiring the close-out lock or appending duplicate ledger events. A missing disposition.json is surfaced as a synthetic 'disposition_present' gate failure rather than as an exception so callers get a single uniform list-of-failures surface.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/closeout-gate-failure-exception",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Added CloseoutGateFailure(Exception) and a frozen GateCheckFailure(check, remediation) dataclass to ai-router/session_state.py. CloseoutGateFailure carries .failures: List[GateCheckFailure] (the structured failure list per spec) and renders a human-readable bulleted summary via str(). The GateCheckFailure type lives in session_state — not close_session — so callers that catch the exception do not need to reach into close_session for the type.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/refactor-flip-helper",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Refactored the snapshot-flip mechanics out of mark_session_complete into a private _flip_state_to_closed(session_set, verification_verdict=None) helper. mark_session_complete now layers gate-then-event-emit-then-flip on top of it; close_session._run_repair (which catches up the snapshot to an already-emitted closeout_succeeded event from a prior close-out) now calls _flip_state_to_closed directly so it does not re-run the gate or emit a duplicate event.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/wire-mark-session-complete",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Wired mark_session_complete to the gate. New keyword-only parameter force=False. Behavior: gate passes -> append closeout_succeeded with forced=False, then flip; gate fails and force=False -> raise CloseoutGateFailure(failures), no flip, no event; gate fails and force=True -> log loud DEPRECATION warning via 'ai_router.session_state' logger, append closeout_succeeded with forced=True and failed_checks=[...], then flip. Event-emit happens before flip so a write failure leaves snapshot un-flipped (snapshot and ledger never disagree on success). Both close_session and session_events imports are lazy to avoid the circular import cycle.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/update-existing-tests",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Updated existing call sites of mark_session_complete in tests. test_session_state_v2.py:131 and :180 (schema-mechanics tests with no disposition or git fixture) now pass force=True so they exercise the public function with documented bypass semantics. test_close_session_session4.py:346 and :596 (legacy-drift simulation tests that explicitly assert no closeout_succeeded events landed) switched to _flip_state_to_closed so the simulation faithfully reproduces the legacy snapshot-flipped-but-ledger-silent drift case. Added _flip_state_to_closed and CloseoutGateFailure/GateCheckFailure to ai-router/__init__.py exports.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/unit-and-integration-tests",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Wrote tests/test_mark_session_complete_gate.py: 15 tests covering the spec's required cases. TestGatePassFlipsSnapshot (2 tests): pass case flips snapshot and emits forced=False closeout_succeeded with verdict; pass case without verdict omits the verdict field. TestGateFailWithoutForce (4 tests): single-failure raises CloseoutGateFailure with structured failures; failure does not flip snapshot; failure emits zero events; multi-failure case surfaces all failures preserving GATE_CHECKS declaration order. TestGateFailWithForce (4 tests): force logs DEPRECATION warning visible to a custom log handler (logger has propagate=False so caplog cannot see it directly); force emits closeout_succeeded with forced=True + failed_checks=[...]; force flips the snapshot; force on a passing gate records forced=False because nothing was bypassed. TestMarkCompleteEdgeCases (2 tests): missing state file returns None with and without force. TestIntegrationFullCloseout (3 tests, real git + bare remote): committed-but-not-pushed disposition fails pushed_to_remote gate and raises CloseoutGateFailure with non-empty remediation; force=True overrides end-to-end and lands forced=True event with failed_checks=['pushed_to_remote',...]; fully passing setup (committed + pushed) lands forced=False with no failed_checks.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/full-test-suite-pre-verification",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Full ai-router test suite: 528 passed (was 513; +15 new). No regressions across all 25 test files.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-3/cross-provider-verification-round-1",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Cross-provider verification routed to gemini-pro per user instruction (58,615-char prompt: spec Session 3 excerpt + full session_state.py + close_session.py run_gate_checks excerpt + close_session.py repair-branch excerpt + full test_mark_session_complete_gate.py). Result: VERIFIED, no findings. Verifier explicitly endorsed (a) the gate-then-emit-then-flip ordering as a sound, defensive choice for ledger integrity, (b) the lazy-import pattern as correctly resolving the session_state <-> close_session dependency cycle, and (c) the synthetic 'disposition_present' gate failure as a graceful unification of the caller's error-handling path. See session-reviews/session-003.md for the full review.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "provider": "google",
+          "costUsd": 0.0211,
+          "callType": "code-review"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "session-3/save-verifier-output",
+      "dateTime": "2026-04-30T14:04:05.723129-04:00",
+      "description": "Wrote session-reviews/session-003.md with the verifier's full review (verbatim) and a per-question summary of which concerns the verifier explicitly endorsed.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-4/read-guidance",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Read spec.md Session 4 deliverables: replace stale committed session-state.json example with a generator script (dump_session_state_schema.py) that emits a fully-populated v2 example, --write and --include-comments flags, plus a CI/pre-commit drift check. User instruction reaffirmed: no external routing this session except cross-provider verification, which routes to Gemini Pro.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-4/register-start",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Registered session-state.json for session 4 with orchestrator metadata (claude-code / anthropic / claude-opus-4-7 / high).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-4/audit-stale-example",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Audited docs/session-sets/ for any stale committed session-state.json *example*. Found none: the four extant session-state.json files (001/002/003/004) are live runtime state files for the actual session sets, not documentation prose. Git history shows one historically-deleted directory (vscode-extension-phase-1-command-palette-python-integration/session-state.json) which was already removed in commit c782006. Reframed Session 4 from 'replace stale example' to 'provide generator + reference + drift check so future drift becomes detectable'; deliverables otherwise unchanged.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-4/build-generator",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Created ai-router/dump_session_state_schema.py. build_example_state() returns a fully-populated v2 dict assembled from the live SCHEMA_VERSION constant and SessionLifecycleState enum (so a constant rename surfaces on the next --check rather than going silent). Includes a non-null nextOrchestrator block that the live validate_next_orchestrator() validator accepts (≥30-char specifics, valid reason.code enum). format_example() emits either pure JSON (sort_keys=False to preserve schema's logical field order, indent=2, trailing newline — byte-deterministic for drift comparison) or JSONC with one // comment per top-level key from a _FIELD_COMMENTS table; nested keys are not annotated. Module follows the existing CLI bootstrap pattern (sys.path.insert at __main__ guard) used by close_session.py / reconciler.py / restart_role.py.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-4/generate-reference-and-readme",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Ran 'python ai-router/dump_session_state_schema.py --write docs/session-state-schema-example.json' to produce the canonical reference. Authored docs/session-state-schema-example.md as a README documenting (a) why the example is generated, not hand-edited, (b) regeneration commands, (c) how to wire --check into CI / pre-commit (with a copy-paste pre-commit recipe), and (d) the workflow for legitimate schema evolution (edit schema → regenerate → commit both in same PR).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-4/drift-check-flag",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Added run_check() and the --check CLI flag. Compares regenerated output to docs/session-state-schema-example.json byte-for-byte; exits 0 on match, 1 on mismatch or missing reference, with a one-line operator hint pointing at the regeneration command on stderr. Repo has no existing CI / pre-commit harness, so the check is provided as an executable script that future CI / pre-commit hooks can invoke verbatim — the README documents the wiring recipe.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-4/unit-tests",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Wrote tests/test_dump_session_state_schema.py with 27 tests across TestBuildExampleState (live-schema pinning, all-keys-present, validator-acceptance of nextOrchestrator, no-shared-state across calls), TestFormatExampleJson (valid JSON, byte-determinism, single trailing newline, two-space indent, round-trip through read_session_state), TestFormatExampleJsonc (// comments present, strict json.loads rejects, every top-level key has a preceding // comment, nested keys are not annotated), TestReferenceFile (committed reference matches generator), TestRunCheck (returns 0 on match, 1 on byte drift, 1 on missing reference, uses cwd by default), TestCli (stdout-by-default, --write, --include-comments, --check pass/fail, end-to-end subprocess invocation against the real reference).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-4/full-test-suite-pre-verification",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Full ai-router test suite: 555 passed (was 528; +27 new). No regressions across all 26 test files.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "session-4/cross-provider-verification-round-1",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Cross-provider verification routed to gemini-pro per user instruction (39,433-char prompt: spec Session 4 excerpt + full dump_session_state_schema.py + full test_dump_session_state_schema.py + committed reference + README + top of session_state.py). Result: ISSUES_FOUND with 1 Minor and 1 Suggestion. Minor: JSONC top-level key parser used str.split('\"', 2) which would mis-split a key containing an escaped quote. Suggestion: add a test for stale entries in _FIELD_COMMENTS that no longer correspond to schema fields. See session-reviews/session-004.md for the full review.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "provider": "google",
+          "costUsd": 0.0203,
+          "callType": "code-review"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 10,
+      "stepKey": "session-4/address-verifier-findings",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Addressed both verifier items. Finding 1 (Minor): replaced str.split('\"', 2) with a compiled regex _TOP_LEVEL_KEY_RE that matches a JSON string body with escape support, then round-trips the matched text through json.loads to recover the actual key text — the JSONC injector should not become a constraint on future field names. Finding 2 (Suggestion): added test_field_comments_table_has_no_stale_entries that diffs _FIELD_COMMENTS.keys() against build_example_state().keys() so CI fails fast when a removed schema field leaves an orphan comment behind. Also added test_jsonc_parser_handles_escaped_quote_in_key as a regression test for the parser fix.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 11,
+      "stepKey": "session-4/full-test-suite-post-fix",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Full ai-router test suite after verifier-finding fixes: 557 passed (was 528 baseline; +29: 27 original + 2 regressions). No regressions. --check still passes against the committed reference.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 12,
+      "stepKey": "session-4/save-verifier-output",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Wrote session-reviews/session-004.md with the verifier's full review (verbatim), per-finding resolution + rationale, and a list of design choices the verifier implicitly endorsed by not flagging.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 13,
+      "stepKey": "session-4/change-log",
+      "dateTime": "2026-04-30T14:49:22-04:00",
+      "description": "Authored docs/session-sets/004-cost-enforcement-and-capacity/change-log.md (per-session summaries, test deltas, routing costs, acceptance-criteria checklist, what's-next pointer). Authored locally rather than via task_type='summarization' route() because the user's session-set instruction restricts external routing to the cross-provider verification only.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

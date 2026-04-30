@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none';
+                 style-src {{CSP_SOURCE}} 'nonce-{{NONCE}}';
+                 script-src 'nonce-{{NONCE}}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dabbler AI Orchestration — Get Started</title>
+  <style nonce="{{NONCE}}">
+    * { box-sizing: border-box; }
+    body {
+      font-family: var(--vscode-font-family);
+      font-size: var(--vscode-font-size);
+      color: var(--vscode-foreground);
+      background: var(--vscode-editor-background);
+      padding: 24px 32px;
+      max-width: 780px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 1.5em; font-weight: 600; margin-bottom: 4px; }
+    h2 { font-size: 1.1em; font-weight: 600; margin-top: 28px; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 4px; }
+    p, li { line-height: 1.6; }
+    code { font-family: var(--vscode-editor-font-family); background: var(--vscode-textBlockQuote-background); padding: 1px 4px; border-radius: 3px; }
+    a { color: var(--vscode-textLink-foreground); cursor: pointer; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .btn {
+      display: inline-block;
+      padding: 6px 14px;
+      margin: 4px 4px 4px 0;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      border: none;
+      border-radius: 3px;
+      font-size: inherit;
+      cursor: pointer;
+    }
+    .btn:hover { background: var(--vscode-button-hoverBackground); }
+    .btn-secondary {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+    .btn-secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .callout {
+      border-left: 3px solid var(--vscode-notificationsWarningIcon-foreground);
+      background: var(--vscode-inputValidation-warningBackground);
+      padding: 10px 14px;
+      border-radius: 0 4px 4px 0;
+      margin: 16px 0;
+    }
+    .callout strong { color: var(--vscode-notificationsWarningIcon-foreground); }
+    .step { display: flex; gap: 12px; margin: 10px 0; }
+    .step-num {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.85em;
+    }
+    .step-body { flex: 1; }
+    .prereq { display: flex; gap: 8px; margin: 6px 0; }
+    .prereq-icon { flex-shrink: 0; }
+    .actions { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 8px; }
+    hr { border: none; border-top: 1px solid var(--vscode-panel-border); margin: 24px 0; }
+  </style>
+</head>
+<body>
+  <h1>Dabbler AI Orchestration</h1>
+  <p>An AI-led workflow for delivering software through structured, reviewable sessions. This extension is your command center.</p>
+
+  <h2>How it works</h2>
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-body"><strong>Create a project plan.</strong> Write or generate a Markdown plan describing your project's phases and features. Import it with <em>Dabbler: Import Project Plan</em>.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-body"><strong>Decompose into session sets.</strong> Use <em>Dabbler: Generate Session-Set Prompt</em> to get a prompt that turns your plan into a sequence of focused session specs.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-body"><strong>Run sessions.</strong> For each session set, copy the start trigger from the Session Sets view and paste it into your AI assistant. The AI runs, commits, and logs its work.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-body"><strong>Review and repeat.</strong> The Session Sets view shows real-time state. Review changes, approve or iterate, and move to the next session.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-body"><strong>Ship.</strong> When all session sets reach "Done," your feature is built, reviewed, and ready.</div>
+  </div>
+
+  <h2>Prerequisites</h2>
+  <div class="prereq"><span class="prereq-icon">✓</span><span>VS Code 1.85 or later (you're here, so ✓)</span></div>
+  <div class="prereq"><span class="prereq-icon">○</span><span>Python ≥ 3.10 with the <code>ai-router</code> module installed in your project</span></div>
+  <div class="prereq"><span class="prereq-icon">○</span><span>At least one API key exported: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, or <code>GEMINI_API_KEY</code></span></div>
+  <div class="prereq"><span class="prereq-icon">○</span><span>Git installed and on your PATH</span></div>
+
+  <div class="callout">
+    <strong>Cost reality.</strong> This workflow is not free. Each session typically costs
+    <strong>$0.01–$2.00</strong> depending on model and effort, and verification farms work out to a second model on
+    top of that. Larger projects spanning days or weeks can accumulate into the <strong>tens or low hundreds of
+    dollars</strong>. The author finds the tradeoff worth it; you may not, especially if you're doing volunteer or
+    open-source work without independent funding. Open <em>Dabbler: Show Cost Dashboard</em> early and often, set a
+    personal budget, and stop if you're not comfortable with the rate of spend.
+    <a href="https://www.anthropic.com/pricing" id="pricingLink">Anthropic pricing →</a>
+  </div>
+
+  <h2>What do you want to do?</h2>
+  <div class="actions">
+    <button class="btn" onclick="send('setupProject')">Set up a new project</button>
+    <button class="btn btn-secondary" onclick="send('importPlan')">Import a project plan</button>
+    <button class="btn btn-secondary" onclick="send('generatePrompt')">Generate session-set prompt</button>
+  </div>
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="send('showCost')">Show cost dashboard</button>
+    <button class="btn btn-secondary" onclick="send('troubleshoot')">Troubleshoot</button>
+  </div>
+
+  <hr>
+  <p style="font-size:0.85em; color: var(--vscode-descriptionForeground);">
+    <a href="https://darndestdabbler.org">darndestdabbler.org</a> &nbsp;·&nbsp;
+    <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/issues">Report an issue</a>
+  </p>
+
+  <script nonce="{{NONCE}}">
+    const vscode = acquireVsCodeApi();
+    function send(command) { vscode.postMessage({ command }); }
+    document.getElementById('pricingLink').addEventListener('click', (e) => {
+      e.preventDefault();
+      vscode.postMessage({ command: 'openExternal', url: 'https://www.anthropic.com/pricing' });
+    });
+  </script>
+</body>
+</html>

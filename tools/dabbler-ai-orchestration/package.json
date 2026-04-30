@@ -1,0 +1,280 @@
+{
+  "name": "dabbler-ai-orchestration",
+  "displayName": "Dabbler AI Orchestration",
+  "description": "Project wizard, session-set explorer, and cost dashboard for the Dabbler AI-led workflow.",
+  "version": "0.9.0",
+  "publisher": "DarndestDabbler",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other", "AI", "SCM Providers"],
+  "keywords": ["ai", "workflow", "session", "claude", "orchestration", "dabbler"],
+  "icon": "media/darndest-dabbler-icon.png",
+  "galleryBanner": {
+    "color": "#5DADE2",
+    "theme": "dark"
+  },
+  "homepage": "https://darndestdabbler.org",
+  "bugs": {
+    "url": "https://github.com/darndestdabbler/dabbler-ai-orchestration/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darndestdabbler/dabbler-ai-orchestration.git"
+  },
+  "license": "MIT",
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:docs/session-sets"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dabblerSessionSetsContainer",
+          "title": "Dabbler AI Orchestration",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "dabblerSessionSetsContainer": [
+        {
+          "id": "dabblerSessionSets",
+          "name": "Session Sets",
+          "contextualTitle": "Dabbler AI Orchestration"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dabblerSessionSets.refresh",
+        "title": "Refresh Session Sets",
+        "category": "Dabbler",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dabblerSessionSets.openSpec",
+        "title": "Open Spec",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openActivityLog",
+        "title": "Open Activity Log",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openChangeLog",
+        "title": "Open Change Log",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openAiAssignment",
+        "title": "Open AI Assignment",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openUatChecklist",
+        "title": "Open UAT Checklist",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.revealPlaywrightTests",
+        "title": "Reveal Playwright Tests for This Set",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openFolder",
+        "title": "Reveal Folder",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.copyStartCommand.default",
+        "title": "Copy: Start next session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.copyStartCommand.parallel",
+        "title": "Copy: Start next parallel session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.copyStartCommand.maxoutClaude",
+        "title": "Copy: Start next session — maxout Claude",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.copySlug",
+        "title": "Copy: Slug only",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.getStarted",
+        "title": "Get Started",
+        "category": "Dabbler",
+        "icon": "$(star)"
+      },
+      {
+        "command": "dabbler.setupNewProject",
+        "title": "Set Up New Project",
+        "category": "Dabbler",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dabbler.importPlan",
+        "title": "Import Project Plan",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.generateSessionSetPrompt",
+        "title": "Generate Session-Set Prompt",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.troubleshoot",
+        "title": "Troubleshoot",
+        "category": "Dabbler",
+        "icon": "$(debug)"
+      },
+      {
+        "command": "dabbler.showCostDashboard",
+        "title": "Show Cost Dashboard",
+        "category": "Dabbler",
+        "icon": "$(graph)"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "dabblerSessionSets.openUatChecklist",
+          "when": "dabblerSessionSets.uatSupportActive"
+        },
+        {
+          "command": "dabblerSessionSets.revealPlaywrightTests",
+          "when": "dabblerSessionSets.e2eSupportActive"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "dabblerSessionSets.refresh",
+          "when": "view == dabblerSessionSets",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dabbler.showCostDashboard",
+          "when": "view == dabblerSessionSets",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dabbler.getStarted",
+          "when": "view == dabblerSessionSets",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "dabblerSessionSets.openSpec",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "dabblerSessionSets.openActivityLog",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "dabblerSessionSets.openChangeLog",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@3"
+        },
+        {
+          "command": "dabblerSessionSets.openAiAssignment",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@4"
+        },
+        {
+          "command": "dabblerSessionSets.openUatChecklist",
+          "when": "view == dabblerSessionSets && viewItem =~ /:uat($|:)/ && dabblerSessionSets.uatSupportActive",
+          "group": "1_open@5"
+        },
+        {
+          "command": "dabblerSessionSets.revealPlaywrightTests",
+          "when": "view == dabblerSessionSets && viewItem =~ /:e2e($|:)/ && dabblerSessionSets.e2eSupportActive",
+          "group": "1_open@6"
+        },
+        {
+          "command": "dabblerSessionSets.openFolder",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "2_navigate@1"
+        },
+        {
+          "command": "dabblerSessionSets.copyStartCommand.default",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:(in-progress|not-started)/",
+          "group": "3_copy@1"
+        },
+        {
+          "command": "dabblerSessionSets.copyStartCommand.parallel",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:(in-progress|not-started)/",
+          "group": "3_copy@2"
+        },
+        {
+          "command": "dabblerSessionSets.copyStartCommand.maxoutClaude",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:(in-progress|not-started)/",
+          "group": "3_copy@3"
+        },
+        {
+          "command": "dabblerSessionSets.copySlug",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "4_copy_meta@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Dabbler AI Orchestration",
+      "properties": {
+        "dabblerSessionSets.uatSupport.enabled": {
+          "type": "string",
+          "enum": ["auto", "always", "never"],
+          "default": "auto",
+          "markdownDescription": "Controls whether UAT-related commands and badges are shown.\n\n- `auto` (default): show UAT features only when at least one spec in the workspace declares `requiresUAT: true`.\n- `always`: always show UAT features.\n- `never`: hide UAT features regardless of spec contents."
+        },
+        "dabblerSessionSets.e2eSupport.enabled": {
+          "type": "string",
+          "enum": ["auto", "always", "never"],
+          "default": "auto",
+          "markdownDescription": "Controls whether E2E-related commands are shown.\n\n- `auto` (default): show E2E features only when at least one spec declares `requiresE2E: true`.\n- `always`: always show E2E features.\n- `never`: hide E2E features regardless of spec contents."
+        },
+        "dabblerSessionSets.e2e.testDirectory": {
+          "type": "string",
+          "default": "tests",
+          "markdownDescription": "Root directory (relative to workspace root) to search for E2E test files. Defaults to `tests/`."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test": "npm run compile && npx tsc --outDir out && node ./out/test/runTests.js",
+    "test:unit": "mocha --require ts-node/register 'src/**/*.test.ts'",
+    "package": "npm run compile && vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-electron": "^2.3.9",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "mocha": "^10.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "simple-git": "^3.22.0"
+  }
+}

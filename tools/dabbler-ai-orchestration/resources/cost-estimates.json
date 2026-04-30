@@ -1,0 +1,24 @@
+{
+  "models": {
+    "claude-opus-4-7": {
+      "displayName": "Claude Opus 4.7",
+      "inputPer1M": 15.0,
+      "outputPer1M": 75.0,
+      "typicalSessionCostUsd": { "low": 0.50, "normal": 1.50, "high": 4.00 }
+    },
+    "claude-sonnet-4-6": {
+      "displayName": "Claude Sonnet 4.6",
+      "inputPer1M": 3.0,
+      "outputPer1M": 15.0,
+      "typicalSessionCostUsd": { "low": 0.05, "normal": 0.25, "high": 0.75 }
+    },
+    "claude-haiku-4-5": {
+      "displayName": "Claude Haiku 4.5",
+      "inputPer1M": 0.80,
+      "outputPer1M": 4.0,
+      "typicalSessionCostUsd": { "low": 0.01, "normal": 0.05, "high": 0.15 }
+    }
+  },
+  "pricingUrl": "https://www.anthropic.com/pricing",
+  "lastUpdated": "2026-04-29"
+}

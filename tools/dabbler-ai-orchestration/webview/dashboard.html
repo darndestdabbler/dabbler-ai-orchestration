@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none';
+                 style-src {{CSP_SOURCE}} 'nonce-{{NONCE}}';
+                 script-src 'nonce-{{NONCE}}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dabbler — Cost Dashboard</title>
+  <style nonce="{{NONCE}}">
+    * { box-sizing: border-box; }
+    body {
+      font-family: var(--vscode-font-family);
+      font-size: var(--vscode-font-size);
+      color: var(--vscode-foreground);
+      background: var(--vscode-editor-background);
+      padding: 20px 28px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    h1 { font-size: 1.4em; font-weight: 600; margin-bottom: 4px; }
+    h2 { font-size: 1.0em; font-weight: 600; margin-top: 24px; border-bottom: 1px solid var(--vscode-panel-border); padding-bottom: 4px; }
+    .total {
+      font-size: 2.4em;
+      font-weight: 700;
+      color: var(--vscode-charts-blue);
+      margin: 8px 0;
+    }
+    .sparkline-wrap { margin: 12px 0; }
+    pre.sparkline {
+      font-family: var(--vscode-editor-font-family);
+      font-size: 1.4em;
+      letter-spacing: 2px;
+      margin: 4px 0;
+      color: var(--vscode-charts-green);
+    }
+    .sparkline-label { font-size: 0.78em; color: var(--vscode-descriptionForeground); }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th { text-align: left; padding: 5px 8px; border-bottom: 2px solid var(--vscode-panel-border); font-weight: 600; }
+    td { padding: 4px 8px; border-bottom: 1px solid var(--vscode-panel-border); }
+    tr:hover td { background: var(--vscode-list-hoverBackground); }
+    .btn {
+      display: inline-block;
+      padding: 5px 12px;
+      margin: 4px 4px 4px 0;
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+      border: none;
+      border-radius: 3px;
+      font-size: inherit;
+      cursor: pointer;
+    }
+    .btn:hover { background: var(--vscode-button-secondaryHoverBackground); }
+    .actions { margin-top: 20px; }
+    hr { border: none; border-top: 1px solid var(--vscode-panel-border); margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <h1>Cost Dashboard</h1>
+
+  <h2>Project total (all time)</h2>
+  <div class="total">{{TOTAL_COST}}</div>
+
+  <h2>Daily spending — last 30 days</h2>
+  <div class="sparkline-wrap">
+    <pre class="sparkline">{{SPARKLINE}}</pre>
+    <div class="sparkline-label">{{SPARKLINE_DATES}}</div>
+  </div>
+
+  <h2>By session set</h2>
+  <table>
+    <thead><tr><th>Session set</th><th>Sessions</th><th>Total cost</th><th>Last run</th></tr></thead>
+    <tbody>{{SESSION_SET_ROWS}}</tbody>
+  </table>
+
+  <h2>By model</h2>
+  <table>
+    <thead><tr><th>Model</th><th>Total cost</th><th>% of spend</th></tr></thead>
+    <tbody>{{MODEL_ROWS}}</tbody>
+  </table>
+
+  <div class="actions">
+    <button class="btn" onclick="send('exportCsv')">Export CSV</button>
+    <button class="btn" onclick="send('refresh')">Refresh</button>
+  </div>
+
+  <hr>
+  <p style="font-size:0.8em; color: var(--vscode-descriptionForeground);">
+    Data read from <code>ai-router/metrics.jsonl</code>.
+    Enable metrics in <code>ai-router/config.py</code>: <code>METRICS_ENABLED = True</code>.
+  </p>
+
+  <script nonce="{{NONCE}}">
+    const vscode = acquireVsCodeApi();
+    function send(command) { vscode.postMessage({ command }); }
+  </script>
+</body>
+</html>

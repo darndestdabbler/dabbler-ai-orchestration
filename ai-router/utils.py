@@ -16,11 +16,11 @@ The Windows helpers (sections 3, 4, and 5) are developer-workflow
 conveniences, not production code paths. They are runnable from the
 command line via:
 
-    python -m ai_router.utils load-env
-    python -m ai_router.utils kill-conhost [--dry-run]
-    python -m ai_router.utils kill-stale-claude-polls [--dry-run] [--yes] [--match-path PATTERN]
-    python -m ai_router.utils kill-dotnet-build-servers [--dry-run] [--yes]
-    python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--yes] [--match-path PATTERN]
+    python -m ai-router.utils load-env
+    python -m ai-router.utils kill-conhost [--dry-run]
+    python -m ai-router.utils kill-stale-claude-polls [--dry-run] [--yes] [--match-path PATTERN]
+    python -m ai-router.utils kill-dotnet-build-servers [--dry-run] [--yes]
+    python -m ai-router.utils cleanup-dev-orphans [--dry-run] [--yes] [--match-path PATTERN]
 
 The cleanup helpers (sections 4 and 5) prompt for confirmation by
 default — important because shutting down dotnet build servers or

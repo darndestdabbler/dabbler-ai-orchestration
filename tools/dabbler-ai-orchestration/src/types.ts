@@ -1,9 +1,12 @@
 export type SessionState = "done" | "in-progress" | "not-started";
 
+export type OutsourceMode = "first" | "last";
+
 export interface SessionSetConfig {
   requiresUAT: boolean;
   requiresE2E: boolean;
   uatScope: string;
+  outsourceMode: OutsourceMode;
 }
 
 export interface UatSummary {

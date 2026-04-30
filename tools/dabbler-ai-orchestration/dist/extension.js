@@ -900,7 +900,7 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode14 = __toESM(require("vscode"));
+var vscode15 = __toESM(require("vscode"));
 var fs10 = __toESM(require("fs"));
 var path12 = __toESM(require("path"));
 
@@ -972,7 +972,12 @@ function discoverRoots() {
   return order;
 }
 function parseSessionSetConfig(specPath) {
-  const config = { requiresUAT: false, requiresE2E: false, uatScope: "none" };
+  const config = {
+    requiresUAT: false,
+    requiresE2E: false,
+    uatScope: "none",
+    outsourceMode: "first"
+  };
   if (!fs.existsSync(specPath))
     return config;
   let text;
@@ -996,6 +1001,12 @@ function parseSessionSetConfig(specPath) {
   const scope = block.match(stringRe("uatScope"));
   if (scope)
     config.uatScope = scope[1];
+  const mode = block.match(stringRe("outsourceMode"));
+  if (mode) {
+    const v = mode[1].toLowerCase();
+    if (v === "first" || v === "last")
+      config.outsourceMode = v;
+  }
   return config;
 }
 function parseUatChecklist(checklistPath) {
@@ -1179,6 +1190,14 @@ function uatBadge(set) {
     return "[UAT done]";
   return "";
 }
+function modeBadge(set) {
+  const mode = set.config?.outsourceMode;
+  if (mode === "last")
+    return "[LAST]";
+  if (mode === "first")
+    return "[FIRST]";
+  return "";
+}
 function liveSessionTooltipLines(set) {
   if (!set.liveSession)
     return [];
@@ -1211,6 +1230,9 @@ function configTooltipLines(set) {
     flags.push("E2E");
   const lines = [];
   lines.push(`Gates: ${flags.length ? flags.join(" + ") : "none"}`);
+  if (set.config.outsourceMode) {
+    lines.push(`Mode: outsource-${set.config.outsourceMode}`);
+  }
   if (set.config.requiresUAT && set.uatSummary) {
     const u = set.uatSummary;
     if (u.totalItems > 0) {
@@ -1294,7 +1316,7 @@ var SessionSetsProvider = class {
       set.name,
       vscode2.TreeItemCollapsibleState.None
     );
-    const bits = [progressText(set), touchedDate(set), uatBadge(set)].filter(Boolean);
+    const bits = [progressText(set), touchedDate(set), modeBadge(set), uatBadge(set)].filter(Boolean);
     item.description = bits.join("  \xB7  ");
     item.tooltip = new vscode2.MarkdownString(
       [
@@ -1652,21 +1674,261 @@ function parseFetchResult(result) {
   }
 }
 
-// src/commands/openFile.ts
+// src/providers/ProviderHeartbeatsProvider.ts
 var vscode5 = __toESM(require("vscode"));
+var CACHE_TTL_MS2 = 5e3;
+var DEFAULT_LOOKBACK_MINUTES = 60;
+var DEFAULT_SILENT_WARNING_MINUTES = 30;
+var HEARTBEAT_FOOTER = "Observational only. Subscription windows are not introspectable. Use as a heartbeat signal, not as routing guidance.";
+var ProviderHeartbeatsProvider = class {
+  constructor(deps) {
+    this.deps = deps;
+    this._onDidChangeTreeData = new vscode5.EventEmitter();
+    this.onDidChangeTreeData = this._onDidChangeTreeData.event;
+    this._cache = null;
+    this._lastError = null;
+    this._inFlight = null;
+  }
+  refresh() {
+    this._cache = null;
+    this._onDidChangeTreeData.fire();
+  }
+  /** Test-only — inject a payload and skip the spawn path. */
+  _setPayloadForTest(payload, lookback) {
+    this._cache = {
+      fetchedAt: this.deps.now?.() ?? Date.now(),
+      payload,
+      lookback
+    };
+    this._lastError = null;
+  }
+  // ---------- TreeDataProvider ----------
+  getTreeItem(element) {
+    return buildTreeItem2(element);
+  }
+  async getChildren(element) {
+    if (element)
+      return [];
+    const root = this.deps.getWorkspaceRoot();
+    if (!root) {
+      return [{ kind: "info", label: "No workspace folder open." }];
+    }
+    const settings = this._readSettings();
+    const payload = await this._getPayload(root, settings.lookbackMinutes);
+    if (!payload) {
+      const detail = this._lastError ?? "Unknown error.";
+      return [
+        {
+          kind: "info",
+          label: "Failed to read heartbeat status.",
+          detail,
+          isError: true
+        }
+      ];
+    }
+    const providers = Object.keys(payload.providers).sort();
+    if (providers.length === 0) {
+      return [
+        {
+          kind: "info",
+          label: "No provider capacity signals found.",
+          detail: "Looked for capacity_signal.jsonl files under provider-queues/. Run a session that emits work to populate this view."
+        }
+      ];
+    }
+    return providers.map((p2) => ({
+      kind: "provider",
+      provider: p2,
+      data: payload.providers[p2],
+      silentWarningMinutes: settings.silentWarningMinutes
+    }));
+  }
+  // ---------- internals ----------
+  _readSettings() {
+    if (this.deps.getSettings)
+      return this.deps.getSettings();
+    const cfg = vscode5.workspace.getConfiguration("dabblerProviderHeartbeats");
+    return {
+      lookbackMinutes: cfg.get("lookbackMinutes", DEFAULT_LOOKBACK_MINUTES),
+      silentWarningMinutes: cfg.get(
+        "silentWarningMinutes",
+        DEFAULT_SILENT_WARNING_MINUTES
+      )
+    };
+  }
+  async _getPayload(root, lookback) {
+    const now = this.deps.now?.() ?? Date.now();
+    if (this._cache && this._cache.lookback === lookback && now - this._cache.fetchedAt < CACHE_TTL_MS2) {
+      return this._cache.payload;
+    }
+    if (this._inFlight) {
+      await this._inFlight;
+      return this._cache?.payload ?? null;
+    }
+    const fetcher = this.deps.fetchPayload ?? defaultFetchPayload2;
+    this._inFlight = (async () => {
+      const result = await fetcher(root, lookback);
+      if (result.ok) {
+        this._cache = {
+          fetchedAt: this.deps.now?.() ?? Date.now(),
+          payload: result.payload,
+          lookback
+        };
+        this._lastError = null;
+      } else {
+        this._lastError = result.message;
+      }
+    })();
+    try {
+      await this._inFlight;
+    } finally {
+      this._inFlight = null;
+    }
+    return this._cache?.payload ?? null;
+  }
+};
+function isSilent(data, silentMinutes) {
+  if (!data.signal_file_present)
+    return true;
+  if (data.minutes_since_last_completion === null)
+    return true;
+  return data.minutes_since_last_completion > silentMinutes;
+}
+function formatMinutesAgo(m) {
+  if (m === null)
+    return "never";
+  if (m < 60)
+    return `${m} min ago`;
+  const h2 = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${h2}h ago` : `${h2}h ${rem}m ago`;
+}
+function buildTreeItem2(node) {
+  switch (node.kind) {
+    case "provider": {
+      const d = node.data;
+      const silent = isSilent(d, node.silentWarningMinutes);
+      const item = new vscode5.TreeItem(
+        node.provider,
+        vscode5.TreeItemCollapsibleState.None
+      );
+      const lookback = d.lookback_minutes;
+      if (!d.signal_file_present) {
+        item.description = "no capacity signal yet";
+      } else if (d.minutes_since_last_completion === null) {
+        item.description = `silent \xB7 0 completions / ${lookback}m`;
+      } else {
+        const ago = formatMinutesAgo(d.minutes_since_last_completion);
+        item.description = `last seen ${ago} \xB7 ${d.completions_in_window} completions / ${lookback}m`;
+      }
+      item.iconPath = new vscode5.ThemeIcon(
+        silent ? "warning" : "pulse",
+        silent ? new vscode5.ThemeColor("notificationsWarningIcon.foreground") : void 0
+      );
+      item.tooltip = buildProviderTooltip(node.provider, d, silent);
+      item.contextValue = silent ? "heartbeatProvider:silent" : "heartbeatProvider:active";
+      return item;
+    }
+    case "info": {
+      const item = new vscode5.TreeItem(node.label, vscode5.TreeItemCollapsibleState.None);
+      item.description = node.detail;
+      item.tooltip = node.detail ? new vscode5.MarkdownString(node.detail) : void 0;
+      item.iconPath = new vscode5.ThemeIcon(node.isError ? "warning" : "info");
+      item.contextValue = node.isError ? "heartbeatInfo:error" : "heartbeatInfo";
+      return item;
+    }
+  }
+}
+function buildProviderTooltip(provider, d, silent) {
+  const lines = [
+    `**${provider}** ${silent ? "\xB7 \u26A0\uFE0F silent" : ""}`.trim(),
+    `Last completion: ${d.last_completion_at ?? "\u2014"}`,
+    `Completions in last ${d.lookback_minutes}m: ${d.completions_in_window}`,
+    `Tokens in last ${d.lookback_minutes}m: ${d.tokens_in_window}`,
+    `Signal file: \`${d.signal_path}\``,
+    `_${d.disclaimer}_`
+  ];
+  return new vscode5.MarkdownString(lines.join("\n\n"));
+}
+async function defaultFetchPayload2(workspaceRoot2, lookbackMinutes) {
+  const result = await runPythonModule({
+    cwd: workspaceRoot2,
+    module: "ai_router.heartbeat_status",
+    args: [
+      "--format",
+      "json",
+      "--lookback-minutes",
+      String(lookbackMinutes)
+    ],
+    pythonPathSetting: "dabblerProviderQueues.pythonPath"
+  });
+  return parseFetchResult2(result, lookbackMinutes);
+}
+function parseFetchResult2(result, lookbackMinutes) {
+  if (result.timedOut) {
+    return { ok: false, message: "heartbeat_status timed out (10s)" };
+  }
+  if (result.exitCode !== 0) {
+    const trimmed2 = (result.stderr || result.stdout).trim();
+    const detail = trimmed2 ? ` \u2014 ${trimmed2.split("\n").slice(-3).join(" / ")}` : "";
+    return {
+      ok: false,
+      message: `heartbeat_status exited ${result.exitCode}${detail}`
+    };
+  }
+  try {
+    const raw = JSON.parse(result.stdout);
+    if (!raw || typeof raw !== "object" || !raw.providers) {
+      return { ok: false, message: "heartbeat_status returned malformed JSON (missing 'providers')" };
+    }
+    const providers = {};
+    for (const [name, info] of Object.entries(raw.providers)) {
+      providers[name] = normalizeProvider(info, lookbackMinutes);
+    }
+    return {
+      ok: true,
+      payload: { providers, disclaimer: String(raw._disclaimer ?? HEARTBEAT_FOOTER) }
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, message: `Failed to parse heartbeat_status JSON: ${msg}` };
+  }
+}
+function normalizeProvider(info, requestedLookback) {
+  const lookback = typeof info.lookback_minutes === "number" ? info.lookback_minutes : requestedLookback;
+  const completions = pickNumber(info, `completions_in_last_${lookback}min`) ?? pickNumber(info, `completions_in_last_${requestedLookback}min`) ?? 0;
+  const tokens = pickNumber(info, `tokens_in_last_${lookback}min`) ?? pickNumber(info, `tokens_in_last_${requestedLookback}min`) ?? 0;
+  return {
+    signal_path: String(info.signal_path ?? ""),
+    signal_file_present: Boolean(info.signal_file_present),
+    last_completion_at: typeof info.last_completion_at === "string" ? info.last_completion_at : null,
+    minutes_since_last_completion: typeof info.minutes_since_last_completion === "number" ? info.minutes_since_last_completion : null,
+    completions_in_window: completions,
+    tokens_in_window: tokens,
+    lookback_minutes: lookback,
+    disclaimer: String(info._disclaimer ?? HEARTBEAT_FOOTER)
+  };
+}
+function pickNumber(obj, key) {
+  const v = obj[key];
+  return typeof v === "number" ? v : null;
+}
+
+// src/commands/openFile.ts
+var vscode6 = __toESM(require("vscode"));
 var fs2 = __toESM(require("fs"));
 var path5 = __toESM(require("path"));
 function openIfExists(filePath, label) {
   if (!filePath || !fs2.existsSync(filePath)) {
-    vscode5.window.showInformationMessage(
+    vscode6.window.showInformationMessage(
       `${label} does not exist yet: ${filePath ? path5.basename(filePath) : "<unknown>"}`
     );
     return;
   }
-  vscode5.commands.executeCommand("vscode.open", vscode5.Uri.file(filePath));
+  vscode6.commands.executeCommand("vscode.open", vscode6.Uri.file(filePath));
 }
 function findPlaywrightTests(set) {
-  const cfg = vscode5.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode6.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
   const playwrightDir = path5.join(set.root, testDirRel);
   if (!fs2.existsSync(playwrightDir))
@@ -1718,50 +1980,50 @@ function findPlaywrightTests(set) {
 }
 function registerOpenFileCommands(context) {
   context.subscriptions.push(
-    vscode5.commands.registerCommand(
+    vscode6.commands.registerCommand(
       "dabblerSessionSets.openSpec",
       (item) => openIfExists(item?.set?.specPath, "Spec")
     ),
-    vscode5.commands.registerCommand(
+    vscode6.commands.registerCommand(
       "dabblerSessionSets.openActivityLog",
       (item) => openIfExists(item?.set?.activityPath, "Activity log")
     ),
-    vscode5.commands.registerCommand(
+    vscode6.commands.registerCommand(
       "dabblerSessionSets.openChangeLog",
       (item) => openIfExists(item?.set?.changeLogPath, "Change log")
     ),
-    vscode5.commands.registerCommand(
+    vscode6.commands.registerCommand(
       "dabblerSessionSets.openAiAssignment",
       (item) => openIfExists(item?.set?.aiAssignmentPath, "AI assignment")
     ),
-    vscode5.commands.registerCommand(
+    vscode6.commands.registerCommand(
       "dabblerSessionSets.openUatChecklist",
       (item) => openIfExists(item?.set?.uatChecklistPath, "UAT checklist")
     ),
-    vscode5.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
+    vscode6.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
       if (!item?.set)
         return;
-      vscode5.commands.executeCommand("revealInExplorer", vscode5.Uri.file(item.set.dir));
+      vscode6.commands.executeCommand("revealInExplorer", vscode6.Uri.file(item.set.dir));
     }),
-    vscode5.commands.registerCommand(
+    vscode6.commands.registerCommand(
       "dabblerSessionSets.revealPlaywrightTests",
       async (item) => {
         if (!item?.set)
           return;
         const tests = findPlaywrightTests(item.set);
         if (tests.length === 0) {
-          const cfg = vscode5.workspace.getConfiguration("dabblerSessionSets");
+          const cfg = vscode6.workspace.getConfiguration("dabblerSessionSets");
           const dir = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT);
-          vscode5.window.showInformationMessage(
+          vscode6.window.showInformationMessage(
             `No Playwright tests found for "${item.set.name}". Search root: ${dir}`
           );
           return;
         }
         if (tests.length === 1) {
-          vscode5.commands.executeCommand("vscode.open", vscode5.Uri.file(tests[0]));
+          vscode6.commands.executeCommand("vscode.open", vscode6.Uri.file(tests[0]));
           return;
         }
-        const picked = await vscode5.window.showQuickPick(
+        const picked = await vscode6.window.showQuickPick(
           tests.map((p2) => ({
             label: path5.basename(p2),
             description: path5.relative(item.set.root, p2),
@@ -1770,7 +2032,7 @@ function registerOpenFileCommands(context) {
           { placeHolder: `Playwright tests matching "${item.set.name}"` }
         );
         if (picked) {
-          vscode5.commands.executeCommand("vscode.open", vscode5.Uri.file(picked.absolute));
+          vscode6.commands.executeCommand("vscode.open", vscode6.Uri.file(picked.absolute));
         }
       }
     )
@@ -1778,10 +2040,10 @@ function registerOpenFileCommands(context) {
 }
 
 // src/commands/copyCommand.ts
-var vscode6 = __toESM(require("vscode"));
+var vscode7 = __toESM(require("vscode"));
 async function copy(text, label) {
-  await vscode6.env.clipboard.writeText(text);
-  vscode6.window.setStatusBarMessage(`Copied: ${label}`, 4e3);
+  await vscode7.env.clipboard.writeText(text);
+  vscode7.window.setStatusBarMessage(`Copied: ${label}`, 4e3);
 }
 var startCommandPresets = {
   default: (slug) => `Start the next session of \`${slug}\`.`,
@@ -1796,7 +2058,7 @@ var presetLabels = {
 function registerCopyCommands(context) {
   for (const [key, builder] of Object.entries(startCommandPresets)) {
     context.subscriptions.push(
-      vscode6.commands.registerCommand(
+      vscode7.commands.registerCommand(
         `dabblerSessionSets.copyStartCommand.${key}`,
         async (item) => {
           if (!item?.set)
@@ -1807,7 +2069,7 @@ function registerCopyCommands(context) {
     );
   }
   context.subscriptions.push(
-    vscode6.commands.registerCommand(
+    vscode7.commands.registerCommand(
       "dabblerSessionSets.copySlug",
       async (item) => {
         if (!item?.set)
@@ -1819,7 +2081,7 @@ function registerCopyCommands(context) {
 }
 
 // src/commands/gitScaffold.ts
-var vscode7 = __toESM(require("vscode"));
+var vscode8 = __toESM(require("vscode"));
 var fs3 = __toESM(require("fs"));
 var path6 = __toESM(require("path"));
 
@@ -5663,7 +5925,7 @@ var init_check_ignore = __esm({
     init_CheckIgnore();
   }
 });
-function parseFetchResult2(stdOut, stdErr) {
+function parseFetchResult3(stdOut, stdErr) {
   const result = {
     raw: stdOut,
     remote: null,
@@ -5733,7 +5995,7 @@ function fetchTask(remote, branch, customArgs) {
   return {
     commands: commands11,
     format: "utf-8",
-    parser: parseFetchResult2
+    parser: parseFetchResult3
   };
 }
 var init_fetch = __esm({
@@ -6792,7 +7054,7 @@ var SCAFFOLD_DIRS = [
   "ai-router"
 ];
 async function pickDirectory() {
-  const picked = await vscode7.window.showOpenDialog({
+  const picked = await vscode8.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
@@ -6802,14 +7064,14 @@ async function pickDirectory() {
 }
 function registerGitScaffoldCommand(context) {
   context.subscriptions.push(
-    vscode7.commands.registerCommand("dabbler.setupNewProject", async () => {
+    vscode8.commands.registerCommand("dabbler.setupNewProject", async () => {
       const projectDir = await pickDirectory();
       if (!projectDir)
         return;
       const git = esm_default(projectDir);
       const isRepo = await git.checkIsRepo().catch(() => false);
       if (!isRepo) {
-        const confirm = await vscode7.window.showWarningMessage(
+        const confirm = await vscode8.window.showWarningMessage(
           `Initialize a new git repository in ${path6.basename(projectDir)}?`,
           { modal: true },
           "Initialize"
@@ -6817,15 +7079,15 @@ function registerGitScaffoldCommand(context) {
         if (confirm !== "Initialize")
           return;
         await git.init();
-        vscode7.window.showInformationMessage("Git repository initialized.");
+        vscode8.window.showInformationMessage("Git repository initialized.");
       }
       for (const rel of SCAFFOLD_DIRS) {
         const full = path6.join(projectDir, rel);
         if (!fs3.existsSync(full))
           fs3.mkdirSync(full, { recursive: true });
       }
-      vscode7.window.showInformationMessage("Folder skeleton created.");
-      const worktreeAnswer = await vscode7.window.showInformationMessage(
+      vscode8.window.showInformationMessage("Folder skeleton created.");
+      const worktreeAnswer = await vscode8.window.showInformationMessage(
         "Set up git worktrees for parallel session sets? (Recommended for large projects)",
         { modal: true },
         "Yes \u2014 set up worktrees",
@@ -6841,38 +7103,38 @@ function registerGitScaffoldCommand(context) {
           if (!fs3.existsSync(worktreesDir))
             fs3.mkdirSync(worktreesDir, { recursive: true });
           await git.raw(["worktree", "add", path6.join(worktreesDir, "main"), "HEAD"]);
-          vscode7.window.showInformationMessage(
+          vscode8.window.showInformationMessage(
             "Worktrees set up. Work from worktrees/main/ for parallel sessions."
           );
         } catch (err) {
-          vscode7.window.showWarningMessage(
+          vscode8.window.showWarningMessage(
             `Worktree setup skipped: ${err instanceof Error ? err.message : String(err)}`
           );
         }
       }
-      const openFolder = await vscode7.window.showInformationMessage(
+      const openFolder = await vscode8.window.showInformationMessage(
         "Project scaffolded. Open the folder now?",
         "Open Folder"
       );
       if (openFolder === "Open Folder") {
-        vscode7.commands.executeCommand("vscode.openFolder", vscode7.Uri.file(projectDir));
+        vscode8.commands.executeCommand("vscode.openFolder", vscode8.Uri.file(projectDir));
       } else {
-        vscode7.commands.executeCommand("dabbler.getStarted");
+        vscode8.commands.executeCommand("dabbler.getStarted");
       }
     })
   );
 }
 
 // src/commands/troubleshoot.ts
-var vscode8 = __toESM(require("vscode"));
+var vscode9 = __toESM(require("vscode"));
 var fs4 = __toESM(require("fs"));
 var path7 = __toESM(require("path"));
 var cp3 = __toESM(require("child_process"));
 function workspaceRoot() {
-  return vscode8.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 function outputChannel() {
-  return vscode8.window.createOutputChannel("Dabbler Diagnostics");
+  return vscode9.window.createOutputChannel("Dabbler Diagnostics");
 }
 function checkActivation() {
   const ch = outputChannel();
@@ -6986,7 +7248,7 @@ function checkLayout() {
 }
 function registerTroubleshootCommand(context) {
   context.subscriptions.push(
-    vscode8.commands.registerCommand("dabbler.troubleshoot", async () => {
+    vscode9.commands.registerCommand("dabbler.troubleshoot", async () => {
       const items = [
         {
           label: "$(warning) Extension not activating",
@@ -7019,7 +7281,7 @@ function registerTroubleshootCommand(context) {
           run: checkLayout
         }
       ];
-      const picked = await vscode8.window.showQuickPick(
+      const picked = await vscode9.window.showQuickPick(
         items.map((i2) => ({ label: i2.label, detail: i2.detail, _run: i2.run })),
         { placeHolder: "Select a troubleshooting topic" }
       );
@@ -7030,11 +7292,11 @@ function registerTroubleshootCommand(context) {
 }
 
 // src/commands/queueActions.ts
-var vscode9 = __toESM(require("vscode"));
+var vscode10 = __toESM(require("vscode"));
 var PAYLOAD_SCHEME = "dabbler-queue-payload";
 var QueuePayloadContentProvider = class {
   constructor() {
-    this._onDidChange = new vscode9.EventEmitter();
+    this._onDidChange = new vscode10.EventEmitter();
     this.onDidChange = this._onDidChange.event;
     this._store = /* @__PURE__ */ new Map();
   }
@@ -7049,19 +7311,19 @@ var QueuePayloadContentProvider = class {
 function registerQueueActionCommands(ctx, qctx) {
   const contentProvider = new QueuePayloadContentProvider();
   ctx.subscriptions.push(
-    vscode9.workspace.registerTextDocumentContentProvider(PAYLOAD_SCHEME, contentProvider)
+    vscode10.workspace.registerTextDocumentContentProvider(PAYLOAD_SCHEME, contentProvider)
   );
   ctx.subscriptions.push(
-    vscode9.commands.registerCommand(
+    vscode10.commands.registerCommand(
       "dabblerProviderQueues.openPayload",
       async (arg) => {
         if (!arg || arg.kind !== "message") {
-          vscode9.window.showWarningMessage("Open Payload: select a queue message first.");
+          vscode10.window.showWarningMessage("Open Payload: select a queue message first.");
           return;
         }
         const root = qctx.getWorkspaceRoot();
         if (!root) {
-          vscode9.window.showErrorMessage("Open Payload: no workspace folder open.");
+          vscode10.window.showErrorMessage("Open Payload: no workspace folder open.");
           return;
         }
         const result = await runPythonModule({
@@ -7077,7 +7339,7 @@ function registerQueueActionCommands(ctx, qctx) {
           timeoutMs: 1e4
         });
         if (result.exitCode !== 0 && result.exitCode !== 1) {
-          vscode9.window.showErrorMessage(
+          vscode10.window.showErrorMessage(
             `queue_status --get-payload failed: ${(result.stderr || result.stdout).trim() || "no output"}`
           );
           return;
@@ -7086,37 +7348,37 @@ function registerQueueActionCommands(ctx, qctx) {
         try {
           parsed = JSON.parse(result.stdout);
         } catch (err) {
-          vscode9.window.showErrorMessage(
+          vscode10.window.showErrorMessage(
             `Open Payload: malformed JSON from queue_status: ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         if (!parsed.ok) {
-          vscode9.window.showWarningMessage(
+          vscode10.window.showWarningMessage(
             `Open Payload: ${parsed.error ?? "message not found"}`
           );
           return;
         }
         const body = JSON.stringify(parsed.message, null, 2);
-        const uri = vscode9.Uri.parse(
+        const uri = vscode10.Uri.parse(
           `${PAYLOAD_SCHEME}:/${encodeURIComponent(arg.provider)}/${encodeURIComponent(arg.message.id)}.json`
         );
         contentProvider.setContent(uri, body);
-        const doc = await vscode9.workspace.openTextDocument(uri);
-        await vscode9.languages.setTextDocumentLanguage(doc, "json");
-        await vscode9.window.showTextDocument(doc, { preview: true });
+        const doc = await vscode10.workspace.openTextDocument(uri);
+        await vscode10.languages.setTextDocumentLanguage(doc, "json");
+        await vscode10.window.showTextDocument(doc, { preview: true });
       }
     )
   );
   ctx.subscriptions.push(
-    vscode9.commands.registerCommand(
+    vscode10.commands.registerCommand(
       "dabblerProviderQueues.markFailed",
       async (arg) => {
         if (!arg || arg.kind !== "message") {
-          vscode9.window.showWarningMessage("Mark Failed: select a queue message first.");
+          vscode10.window.showWarningMessage("Mark Failed: select a queue message first.");
           return;
         }
-        const choice = await vscode9.window.showWarningMessage(
+        const choice = await vscode10.window.showWarningMessage(
           `Force ${arg.message.id.slice(0, 8)} (${arg.message.task_type}, state=${arg.message.state}) into state=failed?`,
           { modal: true, detail: "Bypasses the normal ownership check. Use only when the worker is known dead." },
           "Mark Failed"
@@ -7142,14 +7404,14 @@ function registerQueueActionCommands(ctx, qctx) {
     )
   );
   ctx.subscriptions.push(
-    vscode9.commands.registerCommand(
+    vscode10.commands.registerCommand(
       "dabblerProviderQueues.forceReclaim",
       async (arg) => {
         if (!arg || arg.kind !== "message") {
-          vscode9.window.showWarningMessage("Force Reclaim: select a queue message first.");
+          vscode10.window.showWarningMessage("Force Reclaim: select a queue message first.");
           return;
         }
-        const choice = await vscode9.window.showWarningMessage(
+        const choice = await vscode10.window.showWarningMessage(
           `Release the lease on ${arg.message.id.slice(0, 8)} (${arg.message.task_type})?`,
           { modal: true, detail: "Returns state=claimed -> new and bumps attempts. The next claim() will pick it up." },
           "Force Reclaim"
@@ -7177,7 +7439,7 @@ function registerQueueActionCommands(ctx, qctx) {
 }
 async function reportInterventionResult(label, result, qctx) {
   if (result.timedOut) {
-    vscode9.window.showErrorMessage(`${label}: queue_status timed out.`);
+    vscode10.window.showErrorMessage(`${label}: queue_status timed out.`);
     return;
   }
   let parsed = {};
@@ -7187,20 +7449,20 @@ async function reportInterventionResult(label, result, qctx) {
   }
   if (parsed.ok) {
     const prev = parsed.previous_state ? ` (was ${parsed.previous_state})` : "";
-    vscode9.window.showInformationMessage(`${label} succeeded${prev}.`);
+    vscode10.window.showInformationMessage(`${label} succeeded${prev}.`);
     qctx.refreshView();
     return;
   }
   const detail = parsed.error || (result.stderr || result.stdout).trim() || "no output";
-  vscode9.window.showErrorMessage(`${label} failed: ${detail}`);
+  vscode10.window.showErrorMessage(`${label} failed: ${detail}`);
 }
 
 // src/wizard/WizardPanel.ts
-var vscode12 = __toESM(require("vscode"));
+var vscode13 = __toESM(require("vscode"));
 var fs7 = __toESM(require("fs"));
 
 // src/wizard/planImport.ts
-var vscode10 = __toESM(require("vscode"));
+var vscode11 = __toESM(require("vscode"));
 var fs5 = __toESM(require("fs"));
 var path8 = __toESM(require("path"));
 var PLAN_DEST = path8.join("docs", "planning", "project-plan.md");
@@ -7221,8 +7483,8 @@ sessions.
 Format as a clean Markdown document I can save as docs/planning/project-plan.md.`;
 function registerPlanImportCommand(context) {
   context.subscriptions.push(
-    vscode10.commands.registerCommand("dabbler.importPlan", async () => {
-      const action = await vscode10.window.showQuickPick(
+    vscode11.commands.registerCommand("dabbler.importPlan", async () => {
+      const action = await vscode11.window.showQuickPick(
         [
           { label: "$(file) Import existing plan from file", value: "file" },
           { label: "$(clippy) Get a prompt to create a plan with AI", value: "prompt" }
@@ -7232,13 +7494,13 @@ function registerPlanImportCommand(context) {
       if (!action)
         return;
       if (action.value === "prompt") {
-        await vscode10.env.clipboard.writeText(PLAN_AUTHORING_PROMPT);
-        vscode10.window.showInformationMessage(
+        await vscode11.env.clipboard.writeText(PLAN_AUTHORING_PROMPT);
+        vscode11.window.showInformationMessage(
           "Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, then save the result as docs/planning/project-plan.md and run 'Dabbler: Import Project Plan' again to import it."
         );
         return;
       }
-      const picked = await vscode10.window.showOpenDialog({
+      const picked = await vscode11.window.showOpenDialog({
         canSelectFiles: true,
         canSelectFolders: false,
         canSelectMany: false,
@@ -7247,9 +7509,9 @@ function registerPlanImportCommand(context) {
       });
       if (!picked?.[0])
         return;
-      const root = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const root = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
-        vscode10.window.showErrorMessage("No workspace folder is open.");
+        vscode11.window.showErrorMessage("No workspace folder is open.");
         return;
       }
       const destPath = path8.join(root, PLAN_DEST);
@@ -7257,7 +7519,7 @@ function registerPlanImportCommand(context) {
       if (!fs5.existsSync(destDir))
         fs5.mkdirSync(destDir, { recursive: true });
       if (fs5.existsSync(destPath)) {
-        const overwrite = await vscode10.window.showWarningMessage(
+        const overwrite = await vscode11.window.showWarningMessage(
           `${PLAN_DEST} already exists. Overwrite it?`,
           { modal: true },
           "Overwrite"
@@ -7266,8 +7528,8 @@ function registerPlanImportCommand(context) {
           return;
       }
       fs5.copyFileSync(picked[0].fsPath, destPath);
-      vscode10.commands.executeCommand("vscode.open", vscode10.Uri.file(destPath));
-      vscode10.window.showInformationMessage(
+      vscode11.commands.executeCommand("vscode.open", vscode11.Uri.file(destPath));
+      vscode11.window.showInformationMessage(
         `Plan imported to ${PLAN_DEST}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
       );
     })
@@ -7275,7 +7537,7 @@ function registerPlanImportCommand(context) {
 }
 
 // src/wizard/sessionGenPrompt.ts
-var vscode11 = __toESM(require("vscode"));
+var vscode12 = __toESM(require("vscode"));
 var fs6 = __toESM(require("fs"));
 var path9 = __toESM(require("path"));
 var PLAN_PATH = path9.join("docs", "planning", "project-plan.md");
@@ -7318,20 +7580,20 @@ Guidelines:
 `;
 function registerSessionGenPromptCommand(context) {
   context.subscriptions.push(
-    vscode11.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
-      const root = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    vscode12.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
+      const root = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
-        vscode11.window.showErrorMessage("No workspace folder is open.");
+        vscode12.window.showErrorMessage("No workspace folder is open.");
         return;
       }
       const planPath = path9.join(root, PLAN_PATH);
       if (!fs6.existsSync(planPath)) {
-        const action = await vscode11.window.showWarningMessage(
+        const action = await vscode12.window.showWarningMessage(
           `No project plan found at ${PLAN_PATH}. Import one first?`,
           "Import Plan"
         );
         if (action === "Import Plan")
-          vscode11.commands.executeCommand("dabbler.importPlan");
+          vscode12.commands.executeCommand("dabbler.importPlan");
         return;
       }
       const planText = fs6.readFileSync(planPath, "utf8");
@@ -7342,8 +7604,8 @@ function registerSessionGenPromptCommand(context) {
 Project plan:
 
 ${planText}`;
-      await vscode11.env.clipboard.writeText(prompt);
-      vscode11.window.showInformationMessage(
+      await vscode12.env.clipboard.writeText(prompt);
+      vscode12.window.showInformationMessage(
         "Session-set generation prompt copied to clipboard. Paste it into your AI assistant. When you receive the specs, save each one to docs/session-sets/<slug>/spec.md.\n\nCost reminder: each session set typically costs $0.10\u2013$2.00 depending on model and effort. Review the generated specs before running all sessions.",
         { modal: false }
       );
@@ -7362,16 +7624,16 @@ function getNonce() {
 var WizardPanel = class _WizardPanel {
   static show(extensionUri) {
     if (_WizardPanel.currentPanel) {
-      _WizardPanel.currentPanel._panel.reveal(vscode12.ViewColumn.One);
+      _WizardPanel.currentPanel._panel.reveal(vscode13.ViewColumn.One);
       return;
     }
-    const panel = vscode12.window.createWebviewPanel(
+    const panel = vscode13.window.createWebviewPanel(
       "dabblerWizard",
       "Dabbler AI Orchestration \u2014 Get Started",
-      vscode12.ViewColumn.One,
+      vscode13.ViewColumn.One,
       {
         enableScripts: true,
-        localResourceRoots: [vscode12.Uri.joinPath(extensionUri, "webview")]
+        localResourceRoots: [vscode13.Uri.joinPath(extensionUri, "webview")]
       }
     );
     _WizardPanel.currentPanel = new _WizardPanel(panel, extensionUri);
@@ -7386,25 +7648,25 @@ var WizardPanel = class _WizardPanel {
     this._panel.webview.onDidReceiveMessage((msg) => {
       switch (msg.command) {
         case "setupProject":
-          vscode12.commands.executeCommand("dabbler.setupNewProject");
+          vscode13.commands.executeCommand("dabbler.setupNewProject");
           break;
         case "importPlan":
-          vscode12.commands.executeCommand("dabbler.importPlan");
+          vscode13.commands.executeCommand("dabbler.importPlan");
           break;
         case "generatePrompt":
-          vscode12.commands.executeCommand("dabbler.generateSessionSetPrompt");
+          vscode13.commands.executeCommand("dabbler.generateSessionSetPrompt");
           break;
         case "troubleshoot":
-          vscode12.commands.executeCommand("dabbler.troubleshoot");
+          vscode13.commands.executeCommand("dabbler.troubleshoot");
           break;
         case "showCost":
-          vscode12.commands.executeCommand("dabbler.showCostDashboard");
+          vscode13.commands.executeCommand("dabbler.showCostDashboard");
           break;
       }
     });
   }
   _getHtml() {
-    const htmlPath = vscode12.Uri.joinPath(this._extensionUri, "webview", "wizard.html");
+    const htmlPath = vscode13.Uri.joinPath(this._extensionUri, "webview", "wizard.html");
     try {
       let html = fs7.readFileSync(htmlPath.fsPath, "utf8");
       const nonce = getNonce();
@@ -7418,7 +7680,7 @@ var WizardPanel = class _WizardPanel {
 };
 function registerWizardCommands(context) {
   context.subscriptions.push(
-    vscode12.commands.registerCommand("dabbler.getStarted", () => {
+    vscode13.commands.registerCommand("dabbler.getStarted", () => {
       WizardPanel.show(context.extensionUri);
     })
   );
@@ -7427,7 +7689,7 @@ function registerWizardCommands(context) {
 }
 
 // src/dashboard/CostDashboard.ts
-var vscode13 = __toESM(require("vscode"));
+var vscode14 = __toESM(require("vscode"));
 var fs9 = __toESM(require("fs"));
 var path11 = __toESM(require("path"));
 
@@ -7517,17 +7779,17 @@ function getNonce2() {
 var CostDashboard = class _CostDashboard {
   static show(extensionUri) {
     if (_CostDashboard.currentPanel) {
-      _CostDashboard.currentPanel._panel.reveal(vscode13.ViewColumn.Two);
+      _CostDashboard.currentPanel._panel.reveal(vscode14.ViewColumn.Two);
       _CostDashboard.currentPanel._refresh();
       return;
     }
-    const panel = vscode13.window.createWebviewPanel(
+    const panel = vscode14.window.createWebviewPanel(
       "dabblerCostDashboard",
       "Dabbler \u2014 Cost Dashboard",
-      vscode13.ViewColumn.Two,
+      vscode14.ViewColumn.Two,
       {
         enableScripts: true,
-        localResourceRoots: [vscode13.Uri.joinPath(extensionUri, "webview")]
+        localResourceRoots: [vscode14.Uri.joinPath(extensionUri, "webview")]
       }
     );
     _CostDashboard.currentPanel = new _CostDashboard(panel, extensionUri);
@@ -7550,9 +7812,9 @@ var CostDashboard = class _CostDashboard {
     this._panel.webview.html = this._getHtml();
   }
   _exportCsv() {
-    const root = vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
-      vscode13.window.showErrorMessage("No workspace folder open.");
+      vscode14.window.showErrorMessage("No workspace folder open.");
       return;
     }
     const entries = readMetrics(root);
@@ -7560,13 +7822,13 @@ var CostDashboard = class _CostDashboard {
     const outPath = path11.join(root, "ai-router", "cost-export.csv");
     try {
       fs9.writeFileSync(outPath, csv, "utf8");
-      vscode13.commands.executeCommand("vscode.open", vscode13.Uri.file(outPath));
+      vscode14.commands.executeCommand("vscode.open", vscode14.Uri.file(outPath));
     } catch (err) {
-      vscode13.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+      vscode14.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   _getHtml() {
-    const root = vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const nonce = getNonce2();
     const cspSource = this._panel.webview.cspSource;
     if (!root) {
@@ -7578,7 +7840,7 @@ var CostDashboard = class _CostDashboard {
     }
     const summary = summarizeMetrics(entries);
     const sparkline = buildSparkline(summary.dailyCosts);
-    const htmlPath = vscode13.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
+    const htmlPath = vscode14.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
     try {
       let html = fs9.readFileSync(htmlPath.fsPath, "utf8");
       const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
@@ -7616,7 +7878,7 @@ function noMetricsHtml(nonce, cspSource, metricsPath) {
 }
 function registerCostDashboardCommand(context) {
   context.subscriptions.push(
-    vscode13.commands.registerCommand("dabbler.showCostDashboard", () => {
+    vscode14.commands.registerCommand("dabbler.showCostDashboard", () => {
       CostDashboard.show(context.extensionUri);
     })
   );
@@ -7625,22 +7887,22 @@ function registerCostDashboardCommand(context) {
 // src/extension.ts
 var SESSION_SETS_REL2 = path12.join("docs", "session-sets");
 function evaluateSupportContextKeys(allSets) {
-  const cfg = vscode14.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode15.workspace.getConfiguration("dabblerSessionSets");
   const uatPref = cfg.get("uatSupport.enabled", "auto");
   const e2ePref = cfg.get("e2eSupport.enabled", "auto");
   const anyUat = allSets.some((s) => s.config?.requiresUAT);
   const anyE2e = allSets.some((s) => s.config?.requiresE2E);
   const uatActive = uatPref === "always" || uatPref === "auto" && anyUat;
   const e2eActive = e2ePref === "always" || e2ePref === "auto" && anyE2e;
-  vscode14.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
-  vscode14.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
+  vscode15.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
+  vscode15.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
 }
 function activate(context) {
-  if (!vscode14.workspace.workspaceFolders?.length)
+  if (!vscode15.workspace.workspaceFolders?.length)
     return;
   const provider = new SessionSetsProvider(context.extensionUri);
   context.subscriptions.push(
-    vscode14.window.registerTreeDataProvider("dabblerSessionSets", provider)
+    vscode15.window.registerTreeDataProvider("dabblerSessionSets", provider)
   );
   const evaluateContextKeys = () => {
     evaluateSupportContextKeys(provider._cache ?? readAllSessionSets());
@@ -7652,7 +7914,7 @@ function activate(context) {
   };
   evaluateContextKeys();
   context.subscriptions.push(
-    vscode14.workspace.onDidChangeConfiguration((e) => {
+    vscode15.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") || e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
         evaluateContextKeys();
       }
@@ -7672,11 +7934,11 @@ function activate(context) {
     boundRoots = want;
     for (const root of roots) {
       const sessionSetsAbs = path12.join(root, SESSION_SETS_REL2);
-      const pattern = new vscode14.RelativePattern(
+      const pattern = new vscode15.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,activity-log.json,change-log.md,*-uat-checklist.json}"
       );
-      const watcher = vscode14.workspace.createFileSystemWatcher(pattern);
+      const watcher = vscode15.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => provider.refresh();
       watcher.onDidCreate(onEvent);
       watcher.onDidDelete(onEvent);
@@ -7690,20 +7952,20 @@ function activate(context) {
     provider.refresh();
   };
   bindWatchers();
-  context.subscriptions.push(vscode14.workspace.onDidChangeWorkspaceFolders(refreshAll));
+  context.subscriptions.push(vscode15.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 3e4);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
   context.subscriptions.push(
-    vscode14.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
+    vscode15.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
   );
   const queuesProvider = new ProviderQueuesProvider({
-    getWorkspaceRoot: () => vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath
+    getWorkspaceRoot: () => vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath
   });
   context.subscriptions.push(
-    vscode14.window.registerTreeDataProvider("dabblerProviderQueues", queuesProvider)
+    vscode15.window.registerTreeDataProvider("dabblerProviderQueues", queuesProvider)
   );
   context.subscriptions.push(
-    vscode14.commands.registerCommand(
+    vscode15.commands.registerCommand(
       "dabblerProviderQueues.refresh",
       () => queuesProvider.refresh()
     )
@@ -7712,7 +7974,7 @@ function activate(context) {
   const rebindQueuesPoll = () => {
     if (queuesPoll)
       clearInterval(queuesPoll);
-    const seconds = vscode14.workspace.getConfiguration("dabblerProviderQueues").get("autoRefreshSeconds", 15);
+    const seconds = vscode15.workspace.getConfiguration("dabblerProviderQueues").get("autoRefreshSeconds", 15);
     if (seconds > 0) {
       queuesPoll = setInterval(() => queuesProvider.refresh(), seconds * 1e3);
     } else {
@@ -7727,16 +7989,64 @@ function activate(context) {
     }
   });
   context.subscriptions.push(
-    vscode14.workspace.onDidChangeConfiguration((e) => {
+    vscode15.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerProviderQueues.autoRefreshSeconds")) {
         rebindQueuesPoll();
       }
     })
   );
   registerQueueActionCommands(context, {
-    getWorkspaceRoot: () => vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    getWorkspaceRoot: () => vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath,
     refreshView: () => queuesProvider.refresh()
   });
+  const heartbeatsProvider = new ProviderHeartbeatsProvider({
+    getWorkspaceRoot: () => vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath
+  });
+  const heartbeatsTreeView = vscode15.window.createTreeView("dabblerProviderHeartbeats", {
+    treeDataProvider: heartbeatsProvider,
+    showCollapseAll: false
+  });
+  heartbeatsTreeView.description = HEARTBEAT_FOOTER;
+  context.subscriptions.push(heartbeatsTreeView);
+  context.subscriptions.push(
+    vscode15.commands.registerCommand(
+      "dabblerProviderHeartbeats.refresh",
+      () => heartbeatsProvider.refresh()
+    )
+  );
+  let heartbeatsPoll;
+  const rebindHeartbeatsPoll = () => {
+    if (heartbeatsPoll)
+      clearInterval(heartbeatsPoll);
+    const seconds = vscode15.workspace.getConfiguration("dabblerProviderHeartbeats").get("autoRefreshSeconds", 15);
+    if (seconds > 0) {
+      heartbeatsPoll = setInterval(
+        () => heartbeatsProvider.refresh(),
+        seconds * 1e3
+      );
+    } else {
+      heartbeatsPoll = void 0;
+    }
+  };
+  rebindHeartbeatsPoll();
+  context.subscriptions.push({
+    dispose: () => {
+      if (heartbeatsPoll)
+        clearInterval(heartbeatsPoll);
+    }
+  });
+  context.subscriptions.push(
+    vscode15.workspace.onDidChangeConfiguration((e) => {
+      const affectsTiming = e.affectsConfiguration(
+        "dabblerProviderHeartbeats.autoRefreshSeconds"
+      );
+      const affectsContent = e.affectsConfiguration("dabblerProviderHeartbeats.lookbackMinutes") || e.affectsConfiguration("dabblerProviderHeartbeats.silentWarningMinutes");
+      if (affectsTiming)
+        rebindHeartbeatsPoll();
+      if (affectsTiming || affectsContent)
+        heartbeatsProvider.refresh();
+    })
+  );
   registerOpenFileCommands(context);
   registerCopyCommands(context);
   registerGitScaffoldCommand(context);
@@ -7755,7 +8065,7 @@ function activate(context) {
     });
     if (!hasSessionSets) {
       context.workspaceState.update("hasSeenOnboarding", true);
-      vscode14.commands.executeCommand("dabbler.getStarted");
+      vscode15.commands.executeCommand("dabbler.getStarted");
     }
   }
 }

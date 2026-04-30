@@ -160,6 +160,94 @@
           "callType": "code-review"
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/register-start",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Bumped session-state.json currentSession from 2 to 3 (pending). Reread spec.md for Session 3 deliverables: ProviderHeartbeatsProvider tree view with explicit observational framing, mode badges ([FIRST]/[LAST]) on existing session-set tree items via outsourceMode parsing of spec.md, tests, README updates. User pin reaffirmed: route only the cross-provider verification, target Gemini Pro.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/outsource-mode-parsing",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Added OutsourceMode = 'first' | 'last' to src/types.ts and threaded outsourceMode: OutsourceMode through SessionSetConfig (default 'first' for backward compat). Extended parseSessionSetConfig in src/utils/fileSystem.ts to read the field from the same yaml block it already scans, accepting only 'first' or 'last' (anything else falls back to 'first').",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/heartbeats-provider",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Created src/providers/ProviderHeartbeatsProvider.ts implementing vscode.TreeDataProvider<HeartbeatTreeNode>. Tree shape: root -> per-provider leaf nodes (no further expansion; each row carries its own description and tooltip). Shells out to python -m ai_router.heartbeat_status --format json via the existing pythonRunner; reuses dabblerProviderQueues.pythonPath setting so users only configure Python once. 5s result cache (CACHE_TTL_MS) keyed on (root, lookback) so a lookback change invalidates immediately; concurrent getChildren calls fold onto a single in-flight promise. parseFetchResult normalizes the helper's embedded-N field names (completions_in_last_60min) into stable shape via normalizeProvider; defensively falls back to the requested lookback if the payload disagrees. isSilent treats no signal file or never-completed-yet as silent (operator can't distinguish 'never ran' from 'stopped'). formatMinutesAgo: null -> 'never', <60 -> 'Nm ago', >=60 -> 'Hh Mm ago'. Per-row icon: pulse when active, warning when silent. Exported HEARTBEAT_FOOTER constant for the view-description footer.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/extension-wiring",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Wired ProviderHeartbeatsProvider into src/extension.ts via createTreeView (rather than registerTreeDataProvider) so we can set treeView.description = HEARTBEAT_FOOTER — keeps the observational-only disclaimer visible at the view header at all times. Registered dabblerProviderHeartbeats.refresh command and a configurable auto-poll (dabblerProviderHeartbeats.autoRefreshSeconds, default 15s; 0 disables; rebinds on settings change). Also rebinds + refreshes when lookbackMinutes or silentWarningMinutes change.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/mode-badges",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Added modeBadge() helper to src/providers/SessionSetsProvider.ts: returns '[FIRST]' or '[LAST]' from set.config.outsourceMode. Inserted into the bits.join chain on each session-set row's description. Added 'Mode: outsource-<mode>' line to the row tooltip's config block. Backward-compat: when a spec omits outsourceMode, parseSessionSetConfig fills in 'first', so [FIRST] renders on existing repos with no spec changes.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/unit-tests",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Added two test files. src/test/suite/providerHeartbeats.test.ts (19 tests): tree shape (alphabetic provider order, leaves only, empty payload guidance, fetch failure, missing workspace), silent-warning threshold (active <30m, silent at 31m, exact-30m boundary not-silent, no signal file silent, no completions silent, icon + contextValue assertions), rendering (description format, missing-signal text, tooltip echoes disclaimer, formatMinutesAgo edge cases including 0/45/120/202), parseFetchResult (embedded-N normalization, lookback mismatch fallback, timeout/non-zero/malformed/missing-providers rejection). src/test/suite/modeBadge.test.ts (7 tests): outsourceMode parsing (default-when-missing, default-when-omitted-in-yaml, last, first explicit, unknown-falls-back-to-first) and modeBadge rendering for both modes.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/readme-update",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Updated tools/dabbler-ai-orchestration/README.md: added 'Provider Queues' and 'Provider Heartbeats' feature sections (the latter prominently flagging the observational-only framing in a blockquote), an 'Outsource modes' subsection explaining first vs. last semantics, a 'mode badges' note under Session Set Explorer, six new rows in the Extension Settings table (autoRefreshSeconds + pythonPath + messageLimit for queues; autoRefreshSeconds + lookbackMinutes + silentWarningMinutes for heartbeats), and outsourceMode in the example Session Set Configuration block.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/build-verification",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Bumped extension version 0.10.0 -> 0.11.0; added a 0.11.0 CHANGELOG entry covering Provider Heartbeats view, mode badges, and auto-refresh wiring. TypeScript type-check (npx tsc --noEmit) clean. esbuild bundle (npm run compile) clean. vsce ls validates the manifest. vsce package builds dabbler-ai-orchestration-0.11.0.vsix (17 files, 289.92 KB). Electron test harness still blocked by the same pre-existing Windows-launcher problem flagged in Sessions 1 and 2; not introduced by this session.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/cross-provider-verification",
+      "dateTime": "2026-04-30T18:30:00-04:00",
+      "description": "Cross-provider verification routed to gemini-pro per session instruction (input 12,557; output 276; cost $0.0185). Result: one suggestion-level finding, no defects. Verifier observed that the dabblerProviderHeartbeats config-change listener calls rebindHeartbeatsPoll() unconditionally for any of the three settings even though only autoRefreshSeconds drives the setInterval; the other two only need a refresh. Applied the suggested split in src/extension.ts: affectsTiming gates rebindHeartbeatsPoll, affectsTiming || affectsContent gates the refresh. Recompiled clean and re-packaged 0.11.0 VSIX.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "provider": "google",
+          "costUsd": 0.0185,
+          "callType": "code-review"
+        }
+      ]
     }
   ]
 }

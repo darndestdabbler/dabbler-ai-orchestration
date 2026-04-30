@@ -41,6 +41,17 @@ function uatBadge(set: SessionSet): string {
   return "";
 }
 
+// Outsource-first vs. outsource-last is a routing choice that lives in
+// each spec.md's `Session Set Configuration` block. The badge surfaces it
+// on the session-set tree row so the operator can tell at a glance which
+// path a set's verifications take without opening the spec.
+export function modeBadge(set: SessionSet): string {
+  const mode = set.config?.outsourceMode;
+  if (mode === "last") return "[LAST]";
+  if (mode === "first") return "[FIRST]";
+  return "";
+}
+
 function liveSessionTooltipLines(set: SessionSet): string[] {
   if (!set.liveSession) return [];
   const ls = set.liveSession;
@@ -69,6 +80,9 @@ function configTooltipLines(set: SessionSet): string[] {
   if (set.config.requiresE2E) flags.push("E2E");
   const lines: string[] = [];
   lines.push(`Gates: ${flags.length ? flags.join(" + ") : "none"}`);
+  if (set.config.outsourceMode) {
+    lines.push(`Mode: outsource-${set.config.outsourceMode}`);
+  }
   if (set.config.requiresUAT && set.uatSummary) {
     const u = set.uatSummary;
     if (u.totalItems > 0) {
@@ -176,7 +190,7 @@ export class SessionSetsProvider
       set.name,
       vscode.TreeItemCollapsibleState.None
     ) as SetItem;
-    const bits = [progressText(set), touchedDate(set), uatBadge(set)].filter(Boolean);
+    const bits = [progressText(set), touchedDate(set), modeBadge(set), uatBadge(set)].filter(Boolean);
     item.description = bits.join("  ·  ");
     item.tooltip = new vscode.MarkdownString(
       [

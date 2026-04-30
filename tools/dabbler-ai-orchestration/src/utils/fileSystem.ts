@@ -42,7 +42,14 @@ export function discoverRoots(): string[] {
 }
 
 export function parseSessionSetConfig(specPath: string): SessionSetConfig {
-  const config: SessionSetConfig = { requiresUAT: false, requiresE2E: false, uatScope: "none" };
+  // outsourceMode defaults to "first" — matches the AI router's documented
+  // backward-compat default when the spec omits the field.
+  const config: SessionSetConfig = {
+    requiresUAT: false,
+    requiresE2E: false,
+    uatScope: "none",
+    outsourceMode: "first",
+  };
   if (!fs.existsSync(specPath)) return config;
   let text: string;
   try {
@@ -65,6 +72,11 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   if (e2e) config.requiresE2E = e2e[1].toLowerCase() === "true";
   const scope = block.match(stringRe("uatScope"));
   if (scope) config.uatScope = scope[1];
+  const mode = block.match(stringRe("outsourceMode"));
+  if (mode) {
+    const v = mode[1].toLowerCase();
+    if (v === "first" || v === "last") config.outsourceMode = v;
+  }
   return config;
 }
 

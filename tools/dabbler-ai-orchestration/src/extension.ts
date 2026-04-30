@@ -3,6 +3,10 @@ import * as fs from "fs";
 import * as path from "path";
 import { SessionSetsProvider } from "./providers/SessionSetsProvider";
 import { ProviderQueuesProvider } from "./providers/ProviderQueuesProvider";
+import {
+  ProviderHeartbeatsProvider,
+  HEARTBEAT_FOOTER,
+} from "./providers/ProviderHeartbeatsProvider";
 import { discoverRoots, readAllSessionSets } from "./utils/fileSystem";
 import { registerOpenFileCommands } from "./commands/openFile";
 import { registerCopyCommands } from "./commands/copyCommand";
@@ -150,6 +154,60 @@ export function activate(context: vscode.ExtensionContext): void {
     getWorkspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     refreshView: () => queuesProvider.refresh(),
   });
+
+  // --- Provider Heartbeats view ---
+  const heartbeatsProvider = new ProviderHeartbeatsProvider({
+    getWorkspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+  });
+  // The footer makes the observational framing impossible to miss; it
+  // sits in the view header at all times so a user can't skim past it.
+  const heartbeatsTreeView = vscode.window.createTreeView("dabblerProviderHeartbeats", {
+    treeDataProvider: heartbeatsProvider,
+    showCollapseAll: false,
+  });
+  heartbeatsTreeView.description = HEARTBEAT_FOOTER;
+  context.subscriptions.push(heartbeatsTreeView);
+  context.subscriptions.push(
+    vscode.commands.registerCommand("dabblerProviderHeartbeats.refresh", () =>
+      heartbeatsProvider.refresh(),
+    ),
+  );
+
+  let heartbeatsPoll: NodeJS.Timeout | undefined;
+  const rebindHeartbeatsPoll = () => {
+    if (heartbeatsPoll) clearInterval(heartbeatsPoll);
+    const seconds = vscode.workspace
+      .getConfiguration("dabblerProviderHeartbeats")
+      .get<number>("autoRefreshSeconds", 15);
+    if (seconds > 0) {
+      heartbeatsPoll = setInterval(
+        () => heartbeatsProvider.refresh(),
+        seconds * 1000,
+      );
+    } else {
+      heartbeatsPoll = undefined;
+    }
+  };
+  rebindHeartbeatsPoll();
+  context.subscriptions.push({
+    dispose: () => {
+      if (heartbeatsPoll) clearInterval(heartbeatsPoll);
+    },
+  });
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      // Only the polling-interval setting actually requires rebinding the
+      // setInterval; the other two only affect what the next refresh pulls.
+      const affectsTiming = e.affectsConfiguration(
+        "dabblerProviderHeartbeats.autoRefreshSeconds",
+      );
+      const affectsContent =
+        e.affectsConfiguration("dabblerProviderHeartbeats.lookbackMinutes") ||
+        e.affectsConfiguration("dabblerProviderHeartbeats.silentWarningMinutes");
+      if (affectsTiming) rebindHeartbeatsPoll();
+      if (affectsTiming || affectsContent) heartbeatsProvider.refresh();
+    }),
+  );
 
   // --- Register feature command groups ---
   registerOpenFileCommands(context);

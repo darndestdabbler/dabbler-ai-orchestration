@@ -23,6 +23,41 @@ State is derived from file presence in `docs/session-sets/<slug>/`:
 
 Right-click a session set to open its spec, activity log, change log, or AI assignment. Copy trigger phrases to start the next AI session.
 
+Each session-set row carries small badges in its description:
+
+- `[FIRST]` / `[LAST]` — the spec's `outsourceMode` (whether verifications go through a synchronous API call or via the persistent provider queue). See [Outsource modes](#outsource-modes) below.
+- `[UAT N]` / `[UAT done]` — UAT checklist progress (only on sets with `requiresUAT: true`).
+
+### Provider Queues
+A tree view that shows the live state of each provider's outsource-last queue (`provider-queues/<provider>/queue.db`). Messages are bucketed by lifecycle state — `new` → `claimed` → `completed` → `failed` → `timed_out` — and grouped by provider. Right-click a message for **Open Payload**, **Mark Failed**, or **Force Reclaim** (the last two confirm before mutating). Auto-refreshes every 15 seconds (configurable).
+
+The view shells out to `python -m ai_router.queue_status --format json`. The Python helper is the single source of truth for the queue schema; the extension never opens the SQLite file directly.
+
+### Provider Heartbeats
+A tree view that shows when each provider last produced a completion and how much it has produced over a sliding window:
+
+```
+Provider Heartbeats          Observational only. Subscription windows are not introspectable.
+├── anthropic   last seen 12 min ago · 3 completions / 60m   ⚡
+├── openai      last seen 2 min ago  · 8 completions / 60m   ⚡
+└── google      last seen 3h 22m ago · 0 completions / 60m   ⚠️
+```
+
+> **Read this once.** The heartbeats view is **strictly backward-looking**. It cannot tell you whether a provider has subscription headroom, whether the next call will be rate-limited, or whether a quiet provider is healthy or stuck. Use it as a heartbeat — _is anything coming out of this provider lately?_ — and nothing more. The view's description footer repeats this disclaimer at all times.
+
+A provider is flagged silent (⚠️) when its last completion was more than `dabblerProviderHeartbeats.silentWarningMinutes` ago (default 30). Auto-refreshes every 15 seconds (configurable).
+
+The view shells out to `python -m ai_router.heartbeat_status --format json`.
+
+### Outsource modes
+
+Specs may set `outsourceMode: first | last` in their `Session Set Configuration` block:
+
+- **`first`** (default) — verifications run via a synchronous API call to the chosen provider. Familiar, simple, blocks the session until done.
+- **`last`** — verifications enqueue to the provider's queue and return immediately; a separate verifier-role daemon drains the queue. Use for long-running verifications or when you want to keep multiple verifications in flight.
+
+When `outsourceMode` is omitted from a spec, the extension treats it as `first` for backward compat.
+
 ### Project Wizard (`Dabbler: Get Started`)
 An onboarding panel that walks you through the entire workflow: prerequisites, how sessions work, and first steps. Opens automatically in new workspaces.
 
@@ -86,6 +121,12 @@ budget. Stop if you're not comfortable with the rate of spend.
 | `dabblerSessionSets.uatSupport.enabled` | `auto` | Show UAT commands: `auto` (when any spec declares `requiresUAT: true`), `always`, `never` |
 | `dabblerSessionSets.e2eSupport.enabled` | `auto` | Show E2E commands: `auto`, `always`, `never` |
 | `dabblerSessionSets.e2e.testDirectory` | `tests` | Root directory to search for Playwright test files |
+| `dabblerProviderQueues.autoRefreshSeconds` | `15` | Auto-refresh interval for the Provider Queues view (`0` disables) |
+| `dabblerProviderQueues.pythonPath` | `python` | Python executable used for `queue_status` / `heartbeat_status`; relative paths resolve against the workspace root |
+| `dabblerProviderQueues.messageLimit` | `50` | Max messages fetched per provider per refresh |
+| `dabblerProviderHeartbeats.autoRefreshSeconds` | `15` | Auto-refresh interval for the Provider Heartbeats view (`0` disables) |
+| `dabblerProviderHeartbeats.lookbackMinutes` | `60` | Lookback window for completion / token counts (observational only) |
+| `dabblerProviderHeartbeats.silentWarningMinutes` | `30` | Silent-provider warning threshold |
 
 ## Git Worktree Support
 
@@ -119,6 +160,7 @@ totalSessions: 3
 requiresUAT: true
 requiresE2E: false
 effort: normal
+outsourceMode: first
 ```
 ````
 

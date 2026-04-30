@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Project wizard, session-set explorer, and cost dashboard for the Dabbler AI-led workflow.",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {

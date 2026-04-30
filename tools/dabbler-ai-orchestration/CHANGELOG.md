@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-04-30
+
+### Added
+- `Provider Heartbeats` tree view (Set 5 / Session 3). Reads
+  `python -m ai_router.heartbeat_status --format json`. Shows per-provider
+  last-completion timestamp and lookback-window completions/tokens. Silent
+  providers (no completions in `silentWarningMinutes`, default 30) are
+  flagged with a warning icon. The view's description footer carries a
+  permanent observational-only disclaimer to discourage misreading the
+  view as a routing or capacity signal.
+- Mode badges (`[FIRST]` / `[LAST]`) on session-set tree items, derived
+  from each spec's `outsourceMode` field. Backward-compat default is
+  `first` when the field is absent. Mode also surfaces in the row tooltip.
+- Auto-refresh for the heartbeats view (15s default, configurable;
+  `0` disables) with rebind on settings change.
+
 ## [0.10.0] — 2026-04-30
 
 ### Added

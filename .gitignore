@@ -6,3 +6,4 @@ node_modules/
 *.vsix
 router-metrics.jsonl
 .vscode-test/
+.claude/

@@ -982,24 +982,32 @@ in its "Verifier findings & adjudication" section.
 
 ### Step 8: Close Out the Session
 
-When session work is verified complete, run
-`python -m ai_router.close_session`. The script handles cost report,
-`ai-assignment.md` actuals, next-orchestrator recommendation (every
-session) and next-session-set recommendation (last session only),
-change-log generation (last session only), commit, push,
-mark-complete, and notification. It is the **sole synchronization
-barrier** between session work and the session being marked complete:
-deterministic gate checks, idempotent writes, lock contention
-handling, and reconciler hand-off all live there. See
-`ai-router/docs/close-out.md` for the full reference (when it runs,
-how to run it, what it does, common failures, manual flags,
-troubleshooting). For outsource-last sessions, see also
+When session work is verified complete, the orchestrator (or the
+fresh close-out turn agent) **commits and pushes the work, then runs
+`python -m ai_router.close_session`, then fires the session-complete
+notification** in that order. The close-out script is the **sole
+synchronization barrier** between session work and the session being
+marked complete: it runs deterministic gate checks (including
+`check_pushed_to_remote`, which enforces that the push already
+landed), waits on verification, emits ledger events, and writes
+idempotent state (cost report sourcing, `ai-assignment.md` actuals,
+next-orchestrator recommendation every session, change-log generation
+on the last session, `mark_session_complete`). It does **not** run
+git commit / push / notification — those are the caller's
+responsibility, ordered around the close-out call. See
+`ai-router/docs/close-out.md` Section 1 ("Ownership of commit / push
+/ notification") for the full contract and rationale. For
+outsource-last sessions, see also
 `ai-router/docs/two-cli-workflow.md` for daemon setup and recovery.
 
-Notification ordering matters: close-out fires the
-session-complete Pushover notification *before* Step 9's
-reorganization review so the human is not blocking the
-"session complete" signal while they think about proposals.
+Notification ordering matters: the caller fires the session-complete
+Pushover notification (`send_session_complete_notification` in
+`ai-router/notifications.py`) **after** `close_session` returns
+`succeeded` and **before** Step 9's reorganization review, so the
+human is not blocking the "session complete" signal while they think
+about proposals. Do not fire the notification when the gate failed —
+notifying about a half-closed session corrupts the human's mental
+model of what is or isn't done.
 
 #### Last session only — worktree and branch cleanup
 

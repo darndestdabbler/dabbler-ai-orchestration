@@ -283,7 +283,16 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="python -m ai_router.close_session",
         description=(
             "Run the close-out gate on a session set. This is the sole "
-            "synchronization barrier between session work and close-out."
+            "synchronization barrier between session work and the session "
+            "being marked complete. Close-out runs gate checks, waits on "
+            "verification (queue mode), and writes idempotent state — it "
+            "does NOT run git commit / push or send notifications. The "
+            "caller (orchestrator or fresh close-out turn agent) commits "
+            "and pushes before invoking this script and fires "
+            "send_session_complete_notification afterward; the gate's "
+            "check_pushed_to_remote enforces the precondition. See "
+            "ai-router/docs/close-out.md Section 1 for the full ownership "
+            "contract."
         ),
         epilog=epilog,
         formatter_class=argparse.RawDescriptionHelpFormatter,

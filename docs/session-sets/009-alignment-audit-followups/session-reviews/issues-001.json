@@ -1,0 +1,28 @@
+{
+  "session_number": 1,
+  "verification_round": 1,
+  "verifier_model": "gpt-5-4",
+  "verdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "id": "issue-1",
+      "severity": "Major",
+      "category": "Correctness",
+      "title": "Notification timing contradictory in close-out.md Section 1",
+      "details": "The 'Ownership of commit / push / notification' subsection said all three actions 'run before invoking close_session', then the next paragraph correctly stated notification fires after close_session succeeds. The two readings contradict each other in the canonical contract document.",
+      "location": "ai-router/docs/close-out.md, Section 1 'Ownership of commit / push / notification'",
+      "status": "fixed",
+      "resolution": "Split the bullet into two: (a) git commit/push run before close_session, (b) send_session_complete_notification runs after close_session returns succeeded. The previously-separate notification-ordering paragraph was folded into the second bullet so there is one canonical statement."
+    },
+    {
+      "id": "issue-2",
+      "severity": "Minor",
+      "category": "Completeness",
+      "title": "Original proposal §3.3 items 4 and 6 still describe the superseded contract",
+      "details": "The post-implementation revision note at the top of the proposal flags those items as superseded, but a reader could land on §3.3 directly via a deep link / search and miss the revision note. Verifier recommended inline 'Superseded' markers at the items themselves.",
+      "location": "docs/proposals/2026-04-29-session-close-out-reliability.md, §3.3 items 4 (git operations) and 6 (notification call)",
+      "status": "fixed",
+      "resolution": "Inline '[Superseded by post-implementation revision above: ...]' markers added to both items so a reader who lands on §3.3 directly sees the corrected contract."
+    }
+  ]
+}

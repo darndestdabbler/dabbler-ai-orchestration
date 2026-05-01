@@ -1,12 +1,17 @@
 {
   "schemaVersion": 2,
   "sessionSetName": "009-alignment-audit-followups",
-  "currentSession": null,
+  "currentSession": 1,
   "totalSessions": 5,
-  "status": "not-started",
-  "lifecycleState": null,
-  "startedAt": null,
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-01T16:34:28.368062-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high"
+  }
 }

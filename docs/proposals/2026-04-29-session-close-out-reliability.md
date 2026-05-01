@@ -51,6 +51,70 @@ applies-to: dabbler-ai-orchestration (ai-router/, docs/ai-led-session-workflow.m
 
 ---
 
+> ## POST-IMPLEMENTATION REVISION — close-out does NOT own commit / push / notification (2026-05-01)
+>
+> Set 6 Session 3's combined-design alignment audit
+> (`docs/proposals/2026-04-30-combined-design-alignment-audit.md`)
+> flagged drift item **D-3** as corrective: this proposal's §3 items
+> 4 ("git commit/push") and 6 ("`send_session_complete_notification()`")
+> name `close_session.py` as the owner of commit, push, and
+> notification, but the implementation that shipped through Sets 1–5
+> deliberately does not include those code paths. Set 9 Session 1
+> resolves the drift by **revising the contract to match the
+> implementation**, not by changing the implementation:
+>
+> - **Commit and push** are the orchestrator's (or the fresh
+>   close-out turn agent's) responsibility, run **before** invoking
+>   `close_session`. The gate's `check_pushed_to_remote` predicate
+>   enforces the precondition and fails closed if the work was not
+>   pushed.
+> - **Notification** (`send_session_complete_notification` in
+>   `ai-router/notifications.py`) is fired by the same caller
+>   **after** `close_session` returns `succeeded`. The function is
+>   intentionally retained as part of the public API and is no longer
+>   invoked from inside the close-out flow.
+> - **Close-out's responsibilities** are gate checks, verification
+>   wait, ledger event emission, and idempotent state writes
+>   (`mark_session_complete`, `change-log.md`, next-orchestrator
+>   recommendation). That is exhaustive: anything not on this list
+>   lives outside `close_session.py`.
+>
+> The revision exists because mixing publish-side effects (commit,
+> push, notify) into the close-out gate would re-introduce the
+> "verification + publishing collapse" failure mode that GPT-5.4
+> flagged during the original review (see "Synthesis after
+> cross-provider review" §2 below — *split the state machine*). The
+> shipping design already separates those concerns by accident; this
+> revision makes the separation deliberate and documents it
+> canonically in `ai-router/docs/close-out.md` Section 1 ("Ownership
+> of commit / push / notification") and Section 3 (the revised step
+> list, which omits notification).
+>
+> **What this means for §3 of this proposal:**
+>
+> - Item 3 ("`mark_session_complete()` becomes the gate") stands as
+>   written.
+> - §3.3 item 4 ("git commit and push") and §3.3 item 6
+>   ("`send_session_complete_notification()`") are **superseded**: the
+>   close-out script does not run these. Treat the original wording
+>   as historical; the shipping contract is the close-out doc.
+> - §3.5 ("Workflow doc collapse") stands; Step 8 of
+>   `docs/ai-led-session-workflow.md` was reduced to a one-paragraph
+>   pointer at `ai-router/docs/close-out.md`.
+> - §3.6 ("Fresh-agent close-out turn") stands but with one
+>   adjustment: the fresh turn's prompt
+>   (`_CLOSE_OUT_TURN_CONTENT` in `ai-router/close_out.py`)
+>   explicitly directs the agent to commit and push before invoking
+>   close-out and to notify after close-out succeeds. This makes the
+>   ownership boundary visible to the agent at the moment it acts.
+>
+> The other corrective drift items from the audit (D-1: `(repo,
+> branch)` parallel-session lock; D-2: `--force` flag scope) land in
+> Sessions 2 and 3 of Set 9. The follow-up items (D-4, F-1, F-2)
+> land in Set 9 Session 4 or are explicitly skipped with rationale.
+
+---
+
 # Session close-out reliability
 
 ## Executive summary
@@ -258,9 +322,17 @@ A Python entry point (not an LLM call) that:
    - `mark_session_complete()` is a no-op if status is already
      `complete`.
    - Git operations skip when nothing to commit / nothing to push.
+     **[Superseded by post-implementation revision above:
+     `close_session` does not perform git operations. The caller
+     commits/pushes before invoking the script, and the gate's
+     `check_pushed_to_remote` enforces the precondition.]**
 5. Prints the final `print_cost_report()` (sourced from
    `router-metrics.jsonl`).
 6. Calls `send_session_complete_notification()`.
+   **[Superseded by post-implementation revision above:
+   `close_session` does not call the notification function. The
+   caller fires `send_session_complete_notification(...)` after
+   `close_session` returns `succeeded`.]**
 7. Returns 0 on full success, non-zero on any failed check, with the
    failure list as stderr output.
 

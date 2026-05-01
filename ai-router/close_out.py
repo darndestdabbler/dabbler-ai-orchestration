@@ -94,28 +94,51 @@ except ImportError:
 SESSION_CLOSE_OUT_TASK_TYPE = "session-close-out"
 
 # The prompt sent to the routed close-out agent in outsource-first mode.
-# Deliberately short: the agent's job is to read the canonical doc and
-# run the CLI, not to reason about the gate semantics. Embedding the
-# whole close-out.md into the prompt would defeat the doc-collapse work
-# from Session 1; the pointer is what keeps the single source of truth.
+# Deliberately short: the agent's job is to commit/push/run-the-CLI/
+# notify in the right order, not to reason about the gate semantics.
+# Embedding the whole close-out.md into the prompt would defeat the
+# doc-collapse work from Set 6 Session 1; the pointer is what keeps the
+# single source of truth.
+#
+# Commit / push / notification ownership (Set 9 Session 1, drift item
+# D-3 from the alignment audit): the close_session CLI does NOT run git
+# commit, git push, or notifications — the gate's check_pushed_to_remote
+# enforces the push precondition, and notification fires from this
+# routed agent after close_session succeeds. The prompt therefore
+# orders the steps explicitly so the agent does not skip the commit /
+# push or fire the notification before close-out has actually closed.
 _CLOSE_OUT_TURN_CONTENT = (
     "Run end-of-session close-out for the session set at "
     "{session_set_dir}.\n\n"
     "Steps:\n"
     "1. Read ai-router/docs/close-out.md (the canonical close-out "
-    "reference) for the procedure, expected outputs, and remediation.\n"
-    "2. Invoke `python -m ai_router.close_session "
+    "reference) for the procedure, expected outputs, ownership "
+    "contract (Section 1), and remediation.\n"
+    "2. Stage, commit, and push the session's work BEFORE invoking "
+    "close_session. The gate's check_pushed_to_remote will fail "
+    "closed if the push has not landed, so this step is a "
+    "precondition rather than something close_session does itself. "
+    "Use a descriptive commit message that names the session set "
+    "and session number.\n"
+    "3. Invoke `python -m ai_router.close_session "
     "--session-set-dir {session_set_dir}` and capture its exit code, "
     "result string, and gate-result list.\n"
-    "3. If the gate fails on a transient signal (lock contention, "
+    "4. If the gate fails on a transient signal (lock contention, "
     "verification timeout), do not retry — report the result. The "
     "reconciler will sweep the session set on the next startup.\n"
-    "4. If the gate fails on a hard signal (uncommitted files, push "
+    "5. If the gate fails on a hard signal (uncommitted files, push "
     "rejected, missing nextOrchestrator), surface the remediation "
-    "string verbatim so the human can address it.\n\n"
+    "string verbatim so the human can address it. Do not fire the "
+    "session-complete notification when the gate has failed.\n"
+    "6. ONLY when close_session returns result=='succeeded' and exit "
+    "code 0, fire the session-complete notification by calling "
+    "`ai_router.notifications.send_session_complete_notification(...)` "
+    "(or running it via the venv Python). Notification failure is "
+    "non-fatal — log and continue; the session work is preserved in "
+    "git regardless.\n\n"
     "Return a one-paragraph summary: what close_session reported, "
-    "which gates passed/failed, and whether the session reached "
-    "`closed` lifecycle state."
+    "which gates passed/failed, whether the session reached `closed` "
+    "lifecycle state, and whether the notification was sent."
 )
 
 

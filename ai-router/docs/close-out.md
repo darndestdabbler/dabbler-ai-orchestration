@@ -33,8 +33,10 @@ all of the following are true:
      ISSUES_FOUND retries are exhausted.
    - **`outsourceMode: last`** — the queued verification job has
      reached `completed`, `failed`, or `timed_out` in `queue.db`.
-3. The orchestrator (or its fresh close-out turn — see Set 006
-   Session 2) is ready to commit, push, and notify.
+3. **The orchestrator (or its fresh close-out turn — see Set 006
+   Session 2) has already committed and pushed the session's work.**
+   See "Ownership of commit / push / notification" below for why this
+   is a precondition rather than something close-out does itself.
 
 If any of these is not true, close-out refuses to run and emits a gate
 failure with concrete remediation instead of producing a half-closed
@@ -51,6 +53,46 @@ collapsing Step 8 in the workflow doc could lower agent compliance.
 **Outsource-last** has the orchestrator daemon self-invoke
 `close_session` directly: it already has queue context and fresh-turn
 routing would be a wasted API call.
+
+### Ownership of commit / push / notification
+
+Close-out's responsibilities are deliberately narrow:
+
+- Lifecycle gate checks (`gate_checks.GATE_CHECKS`)
+- Verification-wait (queue mode) / verification-result inspection (api
+  mode)
+- Idempotent state writes (`mark_session_complete`, ledger events,
+  `change-log.md` and the next-orchestrator recommendation in
+  `ai-assignment.md`)
+
+Close-out **does not** run `git commit`, `git push`, or
+`send_session_complete_notification`. Those are the
+**orchestrator's** (or the fresh close-out turn agent's)
+responsibility, and they straddle the close-out call:
+
+- **`git commit` and `git push`** run **before** invoking
+  `close_session`. The boundary is enforced by
+  `gate_checks.check_pushed_to_remote`: a session whose work was not
+  pushed fails the gate at Section 3 step 7 and never reaches the
+  state flip — so the gate guarantees the precondition rather than
+  performing it.
+- **`send_session_complete_notification(...)`** (from
+  `ai-router/notifications.py`) runs **after** `close_session`
+  returns `succeeded`. Firing it before close-out succeeds would
+  notify the human about a session that may still gate-fail; firing
+  it from inside `close_session` would re-introduce the
+  side-effect-as-state-flip coupling that GPT-5.4 flagged in the
+  original proposal review (§5 of
+  `docs/proposals/2026-04-30-combined-design-alignment-audit.md`,
+  drift item D-3).
+
+This is a deliberate revision to the original close-out reliability
+proposal (`docs/proposals/2026-04-29-session-close-out-reliability.md`
+§3, items 4 and 6), which named close-out as the holder of commit,
+push, and notification. The revision is documented in that proposal's
+post-implementation revision section. Future audits should treat the
+revised contract — close-out owns the gate; the caller owns the side
+effects — as canonical.
 
 ---
 
@@ -188,11 +230,17 @@ returns the corresponding exit code without touching downstream state.
      (every session except the last).
    - Last session only: write `change-log.md` and append the
      next-session-set recommendation.
-10. **Notify.** `send_session_complete_notification(...)` posts to
-    Pushover. Failure is non-fatal — log and continue. (The session
-    work is preserved in git regardless.)
-11. **Emit `closeout_succeeded`** to `session-events.jsonl`,
+10. **Emit `closeout_succeeded`** to `session-events.jsonl`,
     release the lock, exit 0.
+
+The caller (orchestrator or fresh close-out turn agent) fires
+`send_session_complete_notification(...)` from `ai-router/notifications.py`
+**after** `close_session` returns `succeeded`. The script does not
+perform the notification itself — see Section 1 "Ownership of commit
+/ push / notification" for the rationale and `git` precondition.
+Notification failure is non-fatal: the work is preserved in git
+regardless and the human can re-fire the notification by hand if
+needed.
 
 The cost report (`print_cost_report(SESSION_SET)`) prints during
 the close-out turn before step 9. It reads `router-metrics.jsonl` for

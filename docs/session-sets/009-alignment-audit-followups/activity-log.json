@@ -1,0 +1,41 @@
+{
+  "sessionSetName": "009-alignment-audit-followups",
+  "createdDate": "2026-05-01T16:42:07.648596-04:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "session-1/verification",
+      "dateTime": "2026-05-01T16:42:07.648596-04:00",
+      "description": "Cross-provider verification of D-3 resolution",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 6169,
+          "outputTokens": 5265,
+          "costUsd": 0.0943975
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 12,
+      "stepKey": "session-1/verification-round-2",
+      "dateTime": "2026-05-01T16:44:51.604312-04:00",
+      "description": "Round 2 cross-provider verification after applying issue fixes",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 6134,
+          "outputTokens": 5418,
+          "costUsd": 0.096605
+        }
+      ]
+    }
+  ]
+}

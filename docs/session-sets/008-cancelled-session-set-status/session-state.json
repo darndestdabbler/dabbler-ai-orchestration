@@ -1,12 +1,17 @@
 {
   "schemaVersion": 2,
   "sessionSetName": "008-cancelled-session-set-status",
-  "currentSession": null,
+  "currentSession": 1,
   "totalSessions": 3,
-  "status": "not-started",
-  "lifecycleState": null,
-  "startedAt": null,
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-01T15:07:55.217272-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high"
+  }
 }

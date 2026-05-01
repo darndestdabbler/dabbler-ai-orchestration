@@ -1112,11 +1112,16 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
 
     State is read from each set's ``session-state.json`` via
     :func:`read_status` (Set 7 invariant: every folder has one, lazy-synth
-    fallback for any that slipped through backfill). Sets are grouped in
-    the table by state (in-progress first, then not-started, then done),
-    then sorted by most recently touched within each group.
+    fallback for any that slipped through backfill). The presence of a
+    ``CANCELLED.md`` marker (Set 8) takes precedence over the status
+    field — a partially-completed set the operator has cancelled
+    renders as cancelled, not whatever its prior status was. Sets are
+    grouped in the table by state (in-progress first, then not-started,
+    then done, then cancelled), and within each group sorted by most
+    recently touched.
     """
     from .session_state import read_status
+    from .session_lifecycle import is_cancelled
 
     if not os.path.isdir(base_dir):
         print(f"(no session-sets directory at {base_dir})")
@@ -1125,6 +1130,7 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
     in_progress: list[dict] = []
     not_started: list[dict] = []
     done: list[dict] = []
+    cancelled: list[dict] = []
 
     for name in sorted(os.listdir(base_dir)):
         path = os.path.join(base_dir, name)
@@ -1177,19 +1183,30 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
             except Exception:
                 pass
 
-        # Single source of truth for state: read_status. The "done"
-        # display label maps from the canonical "complete" status —
-        # other consumers (Set 8 cancel/restore) may extend the set
-        # of recognized values without changing this surface.
-        status = read_status(path)
-        if status == "complete":
-            state = "done"
-        elif status == "in-progress":
-            state = "in-progress"
+        # CANCELLED.md presence beats every other state signal — a
+        # partially-completed set the operator has cancelled renders as
+        # cancelled, not whatever its prior status was. The marker file
+        # is checked first so we do not have to teach `read_status` the
+        # cancelled state (which Set 7 already does, but the on-disk
+        # status field may still be in-progress / complete on
+        # legacy-shape state files that pre-date Set 8's writers).
+        if is_cancelled(path):
+            state = "cancelled"
         else:
-            # not-started, cancelled, or any future status all render
-            # under "not-started" until they get their own column.
-            state = "not-started"
+            # Single source of truth for non-cancelled state: read_status.
+            # The "done" display label maps from the canonical "complete"
+            # status. A "cancelled" status that is NOT backed by a
+            # CANCELLED.md (e.g., a manually-edited state file) falls
+            # through to "not-started" — operators relying on the marker
+            # file alone get the same rendering whether they edited the
+            # status field or not.
+            status = read_status(path)
+            if status == "complete":
+                state = "done"
+            elif status == "in-progress":
+                state = "in-progress"
+            else:
+                state = "not-started"
 
         record = {
             "name": name,
@@ -1203,12 +1220,17 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
             done.append(record)
         elif state == "in-progress":
             in_progress.append(record)
+        elif state == "cancelled":
+            cancelled.append(record)
         else:
             not_started.append(record)
 
     in_progress.sort(key=lambda r: r["last_touched"], reverse=True)
     done.sort(key=lambda r: r["last_touched"], reverse=True)
     not_started.sort(key=lambda r: r["name"])
+    # Cancelled sets sink to the bottom; within the group, most recently
+    # touched first (mirrors the in-progress / done convention).
+    cancelled.sort(key=lambda r: r["last_touched"], reverse=True)
 
     # ASCII-only glyphs — Windows cp1252 consoles cannot print emoji and
     # crash mid-line, losing the rest of the report (see lessons-learned
@@ -1218,6 +1240,7 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
         [("[~]", r) for r in in_progress]
         + [("[ ]", r) for r in not_started]
         + [("[x]", r) for r in done]
+        + [("[!]", r) for r in cancelled]
     )
 
     if not rows:
@@ -1248,11 +1271,18 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
         touched = r["last_touched"][:10] if r["last_touched"] else "-"
         print(f"{icon}  {r['name']:<{name_width}}  {progress:>10}  {touched}")
     print("=" * (name_width + 32))
-    print(
+    legend = (
         f"  [~] in-progress: {len(in_progress)}    "
         f"[ ] not-started: {len(not_started)}    "
         f"[x] done: {len(done)}"
     )
+    if cancelled:
+        # The cancelled column only appears when at least one cancelled
+        # set is present, mirroring the spec's tree-view rule for the
+        # extension's Cancelled group ("only renders when ≥ 1 is
+        # present"). Keeps the legend clean for the common case.
+        legend += f"    [!] cancelled: {len(cancelled)}"
+    print(legend)
     print("=" * (name_width + 32) + "\n")
 
 

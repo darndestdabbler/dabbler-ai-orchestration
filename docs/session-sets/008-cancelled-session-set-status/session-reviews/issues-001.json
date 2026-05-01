@@ -1,0 +1,62 @@
+{
+  "session": 1,
+  "verifier": "gpt-5-4",
+  "rounds": [
+    {
+      "round": 1,
+      "verdict": "ISSUES_FOUND",
+      "findings": [
+        {
+          "severity": "Critical",
+          "summary": "First-time cancel writes the wrong on-disk shape; entry block ends with `\\n` instead of `\\n\\n` per spec line 149.",
+          "resolution": "FIXED. Updated `prependEntry` (TS) and `_prepend_entry` (Python) so each entry is self-terminating with `\\n\\n` (verb-line + reason + blank-line separator). Both writers now emit byte-identical first-cancel output ending with one trailing blank line."
+        },
+        {
+          "severity": "Major",
+          "summary": "ai-router/__init__.py changes not visible in bundle; verifier could not confirm `[!]` glyph or cancelled-last sort.",
+          "resolution": "FIXED. Bundle path `/tmp/session-1-bundle.diff` was bash-resolved (MSYS) but Python read it as `C:\\tmp\\...` which did not exist. Regenerated the bundle to `C:\\tmp\\session-1-bundle.diff` so both shells agree, and re-ran with `DIFF_PATH=/tmp/session-1-bundle.diff`. Round 2 confirmed the changes."
+        },
+        {
+          "severity": "Major",
+          "summary": "TS API does not match the spec contract: `cancelSessionSet`/`restoreSessionSet` should return `Promise<void>`, not `void`.",
+          "resolution": "FIXED. Both functions are now `async function ... : Promise<void>`. Updated `restore without CANCELLED.md throws` test to use `assert.rejects` instead of `assert.throws` to handle the new async signature."
+        },
+        {
+          "severity": "Minor",
+          "summary": "Tests do not exercise the byte-exact file-shape acceptance criteria; the trailing-blank-line bug went undetected.",
+          "resolution": "FIXED. Added `test_first_cancel_byte_shape_matches_spec_prepend_formula_exactly` in both TS and Python. The Python version uses `re.fullmatch` on the body block to lock in the exact `<verb-line>\\n<reason>\\n\\n` shape per spec line 149."
+        },
+        {
+          "severity": "Minor",
+          "summary": "No tests for `print_session_set_status` `[!]` rendering or cancelled-last sorting.",
+          "resolution": "FIXED. Added `ai-router/tests/test_print_session_set_status_cancelled.py` with five tests: glyph rendering, legend silence when no cancelled sets, cancelled-last sort, and CANCELLED.md precedence over both in-progress and complete status fields."
+        },
+        {
+          "severity": "Nitpick",
+          "summary": "Misleading comment in restore: 'is_cancelled returns False' if both files are present, but actually it returns True.",
+          "resolution": "FIXED. Rewrote the comment in both TS and Python to describe the actual crash-recovery semantics: a crash between the rename and the unlink leaves both files present, the next reader sees CANCELLED.md and reports cancelled, the operator can re-run restore to clean up. Same precedence rule (CANCELLED-wins) keeps the failure mode safe."
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "verdict": "ISSUES_FOUND",
+      "findings": [
+        {
+          "severity": "Major",
+          "summary": "Session 1 `print_session_set_status` acceptance criteria are not exercised by automated tests.",
+          "resolution": "REJECTED — verifier oversight. The tests exist in `ai-router/tests/test_print_session_set_status_cancelled.py`, which IS present in the diff bundle (verified via grep — file body and at least one test name show up). The verifier inspected `test_session_lifecycle.py` and concluded no print-status tests existed, but the new test file was a separate addition. The verifier's prescribed fix list (create temp tree, include CANCELLED.md, capture stdout, assert `[!]` rendering, assert cancelled-last ordering) maps 1:1 to the five tests already in the new file. All 22 Python tests pass (16 helper + 6 print-status). No further action; the substantive acceptance criteria are met. Re-routing for re-verification would cost ~$0.22 and add no information; flagged here for the human's awareness instead."
+        }
+      ]
+    }
+  ],
+  "test_results": {
+    "python": "669 passed in 55s (6 new vs Round 1 baseline of 663)",
+    "typescript_unit": "16 cancelLifecycle + 7 metrics = 23 passing (1 added vs Round 1 for byte-shape assertion)",
+    "typescript_typecheck": "tsc --noEmit -p tools/dabbler-ai-orchestration: clean"
+  },
+  "notes": [
+    "Step 3.5 (ai-assignment.md via routed analysis) was skipped per the user's standing cost-containment rule. Same divergence as Set 7 / Session 3 — there is no ai-assignment.md in this set's folder. Document at close-out.",
+    "AI-router was invoked twice this session (verifier rounds 1 and 2). Total spend: ~$0.44 USD. Within end-of-session-only window."
+  ]
+}

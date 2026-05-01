@@ -1,0 +1,158 @@
+{
+  "sessionSetName": "006-docs-fresh-turn-and-alignment-audit",
+  "createdDate": "2026-04-30T18:00:00-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-1/register-start",
+      "dateTime": "2026-04-30T18:00:00-04:00",
+      "description": "Backfilled: registered session-state.json for session 1 with orchestrator metadata (claude-opus-4-7, high effort). State + activity log were not written at the time the session ran; this entry was added retroactively from the session-001.md verifier review.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-1/close-out-doc",
+      "dateTime": "2026-04-30T19:00:00-04:00",
+      "description": "Created ai-router/docs/close-out.md (~400 lines): canonical close-out reference covering when close_session runs, how to invoke it, what it does (gate checks, idempotent writes, mode-specific verification handling), common failures and remediation, manual-flag matrix (--interactive, --force, --manual-verify, --repair), and troubleshooting (stranded sessions, lock contention, reconciler behavior, queue-state debugging). Wired close_session.py --help to surface Section 2 verbatim from this doc as the single source of truth.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-1/two-cli-doc",
+      "dateTime": "2026-04-30T19:30:00-04:00",
+      "description": "Created ai-router/docs/two-cli-workflow.md (~300 lines): operating guide for outsourceMode: last covering when to use it, initial setup (verifier daemon + orchestrator daemon + spec config), day-to-day operation, verifier-daemon recovery, orchestrator CLI context-reset recovery, subscription-window fatigue diagnostics from heartbeat data, and common pitfalls (auth expiry, interactive prompts in daemon CLIs, cross-platform quirks).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-1/collapse-step8",
+      "dateTime": "2026-04-30T19:50:00-04:00",
+      "description": "Collapsed Step 8 of docs/ai-led-session-workflow.md from ~140 lines to one paragraph pointing at ai-router/docs/close-out.md and ai-router/docs/two-cli-workflow.md. Updated header preamble to note the new mode-aware operating model. Added Close-out + Two-CLI workflow pointer blocks to CLAUDE.md, AGENTS.md, and GEMINI.md at the repo root.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/verify",
+      "dateTime": "2026-04-30T20:30:00-04:00",
+      "description": "End-of-session verification routed to gemini-pro per session pin (session-verification, direct provider call). Verdict: VERIFIED. Verifier confirmed Step 8 collapse, the two new docs, and the close_session --help single-source-of-truth wiring. AGENTS.md and GEMINI.md updates were verified at edit time (verifier had only seen CLAUDE.md).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 15577,
+          "outputTokens": 200,
+          "costUsd": 0.0214
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/commit",
+      "dateTime": "2026-04-30T20:33:48-04:00",
+      "description": "Backfilled: committed session 1 changes (commit 401fcb3). Note: session-state.json and activity-log.json were not written at the time of this commit; they are being added retroactively in Session 3.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-05-01T09:00:00-04:00",
+      "description": "Backfilled: registered session-state.json for session 2 with orchestrator metadata (claude-opus-4-7, high effort). User session pin: no external routing except cross-provider verification, which goes to Gemini Pro.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/router-config",
+      "dateTime": "2026-05-01T09:15:00-04:00",
+      "description": "Added session-close-out task type to ai-router/router-config.yaml: task_type_overrides routes it to sonnet (per spec: outsource-first routes to sonnet/haiku tier at low effort), task_type_params sets effort=low and thinking off for sonnet/gemini-pro/gpt-5-4-mini, complexity task_type_scores entry of 15 (mechanical: read doc + run CLI), delegation always_route_task_types entry. Auto-verification deliberately not enabled for this task type — close-out either passes the gate or surfaces the gate's structured failure as the verdict.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/close-out-module",
+      "dateTime": "2026-05-01T09:35:00-04:00",
+      "description": "Created ai-router/close_out.py: route_fresh_close_out_turn() is the mode-aware orchestrator hook. Outsource-first: routes a fresh turn via route() with task_type='session-close-out' and a prompt that points the routed agent at ai-router/docs/close-out.md and tells it to invoke python -m ai_router.close_session. Outsource-last: invokes close_session.run in-process via the injected close_session_runner (no fresh API turn — the orchestrator's primary CLI session already has the queue context). Hook never raises; failures populate FreshCloseOutResult.error and the next orchestrator startup's reconciler sweep recovers the session. Includes a CLI for manual debugging (python -m ai_router.close_out --session-set-dir ...).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/exports",
+      "dateTime": "2026-05-01T09:45:00-04:00",
+      "description": "Added public exports to ai-router/__init__.py: route_fresh_close_out_turn, FreshCloseOutResult, SESSION_CLOSE_OUT_TASK_TYPE, CLOSE_OUT_RESULTS from close_out; register_sweeper_hook, reconcile_sessions, ReconcileSummary, ReconcileEntry, RECONCILER_DEFAULT_QUIET_WINDOW_MINUTES from reconciler. The reconciler exports were already implemented in Set 3 Session 3; this set surfaces them at the package level so orchestrator-startup wiring has a clean import surface.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/tests",
+      "dateTime": "2026-05-01T10:05:00-04:00",
+      "description": "Created ai-router/tests/test_close_out.py (11 unit tests): outsource-first routing assertions (task_type, prompt content, route_result capture), outsource-last runner invocation (Namespace fields, no-route assertion), pre-flight skips (missing disposition, failed/requires_review status, invalid mode config), CLI smoke tests. Created ai-router/tests/test_close_out_e2e.py (4 end-to-end tests): outsource-first close-out via routed turn (real close_session.run wrapped in fake route_fn), outsource-last close-out via in-process runner, failure-then-reconciler-recovery (route_fn raises, session lands in closeout_pending, next sweep recovers), cost-control regression (outsource-last must never invoke route_fn). Full ai-router suite: 606/606 passing (15 new).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/workflow-doc",
+      "dateTime": "2026-05-01T10:15:00-04:00",
+      "description": "Updated Step 6 of docs/ai-led-session-workflow.md to describe the orchestrator-driven close-out hook in both modes. Added a paragraph explaining route_fresh_close_out_turn fires when verification terminates with VERIFIED + disposition.json status=completed, mode-first routes a new turn so the agent reads close-out.md at the moment needed, mode-last self-invokes close_session in-process with no fresh API turn, and hook failures are non-fatal because the reconciler sweeps stranded sessions.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/verify",
+      "dateTime": "2026-05-01T10:30:00-04:00",
+      "description": "End-of-session verification routed to gemini-pro per session pin (session-verification, direct provider call via scripts/verify_session_006_2.py). Bundle: ai-router/__init__.py + router-config.yaml + docs/ai-led-session-workflow.md diffs plus full close_out.py and the two new test files. Verdict: VERIFIED, no findings, $0.0170 (input=13553, output=2).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 13553,
+          "outputTokens": 2,
+          "costUsd": 0.0170
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/commit",
+      "dateTime": "2026-05-01T14:45:00-04:00",
+      "description": "Manual close-out for session 2: staged session-2 work + tracking files, committed, advanced session-state.json to currentSession=3 with lifecycleState=work_in_progress. Followed the same manual close-out pattern used for session 1 of this set. ai-router close-out script not invoked per session pin (no mid-session ai-router invocations except cross-provider verification).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/register-start",
+      "dateTime": "2026-05-01T14:45:00-04:00",
+      "description": "Registered session 3 in session-state.json with orchestrator metadata (claude-opus-4-7, high effort). Session pin: no external routing except cross-provider verification (Gemini Pro), and the spec-required cross-provider review (Gemini Pro + GPT-5.4) which the user explicitly authorized.",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

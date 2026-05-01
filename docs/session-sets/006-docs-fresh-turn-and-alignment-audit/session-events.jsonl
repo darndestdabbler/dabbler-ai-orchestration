@@ -1,0 +1,9 @@
+{"timestamp": "2026-04-30T22:00:00.000000Z", "session_number": 1, "event_type": "work_started", "backfilled": true}
+{"timestamp": "2026-05-01T00:30:00.000000Z", "session_number": 1, "event_type": "verification_requested", "backfilled": true, "verifier_model": "gemini-pro", "step_key": "session-1/verify"}
+{"timestamp": "2026-05-01T00:30:00.000000Z", "session_number": 1, "event_type": "verification_completed", "backfilled": true, "verifier_model": "gemini-pro", "verdict": "unknown", "step_key": "session-1/verify"}
+{"timestamp": "2026-05-01T13:00:00.000000Z", "session_number": 2, "event_type": "work_started", "backfilled": true}
+{"timestamp": "2026-05-01T14:30:00.000000Z", "session_number": 2, "event_type": "verification_requested", "backfilled": true, "verifier_model": "gemini-pro", "step_key": "session-2/verify"}
+{"timestamp": "2026-05-01T14:30:00.000000Z", "session_number": 2, "event_type": "verification_completed", "backfilled": true, "verifier_model": "gemini-pro", "verdict": "unknown", "step_key": "session-2/verify"}
+{"timestamp": "2026-05-01T14:30:00.000000Z", "session_number": 2, "event_type": "work_verified", "backfilled": true}
+{"timestamp": "2026-05-01T14:45:00.000000Z", "session_number": 2, "event_type": "closeout_succeeded"}
+{"timestamp": "2026-05-01T14:45:00.000000Z", "session_number": 3, "event_type": "work_started"}

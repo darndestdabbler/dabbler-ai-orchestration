@@ -712,11 +712,20 @@ Outsource-last sessions (`outsourceMode: last`) enqueue the
 verification message to `provider-queues/<verifierRole>/queue.db`
 and the verifier daemon processes it asynchronously; this step
 returns once the message is enqueued, and Step 8's `close_session`
-waits on the queue's terminal state before proceeding. The
-orchestration layer routes a fresh close-out turn at this step's
-completion (see Set 006 Session 2) so the close-out agent reads
-`ai-router/docs/close-out.md` at the moment the instructions are
-needed.
+waits on the queue's terminal state before proceeding.
+
+When this step terminates with a `VERIFIED` verdict and
+`disposition.json` reports `status: "completed"`, the orchestration
+layer fires the mode-aware fresh close-out hook
+(`ai_router.route_fresh_close_out_turn`). In outsource-first it
+routes a new turn with `task_type="session-close-out"` so the
+close-out agent reads `ai-router/docs/close-out.md` at the moment
+the instructions are needed. In outsource-last it invokes
+`close_session.run` in-process — no fresh API turn — because the
+orchestrator's primary CLI session already holds the queue context
+and the working tree. Hook failures (provider outage, transient
+lock contention) are non-fatal; the reconciler sweeps stranded
+sessions on the next orchestrator startup and re-runs close-out.
 
 1. Collect all files created or modified during the session.
 2. Build a verification prompt with: spec excerpt + file contents +

@@ -226,21 +226,15 @@ def restore_session_set(session_set_dir: str, reason: str = "") -> None:
         existing = f.read()
 
     updated = _prepend_entry(existing, "Restored", reason, _now_iso_seconds())
-    # Write the new file under the target name, then unlink the source.
-    # A crash mid-sequence leaves both files present (subsequent restore
-    # is then a no-op since `is_cancelled` already returns False), and
-    # the cancelled detection still wins via filename presence.
+    # Sequence: write RESTORED.md, then update session-state.json, then
+    # unlink CANCELLED.md. CANCELLED.md is the highest-precedence state
+    # signal, so it stays in place until everything else is consistent —
+    # a crash before the unlink leaves the set looking cancelled (sticky
+    # and correct), and the operator can simply re-run restore. The
+    # alternative (unlink first, then update JSON) would briefly show
+    # the set as restored to the explorer while session-state.json still
+    # reported ``status: "cancelled"`` to any other reader.
     _atomic_write_text(restored_path, updated)
-    # Best-effort source removal. A crash between the two operations
-    # leaves both files present; the next reader sees CANCELLED.md and
-    # therefore reports the set as cancelled (the precedence rule
-    # CANCELLED-wins-over-everything keeps the failure mode safe — the
-    # operator can re-run restore, which then unlinks the lingering
-    # CANCELLED.md and leaves only RESTORED.md as the canonical state).
-    try:
-        os.remove(cancelled_path)
-    except OSError:
-        pass
 
     state = _read_session_state(session_set_dir)
     if state is not None:
@@ -250,3 +244,13 @@ def restore_session_set(session_set_dir: str, reason: str = "") -> None:
         state["status"] = restored
         state.pop("preCancelStatus", None)
         _write_session_state(session_set_dir, state)
+
+    # Best-effort source removal as the final step. If this fails (or
+    # the process crashes before reaching here), CANCELLED.md lingers
+    # and the next reader sees the set as cancelled — the operator
+    # re-runs restore, which then unlinks the lingering CANCELLED.md
+    # and leaves only RESTORED.md as the canonical state.
+    try:
+        os.remove(cancelled_path)
+    except OSError:
+        pass

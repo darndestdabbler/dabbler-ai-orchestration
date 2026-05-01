@@ -274,19 +274,15 @@ export async function restoreSessionSet(
 
   const existing = fs.readFileSync(cancelledPath, "utf8");
   const updated = prependEntry(existing, "Restored", reason, formatLocalIsoSeconds(new Date()));
-  // Write the new content to the target name, then unlink the source.
-  // A crash between the two operations leaves both files present; the
-  // next reader sees CANCELLED.md and therefore reports the set as
-  // cancelled (the precedence rule CANCELLED-wins-over-everything
-  // keeps the failure mode safe — the operator can re-run restore,
-  // which then unlinks the lingering CANCELLED.md and leaves only
-  // RESTORED.md as the canonical state).
+  // Sequence: write RESTORED.md, then update session-state.json, then
+  // unlink CANCELLED.md. CANCELLED.md is the highest-precedence state
+  // signal, so it stays in place until everything else is consistent —
+  // a crash before the unlink leaves the set looking cancelled (sticky
+  // and correct), and the operator can simply re-run restore. The
+  // alternative (unlink first, then update JSON) would briefly show
+  // the set as restored to the explorer while session-state.json still
+  // reported `status: "cancelled"` to any other reader.
   atomicWriteFile(restoredPath, updated);
-  try {
-    fs.unlinkSync(cancelledPath);
-  } catch {
-    /* best-effort: target write succeeded, source removal is a hint */
-  }
 
   const state = readSessionState(sessionSetDir);
   if (state !== null) {
@@ -297,5 +293,14 @@ export async function restoreSessionSet(
     state.status = restored;
     delete state.preCancelStatus;
     writeSessionState(sessionSetDir, state);
+  }
+
+  try {
+    fs.unlinkSync(cancelledPath);
+  } catch {
+    /* best-effort: target write + JSON update succeeded; source removal
+       is the last step. A lingering CANCELLED.md leaves the set looking
+       cancelled until the operator re-runs restore, which then unlinks
+       it and leaves only RESTORED.md as the canonical state. */
   }
 }

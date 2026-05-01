@@ -171,6 +171,95 @@
       "description": "Round 2 verifier flagged a Major spec deviation: readSessionSets had a belt-and-suspenders branch mapping status=cancelled (no CANCELLED.md) to the cancelled tree state, exceeding the spec detection rules. ACCEPTED. Removed the branch from src/utils/fileSystem.ts and inverted the corresponding test in src/test/suite/cancelTreeView.test.ts. 58 tests still pass; tsc clean. Round 3 deliberately skipped \u2014 Round 2 named the fix path verbatim and the change is a 5+4 line removal/inversion with no new information possible from re-routing.",
       "status": "completed",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/workflow-doc",
+      "dateTime": "2026-05-01T16:20:18.925113-04:00",
+      "description": "Added \"Cancelling and restoring a session set\" subsection to docs/ai-led-session-workflow.md (under Key Concepts > Session-Set Lifecycle and State File). Covers when-to-cancel, when-not-to, operator triggers (right-click + manual file ops), detection precedence, and RESTORED.md audit-only role. Also tweaked the existing canonical-status table entry for \"cancelled\" so it points readers at the new subsection instead of saying \"reserved for Set 8\".",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/print-status-legend",
+      "dateTime": "2026-05-01T16:20:18.925113-04:00",
+      "description": "Verified print_session_set_status legend already includes the conditional [!] cancelled column from Session 1 (ai-router/__init__.py lines 1274-1284). Manual run confirmed correct rendering.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/extension-readme",
+      "dateTime": "2026-05-01T16:20:18.925113-04:00",
+      "description": "Updated tools/dabbler-ai-orchestration/README.md Session Set Explorer section: added Cancelled to the state group bullet list (with the \u22651 cancelled visibility rule), added \"cancelled\" row to the status-value table, added the detection-precedence summary, and added Cancel/Restore right-click menu documentation with on-disk file-shape and cross-link to the workflow doc subsection. Screenshot file is unchanged \u2014 caption is text-only, leaving binary update for a future GUI-host capture.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/cross-provider-review",
+      "dateTime": "2026-05-01T16:20:18.925113-04:00",
+      "description": "Cross-provider review of cancel/restore file-shape contract + precedence + UI ergonomics, pinned to gemini-pro via max_tier=2 (cap forces tier_assignments[2] over the session-verification override gpt-5-4 at tier 3 \u2014 the spec for Session 3 explicitly asks for Gemini Pro). Saved raw output + disposition to session-reviews/session-003.md.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/restore-reorder",
+      "dateTime": "2026-05-01T16:20:18.925113-04:00",
+      "description": "Major #1 from gemini-pro review ACCEPTED. Reordered restoreSessionSet (TS) and restore_session_set (Python) so session-state.json is updated BEFORE unlinking CANCELLED.md \u2014 keeps the highest-precedence file as the last thing removed, so a crash in the window leaves the set looking cancelled (sticky and correct) instead of in a state where session-state.json says cancelled but file presence says restored.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/python-comment-fix",
+      "dateTime": "2026-05-01T16:20:18.929702-04:00",
+      "description": "Minor #3 from gemini-pro review ACCEPTED. Removed the misleading \"subsequent restore is then a no-op since is_cancelled already returns False\" parenthetical from ai-router/session_lifecycle.py \u2014 with CANCELLED.md still present after a partial restore, is_cancelled returns True and the next restore re-executes successfully (writing one duplicate history entry, then unlinking). Comment block now matches the TypeScript mirror.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/major2-rejection",
+      "dateTime": "2026-05-01T16:20:18.929702-04:00",
+      "description": "Major #2 from gemini-pro review REJECTED with reasoning. The spec's Risks section line 286-292 explicitly accepts the multi-window concurrent-cancel race (\"Worst case is two history lines instead of one \u2014 both correct\"). Adding cross-platform file locking is a non-trivial new mechanism the spec deferred. Documented in session-003.md.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/test-sweep",
+      "dateTime": "2026-05-01T16:20:18.929702-04:00",
+      "description": "Final test sweep: ai-router pytest 669 passed (incl. 17 session_lifecycle). TS standalone mocha (vscode-stub) 58 passed: 16 cancelLifecycle + 13 cancelTreeView + 7 metrics + 7 modeBadge/outsourceMode + 15 fileSystem. tsc --noEmit clean. Restore reorder did not break any happy-path test \u2014 post-state of restore is unchanged, only the inter-step ordering moved.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/verification",
+      "dateTime": "2026-05-01T16:20:18.929702-04:00",
+      "description": "End-of-session cross-provider verification via gemini-pro ($0.0140). Saved raw output to session-003.md. 1 round; Round 2 deliberately not run \u2014 the substantive findings were addressed and the rejection rationale is documented; a re-verify would not produce new information.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 7984,
+          "outputTokens": 407,
+          "costUsd": 0.01405
+        }
+      ]
     }
   ]
 }

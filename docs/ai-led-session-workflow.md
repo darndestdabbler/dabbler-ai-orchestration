@@ -154,7 +154,8 @@ it directly rather than inferring state from file presence.
 "not-started"   — folder exists, no session has started
 "in-progress"   — at least one session has started, no change-log yet
 "complete"      — change-log.md present and close-out succeeded
-"cancelled"     — reserved for the cancel/restore feature (Set 8)
+"cancelled"     — operator paused or abandoned the set (see "Cancelling
+                  and restoring a session set" below)
 ```
 
 `status` is the coarse public-facing field. The v2 schema's
@@ -190,6 +191,78 @@ the wizard prompt assume the file is created up front.
 `session-state.json` from creation. The lazy-synth fallback is a
 robustness measure for legacy folders, not a license to skip the file
 on new ones.
+
+### Cancelling and restoring a session set
+
+Cancellation is an operator action that takes a set out of the active
+work pool without deleting it. The cancelled set keeps its full
+history (`spec.md`, `activity-log.json`, `session-reviews/`, and any
+`change-log.md` from a partial close-out) and can be restored at any
+time.
+
+**When to cancel:**
+
+- The set was started in error (wrong slug, wrong scope, duplicates
+  another set).
+- Scope was rolled into another set mid-flight and the original is now
+  redundant.
+- The underlying requirement was withdrawn before the set finished.
+- A partially-completed set has stalled and the operator wants it out
+  of the active view without losing the artifacts.
+
+**When NOT to cancel:**
+
+- A set that finished its work successfully — that is what the
+  close-out gate (Step 8) and the resulting `change-log.md` are for.
+  Marking a successful set as cancelled drops it out of the Done
+  group and obscures the history.
+- A set that is mid-session and recoverable — cancellation is a
+  human-visible state change, not a "pause for the day" affordance.
+  If the next session can simply pick up where this one stopped,
+  leave the set in-progress.
+
+**How the operator triggers it:**
+
+- **Right-click in the Session Set Explorer.** The `Cancel Session
+  Set` action is visible on in-progress / not-started / done items;
+  `Restore Session Set` is visible on cancelled items. Both prompt
+  for confirmation and offer an optional reason that is prepended to
+  the on-disk history.
+- **Manually create or delete `CANCELLED.md`.** The same on-disk
+  shape works without the extension — drop a `CANCELLED.md` file in
+  the session-set folder and the next reader treats it as cancelled.
+  Removing the file (or renaming it to `RESTORED.md`) restores the
+  set. The TypeScript and Python helpers in
+  `tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts` and
+  `ai-router/session_lifecycle.py` are the canonical writers; both
+  emit the same byte-for-byte format (LF newlines, UTF-8 no BOM,
+  ISO-8601 local timestamps).
+
+**Detection precedence** (highest first): `CANCELLED.md` →
+`change-log.md` (done) → `activity-log.json` or `session-state.json`
+(in-progress) → otherwise not-started. `CANCELLED.md` always wins:
+a partially-completed set with both `change-log.md` and `CANCELLED.md`
+shows as cancelled, not done.
+
+**`RESTORED.md` is audit-only.** Once a cancelled set is restored,
+`CANCELLED.md` is renamed to `RESTORED.md` and the file is kept
+indefinitely as the toggle history. `RESTORED.md` is *not* a separate
+state — the set falls back to whichever of done / in-progress /
+not-started its other files indicate. Subsequent re-cancels rename
+`RESTORED.md` back to `CANCELLED.md` and prepend a new entry, so the
+file accumulates the full history across multiple toggles.
+
+**Out of scope for cancellation:**
+
+- Automatic cancellation triggered by router-side signals (e.g.
+  "abandon set if no commits for 90 days"). Cancel/restore is a
+  pure-operator action.
+- Cancellation of an individual session within a set. Cancellation
+  applies to whole session sets only.
+- Stopping queued outsource-last verifier messages. The queue keeps
+  running; the verifier daemon has no awareness of the cancel. Use
+  the `Provider Queues` view's `--mark-failed` action to stop a
+  queued message explicitly.
 
 ---
 

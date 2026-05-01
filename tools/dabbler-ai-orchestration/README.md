@@ -12,6 +12,7 @@ A live tree view of your project's session sets, grouped by state:
 - **In Progress** — sessions the AI is currently working or that have started
 - **Not Started** — specs ready to run
 - **Done** — completed and merged session sets
+- **Cancelled** — sets the operator has paused or abandoned (only renders when at least one cancelled set exists)
 
 State is read from `session-state.json` in each
 `docs/session-sets/<slug>/` folder. The file's `status` field is the
@@ -22,6 +23,15 @@ canonical signal, and the extension consults it directly:
 | `"not-started"` | Not started |
 | `"in-progress"` | In Progress |
 | `"complete"` | Done |
+| `"cancelled"` | Cancelled |
+
+Cancellation has its own on-disk marker that always wins over the
+status field: a `CANCELLED.md` file in the session-set folder forces
+the set into the Cancelled group regardless of any other signal,
+including a `change-log.md` from a partial close-out. Detection
+precedence (highest first): `CANCELLED.md` → `change-log.md` (done)
+→ `activity-log.json` or `session-state.json` (in-progress) →
+otherwise not-started.
 
 Every session-set folder is expected to carry a `session-state.json`
 from creation onward. For legacy folders that predate this invariant,
@@ -31,7 +41,12 @@ synthesizes the state file lazily on first read. Run `python -m
 ai_router.backfill_session_state` after pulling new repos to
 materialize the file for every folder up front.
 
-Right-click a session set to open its spec, activity log, change log, or AI assignment. Copy trigger phrases to start the next AI session.
+Right-click a session set to open its spec, activity log, change log, or AI assignment. Copy trigger phrases to start the next AI session. The right-click menu also exposes the cancel/restore lifecycle actions:
+
+- **Cancel Session Set** — visible on in-progress, not-started, and done items. Confirms via a modal, optionally prompts for a reason, writes `CANCELLED.md` to the folder, and refreshes the view so the set jumps to the Cancelled group.
+- **Restore Session Set** — visible on cancelled items. Confirms via a modal, renames `CANCELLED.md` to `RESTORED.md`, and the set returns to whichever underlying state its other files indicate (done if `change-log.md` is present, in-progress if `activity-log.json` is, otherwise not-started).
+
+`RESTORED.md` is an audit artifact, not a separate state — the file accumulates the full toggle history across multiple cancel/restore cycles. The same on-disk shape works without the extension: dropping a `CANCELLED.md` file into a session-set folder is sufficient to mark it cancelled. See [the workflow doc's "Cancelling and restoring a session set" section](../../docs/ai-led-session-workflow.md) for the full operator-facing lifecycle.
 
 Each session-set row carries small badges in its description:
 

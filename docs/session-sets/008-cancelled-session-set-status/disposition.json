@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "summary": "Set 8 Session 3 (final): workflow doc, README updates, cross-provider review, restore-reorder fix. Added a 'Cancelling and restoring a session set' subsection to docs/ai-led-session-workflow.md covering when-to-cancel / when-not-to / operator triggers / detection precedence / RESTORED.md audit role. Updated tools/dabbler-ai-orchestration/README.md Session Set Explorer section with the Cancelled state group, status-table row, precedence summary, and right-click Cancel/Restore docs. Verified Session 1 already wired the conditional [!] cancelled column into print_session_set_status. Cross-provider review routed to gemini-pro (cost $0.014; spec explicitly asked for Gemini Pro, pinned via max_tier=2 to bypass the session-verification override gpt-5-4 at tier 3). Verifier returned ISSUES_FOUND with two Major + one Minor: Major #1 (restore reorder so session-state.json is updated before unlinking CANCELLED.md) ACCEPTED and applied to both TS and Python writers; Major #2 (file locking for concurrent cancel/restore) REJECTED — spec's Risks section explicitly accepts the multi-window race; Minor #3 (misleading Python comment about subsequent restore being a no-op) ACCEPTED and corrected. Final test sweep: ai-router pytest 669 passed (incl. 17 session_lifecycle); TS standalone mocha 58 passed (16 cancelLifecycle + 13 cancelTreeView + 7 metrics + 7 modeBadge/outsourceMode + 15 fileSystem); tsc --noEmit clean; node esbuild.js clean. Note: ai-assignment.md not authored this set (Step 3.5 / Rule #17) because the user has restricted ai-router usage to end-of-session verification only for cost containment.",
+  "files_changed": [
+    "docs/ai-led-session-workflow.md",
+    "tools/dabbler-ai-orchestration/README.md",
+    "tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts",
+    "ai-router/session_lifecycle.py",
+    "docs/session-sets/008-cancelled-session-set-status/session-state.json",
+    "docs/session-sets/008-cancelled-session-set-status/activity-log.json",
+    "docs/session-sets/008-cancelled-session-set-status/disposition.json",
+    "docs/session-sets/008-cancelled-session-set-status/session-reviews/session-003.md",
+    "docs/session-sets/008-cancelled-session-set-status/change-log.md"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": []
+}

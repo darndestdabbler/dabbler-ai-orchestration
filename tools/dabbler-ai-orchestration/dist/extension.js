@@ -1198,10 +1198,6 @@ async function restoreSessionSet(sessionSetDir, reason = "") {
   const existing = fs2.readFileSync(cancelledPath, "utf8");
   const updated = prependEntry(existing, "Restored", reason, formatLocalIsoSeconds(/* @__PURE__ */ new Date()));
   atomicWriteFile(restoredPath, updated);
-  try {
-    fs2.unlinkSync(cancelledPath);
-  } catch {
-  }
   const state = readSessionState(sessionSetDir);
   if (state !== null) {
     let restored = state.preCancelStatus;
@@ -1211,6 +1207,10 @@ async function restoreSessionSet(sessionSetDir, reason = "") {
     state.status = restored;
     delete state.preCancelStatus;
     writeSessionState(sessionSetDir, state);
+  }
+  try {
+    fs2.unlinkSync(cancelledPath);
+  } catch {
   }
 }
 

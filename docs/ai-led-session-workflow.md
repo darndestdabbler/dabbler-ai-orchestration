@@ -12,6 +12,17 @@ session-set close. `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` provide only
 agent-specific bootstrap (API key export, router import snippet) and point
 here for everything else.
 
+The workflow operates in one of two **outsource modes**, declared
+per session set in `spec.md`'s `outsourceMode:` field. **Outsource-first**
+(default) routes reasoning tasks synchronously to per-call API
+providers. **Outsource-last** enqueues verification work to a
+long-running verifier daemon backed by a subscription CLI; the
+two-CLI setup, daemon recovery, and subscription-window quirks live
+in `ai-router/docs/two-cli-workflow.md`. Step 6 (verification) and
+Step 8 (close-out) are mode-aware. The deterministic close-out path,
+gate checks, and reconciler hand-off live in
+`ai-router/docs/close-out.md`.
+
 The orchestrator can change from session to session at the human's discretion.
 All three orchestrators follow the same workflow — only the instruction file
 they read differs.
@@ -694,6 +705,19 @@ Log the result with `log.log_step()`.
 **The orchestrator must not verify its own work.** The `route()` function
 dispatches to a different AI provider for independent review.
 
+Verification routing is **mode-aware**. Outsource-first sessions
+(`outsourceMode: first`, the default) verify synchronously through
+the API and the verdict is in hand by the end of this step.
+Outsource-last sessions (`outsourceMode: last`) enqueue the
+verification message to `provider-queues/<verifierRole>/queue.db`
+and the verifier daemon processes it asynchronously; this step
+returns once the message is enqueued, and Step 8's `close_session`
+waits on the queue's terminal state before proceeding. The
+orchestration layer routes a fresh close-out turn at this step's
+completion (see Set 006 Session 2) so the close-out agent reads
+`ai-router/docs/close-out.md` at the moment the instructions are
+needed.
+
 1. Collect all files created or modified during the session.
 2. Build a verification prompt with: spec excerpt + file contents +
    build results. **The prompt must include the structured JSON
@@ -824,114 +848,26 @@ and verifier pairing may be mismatched for this kind of work. The
 manager report (`report.py`) aggregates these by cause and resolution
 in its "Verifier findings & adjudication" section.
 
-### Step 8: Cost Report, Change Log (Last Session), Recommendations, Commit, Push, Mark Complete, And Notify
+### Step 8: Close Out the Session
 
-Print the cost report:
+When session work is verified complete, run
+`python -m ai_router.close_session`. The script handles cost report,
+`ai-assignment.md` actuals, next-orchestrator recommendation (every
+session) and next-session-set recommendation (last session only),
+change-log generation (last session only), commit, push,
+mark-complete, and notification. It is the **sole synchronization
+barrier** between session work and the session being marked complete:
+deterministic gate checks, idempotent writes, lock contention
+handling, and reconciler hand-off all live there. See
+`ai-router/docs/close-out.md` for the full reference (when it runs,
+how to run it, what it does, common failures, manual flags,
+troubleshooting). For outsource-last sessions, see also
+`ai-router/docs/two-cli-workflow.md` for daemon setup and recovery.
 
-```python
-from ai_router import print_cost_report
-print_cost_report(SESSION_SET)
-```
-
-**Update `ai-assignment.md` actuals.** Append the actuals section for
-this session to the per-session block authored at Step 3.5.
-
-**Author the next-orchestrator recommendation (every session except
-the last).** Route the recommendation — never self-opine.
-
-```python
-result = route(
-    content=next_session_excerpt + "\n\n" + this_session_actuals,
-    task_type="analysis",
-    context="Recommend orchestrator/effort for the next session.",
-    session_set=str(SESSION_SET),
-    session_number=next_session,
-)
-```
-
-Append the recommendation to `ai-assignment.md` and surface it in
-the printout + Pushover body.
-
-**Last session only — generate the change log before committing.** It
-must land in the same commit as the final session's code so the
-session set is marked complete in a single push. Use
-`task_type="summarization"` (not `"documentation"`) — the
-documentation prompt template wraps content in a "document this code"
-frame that mis-fits free-form prose.
-
-```python
-result = route(content=change_log_prompt, task_type="summarization", max_tier=1)
-# write docs/session-sets/<name>/change-log.md
-```
-
-**Last session only — author the next-session-set recommendation.**
-Route this too (`task_type="analysis"`). The recommendation depends
-on whether the repo maintains a master plan:
-
-- **Plan-driven repos** (a master plan file is referenced from
-  `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`, e.g.,
-  `docs/<area>-plan.md` or `docs/*-roadmap.md`): the routed
-  recommendation must (1) read the plan, (2) identify the next set
-  per the plan, (3) either confirm the planned next set or propose
-  a deviation with explicit justification. Do not pick freely from
-  backlog when a plan exists — surface deviations to the human
-  rather than silently re-prioritizing.
-- **Repos without a master plan:** recommend freely from open
-  goals / backlog and the prerequisite chain, grounded in this
-  set's actuals.
-
-Either way, surface the recommendation in the printout + Pushover
-body. The pass/deviate distinction matters most for plan-driven
-repos and is a no-op for repos that don't have a plan to validate
-against.
-
-Commit and push:
-```bash
-git add -A
-git commit -m "Session N of M: <description>"
-git push
-```
-
-**Mark the session complete in `session-state.json`.** Flip status
-from `in-progress` to `complete` and record the verification verdict
-and completedAt timestamp. This signals to the VS Code Session Set
-Explorer (and any external dashboards) that the session has landed.
-
-```python
-from ai_router import mark_session_complete
-
-mark_session_complete(
-    session_set=SESSION_SET,
-    verification_verdict="VERIFIED",  # or "ISSUES_FOUND" with deferred Majors
-)
-```
-
-Then send a session-complete notification through the reusable helper in
-`ai-router/`. **Critical ordering:** notify here — before the Step 9
-reorganization review — so the human is not holding up the "session
-complete" signal while they think about proposals. Include the
-next-orchestrator recommendation (and on the last session, the
-next-session-set recommendation) in the body.
-
-```python
-from ai_router import send_session_complete_notification
-
-try:
-    send_session_complete_notification(
-        session_set=SESSION_SET,
-        session_number=next_session,
-        total_sessions=log.total_sessions,
-        verification_verdict="VERIFIED",
-        summary="<short description>"
-        # body should include next-orc recommendation (every session)
-        # and next-set recommendation (last session only)
-    )
-except Exception as exc:
-    print(f"Session completed, but Pushover notification failed: {exc}")
-```
-
-If notification delivery fails, report it, but do not undo or fail an
-otherwise successful session.
+Notification ordering matters: close-out fires the
+session-complete Pushover notification *before* Step 9's
+reorganization review so the human is not blocking the
+"session complete" signal while they think about proposals.
 
 #### Last session only — worktree and branch cleanup
 

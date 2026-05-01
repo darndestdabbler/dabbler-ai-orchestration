@@ -241,13 +241,52 @@ class CloseoutOutcome:
 # CLI parsing & validation
 # ---------------------------------------------------------------------------
 
+def _load_close_out_section_2() -> Optional[str]:
+    """Read Section 2 of ``ai-router/docs/close-out.md`` if available.
+
+    The close-out doc is the single source of truth for invocation
+    syntax. Surfacing its Section 2 verbatim in ``--help`` keeps the
+    operator-facing reference and the CLI in sync without duplicating
+    text. If the doc isn't found (consumer repo with this script
+    vendored but the doc deliberately stripped), return ``None`` and
+    fall back to argparse's default help output.
+
+    Section boundaries: the body between ``## Section 2 — How to run
+    close-out`` and the next ``## ``. We strip the header line itself
+    so the epilog reads as a continuation of the flag list.
+    """
+    here = Path(__file__).resolve().parent
+    candidates = [
+        here / "docs" / "close-out.md",
+        here.parent / "ai-router" / "docs" / "close-out.md",
+    ]
+    for path in candidates:
+        if path.is_file():
+            try:
+                text = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            marker = "## Section 2 — How to run close-out"
+            start = text.find(marker)
+            if start < 0:
+                continue
+            after_header = text.find("\n", start) + 1
+            next_section = text.find("\n## ", after_header)
+            body = text[after_header:next_section] if next_section > 0 else text[after_header:]
+            return body.strip("\n")
+    return None
+
+
 def _build_parser() -> argparse.ArgumentParser:
+    epilog = _load_close_out_section_2()
     p = argparse.ArgumentParser(
         prog="python -m ai_router.close_session",
         description=(
             "Run the close-out gate on a session set. This is the sole "
             "synchronization barrier between session work and close-out."
         ),
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument(
         "--session-set-dir",

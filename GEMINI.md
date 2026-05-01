@@ -71,6 +71,27 @@ setup recipe, migration recipe (for repos still on the legacy
 sibling-worktree pattern), and gotchas. Consumer repos point their own
 agent-instruction files at this doc.
 
+## Close-out and outsource-last
+
+Step 8 of `docs/ai-led-session-workflow.md` is collapsed to a single
+paragraph that points at the canonical close-out reference:
+
+- **`ai-router/docs/close-out.md`** — when `python -m
+  ai_router.close_session` runs, how to invoke it, what it does
+  (gate checks, idempotent writes, lock contention), common
+  failures and remediation, the manual-flag matrix
+  (`--interactive`, `--force`, `--manual-verify`, `--repair`), and
+  troubleshooting (stranded sessions, queue-state debugging,
+  reconciler behavior).
+- **`ai-router/docs/two-cli-workflow.md`** — operating guide for
+  `outsourceMode: last` session sets: when to use it, initial
+  setup, day-to-day operation, verifier-daemon recovery,
+  orchestrator CLI context-reset recovery, subscription-window
+  fatigue diagnostics, and common pitfalls.
+
+`close_session --help` echoes Section 2 of `close-out.md`; the doc
+is the single source of truth.
+
 ## When curator work runs as a session set
 
 Most curator work in this repo is ad-hoc PR-style review and

@@ -28,6 +28,12 @@ export interface LiveSession {
   startedAt: string | null;
   completedAt: string | null;
   verificationVerdict: string | null;
+  // Set 9 Session 3 (D-2 hard-scoping): true when the close-out path
+  // was bypassed via ``--force`` / ``mark_session_complete(force=True)``.
+  // Surfaced as a ``[FORCED]`` badge on the Session Set Explorer row so
+  // reviewers can spot emergency-bypass close-outs at a glance. Absent
+  // or false on every snapshot written by a normal close-out.
+  forceClosed: boolean | null;
 }
 
 export interface SessionSet {

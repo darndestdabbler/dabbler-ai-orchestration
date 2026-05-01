@@ -273,25 +273,46 @@ def test_missing_change_log_triggers_gate_failed_on_final_session(tmp_path: Path
 
 
 # ---------------------------------------------------------------------------
-# Force still bypasses everything (regression check on the new lock path)
+# Force still bypasses everything (regression check on the new lock path).
+# Set 9 Session 3 (D-2) hard-scoped --force: tests now opt in via the
+# env-var gate + a real --reason-file.
 # ---------------------------------------------------------------------------
 
-def test_force_still_bypasses_gates_under_lock(closeable_set: Path):
+def _force_args(closeable_set: Path, tmp_path: Path):
+    """Build a parsed-args namespace for the hard-scoped --force path."""
+    reason_path = tmp_path / "reason.md"
+    reason_path.write_text(
+        "incident-recovery: integration test exercising --force\n",
+        encoding="utf-8",
+    )
+    return _ns(
+        close_session,
+        session_set_dir=str(closeable_set),
+        force=True,
+        reason_file=str(reason_path),
+    )
+
+
+def test_force_still_bypasses_gates_under_lock(
+    closeable_set: Path, tmp_path: Path, monkeypatch
+):
     """``--force`` skips gate execution but still acquires the lock."""
-    args = _ns(close_session, session_set_dir=str(closeable_set), force=True)
+    monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", "1")
+    args = _force_args(closeable_set, tmp_path)
     outcome = close_session.run(args)
     assert outcome.result == "succeeded"
     assert outcome.gate_results == []
-    assert any("DEPRECATION" in m for m in outcome.messages)
+    assert any("WARNING" in m and "force" in m.lower() for m in outcome.messages)
 
 
-def test_force_blocked_by_live_lock(closeable_set: Path):
+def test_force_blocked_by_live_lock(
+    closeable_set: Path, tmp_path: Path, monkeypatch
+):
     """Even ``--force`` cannot break in while a live peer holds the lock."""
+    monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", "1")
     held = acquire_lock(str(closeable_set), worker_id="peer")
     try:
-        args = _ns(
-            close_session, session_set_dir=str(closeable_set), force=True,
-        )
+        args = _force_args(closeable_set, tmp_path)
         outcome = close_session.run(args)
         assert outcome.result == "lock_contention"
     finally:

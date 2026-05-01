@@ -124,6 +124,156 @@
           "costUsd": 0.0268175
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/register-start",
+      "dateTime": "2026-05-01T19:21:16.051638-04:00",
+      "description": "Register Session 3 start in session-state.json",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/ai-assignment",
+      "dateTime": "2026-05-01T19:21:16.052686-04:00",
+      "description": "Append Session 3 block to ai-assignment.md (with Session 2 actuals)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/event-types",
+      "dateTime": "2026-05-01T19:32:54.107273-04:00",
+      "description": "Add closeout_force_used to EVENT_TYPES (frozen-enum exception)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/close-session-py",
+      "dateTime": "2026-05-01T19:32:54.108284-04:00",
+      "description": "Hard-scope --force in close_session.py: env-var gate, --reason-file required, closeout_force_used event, WARNING line",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/session-state-py",
+      "dateTime": "2026-05-01T19:32:54.109274-04:00",
+      "description": "Thread forced through _flip_state_to_closed and mark_session_complete; write forceClosed: True",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/session-set-explorer",
+      "dateTime": "2026-05-01T19:32:54.110273-04:00",
+      "description": "Add forceClosed field to TS LiveSession + fileSystem reader; add forceClosedBadge to SessionSetsProvider",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/close-out-doc",
+      "dateTime": "2026-05-01T19:32:54.111274-04:00",
+      "description": "Update close-out.md Section 5 (Manual close-out flags) and Section 2 flag-summary row with hard-scoped --force contract",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/python-tests",
+      "dateTime": "2026-05-01T19:32:54.111274-04:00",
+      "description": "Update existing --force tests + add 4 new ones in test_close_session_skeleton.py and test_mark_session_complete_gate.py",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/typescript-tests",
+      "dateTime": "2026-05-01T19:32:54.111274-04:00",
+      "description": "Add forceClosedBadge.test.ts (4 cases: true / false / null / liveSession=null)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-3/pytest-run",
+      "dateTime": "2026-05-01T19:32:54.112777-04:00",
+      "description": "Full pytest suite: 675 passed (+5 vs Session 2 baseline 670)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "session-3/typecheck",
+      "dateTime": "2026-05-01T19:32:54.113782-04:00",
+      "description": "Extension TS typecheck (npx tsc --noEmit -p tsconfig.json): clean",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "session-3/verification-round-1",
+      "dateTime": "2026-05-01T19:45:45.689262-04:00",
+      "description": "Round 1 cross-provider verification (D-2 hard-scope)",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 12063,
+          "outputTokens": 9097,
+          "costUsd": 0.1666125
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 13,
+      "stepKey": "session-3/verification-round-2",
+      "dateTime": "2026-05-01T19:45:45.690266-04:00",
+      "description": "Round 2 cross-provider verification after applying Round 1 fixes (lock-spy + unified CLI test)",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 4891,
+          "outputTokens": 4542,
+          "costUsd": 0.0803575
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 14,
+      "stepKey": "session-3/verification-round-3",
+      "dateTime": "2026-05-01T19:45:45.691265-04:00",
+      "description": "Round 3 cross-provider verification after refining lock-spy fix; VERIFIED",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 1729,
+          "outputTokens": 200,
+          "costUsd": 0.0073225
+        }
+      ]
     }
   ]
 }

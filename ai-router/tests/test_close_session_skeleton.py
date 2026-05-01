@@ -249,16 +249,306 @@ def test_missing_disposition_without_force_returns_exit_2(started_session_set):
     assert any("disposition.json" in m for m in outcome.messages)
 
 
-def test_force_bypass_without_disposition(started_session_set):
-    """``--force`` accepts a missing disposition (transitional path)."""
-    args = _ns(session_set_dir=started_session_set, force=True)
+def test_force_bypass_without_disposition(
+    started_session_set, tmp_path, monkeypatch
+):
+    """``--force`` accepts a missing disposition once the hard-scope
+    gates pass (Set 9 Session 3, D-2: env-var + --reason-file).
+    """
+    monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", "1")
+    reason_path = tmp_path / "reason.md"
+    reason_path.write_text(
+        "incident-recovery: gate stuck on stale push lockfile\n",
+        encoding="utf-8",
+    )
+    args = _ns(
+        session_set_dir=started_session_set,
+        force=True,
+        reason_file=str(reason_path),
+    )
     outcome = run(args)
     assert outcome.result == "succeeded"
     assert outcome.exit_code == 0
-    # Force always emits a deprecation message.
-    assert any("DEPRECATION" in m for m in outcome.messages)
+    # Force emits a loud WARNING (no longer a DEPRECATION line) so the
+    # operator sees the gate was bypassed even when --json hides
+    # outcome.messages inside the JSON payload.
+    assert any("WARNING" in m and "force" in m.lower() for m in outcome.messages)
     # And the gate-results list is empty under force.
     assert outcome.gate_results == []
+    # The forensic ``closeout_force_used`` event landed in the ledger
+    # alongside ``closeout_requested`` / ``closeout_succeeded``.
+    events = [e.event_type for e in read_events(started_session_set)]
+    assert "closeout_force_used" in events
+    # And it carries the operator's reason as a payload field.
+    force_events = [
+        e for e in read_events(started_session_set)
+        if e.event_type == "closeout_force_used"
+    ]
+    assert len(force_events) == 1
+    assert "stale push lockfile" in force_events[0].fields["reason"]
+
+
+def test_force_rejected_without_env_var(started_session_set, tmp_path, monkeypatch):
+    """Without ``AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1``, ``--force`` exits 2.
+
+    The env-var gate fires before any state mutation: no events are
+    written, ``acquire_lock`` is never called, and no lock file lands
+    on disk. A normal terminal session that does not have the variable
+    exported will fail loudly on accidental ``--force`` invocations.
+
+    Spy assertion (primary): ``acquire_lock`` is monkeypatched to a
+    counter and we verify it was never invoked. Spying directly catches
+    a regression where the lock is acquired and then released before
+    the ``invalid_invocation`` return — a code path that leaves no
+    file behind but that would still represent a pre-mutation contract
+    violation. The on-disk absence check below is the secondary
+    assertion (weaker but defensive — covers the case where the spy
+    is wrong about which acquire_lock symbol matters).
+    """
+    monkeypatch.delenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", raising=False)
+    reason_path = tmp_path / "reason.md"
+    reason_path.write_text("test reason\n", encoding="utf-8")
+
+    acquire_calls: List[tuple] = []
+    real_acquire = close_session.acquire_lock
+
+    def _spy_acquire(*args, **kwargs):
+        acquire_calls.append((args, kwargs))
+        return real_acquire(*args, **kwargs)
+
+    monkeypatch.setattr(close_session, "acquire_lock", _spy_acquire)
+
+    args = _ns(
+        session_set_dir=started_session_set,
+        force=True,
+        reason_file=str(reason_path),
+    )
+    outcome = run(args)
+    assert outcome.result == "invalid_invocation"
+    assert outcome.exit_code == 2
+    assert any(
+        "AI_ROUTER_ALLOW_FORCE_CLOSE_OUT" in m for m in outcome.messages
+    )
+    # Primary: acquire_lock was never invoked.
+    assert acquire_calls == [], (
+        "acquire_lock must not be called when --force validation rejects"
+    )
+    # No ledger events were emitted because validation fired before lock.
+    events = [e.event_type for e in read_events(started_session_set)]
+    assert "closeout_requested" not in events
+    assert "closeout_force_used" not in events
+    # Secondary defensive check: no lock file landed on disk.
+    from close_lock import LOCK_FILENAME
+    lock_path = os.path.join(started_session_set, LOCK_FILENAME)
+    assert not os.path.exists(lock_path), (
+        "rejected --force must not have acquired the close-out lock"
+    )
+
+
+def test_force_rejected_with_non_one_env_var(
+    started_session_set, tmp_path, monkeypatch
+):
+    """Values like ``"true"``, ``"yes"``, ``"0"``, or ``""`` are rejected.
+
+    The opt-in token is exactly ``"1"`` — anything else trips the gate.
+    A loose check (e.g. truthy-ness) would let a stale ``=0`` in a
+    process-environment template silently accept ``--force``, which is
+    exactly the footgun the hard-scope is meant to close.
+    """
+    reason_path = tmp_path / "reason.md"
+    reason_path.write_text("test reason\n", encoding="utf-8")
+    for bad_value in ("0", "true", "yes", "", "TRUE"):
+        monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", bad_value)
+        args = _ns(
+            session_set_dir=started_session_set,
+            force=True,
+            reason_file=str(reason_path),
+        )
+        outcome = run(args)
+        assert outcome.result == "invalid_invocation", (
+            f"value {bad_value!r} should be rejected"
+        )
+
+
+def test_force_rejected_without_reason_file(
+    started_session_set, monkeypatch
+):
+    """``--force`` without ``--reason-file`` exits 2 even with the env var.
+
+    The reason becomes the ``closeout_force_used`` event's payload, so
+    refusing the silent-bypass case keeps the forensic audit trail
+    honest. (Mirrors the ``--manual-verify`` contract.)
+
+    Spy assertion (primary): same pattern as ``test_force_rejected_
+    without_env_var`` — monkeypatch ``acquire_lock`` to a counter and
+    verify it was never invoked. The on-disk absence check is the
+    secondary defensive assertion.
+    """
+    monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", "1")
+
+    acquire_calls: List[tuple] = []
+    real_acquire = close_session.acquire_lock
+
+    def _spy_acquire(*args, **kwargs):
+        acquire_calls.append((args, kwargs))
+        return real_acquire(*args, **kwargs)
+
+    monkeypatch.setattr(close_session, "acquire_lock", _spy_acquire)
+
+    args = _ns(session_set_dir=started_session_set, force=True)
+    outcome = run(args)
+    assert outcome.result == "invalid_invocation"
+    assert outcome.exit_code == 2
+    assert any("--reason-file" in m for m in outcome.messages)
+    # Primary: acquire_lock was never invoked.
+    assert acquire_calls == [], (
+        "acquire_lock must not be called when --force validation rejects"
+    )
+    events = [e.event_type for e in read_events(started_session_set)]
+    assert "closeout_force_used" not in events
+    # Secondary defensive check: no lock file appears on disk.
+    from close_lock import LOCK_FILENAME
+    lock_path = os.path.join(started_session_set, LOCK_FILENAME)
+    assert not os.path.exists(lock_path), (
+        "rejected --force must not have acquired the close-out lock"
+    )
+
+
+def test_force_cli_happy_path_emits_all_artifacts_together(
+    started_session_set, tmp_path, monkeypatch
+):
+    """Set 9 Session 3 (D-2): single end-to-end test for the operator
+    path — drive ``close_session.run`` with ``--force`` AND then
+    ``mark_session_complete`` (matching what the orchestrator's force-
+    close-out flow actually does), and assert every required artifact
+    lands together:
+
+    1. A WARNING line in ``outcome.messages``.
+    2. Exactly one ``closeout_force_used`` event with the operator's
+       reason as a payload field.
+    3. ``session-state.json`` carries ``forceClosed: true`` after the
+       snapshot flip.
+
+    Splitting these assertions across two layer-specific tests
+    (``run()`` vs ``mark_session_complete``) leaves a coverage hole
+    where the layers could individually pass while the combined
+    operator artifact is missing or scrambled. This test closes that
+    hole by exercising both layers in the exact order the
+    orchestrator runs them.
+    """
+    from session_state import (
+        mark_session_complete,
+        read_session_state,
+    )
+
+    monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", "1")
+    reason_path = tmp_path / "reason.md"
+    reason_path.write_text(
+        "incident-recovery: gate stuck on stale upstream marker\n",
+        encoding="utf-8",
+    )
+
+    # Stub the gate to deliberate failures so force=True actually
+    # matters — without failures the bypass adds no forensic value
+    # and forceClosed stays False.
+    monkeypatch.setattr(
+        close_session, "run_gate_checks",
+        lambda *_a, **_kw: [
+            GateResult(check="working_tree_clean", passed=False, remediation="dirty"),
+            GateResult(check="pushed_to_remote", passed=False, remediation="not pushed"),
+        ],
+    )
+
+    # Layer 1: close_session.run owns the WARNING line + the
+    # ``closeout_force_used`` event from the CLI path.
+    args = _ns(
+        session_set_dir=started_session_set,
+        force=True,
+        reason_file=str(reason_path),
+    )
+    outcome = run(args)
+    assert outcome.result == "succeeded"
+    assert any("WARNING" in m and "force" in m.lower() for m in outcome.messages)
+
+    # Layer 2: mark_session_complete owns the snapshot flip + the
+    # forceClosed flag.
+    mark_session_complete(
+        started_session_set,
+        verification_verdict="VERIFIED",
+        force=True,
+    )
+
+    # Combined invariants — every artifact present.
+    state = read_session_state(started_session_set)
+    assert state["forceClosed"] is True
+
+    events = read_events(started_session_set)
+    force_used = [e for e in events if e.event_type == "closeout_force_used"]
+    # Two events expected: one from close_session.run (CLI path,
+    # carries ``reason``), one from mark_session_complete
+    # (snapshot-flip path, carries ``failed_checks``). Both signal
+    # the same incident; the distinct payloads make each origin
+    # forensically traceable.
+    assert len(force_used) == 2
+    cli_event = next(e for e in force_used if "reason" in e.fields)
+    assert "stale upstream marker" in cli_event.fields["reason"]
+    flip_event = next(e for e in force_used if "failed_checks" in e.fields)
+    assert flip_event.fields["failed_checks"] == [
+        "working_tree_clean",
+        "pushed_to_remote",
+    ]
+
+
+def test_force_force_closed_flag_written_via_mark_session_complete(
+    tmp_path, monkeypatch
+):
+    """``mark_session_complete(force=True)`` writes ``forceClosed: true``.
+
+    The CLI emits the ``closeout_force_used`` event from
+    ``close_session.run``; the snapshot flip happens via
+    ``mark_session_complete``. The forensic flag in
+    ``session-state.json`` is the bridge the VS Code Session Set
+    Explorer reads — without it, a force-closed set looks
+    indistinguishable from a normally-closed one in the tree view.
+    """
+    from session_state import (
+        mark_session_complete,
+        register_session_start,
+        read_session_state,
+    )
+    set_dir = tmp_path / "set"
+    set_dir.mkdir()
+    register_session_start(
+        session_set=str(set_dir),
+        session_number=1,
+        total_sessions=1,
+        orchestrator_engine="claude-code",
+        orchestrator_model="claude-opus-4-7",
+        orchestrator_effort="high",
+        orchestrator_provider="anthropic",
+    )
+    # Stub the gate to a deliberate failure so force=True actually
+    # matters — without a failure the bypass adds no forensic value
+    # and forceClosed stays False (this is the documented behavior in
+    # mark_session_complete: forced=True is recorded only when the
+    # bypass actually fires).
+    monkeypatch.setattr(
+        close_session, "run_gate_checks",
+        lambda *_a, **_kw: [
+            GateResult(check="working_tree_clean", passed=False, remediation="dirty"),
+        ],
+    )
+    mark_session_complete(
+        str(set_dir),
+        verification_verdict="VERIFIED",
+        force=True,
+    )
+    state = read_session_state(str(set_dir))
+    assert state["forceClosed"] is True
+    # And a closeout_force_used event landed alongside closeout_succeeded.
+    events = [e.event_type for e in read_events(str(set_dir))]
+    assert "closeout_succeeded" in events
+    assert "closeout_force_used" in events
 
 
 def test_happy_path_skeleton_succeeds(started_with_disposition):

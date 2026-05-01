@@ -42,6 +42,17 @@ function uatBadge(set: SessionSet): string {
   return "";
 }
 
+// Set 9 Session 3 (D-2 hard-scoping of ``--force``): the badge surfaces
+// the rare case where a session set was closed via the hard-scoped
+// ``--force`` bypass instead of the deterministic gate. The flag is
+// written by ``_flip_state_to_closed(forced=True)`` in
+// ``ai-router/session_state.py``; absent or false on every snapshot
+// written by a normal close-out, so the badge never appears for
+// healthy sets.
+export function forceClosedBadge(set: SessionSet): string {
+  return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
+}
+
 // Outsource-first vs. outsource-last is a routing choice that lives in
 // each spec.md's `Session Set Configuration` block. The badge surfaces it
 // on the session-set tree row so the operator can tell at a glance which
@@ -70,6 +81,12 @@ function liveSessionTooltipLines(set: SessionSet): string[] {
   }
   if (ls.verificationVerdict) {
     lines.push(`Verifier: ${ls.verificationVerdict}`);
+  }
+  if (ls.forceClosed === true) {
+    lines.push(
+      "Force-closed: gate bypassed via --force (incident recovery). " +
+        "See closeout_force_used in session-events.jsonl for the operator's reason."
+    );
   }
   return lines;
 }
@@ -204,7 +221,13 @@ export class SessionSetsProvider
       set.name,
       vscode.TreeItemCollapsibleState.None
     ) as SetItem;
-    const bits = [progressText(set), touchedDate(set), modeBadge(set), uatBadge(set)].filter(Boolean);
+    const bits = [
+      progressText(set),
+      touchedDate(set),
+      modeBadge(set),
+      uatBadge(set),
+      forceClosedBadge(set),
+    ].filter(Boolean);
     item.description = bits.join("  ·  ");
     item.tooltip = new vscode.MarkdownString(
       [

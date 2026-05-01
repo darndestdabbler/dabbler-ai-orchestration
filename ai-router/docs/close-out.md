@@ -151,7 +151,7 @@ Flag summary:
 | `--session-set-dir PATH` | Path to the session set directory. Defaults to active session set in CWD. |
 | `--json` | Emit a single JSON object on stdout instead of human-readable lines. |
 | `--interactive` | Opt in to interactive prompts. Default is non-interactive — never blocks on stdin. |
-| `--force` | Bypass all gate checks. Transitional only; emits a `DEPRECATION` warning. |
+| `--force` | Bypass all gate checks. **Hard-scoped to incident recovery only**: requires `AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1` in the environment AND `--reason-file`. Emits `closeout_force_used` to the events ledger and writes `forceClosed: true` to `session-state.json`. See Section 5. |
 | `--allow-empty-commit` | Permit close-out for a session that produced no commits. |
 | `--reason-file PATH` | File containing narrative fields (close-out reason, manual-verify attestation). |
 | `--manual-verify` | Skip queue verification blocking; treat verifications as completed by human attestation (bootstrapping window only). Requires `--interactive` or `--reason-file`. |
@@ -164,6 +164,11 @@ Flag combination rules (validated up front; failure exits 2):
 - `--force` is bypass-everything; it is incompatible with
   `--interactive`, `--manual-verify`, and `--repair`. Pick one bypass
   at a time so the audit trail stays unambiguous.
+- **`--force` is hard-scoped to incident recovery** (Set 9 Session 3,
+  D-2). On top of the compatibility rules above, two additional gates
+  fire: the environment must export `AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1`,
+  AND a `--reason-file` must be supplied with a non-empty narrative.
+  Both rejections exit 2 before any state is touched. See Section 5.
 - `--apply` requires `--repair`. Using it alone is almost certainly a
   typo and fails loudly.
 - `--manual-verify` requires either `--interactive` or `--reason-file`.
@@ -323,13 +328,44 @@ in the default non-interactive mode. Use this when an operator is
 running close-out from a terminal and wants to confirm sensitive
 actions.
 
-**`--force`** — bypass all gate checks. Transitional only: the script
-emits a `DEPRECATION` warning to stderr, and Set 4 already tightened
-the validation to forbid combining it with other bypass paths. The
-expected lifecycle: `--force` exists for unblocking emergencies during
-the rollout window; once the gate-check inventory stabilizes (audit
-follow-up after Set 6 Session 3), it will be removed via a separate
-follow-up issue. Do not write tooling that depends on `--force`.
+**`--force`** — bypass all gate checks. **Hard-scoped to incident
+recovery only** (Set 9 Session 3, drift item D-2 in
+`docs/proposals/2026-04-30-combined-design-alignment-audit.md`). The
+flag is rejected by default; opting in requires both:
+
+- **Environment gate.** Export `AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1` in
+  the shell that runs `close_session`. A normal terminal session does
+  not have this set, so an accidental `--force` invocation during
+  day-to-day operation fails fast with a clear `invalid_invocation`
+  message before any state is touched.
+- **Reason file.** Pass `--reason-file <path>` to a non-empty
+  narrative explaining the incident. The file's contents become the
+  payload of the `closeout_force_used` event in
+  `session-events.jsonl`, so a forensic walk of the ledger always
+  answers "why was the gate bypassed?" without requiring a separate
+  paper trail.
+
+When both gates pass, close-out:
+
+- emits a loud `WARNING` line to stderr (operator can't miss it,
+  even in `--json` mode where stdout is JSON);
+- appends a `closeout_force_used` event to `session-events.jsonl`
+  with the reason as a payload field;
+- writes `forceClosed: true` to `session-state.json` so the VS Code
+  Session Set Explorer surfaces a `[FORCED]` description badge on
+  the affected set's row.
+
+The badge persists until the session set is restarted from scratch —
+that's the point. A force-closed set stays visibly force-closed in
+the explorer view so reviewers triaging incidents can spot it
+immediately.
+
+`mark_session_complete(force=True)` (the function-level entry point)
+does not consult the env-var gate — it trusts callers (tests, the
+repair path) to use `force=True` deliberately. The CLI's
+`--force` is the operator-facing entry point and carries the gates;
+the function-level path is for internal use only and is exercised by
+`test_mark_session_complete_gate.py`.
 
 **`--manual-verify`** — skip queue verification blocking and record a
 human attestation that verification happened out of band. Designed for

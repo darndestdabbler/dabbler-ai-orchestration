@@ -278,7 +278,7 @@ class TestGateFailWithoutForce:
 
 
 class TestGateFailWithForce:
-    def test_force_logs_deprecation_warning(
+    def test_force_logs_warning(
         self, started_session_set, monkeypatch,
     ):
         _stub_gate(monkeypatch, [
@@ -288,8 +288,8 @@ class TestGateFailWithForce:
             ),
         ])
 
-        # session_state's logger has propagate=False (noisy DEPRECATION
-        # warnings shouldn't bubble into the parent logging tree of an
+        # session_state's logger has propagate=False (loud WARNING
+        # records shouldn't bubble into the parent logging tree of an
         # embedding application), so caplog can't see the record without
         # an explicit handler attached. Add one for the test, then
         # detach in finally.
@@ -311,14 +311,17 @@ class TestGateFailWithForce:
         finally:
             ss_logger.removeHandler(handler)
 
-        deprecation_records = [
-            r for r in records if "DEPRECATION" in r.getMessage()
+        warning_records = [
+            r for r in records if "WARNING" in r.getMessage()
         ]
-        assert len(deprecation_records) == 1
-        msg = deprecation_records[0].getMessage()
+        assert len(warning_records) == 1
+        msg = warning_records[0].getMessage()
         assert "force=True" in msg
         assert "1 failing gate" in msg
         assert "working_tree_clean" in msg
+        # Set 9 Session 3 (D-2): the warning must signal that the
+        # bypass is hard-scoped, not a transitional flag.
+        assert "hard-scoped" in msg or "incident-recovery" in msg
 
     def test_force_emits_event_with_forced_true_and_failed_checks(
         self, started_session_set, monkeypatch,
@@ -371,6 +374,46 @@ class TestGateFailWithForce:
         assert state["lifecycleState"] == SessionLifecycleState.CLOSED.value
         assert state["status"] == "complete"
         assert state["completedAt"] is not None
+        # Set 9 Session 3 (D-2 hard-scoping): the forensic ``forceClosed``
+        # flag is written when ``force=True`` actually mattered (gates
+        # failed). The VS Code Session Set Explorer reads this flag to
+        # surface a [FORCED] badge.
+        assert state["forceClosed"] is True
+
+    def test_force_emits_closeout_force_used_event(
+        self, started_session_set, monkeypatch,
+    ):
+        """Set 9 Session 3 (D-2): the dedicated ``closeout_force_used``
+        event makes emergency-bypass close-outs greppable from the
+        events ledger without walking ``closeout_succeeded`` payloads.
+        """
+        _stub_gate(monkeypatch, [
+            close_session.GateResult(
+                check="working_tree_clean", passed=False,
+                remediation="commit pending edits",
+            ),
+            close_session.GateResult(
+                check="pushed_to_remote", passed=False,
+                remediation="push to origin/main",
+            ),
+        ])
+        mark_session_complete(
+            started_session_set,
+            verification_verdict="VERIFIED",
+            force=True,
+        )
+        events = read_events(started_session_set)
+        force_used = [
+            e for e in events if e.event_type == "closeout_force_used"
+        ]
+        assert len(force_used) == 1
+        # Carries the failed-checks list for the same forensic purpose
+        # as the closeout_succeeded event's ``failed_checks`` field.
+        assert force_used[0].fields.get("failed_checks") == [
+            "working_tree_clean",
+            "pushed_to_remote",
+        ]
+        assert force_used[0].fields.get("method") == "snapshot_flip"
 
     def test_force_on_passing_gate_records_forced_false(
         self, started_session_set, monkeypatch,
@@ -392,6 +435,16 @@ class TestGateFailWithForce:
         assert len(succeeded) == 1
         assert succeeded[0].fields.get("forced") is False
         assert "failed_checks" not in succeeded[0].fields
+        # Set 9 Session 3 (D-2): force=True against a passing gate is a
+        # no-op for forensic purposes — no ``closeout_force_used`` event,
+        # no ``forceClosed`` flag. The bypass adds no value when the
+        # gate would have passed anyway, so we don't pollute the
+        # forensic surface with non-events.
+        assert not [
+            e for e in events if e.event_type == "closeout_force_used"
+        ]
+        state = read_session_state(started_session_set)
+        assert "forceClosed" not in state or state["forceClosed"] is False
 
 
 class TestMarkCompleteEdgeCases:

@@ -105,7 +105,8 @@ standing operator constraint).
 
 ### Actuals (filled after the session)
 - Orchestrator used: claude-code claude-opus-4-7 @ effort=high
-- Total routed cost: TBD at close-out (verification call only)
+- Total routed cost: $0.1453 (two `session-verification` calls to
+  GPT-5.4 — Round 1 + Round 2 after applying issue fixes)
 - Deviations from recommendation: ai-assignment authoring and
   next-session recommendation produced directly rather than via
   `route(task_type="analysis")`, per the standing operator
@@ -126,3 +127,78 @@ event), TypeScript (Session Set Explorer badge for force-closed
 sessions), docs, and a new test. Multi-language + careful contract
 wording on a security-relevant flag — Opus high-effort is the right
 match.
+
+---
+
+## Session 3: D-2 — `--force` flag resolution
+
+### Recommended orchestrator
+claude-code claude-opus-4-7 @ effort=high
+
+### Rationale
+Operator selected the **hard-scoping path** at session start (audit-accepted
+recommended option a): retain `--force` for incident recovery only,
+gated by `AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1`, mandatory `--reason-file`,
+new `closeout_force_used` event in the ledger, loud WARNING line, a
+`forceClosed` flag on `session-state.json`, and a `[FORCED]` badge on
+the VS Code Session Set Explorer. Surface spans Python
+(`close_session.py` validation + run flow, `session_state.py` snapshot
+flip + `mark_session_complete`, `session_events.py` to admit the new
+event type), TypeScript (`types.ts`, `fileSystem.ts`,
+`SessionSetsProvider.ts`), `ai-router/docs/close-out.md` Section 5, and
+a new failure-injection-style test. Opus high-effort matches the
+multi-language surface and the security-relevant contract wording — a
+loose hard-scope (e.g. silently accepting the env var) would defeat
+the whole point of the hardening.
+
+### Estimated routed cost
+None this session — only end-of-session verification routes (per the
+standing operator constraint).
+
+| Step | Action | Routing Decision |
+|------|--------|------------------|
+| 1 | Read prerequisites (D-2 audit detail, close_session.py, session_state.py, session_events.py, Session Set Explorer extension files, existing --force tests, close-out.md §5) | Direct (orchestrator) |
+| 2 | Register Session 3 start | Direct (file-write helper, no API call) |
+| 3 | Append this Session 3 block to ai-assignment.md (with Session 2 actuals + cost) | Direct (router suspended per operator) |
+| 4 | Add `closeout_force_used` to `EVENT_TYPES` in `session_events.py` | Direct (mechanical edit; deliberate frozen-enum addition justified inline) |
+| 5 | Add env-var gate + `--reason-file` requirement to `_validate_args` in `close_session.py`; emit `closeout_force_used` event from `run()` when `args.force` is True; upgrade DEPRECATION line to WARNING; rewrite `--force` argparse help text | Direct (mechanical edit) |
+| 6 | Thread `forced: bool` through `_flip_state_to_closed` and `mark_session_complete`; write `forceClosed: True` to `session-state.json` when `force=True` | Direct (mechanical edit) |
+| 7 | Add `forceClosed` field to TS `LiveSession`; read it in `fileSystem.ts`; surface a `[FORCED]` description badge + tooltip line in `SessionSetsProvider.ts` | Direct (mechanical TS edit; Session Set Explorer is a small surface) |
+| 8 | Replace Section 5 `--force` entry in `ai-router/docs/close-out.md` with the hard-scoped contract; update the §2 flag-summary row and the `--force` argparse help to match | Direct (mechanical edit) |
+| 9 | Add `TestForceHardScoping` to `test_close_session_skeleton.py` (or a new `test_force_hard_scoping.py`) covering: env-var-missing rejection, missing-reason-file rejection, full happy path emits `closeout_force_used` + WARNING + `forceClosed: True` flip | Direct (test under ~120 lines, mechanical from existing scenarios) |
+| 10 | Run full pytest suite | Direct (shell command) |
+| 11 | End-of-session cross-provider verification | Routed: `route(task_type="session-verification")` — the only API call this session |
+| 12 | Commit, push, run `close_session.py` (gates + closeout_succeeded), then `mark_session_complete` (snapshot flip), send notification | Direct (CLI invocation) |
+
+### Actuals (filled after the session)
+- Orchestrator used: claude-code claude-opus-4-7 @ effort=high
+- Total routed cost: $0.2543 (three `session-verification` calls to
+  GPT-5.4 — Round 1 $0.1666 + Round 2 $0.0804 + Round 3 $0.0073)
+- Deviations from recommendation: ai-assignment authoring and
+  next-session recommendation produced directly rather than via
+  `route(task_type="analysis")`, per the standing operator
+  cost-containment rule. The path-decision (hard-scope vs remove)
+  was surfaced to the operator rather than routed for analysis,
+  also under the same constraint. No other deviations.
+- Notes for next-session calibration: Session 4 is the optional
+  follow-ups bundle (F-1 close-out trigger failure scenario, F-2
+  heartbeat alerter, D-4 widening of the failure-injection trace).
+  None of those are corrective-blocking; the operator may opt to
+  skip Session 4 with a written rationale and proceed directly to
+  Session 5 (re-audit). If Session 4 runs, workload is similar to
+  Session 2's mix (one new module + one or two new tests). Three
+  verification rounds this session is unusual — Round 1 raised four
+  issues, two of which were context-gaps (deliverables that were
+  already in place but not surfaced to the verifier). For
+  multi-language sessions where the deliverables span Python +
+  TypeScript + docs, the prompt should include EVERY changed file
+  (or note that an unmentioned file was unchanged) rather than
+  cherry-picking the most-relevant slices — the cost of including
+  extra context is low compared to the cost of an extra round.
+
+**Next-session orchestrator recommendation (Session 4):**
+claude-code claude-opus-4-7 @ effort=high
+Rationale: F-1 + F-2 + D-4 each touch test-infrastructure or new
+modules where wrong-shape changes propagate poorly. Opus high-effort
+is the right match if Session 4 runs; if the operator opts to skip
+to Session 5 (re-audit), the recommendation re-targets to that.

@@ -199,6 +199,7 @@ export function readSessionSets(root: string): SessionSet[] {
           status?: string;
           orchestrator?: { engine?: string; model?: string; effort?: string };
           verificationVerdict?: string;
+          forceClosed?: boolean;
         };
         if (totalSessions === null && typeof sd.totalSessions === "number") {
           totalSessions = sd.totalSessions;
@@ -212,6 +213,7 @@ export function readSessionSets(root: string): SessionSet[] {
           startedAt: sd.startedAt ?? null,
           completedAt: sd.completedAt ?? null,
           verificationVerdict: sd.verificationVerdict ?? null,
+          forceClosed: sd.forceClosed ?? null,
         };
       } catch { /* ignore */ }
     }

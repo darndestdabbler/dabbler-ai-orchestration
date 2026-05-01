@@ -4,10 +4,14 @@ Usage::
 
     python -m ai_router.close_session --session-set-dir docs/session-sets/<slug>
     python -m ai_router.close_session --json
-    python -m ai_router.close_session --force          # transitional, emits DEPRECATION
     python -m ai_router.close_session --manual-verify --reason-file reason.md
     python -m ai_router.close_session --repair         # diagnostic only
     python -m ai_router.close_session --repair --apply # corrective
+
+    # ``--force`` is hard-scoped to incident-recovery only (Set 9 Session 3,
+    # D-2). Both gates below are required and validated up front:
+    AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1 \
+        python -m ai_router.close_session --force --reason-file reason.md
 
 What this script is (and is not)
 --------------------------------
@@ -29,7 +33,10 @@ queue-mediated verification-wait, respectively. Until then:
   ``--timeout`` budget.
 
 **This script does not yet wire into ``mark_session_complete``.** Set 4
-adds that wiring along with the ``--force`` deprecation transition. For
+adds that wiring. ``--force`` was originally listed as a transitional
+flag scheduled for removal; Set 9 Session 3 (D-2) instead hard-scoped
+it to incident-recovery use only — see :func:`_validate_args` and
+``ai-router/docs/close-out.md`` Section 5 for the full contract. For
 now, ``close_session`` runs to completion with stub gates and emits the
 expected ledger events; the orchestrator's existing Step 8 path is
 unchanged.
@@ -83,12 +90,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, List, Optional
+
+
+# Module logger for loud WARNING lines on the ``--force`` path. Emits to
+# stderr via the default StreamHandler — keeping this separate from
+# ``outcome.messages`` (which lands on stdout via ``_emit_output``)
+# guarantees the warning is visible even in ``--json`` mode where the
+# stdout payload is JSON and a tool may not surface inner ``messages``
+# entries.
+_logger = logging.getLogger("ai_router.close_session")
+if not _logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(message)s"))
+    _logger.addHandler(_handler)
+_logger.setLevel(logging.WARNING)
+_logger.propagate = False
 
 if __name__ == "__main__" and __package__ in (None, ""):
     # Production CLI path: invoked as ``python -m ai_router.close_session``
@@ -324,8 +347,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help=(
-            "Bypass all gate checks. Transitional only; emits a "
-            "DEPRECATION warning. Set 4 will tighten this further."
+            "Bypass all gate checks. Hard-scoped to incident-recovery use "
+            "only: requires AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1 in the "
+            "environment AND --reason-file naming the operator's narrative. "
+            "Emits a closeout_force_used event to the session-events ledger "
+            "with the reason text and writes forceClosed=true to "
+            "session-state.json so the VS Code Session Set Explorer can "
+            "surface a [FORCED] badge for forensic audit. See "
+            "ai-router/docs/close-out.md Section 5 for the full contract."
         ),
     )
     p.add_argument(
@@ -427,6 +456,9 @@ def _read_reason_file(path: Optional[str]) -> tuple[Optional[str], Optional[str]
     return text, None
 
 
+FORCE_CLOSE_OUT_ENV_VAR = "AI_ROUTER_ALLOW_FORCE_CLOSE_OUT"
+
+
 def _validate_args(args: argparse.Namespace) -> Optional[str]:
     """Return an error string if *args* is an invalid combination, else None.
 
@@ -441,6 +473,21 @@ def _validate_args(args: argparse.Namespace) -> Optional[str]:
       handles its own drift surface; combining the two would let a
       ``--force`` claim cover up the very drift ``--repair`` is meant to
       detect.
+    * **``--force`` is hard-scoped to incident-recovery only** (Set 9
+      Session 3, D-2). Two additional gates fire even when the
+      compatibility rules above pass:
+      - The ``AI_ROUTER_ALLOW_FORCE_CLOSE_OUT`` environment variable
+        must be set to ``"1"``. Anything else (unset, empty, ``"0"``,
+        ``"true"``, etc.) is rejected. The intent is that a normal
+        terminal session does NOT have the env var set, so accidental
+        ``--force`` invocations during day-to-day operation fail loudly
+        before any state is touched.
+      - ``--reason-file`` must be supplied with a non-empty narrative.
+        The operator's reason becomes the payload of the
+        ``closeout_force_used`` event so a forensic walk of the events
+        ledger always answers "why was the gate bypassed?" without
+        requiring a separate paper-trail. Refusing the silent-bypass
+        case here mirrors ``--manual-verify``'s contract.
     * ``--apply`` is meaningful only under ``--repair``; using it alone
       is almost certainly a typo and should fail loudly.
     * ``--manual-verify`` is the bootstrapping-window escape hatch — it
@@ -460,6 +507,19 @@ def _validate_args(args: argparse.Namespace) -> Optional[str]:
         return "--force and --manual-verify are incompatible"
     if args.force and args.repair:
         return "--force and --repair are incompatible"
+    if args.force:
+        if os.environ.get(FORCE_CLOSE_OUT_ENV_VAR) != "1":
+            return (
+                f"--force is hard-scoped to incident-recovery only; set "
+                f"{FORCE_CLOSE_OUT_ENV_VAR}=1 in the environment to opt "
+                "in. See ai-router/docs/close-out.md Section 5."
+            )
+        if not args.reason_file:
+            return (
+                "--force requires --reason-file naming a non-empty "
+                "narrative; the operator's reason is recorded in the "
+                "closeout_force_used event for forensic audit"
+            )
     if args.apply and not args.repair:
         return "--apply requires --repair"
     if args.manual_verify and not args.interactive and not args.reason_file:
@@ -613,7 +673,7 @@ def run_gate_checks(
                 remediation=(
                     "disposition.json is required for close-out — write it "
                     "before calling mark_session_complete (or pass force=True "
-                    "to bypass the gate; transitional only)."
+                    "to bypass the gate; incident-recovery use only)."
                 ),
             )
         ]
@@ -1230,7 +1290,10 @@ def run(
 
     disposition = _read_disposition_or_none(session_set_dir)
 
-    # ``--force`` accepts a missing disposition (transitional only).
+    # ``--force`` accepts a missing disposition. By the time we reach
+    # this branch ``_validate_args`` has confirmed ``--force`` is
+    # opted-in via ``AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1`` and
+    # ``--reason-file`` is supplied (Set 9 Session 3, D-2 hard-scoping).
     # In the normal path, refuse: the disposition is the structured
     # handoff the close-out script reads to know what was done and how
     # it was verified.
@@ -1238,15 +1301,17 @@ def run(
         outcome.result = "invalid_invocation"
         outcome.messages.append(
             "disposition.json is required (or pass --force to bypass; "
-            "transitional only)"
+            "incident-recovery use only — see ai-router/docs/close-out.md "
+            "Section 5)"
         )
         return outcome
 
-    if args.force:
-        outcome.messages.append(
-            "DEPRECATION: --force bypasses all close-out gates. "
-            "This flag is transitional and will be tightened in Set 4."
-        )
+    # Note: ``--force`` is hard-scoped (Set 9 Session 3, D-2) — the
+    # env-var gate and ``--reason-file`` requirement are validated by
+    # ``_validate_args`` above. By the time we reach here the operator
+    # has opted in deliberately, so the WARNING/event emission path
+    # below is the documented happy path for incident recovery rather
+    # than an exception.
 
     # Read --reason-file, if provided. A read failure is an invalid
     # invocation — better to surface it now than to drop the operator's
@@ -1318,6 +1383,35 @@ def run(
             outcome,
             **request_fields,
         )
+
+        # Hard-scoped --force path (Set 9 Session 3, D-2): emit the
+        # forensic ``closeout_force_used`` event with the operator's
+        # reason so a forensic walk of the ledger can grep these
+        # without inspecting every ``closeout_succeeded`` payload's
+        # ``forced`` field. ``_validate_args`` guarantees ``args.force``
+        # is True only when both the env-var gate and ``--reason-file``
+        # are satisfied, so ``reason_text`` is always populated here.
+        if args.force:
+            outcome.messages.append(
+                "WARNING: --force bypassed all close-out gates "
+                "(incident-recovery only). The closeout_force_used "
+                "event has been emitted with the operator's reason; "
+                "session-state.json will record forceClosed=true on "
+                "the next snapshot flip."
+            )
+            _logger.warning(
+                "close_session --force used on %s (reason=%r). "
+                "closeout_force_used event emitted; gate bypassed.",
+                session_set_dir,
+                reason_text,
+            )
+            _emit_event(
+                session_set_dir,
+                "closeout_force_used",
+                outcome.session_number,
+                outcome,
+                reason=reason_text,
+            )
 
         # Verification wait. ``--force`` short-circuits this entirely —
         # bypassing the gate is the point of ``--force``, and waiting on

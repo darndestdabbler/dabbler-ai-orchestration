@@ -626,8 +626,12 @@ class TestRealWorldBackfill:
 # ---------------------------------------------------------------------------
 
 class TestPublicSurface:
-    def test_event_types_tuple_has_nine_entries(self):
-        assert len(EVENT_TYPES) == 9
+    def test_event_types_tuple_has_ten_entries(self):
+        # Set 9 Session 3 (D-2 hard-scoping) added the tenth entry
+        # ``closeout_force_used``. Future additions to EVENT_TYPES need
+        # the same justification — a *new audit category*, not just a
+        # new variant of an existing event.
+        assert len(EVENT_TYPES) == 10
         assert set(EVENT_TYPES) == {
             "work_started",
             "verification_requested",
@@ -638,6 +642,7 @@ class TestPublicSurface:
             "closeout_requested",
             "closeout_succeeded",
             "closeout_failed",
+            "closeout_force_used",
         }
 
     def test_filename_constant(self):

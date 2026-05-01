@@ -1,0 +1,48 @@
+{
+  "final_verdict": "VERIFIED_ROUND_3",
+  "rounds": ["ISSUES_FOUND", "ISSUES_FOUND", "VERIFIED"],
+  "round_1": {
+    "model": "gpt-5-4",
+    "verdict": "ISSUES_FOUND",
+    "issues": [
+      {
+        "id": "no_issue",
+        "severity": "n/a",
+        "summary": "Core hard-scope contract (env-var, --reason-file, frozen-enum exception, WARNING via both message and logger, conditional forceClosed plumbing, null-safe badge) verified clean. No fix.",
+        "status": "noted"
+      },
+      {
+        "id": "filesystem_ts_loader_not_shown",
+        "severity": "Major",
+        "verbatim": "tools/dabbler-ai-orchestration/src/fileSystem.ts (or whatever loads session-state.json into LiveSession) → The runtime mapping for forceClosed is not shown in the deliverables. types.ts and SessionSetsProvider.ts can compile and unit-test cleanly while the real explorer still never sees the field.",
+        "resolution": "context-gap → reverify-reshaped",
+        "fix": "The loader mapping is already in place at fileSystem.ts:192-217 ('forceClosed?: boolean' on the JSON parse type and 'forceClosed: sd.forceClosed ?? null' on the liveSession assignment). The Round 1 prompt did not include fileSystem.ts as a deliverable, which is the context gap. Round 2 prompt includes the file.",
+        "status": "context-gap; round-2-context-added"
+      },
+      {
+        "id": "combination_rules_doc_not_shown",
+        "severity": "Minor",
+        "verbatim": "ai-router/docs/close-out.md combination-rules section/list → _validate_args now rejects --force with --interactive, --manual-verify, and --repair, but the shown doc changes only cover the §2 summary row and §5 narrative. The acceptance check explicitly asks that the combination-rules list agree.",
+        "resolution": "context-gap → reverify-reshaped",
+        "fix": "The combination-rules list at close-out.md §2 was updated alongside the flag-summary row to add the env-var + reason-file gates as a new bullet. The Round 1 prompt sliced only the table row via _slice_section2_force_row, not the bullet list that immediately follows it. Round 2 prompt includes the full §2 combination-rules block.",
+        "status": "context-gap; round-2-context-added"
+      },
+      {
+        "id": "rejection_tests_lack_no_lock_assertion",
+        "severity": "Minor",
+        "verbatim": "ai-router/tests/test_close_session_skeleton.py → The new rejection tests prove 'no events emitted,' but they do not prove 'no lock acquired,' which is part of the verification ask for pre-mutation rejection.",
+        "resolution": "accept-finding → fixed (refined in Round 2)",
+        "fix": "Round 1 fix: assert <session-set>/.close_session.lock does not exist after rejection. Round 2 verifier rejected this as insufficient: on-disk absence does not catch a regression where acquire_lock is called and immediately released. Round 2 fix: monkeypatch close_session.acquire_lock with a spy and assert acquire_calls == []. The on-disk absence check is kept as a secondary defensive assertion. Round 3 verifier returned VERIFIED on this resolution.",
+        "status": "fixed"
+      },
+      {
+        "id": "no_unified_cli_force_test",
+        "severity": "Major",
+        "verbatim": "ai-router/tests/test_close_session_skeleton.py and ai-router/tests/test_mark_session_complete_gate.py → Happy-path coverage is split across two layers: run() proves warning + ledger reason, while mark_session_complete(force=True) proves forceClosed. That leaves no single operator-path test showing close_session --force yields all required artifacts together.",
+        "resolution": "accept-finding → fixed",
+        "fix": "Added test_force_cli_happy_path_emits_all_artifacts_together in test_close_session_skeleton.py. The test drives close_session.run with --force --reason-file (asserting WARNING + closeout_force_used event with reason) and then mark_session_complete with force=True (asserting forceClosed: True + a second closeout_force_used event with failed_checks). Two events from two paths are expected — the orchestrator's force-close-out flow runs both layers; one event per origin is the right forensic granularity.",
+        "status": "fixed"
+      }
+    ]
+  }
+}

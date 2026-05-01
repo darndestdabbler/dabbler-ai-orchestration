@@ -10,7 +10,7 @@ step trace.
 Event types
 -----------
 
-Nine event types covering the per-session lifecycle:
+Ten event types covering the per-session lifecycle:
 
 - ``work_started`` — orchestrator registered the session as in-progress.
 - ``verification_requested`` — orchestrator submitted work for
@@ -30,6 +30,13 @@ Nine event types covering the per-session lifecycle:
 - ``closeout_succeeded`` — close-out completed cleanly.
 - ``closeout_failed`` — close-out hit an unrecoverable error
   (Critical/Major issue, push rejected, etc.).
+- ``closeout_force_used`` — operator invoked ``close_session --force``
+  (or ``mark_session_complete(force=True)``) to bypass the deterministic
+  gate. Set 9 Session 3 (D-2 hard-scoping) added this distinct event so
+  forensic audits can grep for emergency-bypass close-outs without
+  walking every ``closeout_succeeded`` payload's ``forced`` field. The
+  event carries the operator's reason as a payload field; ``--force``
+  refuses to run without one.
 
 Per-event fields
 ----------------
@@ -94,7 +101,16 @@ except ImportError:
 SESSION_EVENTS_FILENAME = "session-events.jsonl"
 
 # Event types — exposed as a tuple so callers can validate without
-# importing private constants.
+# importing private constants. Set 1 Session 3 deliberately froze the
+# enum so manual-verify rode the existing ``verification_completed``
+# event (the ``method`` and ``attestation`` fields disambiguate). Set 9
+# Session 3 (D-2 hard-scoping of ``--force``) carved a deliberate
+# exception by adding ``closeout_force_used``: emergency-bypass
+# close-outs are a distinct audit category from the ``forced=True``
+# flag inside a ``closeout_succeeded`` payload, and a separate event
+# type lets forensic tooling grep them out cleanly. Future additions
+# require the same justification — a *new audit category*, not just a
+# new variant of an existing one.
 EVENT_TYPES = (
     "work_started",
     "verification_requested",
@@ -105,6 +121,7 @@ EVENT_TYPES = (
     "closeout_requested",
     "closeout_succeeded",
     "closeout_failed",
+    "closeout_force_used",
 )
 _EVENT_TYPES_SET = frozenset(EVENT_TYPES)
 

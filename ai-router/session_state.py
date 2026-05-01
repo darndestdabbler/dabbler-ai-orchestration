@@ -210,6 +210,8 @@ def _propagate_total_sessions(session_set: str, total: int) -> None:
 def _flip_state_to_closed(
     session_set: str,
     verification_verdict: Optional[str] = None,
+    *,
+    forced: bool = False,
 ) -> Optional[str]:
     """Internal: flip ``session-state.json`` to closed without running the gate.
 
@@ -218,6 +220,15 @@ def _flip_state_to_closed(
     when it needs to catch up a snapshot to an events ledger that
     already records ``closeout_succeeded``. Callers that must enforce
     the gate use the public :func:`mark_session_complete` entry point.
+
+    When ``forced`` is True, write ``forceClosed: True`` to the
+    snapshot (Set 9 Session 3, D-2). The flag is the forensic marker
+    the VS Code Session Set Explorer reads to surface a ``[FORCED]``
+    badge so reviewers can spot emergency-bypass close-outs at a
+    glance. Repair-driven flips leave the flag at its default
+    (``False``) — the snapshot is being resynced to a ledger event
+    that may pre-date the hard-scoping change, so repair never claims
+    forensic authority over close-outs it did not perform.
 
     Returns the file path if it existed and was updated, ``None`` if no
     state file existed.
@@ -235,6 +246,8 @@ def _flip_state_to_closed(
     state["completedAt"] = _now_iso()
     if verification_verdict is not None:
         state["verificationVerdict"] = verification_verdict
+    if forced:
+        state["forceClosed"] = True
     with open(path, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
         f.write("\n")
@@ -278,10 +291,17 @@ def mark_session_complete(
       duplicate what a future ``close_session`` invocation would emit
       against the same set of failures).
     * **One or more gates fail and ``force=True``** → log a loud
-      DEPRECATION warning, append ``closeout_succeeded`` with
-      ``forced=True`` and the failed-check names, and proceed with the
-      flip. The ``--force`` path is transitional and will be tightened
-      in a future set; relying on it now incurs an audit-trail marker.
+      WARNING, append ``closeout_succeeded`` with ``forced=True`` and
+      the failed-check names, append the forensic
+      ``closeout_force_used`` event (Set 9 Session 3, D-2), and
+      proceed with the flip. The ``forceClosed: true`` marker is
+      written to ``session-state.json`` so the VS Code Session Set
+      Explorer surfaces a ``[FORCED]`` badge on the affected set.
+      ``force=True`` is hard-scoped to incident-recovery use only;
+      callers that route through the CLI also need
+      ``AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1``. The function-level
+      contract here trusts callers (tests, the repair path) to use
+      ``force=True`` deliberately.
 
     The event-emission step is best-effort with respect to a missing
     session-set directory or a transient I/O hiccup: a write failure
@@ -323,9 +343,11 @@ def mark_session_complete(
             f"{f.check}: {f.remediation}" for f in failures
         )
         _logger.warning(
-            "DEPRECATION: mark_session_complete(force=True) bypassed "
-            "%d failing gate(s) on %s — %s. The --force / force=True "
-            "path is transitional and will be tightened in a future set.",
+            "WARNING: mark_session_complete(force=True) bypassed "
+            "%d failing gate(s) on %s — %s. --force / force=True is "
+            "hard-scoped to incident-recovery only (Set 9 Session 3, "
+            "D-2); session-state.json will record forceClosed=true "
+            "and a closeout_force_used event will be appended.",
             len(failures), session_set, bullets,
         )
 
@@ -357,8 +379,32 @@ def mark_session_complete(
             session_number,
             **event_fields,
         )
+        # Forensic marker (Set 9 Session 3, D-2): the dedicated
+        # ``closeout_force_used`` event makes emergency-bypass
+        # close-outs cleanly greppable from the events ledger without
+        # requiring callers to walk every ``closeout_succeeded``
+        # payload's ``forced`` field. Emit only when ``force=True``
+        # actually mattered (gates would have failed without it) — a
+        # ``force=True`` invocation against a passing gate adds no
+        # forensic value because the close-out would have succeeded
+        # either way. Same idempotency story as ``closeout_succeeded``
+        # above: the flip below is what marks the session closed, so
+        # if this append raises mid-flight the snapshot stays
+        # un-flipped and the ledger and snapshot never disagree.
+        if failures and force:
+            append_event(
+                session_set,
+                "closeout_force_used",
+                session_number,
+                method="snapshot_flip",
+                failed_checks=[f.check for f in failures],
+            )
 
-    return _flip_state_to_closed(session_set, verification_verdict)
+    return _flip_state_to_closed(
+        session_set,
+        verification_verdict,
+        forced=bool(failures and force),
+    )
 
 
 def _finalize_total_sessions_from_entries(session_set: str) -> None:

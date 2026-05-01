@@ -1,35 +1,20 @@
 {
   "status": "completed",
-  "summary": "Set 7 Session 2: switched every state-reading site from file-presence branching to reading session-state.json's canonical `status`. Added read_status() (Python) / readStatus() (TS) with shared canonical-loader + lazy-synth fallback. The fallback uses _backfill_payload / backfillPayload inference so a legacy folder that slipped through Set 7 Session 1's backfill is classified by current file presence (change-log -> complete; activity-log -> in-progress; neither -> not-started) instead of being regressed to not-started. Tolerant alias canonicalization at the read boundary (\"completed\" -> \"complete\", \"done\" -> \"complete\") preserves the spec's \"backfill leaves drifted files untouched\" rule while preventing reader regressions on sets 005/006. The reconciler stranded-sweep, close-out gate idempotency check, and current_lifecycle_state were intentionally NOT collapsed: each operates on the events ledger (the authoritative source per existing codebase convention), and a coarse read_status pre-filter would either duplicate the events check or mask drift those readers exist to surface; documented inline. Cross-provider verification VERIFIED on round 3 after addressing two rounds of findings (1: read_status validation hole + missing tests; 2: lazy-synth misclassified legacy folders).",
+  "summary": "Set 7 Session 3 (final): bootstrap, docs, cross-provider review. Updated the Generate Session-Set Prompt template (sessionGenPrompt.ts) to instruct the AI to create session-state.json with status:not-started alongside spec.md. Added a new Session-Set Lifecycle and State File section to docs/ai-led-session-workflow.md documenting canonical status values, the file-presence invariant, and the lazy-synthesis fallback. Extended docs/session-state-schema-example.md to document the not-started and in-progress shapes (the .json file remains the closed shape). Replaced the file-presence state-detection table in the extension README with a status-driven table plus a legacy fallback note. Build passed: pytest 647 passed, schema drift check clean, tsc clean, vsce package builds. Cross-provider verification ran on GPT-5.4; two findings (session-003.md self-reference and pre-existing vscode-test launcher infra failure) were surfaced to the human and adjudicated as accept-dismissal via record_adjudication. Note: ai-assignment.md was not authored this set (Step 3.5 / Rule #17) because the user has restricted ai-router usage to end-of-session verification only for cost containment.",
   "files_changed": [
-    "ai-router/session_state.py",
-    "ai-router/session_log.py",
-    "ai-router/__init__.py",
-    "ai-router/close_session.py",
-    "ai-router/session_events.py",
-    "ai-router/tests/test_read_status.py",
-    "tools/dabbler-ai-orchestration/src/utils/sessionState.ts",
-    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts",
-    "tools/dabbler-ai-orchestration/dist/extension.js",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map",
-    "scripts/verify_session_007_2.py",
+    "tools/dabbler-ai-orchestration/src/wizard/sessionGenPrompt.ts",
+    "docs/ai-led-session-workflow.md",
+    "docs/session-state-schema-example.md",
+    "tools/dabbler-ai-orchestration/README.md",
+    "scripts/verify_session_007_3.py",
     "docs/session-sets/007-uniform-session-state-file/session-state.json",
     "docs/session-sets/007-uniform-session-state-file/activity-log.json",
     "docs/session-sets/007-uniform-session-state-file/disposition.json",
-    "docs/session-sets/007-uniform-session-state-file/session-reviews/session-002.md"
+    "docs/session-sets/007-uniform-session-state-file/session-reviews/session-003.md",
+    "docs/session-sets/007-uniform-session-state-file/change-log.md"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 2 landed VERIFIED after three verifier rounds; same orchestrator has full context on the read_status helper, the lazy-synth-via-backfill-inference fallback, and the deliberate non-collapses (reconciler / gate idempotency / current_lifecycle_state) needed for Session 3's bootstrap-and-docs work."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": []
 }

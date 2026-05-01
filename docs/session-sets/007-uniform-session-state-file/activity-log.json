@@ -285,6 +285,78 @@
       "description": "Final ai-router suite: 647 passed (627 baseline + 20 new in test_read_status.py). TypeScript: tsc clean, esbuild compile clean, eslint clean (only pre-existing warning).",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/read-guidance",
+      "dateTime": "2026-05-01T14:12:52.240627-04:00",
+      "description": "Read project-guidance, lessons-learned, authoring guide, workflow doc, spec.md, prior session reviews and disposition.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/wizard-prompt-template",
+      "dateTime": "2026-05-01T14:12:52.241626-04:00",
+      "description": "Updated tools/dabbler-ai-orchestration/src/wizard/sessionGenPrompt.ts to instruct the AI scaffolding new session-set folders to also create session-state.json with status:not-started, with the full not-started shape embedded in the prompt.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/workflow-doc-section",
+      "dateTime": "2026-05-01T14:12:52.242132-04:00",
+      "description": "Added Session-Set Lifecycle and State File subsection to docs/ai-led-session-workflow.md documenting canonical status values, the file invariant, the three writers, and the lazy-synthesis fallback.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/schema-example-md",
+      "dateTime": "2026-05-01T14:12:52.243133-04:00",
+      "description": "Extended docs/session-state-schema-example.md with not-started and in-progress shapes (the .json file remains the closed shape).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/extension-readme",
+      "dateTime": "2026-05-01T14:12:52.244133-04:00",
+      "description": "Replaced file-presence state-detection table in tools/dabbler-ai-orchestration/README.md with status-driven table plus legacy-folder fallback note and backfill-CLI pointer.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/build-and-test",
+      "dateTime": "2026-05-01T14:12:52.244133-04:00",
+      "description": "pytest 647 passed; schema --check exit 0; tsc clean; vsce package builds 0.11.0 vsix. Extension-host integration tests blocked by pre-existing vscode-test environment breakage (Code.exe rejects launcher flags) \u2014 unrelated to this session edits.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/verification",
+      "dateTime": "2026-05-01T14:12:52.245534-04:00",
+      "description": "Cross-provider verification routed to GPT-5.4 (session-verification, complexity_hint 70, cost $0.16). Two findings (session-003.md self-reference; vscode-test infra) surfaced to human and adjudicated as accept-dismissal via record_adjudication.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/disposition-and-changelog",
+      "dateTime": "2026-05-01T14:12:52.246117-04:00",
+      "description": "Wrote disposition.json (status=completed, verification_method=api, no next_orchestrator since final session) and change-log.md for the set.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

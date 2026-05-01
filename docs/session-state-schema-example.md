@@ -17,6 +17,56 @@ silently every time a field is added, renamed, or has its semantics
 changed. A generated example fails a CI / pre-commit drift check
 loudly the moment the schema and the documented example disagree.
 
+## Lifecycle shapes
+
+A `session-state.json` cycles through three shapes during a set's
+lifetime. The committed example in
+`session-state-schema-example.json` is the **closed** shape. The
+other two — **not-started** (written when the folder is first
+scaffolded) and **in-progress** (written by `register_session_start`
+at Step 1 of each session) — are documented inline below because they
+are the entry points consumers and hand-authors most often need to
+reproduce.
+
+### Not-started
+
+Written when a session-set folder is first scaffolded — by the
+extension's "Generate Session-Set Prompt" template (which instructs
+the AI to create the file alongside `spec.md`), by the
+`backfill_session_state_files` walker, or by the lazy-synthesis
+fallback in `read_status` / `readStatus` for any folder that slipped
+through. `currentSession`, `startedAt`, `lifecycleState`, and
+`orchestrator` are all `null`; `totalSessions` is parsed from the
+spec's `Session Set Configuration` block when available.
+
+```json
+{
+  "schemaVersion": 2,
+  "sessionSetName": "<slug>",
+  "currentSession": null,
+  "totalSessions": 4,
+  "status": "not-started",
+  "lifecycleState": null,
+  "startedAt": null,
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": null
+}
+```
+
+### In-progress
+
+Written by `register_session_start()` at Step 1 of each session.
+`currentSession` is the 1-based index of the session being run,
+`status` flips to `in-progress`, `lifecycleState` is
+`work_in_progress`, `startedAt` is populated with an ISO 8601
+timestamp, and `orchestrator` carries the engine/provider/model/effort
+of the driver. `completedAt`, `verificationVerdict`, and
+`nextOrchestrator` (when applicable) remain `null` until close-out.
+
+The closed shape — populated by `mark_session_complete()` at Step 8 —
+is the form rendered in `session-state-schema-example.json`.
+
 ## Regenerating
 
 ```bash

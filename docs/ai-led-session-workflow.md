@@ -141,6 +141,56 @@ did the work. This catches provider-specific biases and blind spots:
 - If the orchestrator is Codex/Gemini, verification goes to an Anthropic model
 - The verifier's raw output is saved and never edited
 
+### Session-Set Lifecycle and State File
+
+Every session-set folder under `docs/session-sets/<slug>/` carries a
+`session-state.json`. The file's `status` field is the canonical
+public-facing answer to "what state is this set in?" — readers consult
+it directly rather than inferring state from file presence.
+
+**Canonical `status` values:**
+
+```
+"not-started"   — folder exists, no session has started
+"in-progress"   — at least one session has started, no change-log yet
+"complete"      — change-log.md present and close-out succeeded
+"cancelled"     — reserved for the cancel/restore feature (Set 8)
+```
+
+`status` is the coarse public-facing field. The v2 schema's
+`lifecycleState` enum (`work_in_progress`, `work_verified`,
+`closeout_pending`, `closeout_blocked`, `closed`) stays the close-out
+machinery's internal granularity and is not a substitute for `status`.
+
+**File invariant — `session-state.json` exists in every session-set
+folder.** Three writers converge on this:
+
+1. The extension's "Generate Session-Set Prompt" flow instructs the AI
+   to scaffold the file alongside `spec.md` with `status:
+   "not-started"`. The full not-started shape is in
+   `docs/session-state-schema-example.md`.
+2. `register_session_start()` overwrites the file at Step 1 of each
+   session, flipping `status` to `in-progress` and populating
+   `currentSession`, `startedAt`, and `orchestrator`.
+3. The one-shot CLI `python -m ai_router.backfill_session_state` walks
+   `docs/session-sets/` and synthesizes the file for any folder that
+   slipped through. Run it once after pulling this repo into a
+   consumer or after any hand-authored folder is created.
+
+**Lazy-synthesis fallback.** Readers (`read_status` in Python,
+`readStatus` in TypeScript) tolerate folders that slipped through
+backfill. On a missing file, the reader infers the initial state from
+legacy file presence (`change-log.md` → `complete`, `activity-log.json`
+→ `in-progress`, neither → `not-started`) and writes that shape before
+returning. This keeps the contract "readers always see a status"
+without forcing users to run backfill — but the contract authors and
+the wizard prompt assume the file is created up front.
+
+**Hand-authored session-set folders** must include
+`session-state.json` from creation. The lazy-synth fallback is a
+robustness measure for legacy folders, not a license to skip the file
+on new ones.
+
 ---
 
 ## Setting Up a New Session Set

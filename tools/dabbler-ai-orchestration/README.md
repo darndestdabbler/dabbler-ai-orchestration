@@ -13,13 +13,23 @@ A live tree view of your project's session sets, grouped by state:
 - **Not Started** — specs ready to run
 - **Done** — completed and merged session sets
 
-State is derived from file presence in `docs/session-sets/<slug>/`:
+State is read from `session-state.json` in each
+`docs/session-sets/<slug>/` folder. The file's `status` field is the
+canonical signal, and the extension consults it directly:
 
-| Files present | State |
+| `status` value | State group |
 |---|---|
-| `spec.md` only | Not started |
-| `activity-log.json` or `session-state.json` | In progress |
-| `change-log.md` | Done |
+| `"not-started"` | Not started |
+| `"in-progress"` | In Progress |
+| `"complete"` | Done |
+
+Every session-set folder is expected to carry a `session-state.json`
+from creation onward. For legacy folders that predate this invariant,
+the extension falls back to file-presence inference (`change-log.md` →
+done, `activity-log.json` → in-progress, neither → not-started) and
+synthesizes the state file lazily on first read. Run `python -m
+ai_router.backfill_session_state` after pulling new repos to
+materialize the file for every folder up front.
 
 Right-click a session set to open its spec, activity log, change log, or AI assignment. Copy trigger phrases to start the next AI session.
 

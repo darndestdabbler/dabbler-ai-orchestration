@@ -7717,6 +7717,31 @@ Guidelines:
 - Set requiresUAT: true only for user-visible features that need manual verification
 - Set requiresE2E: true only if automated browser tests are relevant
 - Set effort: low for simple changes, high for complex multi-file refactors
+
+When you scaffold each session-set folder (\`docs/session-sets/<slug>/\`)
+alongside its \`spec.md\`, also create a \`session-state.json\` file with
+\`status: "not-started"\`. The full not-started shape is:
+
+\`\`\`json
+{
+  "schemaVersion": 2,
+  "sessionSetName": "<slug>",
+  "currentSession": null,
+  "totalSessions": <integer from spec, or null>,
+  "status": "not-started",
+  "lifecycleState": null,
+  "startedAt": null,
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": null
+}
+\`\`\`
+
+Every session-set folder is expected to carry a \`session-state.json\`
+from creation onward. Readers consult \`status\` directly rather than
+inferring state from file presence. If you forget, the workflow's
+lazy-synthesis fallback will create one on first read, but creating
+it up front keeps the folder self-describing.
 `;
 function registerSessionGenPromptCommand(context) {
   context.subscriptions.push(

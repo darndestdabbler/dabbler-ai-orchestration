@@ -32,6 +32,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -426,6 +427,286 @@ def read_session_state(session_set_dir: str) -> Optional[dict]:
     if not isinstance(state, dict):
         return None
     return _migrate_v1_to_v2_inplace(state)
+
+
+# ---------------------------------------------------------------------------
+# Not-started synthesis and one-shot backfill (Set 7 Session 1)
+# ---------------------------------------------------------------------------
+#
+# The invariant Set 7 establishes: every folder under ``docs/session-sets/``
+# with a ``spec.md`` carries a ``session-state.json``, with ``status``
+# always one of ``"not-started" | "in-progress" | "complete" | "cancelled"``
+# (the last reserved for Set 8). Readers stop branching on file presence.
+#
+# Two writers land here:
+#
+# - :func:`synthesize_not_started_state` — writes the not-started shape for
+#   a single folder. Idempotent: no-op if a state file already exists.
+# - :func:`backfill_session_state_files` — walks all folders with a
+#   ``spec.md``, infers status from current file presence (change-log →
+#   complete; activity-log → in-progress; neither → not-started), and
+#   writes the synthesized file. Existing state files are preserved
+#   untouched (the spec is explicit on this — drift between fields like
+#   ``status: "completed"`` vs ``"complete"`` is out of scope; Set 7's job
+#   is making the file *exist* everywhere, not normalizing prior
+#   contents).
+#
+# Both writers use a write-then-rename pattern (``os.replace``) so a
+# concurrent reader hitting the same not-yet-synthesized folder during
+# lazy-synthesis (Set 7 Session 2) sees either the absence or the
+# complete file, never a partial one.
+
+NOT_STARTED_STATUS = "not-started"
+IN_PROGRESS_STATUS = "in-progress"
+COMPLETE_STATUS = "complete"
+
+
+def _atomic_write_json(path: str, payload: dict) -> None:
+    """Write *payload* to *path* via a unique temp file + ``os.replace``.
+
+    Same indentation and trailing-newline convention as the other writers
+    in this module. The temp file is colocated with the destination so
+    ``os.replace`` is a same-filesystem rename (cross-filesystem would
+    fall back to copy+delete and lose atomicity).
+
+    The temp filename is uniquified with PID + a short random suffix.
+    A fixed ``path + ".tmp"`` would let two concurrent writers collide
+    on the temp file itself: writer A opens for write, writer B
+    truncates the same path mid-stream, writer A's ``os.replace`` moves
+    a partial file. Per-call uniqueness avoids that without needing a
+    cross-process lock.
+    """
+    directory = os.path.dirname(path) or "."
+    base = os.path.basename(path)
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f".{base}.",
+        suffix=".tmp",
+        dir=directory,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+            f.write("\n")
+        os.replace(tmp_path, path)
+    except BaseException:
+        # On any failure (write error, KeyboardInterrupt during the
+        # critical section), best-effort remove the temp file so the
+        # destination directory does not accumulate orphans across runs.
+        if os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        raise
+
+
+def _read_total_sessions_from_spec(session_set_dir: str) -> Optional[int]:
+    """Return ``totalSessions`` parsed from spec.md's Session Set Configuration block.
+
+    Returns ``None`` if the spec is missing, unreadable, lacks the
+    configuration block, or the block has no numeric ``totalSessions``
+    field. Mirrors :func:`read_mode_config`'s tolerance for missing /
+    legacy specs.
+    """
+    spec_path = os.path.join(session_set_dir, "spec.md")
+    if not os.path.isfile(spec_path):
+        return None
+    try:
+        with open(spec_path, "r", encoding="utf-8") as f:
+            text = f.read()
+    except OSError:
+        return None
+    block = _extract_session_set_configuration_block(text) or {}
+    value = block.get("totalSessions")
+    if isinstance(value, int) and value > 0:
+        return value
+    return None
+
+
+def _not_started_payload(session_set_dir: str) -> dict:
+    """Return the canonical not-started ``session-state.json`` dict.
+
+    All session-tracking fields are ``null``: no session has started, so
+    there is no current session, no start time, no orchestrator. The
+    ``totalSessions`` field is best-effort populated from the spec; it
+    is the only field that has a meaningful value in this shape.
+    """
+    return {
+        "schemaVersion": SCHEMA_VERSION,
+        "sessionSetName": os.path.basename(session_set_dir.rstrip("/\\")),
+        "currentSession": None,
+        "totalSessions": _read_total_sessions_from_spec(session_set_dir),
+        "status": NOT_STARTED_STATUS,
+        "lifecycleState": None,
+        "startedAt": None,
+        "completedAt": None,
+        "verificationVerdict": None,
+        "orchestrator": None,
+    }
+
+
+def synthesize_not_started_state(session_set_dir: str) -> str:
+    """Write a not-started ``session-state.json`` for *session_set_dir*.
+
+    Idempotent: if a state file already exists, returns its path without
+    touching it. The caller should not depend on the existing file
+    matching the canonical not-started shape — it could be in-progress,
+    complete, or carry pre-Set-7 drift. The contract is only "after this
+    call, the file exists."
+
+    Returns the absolute path to the file (existing or newly written).
+    """
+    path = _state_path(session_set_dir)
+    if os.path.isfile(path):
+        return path
+    _atomic_write_json(path, _not_started_payload(session_set_dir))
+    return path
+
+
+def _earliest_activity_log_timestamp(session_set_dir: str) -> Optional[str]:
+    """Return the smallest ``dateTime`` string across activity-log entries.
+
+    Used to backfill ``startedAt`` for in-progress sets that have an
+    activity-log but no state file. ISO-8601 strings sort lexically in
+    chronological order when the offset format is consistent (it is —
+    every entry comes from :func:`_now_iso`), so a plain ``min`` works.
+
+    Returns ``None`` if the log is missing, malformed, or has no entries
+    with a ``dateTime`` string.
+    """
+    log_path = os.path.join(session_set_dir, "activity-log.json")
+    if not os.path.isfile(log_path):
+        return None
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    entries = data.get("entries") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        return None
+    timestamps = [
+        e["dateTime"]
+        for e in entries
+        if isinstance(e, dict) and isinstance(e.get("dateTime"), str)
+    ]
+    if not timestamps:
+        return None
+    return min(timestamps)
+
+
+def _change_log_mtime_iso(session_set_dir: str) -> Optional[str]:
+    """Return ``change-log.md``'s mtime as an ISO-8601 string, or ``None``.
+
+    Best-effort approximation for ``completedAt`` on done sets that
+    pre-date Set 7. The mtime reflects when the file was last written,
+    which for change-logs is typically very close to actual close-out.
+    Documented as approximate in :func:`backfill_session_state_files`'s
+    docstring; consumers that need exact close-out timing should consult
+    ``session-events.jsonl`` or the activity-log.
+    """
+    log_path = os.path.join(session_set_dir, "change-log.md")
+    if not os.path.isfile(log_path):
+        return None
+    try:
+        mtime = os.path.getmtime(log_path)
+    except OSError:
+        return None
+    return datetime.fromtimestamp(mtime).astimezone().isoformat()
+
+
+def _backfill_payload(session_set_dir: str) -> dict:
+    """Choose the right ``session-state.json`` shape for an existing folder.
+
+    Inference rules (spec, Session 1 deliverables):
+    - ``change-log.md`` exists → status=complete, lifecycleState=closed,
+      ``completedAt`` from the change-log's mtime (best-effort).
+    - else ``activity-log.json`` exists → status=in-progress,
+      lifecycleState=work_in_progress, ``startedAt`` from the earliest
+      log entry's timestamp.
+    - else → not-started shape.
+
+    The orchestrator block is always ``null`` in backfilled files; the
+    activity log carries per-step model info for anyone who needs to
+    recover that history. (Risk noted in spec.)
+    """
+    base = _not_started_payload(session_set_dir)
+
+    if os.path.isfile(os.path.join(session_set_dir, "change-log.md")):
+        base["status"] = COMPLETE_STATUS
+        base["lifecycleState"] = SessionLifecycleState.CLOSED.value
+        base["completedAt"] = _change_log_mtime_iso(session_set_dir)
+        return base
+
+    if os.path.isfile(os.path.join(session_set_dir, "activity-log.json")):
+        base["status"] = IN_PROGRESS_STATUS
+        base["lifecycleState"] = SessionLifecycleState.WORK_IN_PROGRESS.value
+        base["startedAt"] = _earliest_activity_log_timestamp(session_set_dir)
+        return base
+
+    return base
+
+
+def _planned_backfill_paths(base_dir: str) -> List[str]:
+    """Return session-set directories that need a ``session-state.json``.
+
+    Internal helper used by :func:`backfill_session_state_files` and by
+    the ``--dry-run`` path of the CLI. Walks immediate children of
+    *base_dir* and returns those that have a ``spec.md`` but no
+    ``session-state.json``. Existing state files signal "leave alone"
+    even if they carry pre-Set-7 drift; normalization is out of scope
+    (see :func:`backfill_session_state_files` docstring).
+
+    Returns ``[]`` if *base_dir* does not exist (consumer repos may not
+    have laid out the directory yet — that is a valid no-op).
+    """
+    if not os.path.isdir(base_dir):
+        return []
+
+    paths: List[str] = []
+    for entry in sorted(os.listdir(base_dir)):
+        sub = os.path.join(base_dir, entry)
+        if not os.path.isdir(sub):
+            continue
+        if not os.path.isfile(os.path.join(sub, "spec.md")):
+            continue
+        if os.path.isfile(_state_path(sub)):
+            continue
+        paths.append(sub)
+    return paths
+
+
+def backfill_session_state_files(
+    base_dir: str = "docs/session-sets",
+) -> int:
+    """Walk *base_dir* and synthesize ``session-state.json`` where missing.
+
+    For each immediate subdirectory of *base_dir* that contains a
+    ``spec.md``:
+
+    - If ``session-state.json`` already exists, leave it untouched. (The
+      file may carry pre-Set-7 drift such as ``status: "completed"`` vs
+      the canonical ``"complete"``; normalizing that is out of scope —
+      Set 7's invariant is *existence*, not field-value normalization.)
+    - Otherwise infer status from current file presence and write the
+      synthesized file via :func:`_backfill_payload`.
+
+    Returns the count of session-state files synthesized. Non-recursive
+    — only direct children of *base_dir* are considered, matching the
+    layout convention that every session-set folder is one directory
+    level under ``docs/session-sets/``.
+
+    Callers that need the affected paths (e.g., the CLI's per-line
+    output, audit tooling for the lazy-synth fallback) should use
+    :func:`_planned_backfill_paths` before invoking this function — the
+    plan list before a write is the same as the list of folders this
+    function actually wrote, since synthesis only fails on I/O errors
+    that propagate out.
+    """
+    paths = _planned_backfill_paths(base_dir)
+    for sub in paths:
+        _atomic_write_json(_state_path(sub), _backfill_payload(sub))
+    return len(paths)
 
 
 # ---------------------------------------------------------------------------

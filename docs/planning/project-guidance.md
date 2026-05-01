@@ -40,8 +40,18 @@ The file has two top-level sections:
 
 ### Code Style
 
-> **TODO:** Add code style conventions (naming, formatting, nullable, async
-> suffix, file layout, etc.).
+- **CLI / terminal output uses ASCII-only glyphs.** Every helper that
+  writes to a console (`print_session_set_status`,
+  `print_metrics_report`, `queue_status`, `heartbeat_status`,
+  `close_session` output, and any future CLI) must avoid Unicode
+  characters that Windows `cp1252` cannot encode. Use `[~]` for
+  in-progress, `[ ]` for not-started, `[x]` for done; reserve emoji
+  and box-drawing characters for files written with
+  `encoding="utf-8"`. Promoted from `lessons-learned.md` on
+  2026-05-01 after consistent application across five+ CLI surfaces.
+
+> **TODO:** Add additional code style conventions (naming, formatting,
+> nullable, async suffix, file layout, etc.).
 
 ### Workflow Expectations
 

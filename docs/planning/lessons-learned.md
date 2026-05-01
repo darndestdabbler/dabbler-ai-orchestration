@@ -70,17 +70,23 @@
   done. Reserve Unicode for files written with `encoding="utf-8"`.
 - **Action for future sessions:** Follow `print_session_set_status()` in
   `ai-router/__init__.py` as the pattern.
+- **Promoted to `project-guidance.md` → Conventions → Code Style on
+  2026-05-01** after consistent application across five+ CLI surfaces
+  (`print_session_set_status`, `print_metrics_report`, `queue_status`,
+  `heartbeat_status`, `close_session`).
 
 ## Session-State.json Is The Single Source Of Truth For In-Progress Detection
 
-- **Context:** External tools detecting which session set is currently active.
-- **Failure or friction:** `activity-log.json` is only created on first
-  `log_step()` — 5–10 minutes after a session starts. External tools showed
-  sets as "not started" while a session was underway.
-- **Lesson:** Call `register_session_start()` at Step 1 and
-  `mark_session_complete()` at Step 8. Do not infer in-progress from
-  activity-log presence.
-- **Action for future sessions:** Always call both lifecycle functions.
+- **Promoted.** This lesson now lives at `project-guidance.md` →
+  Conventions → Workflow Expectations: *"Session-state.json is the
+  single source of truth for in-progress detection. Call
+  `register_session_start()` at Step 1 before the first `log_step()`,
+  and `mark_session_complete()` at Step 8."* Set 7
+  (`007-uniform-session-state-file`) extended the invariant
+  repo-wide: every session-set folder carries a `session-state.json`
+  from creation, and readers consult `status` directly via
+  `read_status` / `readStatus`. Collapsed to this pointer on
+  2026-05-01 to avoid duplicate guidance drifting in two places.
 
 ## Always Route `ai-assignment.md` And Next-Orchestrator / Next-Set Recommendations
 
@@ -121,14 +127,15 @@
 
 ## Per-Session-Set E2E/UAT Configuration Is Spec-Declared, Not Inferred
 
-- **Context:** Authoring a new session-set spec or onboarding a set.
-- **Failure or friction:** Earlier versions inferred UAT applicability at
-  runtime, causing session-to-session inconsistency within a set.
-- **Lesson:** UAT and E2E gates are declared once in a YAML configuration
-  block at the top of the spec (`requiresUAT`, `requiresE2E`). The
-  orchestrator reads the block at Step 2 and obeys it for the entire workflow.
-- **Action for future sessions:** Read the authoring guide before setting
-  flags. Trust the spec during execution.
+- **Promoted.** The operational rule lives authoritatively in
+  `docs/planning/session-set-authoring-guide.md` (Session Set
+  Configuration block + the When-UAT-Is-Required and
+  When-E2E-Is-Required heuristics) and is reinforced by
+  `project-guidance.md` → Conventions → Workflow Expectations:
+  *"Obey the spec's Session Set Configuration block at runtime."*
+  Collapsed to this pointer on 2026-05-01 to avoid three places
+  (authoring guide, project-guidance, lessons-learned) holding
+  the same rule.
 
 ---
 

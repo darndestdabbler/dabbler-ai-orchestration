@@ -1,7 +1,7 @@
 {
   "sessionSetName": "009-alignment-audit-followups",
   "createdDate": "2026-05-01T16:42:07.648596-04:00",
-  "totalSessions": 0,
+  "totalSessions": 5,
   "entries": [
     {
       "sessionNumber": 1,
@@ -34,6 +34,94 @@
           "inputTokens": 6134,
           "outputTokens": 5418,
           "costUsd": 0.096605
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-05-01T18:46:38.482113-04:00",
+      "description": "Register Session 2 start in session-state.json",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/ai-assignment",
+      "dateTime": "2026-05-01T18:46:38.483113-04:00",
+      "description": "Append Session 2 block to ai-assignment.md (with Session 1 actuals)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/proposal-q2",
+      "dateTime": "2026-05-01T18:46:38.483113-04:00",
+      "description": "Revise proposal Open questions (revised) Q2 with doc-only resolution",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/close-out-doc",
+      "dateTime": "2026-05-01T18:46:38.483113-04:00",
+      "description": "Add Section 6 entry on cross-set parallelism to ai-router/docs/close-out.md",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/test-scenario-7",
+      "dateTime": "2026-05-01T18:46:38.484113-04:00",
+      "description": "Add TestScenario7CrossSetParallelRejection to test_failure_injection.py",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/pytest-run",
+      "dateTime": "2026-05-01T18:46:38.484419-04:00",
+      "description": "Full pytest suite: 670 passed",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/verification",
+      "dateTime": "2026-05-01T18:54:58.975772-04:00",
+      "description": "Round 1 cross-provider verification (D-1 doc-only path)",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 5574,
+          "outputTokens": 6971,
+          "costUsd": 0.1185
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/verification-round-2",
+      "dateTime": "2026-05-01T18:54:58.975772-04:00",
+      "description": "Round 2 cross-provider verification after applying issue fixes",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 6671,
+          "outputTokens": 676,
+          "costUsd": 0.0268175
         }
       ]
     }

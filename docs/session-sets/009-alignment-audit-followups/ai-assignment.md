@@ -49,7 +49,8 @@ standing operator constraint).
 
 ### Actuals (filled after the session)
 - Orchestrator used: claude-code claude-opus-4-7 @ effort=high
-- Total routed cost: TBD at close-out (verification call only)
+- Total routed cost: $0.1910 (two `session-verification` calls to
+  GPT-5.4 — Round 1 + Round 2 after applying issue fixes)
 - Deviations from recommendation: ai-assignment authoring and
   next-session recommendation produced directly rather than via
   `route(task_type="analysis")`, per the standing operator
@@ -66,3 +67,62 @@ Rationale: Lock implementation + executable cross-set failure-injection
 test is concurrency-sensitive code where a wrong call corrupts session
 state. Opus at high effort matches the stakes; the test count is
 small enough that runtime cost is bounded.
+
+---
+
+## Session 2: D-1 — `(repo, branch)` parallel-session exclusion
+
+### Recommended orchestrator
+claude-code claude-opus-4-7 @ effort=high
+
+### Rationale
+Operator selected the **doc-only path** at session start (audit-accepted
+alternative b): revise the contract instead of widening the lock. The
+work surface narrowed to two doc edits (proposal Q2 + close-out.md
+Section 6) and one new executable failure-injection test that proves
+the deterministic gate catches the cross-set push race loudly. Opus
+high-effort is still the right call — careful wording on the contract
+revision matters because future audits will re-check it — but the
+session is materially smaller than the widen-the-lock path Session 1
+projected. The new test exercises real `git` subprocesses, so it must
+slot cleanly into the existing `test_failure_injection.py` style.
+
+### Estimated routed cost
+None this session — only end-of-session verification routes (per the
+standing operator constraint).
+
+| Step | Action | Routing Decision |
+|------|--------|------------------|
+| 1 | Read prerequisites (audit D-1 detail, proposal Q2, close-out.md §6, existing failure-injection scenarios, gate_checks API) | Direct (orchestrator) |
+| 2 | Register Session 2 start | Direct (file-write helper, no API call) |
+| 3 | Append this Session 2 block to ai-assignment.md (with Session 1 actuals + cost) | Direct (router suspended per operator) |
+| 4 | Revise proposal "Open questions (revised)" Q2 with the doc-only resolution | Direct (mechanical edit) |
+| 5 | Add Section 6 entry to ai-router/docs/close-out.md describing the cross-set residual race | Direct (mechanical edit) |
+| 6 | Add `TestScenario7CrossSetParallelRejection` to test_failure_injection.py | Direct (test under ~80 lines, mechanical from existing scenarios) |
+| 7 | Run full pytest suite | Direct (shell command) |
+| 8 | End-of-session cross-provider verification | Routed: `route(task_type="session-verification")` — the only API call this session |
+| 9 | Commit, push, run `close_session.py`, send notification | Direct (CLI invocation) |
+
+### Actuals (filled after the session)
+- Orchestrator used: claude-code claude-opus-4-7 @ effort=high
+- Total routed cost: TBD at close-out (verification call only)
+- Deviations from recommendation: ai-assignment authoring and
+  next-session recommendation produced directly rather than via
+  `route(task_type="analysis")`, per the standing operator
+  cost-containment rule. The path-decision (widen-lock vs doc-only)
+  was surfaced to the operator rather than routed for analysis,
+  also under the same constraint. No other deviations.
+- Notes for next-session calibration: Session 3 (D-2, `--force` flag
+  resolution) is mostly small mechanical edits across `close_session.py`,
+  `close-out.md`, `session_state.py` (verdict enum or analogous field),
+  the VS Code Session Set Explorer (forensic badge), and a new test.
+  Workload is similar to Session 1's mix; same orchestrator/effort
+  tier is appropriate.
+
+**Next-session orchestrator recommendation (Session 3):**
+claude-code claude-opus-4-7 @ effort=high
+Rationale: D-2's surface spans Python (close_session args + ledger
+event), TypeScript (Session Set Explorer badge for force-closed
+sessions), docs, and a new test. Multi-language + careful contract
+wording on a security-relevant flag — Opus high-effort is the right
+match.

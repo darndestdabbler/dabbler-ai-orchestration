@@ -1,0 +1,43 @@
+{
+  "round": 1,
+  "verdict": "ISSUES_FOUND",
+  "verifier_model": "gpt-5-4",
+  "issues": [
+    {
+      "id": 1,
+      "severity": "Major",
+      "category": "Correctness",
+      "summary": "Proposal Q2 still leads with the superseded admission-time-lock recommendation; the Resolution sub-section contains the shipped contract but readers see the rejected idea first.",
+      "location": "docs/proposals/2026-04-29-session-close-out-reliability.md, Open questions (revised) Q2",
+      "status": "fixed",
+      "fix": "Rewrote Q2 so the shipping contract is the primary answer; preserved the original recommendation as a 'History — superseded recommendation' subsection."
+    },
+    {
+      "id": 2,
+      "severity": "Minor",
+      "category": "Correctness",
+      "summary": "Inconsistent lock filename: pre-existing references in close-out.md said `.close.lock`; the new troubleshooting entry and the proposal Q2 resolution said `.close_session.lock` (which matches `close_lock.LOCK_FILENAME` in code).",
+      "location": "ai-router/docs/close-out.md (Section 3 step 3, Section 4 'Stale lock', Section 6 'Lock contention without an obvious holder')",
+      "status": "fixed",
+      "fix": "Updated all three pre-existing references to match the actual code constant `.close_session.lock`. The new entry already used the correct filename."
+    },
+    {
+      "id": 3,
+      "severity": "Minor",
+      "category": "Completeness",
+      "summary": "Docs claimed Scenario 7 covers 'close_session exits 1 without flipping lifecycle state', but the test only asserts the gate predicate's rejection-and-remediation behavior.",
+      "location": "ai-router/docs/close-out.md (Section 6 cross-set entry); docs/proposals/2026-04-29-session-close-out-reliability.md (Q2 resolution); ai-router/tests/test_failure_injection.py (TestScenario7CrossSetParallelRejection docstring)",
+      "status": "fixed",
+      "fix": "Narrowed the scope claim in all three locations: Scenario 7 covers the gate's rejection-and-remediation in the cross-set push-race scenario; the downstream 'exits 1 without flipping state' invariant is asserted elsewhere (test_mark_session_complete_gate.py + close-out integration tests) and Scenario 7 does not re-assert it."
+    },
+    {
+      "id": 4,
+      "severity": "Minor",
+      "category": "Completeness",
+      "summary": "Round 1 prompt sliced the ai-assignment.md from Session 2 onward, so the verifier could not see the Session 1 'Actuals' update (cost $0.1910 + routing-suspension deviation).",
+      "location": "scripts/verify_session_009_2.py prompt construction; docs/session-sets/009-alignment-audit-followups/ai-assignment.md (Session 1 Actuals block)",
+      "status": "fixed",
+      "fix": "Round 2 prompt also includes the Session 1 'Actuals' block so the verifier can confirm Session 1 actuals were correctly backfilled."
+    }
+  ]
+}

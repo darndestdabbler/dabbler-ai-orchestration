@@ -705,12 +705,56 @@ scope is larger but the failure surface is materially smaller.
    and surfaces stranded sessions when the human is most likely to
    notice.
 
-2. **Concurrent worktrees: lock or reject?** The current bare-repo +
-   flat-worktree layout supports parallel session sets but the gate
-   doesn't have a concurrency model. Recommend rejecting parallel
-   sessions on the same `(repo, branch)` pair via an advisory lock
-   file (`docs/session-sets/<slug>/.close_session.lock`). Document
-   that parallel sessions on different worktrees are fine.
+2. **Concurrent worktrees: lock or reject?** The shipping contract
+   (resolved 2026-05-01, Set 9 Session 2 — doc-only path) is:
+
+   - **Same-set close-out re-entry** is serialized by `close_lock.py`'s
+     advisory lock at `<session-set-dir>/.close_session.lock`. Two
+     `close_session` invocations on the same session-set folder
+     cannot interleave their gate checks or state flips.
+   - **Cross-set parallelism on the same `(repo, branch)`** is **not**
+     prevented by an admission-time lock. It is governed by operator
+     discipline and the deterministic close-out gate. Parallel session
+     sets are expected to use distinct `session-set/<slug>` branches
+     via the bare-repo + flat-worktree layout
+     (`docs/planning/repo-worktree-layout.md`); when the
+     parallel-set-on-same-branch case does occur, the gate's
+     `check_pushed_to_remote` predicate refuses to mark the loser of
+     the push race complete until they `git pull --rebase` and
+     re-push.
+   - The residual-race behavior is documented in
+     `ai-router/docs/close-out.md` Section 6 (Troubleshooting →
+     "Cross-set parallelism on the same `(repo, branch)`"). The
+     gate's rejection-and-remediation response in the cross-set
+     push-race scenario — the specific predicate this resolution
+     relies on — is covered by `TestScenario7CrossSetParallelRejection`
+     in `ai-router/tests/test_failure_injection.py`. (The downstream
+     "`close_session` exits 1 without flipping lifecycle state"
+     property of the gate flow is asserted elsewhere — see
+     `test_mark_session_complete_gate.py` and the close-out
+     integration tests — and is not re-asserted by Scenario 7.)
+
+   **History — superseded recommendation.** The original draft of
+   this question recommended *rejecting* parallel sessions on the same
+   `(repo, branch)` via an admission-time advisory lock at
+   `docs/session-sets/<slug>/.close_session.lock`, and documenting
+   that parallel sessions on different worktrees were fine. The
+   combined-design alignment audit
+   (`docs/proposals/2026-04-30-combined-design-alignment-audit.md`
+   §5.2, drift item D-1) flagged the implementation as narrower than
+   that answer: the shipping lock only serializes same-set
+   close-out re-entry, not session admission. Set 9 evaluated two
+   corrective options — (a) widen the lock to cover `(repo, branch)`
+   at session admission, or (b) revise the agreed answer to acknowledge
+   that close-out-only serialization plus the gate is sufficient.
+   The operator selected (b). The widen-the-lock path was rejected
+   because the shipping operating model — parallel sessions on per-set
+   worktree branches — makes the residual race rare in practice, and
+   adding a new admission-time lock would introduce a new failure mode
+   (a corrupt or stranded lock could block all sessions on a branch
+   until the TTL elapsed). The audit's MATERIAL DRIFT verdict on D-1
+   is satisfied by aligning the contract to the implementation rather
+   than the reverse.
 
 3. **`disposition.json` location and lifecycle.** Live in the session
    set directory? Cleaned up when status flips to `closed`? Or kept

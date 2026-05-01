@@ -184,8 +184,8 @@ returns the corresponding exit code without touching downstream state.
 2. **Resolve session-set directory** — explicit `--session-set-dir`,
    else discover from CWD via `find_active_session_set`.
 3. **Acquire close lock** (`ai_router.close_lock.close_session_lock`).
-   The lock file lives at `<session-set-dir>/.close.lock` and stores
-   `pid`, `worker_id`, and `acquired_at`. A stale lock (dead PID, or
+   The lock file lives at `<session-set-dir>/.close_session.lock` and
+   stores `pid`, `worker_id`, and `acquired_at`. A stale lock (dead PID, or
    acquired more than the stale-window ago) is reaped automatically.
    A live lock fails closed with exit 3.
 4. **Idempotency check.** Read `session-state.json`. If the current
@@ -300,8 +300,8 @@ whether the work is genuinely complete, then either resume the session
 **Stale lock** — exit 3 with `lock_contention`, but the lock holder
 PID is dead. The lock file should be reaped automatically on the next
 attempt; if it isn't (clock skew, exotic kill paths), inspect
-`<session-set-dir>/.close.lock` and remove it manually only after
-confirming no other close-out is running.
+`<session-set-dir>/.close_session.lock` and remove it manually only
+after confirming no other close-out is running.
 
 **Manual-verify silent bypass refused** — exit 2 with the validation
 message `"--manual-verify requires either --interactive ... or
@@ -374,7 +374,7 @@ lock file but `pid_file_path` does not point to a live daemon,
 something killed the previous close-out hard. Read the lock file:
 
 ```bash
-cat docs/session-sets/<slug>/.close.lock
+cat docs/session-sets/<slug>/.close_session.lock
 ```
 
 The `acquired_at` field plus the stale-window constant in
@@ -431,3 +431,41 @@ deployments where a process manager handles respawn.
 two-CLI / outsource-last sessions, including verifier-daemon restart,
 orchestrator-CLI context reset, and subscription-window fatigue
 diagnostics, see `ai-router/docs/two-cli-workflow.md`.
+
+**Cross-set parallelism on the same `(repo, branch)`.** The close-out
+lock at `<session-set-dir>/.close_session.lock` serializes **same-set
+close-out re-entry** only. It does not scope to the `(repo, branch)`
+pair, so two session sets pointing at the same branch can still race
+during their work phase. The shipping operating model assumes parallel
+sessions use distinct `session-set/<slug>` branches via the bare-repo
++ flat-worktree layout (see `docs/planning/repo-worktree-layout.md`),
+which makes the cross-set-on-same-branch case rare; when it does
+occur, the deterministic gate is the residual safety net rather than
+admission-time exclusion.
+
+Concretely, if two sets racing on the same branch both commit and one
+pushes first, the loser's `git push` would be rejected non-fast-forward.
+`check_pushed_to_remote` surfaces that rejection verbatim with a
+`run: git pull --rebase` (or equivalent) remediation, and `close_session`
+exits 1 (gate failure) without flipping the lifecycle state. The loser
+rebases onto the winner's commit, re-pushes, and re-runs close-out.
+The gate's rejection-and-remediation behavior on the loser of the
+push race is exercised directly by
+`TestScenario7CrossSetParallelRejection` in
+`ai-router/tests/test_failure_injection.py`. The downstream
+"`close_session` exits 1 without flipping lifecycle state" property is
+not asserted by Scenario 7 itself — it is an established invariant of
+the close-out flow already covered by the gate-failure tests in
+`test_mark_session_complete_gate.py` and the close-out integration
+tests; Scenario 7 proves the gate's response in the
+specific cross-set push-race scenario.
+
+If the parallel-on-same-branch pattern becomes routine rather than
+incidental, reopen the question — a `(repo, branch)`-scoped advisory
+lock acquired at session admission is a viable add-on (see drift item
+D-1 in `docs/proposals/2026-04-30-combined-design-alignment-audit.md`
+§5.2 for the original corrective options). The current contract
+deliberately does not include one because the new failure mode it
+introduces (a corrupt or stranded admission lock blocking all sessions
+on a branch until the TTL elapses) is judged worse than the
+rare-but-loud push race the gate already catches.

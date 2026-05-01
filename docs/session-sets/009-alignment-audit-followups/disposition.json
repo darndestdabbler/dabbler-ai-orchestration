@@ -1,18 +1,23 @@
 {
   "status": "completed",
-  "summary": "Set 9 Session 1 (D-3): Resolved commit/push/notification ownership via the spec-recommended path. Revised ai-router/docs/close-out.md (Section 1 + Section 3 step list), added a post-implementation revision to docs/proposals/2026-04-29-session-close-out-reliability.md, updated close_session --help description, updated the fresh-turn prompt in close_out.py, and adjusted workflow doc Step 8 prose. All 669 Python tests pass; cross-provider verification VERIFIED (Round 2, GPT-5.4).",
+  "summary": "Set 9 Session 2 (D-1): Resolved (repo, branch) parallel-session exclusion via the audit-accepted doc-only alternative (option b). Revised the original proposal's Open questions (revised) Q2 to lead with the shipping contract (close-out lock serializes same-set re-entry only; cross-set parallelism on the same branch is governed by operator discipline + the deterministic gate's check_pushed_to_remote). Added a new troubleshooting entry to ai-router/docs/close-out.md Section 6, normalized three pre-existing .close.lock references in close-out.md to match the actual code constant .close_session.lock, and added TestScenario7CrossSetParallelRejection in test_failure_injection.py that creates a real bare-remote push race with two clones and asserts the loser's gate fails non-fast-forward. All 670 Python tests pass; cross-provider verification VERIFIED (Round 2, GPT-5.4) after fixing four Round-1 issues (Q2 lead, lock filename consistency, test scope claim, Session 1 actuals visibility in the verification prompt).",
   "files_changed": [
-    "ai-router/docs/close-out.md",
-    "ai-router/close_session.py",
-    "ai-router/close_out.py",
-    "docs/ai-led-session-workflow.md",
     "docs/proposals/2026-04-29-session-close-out-reliability.md",
+    "ai-router/docs/close-out.md",
+    "ai-router/tests/test_failure_injection.py",
+    "scripts/verify_session_009_2.py",
+    "scripts/verify_session_009_2_round2.py",
     "docs/session-sets/009-alignment-audit-followups/session-state.json",
     "docs/session-sets/009-alignment-audit-followups/ai-assignment.md",
     "docs/session-sets/009-alignment-audit-followups/activity-log.json",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-001.md",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-001-round-2.md",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/issues-001.json"
+    "docs/session-sets/009-alignment-audit-followups/disposition.json",
+    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-002.md",
+    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-002-prompt.md",
+    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-002-meta.json",
+    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-002-round-2.md",
+    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-002-round-2-prompt.md",
+    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-002-round-2-meta.json",
+    "docs/session-sets/009-alignment-audit-followups/session-reviews/issues-002.json"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
@@ -23,7 +28,7 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 (D-1) implements (repo, branch) parallel-session lock + executable failure-injection test. Concurrency-sensitive; Opus high-effort matches the stakes and the change is bounded enough that runtime cost stays predictable."
+      "specifics": "Session 3 (D-2) hard-scopes or removes the --force flag on close_session. Surface spans Python (close_session args + closeout_force_used ledger event), TypeScript (Session Set Explorer force-closed badge), docs, and a new test. Multi-language + careful contract wording on a security-relevant flag — Opus high-effort matches the stakes."
     }
   },
   "blockers": []

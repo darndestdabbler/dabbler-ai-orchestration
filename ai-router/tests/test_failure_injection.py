@@ -642,6 +642,129 @@ class TestScenario6ModeSwitchMidSet:
 
 
 # ==========================================================================
+# Scenario 7: Cross-set parallel rejection on the same (repo, branch)
+# ==========================================================================
+
+class TestScenario7CrossSetParallelRejection:
+    """Two sets racing on the same ``(repo, branch)`` — gate catches the loser.
+
+    The combined-design alignment audit
+    (``docs/proposals/2026-04-30-combined-design-alignment-audit.md`` §5.2,
+    drift item D-1) flagged that the close-session lock only serializes
+    same-set re-entry. Set 9 Session 2 resolved D-1 via the audit's
+    accepted alternative (b): revise the contract to match the
+    implementation and rely on the deterministic close-out gate as the
+    residual safety net for cross-set parallelism on the same branch.
+    See ``ai-router/docs/close-out.md`` Section 6 ("Cross-set parallelism
+    on the same `(repo, branch)`") for the canonical operator-facing
+    statement.
+
+    This scenario is the executable proof the audit required: when two
+    session sets commit work on the same branch and one pushes first,
+    the loser's ``check_pushed_to_remote`` refuses with a clear
+    non-fast-forward / pull-rebase remediation. The downstream
+    "``close_session`` exits 1 without flipping lifecycle state"
+    property is an established invariant of the close-out gate covered
+    by ``test_mark_session_complete_gate.py`` and the close-out
+    integration tests; this scenario does not re-assert it. The
+    contribution here is proving the gate predicate's specific
+    response in the cross-set push-race scenario the doc-only D-1
+    resolution depends on.
+    """
+
+    def test_loser_of_push_race_gate_fails_loud(self, tmp_path: Path):
+        from gate_checks import check_pushed_to_remote
+
+        def _git(cwd: Path, *args: str) -> None:
+            proc = subprocess.run(
+                ["git", *args],
+                cwd=str(cwd),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+            if proc.returncode != 0:
+                raise RuntimeError(
+                    f"git {' '.join(args)} (cwd={cwd}) failed: "
+                    f"{proc.stderr.strip() or proc.stdout.strip()}"
+                )
+
+        # A bare remote that both clones will push to. The race is
+        # decided by whichever clone's push reaches the bare remote
+        # first; the second push must be non-fast-forward.
+        bare = tmp_path / "origin.git"
+        bare.mkdir()
+        _git(bare, "init", "--bare", "-b", "main")
+
+        # Two clones share the same (repo, branch) just as two parallel
+        # sessions on the same machine would. Seed a baseline from
+        # clone-a, then sync clone-b from the now-populated remote.
+        clone_a = tmp_path / "clone-a"
+        clone_b = tmp_path / "clone-b"
+        for clone in (clone_a, clone_b):
+            _git(tmp_path, "clone", str(bare), str(clone))
+            _git(clone, "config", "user.email", "test@example.invalid")
+            _git(clone, "config", "user.name", "Test")
+            _git(clone, "config", "commit.gpgsign", "false")
+
+        (clone_a / "README.md").write_text("baseline\n", encoding="utf-8")
+        _git(clone_a, "add", "README.md")
+        _git(clone_a, "commit", "-m", "baseline")
+        _git(clone_a, "push", "-u", "origin", "main")
+
+        _git(clone_b, "fetch", "origin")
+        _git(clone_b, "checkout", "-B", "main", "origin/main")
+
+        # Each clone hosts its own session set. Both commit work on
+        # main; A pushes first, simulating A winning the race.
+        set_a_dir = clone_a / "docs" / "session-sets" / "set-a"
+        set_a_dir.mkdir(parents=True)
+        (set_a_dir / "spec.md").write_text("# set a\n", encoding="utf-8")
+        (set_a_dir / "marker.txt").write_text("a\n", encoding="utf-8")
+        _git(clone_a, "add", "-A")
+        _git(clone_a, "commit", "-m", "set A work")
+        _git(clone_a, "push", "origin", "main")
+
+        set_b_dir = clone_b / "docs" / "session-sets" / "set-b"
+        set_b_dir.mkdir(parents=True)
+        (set_b_dir / "spec.md").write_text("# set b\n", encoding="utf-8")
+        (set_b_dir / "marker.txt").write_text("b\n", encoding="utf-8")
+        _git(clone_b, "add", "-A")
+        _git(clone_b, "commit", "-m", "set B work")
+
+        # B is now ahead of origin/main with a divergent commit while
+        # the remote already holds A's commit. B's gate must refuse
+        # close-out with a non-fast-forward / rebase remediation —
+        # this is the residual-race protection the doc-only D-1
+        # resolution depends on.
+        passed, remediation = check_pushed_to_remote(str(set_b_dir), None)
+        assert not passed, (
+            "the deterministic gate is the residual safety net for the "
+            "cross-set parallel race; the loser's gate must NOT silently "
+            "report success"
+        )
+        lower = remediation.lower()
+        assert (
+            "non-fast-forward" in lower
+            or "rebase" in lower
+            or "rejected" in lower
+        ), (
+            "the loser of a cross-set push race needs operator-actionable "
+            f"guidance pointing at a rebase/pull workflow; got: {remediation!r}"
+        )
+
+        # Sanity: A's gate, which won the push race, is in the clean
+        # state (head == upstream) and passes.
+        passed_a, _ = check_pushed_to_remote(str(set_a_dir), None)
+        assert passed_a, (
+            "the winner of the cross-set push race should pass the gate "
+            "cleanly; only the loser is meant to be rejected"
+        )
+
+
+# ==========================================================================
 # Sanity: in-process full lifecycle (cheap smoke test)
 # ==========================================================================
 

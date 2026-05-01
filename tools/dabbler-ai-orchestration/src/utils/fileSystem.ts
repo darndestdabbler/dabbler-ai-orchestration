@@ -3,6 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { listGitWorktrees } from "./git";
 import { readStatus } from "./sessionState";
+import { isCancelled } from "./cancelLifecycle";
 import {
   SessionSet,
   SessionState,
@@ -14,10 +15,16 @@ import {
 export const SESSION_SETS_REL = path.join("docs", "session-sets");
 export const PLAYWRIGHT_REL_DEFAULT = "tests";
 
+// Cancelled sets sort below all other groups in the merge logic — Set 8
+// keeps cancelled state as the lowest precedence so a set that exists in
+// two roots (one cancelled, one active) prefers the active copy when
+// dedup-merging. Within a single root the file-presence rule still wins
+// because readSessionSets has already resolved each entry's state.
 const STATE_RANK: Record<SessionState, number> = {
-  done: 2,
-  "in-progress": 1,
-  "not-started": 0,
+  done: 3,
+  "in-progress": 2,
+  "not-started": 1,
+  cancelled: 0,
 };
 
 export function discoverRoots(): string[] {
@@ -130,21 +137,35 @@ export function readSessionSets(root: string): SessionSet[] {
     const aiAssignmentPath = path.join(dir, "ai-assignment.md");
     const uatChecklistPath = path.join(dir, `${entry.name}-uat-checklist.json`);
 
-    // Set 7 invariant: state is read directly from session-state.json's
-    // canonical `status` (with lazy-synth fallback for any folder that
-    // slipped through backfill). The display labels here keep the
-    // extension's existing surface — `complete` from the file maps to
-    // `done` on the tree view; future statuses (e.g. Set 8's
-    // `cancelled`) collapse to `not-started` until they get their own
-    // column.
-    const status = readStatus(dir);
+    // Set 8: CANCELLED.md presence is the canonical (and only) signal
+    // for the cancelled tree state. The spec's detection-rules table in
+    // `docs/session-sets/008-cancelled-session-set-status/spec.md` makes
+    // the file-presence check the first gate so a partially-completed
+    // set that has been cancelled mid-stream renders as Cancelled rather
+    // than Done. Once a set is restored, its `RESTORED.md` is "purely
+    // an audit artifact" (spec § Detection rules) and the set falls
+    // back to whichever of done/in-progress/not-started its other
+    // files indicate. The cancelLifecycle helpers keep
+    // session-state.json's `status` in lockstep with the markdown file,
+    // so we do not consult `status === "cancelled"` as a separate
+    // signal — operator manual edits resolve via the file-presence
+    // path, matching the spec's "filename presence is what matters"
+    // rule.
     let state: SessionState;
-    if (status === "complete") {
-      state = "done";
-    } else if (status === "in-progress") {
-      state = "in-progress";
+    if (isCancelled(dir)) {
+      state = "cancelled";
     } else {
-      state = "not-started";
+      // Set 7 invariant: state is read directly from session-state.json's
+      // canonical `status` (with lazy-synth fallback for any folder that
+      // slipped through backfill).
+      const status = readStatus(dir);
+      if (status === "complete") {
+        state = "done";
+      } else if (status === "in-progress") {
+        state = "in-progress";
+      } else {
+        state = "not-started";
+      }
     }
 
     let totalSessions: number | null = null;

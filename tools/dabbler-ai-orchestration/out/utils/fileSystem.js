@@ -43,12 +43,20 @@ const vscode = __importStar(require("vscode"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const git_1 = require("./git");
+const sessionState_1 = require("./sessionState");
+const cancelLifecycle_1 = require("./cancelLifecycle");
 exports.SESSION_SETS_REL = path.join("docs", "session-sets");
 exports.PLAYWRIGHT_REL_DEFAULT = "tests";
+// Cancelled sets sort below all other groups in the merge logic — Set 8
+// keeps cancelled state as the lowest precedence so a set that exists in
+// two roots (one cancelled, one active) prefers the active copy when
+// dedup-merging. Within a single root the file-presence rule still wins
+// because readSessionSets has already resolved each entry's state.
 const STATE_RANK = {
-    done: 2,
-    "in-progress": 1,
-    "not-started": 0,
+    done: 3,
+    "in-progress": 2,
+    "not-started": 1,
+    cancelled: 0,
 };
 function discoverRoots() {
     const seen = new Map();
@@ -74,7 +82,14 @@ function discoverRoots() {
     return order;
 }
 function parseSessionSetConfig(specPath) {
-    const config = { requiresUAT: false, requiresE2E: false, uatScope: "none" };
+    // outsourceMode defaults to "first" — matches the AI router's documented
+    // backward-compat default when the spec omits the field.
+    const config = {
+        requiresUAT: false,
+        requiresE2E: false,
+        uatScope: "none",
+        outsourceMode: "first",
+    };
     if (!fs.existsSync(specPath))
         return config;
     let text;
@@ -97,6 +112,12 @@ function parseSessionSetConfig(specPath) {
     const scope = block.match(stringRe("uatScope"));
     if (scope)
         config.uatScope = scope[1];
+    const mode = block.match(stringRe("outsourceMode"));
+    if (mode) {
+        const v = mode[1].toLowerCase();
+        if (v === "first" || v === "last")
+            config.outsourceMode = v;
+    }
     return config;
 }
 function parseUatChecklist(checklistPath) {
@@ -156,13 +177,39 @@ function readSessionSets(root) {
         const statePath = path.join(dir, "session-state.json");
         const aiAssignmentPath = path.join(dir, "ai-assignment.md");
         const uatChecklistPath = path.join(dir, `${entry.name}-uat-checklist.json`);
+        // Set 8: CANCELLED.md presence is the canonical (and only) signal
+        // for the cancelled tree state. The spec's detection-rules table in
+        // `docs/session-sets/008-cancelled-session-set-status/spec.md` makes
+        // the file-presence check the first gate so a partially-completed
+        // set that has been cancelled mid-stream renders as Cancelled rather
+        // than Done. Once a set is restored, its `RESTORED.md` is "purely
+        // an audit artifact" (spec § Detection rules) and the set falls
+        // back to whichever of done/in-progress/not-started its other
+        // files indicate. The cancelLifecycle helpers keep
+        // session-state.json's `status` in lockstep with the markdown file,
+        // so we do not consult `status === "cancelled"` as a separate
+        // signal — operator manual edits resolve via the file-presence
+        // path, matching the spec's "filename presence is what matters"
+        // rule.
         let state;
-        if (fs.existsSync(changeLogPath))
-            state = "done";
-        else if (fs.existsSync(activityPath) || fs.existsSync(statePath))
-            state = "in-progress";
-        else
-            state = "not-started";
+        if ((0, cancelLifecycle_1.isCancelled)(dir)) {
+            state = "cancelled";
+        }
+        else {
+            // Set 7 invariant: state is read directly from session-state.json's
+            // canonical `status` (with lazy-synth fallback for any folder that
+            // slipped through backfill).
+            const status = (0, sessionState_1.readStatus)(dir);
+            if (status === "complete") {
+                state = "done";
+            }
+            else if (status === "in-progress") {
+                state = "in-progress";
+            }
+            else {
+                state = "not-started";
+            }
+        }
         let totalSessions = null;
         let sessionsCompleted = 0;
         let lastTouched = null;

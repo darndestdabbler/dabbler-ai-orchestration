@@ -7,6 +7,7 @@ const ICON_FILES: Record<SessionState, string> = {
   done: "done.svg",
   "in-progress": "in-progress.svg",
   "not-started": "not-started.svg",
+  cancelled: "cancelled.svg",
 };
 
 function iconUriFor(
@@ -149,17 +150,30 @@ export class SessionSetsProvider
       const inProgress = all.filter((s) => s.state === "in-progress");
       const notStarted = all.filter((s) => s.state === "not-started");
       const done = all.filter((s) => s.state === "done");
-      return [
+      const cancelled = all.filter((s) => s.state === "cancelled");
+      const groups: GroupItem[] = [
         this.makeGroup("In Progress", "in-progress", inProgress.length),
         this.makeGroup("Not Started", "not-started", notStarted.length),
         this.makeGroup("Done", "done", done.length),
       ];
+      // Set 8: the Cancelled group only renders when ≥ 1 cancelled set
+      // exists (parallels the existing spec rule for not-emitting empty
+      // groups noted in spec.md scope). A repo that never cancels a set
+      // should not see the group at all.
+      if (cancelled.length > 0) {
+        groups.push(this.makeGroup("Cancelled", "cancelled", cancelled.length));
+      }
+      return groups;
     }
 
     const group = element as GroupItem;
     if (group.contextValue === "group") {
       const subset = all.filter((s) => s.state === group.groupKey);
-      if (group.groupKey === "in-progress" || group.groupKey === "done") {
+      if (
+        group.groupKey === "in-progress" ||
+        group.groupKey === "done" ||
+        group.groupKey === "cancelled"
+      ) {
         subset.sort((a, b) =>
           (b.lastTouched || "").localeCompare(a.lastTouched || "")
         );

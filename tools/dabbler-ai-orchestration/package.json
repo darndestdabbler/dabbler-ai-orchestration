@@ -179,6 +179,16 @@
         "title": "Refresh Provider Heartbeats",
         "category": "Dabbler",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "dabblerSessionSets.cancel",
+        "title": "Cancel Session Set",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.restore",
+        "title": "Restore Session Set",
+        "category": "Dabbler"
       }
     ],
     "menus": {
@@ -274,6 +284,16 @@
           "command": "dabblerSessionSets.copySlug",
           "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
           "group": "4_copy_meta@1"
+        },
+        {
+          "command": "dabblerSessionSets.cancel",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:(in-progress|not-started|done)/",
+          "group": "9_lifecycle@1"
+        },
+        {
+          "command": "dabblerSessionSets.restore",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:cancelled/",
+          "group": "9_lifecycle@2"
         },
         {
           "command": "dabblerProviderQueues.openPayload",

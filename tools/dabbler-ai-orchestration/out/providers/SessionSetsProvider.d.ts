@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { SessionSet } from "../types";
+export declare function modeBadge(set: SessionSet): string;
 export declare class SessionSetsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private readonly extensionUri;
     private _onDidChangeTreeData;

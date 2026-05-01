@@ -47,6 +47,7 @@ const copyCommand_1 = require("./commands/copyCommand");
 const gitScaffold_1 = require("./commands/gitScaffold");
 const troubleshoot_1 = require("./commands/troubleshoot");
 const queueActions_1 = require("./commands/queueActions");
+const cancelLifecycleCommands_1 = require("./commands/cancelLifecycleCommands");
 const WizardPanel_1 = require("./wizard/WizardPanel");
 const CostDashboard_1 = require("./dashboard/CostDashboard");
 const SESSION_SETS_REL = path.join("docs", "session-sets");
@@ -205,6 +206,7 @@ function activate(context) {
     (0, troubleshoot_1.registerTroubleshootCommand)(context);
     (0, WizardPanel_1.registerWizardCommands)(context);
     (0, CostDashboard_1.registerCostDashboardCommand)(context);
+    (0, cancelLifecycleCommands_1.registerCancelLifecycleCommands)(context, { refreshView: refreshAll });
     // Show onboarding on first activation in a workspace with no session sets
     const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
     if (!hasSeenOnboarding) {

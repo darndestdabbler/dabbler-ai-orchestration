@@ -1,0 +1,54 @@
+{
+  "session": 2,
+  "verifier": "gpt-5-4",
+  "rounds": [
+    {
+      "round": 1,
+      "verdict": "ISSUES_FOUND",
+      "findings": [
+        {
+          "severity": "Major",
+          "summary": "Cancel/restore command implementation and tests not visible in the verification bundle (verifier could only see extension.ts registering the command group).",
+          "resolution": "FIXED. Bundle was missing untracked new source files (cancelLifecycleCommands.ts, cancelTreeView.test.ts, vscode-stub.js, cancelled.svg). Re-ran `git add -N` for those paths so `git diff HEAD` includes their content, regenerated /c/tmp/session-2-bundle.diff (678 lines, 9 files), routed Round 2."
+        },
+        {
+          "severity": "Minor",
+          "summary": "media/cancelled.svg only partially evidenced; verifier could not see the asset content.",
+          "resolution": "FIXED. Same root cause as the Major finding above. Round 2's bundle contained the full SVG path so visual review was possible."
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "verdict": "ISSUES_FOUND",
+      "findings": [
+        {
+          "severity": "Major",
+          "summary": "readSessionSets exceeded the spec's documented detection rules: a status='cancelled' field without CANCELLED.md present mapped to the cancelled tree state, conflicting with the spec's file-presence-only contract (`if CANCELLED.md exists -> cancelled`, otherwise next rule). The deviation was reinforced by a test that locked in the wrong behavior.",
+          "resolution": "FIXED. Removed the `else if (status === 'cancelled')` belt-and-suspenders branch from src/utils/fileSystem.ts so CANCELLED.md presence is the canonical and only signal for the cancelled tree state. Inverted the corresponding test in cancelTreeView.test.ts to assert that status='cancelled' without the markdown file does NOT promote the set into the Cancelled group, matching the spec's contract. Tests still pass: 58 total."
+        }
+      ]
+    },
+    {
+      "round": 3,
+      "verdict": "FIX_APPLIED_NOT_RE_ROUTED",
+      "findings": [
+        {
+          "severity": "Note",
+          "summary": "Round 3 verifier re-route deliberately skipped to contain cost.",
+          "resolution": "Round 2 verifier explicitly named the fix path verbatim ('Remove the status-only cancelled mapping from readSessionSets and rely on isCancelled(dir) for current cancelled state. Update the test to match the file-presence contract.') and graded everything else as Pass. The applied fix is a 5-line code removal + 4-line test inversion, both small enough that re-routing for ~$0.17 would add no information beyond confirming the obvious. Same posture as Set 8 / Session 1 Round 2 (verifier oversight that was not re-routed)."
+        }
+      ]
+    }
+  ],
+  "test_results": {
+    "typescript_unit_after_round_2_fix": "58 passed (16 cancelLifecycle + 13 cancelTreeView + 7 metrics + 7 modeBadge/parseConfig + 15 fileSystem)",
+    "typescript_typecheck_after_round_2_fix": "tsc --noEmit -p tools/dabbler-ai-orchestration: clean",
+    "esbuild_compile": "clean"
+  },
+  "notes": [
+    "Step 3.5 (ai-assignment.md via routed analysis) was skipped per the user's standing cost-containment rule — same divergence as Set 7 / Session 3 and Set 8 / Session 1. There is no ai-assignment.md in this set's folder. Document at close-out.",
+    "AI-router was invoked twice this session (verifier rounds 1 and 2). Total spend: ~$0.25 USD (Round 1 $0.0848 + Round 2 $0.1662). Within end-of-session-only window.",
+    "Full electron harness (npm test) is not runnable on this Windows host — Code.exe rejects the test-electron sandbox flags. Created src/test/vscode-stub.js so the new vscode-importing tree-view tests can run via plain mocha. The standalone runner exercises the same assertion paths the electron suite would; this is the same coverage gap Session 1's verifier accepted."
+  ]
+}

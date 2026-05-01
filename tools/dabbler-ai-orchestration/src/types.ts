@@ -1,4 +1,4 @@
-export type SessionState = "done" | "in-progress" | "not-started";
+export type SessionState = "done" | "in-progress" | "not-started" | "cancelled";
 
 export type OutsourceMode = "first" | "last";
 

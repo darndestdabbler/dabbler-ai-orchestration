@@ -13,6 +13,7 @@ import { registerCopyCommands } from "./commands/copyCommand";
 import { registerGitScaffoldCommand } from "./commands/gitScaffold";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerQueueActionCommands } from "./commands/queueActions";
+import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerWizardCommands } from "./wizard/WizardPanel";
 import { registerCostDashboardCommand } from "./dashboard/CostDashboard";
 import { SessionSet } from "./types";
@@ -216,6 +217,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerTroubleshootCommand(context);
   registerWizardCommands(context);
   registerCostDashboardCommand(context);
+  registerCancelLifecycleCommands(context, { refreshView: refreshAll });
 
   // Show onboarding on first activation in a workspace with no session sets
   const hasSeenOnboarding = context.workspaceState.get<boolean>("hasSeenOnboarding", false);

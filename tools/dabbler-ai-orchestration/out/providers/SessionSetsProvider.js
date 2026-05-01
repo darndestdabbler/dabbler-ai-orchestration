@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SessionSetsProvider = void 0;
+exports.modeBadge = modeBadge;
 const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
 const fileSystem_1 = require("../utils/fileSystem");
@@ -41,6 +42,7 @@ const ICON_FILES = {
     done: "done.svg",
     "in-progress": "in-progress.svg",
     "not-started": "not-started.svg",
+    cancelled: "cancelled.svg",
 };
 function iconUriFor(extensionUri, state) {
     const file = ICON_FILES[state];
@@ -69,6 +71,18 @@ function uatBadge(set) {
         return `[UAT ${set.uatSummary.pendingItems}]`;
     if (set.uatSummary.totalItems > 0)
         return "[UAT done]";
+    return "";
+}
+// Outsource-first vs. outsource-last is a routing choice that lives in
+// each spec.md's `Session Set Configuration` block. The badge surfaces it
+// on the session-set tree row so the operator can tell at a glance which
+// path a set's verifications take without opening the spec.
+function modeBadge(set) {
+    const mode = set.config?.outsourceMode;
+    if (mode === "last")
+        return "[LAST]";
+    if (mode === "first")
+        return "[FIRST]";
     return "";
 }
 function liveSessionTooltipLines(set) {
@@ -103,6 +117,9 @@ function configTooltipLines(set) {
         flags.push("E2E");
     const lines = [];
     lines.push(`Gates: ${flags.length ? flags.join(" + ") : "none"}`);
+    if (set.config.outsourceMode) {
+        lines.push(`Mode: outsource-${set.config.outsourceMode}`);
+    }
     if (set.config.requiresUAT && set.uatSummary) {
         const u = set.uatSummary;
         if (u.totalItems > 0) {
@@ -152,16 +169,27 @@ class SessionSetsProvider {
             const inProgress = all.filter((s) => s.state === "in-progress");
             const notStarted = all.filter((s) => s.state === "not-started");
             const done = all.filter((s) => s.state === "done");
-            return [
+            const cancelled = all.filter((s) => s.state === "cancelled");
+            const groups = [
                 this.makeGroup("In Progress", "in-progress", inProgress.length),
                 this.makeGroup("Not Started", "not-started", notStarted.length),
                 this.makeGroup("Done", "done", done.length),
             ];
+            // Set 8: the Cancelled group only renders when ≥ 1 cancelled set
+            // exists (parallels the existing spec rule for not-emitting empty
+            // groups noted in spec.md scope). A repo that never cancels a set
+            // should not see the group at all.
+            if (cancelled.length > 0) {
+                groups.push(this.makeGroup("Cancelled", "cancelled", cancelled.length));
+            }
+            return groups;
         }
         const group = element;
         if (group.contextValue === "group") {
             const subset = all.filter((s) => s.state === group.groupKey);
-            if (group.groupKey === "in-progress" || group.groupKey === "done") {
+            if (group.groupKey === "in-progress" ||
+                group.groupKey === "done" ||
+                group.groupKey === "cancelled") {
                 subset.sort((a, b) => (b.lastTouched || "").localeCompare(a.lastTouched || ""));
             }
             else {
@@ -182,7 +210,7 @@ class SessionSetsProvider {
     }
     makeSetItem(set) {
         const item = new vscode.TreeItem(set.name, vscode.TreeItemCollapsibleState.None);
-        const bits = [progressText(set), touchedDate(set), uatBadge(set)].filter(Boolean);
+        const bits = [progressText(set), touchedDate(set), modeBadge(set), uatBadge(set)].filter(Boolean);
         item.description = bits.join("  ·  ");
         item.tooltip = new vscode.MarkdownString([
             `**${set.name}**`,

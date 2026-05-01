@@ -7,3 +7,6 @@
 {"timestamp": "2026-05-01T14:30:00.000000Z", "session_number": 2, "event_type": "work_verified", "backfilled": true}
 {"timestamp": "2026-05-01T14:45:00.000000Z", "session_number": 2, "event_type": "closeout_succeeded"}
 {"timestamp": "2026-05-01T14:45:00.000000Z", "session_number": 3, "event_type": "work_started"}
+{"timestamp": "2026-05-01T21:00:00.000000Z", "session_number": 3, "event_type": "verification_requested", "verifier_model": "gemini-pro", "step_key": "session-3/verify"}
+{"timestamp": "2026-05-01T21:00:00.000000Z", "session_number": 3, "event_type": "verification_completed", "verifier_model": "gemini-pro", "verdict": "VERIFIED", "step_key": "session-3/verify"}
+{"timestamp": "2026-05-01T21:00:00.000000Z", "session_number": 3, "event_type": "work_verified"}

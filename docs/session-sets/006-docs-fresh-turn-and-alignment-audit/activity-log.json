@@ -153,6 +153,83 @@
       "description": "Registered session 3 in session-state.json with orchestrator metadata (claude-opus-4-7, high effort). Session pin: no external routing except cross-provider verification (Gemini Pro), and the spec-required cross-provider review (Gemini Pro + GPT-5.4) which the user explicitly authorized.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/failure-injection-rerun",
+      "dateTime": "2026-05-01T15:00:00-04:00",
+      "description": "Re-ran the 6 failure-injection scenarios from Set 2 Session 4 (test_failure_injection.py): lease expiration, heartbeat timeout escalation, truncated SQLite WAL recovery, CLI session reset, concurrent claim contention, mode-switch route-time validation. All 6 + the in-process smoke test passed in 6.42s. Saved trace artifact at tests/failure-injection-traces/2026-05-01/trace.txt. Confirmed full ai-router suite at audit time: 606/606 passing in 51.29s.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/audit-doc",
+      "dateTime": "2026-05-01T15:30:00-04:00",
+      "description": "Created docs/proposals/2026-04-30-combined-design-alignment-audit.md (~470 lines). Sections 1-4: per-component implementation evidence (12 components from queue contract through router-config wiring), failure-mode mappings (10 modes from the original cross-provider review and v2 synthesis), open-question resolutions (9 questions), failure-injection trace summary table. Section 5 reserved for post-review synthesis. Sections 6 and 7 reserved for verbatim reviewer output.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/cross-provider-review",
+      "dateTime": "2026-05-01T16:00:00-04:00",
+      "description": "Routed audit + failure-injection trace to both reviewers in parallel via C:/temp/route_combined_alignment.py and C:/temp/dabbler-combined-alignment-prompt.md. Gemini Pro returned ALIGNED WITH MINOR DRIFT (2 follow-ups: F-1 failure-injection scenario for trigger failure, F-2 stale-heartbeat alerting). GPT-5.4 returned MATERIAL DRIFT (4 corrective actions mapping to drift items D-1 through D-4 in the audit). Both reviews saved at C:/temp/review-combined-alignment-{gemini-pro,gpt-5-4}.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 7040,
+          "outputTokens": 587,
+          "costUsd": 0.0147
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "analysis",
+          "inputTokens": 6151,
+          "outputTokens": 8262,
+          "costUsd": 0.1393
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/audit-finalize",
+      "dateTime": "2026-05-01T16:30:00-04:00",
+      "description": "Finalized audit document. Corrected Section 1.4 (close_session does not own commit/push/notification - drift D-3), 1.13 (drift items observed), 2.1/2.2 (reconciler dependent on orchestrator liveness), 2.4 (lock scope drift D-1), 2.9 (heartbeat is observability-only), 3 row 2 (resolved answer wording), 3 row 7 (lock scope partial). Wrote Section 5 with 6 drift/follow-up entries (D-1 through D-4 + F-1 + F-2), classifying D-1, D-2, D-3 as CORRECTIVE and the rest as FOLLOW-UP. Wrote Section 5.3 post-review synthesis: combined design NOT marked complete; corrective work spec'd at docs/session-sets/009-alignment-audit-followups/spec.md. Appended verbatim reviewer output as Sections 6 and 7. Cross-provider review cost total: $0.1540, within $0.15-$0.20 spec expectation.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/corrective-set-spec",
+      "dateTime": "2026-05-01T16:45:00-04:00",
+      "description": "Wrote docs/session-sets/009-alignment-audit-followups/spec.md (5 sessions): S1 D-3 commit/push/notification ownership, S2 D-1 (repo,branch) parallel-session lock, S3 D-2 --force flag resolution, S4 F-1/F-2/D-4 follow-ups, S5 re-audit by both reviewers. The recommended path for D-3 revises the original proposal to match what is shipping (orchestrator owns commit/push/notify; close-out gates on push-completed); recommended path for D-1 is widening the lock to (repo, branch) at session admission; recommended path for D-2 is hard-scoping --force to admin/test use with explicit ledger emission.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/verify",
+      "dateTime": "2026-05-01T17:00:00-04:00",
+      "description": "End-of-session verification routed to gemini-pro per session pin (session-verification, direct provider call via scripts/verify_session_006_3.py). Bundle: full audit doc + corrective spec + session-3 activity-log entries. Verdict: VERIFIED, no findings, $0.0237 (input=18965, output=2).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 18965,
+          "outputTokens": 2,
+          "costUsd": 0.0237
+        }
+      ]
     }
   ]
 }

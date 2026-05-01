@@ -554,12 +554,47 @@ def synthesize_not_started_state(session_set_dir: str) -> str:
     complete, or carry pre-Set-7 drift. The contract is only "after this
     call, the file exists."
 
+    Used at session-set bootstrap time when the caller knows the set
+    truly has not started — a fresh wizard scaffold or a Session 1
+    register call. Lazy-synth fallback paths in :func:`read_status` use
+    :func:`ensure_session_state_file` instead so a legacy folder that
+    slipped through backfill (activity-log present, no state file) is
+    inferred as in-progress rather than regressed to not-started.
+
     Returns the absolute path to the file (existing or newly written).
     """
     path = _state_path(session_set_dir)
     if os.path.isfile(path):
         return path
     _atomic_write_json(path, _not_started_payload(session_set_dir))
+    return path
+
+
+def ensure_session_state_file(session_set_dir: str) -> str:
+    """Idempotently write the inferred ``session-state.json`` for a folder.
+
+    Differs from :func:`synthesize_not_started_state` in one critical
+    way: when the file is absent, this function uses
+    :func:`_backfill_payload` to infer the right shape from current
+    file presence (``change-log.md`` → complete; ``activity-log.json``
+    → in-progress; neither → not-started). That matches the one-shot
+    backfill's behavior, so a legacy folder that slipped through Set 7
+    Session 1's backfill is correctly classified the first time
+    :func:`read_status` lazy-synthesizes it.
+
+    Verifier round 2 (Set 7 / Session 2) flagged the regression: the
+    earlier lazy-synth always wrote the not-started shape, which would
+    misclassify a legacy folder with ``change-log.md`` as "not-started"
+    on first read. This helper is the fix.
+
+    Idempotent: existing files are returned untouched (preserves
+    pre-Set-7 drift like ``status: "completed"``; the read boundary
+    canonicalizes it). Returns the absolute path to the file.
+    """
+    path = _state_path(session_set_dir)
+    if os.path.isfile(path):
+        return path
+    _atomic_write_json(path, _backfill_payload(session_set_dir))
     return path
 
 
@@ -674,6 +709,120 @@ def _planned_backfill_paths(base_dir: str) -> List[str]:
             continue
         paths.append(sub)
     return paths
+
+
+StatusValue = Literal["not-started", "in-progress", "complete", "cancelled"]
+
+
+# Tolerant aliases for ``status`` values that drifted in pre-Set-7 files.
+# The spec is explicit that the backfill leaves existing files untouched
+# ("normalizing field-value drift is out of scope; Set 7's invariant is
+# *existence*, not field-value normalization"). Without tolerant reads,
+# every consumer that switches to ``read_status`` would regress on those
+# files — so the canonicalization happens at the read boundary instead
+# of via a one-shot rewrite. New writers always emit the canonical form,
+# so this map is a transitional concession that shrinks over time.
+_STATUS_ALIASES = {
+    "completed": "complete",  # observed in pre-Set-7 sets 005, 006
+    "done": "complete",
+}
+
+
+def _canonicalize_status(raw: str) -> str:
+    """Map a raw ``status`` value to the canonical Set-7 form.
+
+    Unknown values pass through unchanged — a future status (e.g.
+    ``"cancelled"`` from Set 8) added before this code knows about it
+    should still surface to callers rather than being silently
+    rewritten to ``"not-started"``. The downstream type accepts any
+    string; only the four canonical values trigger consumer logic.
+    """
+    return _STATUS_ALIASES.get(raw, raw)
+
+
+def _load_canonical_status(path: str) -> str:
+    """JSON-load *path*, validate, and canonicalize the ``status`` field.
+
+    Shared between :func:`read_status`'s file-present branch and its
+    post-synthesis re-read so the validation and canonicalization
+    contracts apply uniformly. Without this, a race where another
+    process creates the file after the initial existence check could
+    return a raw aliased value (``"completed"`` instead of
+    ``"complete"``) or a ``KeyError`` instead of the documented
+    ``ValueError`` for a missing-status field.
+
+    Raises ``json.JSONDecodeError`` on malformed JSON, ``ValueError``
+    on a non-dict top-level value or a missing/non-string ``status``.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        state = json.load(f)
+    if not isinstance(state, dict):
+        raise ValueError(
+            f"{path}: session-state.json must contain a JSON object"
+        )
+    status = state.get("status")
+    if not isinstance(status, str):
+        raise ValueError(
+            f"{path}: session-state.json missing string 'status' field"
+        )
+    return _canonicalize_status(status)
+
+
+def read_status(session_set_dir: str) -> str:
+    """Return the canonical ``status`` for *session_set_dir*.
+
+    Single entry point for every "what state is this set in?" reader.
+    Returns one of ``"not-started" | "in-progress" | "complete" |
+    "cancelled"`` (the last reserved for Set 8 but already accepted by
+    the type annotation). The value is read directly from
+    ``session-state.json`` rather than re-derived from file presence.
+
+    Lazy-synthesis fallback: if the folder has a ``spec.md`` but no
+    ``session-state.json`` (e.g., a human-authored folder that never
+    ran the backfill, or a consumer repo that has not yet picked up
+    Set 7), this function calls :func:`ensure_session_state_file`,
+    which infers the right initial status from current file presence
+    (``change-log.md`` → ``"complete"``; ``activity-log.json`` →
+    ``"in-progress"``; neither → ``"not-started"``) — same rules as
+    the one-shot backfill. The function then re-reads so the returned
+    value matches what is now on disk. The atomic-write pattern in
+    :func:`_atomic_write_json` makes concurrent fallback synthesis
+    benign — both writers produce the same shape and the last
+    ``os.replace`` wins.
+
+    Folders without a ``spec.md`` are not session sets; callers should
+    filter these out before calling. Passing one in returns
+    ``"not-started"`` (the synthesizer writes the file with
+    ``totalSessions`` left as ``None``); the behavior is benign but
+    unintended, so the caller-side filter is the contract.
+
+    Parse errors propagate. The spec's risk section is explicit: "the
+    fallback only triggers on file-absent, never on parse-error."
+    A malformed ``session-state.json`` raises ``json.JSONDecodeError``
+    so the caller sees the corruption rather than having it silently
+    overwritten with the not-started shape. A present-but-non-dict
+    or present-but-no-string-status is structurally malformed and
+    raises ``ValueError`` for the same reason. Both branches funnel
+    through :func:`_load_canonical_status` so the contract holds even
+    if a concurrent writer creates the file between the existence
+    check and the re-read.
+    """
+    path = _state_path(session_set_dir)
+    if os.path.isfile(path):
+        return _load_canonical_status(path)
+
+    # File absent. Synthesize via :func:`ensure_session_state_file`,
+    # which infers the right initial status from current file presence
+    # (change-log → complete; activity-log → in-progress; neither →
+    # not-started) — a legacy folder that slipped through Set 7
+    # Session 1's backfill is correctly classified rather than
+    # regressed to not-started. Then re-read through
+    # :func:`_load_canonical_status` so validation and alias
+    # canonicalization apply uniformly under races (a parallel writer
+    # could land any valid status value between our existence check
+    # and re-read).
+    ensure_session_state_file(session_set_dir)
+    return _load_canonical_status(path)
 
 
 def backfill_session_state_files(

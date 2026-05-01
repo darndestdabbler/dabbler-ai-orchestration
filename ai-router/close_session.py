@@ -490,6 +490,21 @@ def _is_already_closed(session_set_dir: str) -> bool:
     canonical source is ``session-events.jsonl`` (Set 1's append-only
     ledger). ``session-state.json`` is the in-memory snapshot consumers
     read; the ledger is the truth.
+
+    Set 7 Session 2 note: the spec lists "the close-out gate's
+    idempotency check" as a reader to collapse to ``read_status``.
+    This function is the close-out gate's idempotency check, but it
+    does not read coarse status — it derives the lifecycle state from
+    the events ledger. The events ledger is intentionally
+    authoritative here for the same reason the reconciler stays
+    events-driven (Set 7 Session 2): a stale snapshot saying
+    ``"complete"`` while the ledger still records ``closeout_pending``
+    is exactly the drift the close-out machinery exists to catch.
+    Switching to ``read_status`` here would mask that drift, and the
+    tests that exercise repair (test_close_session_session4,
+    test_close_session_skeleton) explicitly depend on the events-based
+    derivation. The collapse is a no-op: there is no coarse-status
+    read here to remove.
     """
     events = read_events(session_set_dir)
     state = current_lifecycle_state(events)

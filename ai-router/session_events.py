@@ -327,6 +327,14 @@ def current_lifecycle_state(
     a passing verdict. ``verification_timed_out`` and
     ``verification_claimed`` are observability-only — they do not
     change the state.
+
+    Set 7 Session 2 note: the spec lists this function's "coarse-status
+    reads" among the readers to collapse to ``read_status``. This
+    function does not have any coarse-status reads — its entire
+    derivation operates on the events list passed by the caller. The
+    "lifecycle event reads keep their existing logic" carve-out in
+    the spec covers the entire body. The collapse is a no-op: there
+    is no coarse-status read here to remove.
     """
     if not events:
         return None

@@ -804,10 +804,10 @@ var require_src2 = __commonJS({
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src());
     var log = debug_1.default("@kwsites/file-exists");
-    function check(path13, isFile, isDirectory) {
-      log(`checking %s`, path13);
+    function check(path14, isFile, isDirectory) {
+      log(`checking %s`, path14);
       try {
-        const stat = fs_1.statSync(path13);
+        const stat = fs_1.statSync(path14);
         if (stat.isFile() && isFile) {
           log(`[OK] path represents a file`);
           return true;
@@ -827,8 +827,8 @@ var require_src2 = __commonJS({
         throw e;
       }
     }
-    function exists2(path13, type = exports2.READABLE) {
-      return check(path13, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+    function exists2(path14, type = exports2.READABLE) {
+      return check(path14, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
     }
     exports2.exists = exists2;
     exports2.FILE = 1;
@@ -901,17 +901,17 @@ __export(extension_exports, {
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode15 = __toESM(require("vscode"));
-var fs10 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
+var fs11 = __toESM(require("fs"));
+var path13 = __toESM(require("path"));
 
 // src/providers/SessionSetsProvider.ts
 var vscode2 = __toESM(require("vscode"));
-var path3 = __toESM(require("path"));
+var path4 = __toESM(require("path"));
 
 // src/utils/fileSystem.ts
 var vscode = __toESM(require("vscode"));
-var fs = __toESM(require("fs"));
-var path2 = __toESM(require("path"));
+var fs2 = __toESM(require("fs"));
+var path3 = __toESM(require("path"));
 
 // src/utils/git.ts
 var cp = __toESM(require("child_process"));
@@ -940,8 +940,146 @@ function listGitWorktrees(cwd) {
   return paths;
 }
 
+// src/utils/sessionState.ts
+var fs = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+var SCHEMA_VERSION = 2;
+var SESSION_STATE_FILENAME = "session-state.json";
+var STATUS_ALIASES = {
+  completed: "complete",
+  done: "complete"
+};
+function canonicalizeStatus(raw) {
+  return STATUS_ALIASES[raw] ?? raw;
+}
+function readTotalSessionsFromSpec(sessionSetDir) {
+  const specPath = path2.join(sessionSetDir, "spec.md");
+  if (!fs.existsSync(specPath))
+    return null;
+  let text;
+  try {
+    text = fs.readFileSync(specPath, "utf8");
+  } catch {
+    return null;
+  }
+  const headingMatch = text.match(
+    /##\s*Session Set Configuration[\s\S]*?```ya?ml\s*([\s\S]*?)```/i
+  );
+  const block = headingMatch ? headingMatch[1] : text.slice(0, 4e3);
+  const totalMatch = block.match(/^\s*totalSessions\s*:\s*(\d+)\s*$/im);
+  if (!totalMatch)
+    return null;
+  const value = Number.parseInt(totalMatch[1], 10);
+  if (!Number.isFinite(value) || value <= 0)
+    return null;
+  return value;
+}
+function notStartedPayload(sessionSetDir) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    sessionSetName: path2.basename(sessionSetDir.replace(/[\\/]+$/, "")),
+    currentSession: null,
+    totalSessions: readTotalSessionsFromSpec(sessionSetDir),
+    status: "not-started",
+    lifecycleState: null,
+    startedAt: null,
+    completedAt: null,
+    verificationVerdict: null,
+    orchestrator: null
+  };
+}
+function backfillPayload(sessionSetDir) {
+  const base = notStartedPayload(sessionSetDir);
+  const changelogPath = path2.join(sessionSetDir, "change-log.md");
+  if (fs.existsSync(changelogPath)) {
+    base.status = "complete";
+    base.lifecycleState = "closed";
+    try {
+      const stat = fs.statSync(changelogPath);
+      base.completedAt = new Date(stat.mtime).toISOString();
+    } catch {
+      base.completedAt = null;
+    }
+    return base;
+  }
+  const activityPath = path2.join(sessionSetDir, "activity-log.json");
+  if (fs.existsSync(activityPath)) {
+    base.status = "in-progress";
+    base.lifecycleState = "work_in_progress";
+    try {
+      const data = JSON.parse(fs.readFileSync(activityPath, "utf8"));
+      const timestamps = [];
+      for (const e of data.entries ?? []) {
+        if (typeof e.dateTime === "string")
+          timestamps.push(e.dateTime);
+      }
+      timestamps.sort();
+      base.startedAt = timestamps[0] ?? null;
+    } catch {
+      base.startedAt = null;
+    }
+    return base;
+  }
+  return base;
+}
+function atomicWriteJson(filePath, payload) {
+  const directory = path2.dirname(filePath);
+  const base = path2.basename(filePath);
+  const tmpPath = path2.join(
+    directory,
+    `.${base}.${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`
+  );
+  try {
+    fs.writeFileSync(
+      tmpPath,
+      JSON.stringify(payload, null, 2) + "\n",
+      { encoding: "utf8" }
+    );
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    if (fs.existsSync(tmpPath)) {
+      try {
+        fs.unlinkSync(tmpPath);
+      } catch {
+      }
+    }
+    throw err;
+  }
+}
+function ensureSessionStateFile(sessionSetDir) {
+  const filePath = path2.join(sessionSetDir, SESSION_STATE_FILENAME);
+  if (fs.existsSync(filePath))
+    return filePath;
+  atomicWriteJson(filePath, backfillPayload(sessionSetDir));
+  return filePath;
+}
+function loadCanonicalStatus(filePath) {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const parsed = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(
+      `${filePath}: session-state.json must contain a JSON object`
+    );
+  }
+  const status = parsed.status;
+  if (typeof status !== "string") {
+    throw new Error(
+      `${filePath}: session-state.json missing string 'status' field`
+    );
+  }
+  return canonicalizeStatus(status);
+}
+function readStatus(sessionSetDir) {
+  const filePath = path2.join(sessionSetDir, SESSION_STATE_FILENAME);
+  if (fs.existsSync(filePath)) {
+    return loadCanonicalStatus(filePath);
+  }
+  ensureSessionStateFile(sessionSetDir);
+  return loadCanonicalStatus(filePath);
+}
+
 // src/utils/fileSystem.ts
-var SESSION_SETS_REL = path2.join("docs", "session-sets");
+var SESSION_SETS_REL = path3.join("docs", "session-sets");
 var PLAYWRIGHT_REL_DEFAULT = "tests";
 var STATE_RANK = {
   done: 2,
@@ -954,9 +1092,9 @@ function discoverRoots() {
   const add = (p2) => {
     if (!p2)
       return;
-    const canonical = path2.resolve(p2);
+    const canonical = path3.resolve(p2);
     const key = canonical.toLowerCase();
-    if (seen.has(key) || !fs.existsSync(canonical))
+    if (seen.has(key) || !fs2.existsSync(canonical))
       return;
     seen.set(key, canonical);
     order.push(canonical);
@@ -978,11 +1116,11 @@ function parseSessionSetConfig(specPath) {
     uatScope: "none",
     outsourceMode: "first"
   };
-  if (!fs.existsSync(specPath))
+  if (!fs2.existsSync(specPath))
     return config;
   let text;
   try {
-    text = fs.readFileSync(specPath, "utf8");
+    text = fs2.readFileSync(specPath, "utf8");
   } catch {
     return config;
   }
@@ -1010,11 +1148,11 @@ function parseSessionSetConfig(specPath) {
   return config;
 }
 function parseUatChecklist(checklistPath) {
-  if (!fs.existsSync(checklistPath))
+  if (!fs2.existsSync(checklistPath))
     return null;
   let data;
   try {
-    data = JSON.parse(fs.readFileSync(checklistPath, "utf8"));
+    data = JSON.parse(fs2.readFileSync(checklistPath, "utf8"));
   } catch {
     return null;
   }
@@ -1048,37 +1186,39 @@ function parseUatChecklist(checklistPath) {
   return { totalItems: items.length, pendingItems: pending, e2eRefs: Array.from(e2eRefs) };
 }
 function readSessionSets(root) {
-  const sessionSetsDir = path2.join(root, SESSION_SETS_REL);
-  if (!fs.existsSync(sessionSetsDir))
+  const sessionSetsDir = path3.join(root, SESSION_SETS_REL);
+  if (!fs2.existsSync(sessionSetsDir))
     return [];
-  const entries = fs.readdirSync(sessionSetsDir, { withFileTypes: true });
+  const entries = fs2.readdirSync(sessionSetsDir, { withFileTypes: true });
   const sets = [];
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith("_"))
       continue;
-    const dir = path2.join(sessionSetsDir, entry.name);
-    const specPath = path2.join(dir, "spec.md");
-    if (!fs.existsSync(specPath))
+    const dir = path3.join(sessionSetsDir, entry.name);
+    const specPath = path3.join(dir, "spec.md");
+    if (!fs2.existsSync(specPath))
       continue;
-    const activityPath = path2.join(dir, "activity-log.json");
-    const changeLogPath = path2.join(dir, "change-log.md");
-    const statePath = path2.join(dir, "session-state.json");
-    const aiAssignmentPath = path2.join(dir, "ai-assignment.md");
-    const uatChecklistPath = path2.join(dir, `${entry.name}-uat-checklist.json`);
+    const activityPath = path3.join(dir, "activity-log.json");
+    const changeLogPath = path3.join(dir, "change-log.md");
+    const statePath = path3.join(dir, "session-state.json");
+    const aiAssignmentPath = path3.join(dir, "ai-assignment.md");
+    const uatChecklistPath = path3.join(dir, `${entry.name}-uat-checklist.json`);
+    const status = readStatus(dir);
     let state;
-    if (fs.existsSync(changeLogPath))
+    if (status === "complete") {
       state = "done";
-    else if (fs.existsSync(activityPath) || fs.existsSync(statePath))
+    } else if (status === "in-progress") {
       state = "in-progress";
-    else
+    } else {
       state = "not-started";
+    }
     let totalSessions = null;
     let sessionsCompleted = 0;
     let lastTouched = null;
     let liveSession = null;
-    if (fs.existsSync(activityPath)) {
+    if (fs2.existsSync(activityPath)) {
       try {
-        const data = JSON.parse(fs.readFileSync(activityPath, "utf8"));
+        const data = JSON.parse(fs2.readFileSync(activityPath, "utf8"));
         if (typeof data.totalSessions === "number")
           totalSessions = data.totalSessions;
         const completedSet = /* @__PURE__ */ new Set();
@@ -1092,9 +1232,9 @@ function readSessionSets(root) {
       } catch {
       }
     }
-    if (fs.existsSync(statePath)) {
+    if (fs2.existsSync(statePath)) {
       try {
-        const sd = JSON.parse(fs.readFileSync(statePath, "utf8"));
+        const sd = JSON.parse(fs2.readFileSync(statePath, "utf8"));
         if (totalSessions === null && typeof sd.totalSessions === "number") {
           totalSessions = sd.totalSessions;
         }
@@ -1245,8 +1385,8 @@ function configTooltipLines(set) {
 }
 function folderTooltip(set) {
   const roots = discoverRoots();
-  const rel = path3.relative(set.root, set.dir);
-  return roots.length > 1 ? `${path3.basename(set.root)} / ${rel}` : rel;
+  const rel = path4.relative(set.root, set.dir);
+  return roots.length > 1 ? `${path4.basename(set.root)} / ${rel}` : rel;
 }
 function contextValueFor(set) {
   const parts = [`sessionSet:${set.state}`];
@@ -1345,7 +1485,7 @@ var vscode4 = __toESM(require("vscode"));
 
 // src/utils/pythonRunner.ts
 var cp2 = __toESM(require("child_process"));
-var path4 = __toESM(require("path"));
+var path5 = __toESM(require("path"));
 var vscode3 = __toESM(require("vscode"));
 function resolvePythonPath(workspaceRoot2, settingKey) {
   const dotIndex = settingKey.indexOf(".");
@@ -1357,10 +1497,10 @@ function resolvePythonPath(workspaceRoot2, settingKey) {
   const raw = (cfg.get(key) ?? "python").trim();
   if (!raw)
     return "python";
-  if (path4.isAbsolute(raw))
+  if (path5.isAbsolute(raw))
     return raw;
-  if (raw.includes(path4.sep) || raw.includes("/")) {
-    return path4.resolve(workspaceRoot2, raw);
+  if (raw.includes(path5.sep) || raw.includes("/")) {
+    return path5.resolve(workspaceRoot2, raw);
   }
   return raw;
 }
@@ -1916,12 +2056,12 @@ function pickNumber(obj, key) {
 
 // src/commands/openFile.ts
 var vscode6 = __toESM(require("vscode"));
-var fs2 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
+var fs3 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
 function openIfExists(filePath, label) {
-  if (!filePath || !fs2.existsSync(filePath)) {
+  if (!filePath || !fs3.existsSync(filePath)) {
     vscode6.window.showInformationMessage(
-      `${label} does not exist yet: ${filePath ? path5.basename(filePath) : "<unknown>"}`
+      `${label} does not exist yet: ${filePath ? path6.basename(filePath) : "<unknown>"}`
     );
     return;
   }
@@ -1930,8 +2070,8 @@ function openIfExists(filePath, label) {
 function findPlaywrightTests(set) {
   const cfg = vscode6.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
-  const playwrightDir = path5.join(set.root, testDirRel);
-  if (!fs2.existsSync(playwrightDir))
+  const playwrightDir = path6.join(set.root, testDirRel);
+  if (!fs3.existsSync(playwrightDir))
     return [];
   const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
   const testRefs = set.uatSummary?.e2eRefs ?? [];
@@ -1941,12 +2081,12 @@ function findPlaywrightTests(set) {
       return;
     let entries;
     try {
-      entries = fs2.readdirSync(dir, { withFileTypes: true });
+      entries = fs3.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
-      const p2 = path5.join(dir, e.name);
+      const p2 = path6.join(dir, e.name);
       if (e.isDirectory()) {
         if (e.name === "bin" || e.name === "obj" || e.name === "node_modules")
           continue;
@@ -1962,7 +2102,7 @@ function findPlaywrightTests(set) {
       }
       if (testRefs.length > 0) {
         try {
-          const txt = fs2.readFileSync(p2, "utf8");
+          const txt = fs3.readFileSync(p2, "utf8");
           for (const ref of testRefs) {
             const short = String(ref).split(".").pop();
             if (short && txt.includes(short)) {
@@ -2025,8 +2165,8 @@ function registerOpenFileCommands(context) {
         }
         const picked = await vscode6.window.showQuickPick(
           tests.map((p2) => ({
-            label: path5.basename(p2),
-            description: path5.relative(item.set.root, p2),
+            label: path6.basename(p2),
+            description: path6.relative(item.set.root, p2),
             absolute: p2
           })),
           { placeHolder: `Playwright tests matching "${item.set.name}"` }
@@ -2082,8 +2222,8 @@ function registerCopyCommands(context) {
 
 // src/commands/gitScaffold.ts
 var vscode8 = __toESM(require("vscode"));
-var fs3 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var fs4 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
 
 // node_modules/simple-git/dist/esm/index.js
 var import_file_exists = __toESM(require_dist(), 1);
@@ -2675,8 +2815,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = "\n") {
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path13) {
-  return (0, import_file_exists.exists)(path13, import_file_exists.FOLDER);
+function folderExists(path14) {
+  return (0, import_file_exists.exists)(path14, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -3078,8 +3218,8 @@ function checkIsRepoRootTask() {
     commands: commands11,
     format: "utf-8",
     onError,
-    parser(path13) {
-      return /^\.(git)?$/.test(path13.trim());
+    parser(path14) {
+      return /^\.(git)?$/.test(path14.trim());
     }
   };
 }
@@ -3513,11 +3653,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path13, line, preview] = input.split(NULL);
-    paths.add(path13);
-    (results[path13] = results[path13] || []).push({
+    const [path14, line, preview] = input.split(NULL);
+    paths.add(path14);
+    (results[path14] = results[path14] || []).push({
       line: asNumber(line),
-      path: path13,
+      path: path14,
       preview
     });
   });
@@ -4281,14 +4421,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path13, text) {
+function parseInit(bare, path14, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path13, false, result[1]);
+    return new InitSummary(bare, path14, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path13, true, result[1]);
+    return new InitSummary(bare, path14, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -4299,7 +4439,7 @@ function parseInit(bare, path13, text) {
       break;
     }
   }
-  return new InitSummary(bare, path13, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path14, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -4308,9 +4448,9 @@ var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     "use strict";
     InitSummary = class {
-      constructor(bare, path13, existing, gitDir) {
+      constructor(bare, path14, existing, gitDir) {
         this.bare = bare;
-        this.path = path13;
+        this.path = path14;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -4322,7 +4462,7 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path13, customArgs) {
+function initTask(bare = false, path14, customArgs) {
   const commands11 = ["init", ...customArgs];
   if (bare && !hasBareCommand(commands11)) {
     commands11.splice(1, 0, bareCommand);
@@ -4331,7 +4471,7 @@ function initTask(bare = false, path13, customArgs) {
     commands: commands11,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands11.includes("--bare"), path13, text);
+      return parseInit(commands11.includes("--bare"), path14, text);
     }
   };
 }
@@ -5146,12 +5286,12 @@ var init_FileStatusSummary = __esm({
     "use strict";
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path13, index, working_dir) {
-        this.path = path13;
+      constructor(path14, index, working_dir) {
+        this.path = path14;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path13) || [null, path13, path13];
+          const detail = fromPathRegex.exec(path14) || [null, path14, path14];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -5182,14 +5322,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path13) {
+  function data(index, workingDir, path14) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path13);
+      handler(result, path14);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path13, index, workingDir));
+      result.files.push(new FileStatusSummary(path14, index, workingDir));
     }
   }
 }
@@ -5540,9 +5680,9 @@ var init_simple_git_api = __esm({
           next
         );
       }
-      hashObject(path13, write) {
+      hashObject(path14, write) {
         return this._runTask(
-          hashObjectTask(path13, write === true),
+          hashObjectTask(path14, write === true),
           trailingFunctionArgument(arguments)
         );
       }
@@ -5896,8 +6036,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path13 = input.trim().replace(/^["']|["']$/g, "");
-  return path13 && (0, import_node_path.normalize)(path13);
+  const path14 = input.trim().replace(/^["']|["']$/g, "");
+  return path14 && (0, import_node_path.normalize)(path14);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -6182,8 +6322,8 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path13) {
-  return subModuleTask(["add", repo, path13]);
+function addSubModuleTask(repo, path14) {
+  return subModuleTask(["add", repo, path14]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
@@ -6497,8 +6637,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path13, then) {
-      return this._runTask(addSubModuleTask2(repo, path13), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path14, then) {
+      return this._runTask(addSubModuleTask2(repo, path14), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(
@@ -7049,8 +7189,8 @@ var esm_default = gitInstanceFactory;
 
 // src/commands/gitScaffold.ts
 var SCAFFOLD_DIRS = [
-  path6.join("docs", "session-sets"),
-  path6.join("docs", "planning"),
+  path7.join("docs", "session-sets"),
+  path7.join("docs", "planning"),
   "ai-router"
 ];
 async function pickDirectory() {
@@ -7072,7 +7212,7 @@ function registerGitScaffoldCommand(context) {
       const isRepo = await git.checkIsRepo().catch(() => false);
       if (!isRepo) {
         const confirm = await vscode8.window.showWarningMessage(
-          `Initialize a new git repository in ${path6.basename(projectDir)}?`,
+          `Initialize a new git repository in ${path7.basename(projectDir)}?`,
           { modal: true },
           "Initialize"
         );
@@ -7082,9 +7222,9 @@ function registerGitScaffoldCommand(context) {
         vscode8.window.showInformationMessage("Git repository initialized.");
       }
       for (const rel of SCAFFOLD_DIRS) {
-        const full = path6.join(projectDir, rel);
-        if (!fs3.existsSync(full))
-          fs3.mkdirSync(full, { recursive: true });
+        const full = path7.join(projectDir, rel);
+        if (!fs4.existsSync(full))
+          fs4.mkdirSync(full, { recursive: true });
       }
       vscode8.window.showInformationMessage("Folder skeleton created.");
       const worktreeAnswer = await vscode8.window.showInformationMessage(
@@ -7099,10 +7239,10 @@ function registerGitScaffoldCommand(context) {
           if (status.files.length > 0 || !await git.log().catch(() => null)) {
             await git.commit("init", { "--allow-empty": null });
           }
-          const worktreesDir = path6.join(projectDir, "worktrees");
-          if (!fs3.existsSync(worktreesDir))
-            fs3.mkdirSync(worktreesDir, { recursive: true });
-          await git.raw(["worktree", "add", path6.join(worktreesDir, "main"), "HEAD"]);
+          const worktreesDir = path7.join(projectDir, "worktrees");
+          if (!fs4.existsSync(worktreesDir))
+            fs4.mkdirSync(worktreesDir, { recursive: true });
+          await git.raw(["worktree", "add", path7.join(worktreesDir, "main"), "HEAD"]);
           vscode8.window.showInformationMessage(
             "Worktrees set up. Work from worktrees/main/ for parallel sessions."
           );
@@ -7127,8 +7267,8 @@ function registerGitScaffoldCommand(context) {
 
 // src/commands/troubleshoot.ts
 var vscode9 = __toESM(require("vscode"));
-var fs4 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
 var cp3 = __toESM(require("child_process"));
 function workspaceRoot() {
   return vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -7144,8 +7284,8 @@ function checkActivation() {
     ch.show();
     return;
   }
-  const dir = path7.join(root, SESSION_SETS_REL);
-  const exists2 = fs4.existsSync(dir);
+  const dir = path8.join(root, SESSION_SETS_REL);
+  const exists2 = fs5.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
   if (!exists2) {
@@ -7231,15 +7371,15 @@ function checkLayout() {
     return;
   }
   const dirs = [
-    path7.join("docs", "session-sets"),
-    path7.join("docs", "planning"),
+    path8.join("docs", "session-sets"),
+    path8.join("docs", "planning"),
     "ai-router"
   ];
   ch.appendLine(`Expected layout under: ${root}`);
   ch.appendLine("");
   for (const d of dirs) {
-    const full = path7.join(root, d);
-    const exists2 = fs4.existsSync(full);
+    const full = path8.join(root, d);
+    const exists2 = fs5.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
   ch.appendLine("");
@@ -7459,13 +7599,13 @@ async function reportInterventionResult(label, result, qctx) {
 
 // src/wizard/WizardPanel.ts
 var vscode13 = __toESM(require("vscode"));
-var fs7 = __toESM(require("fs"));
+var fs8 = __toESM(require("fs"));
 
 // src/wizard/planImport.ts
 var vscode11 = __toESM(require("vscode"));
-var fs5 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
-var PLAN_DEST = path8.join("docs", "planning", "project-plan.md");
+var fs6 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
+var PLAN_DEST = path9.join("docs", "planning", "project-plan.md");
 var PLAN_AUTHORING_PROMPT = `You are a project planning assistant for an AI-led development workflow.
 
 Help me create a project plan in Markdown format for my software project.
@@ -7514,11 +7654,11 @@ function registerPlanImportCommand(context) {
         vscode11.window.showErrorMessage("No workspace folder is open.");
         return;
       }
-      const destPath = path8.join(root, PLAN_DEST);
-      const destDir = path8.dirname(destPath);
-      if (!fs5.existsSync(destDir))
-        fs5.mkdirSync(destDir, { recursive: true });
-      if (fs5.existsSync(destPath)) {
+      const destPath = path9.join(root, PLAN_DEST);
+      const destDir = path9.dirname(destPath);
+      if (!fs6.existsSync(destDir))
+        fs6.mkdirSync(destDir, { recursive: true });
+      if (fs6.existsSync(destPath)) {
         const overwrite = await vscode11.window.showWarningMessage(
           `${PLAN_DEST} already exists. Overwrite it?`,
           { modal: true },
@@ -7527,7 +7667,7 @@ function registerPlanImportCommand(context) {
         if (overwrite !== "Overwrite")
           return;
       }
-      fs5.copyFileSync(picked[0].fsPath, destPath);
+      fs6.copyFileSync(picked[0].fsPath, destPath);
       vscode11.commands.executeCommand("vscode.open", vscode11.Uri.file(destPath));
       vscode11.window.showInformationMessage(
         `Plan imported to ${PLAN_DEST}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
@@ -7538,9 +7678,9 @@ function registerPlanImportCommand(context) {
 
 // src/wizard/sessionGenPrompt.ts
 var vscode12 = __toESM(require("vscode"));
-var fs6 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
-var PLAN_PATH = path9.join("docs", "planning", "project-plan.md");
+var fs7 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
+var PLAN_PATH = path10.join("docs", "planning", "project-plan.md");
 var PROMPT_SYSTEM = `You are a session-set architect for an AI-led software development workflow.
 
 Given a project plan, decompose it into a sequence of session sets. Each session set is a
@@ -7586,8 +7726,8 @@ function registerSessionGenPromptCommand(context) {
         vscode12.window.showErrorMessage("No workspace folder is open.");
         return;
       }
-      const planPath = path9.join(root, PLAN_PATH);
-      if (!fs6.existsSync(planPath)) {
+      const planPath = path10.join(root, PLAN_PATH);
+      if (!fs7.existsSync(planPath)) {
         const action = await vscode12.window.showWarningMessage(
           `No project plan found at ${PLAN_PATH}. Import one first?`,
           "Import Plan"
@@ -7596,7 +7736,7 @@ function registerSessionGenPromptCommand(context) {
           vscode12.commands.executeCommand("dabbler.importPlan");
         return;
       }
-      const planText = fs6.readFileSync(planPath, "utf8");
+      const planText = fs7.readFileSync(planPath, "utf8");
       const prompt = `${PROMPT_SYSTEM}
 
 ---
@@ -7668,7 +7808,7 @@ var WizardPanel = class _WizardPanel {
   _getHtml() {
     const htmlPath = vscode13.Uri.joinPath(this._extensionUri, "webview", "wizard.html");
     try {
-      let html = fs7.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs8.readFileSync(htmlPath.fsPath, "utf8");
       const nonce = getNonce();
       const cspSource = this._panel.webview.cspSource;
       html = html.replace(/{{NONCE}}/g, nonce).replace(/{{CSP_SOURCE}}/g, cspSource);
@@ -7690,19 +7830,19 @@ function registerWizardCommands(context) {
 
 // src/dashboard/CostDashboard.ts
 var vscode14 = __toESM(require("vscode"));
-var fs9 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var fs10 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
 
 // src/utils/metrics.ts
-var fs8 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
-var METRICS_FILE = path10.join("ai-router", "metrics.jsonl");
+var fs9 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
+var METRICS_FILE = path11.join("ai-router", "metrics.jsonl");
 function readMetrics(workspaceRoot2) {
-  const metricsPath = path10.join(workspaceRoot2, METRICS_FILE);
-  if (!fs8.existsSync(metricsPath))
+  const metricsPath = path11.join(workspaceRoot2, METRICS_FILE);
+  if (!fs9.existsSync(metricsPath))
     return [];
   try {
-    const lines = fs8.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
+    const lines = fs9.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
     return lines.map((line) => {
       try {
         return JSON.parse(line);
@@ -7819,9 +7959,9 @@ var CostDashboard = class _CostDashboard {
     }
     const entries = readMetrics(root);
     const csv = exportToCsv(entries);
-    const outPath = path11.join(root, "ai-router", "cost-export.csv");
+    const outPath = path12.join(root, "ai-router", "cost-export.csv");
     try {
-      fs9.writeFileSync(outPath, csv, "utf8");
+      fs10.writeFileSync(outPath, csv, "utf8");
       vscode14.commands.executeCommand("vscode.open", vscode14.Uri.file(outPath));
     } catch (err) {
       vscode14.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -7836,13 +7976,13 @@ var CostDashboard = class _CostDashboard {
     }
     const entries = readMetrics(root);
     if (entries.length === 0) {
-      return noMetricsHtml(nonce, cspSource, path11.join(root, METRICS_FILE));
+      return noMetricsHtml(nonce, cspSource, path12.join(root, METRICS_FILE));
     }
     const summary = summarizeMetrics(entries);
     const sparkline = buildSparkline(summary.dailyCosts);
     const htmlPath = vscode14.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
     try {
-      let html = fs9.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs10.readFileSync(htmlPath.fsPath, "utf8");
       const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
         ([slug, d]) => `<tr><td>${slug}</td><td>${d.sessions}</td><td>$${d.cost.toFixed(3)}</td><td>${d.lastRun ? new Date(d.lastRun).toLocaleDateString("en-CA") : "\u2014"}</td></tr>`
       ).join("\n");
@@ -7856,7 +7996,7 @@ var CostDashboard = class _CostDashboard {
       );
       return html;
     } catch {
-      return noMetricsHtml(nonce, cspSource, path11.join(root, METRICS_FILE));
+      return noMetricsHtml(nonce, cspSource, path12.join(root, METRICS_FILE));
     }
   }
 };
@@ -7885,7 +8025,7 @@ function registerCostDashboardCommand(context) {
 }
 
 // src/extension.ts
-var SESSION_SETS_REL2 = path12.join("docs", "session-sets");
+var SESSION_SETS_REL2 = path13.join("docs", "session-sets");
 function evaluateSupportContextKeys(allSets) {
   const cfg = vscode15.workspace.getConfiguration("dabblerSessionSets");
   const uatPref = cfg.get("uatSupport.enabled", "auto");
@@ -7933,7 +8073,7 @@ function activate(context) {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      const sessionSetsAbs = path12.join(root, SESSION_SETS_REL2);
+      const sessionSetsAbs = path13.join(root, SESSION_SETS_REL2);
       const pattern = new vscode15.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,activity-log.json,change-log.md,*-uat-checklist.json}"
@@ -8058,7 +8198,7 @@ function activate(context) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs10.existsSync(path12.join(r2, SESSION_SETS_REL2));
+        return fs11.existsSync(path13.join(r2, SESSION_SETS_REL2));
       } catch {
         return false;
       }

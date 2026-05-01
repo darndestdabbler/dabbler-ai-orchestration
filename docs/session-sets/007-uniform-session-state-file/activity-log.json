@@ -126,6 +126,165 @@
       "description": "Full ai-router test suite passes: 627 tests (623 baseline + 4 added during fix-issues)",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-05-01T12:10:02.732250-04:00",
+      "description": "Registered session 2 start; session-state.json flipped to in-progress with current orchestrator metadata",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/skip-ai-assignment",
+      "dateTime": "2026-05-01T12:10:02.732250-04:00",
+      "description": "Skipped Step 3.5 (ai-assignment.md authoring via route()) per orchestrator-instruction memory restricting ai-router usage to end-of-session verification. No prior session set has authored ai-assignment.md; this matches current repo practice.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/add-read-status",
+      "dateTime": "2026-05-01T12:21:32.204716-04:00",
+      "description": "Added read_status() helper in session_state.py with lazy-synth fallback (file-absent), parse-error propagation per spec risk section, and tolerant canonicalization for pre-Set-7 drift (completed->complete, done->complete) via _STATUS_ALIASES map.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/collapse-py-readers",
+      "dateTime": "2026-05-01T12:21:32.204716-04:00",
+      "description": "Collapsed find_active_session_set (session_log.py) and print_session_set_status (__init__.py) to use read_status. Did NOT modify reconciler: its sweep already uses current_lifecycle_state(events), the authoritative source per the existing codebase comment; a coarse read_status pre-filter would either duplicate the events check or mask drift the reconciler exists to surface.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/add-ts-read-status",
+      "dateTime": "2026-05-01T12:21:32.204716-04:00",
+      "description": "Created tools/dabbler-ai-orchestration/src/utils/sessionState.ts with readStatus + synthesizeNotStartedState mirroring Python writers. Uses fs.renameSync atomic write with PID+random temp suffix matching _atomic_write_json.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/collapse-ts-readers",
+      "dateTime": "2026-05-01T12:21:32.204716-04:00",
+      "description": "Collapsed readSessionSets (utils/fileSystem.ts) state detection to readStatus. Updated fileSystem.test.ts fixtures to write canonical session-state.json + added regression test for completed alias canonicalization.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/add-tests",
+      "dateTime": "2026-05-01T12:21:32.204716-04:00",
+      "description": "Added ai-router/tests/test_read_status.py with 15 tests: 4 canonical pass-through (parametrized), completed/done alias canonicalization, unknown-passes-through, lazy-synth side effect, lazy-synth idempotency on drifted file (no rewrite), 3 error-propagation (JSONDecodeError / ValueError on non-dict / ValueError on missing status), find_active_session_set integration (status overrides activity-log presence; lazy-synth from spec.md-only folder).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/run-full-tests",
+      "dateTime": "2026-05-01T12:21:32.204716-04:00",
+      "description": "ai-router suite: 642 passed (627 baseline + 15 new). TypeScript: tsc --noEmit clean, esbuild compile clean, eslint clean.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/verify-round-1",
+      "dateTime": "2026-05-01T12:31:37.534443-04:00",
+      "description": "Cross-provider verification round 1 via gpt-5-4 (260s, $0.2538). Verdict: ISSUES_FOUND. Findings: (1) read_status absent-branch contract hole \u2014 re-read after lazy-synth bypasses canonicalize/validate (fix: extract _load_status); (2) current_lifecycle_state and close-out gate idempotency collapses not shown (need investigation \u2014 these readers consult events, not coarse status); (3) reconciler exemption is acceptable per code judgment but should be documented; (4) test gaps: print_session_set_status, contradictory-fixture readSessionSets, TS/Py parity. Aliases placement (read boundary) confirmed correct.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 22000,
+          "outputTokens": 1800,
+          "costUsd": 0.2538
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-2/fix-round-1",
+      "dateTime": "2026-05-01T12:47:46.586947-04:00",
+      "description": "Addressed round-1 findings: (1) extracted _load_canonical_status (Py) / loadCanonicalStatus (TS) shared by both branches of read_status/readStatus to close the post-synthesis-validation gap; (2) documented no-op-collapse rationale in close_session.py _is_already_closed and session_events.py current_lifecycle_state (both events-driven, nothing to remove); (3) added 5 new tests: 2 race-injection tests for the lazy-synth re-read path, print_session_set_status contradictory-fixture test (3 fixtures), 2 TS contradictory-fixture tests (status overrides activity-log/change-log presence).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-2/verify-round-2",
+      "dateTime": "2026-05-01T12:47:46.587947-04:00",
+      "description": "Round 2 via gpt-5-4 (168s, $0.2051). Verdict: 2 issues found. (R2-1) lazy-synth fallback misclassifies legacy folders \u2014 write was always not-started, should infer from change-log/activity-log presence; (R2-2) close_session.py and session_events.py docstring changes weren't in the bundle, so couldn't verify.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 18000,
+          "outputTokens": 1100,
+          "costUsd": 0.2051
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "session-2/fix-round-2",
+      "dateTime": "2026-05-01T12:47:46.588948-04:00",
+      "description": "Fixed R2-1: introduced ensure_session_state_file (Py) / ensureSessionStateFile (TS) that uses _backfill_payload / backfillPayload inference (change-log -> complete, activity-log -> in-progress, neither -> not-started). read_status now routes file-absent through ensure_*, not synthesize_not_started_state. Added 4 new tests (2 Py + 2 TS) locking in legacy-folder lazy-synth classification. Synthesize_not_started_state stays as the explicit \"truly not started\" entry point used by register_session_start. R2-2 fixed by including close_session.py and session_events.py diffs in the round-3 bundle.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 13,
+      "stepKey": "session-2/verify-round-3",
+      "dateTime": "2026-05-01T12:47:46.588948-04:00",
+      "description": "Round 3 via gpt-5-4 (114s, $0.1482). Verdict: VERIFIED. R2-1 functionally addressed; R2-2 docstrings present and correct; no regression on the genuine not-started path; no close-out blocker. One non-blocking docstring note: read_status / readStatus prose still mentioned synthesize_not_started_state.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 22000,
+          "outputTokens": 900,
+          "costUsd": 0.1482
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 14,
+      "stepKey": "session-2/fix-round-3-docstrings",
+      "dateTime": "2026-05-01T12:47:46.589943-04:00",
+      "description": "Updated read_status docstring (Py) and readStatus JSDoc (TS) to reference ensure_session_state_file / ensureSessionStateFile and describe the actual inference rules (change-log -> complete, activity-log -> in-progress, neither -> not-started). Cosmetic only.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 15,
+      "stepKey": "session-2/run-tests-final",
+      "dateTime": "2026-05-01T12:47:46.590944-04:00",
+      "description": "Final ai-router suite: 647 passed (627 baseline + 20 new in test_read_status.py). TypeScript: tsc clean, esbuild compile clean, eslint clean (only pre-existing warning).",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

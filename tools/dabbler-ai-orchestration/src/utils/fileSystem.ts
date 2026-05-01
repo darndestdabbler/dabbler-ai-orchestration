@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { listGitWorktrees } from "./git";
+import { readStatus } from "./sessionState";
 import {
   SessionSet,
   SessionState,
@@ -129,10 +130,22 @@ export function readSessionSets(root: string): SessionSet[] {
     const aiAssignmentPath = path.join(dir, "ai-assignment.md");
     const uatChecklistPath = path.join(dir, `${entry.name}-uat-checklist.json`);
 
+    // Set 7 invariant: state is read directly from session-state.json's
+    // canonical `status` (with lazy-synth fallback for any folder that
+    // slipped through backfill). The display labels here keep the
+    // extension's existing surface — `complete` from the file maps to
+    // `done` on the tree view; future statuses (e.g. Set 8's
+    // `cancelled`) collapse to `not-started` until they get their own
+    // column.
+    const status = readStatus(dir);
     let state: SessionState;
-    if (fs.existsSync(changeLogPath)) state = "done";
-    else if (fs.existsSync(activityPath) || fs.existsSync(statePath)) state = "in-progress";
-    else state = "not-started";
+    if (status === "complete") {
+      state = "done";
+    } else if (status === "in-progress") {
+      state = "in-progress";
+    } else {
+      state = "not-started";
+    }
 
     let totalSessions: number | null = null;
     let sessionsCompleted = 0;

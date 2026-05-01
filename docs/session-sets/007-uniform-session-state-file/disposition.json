@@ -1,15 +1,23 @@
 {
   "status": "completed",
-  "summary": "Set 7 Session 1: landed the writers (synthesize_not_started_state, backfill_session_state_files, the python -m ai_router.backfill_session_state CLI). Added 21 tests. Ran the backfill on this repo, which synthesized session-state.json for sets 007/008/009 (sets 001-006 were preserved untouched). Cross-provider verification VERIFIED after a fix-issues round (return-type contract, missing test, atomic-write race).",
+  "summary": "Set 7 Session 2: switched every state-reading site from file-presence branching to reading session-state.json's canonical `status`. Added read_status() (Python) / readStatus() (TS) with shared canonical-loader + lazy-synth fallback. The fallback uses _backfill_payload / backfillPayload inference so a legacy folder that slipped through Set 7 Session 1's backfill is classified by current file presence (change-log -> complete; activity-log -> in-progress; neither -> not-started) instead of being regressed to not-started. Tolerant alias canonicalization at the read boundary (\"completed\" -> \"complete\", \"done\" -> \"complete\") preserves the spec's \"backfill leaves drifted files untouched\" rule while preventing reader regressions on sets 005/006. The reconciler stranded-sweep, close-out gate idempotency check, and current_lifecycle_state were intentionally NOT collapsed: each operates on the events ledger (the authoritative source per existing codebase convention), and a coarse read_status pre-filter would either duplicate the events check or mask drift those readers exist to surface; documented inline. Cross-provider verification VERIFIED on round 3 after addressing two rounds of findings (1: read_status validation hole + missing tests; 2: lazy-synth misclassified legacy folders).",
   "files_changed": [
     "ai-router/session_state.py",
-    "ai-router/backfill_session_state.py",
-    "ai-router/tests/test_session_state_backfill.py",
+    "ai-router/session_log.py",
+    "ai-router/__init__.py",
+    "ai-router/close_session.py",
+    "ai-router/session_events.py",
+    "ai-router/tests/test_read_status.py",
+    "tools/dabbler-ai-orchestration/src/utils/sessionState.ts",
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "scripts/verify_session_007_2.py",
     "docs/session-sets/007-uniform-session-state-file/session-state.json",
     "docs/session-sets/007-uniform-session-state-file/activity-log.json",
-    "docs/session-sets/007-uniform-session-state-file/session-reviews/session-001.md",
-    "docs/session-sets/008-cancelled-session-set-status/session-state.json",
-    "docs/session-sets/009-alignment-audit-followups/session-state.json"
+    "docs/session-sets/007-uniform-session-state-file/disposition.json",
+    "docs/session-sets/007-uniform-session-state-file/session-reviews/session-002.md"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
@@ -20,7 +28,7 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 1 landed cleanly with VERIFIED on round 2; the same orchestrator is well-positioned to drive Session 2 (reader collapses) with full context on the writers and the lazy-synth fallback path."
+      "specifics": "Session 2 landed VERIFIED after three verifier rounds; same orchestrator has full context on the read_status helper, the lazy-synth-via-backfill-inference fallback, and the deliberate non-collapses (reconciler / gate idempotency / current_lifecycle_state) needed for Session 3's bootstrap-and-docs work."
     }
   },
   "blockers": []

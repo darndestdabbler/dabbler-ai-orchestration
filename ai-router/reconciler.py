@@ -234,6 +234,19 @@ def _evaluate_one(
     at the default which invokes :func:`close_session.run` in-process.
     """
     entry = ReconcileEntry(session_set_dir=session_set_dir, action="")
+
+    # Note (Set 7): The reconciler's authoritative state source is the
+    # session-events ledger (via :func:`current_lifecycle_state` below) —
+    # the ledger is the truth. ``session-state.json`` is the in-memory
+    # snapshot consumers read; the ledger is what tracks lifecycle
+    # transitions including the stranded states this sweep is meant to
+    # catch. Adding a coarse ``read_status`` pre-filter here would
+    # either duplicate the events check (no win) or, worse, mask drift
+    # the reconciler is meant to surface (a snapshot saying "complete"
+    # while the ledger still shows ``closeout_pending``). The stranded
+    # sweep stays events-driven; ``read_status`` callers are the
+    # in-process readers that don't need ledger granularity.
+
     events = read_events(session_set_dir)
     if not events:
         entry.action = "skipped_no_events"

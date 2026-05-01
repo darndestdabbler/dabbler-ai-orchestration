@@ -1110,11 +1110,14 @@ from .cost_report import get_costs, print_cost_report
 def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
     """Print a status table of every session set under *base_dir*.
 
-    State is derived from file presence in each set's directory — see
-    :func:`find_active_session_set` for the same rules. Sets are grouped
-    in the table by state (in-progress first, then not-started, then done),
+    State is read from each set's ``session-state.json`` via
+    :func:`read_status` (Set 7 invariant: every folder has one, lazy-synth
+    fallback for any that slipped through backfill). Sets are grouped in
+    the table by state (in-progress first, then not-started, then done),
     then sorted by most recently touched within each group.
     """
+    from .session_state import read_status
+
     if not os.path.isdir(base_dir):
         print(f"(no session-sets directory at {base_dir})")
         return
@@ -1132,13 +1135,18 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
             continue
 
         activity_path = os.path.join(path, "activity-log.json")
-        changelog_path = os.path.join(path, "change-log.md")
         state_path = os.path.join(path, SESSION_STATE_FILENAME)
 
         sessions_completed = 0
         total_sessions: Optional[int] = None
         last_touched: Optional[str] = None
 
+        # Activity log carries per-session count + per-step timestamps;
+        # the state file only has start/complete-of-current-session
+        # timestamps and the canonical totalSessions. Reading both gives
+        # us a richer "last touched" (latest activity entry vs.
+        # session-state's start/complete) without changing the state
+        # decision, which is now read from `status` alone.
         if os.path.isfile(activity_path):
             try:
                 with open(activity_path, "r", encoding="utf-8") as f:
@@ -1157,9 +1165,6 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
             except Exception:
                 pass
 
-        # Session-state.json is the earlier signal — it is written at the
-        # start of session 1 before any activity-log entry exists, so a
-        # newly-started set still shows up as in-progress here.
         if os.path.isfile(state_path):
             try:
                 with open(state_path, "r", encoding="utf-8") as f:
@@ -1172,11 +1177,18 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
             except Exception:
                 pass
 
-        if os.path.isfile(changelog_path):
+        # Single source of truth for state: read_status. The "done"
+        # display label maps from the canonical "complete" status —
+        # other consumers (Set 8 cancel/restore) may extend the set
+        # of recognized values without changing this surface.
+        status = read_status(path)
+        if status == "complete":
             state = "done"
-        elif os.path.isfile(activity_path) or os.path.isfile(state_path):
+        elif status == "in-progress":
             state = "in-progress"
         else:
+            # not-started, cancelled, or any future status all render
+            # under "not-started" until they get their own column.
             state = "not-started"
 
         record = {

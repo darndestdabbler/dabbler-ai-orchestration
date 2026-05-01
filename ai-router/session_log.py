@@ -12,15 +12,17 @@ def find_active_session_set(base_dir: str = "docs/session-sets") -> str:
 
     Detection rules (in priority order):
 
-    1. **In-progress** — has ``spec.md`` + (``activity-log.json`` OR
-       ``session-state.json``) but **no** ``change-log.md``. If exactly one
-       exists, return it. ``session-state.json`` is the earlier signal — it is
-       written at the start of session 1 before any activity-log entry exists.
+    1. **In-progress** — ``status == "in-progress"`` in ``session-state.json``.
+       If exactly one such set exists, return it.
 
-    2. **Not-started** — has ``spec.md`` but neither ``activity-log.json``,
-       ``session-state.json``, nor ``change-log.md``. If exactly one
-       in-progress candidate was found (rule 1), ignore not-started ones.
-       If zero in-progress, and exactly one not-started, return it.
+    2. **Not-started** — ``status == "not-started"`` in
+       ``session-state.json``. If exactly one in-progress candidate was found
+       (rule 1), ignore not-started ones. If zero in-progress, and exactly one
+       not-started, return it.
+
+    The function reads each candidate's ``status`` via :func:`read_status`,
+    which lazy-synthesizes ``session-state.json`` for any folder with a
+    ``spec.md`` but no state file (Set 7 invariant).
 
     Raises ``SystemExit`` with a descriptive message if the result is ambiguous
     (multiple in-progress, or multiple not-started with no in-progress) or if no
@@ -33,6 +35,13 @@ def find_active_session_set(base_dir: str = "docs/session-sets") -> str:
     Returns:
         The path of the single active session set directory.
     """
+    # Lazy import: session_state imports session_events which would form a
+    # cycle through some test paths if pulled in at module load.
+    try:
+        from session_state import read_status  # type: ignore[import-not-found]
+    except ImportError:
+        from .session_state import read_status  # type: ignore[no-redef]
+
     if not os.path.isdir(base_dir):
         raise SystemExit(
             f"Session-sets directory not found: {base_dir!r}\n"
@@ -47,21 +56,15 @@ def find_active_session_set(base_dir: str = "docs/session-sets") -> str:
         if not os.path.isdir(path):
             continue
 
-        has_spec      = os.path.isfile(os.path.join(path, "spec.md"))
-        has_activity  = os.path.isfile(os.path.join(path, "activity-log.json"))
-        has_state     = os.path.isfile(os.path.join(path, "session-state.json"))
-        has_changelog = os.path.isfile(os.path.join(path, "change-log.md"))
-
-        if not has_spec:
+        if not os.path.isfile(os.path.join(path, "spec.md")):
             continue  # not a recognised session set directory
 
-        if has_changelog:
-            continue  # complete — skip
-
-        if has_activity or has_state:
+        status = read_status(path)
+        if status == "in-progress":
             in_progress.append(path)
-        else:
+        elif status == "not-started":
             not_started.append(path)
+        # "complete" / "cancelled" / unknown → skip
 
     if len(in_progress) == 1:
         return in_progress[0]

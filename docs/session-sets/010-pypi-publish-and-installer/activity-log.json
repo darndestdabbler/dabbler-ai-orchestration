@@ -1,0 +1,211 @@
+{
+  "sessionSetName": "010-pypi-publish-and-installer",
+  "createdDate": "2026-05-01T22:05:55-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-1/register-start",
+      "dateTime": "2026-05-01T22:05:55-04:00",
+      "description": "register_session_start: wrote session-state.json with currentSession=1, status=in-progress, lifecycleState=work_in_progress, orchestrator=claude-code/anthropic/claude-opus-4-7/high.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-1/ai-assignment",
+      "dateTime": "2026-05-01T22:08:00-04:00",
+      "description": "Authored ai-assignment.md directly per the standing operator constraint (no mid-session router calls beyond verification). Recommends Opus high-effort for both Session 1 and Session 2.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-1/git-mv-rename",
+      "dateTime": "2026-05-01T22:09:00-04:00",
+      "description": "git mv ai-router ai_router. 40+ file rename entries; full directory contents moved with no content loss.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-1/pytest-ini",
+      "dateTime": "2026-05-01T22:10:00-04:00",
+      "description": "Updated pytest.ini testpaths from ai-router/tests to ai_router/tests.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/internal-refs",
+      "dateTime": "2026-05-01T22:13:00-04:00",
+      "description": "Updated internal references inside the renamed ai_router/ via sed (36 files: Python sources, docstrings, router-config.yaml, schemas/disposition.schema.json, docs/close-out.md, docs/two-cli-workflow.md, all tests). Then hand-rewrote stale 'hyphenated package import' comments in disposition.py, orchestrator_role.py, verifier_role.py, conftest.py, test_disposition.py, test_failure_injection.py, test_print_session_set_status_cancelled.py, test_session_events.py.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/version-export",
+      "dateTime": "2026-05-01T22:14:00-04:00",
+      "description": "Added __version__ = '0.1.0' to ai_router/__init__.py.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-1/agent-files",
+      "dateTime": "2026-05-01T22:16:00-04:00",
+      "description": "Updated CLAUDE.md, AGENTS.md, GEMINI.md: file-map bullet, Building & testing block (now `pip install -e .[tests]` from repo root), AI router import block in AGENTS/GEMINI replaced with `from ai_router import route`.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-1/readme",
+      "dateTime": "2026-05-01T22:18:00-04:00",
+      "description": "Updated README.md: TOC anchor, file map's ### ai-router/ heading -> ### ai_router/, every ai_router/foo.py link, and the Adopting section (Step 1 mentions ai_router/ + pyproject.toml; Step 3 -> pip install -e .; Step 4 -> from ai_router import route).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-1/workflow-doc",
+      "dateTime": "2026-05-01T22:19:00-04:00",
+      "description": "Updated docs/ai-led-session-workflow.md: rewrote Importing the Router section (drops importlib shim), updated all 15 path references.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-1/planning-docs",
+      "dateTime": "2026-05-01T22:20:00-04:00",
+      "description": "Updated docs/planning/repo-worktree-layout.md, lessons-learned.md, session-set-authoring-guide.md, docs/session-state-schema-example.md path refs.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "session-1/verify-scripts",
+      "dateTime": "2026-05-01T22:22:00-04:00",
+      "description": "Replaced importlib shim with direct `import ai_router` in 13 scripts/verify_session_*.py files (after sys.path.insert of repo root). Removed unused `import importlib.util` lines.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 12,
+      "stepKey": "session-1/extension-ts",
+      "dateTime": "2026-05-01T22:24:00-04:00",
+      "description": "Updated tools/dabbler-ai-orchestration/ TS sources, webview HTML, and README path refs. dist/ NOT rebuilt this session - Session 3 packages v0.12.0 with the install command.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 13,
+      "stepKey": "session-1/pyproject-toml",
+      "dateTime": "2026-05-01T22:26:00-04:00",
+      "description": "Authored pyproject.toml at repo root: PEP 621 schema, name=dabbler-ai-router, version=0.1.0, requires-python=>=3.10, dependencies (pyyaml, httpx), [project.optional-dependencies] tests, [project.scripts] for the 7 CLI surfaces (close_session, report, reconciler, queue_status, heartbeat_status, restart_role, backfill_session_state) per spec, [tool.setuptools.packages.find] targeting ai_router*, [tool.setuptools.package-data] including the YAML/MD/JSON resources.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 14,
+      "stepKey": "session-1/proposal-path-notes",
+      "dateTime": "2026-05-01T22:50:00-04:00",
+      "description": "Added explicit Path note (2026-05-01) headers to docs/proposals/2026-04-29-session-close-out-reliability.md, 2026-04-30-combined-design-alignment-audit.md, 2026-05-01-combined-design-realignment-audit.md marking dashed-path body refs as audit-date snapshots, per the Session 1 progress key carveout.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 15,
+      "stepKey": "session-1/smoke-test",
+      "dateTime": "2026-05-01T22:30:00-04:00",
+      "description": "Created fresh .venv at repo root via `python -m venv .venv --copies`. Ran `.venv/Scripts/pip install -e \".[tests]\"` - editable wheel built and installed cleanly. Confirmed `import ai_router` works without any shim; ai_router.__version__ -> '0.1.0'; ai_router.__file__ resolves to the in-repo path.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 16,
+      "stepKey": "session-1/pytest-suite",
+      "dateTime": "2026-05-01T22:36:00-04:00",
+      "description": "Ran `PYTHONPATH=. C:/Python311/python.exe -m pytest -q` -> 676 passed in 49.50s (matches set 009 close baseline). Two tests in test_restart_role.py::TestRestartAgainstRealDaemon fail under the fresh .venv interpreter due to a Windows venv-launcher PID redirector quirk (subprocess.Popen.pid != os.getpid() inside the spawned script); pre-existing platform-specific issue, not a rename regression.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 17,
+      "stepKey": "session-1/verification-r1",
+      "dateTime": "2026-05-01T22:40:00-04:00",
+      "description": "End-of-session cross-provider verification round 1 via gpt-5-4 ($0.0767). ISSUES_FOUND with 2 Major: (a) verify_session_*.py shim should be replaced (not just path-updated); (b) [project.scripts] keys should match spec literal names. Both addressed in-session.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.0766625
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 18,
+      "stepKey": "session-1/verification-r2",
+      "dateTime": "2026-05-01T22:48:00-04:00",
+      "description": "Round 2 verification via gpt-5-4 ($0.1547). ISSUES_FOUND with 2 prose concerns: (a) literal old path in forward-looking docs' historical-context parens; (b) proposal-doc carveout needs explicit historical citation. Addressed: rephrased the parens in README/AGENTS/GEMINI/workflow doc; added Path note (2026-05-01) headers to all 3 proposals.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.154685
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 19,
+      "stepKey": "session-1/verification-r3",
+      "dateTime": "2026-05-01T22:55:00-04:00",
+      "description": "Round 3 verification via gpt-5-4 ($0.0941). VERIFIED with one non-blocking note about the Windows venv-launcher PID quirk (already documented in the prompt; flagged for follow-up in Session 2 or later, not a rename regression).",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.0940625
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 20,
+      "stepKey": "session-1/commit-push",
+      "dateTime": "2026-05-01T23:00:00-04:00",
+      "description": "Committed Session 1 changes (121 files, +1626 / -466). Push succeeded (d2b76ed). dist/extension.js* uncommitted changes (forceClosed work from set 009) intentionally left untouched. Authored disposition.json + activity-log.json as close_session preconditions.",
+      "status": "completed",
+      "routedApiCalls": []
+    }
+  ]
+}

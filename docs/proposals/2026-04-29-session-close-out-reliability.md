@@ -1,9 +1,33 @@
 ---
 title: Session close-out reliability — mechanize the gate, route a fresh turn
-status: superseded — combined with outsource-last mode (see note at top of body)
+status: COMPLETE — implementation verified by cross-provider re-audit (2026-05-01)
 date: 2026-04-29
 authors: human + Claude (Sonnet 4.6), reviewed by Gemini Pro + GPT-5.4
 applies-to: dabbler-ai-orchestration (ai-router/, docs/ai-led-session-workflow.md)
+---
+
+> ## ✓ COMPLETE — Combined design verified FULLY ALIGNED by cross-provider re-audit (2026-05-01)
+>
+> **Implementation under audit:** Sets 001–009 (Sets 001–006 = original
+> combined design; Set 009 = corrective work for the 2026-04-30 audit).
+>
+> **Re-audit verdicts (both providers, independent reads):**
+> - **Gemini Pro:** FULLY ALIGNED
+> - **GPT-5.4:** FULLY ALIGNED
+>
+> **Re-audit document:** [`docs/proposals/2026-05-01-combined-design-realignment-audit.md`](2026-05-01-combined-design-realignment-audit.md)
+>
+> **Cumulative cross-provider verification cost:** $0.7811 across the
+> original audit and three corrective-work verifications + the re-audit.
+>
+> The combined close-out reliability + outsource-last operating-mode
+> design is shipped and verified. The original 2026-04-30 audit's three
+> corrective drift items (D-1, D-2, D-3) all landed in Set 009 Sessions
+> 1–3; the three follow-up items (D-4, F-1, F-2) were explicitly skipped
+> with written rationale per the spec's acceptance criterion. See the
+> re-audit document for full evidence and the residual operational
+> assumptions baked into the chosen corrective paths.
+
 ---
 
 > ## SUPERSEDED — combined with outsource-last mode (2026-04-30)

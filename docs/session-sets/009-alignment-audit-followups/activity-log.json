@@ -274,6 +274,112 @@
           "costUsd": 0.0073225
         }
       ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 0,
+      "stepKey": "session-4/skipped-by-operator-decision",
+      "dateTime": "2026-05-01T20:00:00.000000-04:00",
+      "description": "Session 4 (F-1, F-2, D-4 follow-ups) skipped by operator decision per spec acceptance criterion 'explicitly skipped with written rationale'. Rationale recorded in ai-assignment.md Session 4 block. Audit pre-classified all three items as FOLLOW-UP (not corrective); none block re-audit verdict. F-1 deferred (lower-priority test coverage); F-2 better suited to a future outsource-last set (set 009 is outsourceMode: first); D-4 duplicative of existing unit-test coverage in test_gate_checks.py and test_cost_report.py. Set proceeds directly to Session 5 (re-audit).",
+      "status": "skipped",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 1,
+      "stepKey": "session-5/register-start",
+      "dateTime": "2026-05-01T20:45:38.608036-04:00",
+      "description": "Register Session 5 start in session-state.json (currentSession=5, status=in-progress)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 2,
+      "stepKey": "session-5/ai-assignment",
+      "dateTime": "2026-05-01T20:45:38.608036-04:00",
+      "description": "Append Session 4 SKIPPED block + Session 5 plan block to ai-assignment.md",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "session-5/trace-regeneration",
+      "dateTime": "2026-05-01T21:00:00.000000-04:00",
+      "description": "Regenerate failure-injection trace artifact: 8 scenarios passed in 7.55s (was 7 at original audit; +TestScenario7CrossSetParallelRejection)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 4,
+      "stepKey": "session-5/realignment-audit-doc",
+      "dateTime": "2026-05-01T21:05:00.000000-04:00",
+      "description": "Write docs/proposals/2026-05-01-combined-design-realignment-audit.md with §1 D-1/D-2/D-3 evidence, §2 follow-up skip rationales, §3 test count delta, §4 corrected open questions, §5 deferred items, §§6-8 placeholders for verdicts",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "session-5/prompt-template",
+      "dateTime": "2026-05-01T21:10:00.000000-04:00",
+      "description": "Author C:/temp/dabbler-realignment-audit-prompt.md and C:/temp/route_realignment_audit.py",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "session-5/reaudit-gemini-pro",
+      "dateTime": "2026-05-01T21:13:00.000000-04:00",
+      "description": "Cross-provider re-audit routed to Gemini Pro (analysis task type). Verdict: FULLY ALIGNED",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 19077,
+          "outputTokens": 1001,
+          "costUsd": 0.0339
+        }
+      ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "session-5/reaudit-gpt-5-4",
+      "dateTime": "2026-05-01T21:15:00.000000-04:00",
+      "description": "Cross-provider re-audit routed to GPT-5.4 (analysis task type). Verdict: FULLY ALIGNED",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "analysis",
+          "inputTokens": 16921,
+          "outputTokens": 7619,
+          "costUsd": 0.1566
+        }
+      ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 8,
+      "stepKey": "session-5/verdicts-and-stamps",
+      "dateTime": "2026-05-01T21:18:00.000000-04:00",
+      "description": "Append both verbatim verdicts to realignment audit Sections 6 and 7; populate Section 8 synthesis. Apply completion stamps to (1) docs/proposals/2026-04-29-session-close-out-reliability.md, (2) docs/proposals/2026-04-30-combined-design-alignment-audit.md, (3) docs/proposals/2026-05-01-combined-design-realignment-audit.md",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 9,
+      "stepKey": "session-5/pytest-sanity",
+      "dateTime": "2026-05-01T21:20:00.000000-04:00",
+      "description": "Sanity-check full ai-router test suite: 676 passed in 56.07s (no regressions; doc-only changes this session)",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

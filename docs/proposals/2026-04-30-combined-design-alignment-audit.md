@@ -1,5 +1,24 @@
 # Combined Design Alignment Audit (Close-Out Reliability + Outsource-Last)
 
+> ## ✓ COMPLETE — corrective work landed; re-audit verdicts FULLY ALIGNED (2026-05-01)
+>
+> The three corrective drift items flagged below (D-1, D-2, D-3) all
+> landed in Set 009 Sessions 1–3. The three follow-up items (D-4, F-1,
+> F-2) were explicitly skipped with written rationale.
+>
+> **Re-audit verdicts** (both providers, independent reads of the post-
+> Set-009 implementation):
+> - **Gemini Pro:** FULLY ALIGNED (was: ALIGNED WITH MINOR DRIFT)
+> - **GPT-5.4:** FULLY ALIGNED (was: MATERIAL DRIFT)
+>
+> **Re-audit document:** [`docs/proposals/2026-05-01-combined-design-realignment-audit.md`](2026-05-01-combined-design-realignment-audit.md)
+> contains full evidence of D-1/D-2/D-3 landings, Session 4 skip
+> rationales, the verbatim re-audit reviews from both providers, and
+> the residual operational assumptions to revisit if usage patterns
+> change.
+
+---
+
 **Audit date:** 2026-05-01
 **Implementation under audit:** Sets 001–006 of the combined design
 **Source proposal:** `docs/proposals/2026-04-29-session-close-out-reliability.md`

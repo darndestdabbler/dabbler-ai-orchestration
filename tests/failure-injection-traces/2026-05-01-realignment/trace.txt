@@ -1,0 +1,18 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-8.1.1, pluggy-1.4.0 -- C:\Python311\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\denmi\source\repos\dabbler-ai-orchestration
+configfile: pytest.ini
+plugins: anyio-4.13.0
+collecting ... collected 8 items
+
+ai-router/tests/test_failure_injection.py::TestScenario1LeaseExpiration::test_killed_verifier_lease_expires_then_second_verifier_completes PASSED [ 12%]
+ai-router/tests/test_failure_injection.py::TestScenario2HeartbeatTimeoutEscalation::test_repeated_lease_expiry_transitions_to_timed_out PASSED [ 25%]
+ai-router/tests/test_failure_injection.py::TestScenario3TruncatedSQLiteRecovery::test_kill_during_complete_recovers_via_wal_replay PASSED [ 37%]
+ai-router/tests/test_failure_injection.py::TestScenario4CLISessionReset::test_kill_daemon_then_restart_completes_message PASSED [ 50%]
+ai-router/tests/test_failure_injection.py::TestScenario5ConcurrentClaims::test_two_workers_race_exactly_one_wins PASSED [ 62%]
+ai-router/tests/test_failure_injection.py::TestScenario6ModeSwitchMidSet::test_invalid_outsource_last_spec_raises_at_route_time PASSED [ 75%]
+ai-router/tests/test_failure_injection.py::TestScenario7CrossSetParallelRejection::test_loser_of_push_race_gate_fails_loud PASSED [ 87%]
+ai-router/tests/test_failure_injection.py::TestInProcessLifecycleSmoke::test_run_one_completes_pre_enqueued_message PASSED [100%]
+
+============================== 8 passed in 7.55s ==============================

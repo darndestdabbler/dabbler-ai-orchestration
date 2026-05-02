@@ -1,48 +1,20 @@
 {
   "status": "completed",
-  "summary": "Set 9 Session 3 (D-2): Hard-scoped close_session --force to incident-recovery use only. Added closeout_force_used to EVENT_TYPES (deliberate frozen-enum exception, justified inline). Gated --force on AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1 and a mandatory --reason-file in close_session._validate_args; emit a loud WARNING to both outcome.messages (stdout/JSON) and the module logger (stderr); emit closeout_force_used to the events ledger with the operator's reason as a payload field. Threaded forced through _flip_state_to_closed and mark_session_complete so session-state.json carries forceClosed: true on emergency-bypass close-outs only when the bypass actually mattered (failing gates). Added forceClosed to the TS LiveSession type, fileSystem.ts loader, and a [FORCED] description badge + tooltip line in SessionSetsProvider. Updated close-out.md Section 5 (full --force entry rewrite), Section 2 flag-summary row, and Section 2 combination-rules block. Added forceClosedBadge.test.ts (4 cases: true/false/null/null-liveSession) and updated existing Python tests with a unified CLI happy-path test, lock-acquisition spy assertions, and refreshed warning-text expectations. All 676 Python tests pass; cross-provider verification VERIFIED (Round 3, GPT-5.4) after Round 1 raised four issues — two were context-gaps fixed by surfacing the loader and combination-rules block in the Round 2 prompt, two were genuine test-coverage gaps (no-lock-acquired spy + unified CLI happy-path test) fixed in Round 2 with the spy assertion further refined in Round 3.",
+  "summary": "Set 9 Session 5 (re-audit): Routed the realignment audit document through both Gemini Pro and GPT-5.4 as the cross-provider re-audit per spec acceptance criteria. Both providers returned FULLY ALIGNED on independent reads. The combined close-out reliability + outsource-last operating-mode design is shipped and verified. Wrote docs/proposals/2026-05-01-combined-design-realignment-audit.md (recommended new dated doc over appending to original audit) with §1 D-1/D-2/D-3 evidence, §2 follow-up skip rationales (Session 4 was operator-skipped with written rationale per spec; both reviewers accepted skip rationales), §3 test count delta (606 → 676), §4 corrected open questions 2 and 7, §5 deferred items, §6 Gemini Pro verbatim verdict (FULLY ALIGNED, $0.0339), §7 GPT-5.4 verbatim verdict (FULLY ALIGNED, $0.1566), §8 synthesis with three completion stamps applied. Stamps applied to: (1) docs/proposals/2026-04-29-session-close-out-reliability.md, (2) docs/proposals/2026-04-30-combined-design-alignment-audit.md, (3) docs/proposals/2026-05-01-combined-design-realignment-audit.md. Authored change-log.md and session-005.md. Test suite: 676 passed in 56.07s (no regressions; doc-only changes this session). Aggregate Set 009 cross-provider verification cost: $0.7811 ($0.1910 S1 + $0.1453 S2 + $0.2543 S3 + $0.0000 S4 skipped + $0.1905 S5).",
   "files_changed": [
-    "ai-router/session_events.py",
-    "ai-router/close_session.py",
-    "ai-router/session_state.py",
-    "ai-router/docs/close-out.md",
-    "ai-router/tests/test_close_session_skeleton.py",
-    "ai-router/tests/test_close_session_integration.py",
-    "ai-router/tests/test_mark_session_complete_gate.py",
-    "ai-router/tests/test_session_events.py",
-    "tools/dabbler-ai-orchestration/src/types.ts",
-    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
-    "tools/dabbler-ai-orchestration/src/providers/SessionSetsProvider.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/forceClosedBadge.test.ts",
-    "scripts/verify_session_009_3.py",
-    "scripts/verify_session_009_3_round2.py",
-    "scripts/verify_session_009_3_round3.py",
+    "docs/proposals/2026-04-29-session-close-out-reliability.md",
+    "docs/proposals/2026-04-30-combined-design-alignment-audit.md",
+    "docs/proposals/2026-05-01-combined-design-realignment-audit.md",
     "docs/session-sets/009-alignment-audit-followups/session-state.json",
     "docs/session-sets/009-alignment-audit-followups/ai-assignment.md",
     "docs/session-sets/009-alignment-audit-followups/activity-log.json",
     "docs/session-sets/009-alignment-audit-followups/disposition.json",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003.md",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003-prompt.md",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003-meta.json",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003-round-2.md",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003-round-2-prompt.md",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003-round-2-meta.json",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003-round-3.md",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003-round-3-prompt.md",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-003-round-3-meta.json",
-    "docs/session-sets/009-alignment-audit-followups/session-reviews/issues-003.json"
+    "docs/session-sets/009-alignment-audit-followups/change-log.md",
+    "docs/session-sets/009-alignment-audit-followups/session-reviews/session-005.md",
+    "tests/failure-injection-traces/2026-05-01-realignment/trace.txt"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 4 is optional — F-1 (close-out trigger failure failure-injection scenario), F-2 (heartbeat alerter module), D-4 (widen failure-injection trace coverage). None block completion of the set; the operator may skip directly to Session 5 (re-audit). If Session 4 runs, surface spans test-infrastructure + new module work (concurrency-adjacent) where Opus high-effort matches the stakes; if Session 4 is skipped, the recommendation re-targets to Session 5 with the same orchestrator."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": []
 }

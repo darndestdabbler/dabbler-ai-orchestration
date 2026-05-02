@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Project wizard, session-set explorer, and cost dashboard for the Dabbler AI-led workflow.",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -189,6 +189,18 @@
         "command": "dabblerSessionSets.restore",
         "title": "Restore Session Set",
         "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.installAiRouter",
+        "title": "Install ai-router",
+        "category": "Dabbler",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "dabblerSessionSets.updateAiRouter",
+        "title": "Update ai-router",
+        "category": "Dabbler",
+        "icon": "$(sync)"
       }
     ],
     "menus": {
@@ -331,6 +343,16 @@
           "type": "string",
           "default": "tests",
           "markdownDescription": "Root directory (relative to workspace root) to search for E2E test files. Defaults to `tests/`."
+        },
+        "dabblerSessionSets.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "markdownDescription": "Python executable used by `Dabbler: Install ai-router` and `Dabbler: Update ai-router` for venv detection / creation and `pip install` commands. Accepts an absolute path, a workspace-relative path (e.g. `.venv/Scripts/python.exe`), or a bare command on `PATH`. When the path points at an interpreter inside an existing venv (parent dir is `Scripts/` or `bin/`), the install command treats that venv as the install target instead of hunting for `.venv/` at the workspace root. Falls back to `dabblerProviderQueues.pythonPath` if unset."
+        },
+        "dabblerSessionSets.aiRouterRepoUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Git repo URL the `Dabbler: Install ai-router` command's GitHub-fallback path clones from. Leave blank to use the upstream Dabbler repository. Override to point at a fork — handy for fork-trackers who want the GitHub fallback to pull *their* tags / branches rather than upstream's."
         },
         "dabblerProviderQueues.autoRefreshSeconds": {
           "type": "number",

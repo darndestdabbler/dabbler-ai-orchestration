@@ -1,32 +1,30 @@
 {
   "status": "completed",
-  "summary": "Set 10 Session 2 (3-session set, second non-final session): Authored the GitHub Actions release workflow + per-release runbook for publishing dabbler-ai-router to PyPI via OIDC trusted publishing, collapsed the README adoption section from the 60-line walkthrough to the spec's `pip install dabbler-ai-router + tuning + first set` shape, foreshadowed the Session 3 install command in the extension README's Requirements section, and tightened the pyproject.toml packaging so tests no longer ship in the wheel. Pre-session check confirmed `dabbler-ai-router` is available on PyPI (httpx GET against the JSON API returned 404). Deliverables: .github/workflows/release.yml (3 jobs: classify -> build -> publish-testpypi/publish-pypi; classify uses strict regexes to gate RC vs final tags; build verifies tag matches PEP 440 normalized pyproject version via packaging.version.Version; publish jobs gated by `is_rc`/`is_final` outputs and protected behind `pypi`/`testpypi` deployment environments; OIDC `id-token: write` only on the publish jobs); docs/planning/release-process.md (one-time PyPI/TestPyPI trusted-publisher setup, GitHub deployment-environment setup with required-reviewer guidance, RC dry-run section explaining the v0.1.0-rc1 git tag vs 0.1.0rc1 PEP 440 version asymmetry, per-release checklist, rollback path including PyPI's no-re-upload constraint and yank semantics, failure-modes table, maintenance section); README.md adoption section collapsed (was 60 lines, now ~25 lines: install command + tuning bullets + first-set bullet + editable/source-install fallback + forward-reference to Session 3's install command); tools/dabbler-ai-orchestration/README.md Requirements section augmented with the v0.1 PyPI install path; pyproject.toml exclude/namespaces tightened (wheel went from 80 entries with 35 test files to 45 entries with 0 test files; package data preserved; entry_points unchanged); MANIFEST.in added for sdist parity. Verification: 2 rounds via gpt-5-4. Round 1 ISSUES_FOUND with 2 Major (broken tag/version check for RCs; over-permissive publish-pypi gate that could publish e.g. v1.0.0rc1) + 1 Minor (runbook didn't match the broken workflow); both Major issues addressed by introducing the classify job with strict regexes + PEP 440 Version comparison. Round 2 VERIFIED with one human-handoff follow-up (the publish path is authored correctly but not yet empirically proven until the human completes the trusted-publisher setup and pushes the first tag) and one trivial Minor (runbook hardcoded `CHANGELOG.md` in the commit example) which was fixed in-session. Cumulative routed cost this session: $0.289 ($0.1615 round 1 + $0.1279 round 2). Tests: 676 passed (no Python source touched this session). Human handoff for set close-out: the v0.1.0 tag push is operator-driven; Session 3 should be started either after the publish has landed OR with explicit acknowledgment that the install command can fall back to the GitHub sparse-checkout path until then.",
+  "summary": "Set 10 Session 3 (final session): Shipped Dabbler: Install ai-router and Dabbler: Update ai-router commands plus a graceful 'not configured' tree-item refactor in the Provider Queues / Heartbeats views, and authored the set's change-log.md. Pre-session check confirmed PyPI v0.1.0 is live (HTTP 200). New code: src/utils/aiRouterInstall.ts (pure-logic install core with DI'd ProcessSpawner / FileOps / InstallPrompts; PyPI path materializes ai_router/router-config.yaml from importlib.resources on a fresh install; GitHub path resolves latest release tag via git ls-remote, copies sparse checkout to the persistent .dabbler/ai-router-src/ for editable install, wipes stale workspace ai_router/ before copying, stash-and-restore protocol with retry/finalize wrapper that downgrades success to failure if config restore fails; ENOENT-only bootstrap fallback for venv creation; configurable repoUrl for fork support); src/commands/installAiRouterCommands.ts (VS Code wiring with QuickPick / withProgress / mkdirp-on-write fs adapter / Configuration.inspect-based settings fallback). Provider refactor: ProviderQueuesProvider + ProviderHeartbeatsProvider detect ModuleNotFoundError in parseFetchResult, store a _lastErrorReason, clear cache on any failure (so previously-successful fetches don't mask the new state), render notInstalled root + notInstalledAction child whose command fires dabblerSessionSets.installAiRouter directly (neutral info icons, distinct contextValues from the existing red-error path). Wiring: extension.ts registers the new commands; package.json bumped 0.11.0 -> 0.12.0 with new commands + dabblerSessionSets.pythonPath + dabblerSessionSets.aiRouterRepoUrl settings. Tests: src/test/suite/installAiRouter.test.ts with 47 standalone-mocha tests covering both install paths (8 PyPI + 8 GitHub), the detector (5), deriveVenvFromPythonPath (4), resolveLatestReleaseTag (3), early aborts (1), install-method marker round-trip (1), parseFetchResult for both providers (4), tree-item rendering for both providers (5), failure-invalidates-cache for both (3), and the venv-bootstrap edge cases (2). All 47 pass. Full unit suite: 140 passing, 3 failing (the 3 failures pre-exist on master and are unrelated to this session - confirmed by stashing the changes and re-running). Docs: README.md adoption section restructured to lead with the extension command (5-step flow + CLI fallback + editable/source-install fallback); tools/dabbler-ai-orchestration/README.md gained a new Install ai-router feature block + updated Requirements section (forward-references converted to v0.12 statements). VSIX: dabbler-ai-orchestration-0.12.0.vsix (329 KB, 18 files). Python tests: 676 passed in 52.89s (matches Sessions 1/2 baseline; no Python source touched this session). Verification: SEVEN rounds via gpt-5-4 (cost $1.7822 cumulative this session - far over the workflow's max-2-retries budget; each round caught real issues including a regression I introduced in round 6 that round 7 corrected). Round 7 returned VERIFIED with two Info-severity follow-ups documented in change-log.md Residual notes (install-method marker I/O not outcome-wrapped; GitHub re-installs intentionally wipe workspace ai_router/ preserving only router-config.yaml). Set close-out: change-log.md authored summarizing all 3 sessions; cumulative routed cost across the set $2.3970 vs spec projection $0.35-$0.70 (3.5x over - driven entirely by Session 3's seven-round iteration on a TS/Python/UX-coupled feature surface).",
   "files_changed": [
-    ".github/workflows/release.yml",
-    "docs/planning/release-process.md",
-    "MANIFEST.in",
-    "pyproject.toml",
-    "README.md",
+    "tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts",
+    "tools/dabbler-ai-orchestration/src/commands/installAiRouterCommands.ts",
+    "tools/dabbler-ai-orchestration/src/providers/ProviderQueuesProvider.ts",
+    "tools/dabbler-ai-orchestration/src/providers/ProviderHeartbeatsProvider.ts",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/installAiRouter.test.ts",
+    "tools/dabbler-ai-orchestration/package.json",
     "tools/dabbler-ai-orchestration/README.md",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix",
+    "README.md",
+    "scripts/verify_session_010_3.py",
     "docs/session-sets/010-pypi-publish-and-installer/ai-assignment.md",
     "docs/session-sets/010-pypi-publish-and-installer/session-state.json",
-    "docs/session-sets/010-pypi-publish-and-installer/session-reviews/session-002.md",
-    "docs/session-sets/010-pypi-publish-and-installer/session-reviews/session-002-prompt.md",
+    "docs/session-sets/010-pypi-publish-and-installer/session-reviews/session-003-prompt.md",
+    "docs/session-sets/010-pypi-publish-and-installer/session-reviews/session-003.md",
     "docs/session-sets/010-pypi-publish-and-installer/disposition.json",
     "docs/session-sets/010-pypi-publish-and-installer/activity-log.json",
-    "scripts/verify_session_010_2.py"
+    "docs/session-sets/010-pypi-publish-and-installer/change-log.md"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 3 is the largest single-session estimate in the set ($0.20-$0.35) and has the broadest TS/Python coupling (install command, router-config preservation logic, Provider Queues/Heartbeats graceful 'not configured' refactor, ~12-18 standalone-mocha tests, README screenshot-led collapse, VSIX rebuild). Opus high-effort matches the careful-wording demand on README + workflow paths."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": []
 }

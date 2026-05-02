@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { runPythonModule, PythonRunResult } from "../utils/pythonRunner";
+import { isAiRouterNotInstalled } from "../utils/aiRouterInstall";
 
 /**
  * Tree view backing the ``Provider Queues`` activity-bar entry.
@@ -79,7 +80,9 @@ export type QueueTreeNode =
   | ProviderNode
   | StateGroupNode
   | MessageNode
-  | InfoNode;
+  | InfoNode
+  | NotInstalledNode
+  | NotInstalledActionNode;
 
 interface RootNode {
   kind: "root";
@@ -107,6 +110,20 @@ interface InfoNode {
   detail?: string;
   isError?: boolean;
 }
+/**
+ * Surfaced when ``python -m ai_router.queue_status`` fails because the
+ * ``ai_router`` package is not installed in the configured Python
+ * environment. Has one child :class:`NotInstalledActionNode` carrying
+ * the install command — separate from the generic red-error info node
+ * so first-time users get a single click to the fix instead of an opaque
+ * traceback.
+ */
+interface NotInstalledNode {
+  kind: "notInstalled";
+}
+interface NotInstalledActionNode {
+  kind: "notInstalledAction";
+}
 
 // ---------- provider ----------
 
@@ -114,7 +131,12 @@ export interface ProviderQueuesDeps {
   /** Returns the workspace root that owns ``ai_router/`` and ``provider-queues/``. */
   getWorkspaceRoot: () => string | undefined;
   /** Spawn helper. Injected for tests. */
-  fetchPayload?: (workspaceRoot: string) => Promise<{ ok: true; payload: QueueStatusPayload } | { ok: false; message: string }>;
+  fetchPayload?: (
+    workspaceRoot: string,
+  ) => Promise<
+    | { ok: true; payload: QueueStatusPayload }
+    | { ok: false; message: string; reason?: "module_not_installed" }
+  >;
   /** Clock — overridable for tests. */
   now?: () => number;
 }
@@ -127,6 +149,7 @@ export class ProviderQueuesProvider implements vscode.TreeDataProvider<QueueTree
     | { fetchedAt: number; payload: QueueStatusPayload }
     | null = null;
   private _lastError: string | null = null;
+  private _lastErrorReason: "module_not_installed" | null = null;
   private _inFlight: Promise<void> | null = null;
 
   constructor(private readonly deps: ProviderQueuesDeps) {}
@@ -159,6 +182,9 @@ export class ProviderQueuesProvider implements vscode.TreeDataProvider<QueueTree
     if (!element || element.kind === "root") {
       const payload = await this._getPayload(root);
       if (!payload) {
+        if (this._lastErrorReason === "module_not_installed") {
+          return [{ kind: "notInstalled" }];
+        }
         const detail = this._lastError ?? "Unknown error.";
         return [
           { kind: "info", label: "Failed to read queue status.", detail, isError: true },
@@ -205,6 +231,10 @@ export class ProviderQueuesProvider implements vscode.TreeDataProvider<QueueTree
       });
     }
 
+    if (element.kind === "notInstalled") {
+      return [{ kind: "notInstalledAction" }];
+    }
+
     if (element.kind === "stateGroup") {
       // The Python helper caps the message list (--limit, default 50). When the
       // count exceeds the messages we got back, surface the gap so the operator
@@ -244,8 +274,16 @@ export class ProviderQueuesProvider implements vscode.TreeDataProvider<QueueTree
       if (result.ok) {
         this._cache = { fetchedAt: this.deps.now?.() ?? Date.now(), payload: result.payload };
         this._lastError = null;
+        this._lastErrorReason = null;
       } else {
         this._lastError = result.message;
+        this._lastErrorReason = result.reason ?? null;
+        // Round-5 verifier catch: clear the cache on failure so the
+        // failure surfaces. Otherwise a previously-successful fetch
+        // would mask the new ``module_not_installed`` / red-error
+        // states until the next successful refresh, which on the
+        // not-installed path never comes.
+        this._cache = null;
       }
     })();
     try {
@@ -346,6 +384,31 @@ export function buildTreeItem(node: QueueTreeNode): vscode.TreeItem {
       item.contextValue = node.isError ? "queueInfo:error" : "queueInfo";
       return item;
     }
+    case "notInstalled": {
+      const item = new vscode.TreeItem(
+        "ai_router not installed in this Python environment.",
+        vscode.TreeItemCollapsibleState.Expanded,
+      );
+      // Neutral info icon — this is a "configuration needed" state, not
+      // an error. The red-error path remains for genuine failures (other
+      // non-zero exits, malformed JSON, timeouts).
+      item.iconPath = new vscode.ThemeIcon("info");
+      item.contextValue = "queueInfo:notInstalled";
+      return item;
+    }
+    case "notInstalledAction": {
+      const item = new vscode.TreeItem(
+        'Click here to run "Dabbler: Install ai-router"',
+        vscode.TreeItemCollapsibleState.None,
+      );
+      item.iconPath = new vscode.ThemeIcon("cloud-download");
+      item.command = {
+        command: "dabblerSessionSets.installAiRouter",
+        title: "Install ai-router",
+      };
+      item.contextValue = "queueInfo:notInstalledAction";
+      return item;
+    }
   }
 }
 
@@ -369,7 +432,10 @@ function buildMessageTooltip(provider: string, m: QueueMessageSummary): vscode.M
 
 async function defaultFetchPayload(
   workspaceRoot: string,
-): Promise<{ ok: true; payload: QueueStatusPayload } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; payload: QueueStatusPayload }
+  | { ok: false; message: string; reason?: "module_not_installed" }
+> {
   const cfg = vscode.workspace.getConfiguration("dabblerProviderQueues");
   const limit = cfg.get<number>("messageLimit", 50);
   const result = await runPythonModule({
@@ -383,11 +449,18 @@ async function defaultFetchPayload(
 
 export function parseFetchResult(
   result: PythonRunResult,
-): { ok: true; payload: QueueStatusPayload } | { ok: false; message: string } {
+): { ok: true; payload: QueueStatusPayload } | { ok: false; message: string; reason?: "module_not_installed" } {
   if (result.timedOut) {
     return { ok: false, message: "queue_status timed out (10s)" };
   }
   if (result.exitCode !== 0) {
+    if (isAiRouterNotInstalled(result.stderr)) {
+      return {
+        ok: false,
+        message: "ai_router is not installed in the configured Python environment.",
+        reason: "module_not_installed",
+      };
+    }
     const trimmed = (result.stderr || result.stdout).trim();
     const detail = trimmed ? ` — ${trimmed.split("\n").slice(-3).join(" / ")}` : "";
     return {

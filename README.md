@@ -401,38 +401,47 @@ That writes a fresh `dabbler-session-sets-<version>.vsix` next to
 
 ## Adopting `ai_router` in a project
 
-```bash
-python -m venv .venv
-.venv/Scripts/pip install dabbler-ai-router
-```
+The recommended path is the **Session Set Explorer** extension's install
+command — it's a single command-palette click, picks the right venv, and
+preserves any existing `ai_router/router-config.yaml` you've already
+tuned.
 
-That installs the router as a regular Python package. From your
-orchestrator script:
+1. Install the extension VSIX (see [Installing the VS Code extension](#installing-the-vs-code-extension) above).
+2. Open your project as a workspace.
+3. Run **`Dabbler: Install ai-router`** from the command palette.
+   The command auto-detects (or offers to create) a workspace venv,
+   then runs `pip install dabbler-ai-router` inside it.
+4. Tune `ai_router/router-config.yaml` for your project — per-task-type
+   effort levels, the cost guard for verification, and
+   `delegation.always_route_task_types` all live there.
+5. Author your first session set: create
+   `docs/session-sets/<slug>/spec.md` with a Session Set Configuration
+   block (see [docs/planning/session-set-authoring-guide.md](docs/planning/session-set-authoring-guide.md))
+   and start it with `Start the next session.`.
 
-```python
-from ai_router import route
-```
+Use **`Dabbler: Update ai-router`** later to upgrade to a newer release
+without retyping the command (the extension remembers whether the
+original install was PyPI-based or sparse-checkout-based).
 
-Then:
+**Set API keys** as environment variables once (any path):
+`ANTHROPIC_API_KEY` (Claude Sonnet / Opus), `GEMINI_API_KEY`
+(Gemini Flash / Pro), `OPENAI_API_KEY` (GPT-5.4 / GPT-5.4 Mini), and
+optionally `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` for end-of-session
+phone notifications. On Windows, User environment variables work; the
+notification helper falls back to the Windows User/Machine environment
+if the process environment doesn't already have the Pushover keys.
 
-- **Set API keys** as environment variables:
-  `ANTHROPIC_API_KEY` (Claude Sonnet / Opus), `GEMINI_API_KEY`
-  (Gemini Flash / Pro), `OPENAI_API_KEY` (GPT-5.4 / GPT-5.4 Mini),
-  and optionally `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` for
-  end-of-session phone notifications. On Windows, User environment
-  variables work; the notification helper falls back to the Windows
-  User/Machine environment if the process environment doesn't already
-  have the Pushover keys.
-- **Tune `router-config.yaml`** for your project — the file is shipped
-  as package data inside `ai_router/`, but the production overlay
-  pattern is to copy it into your repo root (or anywhere on the
-  config-search path) and edit there. Per-task-type effort levels, the
-  cost guard for verification, and `delegation.always_route_task_types`
-  all live there.
-- **Author your first session set:** create
-  `docs/session-sets/<slug>/spec.md` with a Session Set Configuration
-  block (see [docs/planning/session-set-authoring-guide.md](docs/planning/session-set-authoring-guide.md))
-  and start it with `Start the next session.`.
+> ### CLI install (fallback)
+>
+> If you'd rather skip the extension, the same install in two
+> commands:
+>
+> ```bash
+> python -m venv .venv
+> .venv/Scripts/pip install dabbler-ai-router
+> ```
+>
+> Then `from ai_router import route` from your orchestrator script.
 
 > ### Editable / source-install fallback
 >
@@ -447,17 +456,10 @@ Then:
 > ```
 >
 > Same import (`from ai_router import route`); the editable install
-> picks up local edits to `ai_router/` without a reinstall.
-
-> ### From inside VS Code (post-Set-010-Session-3)
->
-> Once the **Session Set Explorer** extension's `Dabbler: Install
-> ai-router` command lands (Session 3 of set 010), the install path
-> from inside VS Code is the command palette plus one click. The
-> command runs `pip install dabbler-ai-router` against your workspace
-> venv and is the recommended path for end users — it preserves any
-> existing `router-config.yaml` and surfaces the tuning file in an
-> editor when the install completes.
+> picks up local edits to `ai_router/` without a reinstall. The
+> extension's install command also offers an "Install from GitHub
+> (fallback)" QuickPick option that does this for you, including the
+> sparse-checkout to keep the workspace lean.
 
 ---
 

@@ -58,6 +58,29 @@ A tree view that shows the live state of each provider's outsource-last queue (`
 
 The view shells out to `python -m ai_router.queue_status --format json`. The Python helper is the single source of truth for the queue schema; the extension never opens the SQLite file directly.
 
+### Install ai-router (`Dabbler: Install ai-router` / `Dabbler: Update ai-router`)
+A one-click install of the `ai_router` Python package into the
+workspace's venv. The command:
+
+- Auto-detects `.venv/` or `venv/`, or offers to create `.venv` at the
+  workspace root.
+- Offers two install paths via QuickPick: **PyPI** (`pip install
+  dabbler-ai-router`, default) or **GitHub sparse-checkout** (clones
+  the `ai_router/` directory at a chosen tag — useful for offline
+  workspaces, pre-release testing, or forks).
+- Preserves any existing `ai_router/router-config.yaml` across
+  re-runs, so per-project tuning survives upgrades.
+- Writes a `.dabbler/install-method` marker so `Dabbler: Update
+  ai-router` re-pulls from the same source you originally chose.
+
+The Provider Queues and Provider Heartbeats views also surface a
+**`ai_router not installed in this Python environment`** tree-item
+when `python -m ai_router.queue_status` /
+`python -m ai_router.heartbeat_status` fails with `ModuleNotFoundError`,
+with a child item that fires the install command directly. Other
+non-zero exits (timeouts, bad JSON) still render as the original red
+error so genuine bugs aren't masked.
+
 ### Provider Heartbeats
 A tree view that shows when each provider last produced a completion and how much it has produced over a sliding window:
 
@@ -109,10 +132,11 @@ A guided QuickPick that diagnoses common issues: activation, stuck sessions, git
 - VS Code 1.85 or later
 - Git on your PATH
 - Python ≥ 3.10 with the `ai_router` module installed in your project's
-  venv. As of v0.1, install via `pip install dabbler-ai-router` (the
-  upcoming `Dabbler: Install ai-router` command — Session 3 of set 010
-  — will run this for you against the workspace venv and surface the
-  `router-config.yaml` tuning file when it lands).
+  venv. As of v0.12, run **`Dabbler: Install ai-router`** from the
+  command palette — it `pip install`s `dabbler-ai-router` against your
+  workspace venv (or offers to create one) and opens
+  `ai_router/router-config.yaml` for tuning when it finishes. The CLI
+  equivalent is `pip install dabbler-ai-router`.
 - At least one API key: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`
 
 ## Cost reality — please read before adopting

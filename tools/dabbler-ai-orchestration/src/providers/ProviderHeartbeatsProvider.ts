@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { runPythonModule, PythonRunResult } from "../utils/pythonRunner";
+import { isAiRouterNotInstalled } from "../utils/aiRouterInstall";
 
 /**
  * Tree view backing the ``Provider Heartbeats`` activity-bar entry.
@@ -44,7 +45,11 @@ export interface HeartbeatStatusPayload {
 
 // ---------- tree node shapes ----------
 
-export type HeartbeatTreeNode = ProviderNode | InfoNode;
+export type HeartbeatTreeNode =
+  | ProviderNode
+  | InfoNode
+  | NotInstalledNode
+  | NotInstalledActionNode;
 
 interface ProviderNode {
   kind: "provider";
@@ -58,6 +63,13 @@ interface InfoNode {
   detail?: string;
   isError?: boolean;
 }
+/** See ProviderQueuesProvider.NotInstalledNode — same shape, same purpose. */
+interface NotInstalledNode {
+  kind: "notInstalled";
+}
+interface NotInstalledActionNode {
+  kind: "notInstalledAction";
+}
 
 // ---------- provider ----------
 
@@ -67,7 +79,10 @@ export interface ProviderHeartbeatsDeps {
   fetchPayload?: (
     workspaceRoot: string,
     lookbackMinutes: number,
-  ) => Promise<{ ok: true; payload: HeartbeatStatusPayload } | { ok: false; message: string }>;
+  ) => Promise<
+    | { ok: true; payload: HeartbeatStatusPayload }
+    | { ok: false; message: string; reason?: "module_not_installed" }
+  >;
   /** Override for tests. */
   getSettings?: () => { lookbackMinutes: number; silentWarningMinutes: number };
   /** Clock — overridable for tests. */
@@ -86,6 +101,7 @@ export class ProviderHeartbeatsProvider
     | { fetchedAt: number; payload: HeartbeatStatusPayload; lookback: number }
     | null = null;
   private _lastError: string | null = null;
+  private _lastErrorReason: "module_not_installed" | null = null;
   private _inFlight: Promise<void> | null = null;
 
   constructor(private readonly deps: ProviderHeartbeatsDeps) {}
@@ -112,6 +128,9 @@ export class ProviderHeartbeatsProvider
   }
 
   async getChildren(element?: HeartbeatTreeNode): Promise<HeartbeatTreeNode[]> {
+    if (element?.kind === "notInstalled") {
+      return [{ kind: "notInstalledAction" }];
+    }
     if (element) return [];
 
     const root = this.deps.getWorkspaceRoot();
@@ -121,6 +140,9 @@ export class ProviderHeartbeatsProvider
     const settings = this._readSettings();
     const payload = await this._getPayload(root, settings.lookbackMinutes);
     if (!payload) {
+      if (this._lastErrorReason === "module_not_installed") {
+        return [{ kind: "notInstalled" }];
+      }
       const detail = this._lastError ?? "Unknown error.";
       return [
         {
@@ -190,8 +212,13 @@ export class ProviderHeartbeatsProvider
           lookback,
         };
         this._lastError = null;
+        this._lastErrorReason = null;
       } else {
         this._lastError = result.message;
+        this._lastErrorReason = result.reason ?? null;
+        // Round-5 verifier catch: clear the cache so the failure
+        // surfaces. See ProviderQueuesProvider for the full rationale.
+        this._cache = null;
       }
     })();
     try {
@@ -259,6 +286,28 @@ export function buildTreeItem(node: HeartbeatTreeNode): vscode.TreeItem {
       item.contextValue = node.isError ? "heartbeatInfo:error" : "heartbeatInfo";
       return item;
     }
+    case "notInstalled": {
+      const item = new vscode.TreeItem(
+        "ai_router not installed in this Python environment.",
+        vscode.TreeItemCollapsibleState.Expanded,
+      );
+      item.iconPath = new vscode.ThemeIcon("info");
+      item.contextValue = "heartbeatInfo:notInstalled";
+      return item;
+    }
+    case "notInstalledAction": {
+      const item = new vscode.TreeItem(
+        'Click here to run "Dabbler: Install ai-router"',
+        vscode.TreeItemCollapsibleState.None,
+      );
+      item.iconPath = new vscode.ThemeIcon("cloud-download");
+      item.command = {
+        command: "dabblerSessionSets.installAiRouter",
+        title: "Install ai-router",
+      };
+      item.contextValue = "heartbeatInfo:notInstalledAction";
+      return item;
+    }
   }
 }
 
@@ -283,7 +332,10 @@ function buildProviderTooltip(
 async function defaultFetchPayload(
   workspaceRoot: string,
   lookbackMinutes: number,
-): Promise<{ ok: true; payload: HeartbeatStatusPayload } | { ok: false; message: string }> {
+): Promise<
+  | { ok: true; payload: HeartbeatStatusPayload }
+  | { ok: false; message: string; reason?: "module_not_installed" }
+> {
   const result = await runPythonModule({
     cwd: workspaceRoot,
     module: "ai_router.heartbeat_status",
@@ -301,11 +353,18 @@ async function defaultFetchPayload(
 export function parseFetchResult(
   result: PythonRunResult,
   lookbackMinutes: number,
-): { ok: true; payload: HeartbeatStatusPayload } | { ok: false; message: string } {
+): { ok: true; payload: HeartbeatStatusPayload } | { ok: false; message: string; reason?: "module_not_installed" } {
   if (result.timedOut) {
     return { ok: false, message: "heartbeat_status timed out (10s)" };
   }
   if (result.exitCode !== 0) {
+    if (isAiRouterNotInstalled(result.stderr)) {
+      return {
+        ok: false,
+        message: "ai_router is not installed in the configured Python environment.",
+        reason: "module_not_installed",
+      };
+    }
     const trimmed = (result.stderr || result.stdout).trim();
     const detail = trimmed ? ` — ${trimmed.split("\n").slice(-3).join(" / ")}` : "";
     return {

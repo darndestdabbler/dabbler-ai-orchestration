@@ -510,7 +510,7 @@ var require_has_flag = __commonJS({
 var require_supports_color = __commonJS({
   "node_modules/supports-color/index.js"(exports2, module2) {
     "use strict";
-    var os = require("os");
+    var os2 = require("os");
     var tty = require("tty");
     var hasFlag = require_has_flag();
     var { env: env4 } = process;
@@ -558,7 +558,7 @@ var require_supports_color = __commonJS({
         return min;
       }
       if (process.platform === "win32") {
-        const osRelease = os.release().split(".");
+        const osRelease = os2.release().split(".");
         if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
           return Number(osRelease[2]) >= 14931 ? 3 : 2;
         }
@@ -804,10 +804,10 @@ var require_src2 = __commonJS({
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src());
     var log = debug_1.default("@kwsites/file-exists");
-    function check(path15, isFile, isDirectory) {
-      log(`checking %s`, path15);
+    function check(path17, isFile, isDirectory) {
+      log(`checking %s`, path17);
       try {
-        const stat = fs_1.statSync(path15);
+        const stat = fs_1.statSync(path17);
         if (stat.isFile() && isFile) {
           log(`[OK] path represents a file`);
           return true;
@@ -827,8 +827,8 @@ var require_src2 = __commonJS({
         throw e;
       }
     }
-    function exists2(path15, type = exports2.READABLE) {
-      return check(path15, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+    function exists2(path17, type = exports2.READABLE) {
+      return check(path17, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
     }
     exports2.exists = exists2;
     exports2.FILE = 1;
@@ -900,9 +900,9 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode16 = __toESM(require("vscode"));
-var fs12 = __toESM(require("fs"));
-var path14 = __toESM(require("path"));
+var vscode17 = __toESM(require("vscode"));
+var fs13 = __toESM(require("fs"));
+var path16 = __toESM(require("path"));
 
 // src/providers/SessionSetsProvider.ts
 var vscode2 = __toESM(require("vscode"));
@@ -1388,7 +1388,8 @@ function readSessionSets(root) {
           orchestrator: sd.orchestrator ?? null,
           startedAt: sd.startedAt ?? null,
           completedAt: sd.completedAt ?? null,
-          verificationVerdict: sd.verificationVerdict ?? null
+          verificationVerdict: sd.verificationVerdict ?? null,
+          forceClosed: sd.forceClosed ?? null
         };
       } catch {
       }
@@ -1472,6 +1473,9 @@ function uatBadge(set) {
     return "[UAT done]";
   return "";
 }
+function forceClosedBadge(set) {
+  return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
+}
 function modeBadge(set) {
   const mode = set.config?.outsourceMode;
   if (mode === "last")
@@ -1499,6 +1503,11 @@ function liveSessionTooltipLines(set) {
   }
   if (ls.verificationVerdict) {
     lines.push(`Verifier: ${ls.verificationVerdict}`);
+  }
+  if (ls.forceClosed === true) {
+    lines.push(
+      "Force-closed: gate bypassed via --force (incident recovery). See closeout_force_used in session-events.jsonl for the operator's reason."
+    );
   }
   return lines;
 }
@@ -1603,7 +1612,13 @@ var SessionSetsProvider = class {
       set.name,
       vscode2.TreeItemCollapsibleState.None
     );
-    const bits = [progressText(set), touchedDate(set), modeBadge(set), uatBadge(set)].filter(Boolean);
+    const bits = [
+      progressText(set),
+      touchedDate(set),
+      modeBadge(set),
+      uatBadge(set),
+      forceClosedBadge(set)
+    ].filter(Boolean);
     item.description = bits.join("  \xB7  ");
     item.tooltip = new vscode2.MarkdownString(
       [
@@ -1654,7 +1669,7 @@ function resolvePythonPath(workspaceRoot2, settingKey) {
 function runPythonModule(opts) {
   const exe = resolvePythonPath(opts.cwd, opts.pythonPathSetting);
   const timeoutMs = opts.timeoutMs ?? 1e4;
-  return new Promise((resolve4) => {
+  return new Promise((resolve5) => {
     const child = cp2.spawn(exe, ["-m", opts.module, ...opts.args], {
       cwd: opts.cwd,
       env: process.env,
@@ -1675,7 +1690,7 @@ function runPythonModule(opts) {
     });
     child.on("error", (err) => {
       clearTimeout(timer);
-      resolve4({
+      resolve5({
         stdout,
         stderr: stderr + (stderr ? "\n" : "") + `spawn error: ${err.message}`,
         exitCode: null,
@@ -1685,9 +1700,389 @@ function runPythonModule(opts) {
     });
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      resolve4({ stdout, stderr, exitCode: code, signal, timedOut });
+      resolve5({ stdout, stderr, exitCode: code, signal, timedOut });
     });
   });
+}
+
+// src/utils/aiRouterInstall.ts
+var path7 = __toESM(require("path"));
+var PYPI_PACKAGE_NAME = "dabbler-ai-router";
+var REPO_URL = "https://github.com/darndestdabbler/dabbler-ai-orchestration.git";
+var ROUTER_CONFIG_REL = path7.posix.join("ai_router", "router-config.yaml");
+var INSTALL_METHOD_REL = path7.posix.join(".dabbler", "install-method");
+var GITHUB_CHECKOUT_REL = path7.posix.join(".dabbler", "ai-router-src");
+var DEFAULT_GITHUB_REF = "<latest released tag>";
+var RELEASE_TAG_RE = /^v(\d+)\.(\d+)\.(\d+)$/;
+function isAiRouterNotInstalled(stderr) {
+  if (!stderr)
+    return false;
+  if (/ModuleNotFoundError:\s*No module named ['"]ai_router['"]/.test(stderr))
+    return true;
+  if (/Error while finding module specification for ['"]ai_router\./.test(stderr) && /No module named ['"]ai_router['"]/.test(stderr)) {
+    return true;
+  }
+  return false;
+}
+async function installAiRouter(deps) {
+  return doInstall(deps, { mode: "install" });
+}
+async function updateAiRouter(deps) {
+  return doInstall(deps, { mode: "update" });
+}
+async function doInstall(deps, opts) {
+  const report = deps.reportProgress ?? (() => {
+  });
+  let priorSource = null;
+  if (opts.mode === "update") {
+    priorSource = readInstallMethodMarker(deps);
+  }
+  const defaultSource = priorSource ?? "pypi";
+  const source = await deps.prompts.pickSource(defaultSource);
+  if (!source) {
+    return {
+      ok: false,
+      message: "Install cancelled (no source chosen).",
+      source: null,
+      venvPath: null,
+      routerConfigPreserved: false
+    };
+  }
+  const venvResult = await ensureVenv(deps);
+  if (!venvResult.ok) {
+    return {
+      ok: false,
+      message: venvResult.message,
+      source,
+      venvPath: null,
+      routerConfigPreserved: false
+    };
+  }
+  const venvPath = venvResult.venvPath;
+  if (source === "pypi") {
+    return await runPyPiInstall(deps, { venvPath, mode: opts.mode, report });
+  }
+  return await runGitHubInstall(deps, { venvPath, report });
+}
+async function ensureVenv(deps) {
+  const fromPythonPath = deriveVenvFromPythonPath(deps.pythonPath);
+  if (fromPythonPath && deps.fileOps.exists(fromPythonPath) && deps.fileOps.exists(path7.join(fromPythonPath, "pyvenv.cfg"))) {
+    return {
+      ok: true,
+      venvPath: fromPythonPath,
+      message: `Using venv from configured pythonPath: ${fromPythonPath}`
+    };
+  }
+  const candidate = findExistingVenv(deps);
+  if (candidate) {
+    return { ok: true, venvPath: candidate, message: `Using existing venv at ${candidate}` };
+  }
+  const target = path7.join(deps.workspaceRoot, ".venv");
+  const create = await deps.prompts.confirmCreateVenv(target);
+  if (!create) {
+    return {
+      ok: false,
+      message: "No venv found at .venv/ or venv/. Install cancelled \u2014 create a venv first or accept the prompt to create .venv.",
+      venvPath: null
+    };
+  }
+  const venvShaped = deriveVenvFromPythonPath(deps.pythonPath) !== null;
+  const interpreterExists = path7.isAbsolute(deps.pythonPath) ? deps.fileOps.exists(deps.pythonPath) : true;
+  const bootstrap = venvShaped && !interpreterExists ? "python" : deps.pythonPath;
+  const result = await deps.spawner(bootstrap, ["-m", "venv", target], {
+    cwd: deps.workspaceRoot,
+    timeoutMs: 6e4
+  });
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      message: `Failed to create venv at ${target} (using bootstrap '${bootstrap}'): ${oneLine(result.stderr || result.stdout) || `exit ${result.exitCode}`}`,
+      venvPath: null
+    };
+  }
+  return { ok: true, venvPath: target, message: `Created venv at ${target}` };
+}
+function findExistingVenv(deps) {
+  for (const rel of [".venv", "venv"]) {
+    const abs = path7.join(deps.workspaceRoot, rel);
+    if (deps.fileOps.exists(abs))
+      return abs;
+  }
+  return null;
+}
+function deriveVenvFromPythonPath(pythonPath) {
+  if (!pythonPath || !path7.isAbsolute(pythonPath))
+    return null;
+  const parent = path7.basename(path7.dirname(pythonPath));
+  if (parent === "Scripts" || parent === "bin") {
+    return path7.dirname(path7.dirname(pythonPath));
+  }
+  return null;
+}
+function venvPython(venvPath) {
+  const candidates = process.platform === "win32" ? [path7.join(venvPath, "Scripts", "python.exe"), path7.join(venvPath, "Scripts", "python")] : [path7.join(venvPath, "bin", "python"), path7.join(venvPath, "bin", "python3")];
+  return candidates[0];
+}
+async function runPyPiInstall(deps, opts) {
+  opts.report(
+    opts.mode === "update" ? `Upgrading ${PYPI_PACKAGE_NAME} from PyPI\u2026` : `Installing ${PYPI_PACKAGE_NAME} from PyPI\u2026`
+  );
+  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "-U", PYPI_PACKAGE_NAME] : ["-m", "pip", "install", PYPI_PACKAGE_NAME];
+  const venvPy = venvPython(opts.venvPath);
+  const result = await deps.spawner(venvPy, pipArgs, {
+    cwd: deps.workspaceRoot,
+    timeoutMs: 3e5
+  });
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      message: `pip install failed: ${oneLine(result.stderr || result.stdout) || `exit ${result.exitCode}`}`,
+      source: "pypi",
+      venvPath: opts.venvPath,
+      routerConfigPreserved: false
+    };
+  }
+  let materialized = false;
+  const workspaceConfig = path7.join(deps.workspaceRoot, ROUTER_CONFIG_REL);
+  if (!deps.fileOps.exists(workspaceConfig)) {
+    const seed = await readBundledRouterConfig(deps, venvPy);
+    if (seed !== null) {
+      try {
+        deps.fileOps.mkdirp(path7.dirname(workspaceConfig));
+        deps.fileOps.writeFile(workspaceConfig, seed);
+        materialized = true;
+      } catch {
+      }
+    }
+  }
+  writeInstallMethodMarker(deps, "pypi");
+  return {
+    ok: true,
+    message: opts.mode === "update" ? `Upgraded ${PYPI_PACKAGE_NAME} in ${opts.venvPath}.${materialized ? " Seeded ai_router/router-config.yaml from the installed package." : ""}` : `Installed ${PYPI_PACKAGE_NAME} into ${opts.venvPath}.${materialized ? " Seeded ai_router/router-config.yaml from the installed package." : ""}`,
+    source: "pypi",
+    venvPath: opts.venvPath,
+    routerConfigPreserved: materialized
+  };
+}
+async function readBundledRouterConfig(deps, venvPy) {
+  const code = "from importlib.resources import files; p = files('ai_router').joinpath('router-config.yaml'); import sys; sys.stdout.write(p.read_text(encoding='utf-8'))";
+  const result = await deps.spawner(venvPy, ["-c", code], {
+    cwd: deps.workspaceRoot,
+    timeoutMs: 3e4
+  });
+  if (result.exitCode !== 0 || !result.stdout)
+    return null;
+  return result.stdout;
+}
+async function resolveLatestReleaseTag(deps) {
+  const repo = deps.repoUrl ?? REPO_URL;
+  const result = await deps.spawner(
+    "git",
+    ["ls-remote", "--tags", "--refs", repo],
+    { cwd: deps.workspaceRoot, timeoutMs: 6e4 }
+  );
+  if (result.exitCode !== 0)
+    return null;
+  const tags = [];
+  for (const line of result.stdout.split(/\r?\n/)) {
+    const m = /^[0-9a-f]+\s+refs\/tags\/(.+)$/.exec(line.trim());
+    if (!m)
+      continue;
+    const tag = m[1];
+    const sm = RELEASE_TAG_RE.exec(tag);
+    if (!sm)
+      continue;
+    tags.push({
+      raw: tag,
+      sortable: [Number(sm[1]), Number(sm[2]), Number(sm[3])]
+    });
+  }
+  if (tags.length === 0)
+    return null;
+  tags.sort((a, b2) => {
+    for (let i2 = 0; i2 < 3; i2++) {
+      if (a.sortable[i2] !== b2.sortable[i2])
+        return b2.sortable[i2] - a.sortable[i2];
+    }
+    return 0;
+  });
+  return tags[0].raw;
+}
+async function runGitHubInstall(deps, opts) {
+  const userRef = await deps.prompts.promptGitHubRef(DEFAULT_GITHUB_REF);
+  if (userRef === void 0) {
+    return {
+      ok: false,
+      message: "Install cancelled (no GitHub ref chosen).",
+      source: "github",
+      venvPath: opts.venvPath,
+      routerConfigPreserved: false,
+      resolvedRef: null
+    };
+  }
+  const explicitRef = userRef.trim() === "" || userRef === DEFAULT_GITHUB_REF ? null : userRef;
+  let refToUse = explicitRef;
+  if (refToUse === null) {
+    opts.report("Resolving latest released tag\u2026");
+    refToUse = await resolveLatestReleaseTag(deps);
+    if (refToUse === null) {
+      return {
+        ok: false,
+        message: "Could not resolve the latest released tag from the remote. Re-run and supply a tag/branch explicitly.",
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: false,
+        resolvedRef: null
+      };
+    }
+  }
+  const routerConfigAbs = path7.join(deps.workspaceRoot, ROUTER_CONFIG_REL);
+  let stashedConfig = null;
+  if (deps.fileOps.exists(routerConfigAbs)) {
+    stashedConfig = deps.fileOps.readFile(routerConfigAbs);
+  }
+  let preserved = false;
+  let lastRestoreError = null;
+  const restoreStash = () => {
+    if (stashedConfig === null)
+      return true;
+    if (preserved)
+      return true;
+    try {
+      deps.fileOps.writeFile(routerConfigAbs, stashedConfig);
+      preserved = true;
+      lastRestoreError = null;
+      return true;
+    } catch (err) {
+      lastRestoreError = err instanceof Error ? err.message : String(err);
+      return false;
+    }
+  };
+  const finalize = (outcome) => {
+    if (stashedConfig !== null && !preserved) {
+      return {
+        ...outcome,
+        ok: false,
+        message: `Failed to restore operator-tuned ai_router/router-config.yaml after install (${lastRestoreError ?? "unknown error"}). The install changes have been applied but your tuned config was not put back. Check the workspace's ai_router/router-config.yaml before continuing.`,
+        routerConfigPreserved: false
+      };
+    }
+    return outcome;
+  };
+  const repo = deps.repoUrl ?? REPO_URL;
+  opts.report(`Sparse-cloning ${repo}\u2026`);
+  const tmp = deps.fileOps.mkdtemp("dabbler-ai-router-install-");
+  try {
+    const cloneArgs = ["clone", "--depth", "1", "--filter=blob:none", "--sparse"];
+    cloneArgs.push("--branch", refToUse);
+    cloneArgs.push(repo, tmp);
+    const cloneResult = await deps.spawner("git", cloneArgs, {
+      cwd: deps.workspaceRoot,
+      timeoutMs: 3e5
+    });
+    if (cloneResult.exitCode !== 0) {
+      restoreStash();
+      return finalize({
+        ok: false,
+        message: `git clone failed: ${oneLine(cloneResult.stderr || cloneResult.stdout) || `exit ${cloneResult.exitCode}`}`,
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: preserved,
+        resolvedRef: refToUse
+      });
+    }
+    opts.report("Configuring sparse-checkout\u2026");
+    const sparseResult = await deps.spawner(
+      "git",
+      ["-C", tmp, "sparse-checkout", "set", "ai_router", "pyproject.toml"],
+      { cwd: deps.workspaceRoot, timeoutMs: 6e4 }
+    );
+    if (sparseResult.exitCode !== 0) {
+      restoreStash();
+      return finalize({
+        ok: false,
+        message: `git sparse-checkout failed: ${oneLine(sparseResult.stderr || sparseResult.stdout) || `exit ${sparseResult.exitCode}`}`,
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: preserved,
+        resolvedRef: refToUse
+      });
+    }
+    const stableSrc = path7.join(deps.workspaceRoot, GITHUB_CHECKOUT_REL);
+    const dstAiRouter = path7.join(deps.workspaceRoot, "ai_router");
+    opts.report("Copying sparse-checkout into the workspace\u2026");
+    try {
+      deps.fileOps.removeRecursive(stableSrc);
+      deps.fileOps.copyDir(tmp, stableSrc);
+      deps.fileOps.removeRecursive(dstAiRouter);
+      deps.fileOps.copyDir(path7.join(stableSrc, "ai_router"), dstAiRouter);
+    } catch (err) {
+      restoreStash();
+      return finalize({
+        ok: false,
+        message: `Failed to copy ai_router/ into the workspace: ${err instanceof Error ? err.message : String(err)}`,
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: preserved,
+        resolvedRef: refToUse
+      });
+    }
+    restoreStash();
+    opts.report("Installing the sparse-checked-out tree (editable)\u2026");
+    const pipResult = await deps.spawner(
+      venvPython(opts.venvPath),
+      ["-m", "pip", "install", "-e", stableSrc],
+      { cwd: deps.workspaceRoot, timeoutMs: 3e5 }
+    );
+    if (pipResult.exitCode !== 0) {
+      return finalize({
+        ok: false,
+        message: `pip install -e <sparse-checkout> failed: ${oneLine(pipResult.stderr || pipResult.stdout) || `exit ${pipResult.exitCode}`}`,
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: preserved,
+        resolvedRef: refToUse
+      });
+    }
+    writeInstallMethodMarker(deps, "github");
+    return finalize({
+      ok: true,
+      message: `Installed ai_router from GitHub (${refToUse})${preserved ? " \u2014 preserved existing router-config.yaml" : ""}.`,
+      source: "github",
+      venvPath: opts.venvPath,
+      routerConfigPreserved: preserved,
+      resolvedRef: refToUse
+    });
+  } finally {
+    restoreStash();
+    try {
+      deps.fileOps.removeRecursive(tmp);
+    } catch {
+    }
+  }
+}
+function readInstallMethodMarker(deps) {
+  const markerAbs = path7.join(deps.workspaceRoot, INSTALL_METHOD_REL);
+  if (!deps.fileOps.exists(markerAbs))
+    return null;
+  const raw = deps.fileOps.readFile(markerAbs).trim();
+  if (raw === "pypi" || raw === "github")
+    return raw;
+  return null;
+}
+function writeInstallMethodMarker(deps, source) {
+  const markerAbs = path7.join(deps.workspaceRoot, INSTALL_METHOD_REL);
+  const markerDir = path7.dirname(markerAbs);
+  deps.fileOps.mkdirp(markerDir);
+  deps.fileOps.writeFile(markerAbs, `${source}
+`);
+}
+function oneLine(s) {
+  const trimmed2 = (s || "").trim();
+  if (!trimmed2)
+    return "";
+  const lastLines = trimmed2.split(/\r?\n/).filter(Boolean).slice(-2).join(" / ");
+  return lastLines;
 }
 
 // src/providers/ProviderQueuesProvider.ts
@@ -1714,6 +2109,7 @@ var ProviderQueuesProvider = class {
     this.onDidChangeTreeData = this._onDidChangeTreeData.event;
     this._cache = null;
     this._lastError = null;
+    this._lastErrorReason = null;
     this._inFlight = null;
   }
   refresh() {
@@ -1739,6 +2135,9 @@ var ProviderQueuesProvider = class {
     if (!element || element.kind === "root") {
       const payload = await this._getPayload(root);
       if (!payload) {
+        if (this._lastErrorReason === "module_not_installed") {
+          return [{ kind: "notInstalled" }];
+        }
         const detail = this._lastError ?? "Unknown error.";
         return [
           { kind: "info", label: "Failed to read queue status.", detail, isError: true }
@@ -1782,6 +2181,9 @@ var ProviderQueuesProvider = class {
         };
       });
     }
+    if (element.kind === "notInstalled") {
+      return [{ kind: "notInstalledAction" }];
+    }
     if (element.kind === "stateGroup") {
       const items = element.messages.map((m) => ({
         kind: "message",
@@ -1815,8 +2217,11 @@ var ProviderQueuesProvider = class {
       if (result.ok) {
         this._cache = { fetchedAt: this.deps.now?.() ?? Date.now(), payload: result.payload };
         this._lastError = null;
+        this._lastErrorReason = null;
       } else {
         this._lastError = result.message;
+        this._lastErrorReason = result.reason ?? null;
+        this._cache = null;
       }
     })();
     try {
@@ -1906,6 +2311,28 @@ function buildTreeItem(node) {
       item.contextValue = node.isError ? "queueInfo:error" : "queueInfo";
       return item;
     }
+    case "notInstalled": {
+      const item = new vscode4.TreeItem(
+        "ai_router not installed in this Python environment.",
+        vscode4.TreeItemCollapsibleState.Expanded
+      );
+      item.iconPath = new vscode4.ThemeIcon("info");
+      item.contextValue = "queueInfo:notInstalled";
+      return item;
+    }
+    case "notInstalledAction": {
+      const item = new vscode4.TreeItem(
+        'Click here to run "Dabbler: Install ai-router"',
+        vscode4.TreeItemCollapsibleState.None
+      );
+      item.iconPath = new vscode4.ThemeIcon("cloud-download");
+      item.command = {
+        command: "dabblerSessionSets.installAiRouter",
+        title: "Install ai-router"
+      };
+      item.contextValue = "queueInfo:notInstalledAction";
+      return item;
+    }
   }
 }
 function buildMessageTooltip(provider, m) {
@@ -1942,6 +2369,13 @@ function parseFetchResult(result) {
     return { ok: false, message: "queue_status timed out (10s)" };
   }
   if (result.exitCode !== 0) {
+    if (isAiRouterNotInstalled(result.stderr)) {
+      return {
+        ok: false,
+        message: "ai_router is not installed in the configured Python environment.",
+        reason: "module_not_installed"
+      };
+    }
     const trimmed2 = (result.stderr || result.stdout).trim();
     const detail = trimmed2 ? ` \u2014 ${trimmed2.split("\n").slice(-3).join(" / ")}` : "";
     return {
@@ -1974,6 +2408,7 @@ var ProviderHeartbeatsProvider = class {
     this.onDidChangeTreeData = this._onDidChangeTreeData.event;
     this._cache = null;
     this._lastError = null;
+    this._lastErrorReason = null;
     this._inFlight = null;
   }
   refresh() {
@@ -1994,6 +2429,9 @@ var ProviderHeartbeatsProvider = class {
     return buildTreeItem2(element);
   }
   async getChildren(element) {
+    if (element?.kind === "notInstalled") {
+      return [{ kind: "notInstalledAction" }];
+    }
     if (element)
       return [];
     const root = this.deps.getWorkspaceRoot();
@@ -2003,6 +2441,9 @@ var ProviderHeartbeatsProvider = class {
     const settings = this._readSettings();
     const payload = await this._getPayload(root, settings.lookbackMinutes);
     if (!payload) {
+      if (this._lastErrorReason === "module_not_installed") {
+        return [{ kind: "notInstalled" }];
+      }
       const detail = this._lastError ?? "Unknown error.";
       return [
         {
@@ -2062,8 +2503,11 @@ var ProviderHeartbeatsProvider = class {
           lookback
         };
         this._lastError = null;
+        this._lastErrorReason = null;
       } else {
         this._lastError = result.message;
+        this._lastErrorReason = result.reason ?? null;
+        this._cache = null;
       }
     })();
     try {
@@ -2124,6 +2568,28 @@ function buildTreeItem2(node) {
       item.contextValue = node.isError ? "heartbeatInfo:error" : "heartbeatInfo";
       return item;
     }
+    case "notInstalled": {
+      const item = new vscode5.TreeItem(
+        "ai_router not installed in this Python environment.",
+        vscode5.TreeItemCollapsibleState.Expanded
+      );
+      item.iconPath = new vscode5.ThemeIcon("info");
+      item.contextValue = "heartbeatInfo:notInstalled";
+      return item;
+    }
+    case "notInstalledAction": {
+      const item = new vscode5.TreeItem(
+        'Click here to run "Dabbler: Install ai-router"',
+        vscode5.TreeItemCollapsibleState.None
+      );
+      item.iconPath = new vscode5.ThemeIcon("cloud-download");
+      item.command = {
+        command: "dabblerSessionSets.installAiRouter",
+        title: "Install ai-router"
+      };
+      item.contextValue = "heartbeatInfo:notInstalledAction";
+      return item;
+    }
   }
 }
 function buildProviderTooltip(provider, d, silent) {
@@ -2156,6 +2622,13 @@ function parseFetchResult2(result, lookbackMinutes) {
     return { ok: false, message: "heartbeat_status timed out (10s)" };
   }
   if (result.exitCode !== 0) {
+    if (isAiRouterNotInstalled(result.stderr)) {
+      return {
+        ok: false,
+        message: "ai_router is not installed in the configured Python environment.",
+        reason: "module_not_installed"
+      };
+    }
     const trimmed2 = (result.stderr || result.stdout).trim();
     const detail = trimmed2 ? ` \u2014 ${trimmed2.split("\n").slice(-3).join(" / ")}` : "";
     return {
@@ -2204,11 +2677,11 @@ function pickNumber(obj, key) {
 // src/commands/openFile.ts
 var vscode6 = __toESM(require("vscode"));
 var fs4 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var path8 = __toESM(require("path"));
 function openIfExists(filePath, label) {
   if (!filePath || !fs4.existsSync(filePath)) {
     vscode6.window.showInformationMessage(
-      `${label} does not exist yet: ${filePath ? path7.basename(filePath) : "<unknown>"}`
+      `${label} does not exist yet: ${filePath ? path8.basename(filePath) : "<unknown>"}`
     );
     return;
   }
@@ -2217,7 +2690,7 @@ function openIfExists(filePath, label) {
 function findPlaywrightTests(set) {
   const cfg = vscode6.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
-  const playwrightDir = path7.join(set.root, testDirRel);
+  const playwrightDir = path8.join(set.root, testDirRel);
   if (!fs4.existsSync(playwrightDir))
     return [];
   const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
@@ -2233,7 +2706,7 @@ function findPlaywrightTests(set) {
       return;
     }
     for (const e of entries) {
-      const p2 = path7.join(dir, e.name);
+      const p2 = path8.join(dir, e.name);
       if (e.isDirectory()) {
         if (e.name === "bin" || e.name === "obj" || e.name === "node_modules")
           continue;
@@ -2312,8 +2785,8 @@ function registerOpenFileCommands(context) {
         }
         const picked = await vscode6.window.showQuickPick(
           tests.map((p2) => ({
-            label: path7.basename(p2),
-            description: path7.relative(item.set.root, p2),
+            label: path8.basename(p2),
+            description: path8.relative(item.set.root, p2),
             absolute: p2
           })),
           { placeHolder: `Playwright tests matching "${item.set.name}"` }
@@ -2370,7 +2843,7 @@ function registerCopyCommands(context) {
 // src/commands/gitScaffold.ts
 var vscode8 = __toESM(require("vscode"));
 var fs5 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
+var path9 = __toESM(require("path"));
 
 // node_modules/simple-git/dist/esm/index.js
 var import_file_exists = __toESM(require_dist(), 1);
@@ -2962,8 +3435,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = "\n") {
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path15) {
-  return (0, import_file_exists.exists)(path15, import_file_exists.FOLDER);
+function folderExists(path17) {
+  return (0, import_file_exists.exists)(path17, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -3201,9 +3674,9 @@ var init_simple_git_options = __esm({
     };
   }
 });
-function appendTaskOptions(options, commands12 = []) {
+function appendTaskOptions(options, commands13 = []) {
   if (!filterPlainObject(options)) {
-    return commands12;
+    return commands13;
   }
   return Object.keys(options).reduce((commands22, key) => {
     const value = options[key];
@@ -3221,7 +3694,7 @@ function appendTaskOptions(options, commands12 = []) {
       commands22.push(key);
     }
     return commands22;
-  }, commands12);
+  }, commands13);
 }
 function getTrailingOptions(args, initialPrimitive = 0, objectOnly = false) {
   const command = [];
@@ -3351,29 +3824,29 @@ function checkIsRepoTask(action) {
     case "root":
       return checkIsRepoRootTask();
   }
-  const commands12 = ["rev-parse", "--is-inside-work-tree"];
+  const commands13 = ["rev-parse", "--is-inside-work-tree"];
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     onError,
     parser
   };
 }
 function checkIsRepoRootTask() {
-  const commands12 = ["rev-parse", "--git-dir"];
+  const commands13 = ["rev-parse", "--git-dir"];
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     onError,
-    parser(path15) {
-      return /^\.(git)?$/.test(path15.trim());
+    parser(path17) {
+      return /^\.(git)?$/.test(path17.trim());
     }
   };
 }
 function checkIsBareRepoTask() {
-  const commands12 = ["rev-parse", "--is-bare-repository"];
+  const commands13 = ["rev-parse", "--is-bare-repository"];
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     onError,
     parser
@@ -3463,18 +3936,18 @@ function configurationErrorTask(error) {
     }
   };
 }
-function straightThroughStringTask(commands12, trimmed2 = false) {
+function straightThroughStringTask(commands13, trimmed2 = false) {
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser(text) {
       return trimmed2 ? String(text).trim() : text;
     }
   };
 }
-function straightThroughBufferTask(commands12) {
+function straightThroughBufferTask(commands13) {
   return {
-    commands: commands12,
+    commands: commands13,
     format: "buffer",
     parser(buffer) {
       return buffer;
@@ -3520,9 +3993,9 @@ function cleanWithOptionsTask(mode, customArgs) {
   return cleanTask(cleanMode, options);
 }
 function cleanTask(mode, customArgs) {
-  const commands12 = ["clean", `-${mode}`, ...customArgs];
+  const commands13 = ["clean", `-${mode}`, ...customArgs];
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser(text) {
       return cleanSummaryParser(mode === "n", text);
@@ -3685,13 +4158,13 @@ function asConfigScope(scope, fallback) {
   return fallback;
 }
 function addConfigTask(key, value, append2, scope) {
-  const commands12 = ["config", `--${scope}`];
+  const commands13 = ["config", `--${scope}`];
   if (append2) {
-    commands12.push("--add");
+    commands13.push("--add");
   }
-  commands12.push(key, value);
+  commands13.push(key, value);
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser(text) {
       return text;
@@ -3699,12 +4172,12 @@ function addConfigTask(key, value, append2, scope) {
   };
 }
 function getConfigTask(key, scope) {
-  const commands12 = ["config", "--null", "--show-origin", "--get-all", key];
+  const commands13 = ["config", "--null", "--show-origin", "--get-all", key];
   if (scope) {
-    commands12.splice(1, 0, `--${scope}`);
+    commands13.splice(1, 0, `--${scope}`);
   }
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser(text) {
       return configGetParser(text, key);
@@ -3712,12 +4185,12 @@ function getConfigTask(key, scope) {
   };
 }
 function listConfigTask(scope) {
-  const commands12 = ["config", "--list", "--show-origin", "--null"];
+  const commands13 = ["config", "--list", "--show-origin", "--null"];
   if (scope) {
-    commands12.push(`--${scope}`);
+    commands13.push(`--${scope}`);
   }
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser(text) {
       return configListParser(text);
@@ -3800,11 +4273,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path15, line, preview] = input.split(NULL);
-    paths.add(path15);
-    (results[path15] = results[path15] || []).push({
+    const [path17, line, preview] = input.split(NULL);
+    paths.add(path17);
+    (results[path17] = results[path17] || []).push({
       line: asNumber(line),
-      path: path15,
+      path: path17,
       preview
     });
   });
@@ -3829,10 +4302,10 @@ function grep_default() {
       if (typeof searchTerm === "string") {
         searchTerm = grepQueryBuilder().param(searchTerm);
       }
-      const commands12 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
+      const commands13 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
       return this._runTask(
         {
-          commands: commands12,
+          commands: commands13,
           format: "utf-8",
           parser(stdOut) {
             return parseGrep(stdOut);
@@ -3881,12 +4354,12 @@ __export2(reset_exports, {
   resetTask: () => resetTask
 });
 function resetTask(mode, customArgs) {
-  const commands12 = ["reset"];
+  const commands13 = ["reset"];
   if (isValidResetMode(mode)) {
-    commands12.push(`--${mode}`);
+    commands13.push(`--${mode}`);
   }
-  commands12.push(...customArgs);
-  return straightThroughStringTask(commands12);
+  commands13.push(...customArgs);
+  return straightThroughStringTask(commands13);
 }
 function getResetMode(mode) {
   if (isValidResetMode(mode)) {
@@ -4055,10 +4528,10 @@ var init_tasks_pending_queue = __esm({
     };
   }
 });
-function pluginContext(task, commands12) {
+function pluginContext(task, commands13) {
   return {
     method: first(task.commands) || "",
-    commands: commands12
+    commands: commands13
   };
 }
 function onErrorReceived(target, logger) {
@@ -4359,11 +4832,11 @@ var init_change_working_directory = __esm({
   }
 });
 function checkoutTask(args) {
-  const commands12 = ["checkout", ...args];
-  if (commands12[1] === "-b" && commands12.includes("-B")) {
-    commands12[1] = remove(commands12, "-B");
+  const commands13 = ["checkout", ...args];
+  if (commands13[1] === "-b" && commands13.includes("-B")) {
+    commands13[1] = remove(commands13, "-B");
   }
-  return straightThroughStringTask(commands12);
+  return straightThroughStringTask(commands13);
 }
 function checkout_default() {
   return {
@@ -4495,7 +4968,7 @@ var init_parse_commit = __esm({
   }
 });
 function commitTask(message, files, customArgs) {
-  const commands12 = [
+  const commands13 = [
     "-c",
     "core.abbrev=40",
     "commit",
@@ -4504,7 +4977,7 @@ function commitTask(message, files, customArgs) {
     ...customArgs
   ];
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser: parseCommitResult
   };
@@ -4556,11 +5029,11 @@ var init_first_commit = __esm({
   }
 });
 function hashObjectTask(filePath, write) {
-  const commands12 = ["hash-object", filePath];
+  const commands13 = ["hash-object", filePath];
   if (write) {
-    commands12.push("-w");
+    commands13.push("-w");
   }
-  return straightThroughStringTask(commands12, true);
+  return straightThroughStringTask(commands13, true);
 }
 var init_hash_object = __esm({
   "src/lib/tasks/hash-object.ts"() {
@@ -4568,14 +5041,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path15, text) {
+function parseInit(bare, path17, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path15, false, result[1]);
+    return new InitSummary(bare, path17, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path15, true, result[1]);
+    return new InitSummary(bare, path17, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -4586,7 +5059,7 @@ function parseInit(bare, path15, text) {
       break;
     }
   }
-  return new InitSummary(bare, path15, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path17, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -4595,9 +5068,9 @@ var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     "use strict";
     InitSummary = class {
-      constructor(bare, path15, existing, gitDir) {
+      constructor(bare, path17, existing, gitDir) {
         this.bare = bare;
-        this.path = path15;
+        this.path = path17;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -4609,16 +5082,16 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path15, customArgs) {
-  const commands12 = ["init", ...customArgs];
-  if (bare && !hasBareCommand(commands12)) {
-    commands12.splice(1, 0, bareCommand);
+function initTask(bare = false, path17, customArgs) {
+  const commands13 = ["init", ...customArgs];
+  if (bare && !hasBareCommand(commands13)) {
+    commands13.splice(1, 0, bareCommand);
   }
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands12.includes("--bare"), path15, text);
+      return parseInit(commands13.includes("--bare"), path17, text);
     }
   };
 }
@@ -4850,14 +5323,14 @@ __export2(diff_exports, {
 });
 function diffSummaryTask(customArgs) {
   let logFormat = logFormatFromCommand(customArgs);
-  const commands12 = ["diff"];
+  const commands13 = ["diff"];
   if (logFormat === "") {
     logFormat = "--stat";
-    commands12.push("--stat=4096");
+    commands13.push("--stat=4096");
   }
-  commands12.push(...customArgs);
-  return validateLogFormatConfig(commands12) || {
-    commands: commands12,
+  commands13.push(...customArgs);
+  return validateLogFormatConfig(commands13) || {
+    commands: commands13,
     format: "utf-8",
     parser: getDiffParser(logFormat)
   };
@@ -5375,18 +5848,18 @@ function pushTagsTask(ref = {}, customArgs) {
   return pushTask(ref, customArgs);
 }
 function pushTask(ref = {}, customArgs) {
-  const commands12 = ["push", ...customArgs];
+  const commands13 = ["push", ...customArgs];
   if (ref.branch) {
-    commands12.splice(1, 0, ref.branch);
+    commands13.splice(1, 0, ref.branch);
   }
   if (ref.remote) {
-    commands12.splice(1, 0, ref.remote);
+    commands13.splice(1, 0, ref.remote);
   }
-  remove(commands12, "-v");
-  append(commands12, "--verbose");
-  append(commands12, "--porcelain");
+  remove(commands13, "-v");
+  append(commands13, "--verbose");
+  append(commands13, "--porcelain");
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser: parsePushResult
   };
@@ -5401,19 +5874,19 @@ var init_push = __esm({
 function show_default() {
   return {
     showBuffer() {
-      const commands12 = ["show", ...getTrailingOptions(arguments, 1)];
-      if (!commands12.includes("--binary")) {
-        commands12.splice(1, 0, "--binary");
+      const commands13 = ["show", ...getTrailingOptions(arguments, 1)];
+      if (!commands13.includes("--binary")) {
+        commands13.splice(1, 0, "--binary");
       }
       return this._runTask(
-        straightThroughBufferTask(commands12),
+        straightThroughBufferTask(commands13),
         trailingFunctionArgument(arguments)
       );
     },
     show() {
-      const commands12 = ["show", ...getTrailingOptions(arguments, 1)];
+      const commands13 = ["show", ...getTrailingOptions(arguments, 1)];
       return this._runTask(
-        straightThroughStringTask(commands12),
+        straightThroughStringTask(commands13),
         trailingFunctionArgument(arguments)
       );
     }
@@ -5433,12 +5906,12 @@ var init_FileStatusSummary = __esm({
     "use strict";
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path15, index, working_dir) {
-        this.path = path15;
+      constructor(path17, index, working_dir) {
+        this.path = path17;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path15) || [null, path15, path15];
+          const detail = fromPathRegex.exec(path17) || [null, path17, path17];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -5469,14 +5942,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path15) {
+  function data(index, workingDir, path17) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path15);
+      handler(result, path17);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path15, index, workingDir));
+      result.files.push(new FileStatusSummary(path17, index, workingDir));
     }
   }
 }
@@ -5623,7 +6096,7 @@ var init_StatusSummary = __esm({
   }
 });
 function statusTask(customArgs) {
-  const commands12 = [
+  const commands13 = [
     "status",
     "--porcelain",
     "-b",
@@ -5633,7 +6106,7 @@ function statusTask(customArgs) {
   ];
   return {
     format: "utf-8",
-    commands: commands12,
+    commands: commands13,
     parser(text) {
       return parseStatusSummary(text);
     }
@@ -5748,10 +6221,10 @@ var init_clone = __esm({
     init_task();
     init_utils();
     cloneTask = (repo, directory, customArgs) => {
-      const commands12 = ["clone", ...customArgs];
-      filterString(repo) && commands12.push(c(repo));
-      filterString(directory) && commands12.push(c(directory));
-      return straightThroughStringTask(commands12);
+      const commands13 = ["clone", ...customArgs];
+      filterString(repo) && commands13.push(c(repo));
+      filterString(directory) && commands13.push(c(directory));
+      return straightThroughStringTask(commands13);
     };
     cloneMirrorTask = (repo, directory, customArgs) => {
       append(customArgs, "--mirror");
@@ -5827,9 +6300,9 @@ var init_simple_git_api = __esm({
           next
         );
       }
-      hashObject(path15, write) {
+      hashObject(path17, write) {
         return this._runTask(
-          hashObjectTask(path15, write === true),
+          hashObjectTask(path17, write === true),
           trailingFunctionArgument(arguments)
         );
       }
@@ -6105,23 +6578,23 @@ __export2(branch_exports, {
   deleteBranchTask: () => deleteBranchTask,
   deleteBranchesTask: () => deleteBranchesTask
 });
-function containsDeleteBranchCommand(commands12) {
+function containsDeleteBranchCommand(commands13) {
   const deleteCommands = ["-d", "-D", "--delete"];
-  return commands12.some((command) => deleteCommands.includes(command));
+  return commands13.some((command) => deleteCommands.includes(command));
 }
 function branchTask(customArgs) {
   const isDelete = containsDeleteBranchCommand(customArgs);
   const isCurrentOnly = customArgs.includes("--show-current");
-  const commands12 = ["branch", ...customArgs];
-  if (commands12.length === 1) {
-    commands12.push("-a");
+  const commands13 = ["branch", ...customArgs];
+  if (commands13.length === 1) {
+    commands13.push("-a");
   }
-  if (!commands12.includes("-v")) {
-    commands12.splice(1, 0, "-v");
+  if (!commands13.includes("-v")) {
+    commands13.splice(1, 0, "-v");
   }
   return {
     format: "utf-8",
-    commands: commands12,
+    commands: commands13,
     parser(stdOut, stdErr) {
       if (isDelete) {
         return parseBranchDeletions(stdOut, stdErr).all[0];
@@ -6183,8 +6656,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path15 = input.trim().replace(/^["']|["']$/g, "");
-  return path15 && (0, import_node_path.normalize)(path15);
+  const path17 = input.trim().replace(/^["']|["']$/g, "");
+  return path17 && (0, import_node_path.normalize)(path17);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -6271,16 +6744,16 @@ function disallowedCommand(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function fetchTask(remote, branch, customArgs) {
-  const commands12 = ["fetch", ...customArgs];
+  const commands13 = ["fetch", ...customArgs];
   if (remote && branch) {
-    commands12.push(remote, branch);
+    commands13.push(remote, branch);
   }
-  const banned = commands12.find(disallowedCommand);
+  const banned = commands13.find(disallowedCommand);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser: parseFetchResult3
   };
@@ -6330,12 +6803,12 @@ __export2(pull_exports, {
   pullTask: () => pullTask
 });
 function pullTask(remote, branch, customArgs) {
-  const commands12 = ["pull", ...customArgs];
+  const commands13 = ["pull", ...customArgs];
   if (remote && branch) {
-    commands12.splice(1, 0, remote, branch);
+    commands13.splice(1, 0, remote, branch);
   }
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser(stdOut, stdErr) {
       return parsePullResult(stdOut, stdErr);
@@ -6401,29 +6874,29 @@ function addRemoteTask(remoteName, remoteRepo, customArgs) {
   return straightThroughStringTask(["remote", "add", ...customArgs, remoteName, remoteRepo]);
 }
 function getRemotesTask(verbose) {
-  const commands12 = ["remote"];
+  const commands13 = ["remote"];
   if (verbose) {
-    commands12.push("-v");
+    commands13.push("-v");
   }
   return {
-    commands: commands12,
+    commands: commands13,
     format: "utf-8",
     parser: verbose ? parseGetRemotesVerbose : parseGetRemotes
   };
 }
 function listRemotesTask(customArgs) {
-  const commands12 = [...customArgs];
-  if (commands12[0] !== "ls-remote") {
-    commands12.unshift("ls-remote");
+  const commands13 = [...customArgs];
+  if (commands13[0] !== "ls-remote") {
+    commands13.unshift("ls-remote");
   }
-  return straightThroughStringTask(commands12);
+  return straightThroughStringTask(commands13);
 }
 function remoteTask(customArgs) {
-  const commands12 = [...customArgs];
-  if (commands12[0] !== "remote") {
-    commands12.unshift("remote");
+  const commands13 = [...customArgs];
+  if (commands13[0] !== "remote") {
+    commands13.unshift("remote");
   }
-  return straightThroughStringTask(commands12);
+  return straightThroughStringTask(commands13);
 }
 function removeRemoteTask(remoteName) {
   return straightThroughStringTask(["remote", "remove", remoteName]);
@@ -6441,14 +6914,14 @@ __export2(stash_list_exports, {
 });
 function stashListTask(opt = {}, customArgs) {
   const options = parseLogOptions(opt);
-  const commands12 = ["stash", "list", ...options.commands, ...customArgs];
+  const commands13 = ["stash", "list", ...options.commands, ...customArgs];
   const parser4 = createListLogSummaryParser(
     options.splitter,
     options.fields,
-    logFormatFromCommand(commands12)
+    logFormatFromCommand(commands13)
   );
-  return validateLogFormatConfig(commands12) || {
-    commands: commands12,
+  return validateLogFormatConfig(commands13) || {
+    commands: commands13,
     format: "utf-8",
     parser: parser4
   };
@@ -6469,18 +6942,18 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path15) {
-  return subModuleTask(["add", repo, path15]);
+function addSubModuleTask(repo, path17) {
+  return subModuleTask(["add", repo, path17]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
 }
 function subModuleTask(customArgs) {
-  const commands12 = [...customArgs];
-  if (commands12[0] !== "submodule") {
-    commands12.unshift("submodule");
+  const commands13 = [...customArgs];
+  if (commands13[0] !== "submodule") {
+    commands13.unshift("submodule");
   }
-  return straightThroughStringTask(commands12);
+  return straightThroughStringTask(commands13);
 }
 function updateSubModuleTask(customArgs) {
   return subModuleTask(["update", ...customArgs]);
@@ -6765,9 +7238,9 @@ var require_git = __commonJS2({
     Git2.prototype.branchLocal = function(then) {
       return this._runTask(branchLocalTask2(), trailingFunctionArgument2(arguments));
     };
-    Git2.prototype.raw = function(commands12) {
-      const createRestCommands = !Array.isArray(commands12);
-      const command = [].slice.call(createRestCommands ? arguments : commands12, 0);
+    Git2.prototype.raw = function(commands13) {
+      const createRestCommands = !Array.isArray(commands13);
+      const command = [].slice.call(createRestCommands ? arguments : commands13, 0);
       for (let i2 = 0; i2 < command.length && createRestCommands; i2++) {
         if (!filterPrimitives2(command[i2])) {
           command.splice(i2, command.length - i2);
@@ -6784,8 +7257,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path15, then) {
-      return this._runTask(addSubModuleTask2(repo, path15), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path17, then) {
+      return this._runTask(addSubModuleTask2(repo, path17), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(
@@ -6902,9 +7375,9 @@ var require_git = __commonJS2({
       return this._runTask(task, trailingFunctionArgument2(arguments));
     };
     Git2.prototype.revparse = function() {
-      const commands12 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
+      const commands13 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
       return this._runTask(
-        straightThroughStringTask2(commands12, true),
+        straightThroughStringTask2(commands13, true),
         trailingFunctionArgument2(arguments)
       );
     };
@@ -7336,9 +7809,9 @@ var esm_default = gitInstanceFactory;
 
 // src/commands/gitScaffold.ts
 var SCAFFOLD_DIRS = [
-  path8.join("docs", "session-sets"),
-  path8.join("docs", "planning"),
-  "ai-router"
+  path9.join("docs", "session-sets"),
+  path9.join("docs", "planning"),
+  "ai_router"
 ];
 async function pickDirectory() {
   const picked = await vscode8.window.showOpenDialog({
@@ -7359,7 +7832,7 @@ function registerGitScaffoldCommand(context) {
       const isRepo = await git.checkIsRepo().catch(() => false);
       if (!isRepo) {
         const confirm = await vscode8.window.showWarningMessage(
-          `Initialize a new git repository in ${path8.basename(projectDir)}?`,
+          `Initialize a new git repository in ${path9.basename(projectDir)}?`,
           { modal: true },
           "Initialize"
         );
@@ -7369,7 +7842,7 @@ function registerGitScaffoldCommand(context) {
         vscode8.window.showInformationMessage("Git repository initialized.");
       }
       for (const rel of SCAFFOLD_DIRS) {
-        const full = path8.join(projectDir, rel);
+        const full = path9.join(projectDir, rel);
         if (!fs5.existsSync(full))
           fs5.mkdirSync(full, { recursive: true });
       }
@@ -7386,10 +7859,10 @@ function registerGitScaffoldCommand(context) {
           if (status.files.length > 0 || !await git.log().catch(() => null)) {
             await git.commit("init", { "--allow-empty": null });
           }
-          const worktreesDir = path8.join(projectDir, "worktrees");
+          const worktreesDir = path9.join(projectDir, "worktrees");
           if (!fs5.existsSync(worktreesDir))
             fs5.mkdirSync(worktreesDir, { recursive: true });
-          await git.raw(["worktree", "add", path8.join(worktreesDir, "main"), "HEAD"]);
+          await git.raw(["worktree", "add", path9.join(worktreesDir, "main"), "HEAD"]);
           vscode8.window.showInformationMessage(
             "Worktrees set up. Work from worktrees/main/ for parallel sessions."
           );
@@ -7415,7 +7888,7 @@ function registerGitScaffoldCommand(context) {
 // src/commands/troubleshoot.ts
 var vscode9 = __toESM(require("vscode"));
 var fs6 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var path10 = __toESM(require("path"));
 var cp3 = __toESM(require("child_process"));
 function workspaceRoot() {
   return vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -7431,7 +7904,7 @@ function checkActivation() {
     ch.show();
     return;
   }
-  const dir = path9.join(root, SESSION_SETS_REL);
+  const dir = path10.join(root, SESSION_SETS_REL);
   const exists2 = fs6.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
@@ -7487,7 +7960,7 @@ function checkWorktrees() {
 }
 function checkApiKeys() {
   const ch = outputChannel();
-  ch.appendLine("The ai-router reads API keys from environment variables at session start.");
+  ch.appendLine("The ai_router reads API keys from environment variables at session start.");
   ch.appendLine("");
   ch.appendLine("Keys used (depending on configured providers):");
   ch.appendLine("  ANTHROPIC_API_KEY  \u2014 Claude (claude.ai)");
@@ -7518,14 +7991,14 @@ function checkLayout() {
     return;
   }
   const dirs = [
-    path9.join("docs", "session-sets"),
-    path9.join("docs", "planning"),
-    "ai-router"
+    path10.join("docs", "session-sets"),
+    path10.join("docs", "planning"),
+    "ai_router"
   ];
   ch.appendLine(`Expected layout under: ${root}`);
   ch.appendLine("");
   for (const d of dirs) {
-    const full = path9.join(root, d);
+    const full = path10.join(root, d);
     const exists2 = fs6.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
@@ -7554,7 +8027,7 @@ function registerTroubleshootCommand(context) {
         },
         {
           label: "$(key) API key not found",
-          detail: "Show which environment variables the ai-router expects",
+          detail: "Show which environment variables the ai_router expects",
           run: checkApiKeys
         },
         {
@@ -7817,15 +8290,228 @@ function registerCancelLifecycleCommands(context, deps) {
   );
 }
 
+// src/commands/installAiRouterCommands.ts
+var cp4 = __toESM(require("child_process"));
+var fs7 = __toESM(require("fs"));
+var os = __toESM(require("os"));
+var path11 = __toESM(require("path"));
+var vscode12 = __toESM(require("vscode"));
+function registerInstallAiRouterCommands(context) {
+  context.subscriptions.push(
+    vscode12.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
+      await runInstallFlow("install");
+    }),
+    vscode12.commands.registerCommand("dabblerSessionSets.updateAiRouter", async () => {
+      await runInstallFlow("update");
+    })
+  );
+}
+async function runInstallFlow(mode) {
+  const root = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!root) {
+    vscode12.window.showErrorMessage(
+      "Open a workspace folder before running Dabbler: Install ai-router."
+    );
+    return;
+  }
+  const pythonPath = resolvePythonPath2(root);
+  const repoUrl = resolveAiRouterRepoUrl();
+  const outcome = await vscode12.window.withProgress(
+    {
+      location: vscode12.ProgressLocation.Notification,
+      title: mode === "update" ? "Updating ai_router\u2026" : "Installing ai_router\u2026",
+      cancellable: false
+    },
+    async (progress) => {
+      const deps = {
+        workspaceRoot: root,
+        pythonPath,
+        repoUrl,
+        spawner: makeSpawner(),
+        fileOps: makeFileOps(),
+        prompts: makePrompts(),
+        reportProgress: (msg) => progress.report({ message: msg })
+      };
+      return mode === "update" ? await updateAiRouter(deps) : await installAiRouter(deps);
+    }
+  );
+  if (!outcome.ok) {
+    vscode12.window.showErrorMessage(outcome.message);
+    return;
+  }
+  vscode12.window.showInformationMessage(outcome.message);
+  const routerConfig = path11.join(root, ROUTER_CONFIG_REL);
+  if (fs7.existsSync(routerConfig)) {
+    try {
+      const doc = await vscode12.workspace.openTextDocument(routerConfig);
+      await vscode12.window.showTextDocument(doc, { preview: false });
+      vscode12.window.showInformationMessage(
+        "Tune router-config.yaml for your project \u2014 per-task-type effort, the cost guard, and delegation.always_route_task_types live here."
+      );
+    } catch {
+    }
+  }
+}
+function resolveAiRouterRepoUrl() {
+  const cfg = vscode12.workspace.getConfiguration("dabblerSessionSets");
+  const raw = (cfg.get("aiRouterRepoUrl") ?? "").trim();
+  return raw === "" ? void 0 : raw;
+}
+function resolvePythonPath2(workspaceRoot2) {
+  const raw = (explicitConfigValue("dabblerSessionSets", "pythonPath") ?? explicitConfigValue("dabblerProviderQueues", "pythonPath") ?? "python").trim();
+  if (!raw)
+    return "python";
+  if (path11.isAbsolute(raw))
+    return raw;
+  if (raw.includes(path11.sep) || raw.includes("/")) {
+    return path11.resolve(workspaceRoot2, raw);
+  }
+  return raw;
+}
+function explicitConfigValue(section, key) {
+  const cfg = vscode12.workspace.getConfiguration(section);
+  const inspected = cfg.inspect(key);
+  if (!inspected)
+    return void 0;
+  return inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue ?? void 0;
+}
+function makeSpawner() {
+  return (cmd, args, opts) => new Promise((resolve5) => {
+    const child = cp4.spawn(cmd, args, {
+      cwd: opts?.cwd,
+      env: process.env,
+      windowsHide: true
+    });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    const timer = opts?.timeoutMs ? setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, opts.timeoutMs) : null;
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", (err) => {
+      if (timer)
+        clearTimeout(timer);
+      resolve5({
+        exitCode: null,
+        stdout,
+        stderr: stderr + (stderr ? "\n" : "") + `spawn error: ${err.message}`
+      });
+    });
+    child.on("close", (code) => {
+      if (timer)
+        clearTimeout(timer);
+      if (timedOut) {
+        resolve5({
+          exitCode: code ?? -1,
+          stdout,
+          stderr: stderr + (stderr ? "\n" : "") + "process killed by timeout"
+        });
+      } else {
+        resolve5({ exitCode: code, stdout, stderr });
+      }
+    });
+  });
+}
+function makeFileOps() {
+  return {
+    exists: (p2) => fs7.existsSync(p2),
+    readFile: (p2) => fs7.readFileSync(p2, "utf8"),
+    // Always ensure the parent directory exists before writing. The
+    // GitHub-fallback flow can momentarily leave the destination
+    // ai_router/ directory missing (between `removeRecursive(dst)` and
+    // a partial `copyDir` failure), and the stash-restore path writes
+    // the operator-tuned router-config.yaml inside that directory. The
+    // cost of an always-on mkdirp is one extra syscall per write; the
+    // cost of dropping it is silent data loss in a narrow but real
+    // failure window. Round-3 verifier catch.
+    writeFile: (p2, content) => {
+      fs7.mkdirSync(path11.dirname(p2), { recursive: true });
+      fs7.writeFileSync(p2, content, "utf8");
+    },
+    mkdirp: (p2) => fs7.mkdirSync(p2, { recursive: true }),
+    copyDir: (src, dst) => copyDirSync(src, dst),
+    removeRecursive: (p2) => {
+      if (fs7.existsSync(p2))
+        fs7.rmSync(p2, { recursive: true, force: true });
+    },
+    mkdtemp: (prefix) => fs7.mkdtempSync(path11.join(os.tmpdir(), prefix))
+  };
+}
+function copyDirSync(src, dst) {
+  fs7.mkdirSync(dst, { recursive: true });
+  for (const entry of fs7.readdirSync(src, { withFileTypes: true })) {
+    const s = path11.join(src, entry.name);
+    const d = path11.join(dst, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSync(s, d);
+    } else if (entry.isSymbolicLink()) {
+      const target = fs7.readlinkSync(s);
+      fs7.symlinkSync(target, d);
+    } else {
+      fs7.copyFileSync(s, d);
+    }
+  }
+}
+function makePrompts() {
+  return {
+    pickSource: async (defaultSource) => {
+      const items = [
+        {
+          label: "Install from PyPI (recommended)",
+          description: "pip install dabbler-ai-router",
+          detail: "Default. Pulls the latest released version from the Python Package Index.",
+          value: "pypi"
+        },
+        {
+          label: "Install from GitHub (fallback)",
+          description: "git sparse-checkout of ai_router/",
+          detail: "Use for offline workspaces, pre-release testing, or forks. Preserves any existing router-config.yaml.",
+          value: "github"
+        }
+      ];
+      items.sort((a, b2) => a.value === defaultSource ? -1 : b2.value === defaultSource ? 1 : 0);
+      const picked = await vscode12.window.showQuickPick(items, {
+        placeHolder: "Choose how to install ai_router",
+        ignoreFocusOut: true
+      });
+      return picked?.value;
+    },
+    confirmCreateVenv: async (venvAbsPath) => {
+      const choice = await vscode12.window.showInformationMessage(
+        `No venv found in this workspace. Create one at ${venvAbsPath}?`,
+        { modal: true, detail: "ai_router needs a Python environment to install into. The recommended location is .venv at the workspace root." },
+        "Create venv",
+        "Cancel"
+      );
+      return choice === "Create venv";
+    },
+    promptGitHubRef: async (defaultRef) => {
+      const ref = await vscode12.window.showInputBox({
+        prompt: "Git ref for the sparse checkout (tag or branch). Leave blank for the latest released tag.",
+        placeHolder: defaultRef,
+        ignoreFocusOut: true
+      });
+      return ref;
+    }
+  };
+}
+
 // src/wizard/WizardPanel.ts
-var vscode14 = __toESM(require("vscode"));
-var fs9 = __toESM(require("fs"));
+var vscode15 = __toESM(require("vscode"));
+var fs10 = __toESM(require("fs"));
 
 // src/wizard/planImport.ts
-var vscode12 = __toESM(require("vscode"));
-var fs7 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
-var PLAN_DEST = path10.join("docs", "planning", "project-plan.md");
+var vscode13 = __toESM(require("vscode"));
+var fs8 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
+var PLAN_DEST = path12.join("docs", "planning", "project-plan.md");
 var PLAN_AUTHORING_PROMPT = `You are a project planning assistant for an AI-led development workflow.
 
 Help me create a project plan in Markdown format for my software project.
@@ -7843,8 +8529,8 @@ sessions.
 Format as a clean Markdown document I can save as docs/planning/project-plan.md.`;
 function registerPlanImportCommand(context) {
   context.subscriptions.push(
-    vscode12.commands.registerCommand("dabbler.importPlan", async () => {
-      const action = await vscode12.window.showQuickPick(
+    vscode13.commands.registerCommand("dabbler.importPlan", async () => {
+      const action = await vscode13.window.showQuickPick(
         [
           { label: "$(file) Import existing plan from file", value: "file" },
           { label: "$(clippy) Get a prompt to create a plan with AI", value: "prompt" }
@@ -7854,13 +8540,13 @@ function registerPlanImportCommand(context) {
       if (!action)
         return;
       if (action.value === "prompt") {
-        await vscode12.env.clipboard.writeText(PLAN_AUTHORING_PROMPT);
-        vscode12.window.showInformationMessage(
+        await vscode13.env.clipboard.writeText(PLAN_AUTHORING_PROMPT);
+        vscode13.window.showInformationMessage(
           "Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, then save the result as docs/planning/project-plan.md and run 'Dabbler: Import Project Plan' again to import it."
         );
         return;
       }
-      const picked = await vscode12.window.showOpenDialog({
+      const picked = await vscode13.window.showOpenDialog({
         canSelectFiles: true,
         canSelectFolders: false,
         canSelectMany: false,
@@ -7869,17 +8555,17 @@ function registerPlanImportCommand(context) {
       });
       if (!picked?.[0])
         return;
-      const root = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const root = vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
-        vscode12.window.showErrorMessage("No workspace folder is open.");
+        vscode13.window.showErrorMessage("No workspace folder is open.");
         return;
       }
-      const destPath = path10.join(root, PLAN_DEST);
-      const destDir = path10.dirname(destPath);
-      if (!fs7.existsSync(destDir))
-        fs7.mkdirSync(destDir, { recursive: true });
-      if (fs7.existsSync(destPath)) {
-        const overwrite = await vscode12.window.showWarningMessage(
+      const destPath = path12.join(root, PLAN_DEST);
+      const destDir = path12.dirname(destPath);
+      if (!fs8.existsSync(destDir))
+        fs8.mkdirSync(destDir, { recursive: true });
+      if (fs8.existsSync(destPath)) {
+        const overwrite = await vscode13.window.showWarningMessage(
           `${PLAN_DEST} already exists. Overwrite it?`,
           { modal: true },
           "Overwrite"
@@ -7887,9 +8573,9 @@ function registerPlanImportCommand(context) {
         if (overwrite !== "Overwrite")
           return;
       }
-      fs7.copyFileSync(picked[0].fsPath, destPath);
-      vscode12.commands.executeCommand("vscode.open", vscode12.Uri.file(destPath));
-      vscode12.window.showInformationMessage(
+      fs8.copyFileSync(picked[0].fsPath, destPath);
+      vscode13.commands.executeCommand("vscode.open", vscode13.Uri.file(destPath));
+      vscode13.window.showInformationMessage(
         `Plan imported to ${PLAN_DEST}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
       );
     })
@@ -7897,10 +8583,10 @@ function registerPlanImportCommand(context) {
 }
 
 // src/wizard/sessionGenPrompt.ts
-var vscode13 = __toESM(require("vscode"));
-var fs8 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
-var PLAN_PATH = path11.join("docs", "planning", "project-plan.md");
+var vscode14 = __toESM(require("vscode"));
+var fs9 = __toESM(require("fs"));
+var path13 = __toESM(require("path"));
+var PLAN_PATH = path13.join("docs", "planning", "project-plan.md");
 var PROMPT_SYSTEM = `You are a session-set architect for an AI-led software development workflow.
 
 Given a project plan, decompose it into a sequence of session sets. Each session set is a
@@ -7965,23 +8651,23 @@ it up front keeps the folder self-describing.
 `;
 function registerSessionGenPromptCommand(context) {
   context.subscriptions.push(
-    vscode13.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
-      const root = vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    vscode14.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
+      const root = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
-        vscode13.window.showErrorMessage("No workspace folder is open.");
+        vscode14.window.showErrorMessage("No workspace folder is open.");
         return;
       }
-      const planPath = path11.join(root, PLAN_PATH);
-      if (!fs8.existsSync(planPath)) {
-        const action = await vscode13.window.showWarningMessage(
+      const planPath = path13.join(root, PLAN_PATH);
+      if (!fs9.existsSync(planPath)) {
+        const action = await vscode14.window.showWarningMessage(
           `No project plan found at ${PLAN_PATH}. Import one first?`,
           "Import Plan"
         );
         if (action === "Import Plan")
-          vscode13.commands.executeCommand("dabbler.importPlan");
+          vscode14.commands.executeCommand("dabbler.importPlan");
         return;
       }
-      const planText = fs8.readFileSync(planPath, "utf8");
+      const planText = fs9.readFileSync(planPath, "utf8");
       const prompt = `${PROMPT_SYSTEM}
 
 ---
@@ -7989,8 +8675,8 @@ function registerSessionGenPromptCommand(context) {
 Project plan:
 
 ${planText}`;
-      await vscode13.env.clipboard.writeText(prompt);
-      vscode13.window.showInformationMessage(
+      await vscode14.env.clipboard.writeText(prompt);
+      vscode14.window.showInformationMessage(
         "Session-set generation prompt copied to clipboard. Paste it into your AI assistant. When you receive the specs, save each one to docs/session-sets/<slug>/spec.md.\n\nCost reminder: each session set typically costs $0.10\u2013$2.00 depending on model and effort. Review the generated specs before running all sessions.",
         { modal: false }
       );
@@ -8009,16 +8695,16 @@ function getNonce() {
 var WizardPanel = class _WizardPanel {
   static show(extensionUri) {
     if (_WizardPanel.currentPanel) {
-      _WizardPanel.currentPanel._panel.reveal(vscode14.ViewColumn.One);
+      _WizardPanel.currentPanel._panel.reveal(vscode15.ViewColumn.One);
       return;
     }
-    const panel = vscode14.window.createWebviewPanel(
+    const panel = vscode15.window.createWebviewPanel(
       "dabblerWizard",
       "Dabbler AI Orchestration \u2014 Get Started",
-      vscode14.ViewColumn.One,
+      vscode15.ViewColumn.One,
       {
         enableScripts: true,
-        localResourceRoots: [vscode14.Uri.joinPath(extensionUri, "webview")]
+        localResourceRoots: [vscode15.Uri.joinPath(extensionUri, "webview")]
       }
     );
     _WizardPanel.currentPanel = new _WizardPanel(panel, extensionUri);
@@ -8033,27 +8719,27 @@ var WizardPanel = class _WizardPanel {
     this._panel.webview.onDidReceiveMessage((msg) => {
       switch (msg.command) {
         case "setupProject":
-          vscode14.commands.executeCommand("dabbler.setupNewProject");
+          vscode15.commands.executeCommand("dabbler.setupNewProject");
           break;
         case "importPlan":
-          vscode14.commands.executeCommand("dabbler.importPlan");
+          vscode15.commands.executeCommand("dabbler.importPlan");
           break;
         case "generatePrompt":
-          vscode14.commands.executeCommand("dabbler.generateSessionSetPrompt");
+          vscode15.commands.executeCommand("dabbler.generateSessionSetPrompt");
           break;
         case "troubleshoot":
-          vscode14.commands.executeCommand("dabbler.troubleshoot");
+          vscode15.commands.executeCommand("dabbler.troubleshoot");
           break;
         case "showCost":
-          vscode14.commands.executeCommand("dabbler.showCostDashboard");
+          vscode15.commands.executeCommand("dabbler.showCostDashboard");
           break;
       }
     });
   }
   _getHtml() {
-    const htmlPath = vscode14.Uri.joinPath(this._extensionUri, "webview", "wizard.html");
+    const htmlPath = vscode15.Uri.joinPath(this._extensionUri, "webview", "wizard.html");
     try {
-      let html = fs9.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs10.readFileSync(htmlPath.fsPath, "utf8");
       const nonce = getNonce();
       const cspSource = this._panel.webview.cspSource;
       html = html.replace(/{{NONCE}}/g, nonce).replace(/{{CSP_SOURCE}}/g, cspSource);
@@ -8065,7 +8751,7 @@ var WizardPanel = class _WizardPanel {
 };
 function registerWizardCommands(context) {
   context.subscriptions.push(
-    vscode14.commands.registerCommand("dabbler.getStarted", () => {
+    vscode15.commands.registerCommand("dabbler.getStarted", () => {
       WizardPanel.show(context.extensionUri);
     })
   );
@@ -8074,20 +8760,20 @@ function registerWizardCommands(context) {
 }
 
 // src/dashboard/CostDashboard.ts
-var vscode15 = __toESM(require("vscode"));
-var fs11 = __toESM(require("fs"));
-var path13 = __toESM(require("path"));
+var vscode16 = __toESM(require("vscode"));
+var fs12 = __toESM(require("fs"));
+var path15 = __toESM(require("path"));
 
 // src/utils/metrics.ts
-var fs10 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
-var METRICS_FILE = path12.join("ai-router", "metrics.jsonl");
+var fs11 = __toESM(require("fs"));
+var path14 = __toESM(require("path"));
+var METRICS_FILE = path14.join("ai_router", "metrics.jsonl");
 function readMetrics(workspaceRoot2) {
-  const metricsPath = path12.join(workspaceRoot2, METRICS_FILE);
-  if (!fs10.existsSync(metricsPath))
+  const metricsPath = path14.join(workspaceRoot2, METRICS_FILE);
+  if (!fs11.existsSync(metricsPath))
     return [];
   try {
-    const lines = fs10.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
+    const lines = fs11.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
     return lines.map((line) => {
       try {
         return JSON.parse(line);
@@ -8164,17 +8850,17 @@ function getNonce2() {
 var CostDashboard = class _CostDashboard {
   static show(extensionUri) {
     if (_CostDashboard.currentPanel) {
-      _CostDashboard.currentPanel._panel.reveal(vscode15.ViewColumn.Two);
+      _CostDashboard.currentPanel._panel.reveal(vscode16.ViewColumn.Two);
       _CostDashboard.currentPanel._refresh();
       return;
     }
-    const panel = vscode15.window.createWebviewPanel(
+    const panel = vscode16.window.createWebviewPanel(
       "dabblerCostDashboard",
       "Dabbler \u2014 Cost Dashboard",
-      vscode15.ViewColumn.Two,
+      vscode16.ViewColumn.Two,
       {
         enableScripts: true,
-        localResourceRoots: [vscode15.Uri.joinPath(extensionUri, "webview")]
+        localResourceRoots: [vscode16.Uri.joinPath(extensionUri, "webview")]
       }
     );
     _CostDashboard.currentPanel = new _CostDashboard(panel, extensionUri);
@@ -8197,23 +8883,23 @@ var CostDashboard = class _CostDashboard {
     this._panel.webview.html = this._getHtml();
   }
   _exportCsv() {
-    const root = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
-      vscode15.window.showErrorMessage("No workspace folder open.");
+      vscode16.window.showErrorMessage("No workspace folder open.");
       return;
     }
     const entries = readMetrics(root);
     const csv = exportToCsv(entries);
-    const outPath = path13.join(root, "ai-router", "cost-export.csv");
+    const outPath = path15.join(root, "ai_router", "cost-export.csv");
     try {
-      fs11.writeFileSync(outPath, csv, "utf8");
-      vscode15.commands.executeCommand("vscode.open", vscode15.Uri.file(outPath));
+      fs12.writeFileSync(outPath, csv, "utf8");
+      vscode16.commands.executeCommand("vscode.open", vscode16.Uri.file(outPath));
     } catch (err) {
-      vscode15.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+      vscode16.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   _getHtml() {
-    const root = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const nonce = getNonce2();
     const cspSource = this._panel.webview.cspSource;
     if (!root) {
@@ -8221,13 +8907,13 @@ var CostDashboard = class _CostDashboard {
     }
     const entries = readMetrics(root);
     if (entries.length === 0) {
-      return noMetricsHtml(nonce, cspSource, path13.join(root, METRICS_FILE));
+      return noMetricsHtml(nonce, cspSource, path15.join(root, METRICS_FILE));
     }
     const summary = summarizeMetrics(entries);
     const sparkline = buildSparkline(summary.dailyCosts);
-    const htmlPath = vscode15.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
+    const htmlPath = vscode16.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
     try {
-      let html = fs11.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs12.readFileSync(htmlPath.fsPath, "utf8");
       const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
         ([slug, d]) => `<tr><td>${slug}</td><td>${d.sessions}</td><td>$${d.cost.toFixed(3)}</td><td>${d.lastRun ? new Date(d.lastRun).toLocaleDateString("en-CA") : "\u2014"}</td></tr>`
       ).join("\n");
@@ -8241,7 +8927,7 @@ var CostDashboard = class _CostDashboard {
       );
       return html;
     } catch {
-      return noMetricsHtml(nonce, cspSource, path13.join(root, METRICS_FILE));
+      return noMetricsHtml(nonce, cspSource, path15.join(root, METRICS_FILE));
     }
   }
 };
@@ -8257,37 +8943,37 @@ function noMetricsHtml(nonce, cspSource, metricsPath) {
   </head><body>
   <h2>No cost data found</h2>
   <p>Expected: <code>${metricsPath}</code></p>
-  <p>Enable metrics logging in <code>ai-router/config.py</code> by setting <code>METRICS_ENABLED = True</code>.</p>
-  <p>Each session run will append a JSON line to <code>ai-router/metrics.jsonl</code>.</p>
+  <p>Enable metrics logging in <code>ai_router/config.py</code> by setting <code>METRICS_ENABLED = True</code>.</p>
+  <p>Each session run will append a JSON line to <code>ai_router/metrics.jsonl</code>.</p>
   </body></html>`;
 }
 function registerCostDashboardCommand(context) {
   context.subscriptions.push(
-    vscode15.commands.registerCommand("dabbler.showCostDashboard", () => {
+    vscode16.commands.registerCommand("dabbler.showCostDashboard", () => {
       CostDashboard.show(context.extensionUri);
     })
   );
 }
 
 // src/extension.ts
-var SESSION_SETS_REL2 = path14.join("docs", "session-sets");
+var SESSION_SETS_REL2 = path16.join("docs", "session-sets");
 function evaluateSupportContextKeys(allSets) {
-  const cfg = vscode16.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode17.workspace.getConfiguration("dabblerSessionSets");
   const uatPref = cfg.get("uatSupport.enabled", "auto");
   const e2ePref = cfg.get("e2eSupport.enabled", "auto");
   const anyUat = allSets.some((s) => s.config?.requiresUAT);
   const anyE2e = allSets.some((s) => s.config?.requiresE2E);
   const uatActive = uatPref === "always" || uatPref === "auto" && anyUat;
   const e2eActive = e2ePref === "always" || e2ePref === "auto" && anyE2e;
-  vscode16.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
-  vscode16.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
+  vscode17.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
+  vscode17.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
 }
 function activate(context) {
-  if (!vscode16.workspace.workspaceFolders?.length)
+  if (!vscode17.workspace.workspaceFolders?.length)
     return;
   const provider = new SessionSetsProvider(context.extensionUri);
   context.subscriptions.push(
-    vscode16.window.registerTreeDataProvider("dabblerSessionSets", provider)
+    vscode17.window.registerTreeDataProvider("dabblerSessionSets", provider)
   );
   const evaluateContextKeys = () => {
     evaluateSupportContextKeys(provider._cache ?? readAllSessionSets());
@@ -8299,7 +8985,7 @@ function activate(context) {
   };
   evaluateContextKeys();
   context.subscriptions.push(
-    vscode16.workspace.onDidChangeConfiguration((e) => {
+    vscode17.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") || e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
         evaluateContextKeys();
       }
@@ -8318,12 +9004,12 @@ function activate(context) {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      const sessionSetsAbs = path14.join(root, SESSION_SETS_REL2);
-      const pattern = new vscode16.RelativePattern(
+      const sessionSetsAbs = path16.join(root, SESSION_SETS_REL2);
+      const pattern = new vscode17.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,activity-log.json,change-log.md,*-uat-checklist.json}"
       );
-      const watcher = vscode16.workspace.createFileSystemWatcher(pattern);
+      const watcher = vscode17.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => provider.refresh();
       watcher.onDidCreate(onEvent);
       watcher.onDidDelete(onEvent);
@@ -8337,20 +9023,20 @@ function activate(context) {
     provider.refresh();
   };
   bindWatchers();
-  context.subscriptions.push(vscode16.workspace.onDidChangeWorkspaceFolders(refreshAll));
+  context.subscriptions.push(vscode17.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 3e4);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
   context.subscriptions.push(
-    vscode16.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
+    vscode17.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
   );
   const queuesProvider = new ProviderQueuesProvider({
-    getWorkspaceRoot: () => vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath
+    getWorkspaceRoot: () => vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath
   });
   context.subscriptions.push(
-    vscode16.window.registerTreeDataProvider("dabblerProviderQueues", queuesProvider)
+    vscode17.window.registerTreeDataProvider("dabblerProviderQueues", queuesProvider)
   );
   context.subscriptions.push(
-    vscode16.commands.registerCommand(
+    vscode17.commands.registerCommand(
       "dabblerProviderQueues.refresh",
       () => queuesProvider.refresh()
     )
@@ -8359,7 +9045,7 @@ function activate(context) {
   const rebindQueuesPoll = () => {
     if (queuesPoll)
       clearInterval(queuesPoll);
-    const seconds = vscode16.workspace.getConfiguration("dabblerProviderQueues").get("autoRefreshSeconds", 15);
+    const seconds = vscode17.workspace.getConfiguration("dabblerProviderQueues").get("autoRefreshSeconds", 15);
     if (seconds > 0) {
       queuesPoll = setInterval(() => queuesProvider.refresh(), seconds * 1e3);
     } else {
@@ -8374,27 +9060,27 @@ function activate(context) {
     }
   });
   context.subscriptions.push(
-    vscode16.workspace.onDidChangeConfiguration((e) => {
+    vscode17.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerProviderQueues.autoRefreshSeconds")) {
         rebindQueuesPoll();
       }
     })
   );
   registerQueueActionCommands(context, {
-    getWorkspaceRoot: () => vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    getWorkspaceRoot: () => vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath,
     refreshView: () => queuesProvider.refresh()
   });
   const heartbeatsProvider = new ProviderHeartbeatsProvider({
-    getWorkspaceRoot: () => vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath
+    getWorkspaceRoot: () => vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath
   });
-  const heartbeatsTreeView = vscode16.window.createTreeView("dabblerProviderHeartbeats", {
+  const heartbeatsTreeView = vscode17.window.createTreeView("dabblerProviderHeartbeats", {
     treeDataProvider: heartbeatsProvider,
     showCollapseAll: false
   });
   heartbeatsTreeView.description = HEARTBEAT_FOOTER;
   context.subscriptions.push(heartbeatsTreeView);
   context.subscriptions.push(
-    vscode16.commands.registerCommand(
+    vscode17.commands.registerCommand(
       "dabblerProviderHeartbeats.refresh",
       () => heartbeatsProvider.refresh()
     )
@@ -8403,7 +9089,7 @@ function activate(context) {
   const rebindHeartbeatsPoll = () => {
     if (heartbeatsPoll)
       clearInterval(heartbeatsPoll);
-    const seconds = vscode16.workspace.getConfiguration("dabblerProviderHeartbeats").get("autoRefreshSeconds", 15);
+    const seconds = vscode17.workspace.getConfiguration("dabblerProviderHeartbeats").get("autoRefreshSeconds", 15);
     if (seconds > 0) {
       heartbeatsPoll = setInterval(
         () => heartbeatsProvider.refresh(),
@@ -8421,7 +9107,7 @@ function activate(context) {
     }
   });
   context.subscriptions.push(
-    vscode16.workspace.onDidChangeConfiguration((e) => {
+    vscode17.workspace.onDidChangeConfiguration((e) => {
       const affectsTiming = e.affectsConfiguration(
         "dabblerProviderHeartbeats.autoRefreshSeconds"
       );
@@ -8439,19 +9125,20 @@ function activate(context) {
   registerWizardCommands(context);
   registerCostDashboardCommand(context);
   registerCancelLifecycleCommands(context, { refreshView: refreshAll });
+  registerInstallAiRouterCommands(context);
   const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
   if (!hasSeenOnboarding) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs12.existsSync(path14.join(r2, SESSION_SETS_REL2));
+        return fs13.existsSync(path16.join(r2, SESSION_SETS_REL2));
       } catch {
         return false;
       }
     });
     if (!hasSessionSets) {
       context.workspaceState.update("hasSeenOnboarding", true);
-      vscode16.commands.executeCommand("dabbler.getStarted");
+      vscode17.commands.executeCommand("dabbler.getStarted");
     }
   }
 }

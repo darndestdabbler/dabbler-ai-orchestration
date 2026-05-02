@@ -330,6 +330,251 @@
       "description": "Committed Session 2 changes (release workflow, runbook, README collapse, extension README note, packaging tightening, MANIFEST.in, ai-assignment.md append, verify script, prompt). Pushed to master. Authored disposition.json + activity-log.json append as close_session preconditions.",
       "status": "completed",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/register-start",
+      "dateTime": "2026-05-02T08:00:00-04:00",
+      "description": "register_session_start: overwrote session-state.json with currentSession=3, status=in-progress, lifecycleState=work_in_progress, orchestrator unchanged (claude-code/anthropic/claude-opus-4-7/high).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/pypi-live-check",
+      "dateTime": "2026-05-02T08:01:00-04:00",
+      "description": "Pre-session check: confirmed PyPI v0.1.0 release is live via curl https://pypi.org/pypi/dabbler-ai-router/json (HTTP 200, latest 0.1.0, releases [\"0.1.0\"]). Session 2's human-handoff (trusted-publisher setup + tag pushes) was completed before Session 3 started.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/ai-assignment",
+      "dateTime": "2026-05-02T08:05:00-04:00",
+      "description": "Appended Session 2 actuals + Session 3 block to ai-assignment.md (router suspended per standing operator constraint). Session 3 is the final session of the set.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/install-util",
+      "dateTime": "2026-05-02T08:30:00-04:00",
+      "description": "Authored src/utils/aiRouterInstall.ts: pure-logic install core with DI'd ProcessSpawner / FileOps / InstallPrompts. PyPI path materializes ai_router/router-config.yaml from importlib.resources on a fresh install (existing local files left untouched). GitHub path resolves the latest release tag via git ls-remote, sparse-clones to a tmpdir, then copies to the persistent .dabbler/ai-router-src/ for editable install (no dangling .egg-link); wipes the workspace ai_router/ before copying so stale upgrade-dropped files don't linger; stash-and-restore protocol for router-config.yaml with retry semantics + finalize() wrapper that downgrades success to failure if the config could not be restored. Bootstrap interpreter for venv creation falls back to bare 'python' only when the configured pythonPath has venv shape AND the interpreter doesn't exist on disk (the actual ENOENT case). pyvenv.cfg marker check distinguishes real venvs from system interpreters at /usr/bin/python3 shape. Configurable repoUrl plumbed through both ls-remote and clone.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/install-cmd",
+      "dateTime": "2026-05-02T08:40:00-04:00",
+      "description": "Authored src/commands/installAiRouterCommands.ts: VS Code wiring for dabblerSessionSets.installAiRouter and dabblerSessionSets.updateAiRouter. QuickPick for source pick, modal confirm for venv creation, input box for GitHub ref, withProgress notification, opens router-config.yaml + separate tuning toast on success. Production fs adapter mkdirps parent dirs on every write so the stash restore can write into a directory the in-flight copy may have wiped. resolvePythonPath uses Configuration.inspect() so the dabblerSessionSets.pythonPath -> dabblerProviderQueues.pythonPath fallback actually fires (the contributed default would otherwise mask it).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/providers-graceful-not-installed",
+      "dateTime": "2026-05-02T08:50:00-04:00",
+      "description": "Refactored ProviderQueuesProvider + ProviderHeartbeatsProvider for the graceful 'not configured' path. parseFetchResult detects ModuleNotFoundError (and the python -m belt-and-braces signature) and returns reason=module_not_installed. Providers store a _lastErrorReason field, clear the cache on any failure (otherwise a previously-successful fetch would mask the new state), and render a notInstalled root + notInstalledAction child whose command.command fires dabblerSessionSets.installAiRouter directly. Neutral info icons + distinct contextValues from the existing red-error path.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/extension-wiring",
+      "dateTime": "2026-05-02T08:55:00-04:00",
+      "description": "extension.ts: single import + single registerInstallAiRouterCommands(context) call next to the existing registerCancelLifecycleCommands.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/package-json",
+      "dateTime": "2026-05-02T09:00:00-04:00",
+      "description": "package.json: version 0.11.0 -> 0.12.0 (minor; new feature, no breaking changes); contributes.commands gains dabblerSessionSets.installAiRouter (cloud-download icon) and dabblerSessionSets.updateAiRouter (sync icon); two new settings dabblerSessionSets.pythonPath and dabblerSessionSets.aiRouterRepoUrl with full markdownDescription.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/install-tests",
+      "dateTime": "2026-05-02T09:30:00-04:00",
+      "description": "Authored src/test/suite/installAiRouter.test.ts (47 standalone-mocha tests after seven verification rounds). Coverage: detector (5), deriveVenvFromPythonPath (4), resolveLatestReleaseTag (3), PyPI install (8 incl. router-config.yaml materialization, venv-creation, venv-from-pythonPath with pyvenv.cfg, ENOENT-bootstrap fallback, existing-interpreter no-overcorrection), GitHub install (8 incl. latest-tag resolution, persistent checkout, fork-URL plumbing, stale-files removal, copyDir-failure stash safety, install-fail stash safety, writeFile-mkdir-parent regression, restore-failure-doesnt-claim-success), early aborts (1), install-method marker round-trip (1), parseFetchResult for both providers (4), tree-item rendering for both providers (5), failure-invalidates-cache for both providers (3), bootstrap edge cases (2). All 47 pass. Full suite: 140 passing, 3 failing (the 3 failures pre-exist on master and are unrelated to this session - confirmed by stashing the changes and re-running before round 1).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-3/readmes",
+      "dateTime": "2026-05-02T09:45:00-04:00",
+      "description": "README.md adoption section restructured to lead with the extension command (5-step flow: install VSIX -> open workspace -> Dabbler: Install ai-router -> tune router-config -> author first set), with the CLI install (pip install dabbler-ai-router) and the editable / source-install dropping below as clearly-marked fallbacks. Forward-references Dabbler: Update ai-router and the GitHub-fallback's preserve-router-config behavior. tools/dabbler-ai-orchestration/README.md gained a new ### Install ai-router block in Features (between Provider Queues and Provider Heartbeats); Requirements section's previous v0.1 forward-reference is now a v0.12 statement.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "session-3/vsix-build",
+      "dateTime": "2026-05-02T09:50:00-04:00",
+      "description": "Built dabbler-ai-orchestration-0.12.0.vsix via npm run package (329 KB, 18 files). Includes the new compiled command, both providers' refactored compiled output, the updated package.json, and the augmented README.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "session-3/pytest",
+      "dateTime": "2026-05-02T09:55:00-04:00",
+      "description": "Ran PYTHONPATH=. /c/Python311/python -m pytest -q -> 676 passed in 52.89s (matches Sessions 1/2 baseline; Session 3 touches no Python source).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 13,
+      "stepKey": "session-3/verification-r1",
+      "dateTime": "2026-05-02T10:10:00-04:00",
+      "description": "End-of-session cross-provider verification round 1 via gpt-5-4 ($0.1942). CHANGES_REQUIRED with 3 Major + 2 Minor + 1 Info: pip install -e <tmp> + delete tmp = dangling .egg-link; empty ref = default branch not latest released tag; router-config.yaml preservation not exception-safe; wrong setting namespace; provider tests cover only parseFetchResult; no distinct tuning toast. All six addressed in-session.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.1942375
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 14,
+      "stepKey": "session-3/verification-r2",
+      "dateTime": "2026-05-02T10:30:00-04:00",
+      "description": "Round 2 via gpt-5-4 ($0.2456). CHANGES_REQUIRED with 1 Major + 2 Minor: PyPI install never materializes workspace router-config.yaml; repo URL hardcoded (no fork support); GitHub updates leave stale files. All three addressed in-session.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.2456450
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 15,
+      "stepKey": "session-3/verification-r3",
+      "dateTime": "2026-05-02T10:50:00-04:00",
+      "description": "Round 3 via gpt-5-4 ($0.2172). CHANGES_REQUIRED with 1 Major: stale-file wipe could drop router-config.yaml if copyDir fails after removeRecursive(dstAiRouter) because production writeFile didn't mkdir parent. Addressed by making the production fs adapter match the test adapter's mkdir-parent behavior; new regression test for the data-loss window.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.2172275
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 16,
+      "stepKey": "session-3/verification-r4",
+      "dateTime": "2026-05-02T11:10:00-04:00",
+      "description": "Round 4 via gpt-5-4 ($0.2622). CHANGES_REQUIRED with 2 Majors: /usr/bin/python3-shape interpreters misidentified as venvs; restoreStash swallowed errors and could let install report success while config was unrestored. Addressed: pyvenv.cfg marker validation; restoreStash returns boolean and retries; finalize() wrapper downgrades ok=true to ok=false if restore failed; explicit operator-facing message on restore failure.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.2622430
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 17,
+      "stepKey": "session-3/verification-r5",
+      "dateTime": "2026-05-02T11:35:00-04:00",
+      "description": "Round 5 via gpt-5-4 ($0.2331). CHANGES_REQUIRED with 2 Majors: creating .venv when configured pythonPath points inside it ENOENTs; provider views return stale cache after failure. Addressed: bootstrap interpreter falls back to bare 'python' when configured path has venv shape; both providers clear _cache on failure.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.2331125
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 18,
+      "stepKey": "session-3/verification-r6",
+      "dateTime": "2026-05-02T12:05:00-04:00",
+      "description": "Round 6 via gpt-5-4 ($0.2641). CHANGES_REQUIRED with 1 Major + 1 Minor: round-5 bootstrap fix overcorrected (would override legitimate /usr/bin/python3); backward-compat config fallback never fired because contributed default masked nullish-coalesce. Addressed: tightened bootstrap to only fire when configured path is venv-shaped AND doesn't exist; resolvePythonPath uses Configuration.inspect() to detect explicit values vs contributed default.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.2641325
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 19,
+      "stepKey": "session-3/verification-r7",
+      "dateTime": "2026-05-02T12:40:00-04:00",
+      "description": "Round 7 (FINAL) via gpt-5-4 ($0.3653). VERIFIED with two Info-severity follow-ups documented in change-log.md Residual notes: install-method marker I/O not outcome-wrapped; GitHub re-installs intentionally wipe workspace ai_router/ preserving only router-config.yaml. Workflow's max-2-retries rule was greatly exceeded - each round caught real (non-cosmetic) issues, including a regression I introduced in round 6 that round 7 corrected. Future single-session features of comparable TS/Python/UX-coupled breadth should budget higher up front or split into two sessions.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.3652725
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 20,
+      "stepKey": "session-3/change-log",
+      "dateTime": "2026-05-02T12:50:00-04:00",
+      "description": "Authored change-log.md (final-session deliverable). Summarizes all 3 sessions, lists the two Info-severity residual notes from round 7 verification, and includes the cost summary ($2.3970 cumulative across the set vs spec projection $0.35-$0.70).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 21,
+      "stepKey": "session-3/commit-push",
+      "dateTime": "2026-05-02T13:00:00-04:00",
+      "description": "Authored disposition.json + activity-log.json append. Committing Session 3 changes (install command + provider refactor + tests + extension wiring + package.json bump + READMEs + VSIX rebuild + change-log + ai-assignment append + verify script + prompt + reviews) and pushing to master as close_session preconditions.",
+      "status": "completed",
+      "routedApiCalls": []
     }
   ]
 }

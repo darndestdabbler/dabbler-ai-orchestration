@@ -6,9 +6,9 @@ is the canonical reference for the `session-state.json` schema written by
 each session set under `docs/session-sets/<slug>/`.
 
 The file is **generated**, not hand-edited. The source of truth is the
-schema in [`ai-router/session_state.py`](../ai-router/session_state.py); the
+schema in [`ai_router/session_state.py`](../ai_router/session_state.py); the
 generator at
-[`ai-router/dump_session_state_schema.py`](../ai-router/dump_session_state_schema.py)
+[`ai_router/dump_session_state_schema.py`](../ai_router/dump_session_state_schema.py)
 emits a fully-populated v2 example by reading the live schema constants
 (`SCHEMA_VERSION`, `SessionLifecycleState`).
 
@@ -71,13 +71,13 @@ is the form rendered in `session-state-schema-example.json`.
 
 ```bash
 # Overwrite the committed reference with a fresh emit
-python ai-router/dump_session_state_schema.py --write docs/session-state-schema-example.json
+python ai_router/dump_session_state_schema.py --write docs/session-state-schema-example.json
 
 # Print to stdout instead
-python ai-router/dump_session_state_schema.py
+python ai_router/dump_session_state_schema.py
 
 # JSONC form (JSON with // comments per top-level field) for human reading
-python ai-router/dump_session_state_schema.py --include-comments
+python ai_router/dump_session_state_schema.py --include-comments
 ```
 
 The pure-JSON form is the canonical form. The JSONC form annotates each
@@ -87,7 +87,7 @@ top-level field with a one-line comment from the generator's
 ## Drift check
 
 ```bash
-python ai-router/dump_session_state_schema.py --check
+python ai_router/dump_session_state_schema.py --check
 ```
 
 Exits `0` when the regenerated output matches `docs/session-state-schema-example.json`
@@ -102,10 +102,10 @@ pre-commit hook, add to `.pre-commit-config.yaml`:
   hooks:
     - id: session-state-schema-drift
       name: session-state.json schema drift
-      entry: python ai-router/dump_session_state_schema.py --check
+      entry: python ai_router/dump_session_state_schema.py --check
       language: system
       pass_filenames: false
-      files: ^(ai-router/session_state\.py|ai-router/dump_session_state_schema\.py|docs/session-state-schema-example\.json)$
+      files: ^(ai_router/session_state\.py|ai_router/dump_session_state_schema\.py|docs/session-state-schema-example\.json)$
 ```
 
 For GitHub Actions, run the same command in a step. The exit code is
@@ -113,9 +113,9 @@ the signal — no parsing required.
 
 ## Workflow when the schema legitimately changes
 
-1. Edit `ai-router/session_state.py` (and the generator's
+1. Edit `ai_router/session_state.py` (and the generator's
    `build_example_state()` and `_FIELD_COMMENTS` if a new field is added).
-2. Regenerate: `python ai-router/dump_session_state_schema.py --write docs/session-state-schema-example.json`.
+2. Regenerate: `python ai_router/dump_session_state_schema.py --write docs/session-state-schema-example.json`.
 3. Commit the schema change, the generator change, and the regenerated
    reference in the same PR.
 

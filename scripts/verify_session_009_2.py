@@ -9,7 +9,6 @@ the raw verdict to `session-reviews/session-002.md`.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -19,15 +18,16 @@ SET_DIR = REPO / "docs" / "session-sets" / "009-alignment-audit-followups"
 
 
 def _load_ai_router():
-    spec = importlib.util.spec_from_file_location(
-        "ai_router",
-        str(REPO / "ai-router" / "__init__.py"),
-        submodule_search_locations=[str(REPO / "ai-router")],
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["ai_router"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """Import ``ai_router`` directly. The previous ``importlib.util.spec_from_file_location`` shim,
+    required when the package directory used a hyphenated name, is no longer needed:
+    after Set 10 Session 1 the directory is ``ai_router/`` and the package is installable
+    via ``pip install -e .`` from the repo root. The ``sys.path.insert`` covers the case
+    where the script is run without the editable install.
+    """
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    import ai_router
+    return ai_router
 
 
 def _read(path: Path) -> str:
@@ -83,9 +83,9 @@ def main() -> int:
 
     spec_md = _read(SET_DIR / "spec.md")
     proposal_md = _read(REPO / "docs" / "proposals" / "2026-04-29-session-close-out-reliability.md")
-    closeout_md = _read(REPO / "ai-router" / "docs" / "close-out.md")
+    closeout_md = _read(REPO / "ai_router" / "docs" / "close-out.md")
     ai_assignment_md = _read(SET_DIR / "ai-assignment.md")
-    test_file = _read(REPO / "ai-router" / "tests" / "test_failure_injection.py")
+    test_file = _read(REPO / "ai_router" / "tests" / "test_failure_injection.py")
     workflow_pointer = (
         "Workflow Step 6 (verification) is mode-aware; this set runs "
         "outsource-first and we are routing the verification synchronously."
@@ -139,14 +139,14 @@ def main() -> int:
         _slice_proposal_q2(proposal_md),
         "```",
         "",
-        "### 2. `ai-router/docs/close-out.md` Section 6 — new troubleshooting "
+        "### 2. `ai_router/docs/close-out.md` Section 6 — new troubleshooting "
         "entry on cross-set parallelism",
         "",
         "```markdown",
         _slice_closeout_section6(closeout_md),
         "```",
         "",
-        "### 3. `ai-router/tests/test_failure_injection.py` — new "
+        "### 3. `ai_router/tests/test_failure_injection.py` — new "
         "`TestScenario7CrossSetParallelRejection`",
         "",
         "```python",
@@ -161,7 +161,7 @@ def main() -> int:
         "```",
         "",
         "## Test result",
-        "`python -m pytest ai-router/tests` → **670 passed in 57.06s** "
+        "`python -m pytest ai_router/tests` → **670 passed in 57.06s** "
         "(669 pre-existing + 1 new Scenario 7).",
         "",
         "## Spec excerpt for Session 2",

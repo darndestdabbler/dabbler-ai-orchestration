@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { MetricsEntry, CostSummary } from "../types";
 
-export const METRICS_FILE = path.join("ai-router", "metrics.jsonl");
+export const METRICS_FILE = path.join("ai_router", "metrics.jsonl");
 
 export function readMetrics(workspaceRoot: string): MetricsEntry[] {
   const metricsPath = path.join(workspaceRoot, METRICS_FILE);

@@ -15,7 +15,6 @@ verifier can confirm or reject the resolutions cleanly.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -25,15 +24,16 @@ SET_DIR = REPO / "docs" / "session-sets" / "009-alignment-audit-followups"
 
 
 def _load_ai_router():
-    spec = importlib.util.spec_from_file_location(
-        "ai_router",
-        str(REPO / "ai-router" / "__init__.py"),
-        submodule_search_locations=[str(REPO / "ai-router")],
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["ai_router"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """Import ``ai_router`` directly. The previous ``importlib.util.spec_from_file_location`` shim,
+    required when the package directory used a hyphenated name, is no longer needed:
+    after Set 10 Session 1 the directory is ``ai_router/`` and the package is installable
+    via ``pip install -e .`` from the repo root. The ``sys.path.insert`` covers the case
+    where the script is run without the editable install.
+    """
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    import ai_router
+    return ai_router
 
 
 def _read(path: Path) -> str:
@@ -97,8 +97,8 @@ def main() -> int:
     route = ar.route
 
     filesystem_ts = _read(REPO / "tools" / "dabbler-ai-orchestration" / "src" / "utils" / "fileSystem.ts")
-    closeout_md = _read(REPO / "ai-router" / "docs" / "close-out.md")
-    skeleton_tests = _read(REPO / "ai-router" / "tests" / "test_close_session_skeleton.py")
+    closeout_md = _read(REPO / "ai_router" / "docs" / "close-out.md")
+    skeleton_tests = _read(REPO / "ai_router" / "tests" / "test_close_session_skeleton.py")
 
     prompt_parts = [
         "## Round 2 verification — Set 9 Session 3 (D-2 hard-scoping of `--force`)",
@@ -137,7 +137,7 @@ def main() -> int:
         "",
         "Round 1 verbatim issue:",
         "",
-        "> ai-router/docs/close-out.md combination-rules section/list → "
+        "> ai_router/docs/close-out.md combination-rules section/list → "
         "_validate_args now rejects --force with --interactive, "
         "--manual-verify, and --repair, but the shown doc changes only "
         "cover the §2 summary row and §5 narrative. The acceptance "
@@ -158,7 +158,7 @@ def main() -> int:
         "",
         "Round 1 verbatim issue:",
         "",
-        "> ai-router/tests/test_close_session_skeleton.py → The new "
+        "> ai_router/tests/test_close_session_skeleton.py → The new "
         "rejection tests prove 'no events emitted,' but they do not "
         "prove 'no lock acquired,' which is part of the verification "
         "ask for pre-mutation rejection.",
@@ -209,7 +209,7 @@ def main() -> int:
         "",
         "## Test result",
         "",
-        "`python -m pytest ai-router/tests` → **676 passed in 55.27s** "
+        "`python -m pytest ai_router/tests` → **676 passed in 55.27s** "
         "(+1 vs Round 1's 675; the new unified CLI test). Extension "
         "TypeScript still typechecks clean (`npx tsc --noEmit -p "
         "tsconfig.json` exits 0).",

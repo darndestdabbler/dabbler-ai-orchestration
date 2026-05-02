@@ -5,7 +5,7 @@
 This repo is the canonical source of truth for shared AI orchestration
 infrastructure used across all Dabbler AI-led-workflow repos:
 
-- **`ai-router/`** — multi-provider routing, prompt templates, session
+- **`ai_router/`** — multi-provider routing, prompt templates, session
   state, metrics, and workflow utilities
 - **`tools/vscode-session-sets/`** — the "Session Set Explorer" VS Code
   extension
@@ -18,7 +18,7 @@ Your role in this repo is **curator and normalizer**, not solo developer:
 
 ## Consumer repos
 
-| Repo | ai-router copy | Extension |
+| Repo | ai_router copy | Extension |
 |---|---|---|
 | `dabbler-access-harvester` | owns its own copy | references VSIX from this repo |
 | `dabbler-platform` | owns its own copy | references VSIX from this repo |
@@ -52,9 +52,8 @@ cd tools/vscode-session-sets
 npm install
 npx vsce package
 
-# ai-router (Python, requires .venv)
-cd ai-router
-python -m pytest  # if tests are added
+# ai_router (Python, requires .venv with `pip install -e .[tests]` from repo root)
+python -m pytest
 ```
 
 ## Repo layout standard
@@ -71,14 +70,14 @@ agent-instruction files at this doc.
 Step 8 of `docs/ai-led-session-workflow.md` is collapsed to a single
 paragraph that points at the canonical close-out reference:
 
-- **`ai-router/docs/close-out.md`** — when `python -m
+- **`ai_router/docs/close-out.md`** — when `python -m
   ai_router.close_session` runs, how to invoke it, what it does
   (gate checks, idempotent writes, lock contention), common
   failures and remediation, the manual-flag matrix
   (`--interactive`, `--force`, `--manual-verify`, `--repair`), and
   troubleshooting (stranded sessions, queue-state debugging,
   reconciler behavior).
-- **`ai-router/docs/two-cli-workflow.md`** — operating guide for
+- **`ai_router/docs/two-cli-workflow.md`** — operating guide for
   `outsourceMode: last` session sets: when to use it, initial
   setup, day-to-day operation, verifier-daemon recovery,
   orchestrator CLI context-reset recovery, subscription-window

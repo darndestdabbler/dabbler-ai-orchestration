@@ -1,13 +1,12 @@
 """One-shot cross-provider verification for Set 008 / Session 1.
 
 Routes a session-verification call. Per the user's standing
-cost-containment rule, ai-router is invoked at end-of-session only.
+cost-containment rule, ai_router is invoked at end-of-session only.
 Writes the verifier's raw response to session-reviews/session-001.md
 and the cost line to stdout.
 """
 from __future__ import annotations
 
-import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -16,16 +15,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def load_ai_router():
-    init = REPO_ROOT / "ai-router" / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "ai_router",
-        str(init),
-        submodule_search_locations=[str(init.parent)],
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["ai_router"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """Import ``ai_router`` directly. The previous ``importlib.util.spec_from_file_location`` shim,
+    required when the package directory used a hyphenated name, is no longer needed:
+    after Set 10 Session 1 the directory is ``ai_router/`` and the package is installable
+    via ``pip install -e .`` from the repo root. The ``sys.path.insert`` covers the case
+    where the script is run without the editable install.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    import ai_router
+    return ai_router
 
 
 SESSION_SET = "docs/session-sets/008-cancelled-session-set-status"
@@ -50,11 +49,11 @@ in both TypeScript (for the extension) and Python (for
     - Requires `CANCELLED.md` to exist; throws otherwise.
     - Rename `CANCELLED.md` to `RESTORED.md`.
     - Prepend `Restored on <ISO-8601 local>\\n<reason or "">\\n\\n`.
-- `ai-router/session_lifecycle.py` (new module):
+- `ai_router/session_lifecycle.py` (new module):
   - Same three predicates and two write functions as TS.
   - Reused by `print_session_set_status` to render `[!]` for
     cancelled sets in the ASCII status table.
-- Update `print_session_set_status` in `ai-router/__init__.py`:
+- Update `print_session_set_status` in `ai_router/__init__.py`:
   - Cancelled sets render with `[!]` glyph.
   - Cancelled sets sort to the bottom of the table.
 - Unit tests in both languages covering:
@@ -117,7 +116,7 @@ to be taken on faith):
    defect to flag.
 
 2. Build/test status:
-   - `python -m pytest ai-router/tests/`: 663 passed in 58s (16 new
+   - `python -m pytest ai_router/tests/`: 663 passed in 58s (16 new
      in test_session_lifecycle.py; no regressions in the prior 647).
    - `npx tsc --noEmit -p tools/dabbler-ai-orchestration`: clean.
    - `npx mocha --ui tdd --require ts-node/register
@@ -197,8 +196,8 @@ def main() -> int:
     cancel_test_ts = read_file(
         REPO_ROOT / "tools/dabbler-ai-orchestration/src/test/suite/cancelLifecycle.test.ts"
     )
-    lifecycle_py = read_file(REPO_ROOT / "ai-router/session_lifecycle.py")
-    lifecycle_test_py = read_file(REPO_ROOT / "ai-router/tests/test_session_lifecycle.py")
+    lifecycle_py = read_file(REPO_ROOT / "ai_router/session_lifecycle.py")
+    lifecycle_test_py = read_file(REPO_ROOT / "ai_router/tests/test_session_lifecycle.py")
 
     bundle_parts = [
         "## Spec excerpt for Session 1\n\n" + SPEC_EXCERPT,
@@ -208,11 +207,11 @@ def main() -> int:
         "```typescript\n" + cancel_ts + "\n```\n",
         "## NEW `tools/dabbler-ai-orchestration/src/test/suite/cancelLifecycle.test.ts` (full)\n\n"
         "```typescript\n" + cancel_test_ts + "\n```\n",
-        "## NEW `ai-router/session_lifecycle.py` (full)\n\n"
+        "## NEW `ai_router/session_lifecycle.py` (full)\n\n"
         "```python\n" + lifecycle_py + "\n```\n",
-        "## NEW `ai-router/tests/test_session_lifecycle.py` (full)\n\n"
+        "## NEW `ai_router/tests/test_session_lifecycle.py` (full)\n\n"
         "```python\n" + lifecycle_test_py + "\n```\n",
-        "## Full unified diff for everything else (notably ai-router/__init__.py)\n\n"
+        "## Full unified diff for everything else (notably ai_router/__init__.py)\n\n"
         "```diff\n" + diff + "\n```\n",
     ]
     bundle = "\n\n---\n\n".join(bundle_parts)

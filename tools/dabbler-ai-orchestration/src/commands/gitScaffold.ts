@@ -6,7 +6,7 @@ import simpleGit from "simple-git";
 const SCAFFOLD_DIRS = [
   path.join("docs", "session-sets"),
   path.join("docs", "planning"),
-  "ai-router",
+  "ai_router",
 ];
 
 async function pickDirectory(): Promise<string | undefined> {

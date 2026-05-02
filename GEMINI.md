@@ -10,7 +10,7 @@
 This repo is the canonical source of truth for shared AI orchestration
 infrastructure used across all Dabbler AI-led-workflow repos:
 
-- **`ai-router/`** — multi-provider routing, prompt templates, session
+- **`ai_router/`** — multi-provider routing, prompt templates, session
   state, metrics, and workflow utilities
 - **`tools/vscode-session-sets/`** — the "Session Set Explorer" VS Code
   extension
@@ -23,7 +23,7 @@ Your role in this repo is **curator and normalizer**, not solo developer:
 
 ## Consumer repos
 
-| Repo | ai-router copy | Extension |
+| Repo | ai_router copy | Extension |
 |---|---|---|
 | `dabbler-access-harvester` | owns its own copy | references VSIX from this repo |
 | `dabbler-platform` | owns its own copy | references VSIX from this repo |
@@ -57,9 +57,8 @@ cd tools/vscode-session-sets
 npm install
 npx vsce package
 
-# ai-router (Python, requires .venv)
-cd ai-router
-python -m pytest  # if tests are added
+# ai_router (Python, requires .venv with `pip install -e .[tests]` from repo root)
+python -m pytest
 ```
 
 ## Repo layout standard
@@ -76,14 +75,14 @@ agent-instruction files at this doc.
 Step 8 of `docs/ai-led-session-workflow.md` is collapsed to a single
 paragraph that points at the canonical close-out reference:
 
-- **`ai-router/docs/close-out.md`** — when `python -m
+- **`ai_router/docs/close-out.md`** — when `python -m
   ai_router.close_session` runs, how to invoke it, what it does
   (gate checks, idempotent writes, lock contention), common
   failures and remediation, the manual-flag matrix
   (`--interactive`, `--force`, `--manual-verify`, `--repair`), and
   troubleshooting (stranded sessions, queue-state debugging,
   reconciler behavior).
-- **`ai-router/docs/two-cli-workflow.md`** — operating guide for
+- **`ai_router/docs/two-cli-workflow.md`** — operating guide for
   `outsourceMode: last` session sets: when to use it, initial
   setup, day-to-day operation, verifier-daemon recovery,
   orchestrator CLI context-reset recovery, subscription-window
@@ -96,7 +95,7 @@ is the single source of truth.
 
 Most curator work in this repo is ad-hoc PR-style review and
 normalization. When a structured pass is justified (e.g., merging a
-non-trivial change from a consumer repo, or refactoring `ai-router/`),
+non-trivial change from a consumer repo, or refactoring `ai_router/`),
 author a session set under `docs/session-sets/<slug>/` and follow the
 full procedure in `docs/ai-led-session-workflow.md`. Required reading
 before any session: `docs/planning/project-guidance.md`,
@@ -122,21 +121,16 @@ If keys are missing, stop and tell the human.
 
 ### AI router import
 
+After `.venv/Scripts/pip install -e .` from the repo root (or `pip
+install dabbler-ai-router` once published), import directly:
+
 ```python
-import importlib.util, sys
-
-def load_ai_router():
-    spec = importlib.util.spec_from_file_location(
-        'ai_router', 'ai-router/__init__.py',
-        submodule_search_locations=['ai-router'])
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules['ai_router'] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-ar = load_ai_router()
-route = ar.route
+from ai_router import route
 ```
+
+The previous `importlib.util.spec_from_file_location` shim, required
+when the package directory used a hyphenated name, is no
+longer needed.
 
 Use `.venv/Scripts/python.exe` to run Python scripts on Windows. The
 same module exposes `send_session_complete_notification()`, which reads
@@ -153,4 +147,4 @@ under ~50 lines.
 
 See `docs/ai-led-session-workflow.md` → **Delegation Discipline** for
 the full criteria, the human-tunable thresholds (in
-`ai-router/router-config.yaml` under `delegation:`), and the rationale.
+`ai_router/router-config.yaml` under `delegation:`), and the rationale.

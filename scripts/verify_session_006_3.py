@@ -6,7 +6,6 @@ Writes the verifier's response and cost line to stdout.
 """
 from __future__ import annotations
 
-import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -15,16 +14,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def load_ai_router():
-    init = REPO_ROOT / "ai-router" / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "ai_router",
-        str(init),
-        submodule_search_locations=[str(init.parent)],
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["ai_router"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """Import ``ai_router`` directly. The previous ``importlib.util.spec_from_file_location`` shim,
+    required when the package directory used a hyphenated name, is no longer needed:
+    after Set 10 Session 1 the directory is ``ai_router/`` and the package is installable
+    via ``pip install -e .`` from the repo root. The ``sys.path.insert`` covers the case
+    where the script is run without the editable install.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    import ai_router
+    return ai_router
 
 
 def main() -> int:

@@ -46,7 +46,7 @@ function uatBadge(set: SessionSet): string {
 // the rare case where a session set was closed via the hard-scoped
 // ``--force`` bypass instead of the deterministic gate. The flag is
 // written by ``_flip_state_to_closed(forced=True)`` in
-// ``ai-router/session_state.py``; absent or false on every snapshot
+// ``ai_router/session_state.py``; absent or false on every snapshot
 // written by a normal close-out, so the badge never appears for
 // healthy sets.
 export function forceClosedBadge(set: SessionSet): string {

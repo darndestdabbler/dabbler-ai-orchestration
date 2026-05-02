@@ -11,7 +11,6 @@ fix-issues follow-up after round 1 surfaced findings.
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import subprocess
 import sys
@@ -22,16 +21,16 @@ SESSION_SET = REPO_ROOT / "docs" / "session-sets" / "007-uniform-session-state-f
 
 
 def load_ai_router():
-    init = REPO_ROOT / "ai-router" / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "ai_router",
-        str(init),
-        submodule_search_locations=[str(init.parent)],
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["ai_router"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """Import ``ai_router`` directly. The previous ``importlib.util.spec_from_file_location`` shim,
+    required when the package directory used a hyphenated name, is no longer needed:
+    after Set 10 Session 1 the directory is ``ai_router/`` and the package is installable
+    via ``pip install -e .`` from the repo root. The ``sys.path.insert`` covers the case
+    where the script is run without the editable install.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    import ai_router
+    return ai_router
 
 
 def file_block(label: str, path: Path) -> str:
@@ -62,12 +61,12 @@ def build_bundle() -> str:
     parts.append("## Spec\n\n" + file_block("spec.md", spec_path))
 
     parts.append("## Session 2 changes — Python\n\n")
-    parts.append(diff_block("session_state.py", "ai-router/session_state.py"))
-    parts.append(diff_block("session_log.py", "ai-router/session_log.py"))
-    parts.append(diff_block("__init__.py", "ai-router/__init__.py"))
-    parts.append(diff_block("reconciler.py", "ai-router/reconciler.py"))
-    parts.append(diff_block("close_session.py", "ai-router/close_session.py"))
-    parts.append(diff_block("session_events.py", "ai-router/session_events.py"))
+    parts.append(diff_block("session_state.py", "ai_router/session_state.py"))
+    parts.append(diff_block("session_log.py", "ai_router/session_log.py"))
+    parts.append(diff_block("__init__.py", "ai_router/__init__.py"))
+    parts.append(diff_block("reconciler.py", "ai_router/reconciler.py"))
+    parts.append(diff_block("close_session.py", "ai_router/close_session.py"))
+    parts.append(diff_block("session_events.py", "ai_router/session_events.py"))
 
     parts.append("## Session 2 changes — TypeScript\n\n")
     parts.append(file_block(
@@ -86,12 +85,12 @@ def build_bundle() -> str:
     parts.append("## New Python tests\n\n")
     parts.append(file_block(
         "tests/test_read_status.py",
-        REPO_ROOT / "ai-router" / "tests" / "test_read_status.py",
+        REPO_ROOT / "ai_router" / "tests" / "test_read_status.py",
     ))
 
     parts.append("## Test results\n\n")
     parts.append(
-        "- ai-router pytest: **647 passed** (627 baseline + 20 new in "
+        "- ai_router pytest: **647 passed** (627 baseline + 20 new in "
         "test_read_status.py)\n"
         "- TypeScript: `tsc --noEmit` clean, esbuild compile clean, eslint clean\n"
         "  (only pre-existing unrelated warning in providerHeartbeats.test.ts)\n"
@@ -254,7 +253,7 @@ def main() -> int:
     print(f"cost_usd: {result.total_cost_usd}")
 
     # Save the review.
-    sys.path.insert(0, str(REPO_ROOT / "ai-router"))
+    sys.path.insert(0, str(REPO_ROOT / "ai_router"))
     from session_log import SessionLog  # noqa: E402
 
     log = SessionLog(str(SESSION_SET))

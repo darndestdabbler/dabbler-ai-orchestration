@@ -7,3 +7,7 @@ node_modules/
 router-metrics.jsonl
 .vscode-test/
 .claude/
+*.egg-info/
+build/
+dist/*.tar.gz
+dist/*.whl

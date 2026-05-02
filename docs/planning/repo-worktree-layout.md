@@ -91,7 +91,7 @@ For a repo currently using `~/source/repos/<repo>-<slug>` siblings:
    logs, etc. Recreate venvs fresh — never copy across, paths are
    absolute.
 5. **Smoke test in the new container** before swapping. Build, test,
-   run any project-specific import sanity checks (e.g., the ai-router
+   run any project-specific import sanity checks (e.g., the ai_router
    import test for harvester / orchestration repos).
 6. **Atomic swap.**
    ```bash
@@ -198,8 +198,8 @@ fix** — both the old and new containers are safe across a restart.
 python -m ai_router.utils cleanup-dev-orphans [--dry-run] [--yes] [--match-path PATTERN]
 ```
 
-(Run from inside any worktree where `ai-router/` is importable.) This
-helper, in `dabbler-ai-orchestration/ai-router/utils.py` Section 5,
+(Run from inside any worktree where `ai_router/` is importable.) This
+helper, in `dabbler-ai-orchestration/ai_router/utils.py` Section 5,
 shuts down all `dotnet` build servers (MSBuild `/nodemode:1` workers
 and `VBCSCompiler.exe`), kills stale Claude Code background polling
 loops (the `bash -c "until [...]; do sleep 5; done"` zombies that

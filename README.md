@@ -13,7 +13,7 @@ An AI-led coding-session workflow for VS Code. Structured AI sessions with cross
 - [The Session Set Explorer in action](#the-session-set-explorer-in-action)
 - [Prerequisites: tools and accounts](#prerequisites-tools-and-accounts)
 - [Installing the VS Code extension (the reliable way)](#installing-the-vs-code-extension-the-reliable-way)
-- [Adopting `ai-router` in a project](#adopting-ai-router-in-a-project)
+- [Adopting `ai_router` in a project](#adopting-ai_router-in-a-project)
 - [Repos that need UAT and/or E2E support — and repos that don't](#repos-that-need-uat-andor-e2e-support--and-repos-that-dont)
 - [End-of-session output (worked example)](#end-of-session-output-worked-example)
 - [Repository file map](#repository-file-map)
@@ -40,7 +40,7 @@ glance:
 3. The router picks the cheapest capable model per task type, escalates
    on poor responses, and runs cross-provider verification on
    security-sensitive task types automatically.
-4. Every routed call is appended to `ai-router/router-metrics.jsonl` so
+4. Every routed call is appended to `ai_router/router-metrics.jsonl` so
    per-set, per-task, and per-model spend is fully auditable.
 5. Each session ends with a commit + push + a Pushover notification (if
    configured) that includes the next-orchestrator recommendation.
@@ -91,12 +91,12 @@ file at the repo root: Claude Code reads [CLAUDE.md](CLAUDE.md),
 Codex (OpenAI) and GitHub Copilot read [AGENTS.md](AGENTS.md), and
 Gemini Code Assistant reads [GEMINI.md](GEMINI.md). All three files
 describe the same role and rules — only the agent-specific bootstrap
-(API key export syntax, etc.) differs. The router (`ai-router/`) owns
+(API key export syntax, etc.) differs. The router (`ai_router/`) owns
 reasoning: code review, security review, analysis, architecture,
 documentation, test generation, and the mandatory end-of-session
 verification all go to `route()`, which estimates complexity, picks the
 cheapest capable tier, and applies per-task-type effort overrides from
-[ai-router/router-config.yaml](ai-router/router-config.yaml).
+[ai_router/router-config.yaml](ai_router/router-config.yaml).
 
 Assignment planning happens at **two cadences**:
 
@@ -126,7 +126,7 @@ model from a **different provider** than the one that did the work
 it is non-negotiable: `session-verification` always routes, even under
 the `— maxout <engine>` suffix that lifts every other cost cap.
 
-Verifier selection in [ai-router/verification.py](ai-router/verification.py)
+Verifier selection in [ai_router/verification.py](ai_router/verification.py)
 is rule-based: different provider, enabled as a verifier, matches the
 generator's tier (or one tier higher), cheapest output price wins. The
 verifier returns a structured JSON verdict
@@ -181,7 +181,7 @@ behavior, not an exception:
 - **Tier escalation.** If a tier-1 response is empty, truncated, or
   refused, the router escalates to the next tier (up to two
   escalations). Detection includes the `detect_truncation()` helper in
-  [ai-router/utils.py](ai-router/utils.py) — a hard-won workaround for
+  [ai_router/utils.py](ai_router/utils.py) — a hard-won workaround for
   Gemini Pro returning `stop_reason: "end_turn"` on visibly cut-off
   responses (see [docs/planning/lessons-learned.md](docs/planning/lessons-learned.md)).
 - **Two-attempt verifier fallback.** If the first-choice verifier fails
@@ -231,7 +231,7 @@ E2E gate already caught them.
 
 - **Append-only metrics log + manager report.** Every routed call,
   verifier call, tiebreaker call, and adjudication writes one JSON line
-  to `ai-router/router-metrics.jsonl`, spanning every session set in
+  to `ai_router/router-metrics.jsonl`, spanning every session set in
   the repo. `python -m ai_router.report` produces a markdown summary
   with total spend, the **Opus-only-baseline savings headline** (what
   the same token volume would have cost if every call had gone to
@@ -399,14 +399,17 @@ That writes a fresh `dabbler-session-sets-<version>.vsix` next to
 
 ---
 
-## Adopting `ai-router` in a project
+## Adopting `ai_router` in a project
 
 The router is a plain Python package. To bring it into a consumer repo:
 
-1. **Copy `ai-router/` to the root of the consumer repo.** It is a
-   self-contained directory with no implicit relative paths above its
-   own root. Consumer repos own their copy; this repo is the source of
-   truth that they sync from when changes land.
+1. **Copy `ai_router/` and `pyproject.toml` to the root of the
+   consumer repo.** The package directory is self-contained (no
+   implicit relative paths above its own root) and `pyproject.toml`
+   declares the package metadata `pip install -e .` consumes in
+   step 3. Consumer repos own their copy; this repo is the source of
+   truth that they sync from when changes land. (Once the package is
+   on PyPI, this step collapses to `pip install dabbler-ai-router`.)
 
 2. **Set API keys as environment variables:**
 
@@ -422,37 +425,31 @@ The router is a plain Python package. To bring it into a consumer repo:
    helper falls back to the Windows User/Machine environment if the
    process environment doesn't already have the Pushover keys.
 
-3. **Create the venv and install runtime deps:**
+3. **Create the venv and install the package:**
 
    ```bash
    python -m venv .venv
-   .venv/Scripts/pip install pyyaml httpx
+   .venv/Scripts/pip install -e .
    ```
 
-   The router uses `httpx` directly for all three providers' HTTP APIs
-   (no `openai` / `anthropic` / `google-genai` SDKs needed at runtime).
+   `pip install -e .` reads `pyproject.toml` at the repo root and
+   installs `ai_router` editably along with its runtime dependencies
+   (`pyyaml`, `httpx`). The router uses `httpx` directly for all three
+   providers' HTTP APIs (no `openai` / `anthropic` / `google-genai`
+   SDKs needed at runtime).
 
-4. **Import the router from your orchestrator script.** Because the
-   directory is hyphenated (`ai-router/`), Python can't import it as a
-   package name directly. Use `importlib`:
+4. **Import the router from your orchestrator script.** With the
+   package installed, the import is direct:
 
    ```python
-   import importlib.util, sys
-
-   def load_ai_router():
-       spec = importlib.util.spec_from_file_location(
-           "ai_router", "ai-router/__init__.py",
-           submodule_search_locations=["ai-router"])
-       mod = importlib.util.module_from_spec(spec)
-       sys.modules["ai_router"] = mod
-       spec.loader.exec_module(mod)
-       return mod
-
-   ar = load_ai_router()
-   route = ar.route
+   from ai_router import route
    ```
 
-5. **Tune `ai-router/router-config.yaml`** for the project. This is
+   The previous `importlib.util.spec_from_file_location` shim, required
+   when the package directory used a hyphenated name, is no
+   longer needed.
+
+5. **Tune `ai_router/router-config.yaml`** for the project. This is
    where you set per-task-type effort levels, the cost guard for
    verification, and the `delegation.always_route_task_types` list that
    prevents the orchestrator from doing reasoning work itself. The YAML
@@ -576,7 +573,7 @@ A few things worth noticing in this real example:
 Three other artifacts are produced alongside this stop message:
 
 - **Console cost-report banner** from `print_cost_report()`
-  ([ai-router/__init__.py:767](ai-router/__init__.py#L767)) — sessions
+  ([ai_router/__init__.py:767](ai_router/__init__.py#L767)) — sessions
   completed/remaining, total calls, total cost, per-model breakdown.
 - **Pushover notification** (if configured) — title
   `Session complete: <slug>`, body containing the session number,
@@ -616,26 +613,26 @@ covered elsewhere in this README.
 | [AGENTS.md](AGENTS.md) | Same content as `CLAUDE.md`, addressed to **Codex (OpenAI)** and **GitHub Copilot** — the two agents that look for `AGENTS.md` at the repo root. Agent-specific bootstrap (API key export, router import) is included so a session can be started without consulting either of the other two files. |
 | [GEMINI.md](GEMINI.md) | Same content as `CLAUDE.md`, addressed to **Gemini Code Assistant**. Carries the same agent-specific bootstrap. |
 
-### `ai-router/` — multi-provider routing module
+### `ai_router/` — multi-provider routing module
 
 | Path | Purpose |
 |---|---|
-| [ai-router/__init__.py](ai-router/__init__.py) | Public surface of the router. Exports `route()`, `register_session_start()`, `mark_session_complete()`, `print_cost_report()`, `print_metrics_report()`, `record_adjudication()`, `send_session_complete_notification()`, and the `find_active_session_set()` discovery helper. |
-| [ai-router/config.py](ai-router/config.py) | Loads and validates `router-config.yaml`, parses the prompt-template markdown files, and resolves effective generation parameters for any `(model, task_type)` pair. |
-| [ai-router/models.py](ai-router/models.py) | Complexity estimation (the 1-100 score) and the per-tier model-selection logic that drives routing decisions. |
-| [ai-router/providers.py](ai-router/providers.py) | HTTP callers for Anthropic, Google, and OpenAI. Accepts a per-call `generation_params` dict so each provider's reasoning knobs (effort, thinking, thinking_budget, thinking_level) can be tuned per task type. |
-| [ai-router/prompting.py](ai-router/prompting.py) | Builds the model-specific user message from `prompt-templates/task-prompts.md` for each routed task type. |
-| [ai-router/verification.py](ai-router/verification.py) | Rule-based cross-provider verifier selection: different provider, enabled as verifier, matches generator's tier (or one tier higher), cheapest output price wins. Also implements the two-attempt verifier fallback when the first-choice provider fails at the HTTPS layer. |
-| [ai-router/metrics.py](ai-router/metrics.py) | Append-only `router-metrics.jsonl` writer. One JSON line per routed call / verifier call / tiebreaker / adjudication, spanning every session set in the repo for cross-project trend analysis. |
-| [ai-router/report.py](ai-router/report.py) | Manager-oriented markdown report generator (`python -m ai_router.report`). Aggregates the metrics log into headline spend, per-task-type unreliability rates, top outliers, and auto-generated action items. |
-| [ai-router/session_log.py](ai-router/session_log.py) | `SessionLog` class — `log_step()`, `save_session_review()`, `save_issue_log()`, `get_next_session_number()`. Manages `activity-log.json` and the `session-reviews/` directory inside each session set. |
-| [ai-router/session_state.py](ai-router/session_state.py) | Reads and writes `session-state.json` (the earliest in-progress signal external tools see). Backs `register_session_start()` / `mark_session_complete()`. |
-| [ai-router/notifications.py](ai-router/notifications.py) | Pushover push-notification helper for end-of-session alerts. Falls back to Windows User/Machine environment if Pushover keys aren't already in the process environment. |
-| [ai-router/utils.py](ai-router/utils.py) | Cross-cutting helpers including `detect_truncation(content, stop_reason)` (catches the Gemini-Pro `end_turn`-but-actually-truncated failure mode — see [docs/planning/lessons-learned.md](docs/planning/lessons-learned.md)). |
-| [ai-router/router-config.yaml](ai-router/router-config.yaml) | Single tuning surface for the router. Defines the model pool, tier mapping, per-task-type parameter overrides, verifier preferences, cost guard, delegation thresholds, metrics on/off, and the `always_route_task_types` list. Edit this file to retune. |
-| [ai-router/prompt-templates/system-prompts.md](ai-router/prompt-templates/system-prompts.md) | One H2 section per provider — the system prompt sent with every routed call to that provider. |
-| [ai-router/prompt-templates/task-prompts.md](ai-router/prompt-templates/task-prompts.md) | One H1 section per task type — the user-message template `prompting.py` applies for that task type. |
-| [ai-router/prompt-templates/verification.md](ai-router/prompt-templates/verification.md) | The independent-verifier prompt template, including the structured JSON response schema (`{verdict, issues}`) that closes the bare-paragraph-misclassified-as-VERIFIED hole. |
+| [ai_router/__init__.py](ai_router/__init__.py) | Public surface of the router. Exports `route()`, `register_session_start()`, `mark_session_complete()`, `print_cost_report()`, `print_metrics_report()`, `record_adjudication()`, `send_session_complete_notification()`, and the `find_active_session_set()` discovery helper. |
+| [ai_router/config.py](ai_router/config.py) | Loads and validates `router-config.yaml`, parses the prompt-template markdown files, and resolves effective generation parameters for any `(model, task_type)` pair. |
+| [ai_router/models.py](ai_router/models.py) | Complexity estimation (the 1-100 score) and the per-tier model-selection logic that drives routing decisions. |
+| [ai_router/providers.py](ai_router/providers.py) | HTTP callers for Anthropic, Google, and OpenAI. Accepts a per-call `generation_params` dict so each provider's reasoning knobs (effort, thinking, thinking_budget, thinking_level) can be tuned per task type. |
+| [ai_router/prompting.py](ai_router/prompting.py) | Builds the model-specific user message from `prompt-templates/task-prompts.md` for each routed task type. |
+| [ai_router/verification.py](ai_router/verification.py) | Rule-based cross-provider verifier selection: different provider, enabled as verifier, matches generator's tier (or one tier higher), cheapest output price wins. Also implements the two-attempt verifier fallback when the first-choice provider fails at the HTTPS layer. |
+| [ai_router/metrics.py](ai_router/metrics.py) | Append-only `router-metrics.jsonl` writer. One JSON line per routed call / verifier call / tiebreaker / adjudication, spanning every session set in the repo for cross-project trend analysis. |
+| [ai_router/report.py](ai_router/report.py) | Manager-oriented markdown report generator (`python -m ai_router.report`). Aggregates the metrics log into headline spend, per-task-type unreliability rates, top outliers, and auto-generated action items. |
+| [ai_router/session_log.py](ai_router/session_log.py) | `SessionLog` class — `log_step()`, `save_session_review()`, `save_issue_log()`, `get_next_session_number()`. Manages `activity-log.json` and the `session-reviews/` directory inside each session set. |
+| [ai_router/session_state.py](ai_router/session_state.py) | Reads and writes `session-state.json` (the earliest in-progress signal external tools see). Backs `register_session_start()` / `mark_session_complete()`. |
+| [ai_router/notifications.py](ai_router/notifications.py) | Pushover push-notification helper for end-of-session alerts. Falls back to Windows User/Machine environment if Pushover keys aren't already in the process environment. |
+| [ai_router/utils.py](ai_router/utils.py) | Cross-cutting helpers including `detect_truncation(content, stop_reason)` (catches the Gemini-Pro `end_turn`-but-actually-truncated failure mode — see [docs/planning/lessons-learned.md](docs/planning/lessons-learned.md)). |
+| [ai_router/router-config.yaml](ai_router/router-config.yaml) | Single tuning surface for the router. Defines the model pool, tier mapping, per-task-type parameter overrides, verifier preferences, cost guard, delegation thresholds, metrics on/off, and the `always_route_task_types` list. Edit this file to retune. |
+| [ai_router/prompt-templates/system-prompts.md](ai_router/prompt-templates/system-prompts.md) | One H2 section per provider — the system prompt sent with every routed call to that provider. |
+| [ai_router/prompt-templates/task-prompts.md](ai_router/prompt-templates/task-prompts.md) | One H1 section per task type — the user-message template `prompting.py` applies for that task type. |
+| [ai_router/prompt-templates/verification.md](ai_router/prompt-templates/verification.md) | The independent-verifier prompt template, including the structured JSON response schema (`{verdict, issues}`) that closes the bare-paragraph-misclassified-as-VERIFIED hole. |
 
 ### `tools/vscode-session-sets/` — Session Set Explorer extension
 

@@ -53,7 +53,7 @@ export class CostDashboard {
     if (!root) { vscode.window.showErrorMessage("No workspace folder open."); return; }
     const entries = readMetrics(root);
     const csv = exportToCsv(entries);
-    const outPath = path.join(root, "ai-router", "cost-export.csv");
+    const outPath = path.join(root, "ai_router", "cost-export.csv");
     try {
       fs.writeFileSync(outPath, csv, "utf8");
       vscode.commands.executeCommand("vscode.open", vscode.Uri.file(outPath));
@@ -129,8 +129,8 @@ function noMetricsHtml(nonce: string, cspSource: string, metricsPath: string): s
   </head><body>
   <h2>No cost data found</h2>
   <p>Expected: <code>${metricsPath}</code></p>
-  <p>Enable metrics logging in <code>ai-router/config.py</code> by setting <code>METRICS_ENABLED = True</code>.</p>
-  <p>Each session run will append a JSON line to <code>ai-router/metrics.jsonl</code>.</p>
+  <p>Enable metrics logging in <code>ai_router/config.py</code> by setting <code>METRICS_ENABLED = True</code>.</p>
+  <p>Each session run will append a JSON line to <code>ai_router/metrics.jsonl</code>.</p>
   </body></html>`;
 }
 

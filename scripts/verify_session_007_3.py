@@ -1,12 +1,11 @@
 """One-shot cross-provider verification for Set 007 / Session 3.
 
 Routes a session-verification call. Per the user's standing
-cost-containment rule, ai-router is invoked at end-of-session only.
+cost-containment rule, ai_router is invoked at end-of-session only.
 Writes the verifier's raw response and the cost line to stdout.
 """
 from __future__ import annotations
 
-import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -15,16 +14,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def load_ai_router():
-    init = REPO_ROOT / "ai-router" / "__init__.py"
-    spec = importlib.util.spec_from_file_location(
-        "ai_router",
-        str(init),
-        submodule_search_locations=[str(init.parent)],
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["ai_router"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """Import ``ai_router`` directly. The previous ``importlib.util.spec_from_file_location`` shim,
+    required when the package directory used a hyphenated name, is no longer needed:
+    after Set 10 Session 1 the directory is ``ai_router/`` and the package is installable
+    via ``pip install -e .`` from the repo root. The ``sys.path.insert`` covers the case
+    where the script is run without the editable install.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    import ai_router
+    return ai_router
 
 
 SESSION_SET = "docs/session-sets/007-uniform-session-state-file"
@@ -79,7 +78,7 @@ to be taken on faith):
 
 1. `dabbler.setupNewProject` does NOT itself scaffold individual
    session-set folders — it only creates the parent `docs/session-sets/`
-   directory and the `docs/planning/` and `ai-router/` directories. The
+   directory and the `docs/planning/` and `ai_router/` directories. The
    flow that actually creates a session-set folder is the AI driven by
    the "Generate Session-Set Prompt" template. So the spec's Session-3
    "wizard writes the not-started file" line is interpreted as
@@ -98,7 +97,7 @@ to be taken on faith):
    directive. Flag this for the human at close-out.
 
 3. Build/test status:
-   - `python ai-router/dump_session_state_schema.py --check` -> exit 0
+   - `python ai_router/dump_session_state_schema.py --check` -> exit 0
      (schema example unchanged this session; only the .md describing
      it was extended).
    - `pytest` (repo root): 647 passed in 55s.

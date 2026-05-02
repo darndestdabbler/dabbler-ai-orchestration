@@ -6,7 +6,7 @@ import { LiveSession, SessionSet } from "../../types";
 // description badge surfaces sets that closed via ``close_session
 // --force`` / ``mark_session_complete(force=True)``. It reads the
 // ``forceClosed`` flag written by ``_flip_state_to_closed(forced=True)``
-// in ``ai-router/session_state.py``. The flag is absent or false on
+// in ``ai_router/session_state.py``. The flag is absent or false on
 // every snapshot written by a normal close-out.
 
 function fakeLive(over: Partial<LiveSession> = {}): LiveSession {

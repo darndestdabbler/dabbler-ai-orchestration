@@ -4,7 +4,6 @@ Builds a verification prompt with the spec excerpt + diff bundle + test
 results, calls route(task_type='session-verification'), and saves the
 raw verifier output via SessionLog.save_session_review.
 """
-import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -16,15 +15,18 @@ DIFF_PATH = Path(os.environ.get("DIFF_PATH", "/c/tmp/session-2-bundle.diff"))
 
 
 def load_ai_router():
-    spec = importlib.util.spec_from_file_location(
-        "ai_router",
-        str(REPO / "ai-router/__init__.py"),
-        submodule_search_locations=[str(REPO / "ai-router")],
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["ai_router"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """Import ``ai_router`` directly. The previous
+    ``importlib.util.spec_from_file_location`` shim, required when the
+    package directory used a hyphenated name, is no longer
+    needed: after Set 10 Session 1 the directory is ``ai_router/`` and
+    the package is installable via ``pip install -e .`` from the repo
+    root. The ``sys.path.insert`` covers the case where the script is
+    run without the editable install.
+    """
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    import ai_router
+    return ai_router
 
 
 def main() -> int:

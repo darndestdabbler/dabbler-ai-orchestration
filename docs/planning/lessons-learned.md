@@ -26,7 +26,7 @@
   The orchestrator logs the call as successful; the structured consumer sees
   a malformed JSON / unbalanced brace and downstream parsing fails.
 - **Lesson:** Use `detect_truncation(content, stop_reason)` from
-  `ai-router/utils.py`. It returns True when `stop_reason == "max_tokens"`
+  `ai_router/utils.py`. It returns True when `stop_reason == "max_tokens"`
   OR when the response shows syntactic incompleteness (odd triple-backtick
   count, more `{` than `}`).
 - **Action for future sessions:** Call `detect_truncation()` before treating
@@ -69,7 +69,7 @@
 - **Lesson:** Use ASCII-only: `[~]` in-progress, `[ ]` not-started, `[x]`
   done. Reserve Unicode for files written with `encoding="utf-8"`.
 - **Action for future sessions:** Follow `print_session_set_status()` in
-  `ai-router/__init__.py` as the pattern.
+  `ai_router/__init__.py` as the pattern.
 - **Promoted to `project-guidance.md` → Conventions → Code Style on
   2026-05-01** after consistent application across five+ CLI surfaces
   (`print_session_set_status`, `print_metrics_report`, `queue_status`,

@@ -249,7 +249,7 @@ A session set should declare `requiresE2E: false` when:
   reached from the UI, infrastructure, build configuration.
 - The set is **doc-only**: planning, lessons-learned updates, workflow
   changes.
-- The set is **tooling/infra**: ai-router changes, session-set
+- The set is **tooling/infra**: ai_router changes, session-set
   scaffolding, CI configuration. (Note: changes to the *test*
   infrastructure may still require running the existing E2E suite to
   confirm green; that's covered by the testing hierarchy, not the

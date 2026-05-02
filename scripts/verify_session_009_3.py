@@ -11,7 +11,6 @@ the raw verdict to `session-reviews/session-003.md`.
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -21,15 +20,16 @@ SET_DIR = REPO / "docs" / "session-sets" / "009-alignment-audit-followups"
 
 
 def _load_ai_router():
-    spec = importlib.util.spec_from_file_location(
-        "ai_router",
-        str(REPO / "ai-router" / "__init__.py"),
-        submodule_search_locations=[str(REPO / "ai-router")],
-    )
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["ai_router"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+    """Import ``ai_router`` directly. The previous ``importlib.util.spec_from_file_location`` shim,
+    required when the package directory used a hyphenated name, is no longer needed:
+    after Set 10 Session 1 the directory is ``ai_router/`` and the package is installable
+    via ``pip install -e .`` from the repo root. The ``sys.path.insert`` covers the case
+    where the script is run without the editable install.
+    """
+    if str(REPO) not in sys.path:
+        sys.path.insert(0, str(REPO))
+    import ai_router
+    return ai_router
 
 
 def _read(path: Path) -> str:
@@ -170,13 +170,13 @@ def main() -> int:
     route = ar.route
 
     spec_md = _read(SET_DIR / "spec.md")
-    session_events_py = _read(REPO / "ai-router" / "session_events.py")
-    close_session_py = _read(REPO / "ai-router" / "close_session.py")
-    session_state_py = _read(REPO / "ai-router" / "session_state.py")
-    closeout_md = _read(REPO / "ai-router" / "docs" / "close-out.md")
+    session_events_py = _read(REPO / "ai_router" / "session_events.py")
+    close_session_py = _read(REPO / "ai_router" / "close_session.py")
+    session_state_py = _read(REPO / "ai_router" / "session_state.py")
+    closeout_md = _read(REPO / "ai_router" / "docs" / "close-out.md")
     ai_assignment_md = _read(SET_DIR / "ai-assignment.md")
-    skeleton_tests = _read(REPO / "ai-router" / "tests" / "test_close_session_skeleton.py")
-    gate_tests = _read(REPO / "ai-router" / "tests" / "test_mark_session_complete_gate.py")
+    skeleton_tests = _read(REPO / "ai_router" / "tests" / "test_close_session_skeleton.py")
+    gate_tests = _read(REPO / "ai_router" / "tests" / "test_mark_session_complete_gate.py")
     types_ts = _read(REPO / "tools" / "dabbler-ai-orchestration" / "src" / "types.ts")
     provider_ts = _read(REPO / "tools" / "dabbler-ai-orchestration" / "src" / "providers" / "SessionSetsProvider.ts")
     badge_test_ts = _read(REPO / "tools" / "dabbler-ai-orchestration" / "src" / "test" / "suite" / "forceClosedBadge.test.ts")
@@ -184,7 +184,7 @@ def main() -> int:
     acceptance = (
         "- Either: `--force` is hard-scoped (env-var gated + reason-required + "
         "ledger event + warning) OR removed entirely\n"
-        "- `ai-router/docs/close-out.md` reflects the resolution\n"
+        "- `ai_router/docs/close-out.md` reflects the resolution\n"
         "- A new test exercises the chosen path\n"
         "(Operator selected the **hard-scope** path at session start.)"
     )
@@ -214,7 +214,7 @@ def main() -> int:
         "",
         "## Files changed (deliverables)",
         "",
-        "### 1. `ai-router/session_events.py` — `closeout_force_used` "
+        "### 1. `ai_router/session_events.py` — `closeout_force_used` "
         "added to `EVENT_TYPES`",
         "",
         "Set 1 Session 3 deliberately froze the enum to nine entries; the "
@@ -226,7 +226,7 @@ def main() -> int:
         _slice_event_types(session_events_py),
         "```",
         "",
-        "### 2. `ai-router/close_session.py` — `--force` hard-scoped",
+        "### 2. `ai_router/close_session.py` — `--force` hard-scoped",
         "",
         "Five changes:",
         "",
@@ -250,7 +250,7 @@ def main() -> int:
         _slice_force_event_emission(close_session_py),
         "```",
         "",
-        "### 3. `ai-router/session_state.py` — `forced` flag plumbing",
+        "### 3. `ai_router/session_state.py` — `forced` flag plumbing",
         "",
         "  - `_flip_state_to_closed(forced=False)` writes `forceClosed: True` "
         "when called with `forced=True`:",
@@ -268,7 +268,7 @@ def main() -> int:
         _slice_mark_complete(session_state_py),
         "```",
         "",
-        "### 4. `ai-router/docs/close-out.md` Section 5 + Section 2 row",
+        "### 4. `ai_router/docs/close-out.md` Section 5 + Section 2 row",
         "",
         "  - **Section 2 flag-summary row**:",
         "",
@@ -347,7 +347,7 @@ def main() -> int:
         "```",
         "",
         "## Test result",
-        "`python -m pytest ai-router/tests` → **675 passed in 54.75s** "
+        "`python -m pytest ai_router/tests` → **675 passed in 54.75s** "
         "(670 pre-existing + 5 new force-hard-scoping cases).",
         "",
         "Extension TypeScript: `npx tsc --noEmit -p tsconfig.json` → "
@@ -362,7 +362,7 @@ def main() -> int:
         "Workflow Step 6 (verification) is mode-aware; this set runs "
         "outsource-first and we are routing the verification "
         "synchronously. The standing operator constraint restricts "
-        "ai-router usage to end-of-session verification only — this is "
+        "ai_router usage to end-of-session verification only — this is "
         "the only routed call this session.",
         "",
         "## Verification ask",
@@ -392,7 +392,7 @@ def main() -> int:
         "`[FORCED]` description badge and a tooltip line for "
         "force-closed sets, with a null-safe guard so legacy "
         "snapshots without the field don't light up the badge?",
-        "  6. Does `ai-router/docs/close-out.md` Section 5 reflect "
+        "  6. Does `ai_router/docs/close-out.md` Section 5 reflect "
         "the new contract (env-var gate + reason-file requirement + "
         "event emission + WARNING + forensic flag), and does the "
         "Section 2 flag-summary row + combination-rules list agree?",

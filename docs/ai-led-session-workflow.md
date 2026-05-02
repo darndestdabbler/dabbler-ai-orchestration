@@ -18,10 +18,10 @@ per session set in `spec.md`'s `outsourceMode:` field. **Outsource-first**
 providers. **Outsource-last** enqueues verification work to a
 long-running verifier daemon backed by a subscription CLI; the
 two-CLI setup, daemon recovery, and subscription-window quirks live
-in `ai-router/docs/two-cli-workflow.md`. Step 6 (verification) and
+in `ai_router/docs/two-cli-workflow.md`. Step 6 (verification) and
 Step 8 (close-out) are mode-aware. The deterministic close-out path,
 gate checks, and reconciler hand-off live in
-`ai-router/docs/close-out.md`.
+`ai_router/docs/close-out.md`.
 
 The orchestrator can change from session to session at the human's discretion.
 All three orchestrators follow the same workflow — only the instruction file
@@ -54,7 +54,7 @@ Orchestrator (Claude / Codex / Gemini)
   |
   |  For each step in the session plan:
   |    |-- file work: creates/edits files directly
-  |    |-- reasoning: calls route() via ai-router Python module
+  |    |-- reasoning: calls route() via ai_router Python module
   |    |     |-- router selects cheapest capable model
   |    |     |-- Gemini Flash (tier 1), Gemini Pro (tier 2),
   |    |     |   Sonnet (tier 2), or Opus (tier 3)
@@ -120,7 +120,7 @@ human explicitly overrides it.
 
 ### AI Router
 
-A Python module in `ai-router/` that routes reasoning tasks to external AI
+A Python module in `ai_router/` that routes reasoning tasks to external AI
 models. The orchestrator calls `route()` instead of performing analysis,
 review, or documentation itself. The router:
 
@@ -234,7 +234,7 @@ time.
   Removing the file (or renaming it to `RESTORED.md`) restores the
   set. The TypeScript and Python helpers in
   `tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts` and
-  `ai-router/session_lifecycle.py` are the canonical writers; both
+  `ai_router/session_lifecycle.py` are the canonical writers; both
   emit the same byte-for-byte format (LF newlines, UTF-8 no BOM,
   ISO-8601 local timestamps).
 
@@ -351,9 +351,9 @@ Key rules for the spec:
 
 ### 3. Configure the AI Router
 
-The router is configured via `ai-router/router-config.yaml`. Prompt templates
-and workflow utilities live under `ai-router/prompt-templates/` and
-`ai-router/utils/`. Key sections:
+The router is configured via `ai_router/router-config.yaml`. Prompt templates
+and workflow utilities live under `ai_router/prompt-templates/` and
+`ai_router/utils/`. Key sections:
 
 **Models:** Define available models with tier, pricing, and context limits.
 Each model may also declare `generation_params` controlling the API-level
@@ -842,7 +842,7 @@ When this step terminates with a `VERIFIED` verdict and
 layer fires the mode-aware fresh close-out hook
 (`ai_router.route_fresh_close_out_turn`). In outsource-first it
 routes a new turn with `task_type="session-close-out"` so the
-close-out agent reads `ai-router/docs/close-out.md` at the moment
+close-out agent reads `ai_router/docs/close-out.md` at the moment
 the instructions are needed. In outsource-last it invokes
 `close_session.run` in-process — no fresh API turn — because the
 orchestrator's primary CLI session already holds the queue context
@@ -854,7 +854,7 @@ sessions on the next orchestrator startup and re-runs close-out.
 2. Build a verification prompt with: spec excerpt + file contents +
    build results. **The prompt must include the structured JSON
    response schema** (defined in
-   `ai-router/prompt-templates/verification.md`) so the verifier
+   `ai_router/prompt-templates/verification.md`) so the verifier
    returns `{"verdict": "VERIFIED" | "ISSUES_FOUND", "issues": [...]}`
    rather than a bare paragraph. Bare-paragraph verdicts have caused
    parser failures and silent ISSUES_FOUND-misclassified-as-VERIFIED
@@ -995,14 +995,14 @@ next-orchestrator recommendation every session, change-log generation
 on the last session, `mark_session_complete`). It does **not** run
 git commit / push / notification — those are the caller's
 responsibility, ordered around the close-out call. See
-`ai-router/docs/close-out.md` Section 1 ("Ownership of commit / push
+`ai_router/docs/close-out.md` Section 1 ("Ownership of commit / push
 / notification") for the full contract and rationale. For
 outsource-last sessions, see also
-`ai-router/docs/two-cli-workflow.md` for daemon setup and recovery.
+`ai_router/docs/two-cli-workflow.md` for daemon setup and recovery.
 
 Notification ordering matters: the caller fires the session-complete
 Pushover notification (`send_session_complete_notification` in
-`ai-router/notifications.py`) **after** `close_session` returns
+`ai_router/notifications.py`) **after** `close_session` returns
 `succeeded` and **before** Step 9's reorganization review, so the
 human is not blocking the "session complete" signal while they think
 about proposals. Do not fire the notification when the gate failed —
@@ -1135,7 +1135,7 @@ Each agent-specific file should contain:
 2. **Pointer to `docs/planning/project-guidance.md`**
 3. **Pointer to `docs/planning/lessons-learned.md`**
 4. **Pointer to this workflow doc** for the full procedure and rules
-5. **AI router import snippet** — how to load the `ai-router` module
+5. **AI router import snippet** — how to load the `ai_router` module
 6. **API key export commands** — platform-specific commands to load keys
 7. **Build and test commands**
 8. **Solution structure**
@@ -1161,24 +1161,17 @@ The orchestrator:
 
 ### Importing the Router
 
-The module directory is `ai-router/` (hyphenated). Python cannot import
-hyphenated package names directly, so use `importlib`:
+The package is installed via `pip install -e .` from the repo root
+(or `pip install dabbler-ai-router` once the package is published to
+PyPI), and imports directly:
 
 ```python
-import importlib.util, sys
-
-def load_ai_router():
-    spec = importlib.util.spec_from_file_location(
-        'ai_router', 'ai-router/__init__.py',
-        submodule_search_locations=['ai-router'])
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules['ai_router'] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-ar = load_ai_router()
-route = ar.route
+from ai_router import route
 ```
+
+The previous `importlib.util.spec_from_file_location` shim, required
+when the package directory used a hyphenated name, is no
+longer needed.
 
 On Windows, use `.venv/Scripts/python.exe` to run Python.
 
@@ -1274,7 +1267,7 @@ filesystem.
 ## Metrics and Observability
 
 Every routed call, verifier call, and tiebreaker call is appended to a
-global log at `ai-router/router-metrics.jsonl`. The log is append-only
+global log at `ai_router/router-metrics.jsonl`. The log is append-only
 JSON lines (one record per line). It spans all session sets — it is
 NOT per-session-set — so cross-project trends can be analyzed.
 

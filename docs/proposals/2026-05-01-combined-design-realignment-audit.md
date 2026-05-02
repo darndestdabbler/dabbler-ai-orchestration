@@ -1,5 +1,14 @@
 # Combined Design Realignment Audit (Post-Set-009 Re-Audit)
 
+> **Path note (2026-05-01).** Body and citations below reference
+> `ai-router/` as the package directory. This was renamed to
+> `ai_router/` (underscore) in Set 010 Session 1 so the package is
+> directly Python-importable; the dashed-path references throughout
+> this document accurately describe the implementation **as of the
+> audit dates** (2026-04-29 / 2026-04-30 / 2026-05-01) and are kept
+> for historical fidelity. Equivalent forward-looking guidance lives
+> at the renamed paths (`ai_router/...`).
+
 > ## ✓ COMPLETE — both providers returned FULLY ALIGNED on independent reads (2026-05-01)
 >
 > Gemini Pro: FULLY ALIGNED. GPT-5.4: FULLY ALIGNED. Combined design

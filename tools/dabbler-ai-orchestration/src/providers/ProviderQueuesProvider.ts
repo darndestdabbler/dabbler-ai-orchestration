@@ -111,7 +111,7 @@ interface InfoNode {
 // ---------- provider ----------
 
 export interface ProviderQueuesDeps {
-  /** Returns the workspace root that owns ``ai-router/`` and ``provider-queues/``. */
+  /** Returns the workspace root that owns ``ai_router/`` and ``provider-queues/``. */
   getWorkspaceRoot: () => string | undefined;
   /** Spawn helper. Injected for tests. */
   fetchPayload?: (workspaceRoot: string) => Promise<{ ok: true; payload: QueueStatusPayload } | { ok: false; message: string }>;

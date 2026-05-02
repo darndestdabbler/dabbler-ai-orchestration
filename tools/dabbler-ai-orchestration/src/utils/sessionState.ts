@@ -3,7 +3,7 @@ import * as path from "path";
 
 // Canonical status strings carried by session-state.json under the Set 7
 // invariant. The Python side defines the same set in
-// ai-router/session_state.py; the two writers must stay in lockstep.
+// ai_router/session_state.py; the two writers must stay in lockstep.
 export type CanonicalStatus =
   | "not-started"
   | "in-progress"

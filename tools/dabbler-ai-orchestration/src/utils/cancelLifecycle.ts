@@ -11,7 +11,7 @@ const SESSION_STATE_FILENAME = "session-state.json";
 const HISTORY_HEADER = "# Cancellation history";
 
 // Canonical text written by both this writer and the Python mirror in
-// ai-router/session_lifecycle.py. The two writers must agree
+// ai_router/session_lifecycle.py. The two writers must agree
 // byte-for-byte on the on-disk shape so a set cancelled on one platform
 // reads identically when the same repo is opened on another. Pin both
 // writers to LF newlines and UTF-8 (no BOM) — the spec's Risks section
@@ -70,7 +70,7 @@ export function wasRestored(sessionSetDir: string): boolean {
 
 /**
  * Atomic write via unique temp file + rename. Mirrors
- * ``_atomic_write_json`` in ai-router/session_state.py and the same
+ * ``_atomic_write_json`` in ai_router/session_state.py and the same
  * pattern in src/utils/sessionState.ts. The temp filename is uniquified
  * with PID + a short random suffix so two concurrent writers (e.g.
  * two VS Code windows on the same workspace) cannot collide on the

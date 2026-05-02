@@ -87,14 +87,14 @@ When `outsourceMode` is omitted from a spec, the extension treats it as `first` 
 An onboarding panel that walks you through the entire workflow: prerequisites, how sessions work, and first steps. Opens automatically in new workspaces.
 
 ### New Project Scaffolding (`Dabbler: Set Up New Project`)
-Initializes a git repository and creates the standard folder layout (`docs/session-sets/`, `docs/planning/`, `ai-router/`). Optionally sets up git worktrees for parallel session execution.
+Initializes a git repository and creates the standard folder layout (`docs/session-sets/`, `docs/planning/`, `ai_router/`). Optionally sets up git worktrees for parallel session execution.
 
 ### Plan Import & Session-Set Generation
 - **`Dabbler: Import Project Plan`** — import a Markdown plan file or get a prompt to generate one with AI.
 - **`Dabbler: Generate Session-Set Prompt`** — builds and copies an AI prompt that translates your plan into a sequence of session-set specs.
 
 ### Cost Dashboard (`Dabbler: Show Cost Dashboard`)
-Reads `ai-router/metrics.jsonl` and displays:
+Reads `ai_router/metrics.jsonl` and displays:
 - Cumulative project total
 - Per-session-set breakdown (sessions run, total cost, last run date)
 - 30-day ASCII sparkline chart
@@ -108,7 +108,7 @@ A guided QuickPick that diagnoses common issues: activation, stuck sessions, git
 
 - VS Code 1.85 or later
 - Git on your PATH
-- Python ≥ 3.10 with the `ai-router` module (for running sessions)
+- Python ≥ 3.10 with the `ai_router` module (for running sessions)
 - At least one API key: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`
 
 ## Cost reality — please read before adopting
@@ -159,7 +159,7 @@ The extension automatically discovers all worktrees for each workspace folder vi
 
 ## Cost Metrics Format
 
-Enable `METRICS_ENABLED = True` in `ai-router/config.py`. Each session appends one JSON line to `ai-router/metrics.jsonl`:
+Enable `METRICS_ENABLED = True` in `ai_router/config.py`. Each session appends one JSON line to `ai_router/metrics.jsonl`:
 
 ```json
 {

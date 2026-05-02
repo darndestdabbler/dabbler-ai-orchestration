@@ -331,12 +331,41 @@ testing, or forks).
      change").
 3. Register the commands in
    `tools/dabbler-ai-orchestration/src/extension.ts` `activate()`.
-4. Update `tools/dabbler-ai-orchestration/package.json`:
+4. **Graceful "not configured" handling for the Provider Queues and
+   Provider Heartbeats views.** Today both views shell out to
+   `python -m ai_router.queue_status` /
+   `python -m ai_router.heartbeat_status` and, when the module is
+   not on `sys.path`, render a red error like:
+   > `Failed to read queue status. queue_status exited 1 — ...
+   > ModuleNotFoundError: No module named 'ai_router'`.
+   That message is technically accurate but actively unhelpful — a
+   first-time user has no signal that the fix is "run the install
+   command." The fix:
+   - In `ProviderQueuesProvider.ts` and `ProviderHeartbeatsProvider.ts`,
+     after running `runPythonModule()` and getting a non-zero exit
+     code, inspect `result.stderr` for `ModuleNotFoundError` (or the
+     `Error while finding module specification`-style line that
+     `python -m` emits when the module name is unresolvable).
+   - When detected, render a tree-item that says
+     **`ai_router not installed in this Python environment.`** with
+     a child item **`Click here to run "Dabbler: Install ai-router"`**
+     whose `command` property fires `dabblerSessionSets.installAiRouter`
+     directly. Use a neutral `info` icon, not the red error icon.
+   - Other failure modes (timeout, non-import-error non-zero exit,
+     malformed JSON output) still render as the existing red error
+     so we don't mask real problems.
+   - Even after Session 1's rename and Session 2's PyPI publish,
+     this graceful path stays useful: a user who installs the
+     extension but hasn't run `Dabbler: Install ai-router` yet
+     hits exactly this branch, and the message walks them
+     directly to the fix.
+5. Update `tools/dabbler-ai-orchestration/package.json`:
    - Add `dabblerSessionSets.installAiRouter` and
      `dabblerSessionSets.updateAiRouter` to `contributes.commands`.
-   - Bump extension version `0.8.0` → `0.9.0` (minor bump per
-     SemVer — new feature, no breaking changes).
-5. Update repo-root `README.md` "Adopting" section to lead with
+   - Bump extension version `0.11.0` → `0.12.0` (minor bump per
+     SemVer — new feature, no breaking changes; the actual current
+     version is 0.11.0 as of Set 010 spec authoring).
+6. Update repo-root `README.md` "Adopting" section to lead with
    the extension command:
    ```
    1. Install the extension VSIX (see "Installing the VS Code
@@ -348,9 +377,11 @@ testing, or forks).
    ```
    The pip install instructions stay below as a fallback for users
    who prefer the CLI route.
-6. Update `tools/dabbler-ai-orchestration/README.md` Features
-   section with the new command.
-7. Tests:
+7. Update `tools/dabbler-ai-orchestration/README.md` Features
+   section with the new command and a one-line note that the
+   Queues/Heartbeats views render a "Click here to run install"
+   prompt when `ai_router` is missing instead of a red error.
+8. Tests:
    - New test file
      `tools/dabbler-ai-orchestration/src/test/suite/installAiRouter.test.ts`
      using the same standalone-mocha pattern as set 008's
@@ -360,21 +391,34 @@ testing, or forks).
      preservation (file exists before / restored after),
      venv-missing-handled (creation prompt fires), each command's
      contextValue routing.
-   - Aim for ~10–15 tests; pattern is established from prior sets.
-8. Build the new VSIX:
-   `cd tools/dabbler-ai-orchestration && npx vsce package`. The
-   resulting `dabbler-session-sets-0.9.0.vsix` is the artifact.
-9. End-of-session cross-provider verification.
-10. Commit, push, run close-out (this is the final session — write
+   - **Plus** new tests for the graceful-error path in step 4:
+     when `runPythonModule` returns a non-zero exit with a stderr
+     matching the `ModuleNotFoundError: No module named 'ai_router'`
+     pattern, Provider Queues and Provider Heartbeats render the
+     "not configured" tree-item with the install-command link
+     (verify `command` property + neutral icon); other non-zero
+     exits still render the red error tree-item (verify the
+     existing path is intact).
+   - Aim for ~12–18 tests total; pattern is established from prior
+     sets.
+9. Build the new VSIX:
+   `cd tools/dabbler-ai-orchestration && npm run package`. The
+   resulting `dabbler-ai-orchestration-0.12.0.vsix` is the artifact.
+10. End-of-session cross-provider verification.
+11. Commit, push, run close-out (this is the final session — write
     `change-log.md` summarizing the whole set).
 
 **Creates:**
 `tools/dabbler-ai-orchestration/src/commands/installAiRouterCommands.ts`,
 `tools/dabbler-ai-orchestration/src/test/suite/installAiRouter.test.ts`,
-`tools/dabbler-ai-orchestration/dabbler-session-sets-0.9.0.vsix`.
+`tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix`.
 
 **Touches:**
 `tools/dabbler-ai-orchestration/src/extension.ts`,
+`tools/dabbler-ai-orchestration/src/providers/ProviderQueuesProvider.ts`
+(graceful "not configured" path, step 4),
+`tools/dabbler-ai-orchestration/src/providers/ProviderHeartbeatsProvider.ts`
+(same),
 `tools/dabbler-ai-orchestration/package.json`,
 `tools/dabbler-ai-orchestration/README.md`,
 `README.md` (adoption section).
@@ -492,8 +536,8 @@ rule):
 |---|---|---|
 | 1 — Rename + pyproject.toml | $0.10–$0.20 | Mechanical-but-broad change; the verifier's prompt will be larger because the trace covers many files. |
 | 2 — PyPI publish | $0.05–$0.15 | Smaller surface (one workflow file + one doc). |
-| 3 — Extension install command | $0.15–$0.30 | TS + Python paths; test suite assertions; README updates. Largest single-session estimate. |
-| **Set total** | **$0.30–$0.65** | Lower bound assumes single-round verification; upper bound assumes one Round-2 retry per session. |
+| 3 — Extension install command + graceful "not configured" handler | $0.20–$0.35 | TS + Python paths; provider error-handling refactor; test suite assertions; README updates. Largest single-session estimate. |
+| **Set total** | **$0.35–$0.70** | Lower bound assumes single-round verification; upper bound assumes one Round-2 retry per session. |
 
 This is a small set by recent standards (set 009 cost $0.78 across 5
 sessions). The work is large in lines-changed but the verification

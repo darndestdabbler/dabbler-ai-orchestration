@@ -8,3 +8,7 @@
 {"timestamp": "2026-05-01T23:47:34.920174Z", "session_number": 3, "event_type": "closeout_requested", "force": false, "manual_verify": false}
 {"timestamp": "2026-05-01T23:47:35.047591Z", "session_number": 3, "event_type": "closeout_succeeded", "method": "api"}
 {"timestamp": "2026-05-01T23:47:42.414262Z", "session_number": 3, "event_type": "closeout_succeeded", "forced": false, "method": "snapshot_flip", "verdict": "VERIFIED_ROUND_3"}
+{"timestamp": "2026-05-02T01:10:08.195102Z", "session_number": 5, "event_type": "work_started"}
+{"timestamp": "2026-05-02T01:10:12.468250Z", "session_number": 5, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-05-02T01:10:12.578735Z", "session_number": 5, "event_type": "closeout_succeeded", "method": "api"}
+{"timestamp": "2026-05-02T01:10:40.007495Z", "session_number": 5, "event_type": "closeout_succeeded", "forced": false, "method": "snapshot_flip", "verdict": "VERIFIED_FULLY_ALIGNED_BOTH_PROVIDERS"}

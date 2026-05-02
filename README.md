@@ -1,18 +1,8 @@
-# dabbler-ai-orchestration
+# Dabbler AI Orchestration
 
-Canonical home for shared AI orchestration infrastructure across all
-Dabbler AI-led-workflow repos. Two pieces ship from here:
+An AI-led coding-session workflow for VS Code. Structured AI sessions with cross-provider verification, automatic cost tracking, git-worktree-aware session-set state, and a Session Set Explorer in the activity bar.
 
-- **`ai-router/`** — a Python module that routes reasoning tasks across
-  Anthropic, Google, and OpenAI models, runs cross-provider verification,
-  and tracks costs per session set.
-- **`tools/vscode-session-sets/`** — the **Session Set Explorer** VS Code
-  extension, an activity-bar tree view of session-set state.
-
-Consumer repos (`dabbler-access-harvester`, `dabbler-platform`, …) sync
-the `ai-router/` source from here and install the extension VSIX from
-here. This repo is the source of truth; consumer repos do not maintain
-their own forks of either piece.
+![Session Set Explorer in action](tools/dabbler-ai-orchestration/media/session-set-explorer-in-action.png)
 
 ---
 
@@ -498,7 +488,7 @@ The matrix:
 | **Console / library / CLI / no-UI repo.** Examples: a pure refactor repo, a Python data tool, an internal SDK. | `requiresUAT: false`, `requiresE2E: false` (or block omitted entirely — same effect) | Universal core only: build, test, cross-provider verification, commit, notify. The router never invokes `uat-plan-generation` or `uat-coverage-review`. The Session Set Explorer renders each set as a minimal entry — no UAT badge, no UAT/E2E commands, no Playwright lookup. |
 | **Repo with E2E coverage but no human UAT.** Examples: a service whose behavior is fully testable end-to-end without human judgment. | `requiresUAT: false`, `requiresE2E: true` | Behavioral changes must ship with matching Playwright coverage; the orchestrator confirms via test discovery before notifying. No UAT checklist is built. The *Reveal Playwright Tests for This Set* command appears in the extension's right-click menu. |
 | **Repo with human UAT but no E2E framework.** Examples: legacy UIs not yet wired to Playwright. | `requiresUAT: true`, `requiresE2E: false` | The orchestrator authors `<slug>-uat-checklist.json` during the set, the human runs it via the [UAT checklist editor](https://darndestdabbler.github.io/uat-checklist-editor/), pending review blocks downstream sessions (Rule #9). The extension shows `[UAT n]` / `[UAT done]` badges. The E2E coverage gate is skipped. |
-| **Full-stack UI repo.** Examples: `dabbler-platform` and equivalent Blazor/React apps. | `requiresUAT: true`, `requiresE2E: true` | Full gating: every functional checklist item must have matching Playwright coverage and pass `uat-coverage-review` before the checklist is committed and the human is notified. Judgment items (`IsJudgmentItem: true` in the checklist JSON) are exempt from matching-test parity but still need a sequence-reachability test. |
+| **Full-stack UI repo.** Examples: any Blazor / React / Vue UI app. | `requiresUAT: true`, `requiresE2E: true` | Full gating: every functional checklist item must have matching Playwright coverage and pass `uat-coverage-review` before the checklist is committed and the human is notified. Judgment items (`IsJudgmentItem: true` in the checklist JSON) are exempt from matching-test parity but still need a sequence-reachability test. |
 
 ### Hard-disabling UAT/E2E surfaces in the extension
 

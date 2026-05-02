@@ -108,7 +108,11 @@ A guided QuickPick that diagnoses common issues: activation, stuck sessions, git
 
 - VS Code 1.85 or later
 - Git on your PATH
-- Python ≥ 3.10 with the `ai_router` module (for running sessions)
+- Python ≥ 3.10 with the `ai_router` module installed in your project's
+  venv. As of v0.1, install via `pip install dabbler-ai-router` (the
+  upcoming `Dabbler: Install ai-router` command — Session 3 of set 010
+  — will run this for you against the workspace venv and surface the
+  `router-config.yaml` tuning file when it lands).
 - At least one API key: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`
 
 ## Cost reality — please read before adopting

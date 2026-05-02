@@ -1,0 +1,7 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include ai_router *.py *.yaml *.md *.json
+prune ai_router/tests
+prune ai_router/__pycache__
+recursive-exclude ai_router *.pyc

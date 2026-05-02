@@ -1,11 +1,11 @@
 {
   "schemaVersion": 2,
   "sessionSetName": "010-pypi-publish-and-installer",
-  "currentSession": 1,
+  "currentSession": 2,
   "totalSessions": 3,
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-01T22:05:55-04:00",
+  "startedAt": "2026-05-02T02:43:41-04:00",
   "completedAt": null,
   "verificationVerdict": null,
   "orchestrator": {

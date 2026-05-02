@@ -401,64 +401,63 @@ That writes a fresh `dabbler-session-sets-<version>.vsix` next to
 
 ## Adopting `ai_router` in a project
 
-The router is a plain Python package. To bring it into a consumer repo:
+```bash
+python -m venv .venv
+.venv/Scripts/pip install dabbler-ai-router
+```
 
-1. **Copy `ai_router/` and `pyproject.toml` to the root of the
-   consumer repo.** The package directory is self-contained (no
-   implicit relative paths above its own root) and `pyproject.toml`
-   declares the package metadata `pip install -e .` consumes in
-   step 3. Consumer repos own their copy; this repo is the source of
-   truth that they sync from when changes land. (Once the package is
-   on PyPI, this step collapses to `pip install dabbler-ai-router`.)
+That installs the router as a regular Python package. From your
+orchestrator script:
 
-2. **Set API keys as environment variables:**
+```python
+from ai_router import route
+```
 
-   | Variable | Required for |
-   |---|---|
-   | `ANTHROPIC_API_KEY` | Claude Sonnet / Opus calls |
-   | `GEMINI_API_KEY` | Gemini Flash / Pro calls |
-   | `OPENAI_API_KEY` | GPT-5.4 / GPT-5.4 Mini calls |
-   | `PUSHOVER_API_KEY` | (optional) end-of-session phone notifications |
-   | `PUSHOVER_USER_KEY` | (optional) end-of-session phone notifications |
+Then:
 
-   On Windows, set these as User environment variables; the notification
-   helper falls back to the Windows User/Machine environment if the
-   process environment doesn't already have the Pushover keys.
+- **Set API keys** as environment variables:
+  `ANTHROPIC_API_KEY` (Claude Sonnet / Opus), `GEMINI_API_KEY`
+  (Gemini Flash / Pro), `OPENAI_API_KEY` (GPT-5.4 / GPT-5.4 Mini),
+  and optionally `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` for
+  end-of-session phone notifications. On Windows, User environment
+  variables work; the notification helper falls back to the Windows
+  User/Machine environment if the process environment doesn't already
+  have the Pushover keys.
+- **Tune `router-config.yaml`** for your project — the file is shipped
+  as package data inside `ai_router/`, but the production overlay
+  pattern is to copy it into your repo root (or anywhere on the
+  config-search path) and edit there. Per-task-type effort levels, the
+  cost guard for verification, and `delegation.always_route_task_types`
+  all live there.
+- **Author your first session set:** create
+  `docs/session-sets/<slug>/spec.md` with a Session Set Configuration
+  block (see [docs/planning/session-set-authoring-guide.md](docs/planning/session-set-authoring-guide.md))
+  and start it with `Start the next session.`.
 
-3. **Create the venv and install the package:**
+> ### Editable / source-install fallback
+>
+> If you need to track an unreleased `master` (or run a fork), clone
+> the repo and install editably:
+>
+> ```bash
+> git clone https://github.com/darndestdabbler/dabbler-ai-orchestration.git
+> cd dabbler-ai-orchestration
+> python -m venv .venv
+> .venv/Scripts/pip install -e .
+> ```
+>
+> Same import (`from ai_router import route`); the editable install
+> picks up local edits to `ai_router/` without a reinstall.
 
-   ```bash
-   python -m venv .venv
-   .venv/Scripts/pip install -e .
-   ```
-
-   `pip install -e .` reads `pyproject.toml` at the repo root and
-   installs `ai_router` editably along with its runtime dependencies
-   (`pyyaml`, `httpx`). The router uses `httpx` directly for all three
-   providers' HTTP APIs (no `openai` / `anthropic` / `google-genai`
-   SDKs needed at runtime).
-
-4. **Import the router from your orchestrator script.** With the
-   package installed, the import is direct:
-
-   ```python
-   from ai_router import route
-   ```
-
-   The previous `importlib.util.spec_from_file_location` shim, required
-   when the package directory used a hyphenated name, is no
-   longer needed.
-
-5. **Tune `ai_router/router-config.yaml`** for the project. This is
-   where you set per-task-type effort levels, the cost guard for
-   verification, and the `delegation.always_route_task_types` list that
-   prevents the orchestrator from doing reasoning work itself. The YAML
-   is the single source of truth — there is no separate overlay file.
-
-6. **Author your first session set:** create
-   `docs/session-sets/<slug>/spec.md` with a Session Set Configuration
-   block (see [docs/planning/session-set-authoring-guide.md](docs/planning/session-set-authoring-guide.md)),
-   and start it with `Start the next session.`.
+> ### From inside VS Code (post-Set-010-Session-3)
+>
+> Once the **Session Set Explorer** extension's `Dabbler: Install
+> ai-router` command lands (Session 3 of set 010), the install path
+> from inside VS Code is the command palette plus one click. The
+> command runs `pip install dabbler-ai-router` against your workspace
+> venv and is the recommended path for end users — it preserves any
+> existing `router-config.yaml` and surfaces the tuning file in an
+> editor when the install completes.
 
 ---
 

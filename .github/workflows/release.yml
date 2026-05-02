@@ -1,0 +1,183 @@
+name: Release dabbler-ai-router to PyPI
+
+# OIDC trusted publishing (no API tokens in repo secrets).
+# See `docs/planning/release-process.md` for one-time setup and the
+# per-release checklist. Triggered on tag push:
+#
+#   - `vX.Y.Z-rcN` (e.g. `v0.1.0-rc1`) -> TestPyPI only.
+#   - `vX.Y.Z`     (e.g. `v0.1.0`)     -> PyPI proper.
+#
+# Anything else (e.g. `v1.0.0rc1`, `v1.2`, `vfoo`) is rejected by the
+# `classify` job before any artifact build runs.
+#
+# The build job runs after `classify` so artifacts exist for inspection
+# even if the publish step is gated by environment review.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Classify the pushed tag into one of {final, rc, invalid}. Final and
+  # RC tags must match the strict regexes below; anything else fails the
+  # workflow before any build/publish work happens. The classification
+  # outputs gate the downstream publish jobs so they cannot fire for
+  # the wrong tag shape (e.g., a final tag accidentally also satisfying
+  # the RC condition).
+  # ---------------------------------------------------------------------------
+  classify:
+    name: Classify tag
+    runs-on: ubuntu-latest
+    outputs:
+      is_final: ${{ steps.classify.outputs.is_final }}
+      is_rc: ${{ steps.classify.outputs.is_rc }}
+      pep440_version: ${{ steps.classify.outputs.pep440_version }}
+    steps:
+      - name: Classify ${{ github.ref_name }}
+        id: classify
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "is_final=true"  >> "$GITHUB_OUTPUT"
+            echo "is_rc=false"    >> "$GITHUB_OUTPUT"
+            echo "pep440_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as FINAL (PEP 440 version ${BASH_REMATCH[1]})."
+          elif [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
+            echo "is_final=false" >> "$GITHUB_OUTPUT"
+            echo "is_rc=true"     >> "$GITHUB_OUTPUT"
+            # PEP 440 normalizes `0.1.0-rc1` to `0.1.0rc1` (no dash).
+            echo "pep440_version=${BASH_REMATCH[1]}rc${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as RC (PEP 440 version ${BASH_REMATCH[1]}rc${BASH_REMATCH[2]})."
+          else
+            echo "::error::tag $tag does not match the release pattern. Expected v[0-9]+.[0-9]+.[0-9]+ for finals or v[0-9]+.[0-9]+.[0-9]+-rcN for release candidates."
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build sdist + wheel. Uploaded as a workflow artifact so the publish
+  # jobs (and any human reviewing the release) can inspect the same bytes
+  # that go to PyPI.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build sdist + wheel
+    needs: classify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build packaging
+
+      - name: Verify tag matches pyproject.toml version
+        # Catches the "tagged v0.1.1 but forgot to bump pyproject.toml"
+        # mistake before we waste a build/publish cycle. The check
+        # compares the PEP 440 version the classify job derived from
+        # the tag (`v0.1.0` -> `0.1.0`, `v0.1.0-rc1` -> `0.1.0rc1`)
+        # against the canonicalized version from pyproject.toml. Using
+        # `packaging.version.Version` on both sides catches any
+        # subtle PEP 440 normalization differences.
+        env:
+          EXPECTED_VERSION: ${{ needs.classify.outputs.pep440_version }}
+        run: |
+          python <<'PY'
+          import os, sys, tomllib
+          from packaging.version import Version
+          expected = os.environ["EXPECTED_VERSION"]
+          with open("pyproject.toml", "rb") as f:
+              pyproject_version = tomllib.load(f)["project"]["version"]
+          # `Version()` normalizes both sides to canonical PEP 440 form,
+          # so `0.1.0rc1` and `0.1.0-rc1` and `0.1.0.rc1` all compare
+          # equal — the Version class is the source of truth here.
+          if Version(expected) != Version(pyproject_version):
+              print(
+                  f"::error::tag PEP 440 version {expected!r} does not "
+                  f"match pyproject.toml [project].version {pyproject_version!r}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print(f"tag-vs-pyproject check OK: {expected} == {pyproject_version}")
+          PY
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # TestPyPI publish — release-candidate tags only (`v[0-9]+.[0-9]+.[0-9]+-rcN`).
+  # Lets the release workflow exercise the full upload path against
+  # TestPyPI before the equivalent run against PyPI proper. TestPyPI
+  # rejects re-uploads of the same version, so each RC must bump the
+  # suffix (rc1, rc2, ...).
+  # ---------------------------------------------------------------------------
+  publish-testpypi:
+    name: Publish to TestPyPI (release candidates only)
+    needs: [classify, build]
+    if: ${{ needs.classify.outputs.is_rc == 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/dabbler-ai-router
+    permissions:
+      id-token: write   # required for OIDC trusted publishing
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # No `password:` — OIDC mints a short-lived token from the
+          # trusted-publisher config in the TestPyPI project settings.
+
+  # ---------------------------------------------------------------------------
+  # PyPI publish — final tags only (`v[0-9]+.[0-9]+.[0-9]+` exactly).
+  # The classify job already rejected anything else, so this gate is a
+  # belt-and-suspenders check: even if `classify` ever evolves, an RC
+  # tag cannot end up here.
+  # ---------------------------------------------------------------------------
+  publish-pypi:
+    name: Publish to PyPI (final releases only)
+    needs: [classify, build]
+    if: ${{ needs.classify.outputs.is_final == 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/dabbler-ai-router
+    permissions:
+      id-token: write   # required for OIDC trusted publishing
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # No `repository-url:` — defaults to https://upload.pypi.org/legacy/.
+        # No `password:` — OIDC mints the short-lived token from the
+        # trusted-publisher config in the PyPI project settings.

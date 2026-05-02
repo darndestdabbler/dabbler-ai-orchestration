@@ -61,10 +61,21 @@ standing operator constraint).
 | 18 | Commit, push, run `close_session.py` and stamp Session 1 closed | Direct (CLI invocation) |
 
 ### Actuals (filled after the session)
-- Orchestrator used: <filled at close-out>
-- Total routed cost: <filled at close-out>
-- Deviations from recommendation: <filled at close-out>
-- Notes for next-session calibration: <filled at close-out>
+- Orchestrator used: claude-code claude-opus-4-7 @ effort=high (matches recommendation)
+- Total routed cost: $0.3254 — three rounds of `session-verification`
+  via gpt-5-4 ($0.0767 + $0.1547 + $0.0941). No analysis routes per
+  the standing operator constraint.
+- Deviations from recommendation: none. The session ran on the
+  recommended orchestrator at the recommended effort.
+- Notes for next-session calibration: the verifier flagged 4 Major
+  prose / wiring issues across rounds 1–2 (importlib shim still
+  present in verify scripts; `[project.scripts]` keys not matching
+  spec literal names; literal old path in forward-looking
+  historical-context parens; proposal-doc carveout needing explicit
+  Path note). All addressed in-session; round 3 returned VERIFIED.
+  For Session 2, the `[project.scripts]` literal-name interpretation
+  is now baked into `pyproject.toml`, so the release workflow can
+  proceed without re-litigating it.
 
 **Next-session orchestrator recommendation (Session 2):**
 claude-code claude-opus-4-7 @ effort=high
@@ -76,3 +87,70 @@ effort matches the careful-wording demand for the workflow YAML and
 the per-release runbook prose. Sonnet at medium effort would also be
 viable; bias toward Opus until the workflow has shipped at least one
 successful release.
+
+---
+
+## Session 2: Publish to PyPI via GitHub Actions (OIDC trusted publishing)
+
+### Recommended orchestrator
+claude-code claude-opus-4-7 @ effort=high
+
+### Rationale
+Authoring `.github/workflows/release.yml` with OIDC trusted-publishing
+semantics + the release-process runbook is small in line-count
+(~150 YAML + ~200 markdown) but high-stakes: a wrong permissions
+block, missing `id-token: write`, or sloppy environment-protection
+config breaks the publish path silently or — worse — leaks an
+exploit. Opus at high effort matches the careful-wording demand for
+the workflow YAML and the per-release runbook prose. The README
+adoption-section collapse and the `tools/dabbler-ai-orchestration/README.md`
+PyPI-availability note are mechanical follow-ups inside the same
+session.
+
+The standing operator constraint suspends Rule #17 routed authoring
+of this block; recorded in the Session 1 disposition.
+
+### Estimated routed cost
+None this session — only end-of-session verification routes (per the
+standing operator constraint).
+
+### Pre-session check completed during this session
+PyPI name availability: `dabbler-ai-router` is **available** (HTTPS
+GET against `https://pypi.org/pypi/dabbler-ai-router/json` returned
+404 on 2026-05-02). No fallback name needed.
+
+| Step | Action | Routing Decision |
+|------|--------|------------------|
+| 1 | Read prerequisites (Session 1 deliverables, current `pyproject.toml`, README adoption section, spec Session 2 block) | Direct (orchestrator) |
+| 2 | Register Session 2 start (overwrite `session-state.json`) | Direct (file-write helper, no API call) |
+| 3 | Append Session 1 actuals + Session 2 block to `ai-assignment.md` | Direct (router suspended per operator) |
+| 4 | Check PyPI name availability for `dabbler-ai-router` | Direct (one-shot HTTPS GET, no API key) |
+| 5 | Author `.github/workflows/release.yml` (OIDC trusted publishing, sdist+wheel build, TestPyPI for `-rc*` tags, PyPI for `vX.Y.Z` tags, environment-protected) | Direct (mechanical authoring against spec) |
+| 6 | Author `docs/planning/release-process.md` (one-time PyPI/OIDC setup, per-release checklist, rollback section) | Direct (mechanical authoring against spec) |
+| 7 | Collapse README adoption section to ~10-line PyPI flow (`pip install dabbler-ai-router` + tuning + first session set), keeping the editable-install fallback for adopters who prefer the source path | Direct (mechanical edit) |
+| 8 | Add v0.1+ PyPI-availability note to `tools/dabbler-ai-orchestration/README.md` foreshadowing Session 3's install command | Direct (mechanical edit) |
+| 9 | Run full pytest suite (target: still 676 passing — Session 2 changes are doc + workflow only; no Python source touched) | Direct (shell command) |
+| 10 | End-of-session cross-provider verification | Routed: `route(task_type="session-verification")` — the only API call this session |
+| 11 | Author disposition + activity log; commit, push, run `close_session.py`; send notification | Direct (CLI invocation) |
+
+### Actuals (filled after the session)
+- Orchestrator used: <filled at close-out>
+- Total routed cost: <filled at close-out>
+- Deviations from recommendation: <filled at close-out>
+- Notes for next-session calibration: <filled at close-out>
+
+**Next-session orchestrator recommendation (Session 3):**
+claude-code claude-opus-4-7 @ effort=high
+Rationale: Session 3 is the largest single-session estimate in the
+set ($0.20–$0.35) — TS command authoring with venv detection,
+QuickPick-driven PyPI vs GitHub-sparse-checkout flow,
+`router-config.yaml` preservation logic, the graceful "not
+configured" tree-item refactor in the Provider Queues / Heartbeats
+views, ~12–18 standalone-mocha tests, README updates, and the VSIX
+rebuild. The breadth of TS + Python coupling (the install command
+must mesh with the views' error-handling refactor) plus the
+careful-wording demand on the README's screenshot-led collapse
+favor Opus at high effort. Hold this recommendation until the
+release workflow has shipped at least one successful publish; if the
+human has not yet exercised the release path by the time Session 3
+starts, note that in the actuals.

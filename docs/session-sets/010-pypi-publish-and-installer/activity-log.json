@@ -206,6 +206,130 @@
       "description": "Committed Session 1 changes (121 files, +1626 / -466). Push succeeded (d2b76ed). dist/extension.js* uncommitted changes (forceClosed work from set 009) intentionally left untouched. Authored disposition.json + activity-log.json as close_session preconditions.",
       "status": "completed",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-05-02T02:43:41-04:00",
+      "description": "register_session_start: overwrote session-state.json with currentSession=2, status=in-progress, lifecycleState=work_in_progress, orchestrator unchanged (claude-code/anthropic/claude-opus-4-7/high).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/ai-assignment",
+      "dateTime": "2026-05-02T02:46:00-04:00",
+      "description": "Appended Session 2 block + Session 1 actuals to ai-assignment.md (router suspended per standing operator constraint). Recommends Opus high-effort for both Session 2 and Session 3.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/pypi-name-check",
+      "dateTime": "2026-05-02T02:48:00-04:00",
+      "description": "Checked PyPI name availability via httpx GET on https://pypi.org/pypi/dabbler-ai-router/json -> 404 (AVAILABLE). No fallback name needed; the spec's risk-section fallbacks (dabbler-airouter, dabbler-router) not invoked. Recorded in release-process.md Naming section.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/release-yml",
+      "dateTime": "2026-05-02T02:55:00-04:00",
+      "description": "Authored .github/workflows/release.yml. Initial draft had two real bugs: (a) `!contains(github.ref, '-')` over-permissive PyPI gate, (b) tag-vs-pyproject check stripped suffix only on tag side, breaking RCs. Round-1 verifier flagged both Major; Round-2 fix introduced a `classify` job with strict regexes (`v[0-9]+.[0-9]+.[0-9]+$` for finals, `v[0-9]+.[0-9]+.[0-9]+-rcN$` for RCs) and PEP 440 Version-class comparison via packaging.version.Version. publish-testpypi/publish-pypi gated on classify outputs is_rc/is_final.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/release-process-md",
+      "dateTime": "2026-05-02T03:05:00-04:00",
+      "description": "Authored docs/planning/release-process.md. One-time setup (PyPI/TestPyPI trusted-publisher config, GitHub deployment environments with required-reviewer guidance for `pypi`), per-release checklist (decide version -> bump pyproject -> notes -> commit -> optional RC -> tag/push -> approve deployment -> verify -> GitHub release -> update consumers), rollback (yank semantics, no-re-upload constraint), failure-modes table, maintenance section. Round-2 fix updated the RC dry-run section to explain v0.1.0-rc1 (git tag) vs 0.1.0rc1 (PEP 440 wheel/pyproject) asymmetry. Round-3 fix replaced hardcoded CHANGELOG.md in commit example with a placeholder.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/readme-collapse",
+      "dateTime": "2026-05-02T03:08:00-04:00",
+      "description": "Collapsed README.md adoption section from 60-line walkthrough (six numbered steps) to spec target shape: install command + tuning bullets + first-set bullet + editable/source-install fallback (clearly marked) + forward-reference to Session 3's `Dabbler: Install ai-router` command.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/extension-readme-note",
+      "dateTime": "2026-05-02T03:10:00-04:00",
+      "description": "Updated tools/dabbler-ai-orchestration/README.md Requirements section with v0.1+ PyPI install path (`pip install dabbler-ai-router`) and forward-reference to Session 3's install command.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/packaging-tighten",
+      "dateTime": "2026-05-02T03:18:00-04:00",
+      "description": "Local `python -m build` smoke test surfaced that the wheel was including all 35 ai_router/tests/ files (80 total entries vs expected 45). Cause: ai_router/tests/ lacks __init__.py and PEP 420 implicit namespace handling pulled it in. Fix: explicit `exclude = [\"ai_router.tests\", \"ai_router.tests.*\"]` plus `namespaces = false` in [tool.setuptools.packages.find]. Post-fix wheel: 45 entries, 0 test files, package-data preserved, entry_points.txt unchanged. Added MANIFEST.in for sdist parity (recursive-include ai_router *.py *.yaml *.md *.json; prune ai_router/tests; prune ai_router/__pycache__; recursive-exclude ai_router *.pyc).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/pytest-suite",
+      "dateTime": "2026-05-02T03:20:00-04:00",
+      "description": "Ran `PYTHONPATH=. C:/Python311/python.exe -m pytest -q` -> 676 passed in 52.78s (matches Session 1 baseline; this session is doc + workflow YAML + packaging metadata only, no Python source touched).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-2/verification-r1",
+      "dateTime": "2026-05-02T03:25:00-04:00",
+      "description": "End-of-session cross-provider verification round 1 via gpt-5-4 ($0.1615). CHANGES_REQUIRED with 2 Major (broken RC tag/version check + over-permissive publish-pypi gate) + 1 Minor (runbook didn't match broken workflow) + 1 Info (human handoff). Both Major issues addressed in-session by adding the classify job and PEP 440 Version comparison.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.1615
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-2/verification-r2",
+      "dateTime": "2026-05-02T03:33:00-04:00",
+      "description": "Round 2 verification via gpt-5-4 ($0.1279). VERIFIED with one follow-up (human-driven trusted-publisher setup + first tag push - explicit per spec) and one Minor (runbook commit example hardcoded CHANGELOG.md) which was fixed in-session.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.1278575
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "session-2/commit-push",
+      "dateTime": "2026-05-02T03:40:00-04:00",
+      "description": "Committed Session 2 changes (release workflow, runbook, README collapse, extension README note, packaging tightening, MANIFEST.in, ai-assignment.md append, verify script, prompt). Pushed to master. Authored disposition.json + activity-log.json append as close_session preconditions.",
+      "status": "completed",
+      "routedApiCalls": []
     }
   ]
 }

@@ -52,6 +52,14 @@ backfill_session_state = "ai_router.backfill_session_state:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["ai_router*"]
+# Tests live under ai_router/tests/ so the test suite can run via the
+# package's own conftest. They are not part of the public API and
+# should not bloat the installed wheel. The directory has no
+# __init__.py, so under PEP 420 it would otherwise be picked up as an
+# implicit namespace package; ``namespaces = false`` plus the explicit
+# excludes block both discovery paths.
+exclude = ["ai_router.tests", "ai_router.tests.*"]
+namespaces = false
 
 [tool.setuptools.package-data]
 ai_router = [

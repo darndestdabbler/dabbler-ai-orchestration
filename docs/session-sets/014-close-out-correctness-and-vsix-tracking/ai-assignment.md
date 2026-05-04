@@ -122,13 +122,53 @@ beyond it.)
 ## Session 2: VSIX tracking exception + README accuracy
 
 ### Recommended orchestrator
-*(to be authored at the start of Session 2)*
+claude-code claude-opus-4-7 @ effort=high
 
 ### Rationale
-*(to be authored at the start of Session 2)*
+Session 2 is mechanical — `.gitignore` carve-out + `git add` of an
+existing VSIX + two README path corrections + a sideload smoke test.
+Verification surface is narrow: gitignore semantics (negative-pattern
+re-include scope), README path accuracy across two files, VSIX
+manifest version match. Sonnet at medium effort would handle this
+cleanly; Opus at high effort is overkill for the volume but matches
+Session 1's choice for handoff consistency and matches the
+operator's typical preference recorded in Session 1's actuals. The
+load-bearing piece is also the live regression test of Set 014
+Session 1's fixes: Session 2's own `register_session_start` already
+exercised the new `work_started` auto-emission (verified by the
+events ledger before this block was authored), and Session 2's
+close-out will exercise the new snapshot-flip wiring. If those
+fixes regress, Session 2's close fails or requires `--repair` —
+the multi-session set test in production. The operator's standing
+constraint (router restricted to end-of-session verification) is
+in force; per-session orchestrator-recommendation routing remains
+suspended.
 
 ### Estimated routed cost
-*(to be authored at the start of Session 2)*
+$0.05–$0.15 — single end-of-session `session-verification` route.
+Round 1 typically passes for this category of work (gitignore +
+README + manifest). Round 2 unlikely but possible if the verifier
+finds a subtle gitignore-semantic edge case or a stale README
+reference the orchestrator missed. Defensive `RouteResult`
+dump-to-file before any attribute access, per the wrapper-crash
+pattern Session 1 documented in actuals (cost the orchestrator
+$0.2486 on a single attempt). No analysis routes per the standing
+operator constraint.
+
+| Step | Action | Routing Decision |
+|------|--------|------------------|
+| 1 | Register Session 2 start (exercises Set 014 Session 1's `work_started` auto-emission) | Direct (file-write helper; no manual append needed — first real exercise of the fix) |
+| 2 | Author this Session 2 block in `ai-assignment.md` | Direct (router suspended per operator) |
+| 3 | Edit `.gitignore`: keep `*.vsix`, add `!tools/dabbler-ai-orchestration/*.vsix` carve-out | Direct (one-line config edit) |
+| 4 | Verify carve-out scope with `git check-ignore -v` (0.12.1 VSIX should resolve as not-ignored; sibling paths still ignored) | Direct (CLI invocation) |
+| 5 | `git add tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix` | Direct (CLI invocation) |
+| 6 | Edit repo-root `README.md` at three sites: lines 388, 395, 702 — bump `0.12.0.vsix` → `0.12.1.vsix`; delete misleading "Older VSIXes ... rollback" sentence on line 702 | Direct (mechanical edit) |
+| 7 | Confirm extension `tools/dabbler-ai-orchestration/README.md` has no stale version-specific VSIX path; edit only if needed | Direct (read + edit) |
+| 8 | Run extension test suite (`npm test`) as a sanity check | Direct (CLI invocation) |
+| 9 | Sideload smoke test: clone master into temp dir; confirm 0.12.1 VSIX present at the path the README names; extract manifest and confirm version `0.12.1` + Set 013's `dabbler.copyAdoptionBootstrapPrompt` command + new keywords | Direct (CLI invocation) |
+| 10 | End-of-session cross-provider verification (`session-verification` route) | Routed: single API call this session |
+| 11 | Handle verification result; address issues if any (≤2 retries) | Mixed: fixes are direct; re-verify is routed |
+| 12 | Author `change-log.md`; commit, push, run `python -m ai_router.close_session` (live regression test of Session 1's snapshot-flip fix — should close cleanly without `--repair`) | Direct (CLI invocation) |
 
 ### Actuals (filled after the session)
 *(to be backfilled at close-out)*

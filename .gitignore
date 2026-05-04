@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 node_modules/
 *.vsix
+!tools/dabbler-ai-orchestration/*.vsix
 router-metrics.jsonl
 .vscode-test/
 .claude/

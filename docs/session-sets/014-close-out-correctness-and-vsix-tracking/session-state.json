@@ -1,12 +1,12 @@
 {
   "schemaVersion": 2,
   "sessionSetName": "014-close-out-correctness-and-vsix-tracking",
-  "currentSession": 1,
+  "currentSession": 2,
   "totalSessions": 2,
-  "status": "complete",
-  "lifecycleState": "closed",
-  "startedAt": "2026-05-04T14:48:36.415295-04:00",
-  "completedAt": "2026-05-04T15:23:18.344236-04:00",
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-04T15:52:23.808918-04:00",
+  "completedAt": null,
   "verificationVerdict": null,
   "orchestrator": {
     "engine": "claude-code",

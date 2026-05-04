@@ -385,14 +385,14 @@ PATH/`code` CLI quirks of `code --install-extension`.
 
 1. **Pull this repo** (or the `tools/dabbler-ai-orchestration/`
    directory) so you have the VSIX file locally:
-   `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix`.
+   `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix`.
 2. In VS Code, open the **Extensions** view: `Ctrl+Shift+X`
    (or `View → Extensions`).
 3. Click the **`...`** (More Actions) menu in the top-right corner of
    the Extensions view.
 4. Choose **`Install from VSIX...`**.
 5. Browse to and select
-   `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix`.
+   `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix`.
 6. When prompted, **Reload** the window.
 7. Open any workspace that contains `docs/session-sets/`. The
    activity-bar icon **Session Set Explorer** appears automatically.
@@ -699,7 +699,7 @@ covered elsewhere in this README.
 | [tools/dabbler-ai-orchestration/src/wizard/WizardPanel.ts](tools/dabbler-ai-orchestration/src/wizard/WizardPanel.ts) | The `Dabbler: Get Started` / `Set Up New Project` / `Generate Session-Set Prompt` / `Import Project Plan` wizard flow. |
 | [tools/dabbler-ai-orchestration/src/dashboard/CostDashboard.ts](tools/dabbler-ai-orchestration/src/dashboard/CostDashboard.ts) | The `Dabbler: Show Cost Dashboard` webview — reads `ai_router/router-metrics.jsonl`, plots cumulative spend, per-set breakdown, 30-day sparkline, model mix, CSV export. |
 | [tools/dabbler-ai-orchestration/src/test/suite/](tools/dabbler-ai-orchestration/src/test/suite/) | Standalone-mocha test suite. ~140 tests covering install paths, router-config preservation, provider tree-item rendering, cancel/restore lifecycle, force-closed badge rendering, fileSystem discovery, etc. |
-| [tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix](tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix) | Pre-built v0.12.0 VSIX. Install via the Extensions-view "..." menu (see above). Older VSIXes (`-0.10.0.vsix`, `-0.11.0.vsix`) are kept alongside for rollback. |
+| [tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix](tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix) | Pre-built v0.12.1 VSIX. Install via the Extensions-view "..." menu (see above). |
 | [tools/dabbler-ai-orchestration/README.md](tools/dabbler-ai-orchestration/README.md) | Extension-local README. Detailed feature reference: every command + setting + view, state derivation, worktree auto-discovery, the `Install ai-router` flow, the graceful not-installed tree-item, refresh triggers. |
 | [tools/dabbler-ai-orchestration/CHANGELOG.md](tools/dabbler-ai-orchestration/CHANGELOG.md) | Per-version release notes. |
 | [tools/dabbler-ai-orchestration/media/](tools/dabbler-ai-orchestration/media/) | Activity-bar and tree-item icons (`icon.svg`, `done.svg`, `in-progress.svg`, `not-started.svg`, `cancelled.svg`) plus the `session-set-explorer-in-action.png` screenshot embedded above. |

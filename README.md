@@ -267,7 +267,7 @@ session sets show: one in-progress (with current session, orchestrator,
 and pending-UAT badge in the description column), two complete, several
 not-started.
 
-![Session Set Explorer in a real project](docs/session-set-explorer-screenshot.png)
+![Session Set Explorer in a real project](tools/dabbler-ai-orchestration/media/session-set-explorer-in-action.png)
 
 State is derived from file presence, mirroring
 `ai_router.find_active_session_set()`:
@@ -284,8 +284,11 @@ freshly-started set flips to In Progress immediately.
 
 For the full feature list of the extension (worktree auto-discovery,
 UAT badges, Playwright reveal, the various copy-as-trigger-phrase
-commands, the `dabblerSessionSets.*` settings), see
-[tools/vscode-session-sets/README.md](tools/vscode-session-sets/README.md).
+commands, the new `Dabbler: Install ai-router` / `Dabbler: Update
+ai-router` commands, the graceful "not configured" tree-item in the
+Provider Queues / Heartbeats views, the `dabblerSessionSets.*`
+settings), see
+[tools/dabbler-ai-orchestration/README.md](tools/dabbler-ai-orchestration/README.md).
 
 ---
 
@@ -368,19 +371,25 @@ The VSIX ships from this repo. Use the Extensions-view "..." menu —
 it's the most reliable method across VS Code versions and avoids the
 PATH/`code` CLI quirks of `code --install-extension`.
 
-1. **Pull this repo** (or the `tools/vscode-session-sets/` directory) so
-   you have the VSIX file locally:
-   `tools/vscode-session-sets/dabbler-session-sets-0.8.0.vsix`.
+1. **Pull this repo** (or the `tools/dabbler-ai-orchestration/`
+   directory) so you have the VSIX file locally:
+   `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix`.
 2. In VS Code, open the **Extensions** view: `Ctrl+Shift+X`
    (or `View → Extensions`).
 3. Click the **`...`** (More Actions) menu in the top-right corner of
    the Extensions view.
 4. Choose **`Install from VSIX...`**.
 5. Browse to and select
-   `tools/vscode-session-sets/dabbler-session-sets-0.8.0.vsix`.
+   `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix`.
 6. When prompted, **Reload** the window.
 7. Open any workspace that contains `docs/session-sets/`. The
    activity-bar icon **Session Set Explorer** appears automatically.
+8. Run **`Dabbler: Install ai-router`** from the command palette
+   (`Ctrl+Shift+P` / `Cmd+Shift+P`) to install the router into the
+   workspace's venv. The command auto-detects (or offers to create)
+   `.venv/`, runs `pip install dabbler-ai-router`, and materializes
+   `ai_router/router-config.yaml` for tuning. Use **`Dabbler: Update
+   ai-router`** later to upgrade.
 
 > The extension auto-activates on `workspaceContains:docs/session-sets`,
 > so there is no enable-step. Open a workspace without that folder and
@@ -389,12 +398,12 @@ PATH/`code` CLI quirks of `code --install-extension`.
 ### Building the VSIX from source (rare — only when bumping the version)
 
 ```bash
-cd tools/vscode-session-sets
+cd tools/dabbler-ai-orchestration
 npm install
 npx vsce package
 ```
 
-That writes a fresh `dabbler-session-sets-<version>.vsix` next to
+That writes a fresh `dabbler-ai-orchestration-<version>.vsix` next to
 `package.json`. Install it via the **`...`** menu as above.
 
 ---
@@ -635,21 +644,27 @@ covered elsewhere in this README.
 | [ai_router/prompt-templates/task-prompts.md](ai_router/prompt-templates/task-prompts.md) | One H1 section per task type — the user-message template `prompting.py` applies for that task type. |
 | [ai_router/prompt-templates/verification.md](ai_router/prompt-templates/verification.md) | The independent-verifier prompt template, including the structured JSON response schema (`{verdict, issues}`) that closes the bare-paragraph-misclassified-as-VERIFIED hole. |
 
-### `tools/vscode-session-sets/` — Session Set Explorer extension
+### `tools/dabbler-ai-orchestration/` — Session Set Explorer extension (TypeScript)
 
 | Path | Purpose |
 |---|---|
-| [tools/vscode-session-sets/extension.js](tools/vscode-session-sets/extension.js) | The full extension implementation. Activity-bar tree view, file-watcher refresh, worktree auto-discovery via `git worktree list --porcelain`, UAT-checklist parsing, Playwright-test reveal, the four `Copy:` clipboard commands, and the `dabblerSessionSets.uatSupportActive` / `e2eSupportActive` context keys that gate UAT/E2E menu entries. |
-| [tools/vscode-session-sets/dabbler-session-sets-0.8.0.vsix](tools/vscode-session-sets/dabbler-session-sets-0.8.0.vsix) | Pre-built v0.8.0 VSIX. Install via the Extensions-view "..." menu (see above). |
-| [tools/vscode-session-sets/README.md](tools/vscode-session-sets/README.md) | Extension-local README. Detailed feature reference: state derivation, worktree auto-discovery, all gated commands, settings table, refresh triggers. |
-| [tools/vscode-session-sets/media/](tools/vscode-session-sets/media/) | Activity-bar and tree-item icons (`icon.svg`, `done.svg`, `in-progress.svg`, `not-started.svg`). |
+| [tools/dabbler-ai-orchestration/src/extension.ts](tools/dabbler-ai-orchestration/src/extension.ts) | Extension entry point. Wires up the activity-bar tree views (Session Sets, Provider Queues, Provider Heartbeats), the file-watcher refresh, worktree auto-discovery, and registration of every command group below. Compiled to `dist/extension.js` via `npm run package`. |
+| [tools/dabbler-ai-orchestration/src/providers/](tools/dabbler-ai-orchestration/src/providers/) | TreeDataProvider implementations: `SessionSetsProvider` (the activity-bar inventory), `ProviderQueuesProvider`, `ProviderHeartbeatsProvider`. Both queue/heartbeat providers render a graceful "ai_router not installed → click to install" tree-item when `python -m ai_router.queue_status` / `heartbeat_status` exit with `ModuleNotFoundError`. |
+| [tools/dabbler-ai-orchestration/src/commands/](tools/dabbler-ai-orchestration/src/commands/) | Command implementations: `installAiRouterCommands` (`Dabbler: Install ai-router` / `Update ai-router` — pure-logic core in `src/utils/aiRouterInstall.ts`), `cancelLifecycleCommands` (cancel/restore session set), `copyCommand` (the four `Copy:` trigger-phrase commands), `gitScaffold`, `openFile`, `queueActions`, `troubleshoot`. |
+| [tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts](tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts) | Pure-logic install core for the install command. Dependency-injected `ProcessSpawner` / `FileOps` / `InstallPrompts` so the test suite can exercise both PyPI and GitHub-sparse-checkout paths without spawning real subprocesses. Exports `isAiRouterNotInstalled()` (the detector both providers use), `resolveLatestReleaseTag()`, `deriveVenvFromPythonPath()`. |
+| [tools/dabbler-ai-orchestration/src/wizard/WizardPanel.ts](tools/dabbler-ai-orchestration/src/wizard/WizardPanel.ts) | The `Dabbler: Get Started` / `Set Up New Project` / `Generate Session-Set Prompt` / `Import Project Plan` wizard flow. |
+| [tools/dabbler-ai-orchestration/src/dashboard/CostDashboard.ts](tools/dabbler-ai-orchestration/src/dashboard/CostDashboard.ts) | The `Dabbler: Show Cost Dashboard` webview — reads `ai_router/router-metrics.jsonl`, plots cumulative spend, per-set breakdown, 30-day sparkline, model mix, CSV export. |
+| [tools/dabbler-ai-orchestration/src/test/suite/](tools/dabbler-ai-orchestration/src/test/suite/) | Standalone-mocha test suite. ~140 tests covering install paths, router-config preservation, provider tree-item rendering, cancel/restore lifecycle, force-closed badge rendering, fileSystem discovery, etc. |
+| [tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix](tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.0.vsix) | Pre-built v0.12.0 VSIX. Install via the Extensions-view "..." menu (see above). Older VSIXes (`-0.10.0.vsix`, `-0.11.0.vsix`) are kept alongside for rollback. |
+| [tools/dabbler-ai-orchestration/README.md](tools/dabbler-ai-orchestration/README.md) | Extension-local README. Detailed feature reference: every command + setting + view, state derivation, worktree auto-discovery, the `Install ai-router` flow, the graceful not-installed tree-item, refresh triggers. |
+| [tools/dabbler-ai-orchestration/CHANGELOG.md](tools/dabbler-ai-orchestration/CHANGELOG.md) | Per-version release notes. |
+| [tools/dabbler-ai-orchestration/media/](tools/dabbler-ai-orchestration/media/) | Activity-bar and tree-item icons (`icon.svg`, `done.svg`, `in-progress.svg`, `not-started.svg`, `cancelled.svg`) plus the `session-set-explorer-in-action.png` screenshot embedded above. |
 
 ### `docs/`
 
 | Path | Purpose |
 |---|---|
 | [docs/ai-led-session-workflow.md](docs/ai-led-session-workflow.md) | The single source of truth for **execution mechanics**: trigger phrases, the 10-step procedure, cross-provider verification rules, the verifier-disagreement adjudication path, delegation discipline, the metrics log, and the authoritative 18-rule list every orchestrator obeys. |
-| [docs/session-set-explorer-screenshot.png](docs/session-set-explorer-screenshot.png) | The screenshot embedded above showing the extension running in a real workspace. |
 | [docs/planning/project-guidance.md](docs/planning/project-guidance.md) | Durable Principles + Conventions for this repo. Read before every AI-led session. Items get promoted here from `lessons-learned.md` after proving themselves in two-or-more contexts. |
 | [docs/planning/lessons-learned.md](docs/planning/lessons-learned.md) | Append-only list of failure patterns and reusable tactics (truncation detection, the verification cost guard, ASCII-only terminal glyphs, the spec-declared-not-inferred UAT/E2E rule, etc.). Lessons graduate to `project-guidance.md` once they've applied in two-or-more contexts. |
 | [docs/planning/session-set-authoring-guide.md](docs/planning/session-set-authoring-guide.md) | The single source of truth for **authoring** specs: slug naming, sizing, the Session Set Configuration block schema, deliverables, anti-patterns, templates, and the When-UAT-Is-Required / When-E2E-Is-Required heuristics. Companion to the workflow doc, not a duplicate. |
@@ -662,7 +677,7 @@ This repo is released under the **MIT License**. See [LICENSE](LICENSE)
 for the full text. Copyright © 2026 darndestdabbler.
 
 > A duplicate `LICENSE` lives at
-> [tools/vscode-session-sets/LICENSE](tools/vscode-session-sets/LICENSE)
+> [tools/dabbler-ai-orchestration/LICENSE](tools/dabbler-ai-orchestration/LICENSE)
 > alongside the extension's `package.json`. The duplication is required:
 > `vsce package` expects the file beside the manifest and has no flag
 > to point elsewhere. Both files must be kept in sync — they are the

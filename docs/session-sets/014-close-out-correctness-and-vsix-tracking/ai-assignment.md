@@ -171,4 +171,33 @@ operator constraint.
 | 12 | Author `change-log.md`; commit, push, run `python -m ai_router.close_session` (live regression test of Session 1's snapshot-flip fix — should close cleanly without `--repair`) | Direct (CLI invocation) |
 
 ### Actuals (filled after the session)
-*(to be backfilled at close-out)*
+- Orchestrator used: claude-code claude-opus-4-7 @ effort=high (matches recommendation)
+- Total routed cost: $0.1028 — single `session-verification` call via
+  gpt-5-4. R1 returned VERIFIED with no blockers and ten "no issue"
+  / minor-note entries. Two minor optional hardening items the
+  verifier flagged were addressed inline before close-out (no
+  re-route): (a) broader README version-string scan via `grep -nE
+  '0\.(12\.0|11\.0|10\.0|9\.0)' README.md` — zero hits; (b)
+  byte-diff of the VSIX's bundled `extension/package.json` against
+  the committed `tools/dabbler-ai-orchestration/package.json` —
+  identical (provenance confirmed).
+- Deviations from recommendation: none. Cost landed in the
+  middle of the projected $0.05–$0.15 band as expected for
+  mechanical work; Round 1 passed as the spec projected.
+- Notes for next-session calibration: the defensive
+  `RouteResult`-dump-to-JSON-before-attribute-access pattern (used
+  in `route_session2.py`) survived without crash — this is now the
+  proven shape and should be the default for any future inline
+  `ai_router.route()` invocation. The pattern's value over a naive
+  attribute-read approach is real spend protection: Session 1 lost
+  $0.2486 on a single wrapper crash, which is more than the
+  total Session 2 verification cost. The wrapper-crash pattern has
+  now bitten in two consecutive sets — the `lessons-learned.md`
+  note Set 013 flagged is overdue.
+
+**Set close-out:** complete. Both Session 1 fixes held under live
+multi-session exercise: Session 2's `register_session_start`
+auto-emitted `work_started` for session 2 (no manual append), and
+the close-out command will flip the snapshot to `closed` via the
+new success-path wiring (no `--repair`). Set 014 is the regression
+test for itself, and the regression test passed.

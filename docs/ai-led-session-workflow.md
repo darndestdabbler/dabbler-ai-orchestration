@@ -81,6 +81,103 @@ Orchestrator (Claude / Codex / Gemini)
   +-- STOPS (one session per conversation)
 ```
 
+## Cost-budgeted verification modes
+
+Every project that adopts this workflow declares an outsourcing/API
+**budget threshold** during the adoption-bootstrap flow (see
+`docs/adoption-bootstrap.md`). The threshold is recorded in
+`ai_router/budget.yaml` and governs which verification path the
+project uses. Four tiers, with two sub-options under the zero tier:
+
+| Tier (`mode` value) | Threshold (`threshold_usd`) | Recommended `outsource_mode` | `verification_method` |
+|---|---|---|---|
+| **`zero-budget`** | `0` | `none` | (a) **`manual-via-other-engine`** OR (b) **`skipped`** — operator picks |
+| **`limited-budget`** | `< 20` | `last` (outsource-last) | `api` (verifier daemon backed by subscription CLI) |
+| **`middle-tier`** | `20–99` | `last` (outsource-last) | `api` + 50%-of-threshold tier-upgrade prompt |
+| **`ample-budget`** | `100+` | `first` (outsource-first) | `api` (synchronous per-call providers) |
+
+The threshold and the chosen verification method are persisted in
+`ai_router/budget.yaml` (see schema in `docs/adoption-bootstrap.md`).
+The bootstrap flow writes this file once at adoption time; the
+operator can edit it anytime to change tier or method.
+
+**Compatibility rule for missing fields.** Older or hand-authored
+`budget.yaml` files may omit fields added after their creation. The
+canonical defaults are: `threshold_scope` → `project-lifetime` if
+absent (cumulative spend); `verification_method` → `api` if absent
+(matches Rule 2's default). Readers (current and future enforcement
+code) must apply these defaults rather than erroring on a missing
+field, so an older file continues to work without manual migration.
+
+### Interaction with Rule 2
+
+Rule 2 in the [Rules section](#rules-apply-to-all-orchestrators)
+below — **"Never skip verification"** — is the default for every
+session and remains the default for every project that operates with
+a non-zero budget (limited / middle / ample tiers).
+
+The zero-budget tier introduces an **operator-authorized exception**
+to Rule 2 via two paths, neither of which weakens the rule itself:
+
+- **`verification_method: "manual-via-other-engine"`** — Rule 2 is
+  satisfied by manual cross-provider review. The operator (human)
+  performs the verification by handing the work to a different AI
+  assistant + the verification template, then copying the verdict
+  back. The template's stable public URL is
+  `https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/ai_router/prompt-templates/verification.md`
+  (also reachable locally at `ai_router/prompt-templates/verification.md`
+  in this canonical repo). For freshly-bootstrapped consumer projects
+  that don't yet have `ai_router/` checked in, the URL is the
+  authoritative source. The session orchestrator records this method
+  in the session's `change-log.md`.
+- **`verification_method: "skipped"`** — Rule 2 is explicitly
+  bypassed. Every session's `change-log.md` records the skip with a
+  reference to the project's `ai_router/budget.yaml`. This is the
+  honest audit trail of "verification was opted out at the project
+  level for explicit budget reasons." Sessions running under this
+  setting do **not** route a `session-verification` task and do
+  **not** invoke the cross-provider verifier.
+
+Both paths are valid only when `ai_router/budget.yaml` declares the
+zero-budget tier. A session running on a non-zero-budget project
+that tries to skip verification or substitute manual review without
+a corresponding `budget.yaml` declaration violates Rule 2.
+
+### What this means at session execution time
+
+The orchestrator at Step 6 (end-of-session verification) reads
+`ai_router/budget.yaml` if present:
+
+- **`verification_method: "api"`** — Step 6 runs as documented
+  (`route(task_type="session-verification")` against a different
+  provider, save raw output, handle issues).
+- **`verification_method: "manual-via-other-engine"`** — Step 6
+  pauses and prompts the human to perform the manual review. The
+  orchestrator hands the human a copy of the work + the
+  verification template; the human runs the review elsewhere; the
+  human pastes the verdict back; the orchestrator continues.
+- **`verification_method: "skipped"`** — Step 6 is explicitly
+  bypassed. The session's `change-log.md` records the skip with a
+  pointer to `ai_router/budget.yaml`.
+
+If `ai_router/budget.yaml` is absent (project has not yet run the
+adoption bootstrap), the orchestrator treats the project as if
+`verification_method: "api"` were set — Rule 2's default behavior.
+
+### Spend monitoring
+
+Set 013 ships the file format and the dialog that produces it. It
+does **not** ship automated pre-call enforcement (warnings,
+block-on-exceed). Operators monitor spend manually with:
+
+- `python -m ai_router.report --since YYYY-MM-DD` — governance summary.
+- `python -m ai_router.cost_report` — per-session detail.
+- The `Dabbler: Show cost dashboard` extension command — live spend
+  view.
+
+Automated threshold-aware pre-call warnings + block-on-exceed
+enforcement are planned for a follow-up set.
+
 ## Key Concepts
 
 ### Session Set

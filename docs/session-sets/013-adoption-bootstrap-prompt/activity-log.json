@@ -1,0 +1,54 @@
+{
+  "sessionSetName": "013-adoption-bootstrap-prompt",
+  "createdDate": "2026-05-04T13:47:57.911666-04:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/cross-provider-verification",
+      "dateTime": "2026-05-04T14:04:12.429394-04:00",
+      "description": "Routed session-verification via gpt-5-4 (R1: ISSUES_FOUND, R2: ISSUES_FOUND, R3: ISSUES_FOUND, R4: VERIFIED).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.1512
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.1995
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.1759
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.0632
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-1/handle-verification-result",
+      "dateTime": "2026-05-04T14:04:12.429394-04:00",
+      "description": "Round 1 raised 1 Critical, 4 Major, 1 Minor; rounds 2-4 progressively resolved all 13 issues (some new ones surfaced as deeper polish was applied). R4 returned VERIFIED with no remaining issues.",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

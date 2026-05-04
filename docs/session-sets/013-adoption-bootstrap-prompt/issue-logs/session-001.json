@@ -1,0 +1,119 @@
+[
+  {
+    "severity": "Critical",
+    "round_introduced": 1,
+    "round_fixed": 2,
+    "status": "fixed",
+    "title": "State B sub-path (3) git clone violated checklist-before-execute gate",
+    "detail": "Sub-path (3) ran git clone immediately after the human gave a URL \u2014 a write action contradicting the doc preamble rule \"no writes until checklist approved.\"",
+    "fix": "Carved clone out as a discrete preparatory action with its own one-shot approval, separate from Step 7. Added \"One narrow exception\" paragraph to preamble. Sub-path (3) now requires explicit human approval before clone runs."
+  },
+  {
+    "severity": "Major",
+    "round_introduced": 1,
+    "round_fixed": 2,
+    "status": "fixed",
+    "title": "Enum inconsistency: 4 tier names but only 3 mode values, mixed outsource-mode tokens",
+    "detail": "Step 5 had four tiers (zero/limited/middle/ample) but schema only had three mode values (no middle-tier). Schema example showed mode=limited-budget with threshold=$25 (incorrect for $25). Outsource-mode tokens mixed: workflow doc table used outsource-first/outsource-last, schema used first/last.",
+    "fix": "Added middle-tier as fourth mode enum. Schema example fixed to mode=middle-tier with threshold=$25. Standardized outsource-mode tokens to short form first|last|none everywhere (matches router-config.yaml)."
+  },
+  {
+    "severity": "Major",
+    "round_introduced": 1,
+    "round_fixed": 3,
+    "status": "fixed",
+    "title": "Arbitrary-path canvas fallback (was Step-3-only in R2)",
+    "detail": "Doc said \"proceed as if a workspace were open at that path\" but many AI assistants can only canvas the current workspace. R2 verifier flagged that the R2 fix was scoped only to Step 3, leaving Step 2 fast-path and Step 8 writes underspecified.",
+    "fix": "R2: added retargeting check + workspace-reopen fallback. R3: extended discipline through Step 8 \u2014 every read, glob, command, write must use absolute target path until end-of-bootstrap. Added Step 8 target-path reminder."
+  },
+  {
+    "severity": "Major",
+    "round_introduced": 1,
+    "round_fixed": 3,
+    "status": "fixed",
+    "title": "Threshold scope ambiguity (lifetime vs. monthly)",
+    "detail": "Step 5 said \"over the project lifetime\" but middle-tier referenced \"monthly spend.\" Schema had no field recording the scope.",
+    "fix": "R2: added threshold_scope field to schema with project-lifetime/monthly values. Step 5 dialog asks two questions. R3: added missing-field compatibility rule (defaults to project-lifetime if absent)."
+  },
+  {
+    "severity": "Major",
+    "round_introduced": 1,
+    "round_fixed": 2,
+    "status": "fixed",
+    "title": "Manual verification template URL not provided for fresh consumer projects",
+    "detail": "Zero-budget option (a) referenced ai_router/prompt-templates/verification.md but a fresh project does not have it locally.",
+    "fix": "Added stable public URL pointing at raw.githubusercontent.com. Bootstrap doc + workflow doc both reference it. Bootstrap doc Step 7 offers to write a local docs/manual-verification.md with the URL + recipe."
+  },
+  {
+    "severity": "Minor",
+    "round_introduced": 1,
+    "round_fixed": 2,
+    "status": "fixed",
+    "title": "State-detection edge case guards missing",
+    "detail": "Step 1/2/3 did not spell out behavior for empty folders, multiple project-plan candidates, partial Dabbler artifacts (existing docs/session-sets/), home-directory paths, or stale plans.",
+    "fix": "Added Guard cases subsection in Step 3 (empty folder, too-broad path, multiple plan candidates, existing session-sets with three sub-cases, partial/stale plan). Added pre-fast-path stale-plan guard in Step 2."
+  },
+  {
+    "severity": "Major",
+    "round_introduced": 2,
+    "round_fixed": 3,
+    "status": "fixed",
+    "title": "Clone destination ambiguity in no-workspace mode",
+    "detail": "Sub-path (3) said \"sensibly-named local folder\" with default \"sibling of current folder\" \u2014 ambiguous in no-workspace mode where no current folder exists.",
+    "fix": "Sub-path (3) now requires absolute destination path (with platform-specific examples). Approval prompt echoes the fully-resolved absolute clone target back to the human."
+  },
+  {
+    "severity": "Major",
+    "round_introduced": 2,
+    "round_fixed": 3,
+    "status": "fixed",
+    "title": "threshold_scope missing-field compatibility rule unstated",
+    "detail": "R2 added threshold_scope field but did not specify reader behavior when the field is absent in older or hand-authored budget.yaml files.",
+    "fix": "Added compatibility rule to workflow-doc section: missing threshold_scope defaults to project-lifetime; missing verification_method defaults to api."
+  },
+  {
+    "severity": "Minor",
+    "round_introduced": 2,
+    "round_fixed": 3,
+    "status": "fixed",
+    "title": "Residual tier-count drift in workflow doc + Step 8 example",
+    "detail": "Workflow doc said \"Three tiers, with two sub-options\" instead of Four. Step 8 execute-list example showed \"$25 threshold, limited-budget mode\" instead of middle-tier.",
+    "fix": "Workflow doc: \"Four tiers\". Step 8 example: middle-tier mode."
+  },
+  {
+    "severity": "Major",
+    "round_introduced": 3,
+    "round_fixed": 4,
+    "status": "fixed",
+    "title": "verification_method missing-field default not in bootstrap doc field reference",
+    "detail": "Workflow doc had the compatibility rule for verification_method (default api); bootstrap doc did not.",
+    "fix": "Appended compatibility rule to bootstrap doc verification_method field reference, mirroring the workflow doc."
+  },
+  {
+    "severity": "Minor",
+    "round_introduced": 3,
+    "round_fixed": 4,
+    "status": "fixed",
+    "title": "Step 9 More info bullet still said \"three-tier mapping\"",
+    "detail": "Stale wording from before the four-tier renaming.",
+    "fix": "Changed to \"four-tier mapping\"."
+  },
+  {
+    "severity": "Minor",
+    "round_introduced": 3,
+    "round_fixed": 4,
+    "status": "fixed",
+    "title": "Step 3 heading \"(workspace path only)\" inaccurate after arbitrary-path support",
+    "detail": "Heading no longer matched body content.",
+    "fix": "Renamed to \"Confirm understanding (workspace or explicit target path)\"."
+  },
+  {
+    "severity": "Minor",
+    "round_introduced": 3,
+    "round_fixed": 4,
+    "status": "fixed",
+    "title": "Clone command shell-safe execution unspecified",
+    "detail": "git clone <url> <absolute-destination> instruction did not address spaces or shell-meta characters; naive splicing could break.",
+    "fix": "Appended shell-safe execution paragraph requiring argument-array invocation or proper quoting. Avoid naive interpolation."
+  }
+]

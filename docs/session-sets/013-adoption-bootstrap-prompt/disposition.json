@@ -1,0 +1,31 @@
+{
+  "status": "completed",
+  "summary": "Set 13 Session 1 (non-final): Authored docs/adoption-bootstrap.md (~360 lines) — the canonical runtime instruction set an arbitrary AI assistant reads when a human pastes a bootstrap prompt into a fresh chat. Internal logic: state detection (workspace-open vs. no-workspace with three sub-paths); fast-path detection; in-flow education; budget-threshold dialog with four tiers (zero/limited/middle/ample) plus two zero-tier sub-options (manual-via-other-engine / skipped); plan alignment dialog; checklist-before-execute gate (no writes until human batch-approves); execution; closing pointers. Engine-agnostic (capability-term tools, no Claude-specific names). Embeds ai_router/budget.yaml schema with explicit missing-field compatibility defaults. Workspace-vs-arbitrary-path discipline consistent through Steps 1-8. State B sub-path (3) git clone is a discrete preparatory action with its own one-shot approval, separate from main checklist gate, with shell-safe execution requirements. Also added a new 'Cost-budgeted verification modes' section to docs/ai-led-session-workflow.md (after Overview, before Key Concepts) documenting the four-tier mapping and the operator-authorized exception to Rule 2 ('Never skip verification') for the zero-budget + skipped path. Rule 2 itself unchanged. Cross-provider verification (gpt-5-4): R1 ISSUES_FOUND (1 Critical: clone violated checklist gate; 4 Major: enum inconsistency, arbitrary-path scope, threshold scope ambiguity, manual-template URL; 1 Minor: edge-case guards) -> R2 ISSUES_FOUND (3 Major: arbitrary-path scope-creep, clone destination ambiguity, threshold_scope compatibility; 1 Minor: tier drift) -> R3 ISSUES_FOUND (1 Major: verification_method default; 3 Minor: tier drift, Step 3 heading, shell-safe quoting) -> R4 VERIFIED. 13 issues total, all fixed and recorded in issue-logs/session-001.json. Cost: $0.59 across 4 rounds. Push commit 27b9da1 to origin/master also landed Set 012 Session 1 commit 888215d as a side effect (both stacked on local master); push is non-releasing since no v* tag was pushed. Canonical URL https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/docs/adoption-bootstrap.md is now live (HTTP 200, 28879 bytes).",
+  "files_changed": [
+    "docs/adoption-bootstrap.md",
+    "docs/ai-led-session-workflow.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/spec.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-state.json",
+    "docs/session-sets/013-adoption-bootstrap-prompt/ai-assignment.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/activity-log.json",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001-prompt.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001-prompt-r2.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001-prompt-r3.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001-prompt-r4.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/issue-logs/session-001.json"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 is mechanical wiring (TS command file, package.json, READMEs, CHANGELOG, VSIX build, smoke test); narrow verification surface; same orchestrator keeps consistency with Session 1's authoring choices."
+    }
+  },
+  "blockers": []
+}

@@ -18,10 +18,94 @@ from pathlib import Path
 # invoked from.
 _THIS_DIR = Path(__file__).parent
 
+# Workspace-relative config / metrics discovery. The walk-up looks for
+# this exact relative path under each ancestor of cwd, so a workspace
+# that checks in `ai_router/router-config.yaml` is auto-discovered
+# without operators having to set AI_ROUTER_CONFIG. The metrics file is
+# resolved to the same directory as the discovered config.
+_WORKSPACE_CONFIG_RELPATH = Path("ai_router") / "router-config.yaml"
+
+
+def _find_workspace_config(start: Path | None = None) -> Path | None:
+    """Walk up from *start* (default: cwd) looking for an
+    ``ai_router/router-config.yaml`` checked into a workspace.
+
+    Returns the first hit (closest ancestor wins), or ``None`` if no
+    ancestor contains the file. Stops at the filesystem root without
+    erroring. Permission-denied or other OS errors during the walk are
+    treated as a miss for that ancestor and the walk continues —
+    operators running tools from unusual mountpoints should not crash.
+    """
+    try:
+        cur = (Path(start) if start is not None else Path.cwd()).resolve()
+    except OSError:
+        return None
+
+    seen: set[Path] = set()
+    while cur not in seen:
+        seen.add(cur)
+        candidate = cur / _WORKSPACE_CONFIG_RELPATH
+        try:
+            if candidate.is_file():
+                return candidate
+        except OSError:
+            pass
+        parent = cur.parent
+        if parent == cur:
+            break
+        cur = parent
+    return None
+
+
+CONFIG_SOURCE_EXPLICIT = "explicit"
+CONFIG_SOURCE_ENV = "env"
+CONFIG_SOURCE_WORKSPACE = "workspace"
+CONFIG_SOURCE_BUNDLED_DEFAULT = "bundled-default"
+
+
+def _resolve_config_path_and_source(
+    path: str | None = None,
+) -> tuple[str, str]:
+    """Return ``(resolved_path, source)`` for the same input ``load_config``
+    would use.
+
+    Resolution order (highest priority first):
+      1. Explicit ``path`` argument                → ``"explicit"``
+      2. ``AI_ROUTER_CONFIG`` env var              → ``"env"``
+      3. Workspace-relative ``_find_workspace_config()`` → ``"workspace"``
+      4. Bundled default at ``_THIS_DIR / "router-config.yaml"``
+                                                   → ``"bundled-default"``
+
+    The source tag is consumed by ``load_config`` to decide whether
+    metrics should auto-co-locate next to the config file. Per the
+    Set 012 Session 1 spec, that auto-co-location is gated to
+    workspace-discovery only — explicit-path and env-var overrides keep
+    the existing bundled-default metrics location unless
+    ``AI_ROUTER_METRICS_PATH`` is also set. This preserves the
+    independence of the two env vars.
+    """
+    if path is not None:
+        return path, CONFIG_SOURCE_EXPLICIT
+    env_override = os.environ.get("AI_ROUTER_CONFIG")
+    if env_override:
+        return env_override, CONFIG_SOURCE_ENV
+    workspace = _find_workspace_config()
+    if workspace is not None:
+        return str(workspace), CONFIG_SOURCE_WORKSPACE
+    return str(_THIS_DIR / "router-config.yaml"), CONFIG_SOURCE_BUNDLED_DEFAULT
+
+
+def _resolve_config_path(path: str | None = None) -> str:
+    """Backward-compatible thin wrapper returning just the resolved
+    path. Prefer :func:`_resolve_config_path_and_source` when the
+    caller needs to know how the path was resolved.
+    """
+    resolved, _ = _resolve_config_path_and_source(path)
+    return resolved
+
 
 def load_config(path: str | None = None) -> dict:
-    if path is None:
-        path = str(_THIS_DIR / "router-config.yaml")
+    path, config_source = _resolve_config_path_and_source(path)
     config_path = Path(path)
     if not config_path.exists():
         raise FileNotFoundError(
@@ -144,6 +228,19 @@ def load_config(path: str | None = None) -> dict:
     # not been reviewed inside the configured window. Missing metadata
     # is treated as "never reviewed" and always warns.
     _check_pricing_staleness(config)
+
+    # Stash the resolved config path (always — useful for diagnostics)
+    # and a separate metrics-base-dir hint that is set ONLY when the
+    # workspace-discovery branch resolved the config. The metrics
+    # co-location is intentionally NOT applied to env-var or
+    # explicit-path overrides: those preserve the 0.1.0 contract that
+    # the AI_ROUTER_CONFIG and AI_ROUTER_METRICS_PATH env vars are
+    # independent. Operators who want metrics next to a non-workspace
+    # config still set AI_ROUTER_METRICS_PATH explicitly.
+    config["_config_path"] = str(config_path.resolve())
+    config["_config_source"] = config_source
+    if config_source == CONFIG_SOURCE_WORKSPACE:
+        config["_metrics_base_dir"] = str(config_path.resolve().parent)
 
     return config
 

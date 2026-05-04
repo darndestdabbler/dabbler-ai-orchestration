@@ -1,0 +1,20 @@
+[
+  {
+    "severity": "Major",
+    "title": "Metrics co-location applied to all config sources, not just workspace",
+    "detail": "Round 1 implementation stashed _config_path on every load_config() result and _log_path() always co-located metrics next to the resolved config. That broke the spec requirement that env-var-overridden and explicit-path configs preserve the bundled-default metrics location (the two env vars stay independent).",
+    "status": "fixed",
+    "fix": "Added _resolve_config_path_and_source() with a source tag, and gated _metrics_base_dir on source == workspace only. _log_path() now reads _metrics_base_dir instead of _config_path. Added 4 integration tests through load_config() that verify the gating across all four sources.",
+    "round_introduced": 1,
+    "round_fixed": 2
+  },
+  {
+    "severity": "Minor",
+    "title": "Walk-up miss-path test was non-deterministic",
+    "detail": "test_find_workspace_config_returns_none_when_no_ancestor_has_it accepted any discovered config outside tmp_path rather than asserting None. The miss-path contract was under-tested.",
+    "status": "fixed",
+    "fix": "Test now monkeypatches _WORKSPACE_CONFIG_RELPATH to a uuid-suffixed filename so the walk deterministically traverses to the filesystem root and returns None.",
+    "round_introduced": 1,
+    "round_fixed": 2
+  }
+]

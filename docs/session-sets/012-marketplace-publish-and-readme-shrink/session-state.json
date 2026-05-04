@@ -1,12 +1,17 @@
 {
   "schemaVersion": 2,
   "sessionSetName": "012-marketplace-publish-and-readme-shrink",
-  "currentSession": null,
+  "currentSession": 1,
   "totalSessions": 3,
-  "status": "not-started",
-  "lifecycleState": null,
-  "startedAt": null,
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-04T11:35:46.211741-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high"
+  }
 }

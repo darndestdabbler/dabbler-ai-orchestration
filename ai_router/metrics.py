@@ -60,13 +60,28 @@ _THIS_DIR = Path(__file__).parent
 
 
 def _log_path(config: dict) -> Path:
-    """Resolve the metrics log file path."""
+    """Resolve the metrics log file path.
+
+    Resolution order (highest priority first):
+      1. ``AI_ROUTER_METRICS_PATH`` env var — explicit deployment override.
+      2. ``config["_metrics_base_dir"]`` — set by ``load_config`` ONLY
+         when the router-config.yaml was resolved via workspace
+         discovery (``_find_workspace_config``). Explicit-path and
+         ``AI_ROUTER_CONFIG``-overridden configs do NOT auto-redirect
+         metrics; the two env vars stay independent, matching the
+         0.1.0 contract.
+      3. The package-bundled default at ``<this dir>/<filename>``.
+    """
     metrics_cfg = config.get("metrics", {}) or {}
     filename = metrics_cfg.get("log_filename", "router-metrics.jsonl")
 
     override = os.environ.get("AI_ROUTER_METRICS_PATH")
     if override:
         return Path(override)
+
+    base_dir = config.get("_metrics_base_dir")
+    if base_dir:
+        return Path(base_dir) / filename
 
     return _THIS_DIR / filename
 

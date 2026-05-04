@@ -83,3 +83,76 @@ completeness). Sonnet at medium effort would handle this cleanly;
 Opus at high effort is overkill for the volume but matches the
 operator's typical choice and keeps consistency with Session 1.
 Either is defensible.
+
+---
+
+## Session 2: Extension command + READMEs + 0.12.1 VSIX build + smoke test
+
+### Recommended orchestrator
+claude-code claude-opus-4-7 @ effort=high
+
+### Rationale
+Session 2's deliverables are mechanical: a ~25-line TypeScript
+command file that copies a constant string to the clipboard, three
+small package.json updates (version + keywords + description +
+commands list), a CHANGELOG entry, two README pointer updates
+(extension + repo-root), a VSIX build, and a sideload smoke test.
+Verification surface is narrow: clipboard-string byte-fidelity vs.
+the spec sketch, command-id / title consistency between
+`package.json` and `extension.ts`, README cross-link correctness,
+and VSIX completeness. Sonnet at medium effort would handle every
+piece cleanly. Opus at high effort is overkill for the volume but
+matches Session 1's choice for handoff consistency and matches the
+operator's typical preference. The cost differential against Sonnet
+is small enough on this short session that the consistency wins.
+
+### Estimated routed cost
+$0.05–$0.15 — single end-of-session `session-verification` route
+(typically Round 1 passes for this category of mechanical work).
+No analysis routes per the standing operator constraint.
+
+| Step | Action | Routing Decision |
+|------|--------|------------------|
+| 1 | Read prerequisites (curl URL, package.json, extension.ts, READMEs) | Direct (orchestrator) |
+| 2 | Register Session 2 start (write `session-state.json`) | Direct (file-write helper) |
+| 3 | Author this Session 2 block (above) + backfill Session 1 actuals (above) | Direct (router suspended per operator) |
+| 4 | Author `copyAdoptionBootstrapPrompt.ts` + register in `extension.ts` + add command id to `package.json` | Direct (mechanical authoring) |
+| 5 | Bump `package.json` version 0.12.0 → 0.12.1 + extend keywords + update description | Direct (mechanical edits) |
+| 6 | Add v0.12.1 entry to `CHANGELOG.md` | Direct (mechanical edit) |
+| 7 | Update extension README + repo-root README with adoption-bootstrap pointers | Direct (prose authoring) |
+| 8 | Build VSIX (`npm install && npx vsce package`) | Direct (CLI invocation) |
+| 9 | Smoke test (manifest inspection + clipboard-string round-trip + curl) | Direct (CLI / process inspection) |
+| 10 | End-of-session cross-provider verification | Routed: `route(task_type="session-verification")` |
+| 11 | Handle verification result (fix issues if any; re-verify, max 2 retries) | Mixed: fixes are direct; re-verify is routed |
+| 12 | Commit, push, run `close_session.py` (writes `change-log.md` for the set) | Direct (CLI invocation) |
+
+### Actuals (filled after the session)
+- Orchestrator used: claude-code claude-opus-4-7 @ effort=high (matches recommendation)
+- Total routed cost: $0.1296 — two `session-verification` calls via
+  gpt-5-4 ($0.0898 + $0.0398). The first call returned a verdict but
+  the orchestrator's Python wrapper crashed reading the wrong
+  RouteResult attribute (`.model` vs the actual `.model_name`) before
+  the verdict was captured to a file; the re-run on the corrected
+  attribute name returned `VERIFIED` with no issues. Both calls were
+  logged to metrics.jsonl per the append-only contract — the cost is
+  real spend, not a duplicate write. No analysis routes per the
+  standing operator constraint.
+- Deviations from recommendation: routed cost ran slightly under the
+  projected $0.05–$0.15 upper bound on the *verdict-returning* call
+  alone ($0.0398), but the inadvertent first-call crash pushed the
+  full session spend to $0.1296 — at the top of the projected range
+  rather than below it. Single-round verification was correctly
+  predicted; the only unplanned spend was orchestrator-side
+  brittleness in the Python ai_router invocation, not anything from
+  the verifier.
+- Notes for next-set calibration: when invoking `ai_router.route()`
+  inline from Python, prefer reading the result by `model_name` /
+  `model_id` (the actual RouteResult dataclass fields) rather than
+  guessing `.model`. A small wrapper that prints the result to a file
+  before any field access would prevent the read-then-crash double-
+  spend pattern. This is a candidate `lessons-learned.md` note about
+  guarding routed-call result reads. Session 2's verification surface
+  was correctly modeled as narrow (mechanical wiring, byte-level
+  comparison of a single string, manifest field checks) and Round 1
+  passed cleanly — the spec's "Round 1 typically passes for this
+  category" projection held.

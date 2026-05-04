@@ -6,6 +6,10 @@ An AI-led workflow extension for VS Code. Manage structured AI coding sessions, 
 
 ## Features
 
+### Adoption bootstrap (`Dabbler: Copy adoption bootstrap prompt`)
+
+The single recommended starting point for any new project. Copies a short prompt to the clipboard that you paste into a fresh AI chat — Claude Code, Gemini Code Assist, GPT-based tools, all work. The pasted prompt points the AI at the canonical online instructions at [docs/adoption-bootstrap.md](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/docs/adoption-bootstrap.md), which orient the AI to detect your workspace state, run a budget-threshold dialog (zero / less than $20 / $20–$99 / $100+ tiers), propose a session-set decomposition, and then present a numbered checklist of every intended write/config/scaffolding action for batch approval before executing. No per-write prompts; you can interrupt at any time. The doc is engine-agnostic by construction — it describes tools in capability terms ("fetch a URL," "list files matching a pattern") rather than Claude-specific function names. After the AI completes its checklist, the rest of the workflow uses the existing wizard, session-set explorer, and cost dashboard documented below.
+
 ### Session Set Explorer
 A live tree view of your project's session sets, grouped by state:
 

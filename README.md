@@ -13,6 +13,7 @@ An AI-led coding-session workflow for VS Code. Structured AI sessions with cross
 - [The Session Set Explorer in action](#the-session-set-explorer-in-action)
 - [Prerequisites: tools and accounts](#prerequisites-tools-and-accounts)
 - [Installing the VS Code extension (the reliable way)](#installing-the-vs-code-extension-the-reliable-way)
+- [For new projects: adoption bootstrap](#for-new-projects-adoption-bootstrap)
 - [Adopting `ai_router` in a project](#adopting-ai_router-in-a-project)
 - [Repos that need UAT and/or E2E support — and repos that don't](#repos-that-need-uat-andor-e2e-support--and-repos-that-dont)
 - [End-of-session output (worked example)](#end-of-session-output-worked-example)
@@ -416,6 +417,38 @@ npx vsce package
 
 That writes a fresh `dabbler-ai-orchestration-<version>.vsix` next to
 `package.json`. Install it via the **`...`** menu as above.
+
+---
+
+## For new projects: adoption bootstrap
+
+If you're starting a new project — greenfield, an existing local
+project that hasn't yet adopted the workflow, or a remote repo you
+want to clone in — the recommended starting point is **`Dabbler: Copy
+adoption bootstrap prompt`** from the command palette. The command
+copies a short prompt to your clipboard that you paste into a fresh
+AI chat (Claude Code, Gemini Code Assist, or any GPT-based tool —
+the prompt is engine-agnostic). The AI then fetches the canonical
+online instructions at
+[docs/adoption-bootstrap.md](docs/adoption-bootstrap.md)
+([raw URL](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/docs/adoption-bootstrap.md))
+and runs a 9-step interactive flow: detect your workspace state, run
+a budget-threshold dialog (zero / less than $20 / $20–$99 / $100+
+tiers, mapping to verification modes from manual-via-other-engine
+through outsource-first with full API automation), propose a
+session-set decomposition, and present a numbered checklist of every
+intended write / config / scaffolding action for batch approval
+before executing. No per-write prompts; you can interrupt at any
+time. The four-tier budget mapping is documented in
+[docs/ai-led-session-workflow.md → Cost-budgeted verification modes](docs/ai-led-session-workflow.md#cost-budgeted-verification-modes).
+
+This entry point sits *before* the **Adopting `ai_router`** section
+below — the bootstrap flow installs the router, scaffolds the
+folders, authors `docs/planning/project-plan.md` and your first
+session-set specs, and saves your budget threshold to
+`ai_router/budget.yaml` as part of its action checklist. If you
+already have a plan in hand, the bootstrap flow detects it (Step 2
+fast-path) and offers to skip the discovery dialog.
 
 ---
 

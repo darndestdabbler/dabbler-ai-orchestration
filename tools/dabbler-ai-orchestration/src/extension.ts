@@ -11,6 +11,7 @@ import { discoverRoots, readAllSessionSets } from "./utils/fileSystem";
 import { registerOpenFileCommands } from "./commands/openFile";
 import { registerCopyCommands } from "./commands/copyCommand";
 import { registerGitScaffoldCommand } from "./commands/gitScaffold";
+import { registerCopyAdoptionBootstrapPromptCommand } from "./commands/copyAdoptionBootstrapPrompt";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerQueueActionCommands } from "./commands/queueActions";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
@@ -215,6 +216,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerOpenFileCommands(context);
   registerCopyCommands(context);
   registerGitScaffoldCommand(context);
+  registerCopyAdoptionBootstrapPromptCommand(context);
   registerTroubleshootCommand(context);
   registerWizardCommands(context);
   registerCostDashboardCommand(context);

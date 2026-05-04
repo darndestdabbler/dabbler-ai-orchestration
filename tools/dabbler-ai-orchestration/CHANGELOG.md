@@ -5,6 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.12.1] — 2026-05-04
+
+### Added
+- `Dabbler: Copy adoption bootstrap prompt` command. Copies a short
+  prompt to the clipboard that points an arbitrary AI assistant
+  (Claude Code, Gemini Code Assist, GPT-based tools) at the canonical
+  online instructions at
+  [docs/adoption-bootstrap.md](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/docs/adoption-bootstrap.md).
+  The pasted prompt instructs the AI to gather all decisions in dialog
+  with the human, then present a numbered checklist of intended writes
+  and configs for batch approval before executing — no per-write
+  confirmation prompts. The canonical doc is engine-agnostic
+  (capabilities-term tools, no Claude-specific tool names) and runs a
+  9-step interactive flow: detect VS Code state, fast-path detection,
+  in-flow education, **budget-threshold dialog with four tiers**
+  (zero / less than ~$20 / $20–$99 / $100+, mapping to verification
+  modes from manual-via-other-engine through outsource-first with full
+  API automation), plan alignment, action checklist, execute, and
+  closing pointers (budget monitoring, cost dashboard, more-info
+  links, next-session trigger phrase).
+- `adoption`, `bootstrap`, `onboarding` keywords for Marketplace
+  search.
+- Extension description now mentions the bootstrap entry point.
+
+### Notes
+- This is a single new top-level command with no logic changes to any
+  existing command — version bump is a patch (0.12.0 → 0.12.1). The
+  next release (Set 012 Session 2's planned Marketplace publish) will
+  bump 0.12.1 → 0.13.0.
+- This release ships the file format for `ai_router/budget.yaml`
+  (documented in the canonical doc) but does not yet enforce
+  thresholds or warn on approaching spend — automated enforcement is
+  a follow-up set. The bootstrap flow tells the human that monitoring
+  is currently manual via `python -m ai_router.report --since
+  YYYY-MM-DD` and the cost dashboard.
+
 ## [0.11.0] — 2026-04-30
 
 ### Added

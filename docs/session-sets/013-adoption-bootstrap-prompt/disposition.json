@@ -1,31 +1,26 @@
 {
   "status": "completed",
-  "summary": "Set 13 Session 1 (non-final): Authored docs/adoption-bootstrap.md (~360 lines) — the canonical runtime instruction set an arbitrary AI assistant reads when a human pastes a bootstrap prompt into a fresh chat. Internal logic: state detection (workspace-open vs. no-workspace with three sub-paths); fast-path detection; in-flow education; budget-threshold dialog with four tiers (zero/limited/middle/ample) plus two zero-tier sub-options (manual-via-other-engine / skipped); plan alignment dialog; checklist-before-execute gate (no writes until human batch-approves); execution; closing pointers. Engine-agnostic (capability-term tools, no Claude-specific names). Embeds ai_router/budget.yaml schema with explicit missing-field compatibility defaults. Workspace-vs-arbitrary-path discipline consistent through Steps 1-8. State B sub-path (3) git clone is a discrete preparatory action with its own one-shot approval, separate from main checklist gate, with shell-safe execution requirements. Also added a new 'Cost-budgeted verification modes' section to docs/ai-led-session-workflow.md (after Overview, before Key Concepts) documenting the four-tier mapping and the operator-authorized exception to Rule 2 ('Never skip verification') for the zero-budget + skipped path. Rule 2 itself unchanged. Cross-provider verification (gpt-5-4): R1 ISSUES_FOUND (1 Critical: clone violated checklist gate; 4 Major: enum inconsistency, arbitrary-path scope, threshold scope ambiguity, manual-template URL; 1 Minor: edge-case guards) -> R2 ISSUES_FOUND (3 Major: arbitrary-path scope-creep, clone destination ambiguity, threshold_scope compatibility; 1 Minor: tier drift) -> R3 ISSUES_FOUND (1 Major: verification_method default; 3 Minor: tier drift, Step 3 heading, shell-safe quoting) -> R4 VERIFIED. 13 issues total, all fixed and recorded in issue-logs/session-001.json. Cost: $0.59 across 4 rounds. Push commit 27b9da1 to origin/master also landed Set 012 Session 1 commit 888215d as a side effect (both stacked on local master); push is non-releasing since no v* tag was pushed. Canonical URL https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/docs/adoption-bootstrap.md is now live (HTTP 200, 28879 bytes).",
+  "summary": "Set 13 Session 2 (final session): Wired up the dabbler.copyAdoptionBootstrapPrompt VS Code command, bumped extension to 0.12.1, built the VSIX, and ran end-of-session cross-provider verification. New file: tools/dabbler-ai-orchestration/src/commands/copyAdoptionBootstrapPrompt.ts (~21 lines, exports registerCopyAdoptionBootstrapPromptCommand which registers a single command that copies a constant ADOPTION_BOOTSTRAP_PROMPT to clipboard via vscode.env.clipboard.writeText and shows an info message). Wired into src/extension.ts alongside the other registerXxx command groups. package.json: version 0.12.0 -> 0.12.1 (patch, additive command), description extended to mention 'adoption-bootstrap entry point', keywords appended with adoption/bootstrap/onboarding for Marketplace search, contributes.commands gained the new dabbler.copyAdoptionBootstrapPrompt entry with title 'Copy adoption bootstrap prompt' and category 'Dabbler' (slotted between dabbler.getStarted and dabbler.setupNewProject). CHANGELOG.md: new v0.12.1 [2026-05-04] section under Unreleased, covering the new command + the four-tier budget-driven mode philosophy + the canonical doc URL, with a Notes block clarifying patch-vs-minor rationale and the explicit non-shipped automated-enforcement scope. tools/dabbler-ai-orchestration/README.md: new 'Adoption bootstrap' subsection at the top of Features, one-paragraph form, with the canonical raw URL. Repo-root README.md: new 'For new projects: adoption bootstrap' top-level section inserted after 'Installing the VS Code extension' and before 'Adopting ai_router in a project', with both relative and absolute links to the canonical doc and a cross-link to docs/ai-led-session-workflow.md#cost-budgeted-verification-modes; entry added to the table of contents. Built dabbler-ai-orchestration-0.12.1.vsix (18 files, 331 KB) via npm run compile + npx vsce package; first build attempt was from stale dist/ because npx vsce package skips the compile step, caught and corrected via explicit npm run compile + repackage. Smoke test: VSIX manifest version=0.12.1, description includes 'adoption-bootstrap entry point', keywords include adoption/bootstrap/onboarding, the new command id appears in contributes.commands with the right title; bundled extension.js (285,149 bytes) contains the copyAdoptionBootstrapPrompt source with the registration call and the URL string; round-trip-extracted ADOPTION_BOOTSTRAP_PROMPT literal byte-matches the spec sketch; canonical URL https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/docs/adoption-bootstrap.md returns HTTP 200 (28879 bytes, matches Session 1). Cross-provider verification (gpt-5-4): R1 VERIFIED with empty issues array on the first round, no fix rounds required. Cost: $0.1296 across two routed calls — $0.0898 on the first call (orchestrator's Python wrapper crashed reading a wrong RouteResult attribute name before capturing the verdict) + $0.0398 on the re-run that captured the VERIFIED verdict. Both calls logged to metrics.jsonl per the append-only contract. Set 013 close-out: this is the final session, so close-out writes change-log.md summarizing both sessions (cumulative spend $0.7194 vs spec projection $0.20-$0.55, 31% over driven entirely by Session 1's four-round verification surface). The 0.12.1 VSIX is committed alongside the source for sideload availability, matching the existing 0.12.0 VSIX artifact pattern.",
   "files_changed": [
-    "docs/adoption-bootstrap.md",
-    "docs/ai-led-session-workflow.md",
-    "docs/session-sets/013-adoption-bootstrap-prompt/spec.md",
-    "docs/session-sets/013-adoption-bootstrap-prompt/session-state.json",
+    "tools/dabbler-ai-orchestration/src/commands/copyAdoptionBootstrapPrompt.ts",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/package-lock.json",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/README.md",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix",
+    "README.md",
     "docs/session-sets/013-adoption-bootstrap-prompt/ai-assignment.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-state.json",
     "docs/session-sets/013-adoption-bootstrap-prompt/activity-log.json",
-    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001-prompt.md",
-    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001-prompt-r2.md",
-    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001-prompt-r3.md",
-    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001-prompt-r4.md",
-    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-001.md",
-    "docs/session-sets/013-adoption-bootstrap-prompt/issue-logs/session-001.json"
+    "docs/session-sets/013-adoption-bootstrap-prompt/disposition.json",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-002-prompt.md",
+    "docs/session-sets/013-adoption-bootstrap-prompt/session-reviews/session-002.md"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 2 is mechanical wiring (TS command file, package.json, READMEs, CHANGELOG, VSIX build, smoke test); narrow verification surface; same orchestrator keeps consistency with Session 1's authoring choices."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": []
 }

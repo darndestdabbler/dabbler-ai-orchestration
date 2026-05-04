@@ -1,0 +1,4 @@
+{"timestamp": "2026-05-04T18:06:42.617640Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-05-04T18:06:42.768822Z", "session_number": 1, "event_type": "closeout_failed", "failed_checks": ["working_tree_clean"]}
+{"timestamp": "2026-05-04T18:06:53.451460Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-05-04T18:06:53.611611Z", "session_number": 1, "event_type": "closeout_succeeded", "method": "api"}

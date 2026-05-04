@@ -42,6 +42,77 @@
       "description": "Round 1 attempt 2 surfaced 3 issues: missing test for closeout_succeeded-before-flip ordering invariant; missing forced= propagation to _flip_state_to_closed (production bug); missing test for None-branch return. All three fixed: 1 line of production code (forced=bool(args.force)) + 3 new tests. Round 2 returned VERIFIED.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register-session-start",
+      "dateTime": "2026-05-04T15:52:23-04:00",
+      "description": "Registered Session 2 via register_session_start — first real exercise of Set 014 Session 1's work_started auto-emission fix. The events ledger immediately afterward showed exactly one work_started event for session_number=2, emitted by the function itself with no manual append. Snapshot flipped to currentSession=2 / status=in-progress / lifecycleState=work_in_progress.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/gitignore-carve-out",
+      "dateTime": "2026-05-04T15:55:00-04:00",
+      "description": "Added !tools/dabbler-ai-orchestration/*.vsix carve-out to .gitignore (line 7), preserving the broad *.vsix rule on line 6. Verified scope with git check-ignore -v against five paths: 0.10.0/0.11.0/0.12.0/0.12.1 VSIXes in the carved-out dir all resolve as not-ignored (rule 7); some-other-dir/random.vsix and ai_router/something.vsix still ignored (rule 6).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/add-vsix-and-readme-edits",
+      "dateTime": "2026-05-04T15:58:00-04:00",
+      "description": "git add tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix (339,038 bytes; plain git add, not -f). Repo-root README.md updated at three sites: lines 388 + 395 (install instructions) bumped 0.12.0.vsix to 0.12.1.vsix; line 702 (repo-layout table) bumped both file-anchor and label and removed the misleading 'Older VSIXes ... rollback' sentence. Extension README checked, no version-specific path references, no edit needed.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/extension-test-suite",
+      "dateTime": "2026-05-04T16:00:00-04:00",
+      "description": "npm test failed with VS Code 1.118.1 launcher-flag rejection (bad option: --no-sandbox etc.) — pre-existing environment-specific issue on this Windows host. npm run test:unit failed with mocha BDD/TDD UI mismatch ('suite is not defined') — also pre-existing. Both unrelated to Session 2's changes (no source files in tools/dabbler-ai-orchestration/src/ were touched). The step's purpose was to catch accidental staging, which git status confirmed cleanly.",
+      "status": "complete-with-known-failures",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/sideload-smoke-test",
+      "dateTime": "2026-05-04T16:02:00-04:00",
+      "description": "Clean clone of the committed state into a temp directory (after committing Session 2 changes locally — git clone snapshots committed history, not unstaged working tree). Confirmed dabbler-ai-orchestration-0.12.1.vsix is present at the documented path (339,038 bytes); manifest version is 0.12.1; bundled extension/package.json version is 0.12.1; dabbler.copyAdoptionBootstrapPrompt command from Set 013 is present (28 commands total). VS Code 'Install from VSIX' UI step described but not driven (no headless VS Code).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-2/cross-provider-verification",
+      "dateTime": "2026-05-04T16:05:00-04:00",
+      "description": "Routed session-verification via gpt-5-4 using defensive RouteResult-dump-to-JSON-before-attribute-access pattern (route_session2.py). R1 returned VERIFIED with no blockers and ten 'no issue' or minor-note entries. The defensive dump pattern survived without crash — proven shape after the wrapper-crash pattern bit in two consecutive sets.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 7196,
+          "outputTokens": 1370,
+          "costUsd": 0.1028
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-2/handle-verification-result",
+      "dateTime": "2026-05-04T16:08:00-04:00",
+      "description": "Verifier flagged two minor optional hardening items, both addressed inline before close-out (no re-route): (a) broader README scan via grep -nE '0\\.(12\\.0|11\\.0|10\\.0|9\\.0)' README.md returned zero hits — all version-path references are 0.12.1; (b) byte-diff of the VSIX's bundled extension/package.json against the committed tools/dabbler-ai-orchestration/package.json — identical, provenance confirmed.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

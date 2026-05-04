@@ -118,6 +118,15 @@ A model-tier and pricing reference (Gemini Flash → Gemini Pro / Sonnet /
 GPT-5.4 Mini → Opus / GPT-5.4) lives in
 [docs/ai-led-session-workflow.md → Model Tiers and Pricing](docs/ai-led-session-workflow.md#model-tiers-and-pricing).
 
+**What this looks like at scale** — see
+[docs/sample-reports/](docs/sample-reports/) for a real
+`python -m ai_router.report` output from a CLI / library / parser
+project that showed **73% savings vs the Opus-only baseline**
+across 990 routed calls. The report surfaces auto-generated action
+items naming task types whose unreliability suggests a
+prompt-template tightening — the manager doesn't have to hunt for
+"where am I bleeding cost or quality."
+
 ### 3. Cross-provider verification
 
 Every session ends with a **mandatory** independent verification by a

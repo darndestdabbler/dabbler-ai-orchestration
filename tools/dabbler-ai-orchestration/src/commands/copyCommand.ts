@@ -13,13 +13,11 @@ async function copy(text: string, label: string): Promise<void> {
 const startCommandPresets: Record<string, (slug: string) => string> = {
   default: (slug) => `Start the next session of \`${slug}\`.`,
   parallel: (slug) => `Start the next parallel session of \`${slug}\`.`,
-  maxoutClaude: (slug) => `Start the next session of \`${slug}\`. — maxout Claude`,
 };
 
 const presetLabels: Record<string, string> = {
   default: "start next session",
   parallel: "start next parallel session",
-  maxoutClaude: "start next session — maxout Claude",
 };
 
 export function registerCopyCommands(context: vscode.ExtensionContext): void {

@@ -2807,13 +2807,11 @@ async function copy(text, label) {
 }
 var startCommandPresets = {
   default: (slug) => `Start the next session of \`${slug}\`.`,
-  parallel: (slug) => `Start the next parallel session of \`${slug}\`.`,
-  maxoutClaude: (slug) => `Start the next session of \`${slug}\`. \u2014 maxout Claude`
+  parallel: (slug) => `Start the next parallel session of \`${slug}\`.`
 };
 var presetLabels = {
   default: "start next session",
-  parallel: "start next parallel session",
-  maxoutClaude: "start next session \u2014 maxout Claude"
+  parallel: "start next parallel session"
 };
 function registerCopyCommands(context) {
   for (const [key, builder] of Object.entries(startCommandPresets)) {

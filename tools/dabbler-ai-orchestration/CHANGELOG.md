@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-05-04
+
+### Added
+- **Marketplace-publish-ready release.** This is the first VSIX
+  designated for publication to the VS Code Marketplace as
+  `DarndestDabbler.dabbler-ai-orchestration`. The publishing
+  infrastructure (workflow + runbook) lands in this commit; the
+  one-time human-driven publisher account setup + first
+  `vsix-v0.13.0` tag push are operator-driven steps that may have
+  not yet completed at the time the VSIX is built. Once the publish
+  lands, `code --install-extension
+  DarndestDabbler.dabbler-ai-orchestration` will resolve from the
+  Marketplace.
+- `.github/workflows/publish-vscode.yml` — tag-driven publish workflow
+  for the VS Code Marketplace and Open VSX Registry. Triggered on
+  `vsix-vX.Y.Z` (publish) and `vsix-vX.Y.Z-rcN` (build-only) tags.
+  See `docs/planning/marketplace-release-process.md` for one-time
+  setup, the per-release checklist, rollback paths, and the
+  failure-modes table.
+
+### Removed
+- `Dabbler: Copy: Start next session — maxout Claude` command (and the
+  matching session-set context-menu entry). The "maxout" suffix as a
+  per-session token-window override is no longer surfaced as a
+  one-click affordance; the broader `— maxout <engine>` workflow
+  concept remains documented in `docs/ai-led-session-workflow.md` for
+  operators who want to type the suffix manually.
+
 ## [0.12.1] — 2026-05-04
 
 ### Added

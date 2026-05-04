@@ -1,0 +1,19 @@
+{
+  "content": "```json\n{\n  \"verdict\": \"ISSUES_FOUND\",\n  \"issues\": [\n    {\n      \"severity\": \"Major\",\n      \"issue\": \"The claimed `v*`/`vsix-v*` tag-pattern coexistence is incorrect. GitHub's `on.push.tags: ['v*']` also matches `vsix-v0.13.0`, so the PyPI `release.yml` will trigger on Marketplace tags and then fail its strict classify regex. The Marketplace publish can still succeed, but every `vsix-v*` release will produce a spurious failing PyPI workflow and the runbook's 'prefix prevents collision' statement is false.\",\n      \"location\": \".github/workflows/release.yml `on.push.tags`, and `docs/planning/marketplace-release-process.md` section 'Tag-pattern coexistence with PyPI'\",\n      \"fix\": \"Narrow the PyPI trigger so it excludes Marketplace tags, e.g. use tag patterns that explicitly negate `vsix-v*` or otherwise constrain to real PyPI tags only, then update the runbook to describe the actual isolation mechanism.\"\n    },\n    {\n      \"severity\": \"Major\",\n      \"issue\": \"The `0.13.0` CHANGELOG entry overstates Marketplace availability. It says this 'is the first version published' on the Marketplace and gives install instructions as if publication has already happened, but the commit only adds the workflow/runbook and bumps the version; the human setup and first `vsix-v0.13.0` publish are still operator-driven post-commit steps.\",\n      \"location\": \"tools/dabbler-ai-orchestration/CHANGELOG.md, `[0.13.0]` -> `Added`\",\n      \"fix\": \"Reword the entry to say the release is Marketplace-publish-ready / adds Marketplace publishing support, or update the wording only after the first Marketplace publish has actually completed.\"\n    }\n  ]\n}\n```",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 5179,
+  "output_tokens": 9663,
+  "cost_usd": 0.1578925,
+  "total_cost_usd": 0.1578925,
+  "complexity_score": 71,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 171.59468984603882,
+  "truncated": false,
+  "verification": null,
+  "pending": false,
+  "message_id": null,
+  "queue_provider": null
+}

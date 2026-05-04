@@ -81,3 +81,87 @@ which closed VERIFIED in one round.
 > need (a new project starting ASAP). Sessions 2 and 3 of this set
 > may need amendment, or a parallel new set may insert before Set 011.
 > Decision is the operator's at Session 2 start.
+
+---
+
+## Session 2: VS Code Marketplace publishing
+
+### Recommended orchestrator
+claude-code claude-opus-4-7 @ effort=high
+
+### Rationale
+Session 2 is workflow-YAML + runbook authoring with a human-handoff
+component (Marketplace publisher account + PAT minting). The runbook
+completeness bar — every failure mode actionable, every human-driven
+step explicit — needs Opus-level prose precision; the workflow YAML's
+classify-job regex and environment-protection wiring need careful
+correctness. Comparable in shape to Set 010 Session 2 which closed
+VERIFIED in one round.
+
+### Estimated routed cost
+$0.15–$0.30, single end-of-session verification (no analysis routes
+per the standing operator constraint). Round 2 may add $0.10–$0.15
+if the verifier flags a gap in the runbook's failure-modes table or
+the workflow's dual-publish ordering.
+
+### Notable bundled change
+The operator authorized (2026-05-04, in this same session) the
+removal of the `Dabbler: Copy: Start next session — maxout Claude`
+command and its session-set context-menu entry. The change is folded
+into the v0.13.0 bump rather than carved into its own VSIX release —
+both are user-visible Marketplace-launch-window changes and shipping
+them as one v0.13.0 entry keeps the CHANGELOG narrative clean. The
+broader `— maxout <engine>` workflow concept (the typed phrase
+suffix) remains documented in `docs/ai-led-session-workflow.md`; only
+the one-click affordance is gone.
+
+| Step | Action | Routing Decision |
+|------|--------|------------------|
+| 1 | Read prerequisites (Set 010 release.yml, release-process.md, current package.json, CHANGELOG) | Direct (orchestrator) |
+| 2 | Register Session 2 start (work_started event + session-state currentSession=2) | Direct (helper) |
+| 3 | Author Session 2 block in this `ai-assignment.md` | Direct (router suspended per operator) |
+| 4 | Bundled: remove maxoutClaude command (copyCommand.ts, package.json, recompile dist/ + out/, CHANGELOG entry) | Direct (mechanical edits) |
+| 5 | Author `.github/workflows/publish-vscode.yml` (classify / build / publish-marketplace / publish-openvsx jobs) | Direct (mechanical authoring) |
+| 6 | Author `docs/planning/marketplace-release-process.md` (one-time setup → per-release checklist → rollback → failure-modes → maintenance) | Direct (mechanical authoring) |
+| 7 | Bump extension `package.json` 0.12.1 → 0.13.0 | Direct (mechanical edit) |
+| 8 | Update `tools/dabbler-ai-orchestration/CHANGELOG.md` with `[0.13.0]` section | Direct (mechanical edit) |
+| 9 | Recompile (`npm run compile` + `npx tsc --outDir out`) so dist/ and out/ pick up new version | Direct (shell command) |
+| 10 | End-of-session cross-provider verification | Routed: `route(task_type="session-verification")` — the only API call this session |
+| 11 | Handle verification result (fix issues if any; re-verify, max 2 retries) | Mixed: fixes are direct; re-verify is routed |
+| 12 | Build disposition.json + activity-log entries; commit; run `close_session.py` | Direct (CLI invocation) |
+
+### Actuals (filled after the session)
+- Orchestrator used: claude-code claude-opus-4-7 @ effort=high (matches recommendation)
+- Total routed cost: **$0.1960** — two rounds of `session-verification`
+  via gpt-5-4 ($0.157892 round 1 + $0.038090 round 2). No analysis
+  routes per the standing operator constraint. Within the spec's
+  $0.15–$0.30 single-round projection band; the second round added
+  $0.04 — modest because the delta prompt scoped Round 2 to two
+  fixes only.
+- Deviations from recommendation: **bundled the maxoutClaude removal
+  into this session.** Spec did not anticipate it; operator authorized
+  it 2026-05-04 alongside the directive to finish Set 012, with the
+  rationale that v0.13.0 is the natural release for both
+  Marketplace-launch and a small UX cleanup. The `[0.13.0]` CHANGELOG
+  entry surfaces both under one release note; the change-log.md
+  records the bundling.
+- Notes for next-session calibration: round-1 verifier flagged two
+  real Major issues — (a) PyPI release.yml's `on.push.tags: ['v*']`
+  glob also matches `vsix-v*` tag pushes (would have triggered a
+  spurious failing PyPI run on every Marketplace release), fixed by
+  adding `'!vsix-v*'` negative pattern; (b) CHANGELOG `[0.13.0]`
+  entry over-claimed that Marketplace publication had landed when
+  only the publishing infrastructure landed, fixed by reframing as
+  "Marketplace-publish-ready". Lesson worth filing if the pattern
+  recurs: when authoring CI/CD coexistence, **trace the actual glob
+  match** rather than assuming prefixes are sufficient — `v*` glob
+  in GitHub Actions is greedy on the leading `v`.
+
+**Next-session orchestrator recommendation (Session 3):**
+claude-code claude-opus-4-7 @ effort=high
+Rationale: Session 3 is the README shrink + technical-detail spinout
+to `docs/repository-reference.md`. Prose-quality verification on the
+leaner README + completeness check on the reference doc; the spec
+warns that Round 2 is more likely than usual given the prose-tighten
+nature of the work. Opus at high effort handles tone calibration and
+cross-link integrity audits without escalation.

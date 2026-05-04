@@ -1,7 +1,7 @@
 {
   "sessionSetName": "012-marketplace-publish-and-readme-shrink",
   "createdDate": "2026-05-04T12:07:30.731533-04:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -33,6 +33,39 @@
       "stepKey": "session-1/handle-verification-result",
       "dateTime": "2026-05-04T12:14:00.980756-04:00",
       "description": "Round 1 raised 1 Major + 1 Minor; both fixed and re-verified clean in round 2. issues-001.json saved.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-2/cross-provider-verification",
+      "dateTime": "2026-05-04T18:30:00.000000-04:00",
+      "description": "Routed session-verification via gpt-5-4 (R1: ISSUES_FOUND with 2 Major; R2: VERIFIED after fixes).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.157892
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.03809
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-2/handle-verification-result",
+      "dateTime": "2026-05-04T18:30:00.000000-04:00",
+      "description": "Round 1 raised 2 Major (PyPI workflow tag-glob would also match vsix-v* tags; CHANGELOG over-claimed Marketplace publication had landed). Both fixed: added '!vsix-v*' negative pattern to release.yml's on.push.tags, revised runbook's tag-coexistence section, reworded CHANGELOG [0.13.0] Added block to 'Marketplace-publish-ready' framing. Round 2 returned VERIFIED.",
       "status": "complete",
       "routedApiCalls": []
     }

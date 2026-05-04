@@ -12,11 +12,23 @@ name: Release dabbler-ai-router to PyPI
 #
 # The build job runs after `classify` so artifacts exist for inspection
 # even if the publish step is gated by environment review.
+#
+# The `!vsix-v*` negative pattern excludes Marketplace tags because
+# GitHub's tag-pattern matcher treats `v*` as a glob that also matches
+# `vsix-v0.13.0` (the leading `v` is just a literal). Without this
+# exclusion, every Marketplace tag push would trigger a spurious PyPI
+# workflow run that fails the classify job. `publish-vscode.yml` (the
+# Marketplace pipeline) is the canonical handler for `vsix-v*`; this
+# workflow only sees `v*` tags that are *not* prefixed with `vsix-`.
+# Note: `branches`/`tags` and the corresponding `*-ignore` keys cannot
+# be combined in the same `on:` block, so we use the `!pattern` form
+# inside the `tags:` list instead.
 
 on:
   push:
     tags:
       - 'v*'
+      - '!vsix-v*'
 
 permissions:
   contents: read

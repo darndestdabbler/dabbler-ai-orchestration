@@ -1,0 +1,235 @@
+name: Publish dabbler-ai-orchestration to VS Code Marketplace
+
+# Triggered on tag push:
+#
+#   - `vsix-vX.Y.Z-rcN` (e.g. `vsix-v0.13.0-rc1`) -> build only, no publish.
+#                         The RC tag exercises the build path and produces an
+#                         inspectable VSIX artifact without claiming a
+#                         Marketplace version slot.
+#   - `vsix-vX.Y.Z`     (e.g. `vsix-v0.13.0`)     -> Marketplace publish (and
+#                         optional Open VSX publish), gated by the
+#                         `marketplace` deployment environment.
+#
+# Anything else (e.g. `vsix-v1.0.0rc1`, `vsix-v1.2`, `vsix-vfoo`, plain `v0.1.0`)
+# is rejected by the `classify` job before any artifact build runs. The plain
+# `v*` pattern is reserved for `dabbler-ai-router`'s PyPI release workflow at
+# `.github/workflows/release.yml`; the `vsix-v*` prefix keeps the two
+# tag-driven release pipelines from colliding in a single repo.
+#
+# Authentication: Microsoft's Marketplace does not support OIDC trusted
+# publishing as of 2026-05-04. The supported path is an Azure DevOps Personal
+# Access Token (PAT) scoped to "Marketplace (publish)" stored as the
+# `VSCE_PAT` secret in the `marketplace` environment. Open VSX uses a
+# separate PAT (`OVSX_PAT`). See `docs/planning/marketplace-release-process.md`
+# for one-time setup and per-release checklist.
+
+on:
+  push:
+    tags:
+      - 'vsix-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Classify the pushed tag into one of {final, rc, invalid}. Final and
+  # RC tags must match the strict regexes below; anything else fails the
+  # workflow before any build/publish work happens. The classification
+  # outputs gate the downstream publish jobs so they cannot fire for
+  # the wrong tag shape.
+  # ---------------------------------------------------------------------------
+  classify:
+    name: Classify tag
+    runs-on: ubuntu-latest
+    outputs:
+      is_final: ${{ steps.classify.outputs.is_final }}
+      is_rc: ${{ steps.classify.outputs.is_rc }}
+      semver_version: ${{ steps.classify.outputs.semver_version }}
+    steps:
+      - name: Classify ${{ github.ref_name }}
+        id: classify
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ "$tag" =~ ^vsix-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "is_final=true"  >> "$GITHUB_OUTPUT"
+            echo "is_rc=false"    >> "$GITHUB_OUTPUT"
+            echo "semver_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as FINAL (semver ${BASH_REMATCH[1]})."
+          elif [[ "$tag" =~ ^vsix-v([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
+            echo "is_final=false" >> "$GITHUB_OUTPUT"
+            echo "is_rc=true"     >> "$GITHUB_OUTPUT"
+            # vsce / Marketplace use the dashed pre-release form natively
+            # (semver 2.0.0). No PEP 440 normalization step needed.
+            echo "semver_version=${BASH_REMATCH[1]}-rc${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as RC (semver ${BASH_REMATCH[1]}-rc${BASH_REMATCH[2]}). RC builds only — no Marketplace publish."
+          else
+            echo "::error::tag $tag does not match the release pattern. Expected vsix-v[0-9]+.[0-9]+.[0-9]+ for finals or vsix-v[0-9]+.[0-9]+.[0-9]+-rcN for release candidates."
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build the VSIX. Uploaded as a workflow artifact so the publish job
+  # (and any human reviewing the release) can inspect the same bytes that
+  # go to the Marketplace.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build VSIX
+    needs: classify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/dabbler-ai-orchestration
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify tag matches package.json version
+        # Catches the "tagged vsix-v0.13.0 but forgot to bump package.json"
+        # mistake before we waste a build/publish cycle. The check compares
+        # the semver version the classify job derived from the tag
+        # (`vsix-v0.13.0` -> `0.13.0`, `vsix-v0.13.0-rc1` -> `0.13.0-rc1`)
+        # against package.json's `version` field. vsce and the Marketplace
+        # both use semver 2.0.0, so string equality is sufficient.
+        env:
+          EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const expected = process.env.EXPECTED_VERSION;
+          if (pkg.version !== expected) {
+            console.error(
+              `::error::tag semver version '${expected}' does not match ` +
+              `package.json version '${pkg.version}'`
+            );
+            process.exit(1);
+          }
+          console.log(`tag-vs-package.json check OK: ${expected} == ${pkg.version}`);
+          JS
+
+      - name: Build VSIX
+        # `npx vsce package` produces dabbler-ai-orchestration-<version>.vsix
+        # in the working directory. The CHANGELOG.md / README.md / LICENSE
+        # files referenced from package.json must exist alongside it.
+        run: npx vsce package
+
+      - name: Verify VSIX filename
+        # Belt-and-suspenders: the produced VSIX's filename must encode the
+        # expected version. vsce derives the filename from package.json, so
+        # this is unlikely to fail given the previous check passed, but it
+        # protects against a vsce-side regression where the produced file
+        # name diverges from the stated version.
+        env:
+          EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
+        run: |
+          expected_file="dabbler-ai-orchestration-${EXPECTED_VERSION}.vsix"
+          if [[ ! -f "$expected_file" ]]; then
+            echo "::error::expected VSIX file '$expected_file' not found in tools/dabbler-ai-orchestration/. Found:"
+            ls -la *.vsix || true
+            exit 1
+          fi
+          echo "VSIX filename check OK: $expected_file exists."
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: tools/dabbler-ai-orchestration/dabbler-ai-orchestration-*.vsix
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # VS Code Marketplace publish — final tags only (`vsix-v[0-9]+.[0-9]+.[0-9]+`).
+  # The classify job already rejected anything else; this `if:` is a
+  # belt-and-suspenders gate. The `marketplace` environment requires a
+  # human reviewer's approval before the job runs, and the `VSCE_PAT`
+  # secret is bound at the environment level so it is not visible to
+  # the build job above.
+  # ---------------------------------------------------------------------------
+  publish-marketplace:
+    name: Publish to VS Code Marketplace (final releases only)
+    needs: [classify, build]
+    if: ${{ needs.classify.outputs.is_final == 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix
+          path: vsix/
+
+      - name: Publish to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          vsix_file=$(ls vsix/dabbler-ai-orchestration-*.vsix | head -n1)
+          if [[ -z "$vsix_file" ]]; then
+            echo "::error::no VSIX found in downloaded artifact"
+            exit 1
+          fi
+          echo "Publishing $vsix_file to VS Code Marketplace..."
+          npx --yes @vscode/vsce publish --packagePath "$vsix_file" -p "$VSCE_PAT"
+
+  # ---------------------------------------------------------------------------
+  # Open VSX Registry publish — final tags only. Separate job from the
+  # primary Marketplace publish so an Open VSX failure does not block the
+  # primary publish (and the inverse). Cursor, VSCodium, and other
+  # forks read from Open VSX rather than the Microsoft Marketplace, so
+  # dual-publish is the recommended default. Skip by clearing the
+  # `OVSX_PAT` secret; the job logs and exits cleanly.
+  # ---------------------------------------------------------------------------
+  publish-openvsx:
+    name: Publish to Open VSX Registry (final releases only)
+    needs: [classify, build, publish-marketplace]
+    if: ${{ needs.classify.outputs.is_final == 'true' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: openvsx
+      url: https://open-vsx.org/extension/DarndestDabbler/dabbler-ai-orchestration
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix
+          path: vsix/
+
+      - name: Publish to Open VSX Registry
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [[ -z "${OVSX_PAT:-}" ]]; then
+            echo "OVSX_PAT not configured for the openvsx environment; skipping Open VSX publish."
+            echo "This is non-fatal: Marketplace publish above already succeeded. Configure OVSX_PAT to enable dual-publish."
+            exit 0
+          fi
+          vsix_file=$(ls vsix/dabbler-ai-orchestration-*.vsix | head -n1)
+          if [[ -z "$vsix_file" ]]; then
+            echo "::error::no VSIX found in downloaded artifact"
+            exit 1
+          fi
+          echo "Publishing $vsix_file to Open VSX Registry..."
+          npx --yes ovsx publish "$vsix_file" -p "$OVSX_PAT"

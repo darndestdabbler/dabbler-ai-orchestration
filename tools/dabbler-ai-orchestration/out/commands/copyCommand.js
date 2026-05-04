@@ -42,12 +42,10 @@ async function copy(text, label) {
 const startCommandPresets = {
     default: (slug) => `Start the next session of \`${slug}\`.`,
     parallel: (slug) => `Start the next parallel session of \`${slug}\`.`,
-    maxoutClaude: (slug) => `Start the next session of \`${slug}\`. — maxout Claude`,
 };
 const presetLabels = {
     default: "start next session",
     parallel: "start next parallel session",
-    maxoutClaude: "start next session — maxout Claude",
 };
 function registerCopyCommands(context) {
     for (const [key, builder] of Object.entries(startCommandPresets)) {

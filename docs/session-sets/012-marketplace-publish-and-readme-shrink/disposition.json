@@ -1,0 +1,32 @@
+{
+  "status": "completed",
+  "summary": "Set 12 Session 2 (Marketplace publishing): authored .github/workflows/publish-vscode.yml (classify / build / publish-marketplace / publish-openvsx jobs, semver tag pattern vsix-vX.Y.Z, environment-protected publish behind required reviewer, dual-publish to Open VSX with soft-skip when OVSX_PAT empty); authored docs/planning/marketplace-release-process.md (eight-section runbook mirroring Set 010's PyPI runbook: PAT-vs-OIDC rationale, naming, tag-pattern coexistence with PyPI, six-subsection one-time setup walking Microsoft account / publisher claim / Azure DevOps PAT minting / GitHub deployment environments / Open VSX dual-publish / RC verify, eleven-step per-release checklist, two-path rollback, eight-row failure-modes table, maintenance with PAT-rotation cadence + future-OIDC-migration note); bumped tools/dabbler-ai-orchestration/package.json version 0.12.1 -> 0.13.0; added [0.13.0] CHANGELOG section. Bundled change authorized by operator in this same session: removed dabblerSessionSets.copyStartCommand.maxoutClaude command + its session-set context-menu entry from copyCommand.ts and package.json (regenerated dist/extension.js via npm run compile and out/ via npx tsc --outDir out, both compiled artifacts grep-clean of maxoutClaude); CHANGELOG [0.13.0] Removed block surfaces the deletion. The broader '-- maxout <engine>' workflow concept (the typed phrase suffix) remains documented in docs/ai-led-session-workflow.md by design; only the one-click menu affordance was removed. Cross-provider verification (gpt-5-4): Round 1 returned ISSUES_FOUND with 2 Major: (a) GitHub Actions matches 'v*' glob against vsix-v* tags (the leading v is just a literal), so PyPI release.yml would trigger spuriously on every Marketplace tag push and fail its strict classify regex - fixed by adding '!vsix-v*' negative pattern to release.yml's on.push.tags list (cannot use both tags: and tags-ignore: together, hence the !pattern form) plus a revised runbook section describing the actual mechanism rather than asserting prefix-uniqueness; (b) [0.13.0] CHANGELOG over-claimed that Marketplace publication had landed when only the publishing infrastructure landed - fixed by reframing as 'Marketplace-publish-ready' with the actual publish called out as a downstream operator-driven event. Round 2 returned VERIFIED with no remaining issues. Cost: $0.1960 across two routed calls ($0.157892 R1 + $0.038090 R2). Round 1 took 171s elapsed (longer than Set 013's 30s baseline); the verifier was scrutinizing the runbook's twelve probes including one about the tag-coexistence claim - which is exactly where the bug surfaced. The defensive RouteResult-dump-to-JSON-before-attribute-access pattern in route_session2.py / route_session2_r2.py held without crash. Operator-driven follow-ups for downstream work (NOT blockers for close-out): (1) Microsoft Marketplace publisher account creation + Azure DevOps PAT minting + GitHub marketplace environment setup are required before the first vsix-v0.13.0 tag push will publish successfully; (2) Open VSX namespace claim + OVSX_PAT secret are required if dual-publish is desired, otherwise that job soft-skips cleanly; (3) Session 3 (README shrink + docs/repository-reference.md spinout) is the next session and depends on this session's CHANGELOG framing for its quick-start copy.",
+  "files_changed": [
+    ".github/workflows/release.yml",
+    ".github/workflows/publish-vscode.yml",
+    "docs/planning/marketplace-release-process.md",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/src/commands/copyCommand.ts",
+    "tools/dabbler-ai-orchestration/out/commands/copyCommand.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/ai-assignment.md",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-state.json",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-events.jsonl",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/activity-log.json",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/disposition.json",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-reviews/session-002-prompt.md",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-reviews/session-002-prompt-r2.md",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-reviews/session-002.md",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-reviews/session-002-raw.json",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-reviews/session-002-r2.md",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-reviews/session-002-r2-raw.json",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-reviews/route_session2.py",
+    "docs/session-sets/012-marketplace-publish-and-readme-shrink/session-reviews/route_session2_r2.py"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": []
+}

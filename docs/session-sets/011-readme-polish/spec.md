@@ -3,7 +3,7 @@
 > **Purpose:** Take the repo-root README from "feature-tour with one screenshot" to "credibly-positioned tool that pre-qualifies its readers." Three streams of work feed one polished README: (1) more screenshots of the extension actually doing work, against real projects; (2) sample reports from `python -m ai_router.report` showing what the metrics layer produces at scale; (3) a short philosophical-framing section that names the posture shift the extension hints at — not in the elevator pitch, but front-of-house enough that curious readers find it.
 > **Created:** 2026-05-02
 > **Session Set:** `docs/session-sets/011-readme-polish/`
-> **Prerequisite:** Set 010 (`010-pypi-publish-and-installer`) must be closed. Both sets touch the README's adoption section; Set 010 does the structural rewrite (collapse to one install command), Set 011 does the polish pass on top. Sequencing avoids merge conflicts and lets Set 011 reference the install command as a real thing, not a planned thing.
+> **Prerequisite:** Set 012 (`012-marketplace-publish-and-readme-shrink`) must be closed. Set 012 does the structural rewrite (~700 → ~150-200-line README + spinout to `docs/repository-reference.md`); Set 011's polish pass (screenshots, sample-report excerpts, posture-shift framing) lands on top of that lean structure.
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification.
 
 ---

@@ -68,6 +68,39 @@
       "description": "Round 1 raised 2 Major (PyPI workflow tag-glob would also match vsix-v* tags; CHANGELOG over-claimed Marketplace publication had landed). Both fixed: added '!vsix-v*' negative pattern to release.yml's on.push.tags, revised runbook's tag-coexistence section, reworded CHANGELOG [0.13.0] Added block to 'Marketplace-publish-ready' framing. Round 2 returned VERIFIED.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/cross-provider-verification",
+      "dateTime": "2026-05-04T19:00:00.000000-04:00",
+      "description": "Routed session-verification via gpt-5-4 (R1: ISSUES_FOUND with 3 Minor findings re verbatim-move calibration; R2: ISSUES_FOUND with 1 wording-precision nit on the change-log; nit addressed inline without a Round 3 per the verifier's stated remediation path).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.069192
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.04065
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-3/handle-verification-result",
+      "dateTime": "2026-05-04T19:00:00.000000-04:00",
+      "description": "Round 1 raised 3 Minor about the spec's 'verbatim move' language: (1) state-derivation-table merge in the deep-dive section, (2) six new file-map rows beyond the verbatim move, (3) Set 011 prerequisite edit too broad. Issue 3 fixed by tightening the prerequisite line; issues 1 and 2 authorized via Set 012's change-log per the verifier's stated 'amend the change-log' remediation. Round 2 cleared issues 1+3, raised one wording-precision nit on the change-log's path enumeration; addressed inline by clarifying the docs/planning/ prefix on runbook entries and adding the 'all other pre-existing rows carried over unchanged' assertion. No Round 3 — finding was documentation-quality not correctness.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

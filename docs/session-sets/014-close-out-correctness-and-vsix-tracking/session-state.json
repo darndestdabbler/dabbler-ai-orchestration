@@ -1,12 +1,17 @@
 {
   "schemaVersion": 2,
   "sessionSetName": "014-close-out-correctness-and-vsix-tracking",
-  "currentSession": null,
+  "currentSession": 1,
   "totalSessions": 2,
-  "status": "not-started",
-  "lifecycleState": null,
-  "startedAt": null,
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-04T14:48:36.415295-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high"
+  }
 }

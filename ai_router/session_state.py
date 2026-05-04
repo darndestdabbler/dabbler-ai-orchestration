@@ -153,7 +153,49 @@ def register_session_start(
     ``orchestrator_effort`` accepts ``"low"``, ``"medium"``, ``"high"``,
     ``"fast"``, ``"normal"``, or ``"unknown"`` — orchestrators that cannot
     introspect their own effort level pass ``"unknown"`` rather than guess.
+
+    Events emission
+    ---------------
+    Before writing the snapshot, this function appends a ``work_started``
+    event to ``session-events.jsonl`` for *session_number*. The append is
+    idempotent: if a ``work_started`` event for this session number is
+    already in the ledger, no second event is appended (covers the
+    orchestrator-restart case where ``register_session_start`` is called
+    twice on the same session). The append happens **before** the
+    snapshot write so that an event-write failure leaves the snapshot
+    un-flipped — same ordering invariant as :func:`mark_session_complete`
+    (event is the audit trail, snapshot is the consumer-readable cache;
+    if the snapshot is missing on the next call, idempotency dedupes
+    the event and the retry succeeds cleanly). The append is best-
+    effort with respect to a missing session-set directory: if the
+    directory does not exist, the event is skipped (the snapshot write
+    below will raise ``FileNotFoundError`` for the same reason, so the
+    skip never hides a recoverable case).
     """
+    # Append the work_started event before the snapshot write so a
+    # failed event leaves the snapshot un-flipped (mirrors the ordering
+    # in mark_session_complete). Lazy import to avoid a top-level cycle:
+    # session_events imports from session_state at module load.
+    if os.path.isdir(session_set):
+        try:
+            from session_events import (  # type: ignore[import-not-found]
+                append_event,
+                read_events,
+            )
+        except ImportError:
+            from .session_events import (  # type: ignore[no-redef]
+                append_event,
+                read_events,
+            )
+        existing = read_events(session_set)
+        already_emitted = any(
+            ev.event_type == "work_started"
+            and ev.session_number == session_number
+            for ev in existing
+        )
+        if not already_emitted:
+            append_event(session_set, "work_started", session_number)
+
     state = {
         "schemaVersion": SCHEMA_VERSION,
         "sessionSetName": os.path.basename(session_set.rstrip("/\\")),

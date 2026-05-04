@@ -1,0 +1,47 @@
+{
+  "sessionSetName": "014-close-out-correctness-and-vsix-tracking",
+  "createdDate": "2026-05-04T14:48:36-04:00",
+  "totalSessions": 2,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-1/cross-provider-verification",
+      "dateTime": "2026-05-04T19:03:39-04:00",
+      "description": "Routed session-verification via gpt-5-4 (R1 attempt 1: lost to wrapper crash; R1 attempt 2: ISSUES_FOUND with 3 items; R2: VERIFIED, no issues).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 46858,
+          "outputTokens": 8762,
+          "costUsd": 0.2486
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.2602
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.1264
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-1/handle-verification-result",
+      "dateTime": "2026-05-04T19:30:00-04:00",
+      "description": "Round 1 attempt 2 surfaced 3 issues: missing test for closeout_succeeded-before-flip ordering invariant; missing forced= propagation to _flip_state_to_closed (production bug); missing test for None-branch return. All three fixed: 1 line of production code (forced=bool(args.force)) + 3 new tests. Round 2 returned VERIFIED.",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

@@ -118,6 +118,151 @@ class TestRegisterSessionStartV2:
         assert data["status"] == "in-progress"  # backward-compat field
         assert data["currentSession"] == 1
 
+    def test_register_session_start_emits_work_started(self, session_set_dir):
+        """Set 014 Session 1 (a): a fresh ``register_session_start`` call
+        appends a single ``work_started`` event for the registered session.
+
+        The event lands in ``session-events.jsonl`` with the right
+        ``session_number`` and ``event_type``. Before Set 014, the
+        orchestrator had to hand-append this event after every
+        ``register_session_start`` so the close-out gate's idempotency
+        check could see the current session's lifecycle correctly; the
+        fix moves the emission into the registration call itself.
+        """
+        from session_events import read_events
+
+        register_session_start(
+            session_set=session_set_dir,
+            session_number=1,
+            total_sessions=2,
+            orchestrator_engine="claude-code",
+            orchestrator_model="claude-opus-4-7",
+        )
+
+        events = read_events(session_set_dir)
+        work_started = [e for e in events if e.event_type == "work_started"]
+        assert len(work_started) == 1, (
+            f"expected exactly one work_started event, got {len(work_started)}"
+        )
+        assert work_started[0].session_number == 1
+        assert work_started[0].event_type == "work_started"
+
+    def test_register_session_start_idempotent_on_repeat(self, session_set_dir):
+        """Set 014 Session 1 (a): calling ``register_session_start`` twice
+        on the same session does not double-emit ``work_started``.
+
+        Idempotency-on-retry is the load-bearing piece — orchestrator
+        restarts (where the start step is re-run after a crash) must not
+        produce two events for the same session number. The snapshot is
+        overwritten on each call (timestamp refreshes), but the events
+        ledger is append-only and dedupes the work_started event.
+        """
+        from session_events import read_events
+
+        register_session_start(
+            session_set=session_set_dir,
+            session_number=1,
+            total_sessions=2,
+            orchestrator_engine="claude-code",
+            orchestrator_model="claude-opus-4-7",
+        )
+        register_session_start(
+            session_set=session_set_dir,
+            session_number=1,
+            total_sessions=2,
+            orchestrator_engine="claude-code",
+            orchestrator_model="claude-opus-4-7",
+        )
+
+        events = read_events(session_set_dir)
+        work_started_for_1 = [
+            e for e in events
+            if e.event_type == "work_started" and e.session_number == 1
+        ]
+        assert len(work_started_for_1) == 1, (
+            "register_session_start must dedupe work_started on repeat call"
+        )
+
+    def test_register_session_start_total_sessions_still_propagates(
+        self, session_set_dir,
+    ):
+        """Set 014 Session 1 (a): the new event-emission step must not
+        regress the existing ``totalSessions`` propagation into
+        ``activity-log.json`` (the original behavior of
+        ``_propagate_total_sessions``).
+        """
+        # Pre-create activity-log.json with totalSessions=0 so the
+        # propagation path has something to update.
+        log_path = os.path.join(session_set_dir, "activity-log.json")
+        with open(log_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "sessionSetName": "test-set",
+                "createdDate": "2026-05-04T00:00:00-04:00",
+                "totalSessions": 0,
+                "entries": [],
+            }, f)
+
+        register_session_start(
+            session_set=session_set_dir,
+            session_number=1,
+            total_sessions=7,
+            orchestrator_engine="claude-code",
+            orchestrator_model="claude-opus-4-7",
+        )
+
+        with open(log_path, encoding="utf-8") as f:
+            log_data = json.load(f)
+        assert log_data["totalSessions"] == 7, (
+            "register_session_start must still propagate total_sessions to "
+            "activity-log.json after the work_started emission addition"
+        )
+
+    def test_register_session_start_emits_event_before_snapshot_write(
+        self, session_set_dir, monkeypatch,
+    ):
+        """Set 014 Session 1 (a): the work_started event is appended
+        BEFORE the snapshot file is written.
+
+        Ordering matters: if the event is appended after the snapshot,
+        an event-write failure would leave the snapshot already flipped
+        to ``in-progress`` while the events ledger has no record. The
+        documented invariant (mirroring ``mark_session_complete``) is
+        event-before-mutation so a failed event leaves the snapshot
+        un-flipped and the next call retries cleanly. We monkey-patch
+        ``append_event`` to raise; the snapshot must NOT exist after
+        the failed call.
+        """
+        import session_events
+        from session_events import read_events
+
+        boom = RuntimeError("simulated event-write failure")
+
+        def fake_append_event(*_a, **_kw):
+            raise boom
+
+        monkeypatch.setattr(session_events, "append_event", fake_append_event)
+
+        with pytest.raises(RuntimeError, match="simulated event-write failure"):
+            register_session_start(
+                session_set=session_set_dir,
+                session_number=1,
+                total_sessions=2,
+                orchestrator_engine="claude-code",
+                orchestrator_model="claude-opus-4-7",
+            )
+
+        # Snapshot must NOT exist — proves the event was attempted first
+        # and the failure aborted the call before the snapshot write.
+        snapshot_path = os.path.join(session_set_dir, SESSION_STATE_FILENAME)
+        assert not os.path.isfile(snapshot_path), (
+            "snapshot must not be written when work_started event fails — "
+            "ordering invariant violated"
+        )
+        # And the events ledger has no work_started either (the patched
+        # append_event raised before writing).
+        events = read_events(session_set_dir)
+        assert not any(e.event_type == "work_started" for e in events)
+
 
 class TestMarkSessionCompleteV2:
     def test_writes_closed_lifecycle_state(self, session_set_dir):

@@ -32,14 +32,18 @@ queue-mediated verification-wait, respectively. Until then:
   — Session 3 implements queue polling against ``queue_db`` and the
   ``--timeout`` budget.
 
-**This script does not yet wire into ``mark_session_complete``.** Set 4
-adds that wiring. ``--force`` was originally listed as a transitional
-flag scheduled for removal; Set 9 Session 3 (D-2) instead hard-scoped
-it to incident-recovery use only — see :func:`_validate_args` and
-``ai_router/docs/close-out.md`` Section 5 for the full contract. For
-now, ``close_session`` runs to completion with stub gates and emits the
-expected ledger events; the orchestrator's existing Step 8 path is
-unchanged.
+Snapshot-flip on success lives in :func:`session_state._flip_state_to_closed`,
+called from this script's success path after ``closeout_succeeded`` is
+appended to the events ledger. The choice of the gate-bypass internal
+flip helper (rather than the public :func:`mark_session_complete`)
+mirrors the ``--repair --apply`` case-2 path: by the time we flip, the
+events ledger already records the close-out as succeeded, so re-running
+the gate via ``mark_session_complete`` would either redundantly validate
+or fail on transient drift the gate would surface. ``--force`` was
+originally listed as a transitional flag scheduled for removal; Set 9
+Session 3 (D-2) instead hard-scoped it to incident-recovery use only —
+see :func:`_validate_args` and ``ai_router/docs/close-out.md`` Section 5
+for the full contract.
 
 Exit codes
 ----------
@@ -1599,6 +1603,44 @@ def run(
             outcome,
             method=method,
         )
+
+        # Flip session-state.json to complete/closed via the gate-bypass
+        # internal helper. Mirrors the ``--repair --apply`` case-2 path
+        # (lines ~1045–1075): the events ledger already records
+        # closeout_succeeded for this session, so re-running the gate
+        # via mark_session_complete would either redundantly validate
+        # or fail on transient drift the gate would surface. The flip
+        # is a snapshot resync, not a gate decision. Lazy-import to
+        # avoid a top-level cycle (session_state imports close_session
+        # in mark_session_complete's gate-running branch).
+        #
+        # ``forced=args.force`` propagates the forensic marker on the
+        # ``--force`` path (Set 9 Session 3, D-2): the success path's
+        # message above promises that ``session-state.json`` will record
+        # ``forceClosed=true`` on the next snapshot flip. Without this
+        # argument the snapshot would silently skip the marker and
+        # forensic walks of the events + snapshot pair would lose the
+        # bypass signal.
+        try:
+            from session_state import _flip_state_to_closed  # type: ignore[import-not-found]
+        except ImportError:
+            from .session_state import _flip_state_to_closed  # type: ignore[no-redef]
+        flipped_path = _flip_state_to_closed(
+            session_set_dir, forced=bool(args.force),
+        )
+        if flipped_path is not None:
+            outcome.messages.append(
+                "flipped session-state.json to complete/closed via "
+                "_flip_state_to_closed"
+            )
+        else:
+            # No state file to flip — surface a warning but do not
+            # fail close-out. The events ledger is the canonical
+            # record; the snapshot is the consumer-readable cache.
+            outcome.messages.append(
+                "warning: no session-state.json found to flip; "
+                "events ledger remains the canonical record"
+            )
         return outcome
     finally:
         release_lock(lock_handle)

@@ -1,0 +1,33 @@
+{
+  "status": "completed",
+  "summary": "Set 14 Session 1: Landed two close-out workflow correctness fixes plus tests. (a) ai_router/session_state.py register_session_start now appends a work_started event to session-events.jsonl before writing the snapshot, with idempotency via read_events check (no double-emit on orchestrator restart) and the os.path.isdir guard matching mark_session_complete's precedent. Ordering invariant: event-before-snapshot mirrors mark_session_complete so a failed event leaves the snapshot un-flipped. Docstring extended with an Events emission section describing the new behavior. (b) ai_router/close_session.py's success path (after the existing closeout_succeeded _emit_event call, around line 1595) now lazy-imports _flip_state_to_closed and calls it with forced=bool(args.force). The forced= propagation is the Round 1 fix (Issue 2): without it, --force close-outs would silently skip the forceClosed: true forensic marker that Set 9 Session 3 D-2 contracts to the VS Code Session Set Explorer's [FORCED] badge. The flip is gate-bypass (matches the --repair --apply case-2 pattern at lines 1046-1075) since the events ledger already records closeout_succeeded for this session. None-return from the helper surfaces a warning message but does not fail close-out (events ledger is canonical). The line-35 module docstring's Set-4-pending forward-reference was replaced with a current description pointing at _flip_state_to_closed. (c) Six tests in two files: ai_router/tests/test_session_state_v2.py gained four register_session_start tests (emits work_started; idempotent on repeat; total_sessions still propagates; emits event before snapshot write — the latter monkeypatches append_event to raise and asserts the snapshot was not created). ai_router/tests/test_close_session_snapshot_flip.py is a new file with six tests against a real-git-repo + bare-remote fixture: happy_path_flips_snapshot; emits_closeout_succeeded_before_flip (Round 1 ordering test, monkeypatches close_session.append_event to raise selectively for closeout_succeeded); force_path_records_force_closed_marker (Round 1 forced-marker test); succeeds_when_state_file_missing (Round 1 None-branch test); happy_path_no_repair_needed; multi_session_set_clean (the regression test for Set 013's papercut). One assertion in test_mark_session_complete_gate.py::test_failure_emits_no_event was narrowed to filter out work_started (now emitted by register_session_start in the fixture per Set 014 (a)) — the test's actual intent (no closeout events on gate-fail) is preserved. (d) Docstring updates done as part of (a) and (b). Full Python test suite passes 690 tests excluding two pre-existing test_restart_role.py daemon-PID-mismatch flakes (verified unrelated to Set 014 by stashing changes and re-running on master). Cross-provider verification: Round 1 attempt 1 ($0.2486) lost to the same wrapper-crash bug Set 013 Session 2 documented (orchestrator's Python wrapper read .cost instead of .total_cost_usd before capturing the verdict); Round 1 attempt 2 ($0.2602) returned ISSUES_FOUND with 3 items, all addressed; Round 2 ($0.1264) returned VERIFIED. Total session-verification spend: $0.6353, double the $0.10-$0.30 spec projection — driver split: (1) wrapper-crash double-spend ($0.2486 lost — strengthens the case for the lessons-learned.md note Set 013 flagged); (2) Round 2 needed because the verifier found a real production bug (the forced= propagation) plus two missing test invariants. The verifier's instinct on Issue 2 is the kind of subtle cross-feature coupling (Set 9 D-2 marker contract x Set 14 flip-on-success wiring) the cross-provider workflow exists to surface. Session 1 lands without manual workarounds for Session 2's start: register_session_start will auto-emit work_started for session 2, and close_session at session 2 will flip the snapshot without --repair — the multi-session regression test in production.",
+  "files_changed": [
+    "ai_router/session_state.py",
+    "ai_router/close_session.py",
+    "ai_router/tests/test_session_state_v2.py",
+    "ai_router/tests/test_close_session_snapshot_flip.py",
+    "ai_router/tests/test_mark_session_complete_gate.py",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/ai-assignment.md",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/session-state.json",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/session-events.jsonl",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/activity-log.json",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/disposition.json",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/session-reviews/session-001-prompt.md",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/session-reviews/session-001.md",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/session-reviews/session-001-prompt-r2.md",
+    "docs/session-sets/014-close-out-correctness-and-vsix-tracking/session-reviews/session-001-r2.md"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 is mechanical (gitignore + READMEs + sideload smoke test). Sonnet at medium would suffice, but staying on Opus matches Session 1's choice and operator's typical preference. No production-code surprises expected; one verification round."
+    }
+  },
+  "blockers": []
+}

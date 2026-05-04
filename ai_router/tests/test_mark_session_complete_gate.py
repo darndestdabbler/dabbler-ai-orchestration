@@ -237,10 +237,18 @@ class TestGateFailWithoutForce:
         with pytest.raises(CloseoutGateFailure):
             mark_session_complete(started_session_set)
 
-        events = read_events(started_session_set)
+        # Filter out work_started — emitted by register_session_start in
+        # the fixture (Set 014 (a)), not by mark_session_complete. The
+        # assertion's intent is "no closeout-flow events landed", which
+        # is what mark_session_complete's failure path is expected to
+        # uphold.
+        events = [
+            e for e in read_events(started_session_set)
+            if e.event_type != "work_started"
+        ]
         assert events == [], (
-            "no events should land when the gate rejects without force; "
-            f"got: {[e.event_type for e in events]}"
+            "no closeout events should land when the gate rejects without "
+            f"force; got: {[e.event_type for e in events]}"
         )
 
     def test_multiple_failures_all_surface(

@@ -27,6 +27,13 @@
   ],
   "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": null,
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "reason": "continue-current-trajectory",
+    "specifics": "Session 3 (final session of Set 012) is the README shrink + docs/repository-reference.md spinout. Pure documentation restructure — heavy edit on README.md, new reference doc, Set 011 prerequisite line update, cross-link audit. Same orchestrator and effort as Sessions 1 and 2; no scope or constraint shift indicated. Spec warns Round 2 verification is more likely than usual given the prose-tighten nature, so budget should accommodate two rounds."
+  },
   "blockers": []
 }

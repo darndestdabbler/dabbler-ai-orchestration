@@ -1,0 +1,73 @@
+{
+  "_note": "Audit record of all routing attempts during Set 016 Session 1. The original _route_consultation.py crashed on a Windows cp1252 console encoding error after Gemini's call succeeded but before this JSON dump was written; this file is reconstructed from the metrics record and provider-response files on disk.",
+
+  "gemini-2.5-pro": {
+    "status": "succeeded",
+    "model_alias": "gemini-pro",
+    "provider": "google",
+    "model_id": "gemini-2.5-pro",
+    "tier": 2,
+    "routing_surface": "raw API via ai_router.providers.call_model",
+    "input_tokens": 4371,
+    "output_tokens": 5377,
+    "cost_usd": 0.059234,
+    "elapsed_seconds": 112.914,
+    "stop_reason": "end_turn",
+    "thinking_on": true,
+    "response_file": "gemini-2.5-pro.md",
+    "metrics_record_timestamp": "2026-05-05T10:13:39.999826+00:00",
+    "notes": "Clean completion via raw API. Substantial 21KB response covering all five questions plus caveats. See router-metrics.jsonl for the canonical metrics row."
+  },
+
+  "gpt-5-4-via-codex": {
+    "status": "succeeded",
+    "model_alias": "gpt-5-4",
+    "provider": "openai",
+    "model_id": "gpt-5.4",
+    "reasoning_effort": "medium",
+    "tier": 3,
+    "routing_surface": "Codex (IDE-integrated agent with file-system access)",
+    "input_tokens": null,
+    "output_tokens": null,
+    "cost_usd": null,
+    "elapsed_seconds": null,
+    "stop_reason": null,
+    "response_file": "codex.md",
+    "metrics_record_timestamp": null,
+    "notes": "Run manually by operator via Codex after raw-API attempts timed out. Token/cost data not captured because the call did not pass through ai_router.providers.call_model. The IDE-integrated routing turned out to be load-bearing: Codex inspected the actual harvester repo state, which is what produced GPT's empirical advantages over Gemini-via-API (noticed dirty main + 36-commit gap, empirically tested git clean -fdx -n on Git 2.51). See docs/case-studies/cross-provider-collaboration-spike-016.md for the full discussion."
+  },
+
+  "gpt-5-4-via-api-attempts": [
+    {
+      "status": "failed",
+      "model_alias": "gpt-5-4",
+      "provider": "openai",
+      "model_id": "gpt-5.4",
+      "reasoning_effort": "high",
+      "routing_surface": "raw API via ai_router.providers.call_model",
+      "attempt_count": 3,
+      "timeout_seconds_per_attempt": 300,
+      "total_elapsed_seconds_approx": "unknown (script error before timing was captured)",
+      "failure": "RuntimeError: API call failed after 3 attempts: The read operation timed out",
+      "notes": "First attempt with default 300s timeout. All three retries (per provider config) hit the read timeout."
+    },
+    {
+      "status": "failed",
+      "model_alias": "gpt-5-4",
+      "provider": "openai",
+      "model_id": "gpt-5.4",
+      "reasoning_effort": "high",
+      "routing_surface": "raw API via ai_router.providers.call_model",
+      "attempt_count": 2,
+      "timeout_seconds_per_attempt": 1200,
+      "total_elapsed_seconds_approx": 2402.8,
+      "failure": "RuntimeError: API call failed after 2 attempts: The read operation timed out",
+      "notes": "Second attempt with bumped 1200s (20-min) timeout per attempt. Both attempts still hit the read timeout. This is anomalous — past metrics show GPT-5.4 with reasoning_effort:high typically completes similar prompts in 40-60 seconds. Cause is unclear: candidates include OpenAI API instability on the day, pathological reasoning loops on the specific prompt shape, or network buffering causing a streaming-style response to look like a hung request to a synchronous httpx client. The eventual successful path (GPT-5.4 medium via Codex) avoided the issue entirely."
+    }
+  ],
+
+  "_open_issues_for_followup": [
+    "Windows cp1252 console encoding bug in _route_consultation.py (now deleted) — any future routing helper script must replace U+2192 (→) and other non-cp1252 characters in print statements, or set PYTHONIOENCODING=utf-8.",
+    "GPT-5.4 reasoning_effort:high timeout on long structured prompts — needs further investigation if reproduced; default to reasoning_effort:medium for advisory/structured tasks until understood."
+  ]
+}

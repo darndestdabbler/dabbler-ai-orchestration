@@ -212,6 +212,11 @@ authoritative rule list every orchestrator obeys), see
 For sample manager-report output from real projects at scale, see
 [docs/sample-reports/](docs/sample-reports/).
 
+For worked examples of cross-provider AI consultation in practice — what
+each provider explored, where they agreed and meaningfully differed,
+and what makes the pattern worth using — see
+[docs/case-studies/](docs/case-studies/).
+
 ---
 
 ## License

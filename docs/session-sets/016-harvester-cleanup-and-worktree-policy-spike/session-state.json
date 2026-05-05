@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "sessionSetName": "016-harvester-cleanup-and-worktree-policy-spike",
+  "currentSession": 1,
+  "totalSessions": 1,
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-05T04:39:38.768154-04:00",
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high"
+  }
+}

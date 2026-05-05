@@ -1,0 +1,24 @@
+{
+  "status": "completed",
+  "summary": "Set 016 Session 1 (single-session spike): cross-provider consultation on harvester drift + canonical worktree-layout choice. Three independent takes (Gemini-2.5 Pro via raw API, GPT-5.4 Medium via Codex, orchestrator Opus 4.7) converged on Option B (Nephew-and-Niece Worktrees) as the new canonical layout, replacing Option D (bare-repo + flat-worktree) adopted 2026-04-28. Spike produced a technical proposal driving downstream work plus a published case study suitable for external sharing. No code or repo state changes outside this set's folder, docs/case-studies/ (new), and a one-paragraph README link. Routing notes: GPT-5.4 raw-API attempts at reasoning_effort:high timed out twice (3 retries at 300s, then 2 retries at 1200s = 40 minutes total). Operator successfully re-routed via Codex with reasoning_effort:medium. Gemini-2.5 Pro succeeded on first attempt via raw API (113s, $0.0592, 4371 in / 5377 out tokens). The routing surface (raw API vs IDE-integrated agent) turned out to be load-bearing: GPT-via-Codex inspected the actual harvester repo state and caught two things Gemini-via-API missed (main worktree currently dirty, PoC branch 36 commits behind base; git clean -fdx -n empirically skips registered worktrees on Git 2.51 contradicting an assumption baked into the prompt). This insight was saved as feedback memory feedback_routing_surface_choice.md and surfaced as a queued follow-up tooling set (IDE-agent consult tool). Total spike spend: $0.0592 (Gemini-only metered; Codex run on operator subscription not metered through this repo's API spend) - 50x under the high-budget cap. Five operator decisions ratified: (1) Option B as canonical, (2) preserve-first cleanup discipline with backups before destructive ops, (3) clone-and-swap migration over collapse-in-place, (4) patch+bundle archive default for cancelled work at <repo>/docs/cancelled-sessions/, (5) tooling-first regression guardrails (worktree CLI as primary defense). Six follow-up work items queued in change-log.md: layout-doc edit, Set 015 Session 3 re-plan (D->B migration), worktree CLI tooling, layout checker, cancel CLI, and the new IDE-agent consult tool surfaced this session. Auto-memory entries saved: feedback_routing_surface_choice.md (new), project_marketplace_presentation_followups.md (updated with Testing as candidate marketplace category), project_uat_dsl.md (new, captures operator's DSL-driven UAT/E2E pattern in dabbler-platform). Cross-provider verification was satisfied by the spike's structure itself: two independent providers reviewed the same prompt with the same five questions; their responses are preserved verbatim in provider-responses/ and synthesized in proposal.md with explicit divergence tracking. No additional verifier route required; spec did not mandate a separate verifier route given the spike's nature. Routing helper script (_route_consultation.py) was deleted post-completion due to a Windows cp1252 console encoding bug (couldn't print U+2192) that crashed the success-print after both providers' content was already on disk; route-results.json under provider-responses/ was reconstructed from the metrics record and on-disk state to preserve audit trail. The empty gpt-5.md API-failure stub was deleted; codex.md (filename reflecting routing surface, not just model) is the canonical OpenAI response artifact. Naming deviation from spec (which listed gpt-5.md) is documented in change-log.md. Session 1 of 1 complete; spike's only session.",
+  "files_changed": [
+    "README.md",
+    "docs/case-studies/cross-provider-collaboration-spike-016.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/spec.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/findings.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/questions.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/provider-responses/gemini-2.5-pro.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/provider-responses/codex.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/provider-responses/route-results.json",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/proposal.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/executive-summary.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/change-log.md",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/disposition.json",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/session-state.json",
+    "docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/session-events.jsonl"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": []
+}

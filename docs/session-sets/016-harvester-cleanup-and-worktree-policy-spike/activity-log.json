@@ -1,0 +1,114 @@
+{
+  "sessionSetName": "016-harvester-cleanup-and-worktree-policy-spike",
+  "createdDate": "2026-05-05T04:39:38-04:00",
+  "totalSessions": 1,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-1/register-session-start",
+      "dateTime": "2026-05-05T04:39:38-04:00",
+      "description": "Registered Session 1 start via ai_router.session_state.register_session_start. Snapshot flipped to in-progress; work_started event appended to session-events.jsonl.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-1/audit-harvester",
+      "dateTime": "2026-05-05T04:50:00-04:00",
+      "description": "Empirical audit of dabbler-access-harvester topology against the canonical Option D layout. Three anomaly classes identified: (A) live registered worktree at non-canonical .claude/worktrees/vba-symbol-resolution-session-1 path, branch worktree-vba-symbol-resolution-session-1 with 3 unique commits never pushed and not merged, 5+ commits behind main; (B) empty stranded directory docs/session-sets/workflow-package-pilot/ at container root; (C) empty stranded directory tmp/feedback/ at container root. Findings authored to findings.md.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-1/author-consultation-prompt",
+      "dateTime": "2026-05-05T05:30:00-04:00",
+      "description": "Authored questions.md as the verbatim cross-provider consultation prompt. Initial draft had four questions (Q1 cleanup, Q2 bare-repo-vs-sequential, Q3 deactivate-recipe, Q4 guardrails); operator subsequently expanded scope with four named layout options (Repo-Level Sibling, Nephew-and-Niece, Son-and-Daughter, Subrepo-Level Sibling) and added Q5 (cancel-and-cleanup safe-way-out). Final prompt: five questions, ~14KB, with Option C technical-feasibility sub-questions for the providers to validate empirically.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-1/cross-provider-consultation",
+      "dateTime": "2026-05-05T06:13:39-04:00",
+      "description": "Cross-provider consultation routed in parallel via concurrent.futures.ThreadPoolExecutor. Gemini-2.5 Pro completed in 113s on first attempt via raw API. GPT-5.4 reasoning_effort:high raw-API attempts repeatedly timed out (3 retries at 300s default, then 2 retries at 1200s = 40min total wall-clock). Operator successfully re-routed via Codex (IDE-integrated agent with file-system access) using GPT-5.4 reasoning_effort:medium; substantive response saved as provider-responses/codex.md. Routing helper script crashed on Windows cp1252 console encoding error (U+2192 in success-print) AFTER Gemini's response and metrics record were already written; route-results.json reconstructed from on-disk state.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 4371,
+          "outputTokens": 5377,
+          "costUsd": 0.0592
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/review-divergences",
+      "dateTime": "2026-05-05T07:20:00-04:00",
+      "description": "Reviewed both provider responses against orchestrator's own pre-routing analysis. Identified five meaningful divergences: (1) Q1 default Anomaly A disposition (Gemini auto-merge vs GPT preserve-first; GPT wins because main is dirty + branch 36 commits behind), (2) Option C git clean -fdx behavior (Gemini/orchestrator reasoned would-nuke; GPT empirically tested on Git 2.51 and confirmed registered worktrees are protected), (3) D->B migration approach (Gemini collapse-in-place vs GPT clone-and-swap; GPT wins because matches existing canonical migration recipe and preserves rollback path), (4) Q4 worktree CLI tooling (only GPT proposed; adopted as primary regression guardrail), (5) Q5 archive location (genuine tradeoff: docs/cancelled-sessions/ for discoverability vs git-common-dir for git-purity).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/synthesize-proposal",
+      "dateTime": "2026-05-05T07:50:00-04:00",
+      "description": "Authored proposal.md as the technical synthesis driving downstream work. Sections: TL;DR, recommended canonical layout (Option B with explicit ranking + rationale), harvester cleanup recipe (preserve-first per GPT), D->B migration recipe (clone-and-swap per GPT), four tooling specs (worktree CLI, cancel_session CLI, layout checker, doc updates), provider divergences table, six open questions for operator review, three non-goals NOT addressed by this proposal.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-1/author-and-publish-case-study",
+      "dateTime": "2026-05-05T08:20:00-04:00",
+      "description": "Authored executive-summary.md as the cross-provider collaboration narrative suitable for external sharing. Operator approved synthesis recommendations and elected to publish under docs/case-studies/ with a small README link (rather than as a Wiki entry, which would be out of git history). Created docs/case-studies/cross-provider-collaboration-spike-016.md with adjusted relative paths; replaced spike's executive-summary.md with a small stub redirecting to the canonical location; added one paragraph to README.md 'More' section linking to docs/case-studies/.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-1/save-routing-surface-feedback",
+      "dateTime": "2026-05-05T08:50:00-04:00",
+      "description": "Operator surfaced an architectural insight: GPT's empirical advantages came from routing surface (Codex with file access), not from anything intrinsic to GPT-5.4 as a model. Routing decision is two-dimensional (provider X surface), not one-dimensional. Saved as feedback memory feedback_routing_surface_choice.md with decision matrix for when surface matters. Updated case study with new section 'Surface choice (API vs IDE agent) was load-bearing' and added honesty note that orchestrator (Claude Code) also has file access, partly explaining why orchestrator+GPT aligned more closely than either aligned with Gemini-via-API. Insight queued as a future tooling set: python -m ai_router.consult emitting copy-pasteable bundles for IDE-agent routing.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-1/cleanup-residuals",
+      "dateTime": "2026-05-05T09:10:00-04:00",
+      "description": "Per operator's 'use your best judgment' on residual cleanup: deleted empty provider-responses/gpt-5.md API-failure stub (codex.md is the canonical OpenAI response artifact, filename reflects routing surface); deleted _route_consultation.py routing helper (cp1252 unicode bug means it can't be re-run as-is, and any future generic routing should be the queued IDE-agent consult tool, not a Set-016-specific script); reconstructed provider-responses/route-results.json from on-disk state to preserve audit trail.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-1/author-change-log-and-disposition",
+      "dateTime": "2026-05-05T09:30:00-04:00",
+      "description": "Authored change-log.md (close-out summary listing what landed, decisions ratified, six queued follow-up work items including the new IDE-agent consult tool surfaced this session, naming-convention note about codex.md vs spec's gpt-5.md, routing-attempt summary, effort/spend total $0.0592). Authored disposition.json + activity-log.json as required close-out artifacts.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "session-1/close-out",
+      "dateTime": "2026-05-05T09:40:00-04:00",
+      "description": "Content commit (613f1bf) staged Set 016 deliverables only (README.md + docs/case-studies/ + docs/session-sets/016-.../) - excluded pre-existing unrelated changes in tools/. Pushed to origin master. close_session run twice: first invocation surfaced disposition.json + activity-log.json as missing required artifacts; second invocation passes the gate.",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

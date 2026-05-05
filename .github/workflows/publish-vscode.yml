@@ -130,6 +130,19 @@ jobs:
         # this is unlikely to fail given the previous check passed, but it
         # protects against a vsce-side regression where the produced file
         # name diverges from the stated version.
+        #
+        # Defensive single-VSIX check: also fail if any *other* VSIX file is
+        # present in the working directory after `vsce package`. The repo
+        # commits the canonical sideload artifact at
+        # `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-<prior>.vsix`,
+        # which is checked into the working tree at tag-checkout time.
+        # Without this check, the upload-artifact glob below would scoop up
+        # the prior committed VSIX alongside the freshly built one, and the
+        # publish step's `head -n1` would pick the lexicographically-first
+        # file — which is the wrong (older) version. (See the v0.12.1
+        # mis-publish on the vsix-v0.13.0 release run for the actual
+        # incident.) This step now rejects any extra VSIX so the wrong-
+        # artifact path can never silently re-occur.
         env:
           EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
         run: |
@@ -139,13 +152,33 @@ jobs:
             ls -la *.vsix || true
             exit 1
           fi
-          echo "VSIX filename check OK: $expected_file exists."
+          # Count VSIX files in the working directory; only the just-built
+          # one should remain. Any extras indicate a committed sideload
+          # artifact that needs removal before publish.
+          shopt -s nullglob
+          extras=()
+          for f in dabbler-ai-orchestration-*.vsix; do
+            if [[ "$f" != "$expected_file" ]]; then
+              extras+=("$f")
+            fi
+          done
+          if (( ${#extras[@]} > 0 )); then
+            echo "::error::extra VSIX file(s) present in tools/dabbler-ai-orchestration/ alongside '$expected_file': ${extras[*]}. Remove them from the working tree (or update the workflow to clean before vsce package) so the publish step cannot pick the wrong one."
+            exit 1
+          fi
+          echo "VSIX filename check OK: $expected_file is the only VSIX present."
 
       - name: Upload VSIX artifact
+        # Path is version-pinned to the expected filename rather than a
+        # `*.vsix` glob, so even if the defensive check above fails to
+        # catch an extra VSIX, the artifact upload still ships only the
+        # intended bytes. Pre-the-fix, the glob uploaded both the built
+        # and the pre-committed VSIX, and the publish step picked the
+        # wrong one via `head -n1`.
         uses: actions/upload-artifact@v4
         with:
           name: vsix
-          path: tools/dabbler-ai-orchestration/dabbler-ai-orchestration-*.vsix
+          path: tools/dabbler-ai-orchestration/dabbler-ai-orchestration-${{ needs.classify.outputs.semver_version }}.vsix
           if-no-files-found: error
           retention-days: 30
 
@@ -180,10 +213,18 @@ jobs:
       - name: Publish to VS Code Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
         run: |
-          vsix_file=$(ls vsix/dabbler-ai-orchestration-*.vsix | head -n1)
-          if [[ -z "$vsix_file" ]]; then
-            echo "::error::no VSIX found in downloaded artifact"
+          # Version-pinned path: pick the exact VSIX matching the tag, not
+          # whatever lexicographically-first file the download artifact
+          # happens to contain. The pre-fix `ls ... | head -n1` shape
+          # silently mis-published v0.12.1 from the vsix-v0.13.0 run when
+          # a stale committed VSIX was bundled alongside the just-built
+          # one.
+          vsix_file="vsix/dabbler-ai-orchestration-${EXPECTED_VERSION}.vsix"
+          if [[ ! -f "$vsix_file" ]]; then
+            echo "::error::expected VSIX '$vsix_file' not found in downloaded artifact. Files present:"
+            ls -la vsix/ || true
             exit 1
           fi
           echo "Publishing $vsix_file to VS Code Marketplace..."
@@ -220,15 +261,18 @@ jobs:
       - name: Publish to Open VSX Registry
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
+          EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
         run: |
           if [[ -z "${OVSX_PAT:-}" ]]; then
             echo "OVSX_PAT not configured for the openvsx environment; skipping Open VSX publish."
             echo "This is non-fatal: Marketplace publish above already succeeded. Configure OVSX_PAT to enable dual-publish."
             exit 0
           fi
-          vsix_file=$(ls vsix/dabbler-ai-orchestration-*.vsix | head -n1)
-          if [[ -z "$vsix_file" ]]; then
-            echo "::error::no VSIX found in downloaded artifact"
+          # Version-pinned path; same rationale as the Marketplace step.
+          vsix_file="vsix/dabbler-ai-orchestration-${EXPECTED_VERSION}.vsix"
+          if [[ ! -f "$vsix_file" ]]; then
+            echo "::error::expected VSIX '$vsix_file' not found in downloaded artifact. Files present:"
+            ls -la vsix/ || true
             exit 1
           fi
           echo "Publishing $vsix_file to Open VSX Registry..."

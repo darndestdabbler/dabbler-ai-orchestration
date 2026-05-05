@@ -54,13 +54,15 @@ export function forceClosedBadge(set: SessionSet): string {
 }
 
 // Outsource-first vs. outsource-last is a routing choice that lives in
-// each spec.md's `Session Set Configuration` block. The badge surfaces it
-// on the session-set tree row so the operator can tell at a glance which
-// path a set's verifications take without opening the spec.
-export function modeBadge(set: SessionSet): string {
-  const mode = set.config?.outsourceMode;
-  if (mode === "last") return "[LAST]";
-  if (mode === "first") return "[FIRST]";
+// each spec.md's `Session Set Configuration` block. v0.13.1 removed the
+// always-visible badge text — when 99% of sets use the default
+// `outsourceMode: first`, the badge becomes visual noise that doesn't
+// differentiate anything. The mode still surfaces in the row tooltip
+// (`configTooltipLines` adds `Mode: outsource-<x>` on hover) for
+// diagnostic purposes, and the AI router still consumes the field —
+// only the badge text was removed. Function kept (returning empty) so
+// existing imports / tests don't need to change shape.
+export function modeBadge(_set: SessionSet): string {
   return "";
 }
 
@@ -164,6 +166,18 @@ export class SessionSetsProvider
     const all = this._cache;
 
     if (!element) {
+      // v0.13.1: when the workspace has no session sets at all, return an
+      // empty array so VS Code renders the `viewsWelcome` content
+      // (configured in package.json under `contributes.viewsWelcome`).
+      // The welcome content shows a Copy-adoption-bootstrap-prompt link
+      // and a Get Started pointer — the discoverable starting point for
+      // first-time users sits at the empty state itself rather than
+      // hiding behind context-menu actions on rows that don't exist
+      // yet. Once any session set exists in the workspace, the groups
+      // below render and the welcome content suppresses automatically.
+      if (all.length === 0) {
+        return [];
+      }
       const inProgress = all.filter((s) => s.state === "in-progress");
       const notStarted = all.filter((s) => s.state === "not-started");
       const done = all.filter((s) => s.state === "done");

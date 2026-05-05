@@ -93,21 +93,26 @@ suite("parseSessionSetConfig — outsourceMode", () => {
 });
 
 suite("SessionSetsProvider — modeBadge", () => {
-  test("renders [FIRST] for outsource-first sets", () => {
+  // v0.13.1 removed the always-visible badge text. The function still
+  // exists (returning empty) so existing imports don't break, but the
+  // badge does not render in the tree row description anymore. The
+  // mode information still surfaces in the row tooltip via
+  // configTooltipLines's `Mode: outsource-<x>` entry.
+  test("renders empty string for outsource-first sets (badge suppressed)", () => {
     assert.strictEqual(
       modeBadge(fakeSet({ config: {
         requiresUAT: false, requiresE2E: false, uatScope: "none", outsourceMode: "first",
       } })),
-      "[FIRST]",
+      "",
     );
   });
 
-  test("renders [LAST] for outsource-last sets", () => {
+  test("renders empty string for outsource-last sets (badge suppressed)", () => {
     assert.strictEqual(
       modeBadge(fakeSet({ config: {
         requiresUAT: false, requiresE2E: false, uatScope: "none", outsourceMode: "last",
       } })),
-      "[LAST]",
+      "",
     );
   });
 });

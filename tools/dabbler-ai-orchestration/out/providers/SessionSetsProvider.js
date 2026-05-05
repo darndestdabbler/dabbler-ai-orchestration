@@ -34,6 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SessionSetsProvider = void 0;
+exports.forceClosedBadge = forceClosedBadge;
 exports.modeBadge = modeBadge;
 const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
@@ -73,16 +74,26 @@ function uatBadge(set) {
         return "[UAT done]";
     return "";
 }
+// Set 9 Session 3 (D-2 hard-scoping of ``--force``): the badge surfaces
+// the rare case where a session set was closed via the hard-scoped
+// ``--force`` bypass instead of the deterministic gate. The flag is
+// written by ``_flip_state_to_closed(forced=True)`` in
+// ``ai_router/session_state.py``; absent or false on every snapshot
+// written by a normal close-out, so the badge never appears for
+// healthy sets.
+function forceClosedBadge(set) {
+    return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
+}
 // Outsource-first vs. outsource-last is a routing choice that lives in
-// each spec.md's `Session Set Configuration` block. The badge surfaces it
-// on the session-set tree row so the operator can tell at a glance which
-// path a set's verifications take without opening the spec.
-function modeBadge(set) {
-    const mode = set.config?.outsourceMode;
-    if (mode === "last")
-        return "[LAST]";
-    if (mode === "first")
-        return "[FIRST]";
+// each spec.md's `Session Set Configuration` block. v0.13.1 removed the
+// always-visible badge text — when 99% of sets use the default
+// `outsourceMode: first`, the badge becomes visual noise that doesn't
+// differentiate anything. The mode still surfaces in the row tooltip
+// (`configTooltipLines` adds `Mode: outsource-<x>` on hover) for
+// diagnostic purposes, and the AI router still consumes the field —
+// only the badge text was removed. Function kept (returning empty) so
+// existing imports / tests don't need to change shape.
+function modeBadge(_set) {
     return "";
 }
 function liveSessionTooltipLines(set) {
@@ -104,6 +115,10 @@ function liveSessionTooltipLines(set) {
     }
     if (ls.verificationVerdict) {
         lines.push(`Verifier: ${ls.verificationVerdict}`);
+    }
+    if (ls.forceClosed === true) {
+        lines.push("Force-closed: gate bypassed via --force (incident recovery). " +
+            "See closeout_force_used in session-events.jsonl for the operator's reason.");
     }
     return lines;
 }
@@ -166,6 +181,18 @@ class SessionSetsProvider {
         }
         const all = this._cache;
         if (!element) {
+            // v0.13.1: when the workspace has no session sets at all, return an
+            // empty array so VS Code renders the `viewsWelcome` content
+            // (configured in package.json under `contributes.viewsWelcome`).
+            // The welcome content shows a Copy-adoption-bootstrap-prompt link
+            // and a Get Started pointer — the discoverable starting point for
+            // first-time users sits at the empty state itself rather than
+            // hiding behind context-menu actions on rows that don't exist
+            // yet. Once any session set exists in the workspace, the groups
+            // below render and the welcome content suppresses automatically.
+            if (all.length === 0) {
+                return [];
+            }
             const inProgress = all.filter((s) => s.state === "in-progress");
             const notStarted = all.filter((s) => s.state === "not-started");
             const done = all.filter((s) => s.state === "done");
@@ -210,7 +237,13 @@ class SessionSetsProvider {
     }
     makeSetItem(set) {
         const item = new vscode.TreeItem(set.name, vscode.TreeItemCollapsibleState.None);
-        const bits = [progressText(set), touchedDate(set), modeBadge(set), uatBadge(set)].filter(Boolean);
+        const bits = [
+            progressText(set),
+            touchedDate(set),
+            modeBadge(set),
+            uatBadge(set),
+            forceClosedBadge(set),
+        ].filter(Boolean);
         item.description = bits.join("  ·  ");
         item.tooltip = new vscode.MarkdownString([
             `**${set.name}**`,

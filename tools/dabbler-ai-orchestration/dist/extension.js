@@ -1476,12 +1476,7 @@ function uatBadge(set) {
 function forceClosedBadge(set) {
   return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
 }
-function modeBadge(set) {
-  const mode = set.config?.outsourceMode;
-  if (mode === "last")
-    return "[LAST]";
-  if (mode === "first")
-    return "[FIRST]";
+function modeBadge(_set) {
   return "";
 }
 function liveSessionTooltipLines(set) {
@@ -1569,6 +1564,9 @@ var SessionSetsProvider = class {
     }
     const all = this._cache;
     if (!element) {
+      if (all.length === 0) {
+        return [];
+      }
       const inProgress = all.filter((s) => s.state === "in-progress");
       const notStarted = all.filter((s) => s.state === "not-started");
       const done = all.filter((s) => s.state === "done");

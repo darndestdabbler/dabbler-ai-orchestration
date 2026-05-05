@@ -1,239 +1,151 @@
 # Dabbler AI Orchestration
 
-An AI-led workflow extension for VS Code. Manage structured AI coding sessions, scaffold new projects, track session-set state across git worktrees, and monitor cumulative API costs — all from the activity bar.
+An AI-led coding-session workflow for VS Code. Manage structured AI
+sessions, automatic cross-provider verification, cost tracking, and
+git-worktree-aware session-set state — all from the activity bar.
 
 ![Session Set Explorer in action](media/session-set-explorer-in-action.png)
 
-## Features
+---
 
-### Adoption bootstrap (`Dabbler: Copy adoption bootstrap prompt`)
+## What you get
 
-The single recommended starting point for any new project. Copies a short prompt to the clipboard that you paste into a fresh AI chat — Claude Code, Gemini Code Assist, GPT-based tools, all work. The pasted prompt points the AI at the canonical online instructions at [docs/adoption-bootstrap.md](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/docs/adoption-bootstrap.md), which orient the AI to detect your workspace state, run a budget-threshold dialog (zero / less than $20 / $20–$99 / $100+ tiers), propose a session-set decomposition, and then present a numbered checklist of every intended write/config/scaffolding action for batch approval before executing. No per-write prompts; you can interrupt at any time. The doc is engine-agnostic by construction — it describes tools in capability terms ("fetch a URL," "list files matching a pattern") rather than Claude-specific function names. After the AI completes its checklist, the rest of the workflow uses the existing wizard, session-set explorer, and cost dashboard documented below.
+- **Sessions, not infinite chats.** Bounded slices of work — one
+  session, one orchestrator conversation, one verification, one
+  commit. Sessions live inside ordered **session sets** that you and
+  the AI co-design before any code is written. The activity-bar tree
+  shows what's in flight, what's queued, and what's done.
 
-### Session Set Explorer
-A live tree view of your project's session sets, grouped by state:
+- **Cost-minded routing.** Every reasoning task (code review,
+  analysis, documentation, end-of-session verification) goes through
+  the AI router, which picks the cheapest capable model per task and
+  escalates only when needed. Real projects we tested measured
+  **73% savings vs Opus-only** on a CLI/library project (990 routed
+  calls) and **32% savings** on a UI app with UAT/E2E gates (370
+  calls). Two sample reports ship in the
+  [GitHub repo](https://github.com/darndestdabbler/dabbler-ai-orchestration/tree/master/docs/sample-reports).
 
-- **In Progress** — sessions the AI is currently working or that have started
-- **Not Started** — specs ready to run
-- **Done** — completed and merged session sets
-- **Cancelled** — sets the operator has paused or abandoned (only renders when at least one cancelled set exists)
+- **Cross-provider verification, every session.** Each session ends
+  with an independent verification by a model from a *different*
+  provider than the one that did the work. The verifier returns
+  structured JSON; disagreements surface for human adjudication
+  rather than being silently merged or dismissed.
 
-State is read from `session-state.json` in each
-`docs/session-sets/<slug>/` folder. The file's `status` field is the
-canonical signal, and the extension consults it directly:
+---
 
-| `status` value | State group |
-|---|---|
-| `"not-started"` | Not started |
-| `"in-progress"` | In Progress |
-| `"complete"` | Done |
-| `"cancelled"` | Cancelled |
+## Get started
 
-Cancellation has its own on-disk marker that always wins over the
-status field: a `CANCELLED.md` file in the session-set folder forces
-the set into the Cancelled group regardless of any other signal,
-including a `change-log.md` from a partial close-out. Detection
-precedence (highest first): `CANCELLED.md` → `change-log.md` (done)
-→ `activity-log.json` or `session-state.json` (in-progress) →
-otherwise not-started.
+After install, the Session Set Explorer shows a **Get Started**
+welcome the first time you open a workspace with no
+`docs/session-sets/` folder. Click **Copy adoption bootstrap prompt**
+and paste it into a fresh AI chat (Claude Code, Gemini Code Assist,
+or any GPT-based tool). The AI fetches the canonical setup
+instructions and walks you through:
 
-Every session-set folder is expected to carry a `session-state.json`
-from creation onward. For legacy folders that predate this invariant,
-the extension falls back to file-presence inference (`change-log.md` →
-done, `activity-log.json` → in-progress, neither → not-started) and
-synthesizes the state file lazily on first read. Run `python -m
-ai_router.backfill_session_state` after pulling new repos to
-materialize the file for every folder up front.
+1. **A budget-threshold dialog** — pick a tier (zero, under ~$20,
+   $20–$99, or $100+) that maps to a verification mode you can
+   afford.
+2. **A plan alignment** — the AI proposes a session-set
+   decomposition based on what you describe.
+3. **A numbered action checklist** — *every* intended write, config,
+   and scaffolding step is listed. You batch-approve before anything
+   touches disk. No per-write confirmation prompts. You can
+   interrupt at any time.
 
-Right-click a session set to open its spec, activity log, change log, or AI assignment. Copy trigger phrases to start the next AI session. The right-click menu also exposes the cancel/restore lifecycle actions:
+Once your first session set exists, the welcome content disappears
+and the standard activity-bar tree takes over.
 
-- **Cancel Session Set** — visible on in-progress, not-started, and done items. Confirms via a modal, optionally prompts for a reason, writes `CANCELLED.md` to the folder, and refreshes the view so the set jumps to the Cancelled group.
-- **Restore Session Set** — visible on cancelled items. Confirms via a modal, renames `CANCELLED.md` to `RESTORED.md`, and the set returns to whichever underlying state its other files indicate (done if `change-log.md` is present, in-progress if `activity-log.json` is, otherwise not-started).
+If you'd rather drive the setup from VS Code's UI directly, run
+**`Dabbler: Get Started`** from the command palette
+(`Ctrl+Shift+P` / `Cmd+Shift+P`) for the wizard alternative.
 
-`RESTORED.md` is an audit artifact, not a separate state — the file accumulates the full toggle history across multiple cancel/restore cycles. The same on-disk shape works without the extension: dropping a `CANCELLED.md` file into a session-set folder is sufficient to mark it cancelled. See [the workflow doc's "Cancelling and restoring a session set" section](../../docs/ai-led-session-workflow.md) for the full operator-facing lifecycle.
+---
 
-Each session-set row carries small badges in its description:
+## What it'll cost
 
-- `[FIRST]` / `[LAST]` — the spec's `outsourceMode` (whether verifications go through a synchronous API call or via the persistent provider queue). See [Outsource modes](#outsource-modes) below.
-- `[UAT N]` / `[UAT done]` — UAT checklist progress (only on sets with `requiresUAT: true`).
+API spend is real and varies by project size and verification
+appetite. Honest framing:
 
-### Provider Queues
-A tree view that shows the live state of each provider's outsource-last queue (`provider-queues/<provider>/queue.db`). Messages are bucketed by lifecycle state — `new` → `claimed` → `completed` → `failed` → `timed_out` — and grouped by provider. Right-click a message for **Open Payload**, **Mark Failed**, or **Force Reclaim** (the last two confirm before mutating). Auto-refreshes every 15 seconds (configurable).
+- **Zero-budget mode** is genuinely free — verification routes
+  through a *different* AI assistant you open manually (e.g.
+  open a second AI chat as the verifier), or you skip verification
+  with the decision logged in the session's `change-log.md`.
+- **Low-budget mode** (under ~$20 over multi-week project life)
+  uses subscription-based AI assistants for the heavy lifting,
+  with API verification only at session end.
+- **High-budget mode** ($20+ over project life) uses synchronous
+  API calls throughout, with full automation.
 
-The view shells out to `python -m ai_router.queue_status --format json`. The Python helper is the single source of truth for the queue schema; the extension never opens the SQLite file directly.
+The router writes one JSON line per call to
+`ai_router/router-metrics.jsonl` so you can audit spend at any
+time. The **Cost Dashboard** command surfaces cumulative spend
+visually; `python -m ai_router.report` produces a full markdown
+manager-report with the Opus-baseline savings headline,
+per-task-type unreliability rates, and auto-generated action
+items. The framework is open-source (MIT) — your costs are entirely
+your provider's API spend; nothing in this extension is paywalled.
 
-### Install ai-router (`Dabbler: Install ai-router` / `Dabbler: Update ai-router`)
-A one-click install of the `ai_router` Python package into the
-workspace's venv. The command:
-
-- Auto-detects `.venv/` or `venv/`, or offers to create `.venv` at the
-  workspace root.
-- Offers two install paths via QuickPick: **PyPI** (`pip install
-  dabbler-ai-router`, default) or **GitHub sparse-checkout** (clones
-  the `ai_router/` directory at a chosen tag — useful for offline
-  workspaces, pre-release testing, or forks).
-- Preserves any existing `ai_router/router-config.yaml` across
-  re-runs, so per-project tuning survives upgrades.
-- Writes a `.dabbler/install-method` marker so `Dabbler: Update
-  ai-router` re-pulls from the same source you originally chose.
-
-The Provider Queues and Provider Heartbeats views also surface a
-**`ai_router not installed in this Python environment`** tree-item
-when `python -m ai_router.queue_status` /
-`python -m ai_router.heartbeat_status` fails with `ModuleNotFoundError`,
-with a child item that fires the install command directly. Other
-non-zero exits (timeouts, bad JSON) still render as the original red
-error so genuine bugs aren't masked.
-
-### Provider Heartbeats
-A tree view that shows when each provider last produced a completion and how much it has produced over a sliding window:
-
-```
-Provider Heartbeats          Observational only. Subscription windows are not introspectable.
-├── anthropic   last seen 12 min ago · 3 completions / 60m   ⚡
-├── openai      last seen 2 min ago  · 8 completions / 60m   ⚡
-└── google      last seen 3h 22m ago · 0 completions / 60m   ⚠️
-```
-
-> **Read this once.** The heartbeats view is **strictly backward-looking**. It cannot tell you whether a provider has subscription headroom, whether the next call will be rate-limited, or whether a quiet provider is healthy or stuck. Use it as a heartbeat — _is anything coming out of this provider lately?_ — and nothing more. The view's description footer repeats this disclaimer at all times.
-
-A provider is flagged silent (⚠️) when its last completion was more than `dabblerProviderHeartbeats.silentWarningMinutes` ago (default 30). Auto-refreshes every 15 seconds (configurable).
-
-The view shells out to `python -m ai_router.heartbeat_status --format json`.
-
-### Outsource modes
-
-Specs may set `outsourceMode: first | last` in their `Session Set Configuration` block:
-
-- **`first`** (default) — verifications run via a synchronous API call to the chosen provider. Familiar, simple, blocks the session until done.
-- **`last`** — verifications enqueue to the provider's queue and return immediately; a separate verifier-role daemon drains the queue. Use for long-running verifications or when you want to keep multiple verifications in flight.
-
-When `outsourceMode` is omitted from a spec, the extension treats it as `first` for backward compat.
-
-### Project Wizard (`Dabbler: Get Started`)
-An onboarding panel that walks you through the entire workflow: prerequisites, how sessions work, and first steps. Opens automatically in new workspaces.
-
-### New Project Scaffolding (`Dabbler: Set Up New Project`)
-Initializes a git repository and creates the standard folder layout (`docs/session-sets/`, `docs/planning/`, `ai_router/`). Optionally sets up git worktrees for parallel session execution.
-
-### Plan Import & Session-Set Generation
-- **`Dabbler: Import Project Plan`** — import a Markdown plan file or get a prompt to generate one with AI.
-- **`Dabbler: Generate Session-Set Prompt`** — builds and copies an AI prompt that translates your plan into a sequence of session-set specs.
-
-### Cost Dashboard (`Dabbler: Show Cost Dashboard`)
-Reads `ai_router/metrics.jsonl` and displays:
-- Cumulative project total
-- Per-session-set breakdown (sessions run, total cost, last run date)
-- 30-day ASCII sparkline chart
-- Model mix (% of spend by model)
-- CSV export
-
-### Troubleshooting (`Dabbler: Troubleshoot`)
-A guided QuickPick that diagnoses common issues: activation, stuck sessions, git worktrees, API key setup, high costs, and folder layout.
+---
 
 ## Requirements
 
-- VS Code 1.85 or later
-- Git on your PATH
-- Python ≥ 3.10 with the `ai_router` module installed in your project's
-  venv. As of v0.12, run **`Dabbler: Install ai-router`** from the
-  command palette — it `pip install`s `dabbler-ai-router` against your
-  workspace venv (or offers to create one) and opens
-  `ai_router/router-config.yaml` for tuning when it finishes. The CLI
-  equivalent is `pip install dabbler-ai-router`.
-- At least one API key: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY`
+- **VS Code** 1.85+
+- **Python 3.10+** with a workspace `.venv/` (the
+  **`Dabbler: Install ai-router`** command auto-detects or creates
+  it for you)
+- **API keys** as environment variables:
+  - `ANTHROPIC_API_KEY` (Claude Sonnet, Opus)
+  - `GEMINI_API_KEY` (Gemini Flash, Pro)
+  - `OPENAI_API_KEY` (GPT-5.4, GPT-5.4 Mini)
+  - All three are required so cross-provider verification has
+    somewhere to route to.
+- **One orchestrator AI agent** installed as a VS Code extension
+  (Claude Code, Codex/GitHub Copilot, or Gemini Code Assist — the
+  framework is agent-agnostic and supports switching mid-set).
 
-## Cost reality — please read before adopting
+Optional: `PUSHOVER_API_KEY` + `PUSHOVER_USER_KEY` for
+end-of-session phone notifications.
 
-This workflow is **not free**, and the costs are worth understanding up front.
+Sign-up links and a full prerequisites checklist live in the
+[GitHub repo's README](https://github.com/darndestdabbler/dabbler-ai-orchestration#prerequisites-tools-and-accounts).
 
-The orchestration does try to contain costs. For each session it picks the
-least expensive model that's capable of the job, and calibrates the effort
-level (low / normal / high) accordingly. But the workflow also routinely
-farms work out — including end-of-session verification tasks that may run on
-a different (often more expensive) model than the session itself, to give
-you cross-provider review.
+---
 
-For a small or short-lived project, the total cost is usually modest. For
-**larger projects that span many days or weeks** — multiple session sets,
-many sessions per set, plus verification on each — the cumulative spend can
-get **significant**. It's not unusual for an active project to run into the
-tens or low hundreds of dollars over its lifetime.
+## Other features
 
-The author finds the tradeoff worth it: the workflow ships features faster
-and at higher quality than working solo. But this isn't a tradeoff everyone
-should make. In particular, **if you're doing volunteer or open-source work
-and you're not independently wealthy, please look at the cost dashboard
-early and often** — it's easy to underestimate how quickly per-session costs
-add up across an active project.
+- **Activity-bar views** for Provider Queues and Provider Heartbeats
+  — observe outsource-last work in flight and per-provider activity
+  at a glance.
+- **Cancel/Restore lifecycle** — cancel a session set mid-stream
+  with a recorded reason; restore later if priorities shift. The
+  audit trail accumulates across cycles.
+- **UAT checklist editor integration** — for sets that opt in with
+  `requiresUAT: true`, the orchestrator authors a checklist that
+  pairs with the freely-available
+  [UAT checklist editor](https://darndestdabbler.github.io/uat-checklist-editor/).
+  Pending review blocks downstream sessions unless explicitly
+  overridden.
+- **Worktree auto-discovery** — parallel session sets running in
+  sibling git worktrees show up in the activity-bar tree even when
+  the worktree isn't open as a separate workspace folder.
 
-Use `Dabbler: Show Cost Dashboard` after every few sessions until you have
-calibrated intuition for what your typical project costs. Set a personal
-budget. Stop if you're not comfortable with the rate of spend.
+---
 
-## Extension Settings
+## Learn more
 
-| Setting | Default | Description |
-|---|---|---|
-| `dabblerSessionSets.uatSupport.enabled` | `auto` | Show UAT commands: `auto` (when any spec declares `requiresUAT: true`), `always`, `never` |
-| `dabblerSessionSets.e2eSupport.enabled` | `auto` | Show E2E commands: `auto`, `always`, `never` |
-| `dabblerSessionSets.e2e.testDirectory` | `tests` | Root directory to search for Playwright test files |
-| `dabblerProviderQueues.autoRefreshSeconds` | `15` | Auto-refresh interval for the Provider Queues view (`0` disables) |
-| `dabblerProviderQueues.pythonPath` | `python` | Python executable used for `queue_status` / `heartbeat_status`; relative paths resolve against the workspace root |
-| `dabblerProviderQueues.messageLimit` | `50` | Max messages fetched per provider per refresh |
-| `dabblerProviderHeartbeats.autoRefreshSeconds` | `15` | Auto-refresh interval for the Provider Heartbeats view (`0` disables) |
-| `dabblerProviderHeartbeats.lookbackMinutes` | `60` | Lookback window for completion / token counts (observational only) |
-| `dabblerProviderHeartbeats.silentWarningMinutes` | `30` | Silent-provider warning threshold |
+- **GitHub:** [darndestdabbler/dabbler-ai-orchestration](https://github.com/darndestdabbler/dabbler-ai-orchestration)
+- **Workflow mechanics:** [docs/ai-led-session-workflow.md](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/ai-led-session-workflow.md)
+  (trigger phrases, the 10-step procedure, the rule list every
+  orchestrator obeys).
+- **Repository reference:** [docs/repository-reference.md](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/repository-reference.md)
+  (deep feature descriptions, UAT/E2E flag matrix, worked
+  end-of-session output, file map).
+- **Sample reports:** [docs/sample-reports/](https://github.com/darndestdabbler/dabbler-ai-orchestration/tree/master/docs/sample-reports)
+  (real `python -m ai_router.report` outputs from contrasting
+  projects).
 
-## Git Worktree Support
+---
 
-The extension automatically discovers all worktrees for each workspace folder via `git worktree list`. Session sets from multiple worktrees are merged: when the same slug appears in more than one worktree, the higher-state version wins (done > in-progress > not-started), with ties broken by most-recent `lastTouched` timestamp.
+## License
 
-## Cost Metrics Format
-
-Enable `METRICS_ENABLED = True` in `ai_router/config.py`. Each session appends one JSON line to `ai_router/metrics.jsonl`:
-
-```json
-{
-  "session_set": "my-feature",
-  "session_num": 3,
-  "model": "claude-sonnet-4-6",
-  "effort": "normal",
-  "input_tokens": 12400,
-  "output_tokens": 3200,
-  "cost_usd": 0.34,
-  "timestamp": "2026-04-29T14:23:00Z"
-}
-```
-
-## Session Set Configuration Block
-
-Add this block to `spec.md` to enable UAT/E2E features for that session set:
-
-````markdown
-## Session Set Configuration
-```yaml
-totalSessions: 3
-requiresUAT: true
-requiresE2E: false
-effort: normal
-outsourceMode: first
-```
-````
-
-## Building from Source
-
-```bash
-cd tools/dabbler-ai-orchestration
-npm install
-npm run compile    # one-shot build
-npm run watch      # incremental watch build
-npm run package    # produces a .vsix for local install
-npm test           # compile + run tests
-```
-
-## Links
-
-- [darndestdabbler.org](https://darndestdabbler.org)
-- [Report an issue](https://github.com/darndestdabbler/dabbler-ai-orchestration/issues)
-- [Workflow documentation](../../docs/ai-led-session-workflow.md)
+MIT. Copyright © 2026 darndestdabbler.

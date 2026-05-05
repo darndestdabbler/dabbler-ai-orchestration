@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Project wizard, session-set explorer, cost dashboard, and adoption-bootstrap entry point for the Dabbler AI-led workflow.",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -57,6 +57,12 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "dabblerSessionSets",
+        "contents": "No session sets in this workspace yet.\n\nThe quickest way to get started is to copy the adoption bootstrap prompt and paste it into a fresh AI chat (Claude Code, Gemini Code Assist, or any GPT-based tool). The AI will fetch the canonical setup instructions, talk you through a budget-threshold dialog, and present a numbered checklist of every intended write for batch approval before executing — no per-write prompts.\n[Copy adoption bootstrap prompt](command:dabbler.copyAdoptionBootstrapPrompt)\nPrefer a guided wizard? The Get Started panel offers the same starting points without leaving VS Code.\n[Open Get Started](command:dabbler.getStarted)\nMore on the workflow: [Dabbler AI Orchestration on GitHub](https://github.com/darndestdabbler/dabbler-ai-orchestration#readme)"
+      }
+    ],
     "commands": [
       {
         "command": "dabblerSessionSets.refresh",

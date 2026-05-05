@@ -5,6 +5,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.13.1] — 2026-05-05
+
+### Fixed
+- **Marketplace publish workflow now ships the correct VSIX.** The
+  `vsix-v0.13.0` release run inadvertently published the prior
+  `0.12.1` VSIX to the Marketplace because two VSIX files were present
+  in the build directory at tag-checkout time (the just-built one and
+  the canonical sideload artifact committed in Set 014); the upload
+  step's `*.vsix` glob captured both, and the publish step's
+  lexicographic `head -n1` picked the older one. Workflow now
+  version-pins the upload and publish paths to the exact tag-derived
+  filename, plus a new defensive build-step gate that fails if any
+  extra VSIX is present alongside the just-built one. Marketplace
+  v0.13.0 was never actually published; v0.13.1 is the corrected
+  release with the v0.13.0 payload (Marketplace-publish workflow,
+  runbook, `maxoutClaude` removal).
+
+### Added
+- **Empty-state Get Started prompt in the Session Set Explorer.** When
+  the active workspace has no `docs/session-sets/` directory or the
+  directory is empty, the Session Set Explorer view shows a concise
+  welcome message with a one-click **Copy adoption bootstrap prompt**
+  link and a pointer at the Get Started wizard. Once any session set
+  exists, the welcome content suppresses automatically. Previous
+  behavior (relying on the activity-bar Get Started icon and the
+  context-menu actions) put the discoverable starting point too far
+  from where a first-time user is looking; this change makes the
+  empty-state itself a teachable moment.
+
+### Changed
+- **`[FIRST]` and `[LAST]` mode badges removed from session-set tree
+  rows.** When 99% of sets use the default `outsourceMode: first`, the
+  badge becomes visual noise that doesn't differentiate anything. The
+  mode still surfaces in the row tooltip on hover for diagnostic
+  purposes, and the AI router still consumes the `outsourceMode`
+  field from each spec — only the always-visible badge text was
+  removed.
+- **Marketplace listing README rewritten for the listing page
+  audience.** The extension-local README that the Marketplace serves
+  on the listing page is now lean, visual-led, and points at the
+  GitHub repo for technical depth — replaces the ~600-line technical
+  reference that was previously the listing copy. The repo's deep
+  documentation is unchanged (still at `docs/repository-reference.md`
+  in the source tree); this is purely the Marketplace-facing front
+  door.
+
 ## [0.13.0] — 2026-05-04
 
 ### Added

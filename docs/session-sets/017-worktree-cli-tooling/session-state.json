@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "sessionSetName": "017-worktree-cli-tooling",
+  "currentSession": 1,
+  "totalSessions": 1,
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-05T08:36:04.287985-04:00",
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high"
+  }
+}

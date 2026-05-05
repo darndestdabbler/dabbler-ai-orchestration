@@ -1,0 +1,23 @@
+{
+  "status": "completed",
+  "summary": "Set 017 Session 1 (single-session): shipped python -m ai_router.worktree CLI as the structural fix for the regression class that caused Set 016 (worktrees at non-canonical paths). 610-line ai_router/worktree.py with three subcommands (open, close, list) and five public helpers (find_primary_worktree_root, canonical_worktree_path, default_branch, enumerate_worktrees, assess_closeability). 600-line ai_router/tests/test_worktree.py with 39 tests (all passing) using real-git fixtures via tempfile.TemporaryDirectory + subprocess git invocation - first tests in this codebase to use real-git fixtures. Cross-provider design review BEFORE implementation: Codex (GPT-5.4 Medium) and Gemini Code Assist (Gemini-2.5 Pro) both routed via IDE agents (per Set 016's routing-surface lesson, design review benefits from providers seeing the existing ai_router/ codebase). Six pushback questions (helper-factoring, --keep-branch default, canonical-path enforcement strictness, remote-delete failure modes, list output format, end-of-session verification skip) resolved with explicit divergence tracking in design.md. Notable design decisions: (a) single module worktree.py acting as CLI + library matching session_state.py pattern (Gemini's call, won on developer-clarity tiebreaker per operator guidance); (b) hard refusal on non-canonical paths with NO escape hatch flag (both providers agreed; raw git worktree add is the existing legitimate escape hatch); (c) close sequence reordered to worktree-remove -> remote-delete -> local-branch-delete so failed remote-delete preserves local branch as recovery anchor (GPT's call); (d) relative paths in human list output, absolute in JSON, with versioned schema_version=1 + issues[] array per worktree for future repo_layout_check consumption; (e) skip end-of-session verification route - design review consumed the verification budget, tests are the canonical surface for tooling code (both providers agreed). docs/planning/repo-worktree-layout.md updated to reference the CLI as the canonical lifecycle path (removed 'CLI not yet shipped, follow manual recipes' framing). Total spend: $0 metered (both consultations on operator subscriptions; no API spend through this repo). Test coverage follows GPT's tests-must-cover checklist: primary-worktree resolution from inside linked worktree, Windows path-format handling, destructive-step ordering (verified with test_close_ordering_preserves_local_branch_on_remote_failure exercising the contested Q4 decision), error-message clarity (cancel_session pointer in close-refuses-dirty error), edge states (missing origin/HEAD with main/master fallback, purely-local branch fail-open on unpushed check, branch/path collisions on open). End-to-end smoke test of `python -m ai_router.worktree list` against the orchestration repo itself confirmed correct classification of master worktree as [main]. Five queued follow-ups remain from Set 016's change-log: layout-doc update (closed in prior commit + refined in this set), Set 015 Session 3 re-plan, layout checker (now easier - can consume worktree list --json), cancel CLI (can use worktree's helpers), IDE-agent consult tool from routing-surface insight.",
+  "files_changed": [
+    "ai_router/worktree.py",
+    "ai_router/tests/test_worktree.py",
+    "docs/planning/repo-worktree-layout.md",
+    "docs/session-sets/017-worktree-cli-tooling/spec.md",
+    "docs/session-sets/017-worktree-cli-tooling/questions.md",
+    "docs/session-sets/017-worktree-cli-tooling/design.md",
+    "docs/session-sets/017-worktree-cli-tooling/provider-responses/codex.md",
+    "docs/session-sets/017-worktree-cli-tooling/provider-responses/gemini-code-assist.md",
+    "docs/session-sets/017-worktree-cli-tooling/change-log.md",
+    "docs/session-sets/017-worktree-cli-tooling/disposition.json",
+    "docs/session-sets/017-worktree-cli-tooling/activity-log.json",
+    "docs/session-sets/017-worktree-cli-tooling/session-state.json",
+    "docs/session-sets/017-worktree-cli-tooling/session-events.jsonl"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": []
+}

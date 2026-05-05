@@ -132,65 +132,78 @@ be created on demand when you open your first session-set worktree.
 
 ## Worktree lifecycle
 
-> **Once `python -m ai_router.worktree open|close <slug>` exists**
-> (queued in
-> [docs/session-sets/016-harvester-cleanup-and-worktree-policy-spike/change-log.md](../session-sets/016-harvester-cleanup-and-worktree-policy-spike/change-log.md)),
-> all worktree creation and removal goes through that CLI rather than
-> through raw `git worktree` commands. The CLI enforces the canonical
-> path and branch naming, removing the class of regressions that
-> caused Set 016. Until that CLI ships, follow the manual recipes
-> below precisely.
+**Use `python -m ai_router.worktree open|close|list <slug>` for all
+worktree creation, removal, and inspection.** The CLI enforces the
+canonical path and branch naming on every operation, removing the
+class of regressions that caused Set 016 and shipped in Set 017.
 
 ### Open a worktree
 
-From `~/source/repos/<repo>/` (the main checkout):
+From `~/source/repos/<repo>/` or any of its existing worktrees:
 
 ```bash
-mkdir -p ../<repo>-worktrees
-git worktree add ../<repo>-worktrees/<slug> -b session-set/<slug>
-cd ../<repo>-worktrees/<slug>
+python -m ai_router.worktree open <slug>
+# or, with an explicit base branch:
+python -m ai_router.worktree open <slug> --base develop
 ```
 
-The `-b session-set/<slug>` form creates the new branch in the same
-operation. If the branch already exists, drop the `-b` flag.
+The CLI:
+- Resolves the primary worktree from your cwd (works whether you're in main or a linked worktree).
+- Creates the `<repo>-worktrees/` container if needed.
+- Creates a worktree at `<repo>-worktrees/<slug>/` on a new branch named `session-set/<slug>`.
+- Defaults the base branch to the repo's default (resolved via `origin/HEAD`, falling back to local `main` then `master`).
+- Refuses non-canonical paths and slug/branch collisions.
+- Prints the `cd` command for the next step.
+
+The CLI does not provide an escape hatch flag for non-canonical
+paths. If you need a worktree outside the canonical layout (e.g.,
+exploratory work), use raw `git worktree add` directly — that's the
+intentional escape hatch. The CLI does one thing: manage canonical
+worktrees.
 
 ### List worktrees
 
-From any worktree (main or a session-set worktree):
+From any worktree:
 
 ```bash
-git worktree list
+python -m ai_router.worktree list
+# JSON output for scripting / repo_layout_check consumption:
+python -m ai_router.worktree list --json
 ```
 
-Expect to see the main worktree plus one entry per active session-set
-worktree, all under the canonical paths. Anything outside
-`<repo>/` itself or `<repo>-worktrees/<slug>/` is **drift** and
-should be addressed via the drift-recovery section below.
+Output classifies each worktree as `[main]`, `[canonical]`, or
+`[drift]`. Drift entries are flagged with a count summary at the
+bottom. Address drift via the drift-recovery recipes below.
 
 ### Close a worktree
 
 When a session set's last session merges:
 
 ```bash
-cd ~/source/repos/<repo>             # back to main
-git worktree remove ../<repo>-worktrees/<slug>
-git branch -d session-set/<slug>
-git push origin --delete session-set/<slug>
-
-# If <repo>-worktrees/ is now empty, remove the container:
-rmdir ../<repo>-worktrees             # only removes if empty
+python -m ai_router.worktree close <slug>
+# Also delete the remote branch (with confirmation):
+python -m ai_router.worktree close <slug> --delete-remote
+# Keep the local branch (default: delete):
+python -m ai_router.worktree close <slug> --keep-branch
 ```
 
-The `rmdir` succeeds only when the container has no other active
-worktrees, which is the right safety check — the container should
-never persist empty.
+The CLI runs the operations in this order:
+1. Pre-flight checks: refuses if the worktree is dirty, has unmerged
+   commits vs base, or has unpushed commits (only checked when an
+   upstream is configured).
+2. `git worktree remove <canonical-path>`.
+3. If `--delete-remote`: prompts for confirmation, then `git push
+   origin --delete session-set/<slug>`. On failure (network, auth,
+   permission), preserves the local branch as a recovery anchor and
+   exits with code 2 (partial completion).
+4. `git branch -d session-set/<slug>` (unless `--keep-branch`).
+5. Removes the `<repo>-worktrees/` container if it's now empty.
 
 If the worktree has uncommitted or unmerged work and you're
-**cancelling** the session set rather than completing it, use
-`python -m ai_router.cancel_session` (queued tool, see
-[proposal.md §4.2](../session-sets/016-harvester-cleanup-and-worktree-policy-spike/proposal.md))
-instead of the raw recipe above. The cancel CLI handles preservation
-(stash + bundle + manifest archive) before removal.
+**cancelling** the session set rather than completing it, the CLI
+will refuse to close it and point you to
+`python -m ai_router.cancel_session <slug>` (queued companion tool;
+see [proposal.md §4.2](../session-sets/016-harvester-cleanup-and-worktree-policy-spike/proposal.md)).
 
 ## Drift recovery
 

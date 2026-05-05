@@ -54,7 +54,22 @@ export function activate(context: vscode.ExtensionContext): void {
     originalRefresh();
     setImmediate(evaluateContextKeys);
   };
-  evaluateContextKeys();
+  // v0.13.2: defensive — `evaluateContextKeys()` calls `readAllSessionSets()`
+  // which iterates every session set's session-state.json. A single
+  // malformed file would otherwise propagate up and abort activation
+  // before any feature commands register. Catch + log instead so the
+  // tree may render with stale context-key flags (UAT / E2E menu
+  // visibility) but the rest of the extension stays alive.
+  try {
+    evaluateContextKeys();
+  } catch (err) {
+    console.error(
+      "[dabbler-ai-orchestration] activation: evaluateContextKeys() threw — " +
+        "context keys (UAT/E2E support flags) may be stale, but command " +
+        "registration continues. Investigate via the dev console stack trace.",
+      err,
+    );
+  }
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
@@ -104,7 +119,20 @@ export function activate(context: vscode.ExtensionContext): void {
     provider.refresh();
   };
 
-  bindWatchers();
+  // Defensive: bindWatchers iterates roots and creates filesystem
+  // watchers; a thrown error from createFileSystemWatcher (e.g., a
+  // permission issue on a workspace folder) shouldn't kill activation.
+  try {
+    bindWatchers();
+  } catch (err) {
+    console.error(
+      "[dabbler-ai-orchestration] activation: bindWatchers() threw — " +
+        "live tree-refresh on file changes may not work, but command " +
+        "registration continues. Manual refresh via " +
+        "`Dabbler: Refresh Session Sets` still functions.",
+      err,
+    );
+  }
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 30000);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
@@ -213,15 +241,46 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // --- Register feature command groups ---
-  registerOpenFileCommands(context);
-  registerCopyCommands(context);
-  registerGitScaffoldCommand(context);
-  registerCopyAdoptionBootstrapPromptCommand(context);
-  registerTroubleshootCommand(context);
-  registerWizardCommands(context);
-  registerCostDashboardCommand(context);
-  registerCancelLifecycleCommands(context, { refreshView: refreshAll });
-  registerInstallAiRouterCommands(context);
+  //
+  // Each register*Commands call is wrapped in its own try/catch so a
+  // throw in one group does not silently skip the registrations that
+  // follow. v0.13.1 shipped without these wrappers; in dabbler-platform
+  // workspaces some users hit "command 'dabbler.showCostDashboard' not
+  // found" because an earlier register call threw and the cascade
+  // skipped the cost-dashboard + wizard + install-ai-router
+  // registrations. Defensive logging via console.error means a future
+  // similar failure surfaces in `Help → Toggle Developer Tools →
+  // Console` with the exact group name, instead of presenting as
+  // an opaque command-not-found at click time.
+  const safeRegister = (name: string, fn: () => void): void => {
+    try {
+      fn();
+    } catch (err) {
+      console.error(
+        `[dabbler-ai-orchestration] activation failed in ${name} — ` +
+          `subsequent commands still attempt to register; the failed ` +
+          `group's commands will not be available until the underlying ` +
+          `error is fixed.`,
+        err,
+      );
+    }
+  };
+
+  safeRegister("registerOpenFileCommands", () => registerOpenFileCommands(context));
+  safeRegister("registerCopyCommands", () => registerCopyCommands(context));
+  safeRegister("registerGitScaffoldCommand", () => registerGitScaffoldCommand(context));
+  safeRegister("registerCopyAdoptionBootstrapPromptCommand", () =>
+    registerCopyAdoptionBootstrapPromptCommand(context),
+  );
+  safeRegister("registerTroubleshootCommand", () => registerTroubleshootCommand(context));
+  safeRegister("registerWizardCommands", () => registerWizardCommands(context));
+  safeRegister("registerCostDashboardCommand", () => registerCostDashboardCommand(context));
+  safeRegister("registerCancelLifecycleCommands", () =>
+    registerCancelLifecycleCommands(context, { refreshView: refreshAll }),
+  );
+  safeRegister("registerInstallAiRouterCommands", () =>
+    registerInstallAiRouterCommands(context),
+  );
 
   // Show onboarding on first activation in a workspace with no session sets
   const hasSeenOnboarding = context.workspaceState.get<boolean>("hasSeenOnboarding", false);

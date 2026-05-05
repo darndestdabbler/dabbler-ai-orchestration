@@ -4,7 +4,7 @@ An AI-led coding-session workflow for VS Code. Manage structured AI
 sessions, automatic cross-provider verification, cost tracking, and
 git-worktree-aware session-set state — all from the activity bar.
 
-![Session Set Explorer in action](media/session-set-explorer-in-action.png)
+![Session Set Explorer in action](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/session-set-explorer-in-action.png)
 
 ---
 

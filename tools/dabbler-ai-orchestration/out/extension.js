@@ -45,9 +45,11 @@ const fileSystem_1 = require("./utils/fileSystem");
 const openFile_1 = require("./commands/openFile");
 const copyCommand_1 = require("./commands/copyCommand");
 const gitScaffold_1 = require("./commands/gitScaffold");
+const copyAdoptionBootstrapPrompt_1 = require("./commands/copyAdoptionBootstrapPrompt");
 const troubleshoot_1 = require("./commands/troubleshoot");
 const queueActions_1 = require("./commands/queueActions");
 const cancelLifecycleCommands_1 = require("./commands/cancelLifecycleCommands");
+const installAiRouterCommands_1 = require("./commands/installAiRouterCommands");
 const WizardPanel_1 = require("./wizard/WizardPanel");
 const CostDashboard_1 = require("./dashboard/CostDashboard");
 const SESSION_SETS_REL = path.join("docs", "session-sets");
@@ -75,7 +77,20 @@ function activate(context) {
         originalRefresh();
         setImmediate(evaluateContextKeys);
     };
-    evaluateContextKeys();
+    // v0.13.2: defensive — `evaluateContextKeys()` calls `readAllSessionSets()`
+    // which iterates every session set's session-state.json. A single
+    // malformed file would otherwise propagate up and abort activation
+    // before any feature commands register. Catch + log instead so the
+    // tree may render with stale context-key flags (UAT / E2E menu
+    // visibility) but the rest of the extension stays alive.
+    try {
+        evaluateContextKeys();
+    }
+    catch (err) {
+        console.error("[dabbler-ai-orchestration] activation: evaluateContextKeys() threw — " +
+            "context keys (UAT/E2E support flags) may be stale, but command " +
+            "registration continues. Investigate via the dev console stack trace.", err);
+    }
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") ||
             e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
@@ -112,7 +127,18 @@ function activate(context) {
         bindWatchers();
         provider.refresh();
     };
-    bindWatchers();
+    // Defensive: bindWatchers iterates roots and creates filesystem
+    // watchers; a thrown error from createFileSystemWatcher (e.g., a
+    // permission issue on a workspace folder) shouldn't kill activation.
+    try {
+        bindWatchers();
+    }
+    catch (err) {
+        console.error("[dabbler-ai-orchestration] activation: bindWatchers() threw — " +
+            "live tree-refresh on file changes may not work, but command " +
+            "registration continues. Manual refresh via " +
+            "`Dabbler: Refresh Session Sets` still functions.", err);
+    }
     context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(refreshAll));
     const pollHandle = setInterval(refreshAll, 30000);
     context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
@@ -200,13 +226,37 @@ function activate(context) {
             heartbeatsProvider.refresh();
     }));
     // --- Register feature command groups ---
-    (0, openFile_1.registerOpenFileCommands)(context);
-    (0, copyCommand_1.registerCopyCommands)(context);
-    (0, gitScaffold_1.registerGitScaffoldCommand)(context);
-    (0, troubleshoot_1.registerTroubleshootCommand)(context);
-    (0, WizardPanel_1.registerWizardCommands)(context);
-    (0, CostDashboard_1.registerCostDashboardCommand)(context);
-    (0, cancelLifecycleCommands_1.registerCancelLifecycleCommands)(context, { refreshView: refreshAll });
+    //
+    // Each register*Commands call is wrapped in its own try/catch so a
+    // throw in one group does not silently skip the registrations that
+    // follow. v0.13.1 shipped without these wrappers; in dabbler-platform
+    // workspaces some users hit "command 'dabbler.showCostDashboard' not
+    // found" because an earlier register call threw and the cascade
+    // skipped the cost-dashboard + wizard + install-ai-router
+    // registrations. Defensive logging via console.error means a future
+    // similar failure surfaces in `Help → Toggle Developer Tools →
+    // Console` with the exact group name, instead of presenting as
+    // an opaque command-not-found at click time.
+    const safeRegister = (name, fn) => {
+        try {
+            fn();
+        }
+        catch (err) {
+            console.error(`[dabbler-ai-orchestration] activation failed in ${name} — ` +
+                `subsequent commands still attempt to register; the failed ` +
+                `group's commands will not be available until the underlying ` +
+                `error is fixed.`, err);
+        }
+    };
+    safeRegister("registerOpenFileCommands", () => (0, openFile_1.registerOpenFileCommands)(context));
+    safeRegister("registerCopyCommands", () => (0, copyCommand_1.registerCopyCommands)(context));
+    safeRegister("registerGitScaffoldCommand", () => (0, gitScaffold_1.registerGitScaffoldCommand)(context));
+    safeRegister("registerCopyAdoptionBootstrapPromptCommand", () => (0, copyAdoptionBootstrapPrompt_1.registerCopyAdoptionBootstrapPromptCommand)(context));
+    safeRegister("registerTroubleshootCommand", () => (0, troubleshoot_1.registerTroubleshootCommand)(context));
+    safeRegister("registerWizardCommands", () => (0, WizardPanel_1.registerWizardCommands)(context));
+    safeRegister("registerCostDashboardCommand", () => (0, CostDashboard_1.registerCostDashboardCommand)(context));
+    safeRegister("registerCancelLifecycleCommands", () => (0, cancelLifecycleCommands_1.registerCancelLifecycleCommands)(context, { refreshView: refreshAll }));
+    safeRegister("registerInstallAiRouterCommands", () => (0, installAiRouterCommands_1.registerInstallAiRouterCommands)(context));
     // Show onboarding on first activation in a workspace with no session sets
     const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
     if (!hasSeenOnboarding) {

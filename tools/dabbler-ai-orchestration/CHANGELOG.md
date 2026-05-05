@@ -5,6 +5,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.13.2] — 2026-05-05
+
+### Fixed
+- **Marketplace listing image now displays.** The hero screenshot
+  was referenced via a relative path (`media/...`); vsce's
+  relative-to-absolute URL rewrite based on `repository.url` did
+  not consistently apply on the Marketplace render. The image
+  reference now uses an absolute `raw.githubusercontent.com` URL
+  so the Marketplace listing renders the screenshot reliably.
+
+### Added
+- **Defensive activation wrappers.** Each `register*Commands` call
+  in `extension.ts` is now wrapped in its own try/catch with
+  `console.error` logging via a `safeRegister` helper. v0.13.1
+  shipped without these wrappers; in some workspaces a throw in
+  one register group silently skipped the registrations that
+  followed (causing "command 'dabbler.showCostDashboard' not
+  found" because an earlier register call threw and the cost-
+  dashboard / wizard / install-ai-router registrations were
+  skipped). The wrappers ensure independent failures and surface
+  the exact failing group + error in `Help → Toggle Developer
+  Tools → Console` rather than presenting as opaque
+  command-not-found at click time. The early-activation steps
+  `evaluateContextKeys()` and `bindWatchers()` are also wrapped
+  for the same reason.
+- **Diagnostic state-bucketing log.** `readSessionSets()` now logs
+  a one-line summary per root to the dev console:
+  `[dabbler-ai-orchestration] readSessionSets(<root>): N set(s) — done=X, in-progress=Y, not-started=Z, cancelled=W`.
+  Helps pinpoint cache / worktree-merge / file-read drift when a
+  session set's bucket disagrees with its on-disk
+  `session-state.json` status.
+
+### Changed
+- **Evidence-based bucketing for "in-progress" status.** A session
+  set whose `session-state.json` claims `status: "in-progress"`
+  is now bucketed as In Progress only when there's positive
+  corroborating evidence — either `session-events.jsonl` contains
+  at least one `work_started` event, or `activity-log.json` has
+  at least one entry. Without corroboration the status decays to
+  Not Started. Implements the principle: "default Not Started;
+  require positive evidence to escalate to In Progress / Done /
+  Cancelled" (Done is already gated by `change-log.md` presence
+  via close_session; Cancelled is gated by `CANCELLED.md`; In
+  Progress now joins them). Handles two failure modes: stale
+  `in-progress` status from past partial work that was abandoned
+  without closing, and migrations / manual edits that flipped the
+  status field prematurely.
+
 ## [0.13.1] — 2026-05-05
 
 ### Fixed

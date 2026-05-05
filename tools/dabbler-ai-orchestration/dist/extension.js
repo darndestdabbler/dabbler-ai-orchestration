@@ -1246,6 +1246,29 @@ function discoverRoots() {
   }
   return order;
 }
+function hasInProgressEvidence(sessionSetDir) {
+  const eventsPath = path4.join(sessionSetDir, "session-events.jsonl");
+  if (fs3.existsSync(eventsPath)) {
+    try {
+      const text = fs3.readFileSync(eventsPath, "utf8");
+      if (text.includes('"event_type": "work_started"') || text.includes('"event_type":"work_started"')) {
+        return true;
+      }
+    } catch {
+    }
+  }
+  const activityPath = path4.join(sessionSetDir, "activity-log.json");
+  if (fs3.existsSync(activityPath)) {
+    try {
+      const data = JSON.parse(fs3.readFileSync(activityPath, "utf8"));
+      if (Array.isArray(data.entries) && data.entries.length > 0) {
+        return true;
+      }
+    } catch {
+    }
+  }
+  return false;
+}
 function parseSessionSetConfig(specPath) {
   const config = {
     requiresUAT: false,
@@ -1347,7 +1370,7 @@ function readSessionSets(root) {
       const status = readStatus(dir);
       if (status === "complete") {
         state = "done";
-      } else if (status === "in-progress") {
+      } else if (status === "in-progress" && hasInProgressEvidence(dir)) {
         state = "in-progress";
       } else {
         state = "not-started";
@@ -1414,6 +1437,18 @@ function readSessionSets(root) {
       uatSummary,
       root
     });
+  }
+  if (sets.length > 0) {
+    const counts = sets.reduce(
+      (acc, s) => {
+        acc[s.state] = (acc[s.state] ?? 0) + 1;
+        return acc;
+      },
+      {}
+    );
+    console.log(
+      `[dabbler-ai-orchestration] readSessionSets(${path4.basename(root)}): ${sets.length} set(s) \u2014 done=${counts.done ?? 0}, in-progress=${counts["in-progress"] ?? 0}, not-started=${counts["not-started"] ?? 0}, cancelled=${counts.cancelled ?? 0}`
+    );
   }
   return sets;
 }
@@ -8998,7 +9033,14 @@ function activate(context) {
     originalRefresh();
     setImmediate(evaluateContextKeys);
   };
-  evaluateContextKeys();
+  try {
+    evaluateContextKeys();
+  } catch (err) {
+    console.error(
+      "[dabbler-ai-orchestration] activation: evaluateContextKeys() threw \u2014 context keys (UAT/E2E support flags) may be stale, but command registration continues. Investigate via the dev console stack trace.",
+      err
+    );
+  }
   context.subscriptions.push(
     vscode18.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") || e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
@@ -9037,7 +9079,14 @@ function activate(context) {
     bindWatchers();
     provider.refresh();
   };
-  bindWatchers();
+  try {
+    bindWatchers();
+  } catch (err) {
+    console.error(
+      "[dabbler-ai-orchestration] activation: bindWatchers() threw \u2014 live tree-refresh on file changes may not work, but command registration continues. Manual refresh via `Dabbler: Refresh Session Sets` still functions.",
+      err
+    );
+  }
   context.subscriptions.push(vscode18.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 3e4);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
@@ -9133,15 +9182,34 @@ function activate(context) {
         heartbeatsProvider.refresh();
     })
   );
-  registerOpenFileCommands(context);
-  registerCopyCommands(context);
-  registerGitScaffoldCommand(context);
-  registerCopyAdoptionBootstrapPromptCommand(context);
-  registerTroubleshootCommand(context);
-  registerWizardCommands(context);
-  registerCostDashboardCommand(context);
-  registerCancelLifecycleCommands(context, { refreshView: refreshAll });
-  registerInstallAiRouterCommands(context);
+  const safeRegister = (name, fn) => {
+    try {
+      fn();
+    } catch (err) {
+      console.error(
+        `[dabbler-ai-orchestration] activation failed in ${name} \u2014 subsequent commands still attempt to register; the failed group's commands will not be available until the underlying error is fixed.`,
+        err
+      );
+    }
+  };
+  safeRegister("registerOpenFileCommands", () => registerOpenFileCommands(context));
+  safeRegister("registerCopyCommands", () => registerCopyCommands(context));
+  safeRegister("registerGitScaffoldCommand", () => registerGitScaffoldCommand(context));
+  safeRegister(
+    "registerCopyAdoptionBootstrapPromptCommand",
+    () => registerCopyAdoptionBootstrapPromptCommand(context)
+  );
+  safeRegister("registerTroubleshootCommand", () => registerTroubleshootCommand(context));
+  safeRegister("registerWizardCommands", () => registerWizardCommands(context));
+  safeRegister("registerCostDashboardCommand", () => registerCostDashboardCommand(context));
+  safeRegister(
+    "registerCancelLifecycleCommands",
+    () => registerCancelLifecycleCommands(context, { refreshView: refreshAll })
+  );
+  safeRegister(
+    "registerInstallAiRouterCommands",
+    () => registerInstallAiRouterCommands(context)
+  );
   const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
   if (!hasSeenOnboarding) {
     const roots = discoverRoots();

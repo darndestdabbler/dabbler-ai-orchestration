@@ -93,7 +93,7 @@ deeper feature descriptions live at
    - Or directly from the
      [Marketplace listing](https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration).
    - Offline / firewall fallback: the most recent VSIX is committed at
-     [`tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.13.1.vsix`](tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.13.1.vsix);
+     [`tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.13.2.vsix`](tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.13.2.vsix);
      **Extensions → ... → Install from VSIX...** picks it up.
 2. **Open your workspace.** Any folder with — or destined for — a
    `docs/session-sets/` directory. The activity-bar **Session Set

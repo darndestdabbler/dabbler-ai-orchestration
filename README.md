@@ -86,17 +86,15 @@ deeper feature descriptions live at
 
 ## Quick start
 
-> The extension's first Marketplace publish (`v0.13.0`) is in flight.
-> Until that's live, install from the committed VSIX as below; the
-> Marketplace path will be a single click from the VS Code
-> Extensions view once it lands.
-
-1. **Install the extension.** From a clone of this repo:
-   - VS Code → **Extensions** view (`Ctrl+Shift+X`) → click the
-     **`...`** menu → **Install from VSIX...**
-   - Pick
-     [`tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix`](tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.12.1.vsix)
-     (the most recent committed VSIX) and **Reload** when prompted.
+1. **Install the extension** from the VS Code Marketplace:
+   - VS Code → **Extensions** view (`Ctrl+Shift+X`) → search
+     `Dabbler AI Orchestration` → **Install**.
+   - Or from a terminal: `code --install-extension DarndestDabbler.dabbler-ai-orchestration`.
+   - Or directly from the
+     [Marketplace listing](https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration).
+   - Offline / firewall fallback: the most recent VSIX is committed at
+     [`tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.13.0.vsix`](tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.13.0.vsix);
+     **Extensions → ... → Install from VSIX...** picks it up.
 2. **Open your workspace.** Any folder with — or destined for — a
    `docs/session-sets/` directory. The activity-bar **Session Set
    Explorer** icon appears automatically once that path is present.

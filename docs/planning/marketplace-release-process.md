@@ -116,13 +116,39 @@ attached Azure DevOps organization. If the operator does not already
 have one:
 
 - Sign in at [`marketplace.visualstudio.com/manage`](https://marketplace.visualstudio.com/manage)
-  with the Microsoft account that should own the publisher. The
-  Marketplace UI walks the operator through Azure DevOps organization
-  creation if one isn't already attached.
+  with the Microsoft account that should own the publisher.
 - The publisher is owned by **the Microsoft account**, not the GitHub
   organization. Plan for ownership transfer in the rare case the human
   custodian changes (Marketplace supports it, but it's a manual ticket
   to Microsoft).
+
+> **Azure subscription required as billing anchor.** As of 2026-05-04,
+> creating a new Azure DevOps organization (the prerequisite for
+> minting a Marketplace PAT in Step 3) requires an existing Azure
+> subscription that the Microsoft account owns or contributes to.
+> Microsoft displays this requirement at the
+> "Almost done — name your Azure DevOps organization" step with the
+> message "We couldn't find any subscriptions you have access to."
+>
+> If the operator does not already have an Azure subscription, click
+> **Get started with Azure** at that step and sign up — the
+> **Pay-as-you-go** subscription is the simplest fit for this use
+> case (no expiry like the free trial has). The subscription
+> requires a credit card for identity verification, but for the
+> Marketplace publish use case, **the subscription will sit at $0
+> usage indefinitely** — no Azure resources are consumed; the
+> subscription is purely a billing anchor for the Azure DevOps org.
+>
+> Belt-and-suspenders: after the subscription is active, set a $1
+> cost alert at `portal.azure.com → Cost Management + Billing →
+> Cost Alerts` to catch any accidental resource spin-up.
+>
+> Once an Azure subscription exists, return to
+> `marketplace.visualstudio.com/manage` (or `aex.dev.azure.com/me` if
+> you'd prefer to manage Azure DevOps directly) and complete the
+> organization-creation flow. The org name is internal — typically
+> match the publisher ID for clarity (e.g., `darndestdabbler`), but
+> any short identifier works.
 
 ### 2. Claim the Marketplace publisher ID
 
@@ -146,20 +172,34 @@ have one:
 
 ### 3. Mint the Marketplace PAT (Azure DevOps)
 
-- Sign in to [`dev.azure.com`](https://dev.azure.com) with the same
-  Microsoft account that owns the publisher.
-- Click the user avatar (top-right) → **Personal access tokens** → **+ New Token**.
-- Fill in:
+- Navigate directly to the org-scoped PAT URL:
+  `https://dev.azure.com/<your-org>/_usersSettings/tokens`. Substitute
+  the org name from Step 1 — `https://dev.azure.com/darndestdabbler/_usersSettings/tokens`
+  for the canonical org. The bare `https://dev.azure.com/_usersSettings/tokens`
+  URL no longer resolves; the path requires the org segment.
+- If the org's home page intercepts you with **"To get started, create
+  a project"**, create a throwaway project (any name like
+  `placeholder` or `marketplace-publishing`; default Git +
+  Basic-process settings) just to satisfy the gate. The project sits
+  empty and is not used for anything related to publishing.
+- Click **+ New Token**. Fill in:
 
   | Field | Value |
   |---|---|
   | Name | `dabbler-ai-orchestration Marketplace publish` |
   | Organization | **All accessible organizations** (required — Marketplace lives outside any one Azure DevOps org) |
-  | Expiration | **365 days** (or shorter; record the date for rotation) |
-  | Scopes | **Custom defined** → expand → **Marketplace** → check **Manage** |
+  | Expiration | **365 days** (Azure DevOps's default Expiration dropdown caps at 90 days; pick **Custom defined** and set the date one year out — record the date for rotation) |
+  | Scopes | **Custom defined** → click **Show all scopes (30 more)** at the bottom → scroll to **Marketplace** → check **Manage** |
 
 - Click **Create**. **Copy the token immediately** — the UI does not
   show it again.
+
+> **Watch out for the scopes UI.** The default "Custom defined" view
+> shows only Work Items / Code / Build / Release. The Marketplace
+> scope is among the additional 30 scopes hidden behind the
+> **Show all scopes** link at the bottom of the list. Without
+> clicking that link, you can't grant the right scope and the token
+> will fail at publish time with an authorization error.
 
 ### 4. Configure the GitHub deployment environments
 

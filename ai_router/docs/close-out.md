@@ -473,8 +473,8 @@ lock at `<session-set-dir>/.close_session.lock` serializes **same-set
 close-out re-entry** only. It does not scope to the `(repo, branch)`
 pair, so two session sets pointing at the same branch can still race
 during their work phase. The shipping operating model assumes parallel
-sessions use distinct `session-set/<slug>` branches via the bare-repo
-+ flat-worktree layout (see `docs/planning/repo-worktree-layout.md`),
+sessions use distinct `session-set/<slug>` branches via the sibling-
+worktrees-folder layout (see `docs/planning/repo-worktree-layout.md`),
 which makes the cross-set-on-same-branch case rare; when it does
 occur, the deterministic gate is the residual safety net rather than
 admission-time exclusion.

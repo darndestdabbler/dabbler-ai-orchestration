@@ -63,12 +63,15 @@ python -m pytest
 
 ## Repo layout standard
 
-The bare-repo + flat-worktree layout is the dabbler standard for new
-repos and the migration target for existing ones. See
+The sibling-worktrees-folder layout is the dabbler standard for new
+repos and the migration target for existing ones — main checkout at
+`~/source/repos/<repo>/` (never moves), worktrees at
+`~/source/repos/<repo>-worktrees/<slug>/`. See
 `docs/planning/repo-worktree-layout.md` for the layout, fresh-repo
-setup recipe, migration recipe (for repos still on the legacy
-sibling-worktree pattern), and gotchas. Consumer repos point their own
-agent-instruction files at this doc.
+setup recipe, migration recipes (covering both the legacy sibling-
+worktree pattern and the retired bare-repo + flat-worktree pattern),
+drift recovery, deactivate-mode recipe, and gotchas. Consumer repos
+point their own agent-instruction files at this doc.
 
 ## Close-out and outsource-last
 

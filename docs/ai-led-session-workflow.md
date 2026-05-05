@@ -595,11 +595,18 @@ The human starts a session with one of these phrases:
 - **`Start the next parallel session of <slug>.`** — runs the session in
   an isolated git worktree on a `session-set/<slug>` branch. The
   worktree path depends on the repo's layout:
-  - **Bare-repo + flat-worktree layout (standard going forward,** see
+  - **Sibling-worktrees-folder layout (canonical as of 2026-05-05,** see
     `docs/planning/repo-worktree-layout.md`**):** worktree lives at
-    `<container>/<slug>` — a sibling of `<container>/main/`.
-  - **Legacy sibling-worktree layout:** worktree lives at
-    `../<repo>-<slug>` as a top-level sibling of the main repo dir.
+    `~/source/repos/<repo>-worktrees/<slug>/` — a subfolder of the
+    `<repo>-worktrees/` sibling container; main checkout at
+    `~/source/repos/<repo>/` is unchanged.
+  - **Legacy sibling-worktree layout (Option A):** worktree lives at
+    `~/source/repos/<repo>-<slug>/` as a top-level sibling of the
+    main repo dir.
+  - **Retired bare-repo + flat-worktree layout (Option D):** worktree
+    lived at `<container>/<slug>` as a sibling of `<container>/main/`;
+    repos still in this layout should migrate per the recipe in
+    `docs/planning/repo-worktree-layout.md`.
 
   Multiple parallel sessions on different sets do not contend for the
   working tree. The set's last session merges `origin/main` back into
@@ -746,9 +753,11 @@ The `find_active_session_set()` function auto-detects:
 If the trigger phrase named a specific slug (e.g., "Start the next
 session of `<slug>`"), use that slug directly rather than calling
 `find_active_session_set()`. For a parallel-trigger phrase, switch
-into the session-set worktree before proceeding — `<container>/<slug>`
-under the bare-repo + flat-worktree layout, or `../<repo>-<slug>` under
-the legacy sibling-worktree layout. See
+into the session-set worktree before proceeding —
+`../<repo>-worktrees/<slug>` under the canonical sibling-worktrees-
+folder layout, `../<repo>-<slug>` under the legacy sibling-worktree
+layout, or `<container>/<slug>` for repos still on the retired bare-
+repo + flat-worktree layout. See
 `docs/planning/repo-worktree-layout.md`.
 
 ```python
@@ -1133,7 +1142,7 @@ For sequential-trigger sessions (no parallel worktree was created),
 this step is a no-op — the work happened in the main worktree and
 there is nothing to remove.
 
-The bare-repo + flat-worktree layout that makes this cleanup natural
+The sibling-worktrees-folder layout that makes this cleanup natural
 is documented in `docs/planning/repo-worktree-layout.md`.
 
 ### Step 9: Last Session Only — Reorganization Proposals (Post-Notify)

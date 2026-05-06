@@ -74,6 +74,105 @@
       "description": "Content commit staged Set 015 deliverables only. Pushed to origin master. close_session run with all five gates passing.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register-session-start",
+      "dateTime": "2026-05-06T13:23:00-04:00",
+      "description": "Registered Session 2 start via ai_router.session_state.register_session_start. Snapshot flipped to in-progress for Session 2; work_started event appended.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/preflight-verification",
+      "dateTime": "2026-05-06T13:24:00-04:00",
+      "description": "Re-verified harvester state matches Session 1 audit. Confirmed Option D layout, three Set-016 anomalies still present (.claude/worktrees/vba-symbol-resolution-session-1, empty docs/, empty tmp/), active migrate/dabbler-ai-router-pip branch with the same dirty working tree (modified/deleted .accdb files, modified activity-log.json, untracked samples/ dirs). Captured local-only git config from .bare/config: credential username, vscode-merge-base hints for main and migrate branches.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/revert-ghost-changes",
+      "dateTime": "2026-05-06T13:24:30-04:00",
+      "description": "Reverted operator-confirmed ghost changes via git checkout -- docs/session-sets/blazor-add-an-order/activity-log.json samples/ followed by git clean -fd samples/. Working tree now clean; verified via git status --short --branch.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/backup-refs-and-bundles",
+      "dateTime": "2026-05-06T13:24:30-04:00",
+      "description": "Created backup refs in old .bare/: backup/migrate-pip-20260506-132426 (from migrate/dabbler-ai-router-pip) and backup/vba-poc-20260506-132426 (from worktree-vba-symbol-resolution-session-1). Created bundle files in C:\\Users\\denmi\\source\\repos\\: harvester-migrate-pip-20260506-132426.bundle and harvester-vba-poc-20260506-132426.bundle. Both bundles will survive the container rename for use as recovery anchors.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/clone-new-sibling-repo",
+      "dateTime": "2026-05-06T13:25:30-04:00",
+      "description": "Cloned origin (https://github.com/darndestdabbler/dabbler-access-harvester.git) into C:\\Users\\denmi\\source\\repos\\dabbler-access-harvester-new\\. Switched to migrate/dabbler-ai-router-pip branch; verified HEAD bfe54d0 matches old main/'s state. Per operator decision (b), did NOT recreate the worktree-vba-symbol-resolution-session-1 branch in the new repo - bundle preserves it indefinitely.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/apply-local-config",
+      "dateTime": "2026-05-06T13:26:00-04:00",
+      "description": "Applied local-only git config to new repo's .git/config: credential.https://github.com.username=darndestdabbler, branch.main.vscode-merge-base=origin/main, branch.migrate/dabbler-ai-router-pip.vscode-merge-base=origin/main. Standard branch tracking (remote + merge for main and migrate) was auto-set by clone+switch.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/recreate-venv-and-install-router",
+      "dateTime": "2026-05-06T13:26:00-04:00",
+      "description": "Created fresh .venv at C:\\Users\\denmi\\source\\repos\\dabbler-access-harvester-new\\.venv\\ via python -m venv. Upgraded pip to 26.1.1. Installed -r requirements.txt; dabbler-ai-router-0.1.1 + dependencies installed cleanly. Verified: pip show reports Version 0.1.1, import ai_router; __version__ reports 0.1.1 - the pre-migration discrepancy is resolved.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/smoke-test-pre-swap",
+      "dateTime": "2026-05-06T13:28:00-04:00",
+      "description": "Smoke-tested the new repo before the swap. from ai_router import route, send_session_complete_notification; from ai_router.session_log import SessionLog all import cleanly. Validated layout via raw git worktree list plus filesystem signal checks: no .bare/ directory, .git/ is a normal directory (not a pointer), no main/ subdirectory, source files at repo root. All four canonical Option B signals pass. Notable gap: python -m ai_router.worktree fails because PyPI's dabbler-ai-router 0.1.1 predates Set 017's worktree-CLI shipment; falling back to raw git for layout validation.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/atomic-swap",
+      "dateTime": "2026-05-06T13:30:00-04:00",
+      "description": "Operator-confirmed VS Code closed on harvester. Executed atomic swap as two separate mv operations: dabbler-access-harvester -> dabbler-access-harvester-old, then dabbler-access-harvester-new -> dabbler-access-harvester. No file-lock failures; cleanup-dev-orphans not needed. Final state: new canonical Option B repo at C:\\Users\\denmi\\source\\repos\\dabbler-access-harvester\\, old container preserved as -old for ~1 week.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-2/post-swap-verification",
+      "dateTime": "2026-05-06T13:31:00-04:00",
+      "description": "Post-swap state verified: layout signals all green, git status --short --branch shows migrate/dabbler-ai-router-pip clean and tracking origin, single primary worktree at canonical path, ai_router 0.1.1 imports cleanly. Operator VS Code smoke test confirmed green: extension activates without manifest-registration errors, Cost Dashboard renders, Session Set Explorer shows expected session sets bucketed correctly.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-2/close-out",
+      "dateTime": "2026-05-06T13:35:00-04:00",
+      "description": "Authored Session 2 close-out artifacts: change-log.md updated with Session 2 deliverables section + cleanup checklist for old container/bundles, disposition.json replaced with Session 2's record (next_orchestrator points at Session 3 with continue-current-trajectory rationale), activity-log.json appended with Session 2 step entries. Content commit staged orchestration-side deliverables; pushed to origin master; close_session passes all five gates.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

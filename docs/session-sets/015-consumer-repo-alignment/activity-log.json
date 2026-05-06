@@ -1,0 +1,79 @@
+{
+  "sessionSetName": "015-consumer-repo-alignment",
+  "createdDate": "2026-05-05T00:00:00-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-1/spec-amendment-precommit",
+      "dateTime": "2026-05-06T06:50:00-04:00",
+      "description": "Pre-Session-1 spec amendment landed in commit 87dc900. Reduced 4 sessions to 3 (deferred healthcare-accessdb to Set 018), re-sequenced harvester before platform, updated migration target from Option D to Option B per Set 016/017 outcomes. Spec status-note preamble records the supersession.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-1/register-session-start",
+      "dateTime": "2026-05-06T06:55:39-04:00",
+      "description": "Registered Session 1 start via ai_router.session_state.register_session_start. Snapshot flipped to in-progress; work_started event appended.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-1/audit-harvester",
+      "dateTime": "2026-05-06T07:00:00-04:00",
+      "description": "Audited dabbler-access-harvester via filesystem + git probes. Confirmed Option D layout unchanged from Set 016 audit (.bare/ + .git pointer + main/); all three anomalies still present (.claude/worktrees/vba-symbol-resolution-session-1, empty docs/, empty tmp/). Active branch on main: migrate/dabbler-ai-router-pip with dirty working tree (modified/deleted .accdb sample files, modified activity-log.json, untracked samples/ dirs) - operator-confirmed as ghost changes revertable before migration. pip show dabbler-ai-router reports 0.1.0; import ai_router shows __version__ 0.1.1 - resolves via clean re-install. Doc references in CLAUDE.md/AGENTS.md/GEMINI.md all correct (use ai_router/ underscore). 20 session sets in main/docs/session-sets/, including vba-symbol-resolution-and-enrichment (slug-similar successor to the stranded PoC's branch).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-1/audit-platform",
+      "dateTime": "2026-05-06T07:15:00-04:00",
+      "description": "Audited dabbler-platform via filesystem + git probes. Confirmed already canonical Option B-compatible layout: single working tree at repo root, no .bare/, no <repo>/main/, no <repo>-worktrees/ container. ai_router/ (underscore) directory at repo root with router-config.yaml and router-metrics.jsonl. uat_runner/ top-level package present (cli.py, runner.py, triage.py, personas.json, personas.py, remediations/, test_cases/) - the UAT DSL infrastructure per project_uat_dsl.md memory; must be preserved through migration. pip show dabbler-ai-router reports 0.1.0 (needs upgrade). Doc references in CLAUDE.md/AGENTS.md/GEMINI.md all correct. Active branch migrate/dabbler-ai-router-pip with clean working tree. No in-flight worktrees. .tmp/ at repo root contains generated session-step caches (gitignored, not migration-relevant). .claude/settings.json is 79 bytes; brief inspection deferred to Session 3 step 2.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/author-migration-plans",
+      "dateTime": "2026-05-06T08:00:00-04:00",
+      "description": "Authored ai-assignment.md with per-repo migration plans for both repos in scope. Each plan follows the uniform six-section shape: Findings, Current layout, Drift items, Migration steps, Risk callouts, Out of scope. Cross-repo summary section identifies operator decisions to lock before Session 2. Harvester plan: 16-step clone-and-swap including ghost-change reversion, backup ref + bundle for active branch and stranded PoC branch, .venv recreation, pip upgrade, atomic Windows-rename swap, ~1-week rollback window. Platform plan: 8-step pip-upgrade-plus-smoke-test with UAT DSL canary as the primary risk control.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/operator-review-gate",
+      "dateTime": "2026-05-06T08:30:00-04:00",
+      "description": "Operator reviewed migration plans. Ratified default for Anomaly A's PoC branch: backup-and-leave-behind (option b). Bundle preserves 3 unique commits indefinitely; new repo does not carry the worktree-vba-symbol-resolution-session-1 branch forward. Operator response: 'trust your default'. Both other proposed defaults previously confirmed (ghost changes revertable; harvester first then platform per amended spec).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-1/author-close-out-artifacts",
+      "dateTime": "2026-05-06T08:45:00-04:00",
+      "description": "Authored change-log.md (Session 1 deliverables, Session 2/3 readiness summaries, spend, what's next), disposition.json (with verification_method='api' as required by validator; semantically the in-band review IS the verification path for audit work), activity-log.json (this file).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-1/close-out",
+      "dateTime": "2026-05-06T09:00:00-04:00",
+      "description": "Content commit staged Set 015 deliverables only. Pushed to origin master. close_session run with all five gates passing.",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

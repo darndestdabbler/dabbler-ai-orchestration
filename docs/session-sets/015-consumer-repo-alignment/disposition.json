@@ -1,0 +1,16 @@
+{
+  "status": "completed",
+  "summary": "Set 015 Session 1 (audit + per-repo migration plans for harvester and platform): completed read-only audit across both consumer repos, authored ai-assignment.md with per-repo migration plans following the uniform six-section shape (Findings / Current layout / Drift items / Migration steps / Risk callouts / Out of scope). Operator decisions ratified for Session 2: (a) Anomaly A's PoC branch (worktree-vba-symbol-resolution-session-1, 3 unique commits never pushed) treated as superseded by the vba-symbol-resolution-and-enrichment session set in main; backup-and-leave-behind via ref + bundle, do not carry to new repo; (b) ghost changes in harvester's main/ (modified/deleted .accdb sample files, untracked samples/ dirs, modified activity-log.json) are revertable filesystem detritus per operator confirmation 2026-05-06, will be reverted before clone-and-swap migration. Audit findings: harvester is at Option D unchanged from Set 016 audit, with all three anomalies still present; the active migrate/dabbler-ai-router-pip branch has dirty working tree per the ghost-changes confirmation; pip metadata reports dabbler-ai-router 0.1.0 but import ai_router shows __version__ 0.1.1 (discrepancy resolves via clean re-install in Session 2). Platform is already at canonical Option B-compatible layout (single working tree at repo root, ai_router/ underscore directory exists, doc references correct, no in-flight worktrees); migration reduces to a pip upgrade 0.1.0 to >=0.1.1 plus smoke tests; the UAT DSL (uat_runner/ top-level package per project_uat_dsl.md memory) must be preserved through the upgrade and is verified via import + CLI smoke test. Cross-provider verification route SKIPPED per Set 017 precedent (audit work's verification surface is operator review of the plans, not LLM diff review). No code changes anywhere; this session is pure planning. Spec amendment landed in commit 87dc900 before this session ran: reduced 4 sessions to 3, deferred healthcare-accessdb to Set 018, re-sequenced harvester before platform, updated migration target from Option D (original 2026-05-05 spec) to Option B (post-Set-016 canonical). Sessions 2 and 3 unlocked for execution on operator's call.",
+  "files_changed": [
+    "docs/session-sets/015-consumer-repo-alignment/ai-assignment.md",
+    "docs/session-sets/015-consumer-repo-alignment/change-log.md",
+    "docs/session-sets/015-consumer-repo-alignment/disposition.json",
+    "docs/session-sets/015-consumer-repo-alignment/activity-log.json",
+    "docs/session-sets/015-consumer-repo-alignment/session-state.json",
+    "docs/session-sets/015-consumer-repo-alignment/session-events.jsonl"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": []
+}

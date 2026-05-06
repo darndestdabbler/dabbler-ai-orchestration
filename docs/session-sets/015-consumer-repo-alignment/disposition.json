@@ -11,6 +11,15 @@
   ],
   "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": null,
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 (harvester migration) executes the recipe authored in this session's ai-assignment.md. Same orchestrator continues for execution continuity; the per-repo plans are concrete and don't need a different reasoning shape."
+    }
+  },
   "blockers": []
 }

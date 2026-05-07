@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.13.3] — 2026-05-06
+
+### Fixed
+- **`requiresUAT` / `requiresE2E` detection no longer silently fails
+  for specs with non-canonical headings.** `parseSessionSetConfig`
+  in `src/utils/fileSystem.ts` previously fell back to scanning only
+  the first 4000 bytes of a spec when the canonical
+  `## Session Set Configuration` heading was absent. Specs that put
+  their config yaml block under a non-canonical heading like
+  `## UAT scope` and had enough upstream prose to push the yaml
+  past the 4000-byte cutoff were silently treated as
+  `requiresUAT: false`, suppressing UAT badges, the
+  "Open UAT Checklist" context-menu item, and any other
+  UAT-conditional affordance for the affected sets. Fix: scan the
+  entire spec when the canonical heading is absent. The line-
+  anchored regex (`^\s*requiresUAT\s*:\s*(true|false)\s*$`) is
+  specific enough that false positives from prose mentions are very
+  unlikely. Two regression tests added in
+  `src/test/suite/fileSystem.test.ts` (positive and negative case).
+  Surfaced and fixed during dabbler-ai-orchestration Set 015
+  Session 3 (consumer-repo alignment) on `dabbler-platform`'s
+  `admin-user-creation-flow` and `admin-users-cross-links` specs.
+
 ## [0.13.2] — 2026-05-05
 
 ### Fixed

@@ -34,6 +34,38 @@ suite("fileSystem — parseSessionSetConfig", () => {
     assert.strictEqual(cfg.requiresUAT, true);
     fs.rmSync(dir, { recursive: true });
   });
+
+  // Regression test for Set 015 Session 3 (2026-05-06): platform specs
+  // that put the config yaml block under a non-canonical heading like
+  // `## UAT scope` AND have enough upstream prose to push the yaml past
+  // 4000 bytes were silently treated as `requiresUAT: false`. The parser
+  // now scans the whole file when the canonical heading is absent.
+  test("detects requiresUAT in yaml block past 4000 bytes when canonical heading absent", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    const padding = "x".repeat(4500);  // push the yaml block past the old cutoff
+    const content = `# Some Spec\n\n${padding}\n\n## UAT scope\n\n\`\`\`yaml\nrequiresUAT: true\nrequiresE2E: false\nuatScope: full\n\`\`\`\n`;
+    fs.writeFileSync(specPath, content);
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.requiresUAT, true);
+    assert.strictEqual(cfg.requiresE2E, false);
+    assert.strictEqual(cfg.uatScope, "full");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  // Negative case: spec that doesn't declare requiresUAT anywhere remains
+  // false. Guards against an over-broad fix that might match prose
+  // mentions of "requiresUAT" that aren't on their own line.
+  test("returns false when requiresUAT is not declared anywhere", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    const content = `# Some Spec\n\nThis spec does not declare requiresUAT or requiresE2E.\nIt mentions them in prose but never on a standalone line.\n`;
+    fs.writeFileSync(specPath, content);
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.requiresUAT, false);
+    assert.strictEqual(cfg.requiresE2E, false);
+    fs.rmSync(dir, { recursive: true });
+  });
 });
 
 suite("fileSystem — parseUatChecklist", () => {

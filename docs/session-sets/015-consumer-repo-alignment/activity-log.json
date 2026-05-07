@@ -173,6 +173,87 @@
       "description": "Authored Session 2 close-out artifacts: change-log.md updated with Session 2 deliverables section + cleanup checklist for old container/bundles, disposition.json replaced with Session 2's record (next_orchestrator points at Session 3 with continue-current-trajectory rationale), activity-log.json appended with Session 2 step entries. Content commit staged orchestration-side deliverables; pushed to origin master; close_session passes all five gates.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/register-session-start",
+      "dateTime": "2026-05-06T16:00:00-04:00",
+      "description": "Registered Session 3 start via ai_router.session_state.register_session_start. Snapshot flipped to in-progress for Session 3.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/preflight-platform",
+      "dateTime": "2026-05-06T16:01:00-04:00",
+      "description": "Pre-flight on dabbler-platform: working tree clean on migrate/dabbler-ai-router-pip branch tracking origin. Confirmed pip dabbler-ai-router 0.1.0. Inspected .claude/settings.json (4-line permission rule for Bash docker context, not migration-relevant). requirements.txt has loose pin dabbler-ai-router>=0.1.0 - no file edits needed for upgrade.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/pip-upgrade",
+      "dateTime": "2026-05-06T16:02:00-04:00",
+      "description": "Ran .venv/Scripts/python.exe -m pip install --upgrade dabbler-ai-router. Result: 0.1.0 -> 0.1.1 cleanly. pip show and import-time __version__ both report 0.1.1.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/uat-dsl-canary",
+      "dateTime": "2026-05-06T16:03:00-04:00",
+      "description": "UAT DSL canary: from uat_runner.runner import run_checklist; from uat_runner.triage import FailureRecord, TriageSession all import cleanly. python -m uat_runner.cli --help renders correctly. The platform-specific UAT runner is unaffected by the dabbler-ai-router upgrade (as expected - uat_runner is a top-level package, separate from ai_router).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/uat-detection-investigation",
+      "dateTime": "2026-05-06T16:10:00-04:00",
+      "description": "Operator asked which platform sets declare requiresUAT: true. Investigation surfaced that the extension parser at tools/dabbler-ai-orchestration/src/utils/fileSystem.ts:107-138 has a bug: when the canonical ## Session Set Configuration heading is absent, the fallback only scans the first 4000 bytes of the spec. Two platform specs (admin-user-creation-flow line 83 byte 4079, admin-users-cross-links line 80 byte 4308) put their yaml block under ## UAT scope heading and have enough upstream prose to push the yaml past the 4000-byte cutoff. The extension treated both as requiresUAT: false silently.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/parser-fix",
+      "dateTime": "2026-05-06T16:20:00-04:00",
+      "description": "Fixed parseSessionSetConfig in fileSystem.ts: changed the fallback from text.slice(0, 4000) to scanning the entire file. The line-anchored regex (^\\s*requiresUAT\\s*:\\s*(true|false)\\s*$) is specific enough that false positives in prose are very unlikely. Added two regression tests in fileSystem.test.ts: positive (yaml past 4000 bytes under non-canonical heading detected) and negative (prose mention of requiresUAT not on its own line stays false). Test runner broken on this Windows host (pre-existing per Set 014: vscode import not resolvable in non-extension-host context, mocha BDD/TDD UI mismatch); verified via ad-hoc Node script that inlined the parser logic and ran against real platform specs - 5/5 passing (2 previously-misdetected specs now caught, 1 already-detected stays detected, 1 legitimately-false stays false, 1 synthetic prose-only case stays false).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/platform-spec-hygiene",
+      "dateTime": "2026-05-06T16:35:00-04:00",
+      "description": "Edited 3 platform specs to put requiresUAT declarations under canonical ## Session Set Configuration heading. (1) admin-user-creation-flow and (2) admin-users-cross-links: added the canonical block at the top of each spec so both the old (4000-byte fallback) AND new (whole-file fallback) parsers detect them. Existing ## UAT scope blocks left intact for prose context. (3) unified-master-details-composite: added requiresUAT: true for the first time per operator confirmation that the master-details composite control with four data-entry workflows (Add-Only, Search+Update, Pick-or-Add, M2M-with-payload) cannot be visually verified by automated tests alone - human eyes need to confirm layout/keyboard flow/visual polish across each workflow.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/operator-confirmation",
+      "dateTime": "2026-05-06T16:50:00-04:00",
+      "description": "Operator confirmations: (a) extension probe shows only darndestdabbler.dabbler-ai-orchestration installed (no legacy dabbler-session-sets); (b) VS Code on platform shows extension activates cleanly without manifest-registration errors, Cost Dashboard renders, Session Set Explorer shows correct bucketing; (c) Open UAT Checklist visible on right-click for the 4 UAT-flagged sets (admin-user-creation-flow, admin-users-cross-links, sensitive-field-masking-audit-uat-remediation, unified-master-details-composite) - canary that platform spec edits are picked up by the currently-installed extension despite the parser fix not yet being in the installed VSIX.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/close-out",
+      "dateTime": "2026-05-06T17:00:00-04:00",
+      "description": "Authored Session 3 close-out artifacts: change-log.md appended with Session 3 deliverables section + Set 015 final summary, disposition.json replaced with Session 3's record (next_orchestrator: null since Session 3 is final session of Set 015), activity-log.json appended with Session 3 step entries. Two backlog items queued for future release work: (1) bump dabbler-ai-router PyPI release to include Set 017's worktree CLI module, (2) rebuild + republish dabbler-ai-orchestration VSIX to bundle the parser fix. Both share a logical resolution via a future release session set or focused commit + Marketplace publish workflow.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

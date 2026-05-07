@@ -1,5 +1,22 @@
 # Change log — Set 015 (consumer-repo alignment)
 
+> **Status at end of Session 3 (Set 015 complete):** Platform
+> migration to canonical Option B done — already at compatible
+> layout, so the work was the `dabbler-ai-router` pip upgrade
+> (0.1.0 → 0.1.1) plus a defense-in-depth parser fix in the
+> orchestration extension that surfaced when verifying UAT
+> detection. Three platform specs got canonical
+> `## Session Set Configuration` headings during the same
+> session: two existing UAT-flagged sets (admin-user-creation-flow,
+> admin-users-cross-links) that the old parser was missing because
+> their yaml block sat past 4000 bytes under a non-canonical
+> `## UAT scope` heading, plus `unified-master-details-composite`
+> which now declares `requiresUAT: true` per operator confirmation
+> that visual UI verification matters there. **Set 015 is now fully
+> closed.** Three consumer repos in scope: harvester migrated
+> (Session 2), platform aligned (Session 3), healthcare-accessdb
+> deferred to [Set 018](../018-healthcare-accessdb-migration/).
+>
 > **Status at end of Session 2:** Harvester migration to canonical
 > Option B layout complete via clone-and-swap. Old container
 > preserved as `dabbler-access-harvester-old/` for ~1 week as
@@ -72,6 +89,52 @@ Validation during Session 2 fell back to raw `git worktree list` plus filesystem
 - [ ] Delete `C:\Users\denmi\source\repos\dabbler-access-harvester-old\` after operator confirms the new repo is stable in regular work.
 - [ ] Delete `C:\Users\denmi\source\repos\harvester-migrate-pip-20260506-132426.bundle` and `harvester-vba-poc-20260506-132426.bundle` (the backup refs in `-old/.bare/` are gone with the directory; the bundle files are independent and safe to keep longer if desired).
 
+## Session 3 deliverables (platform alignment + parser fix — COMPLETE)
+
+Executed the simpler-than-Session-2 plan from Session 1's
+ai-assignment.md (platform was already at canonical Option B-
+compatible layout, so no clone-and-swap needed). Plus an unplanned
+side-quest: fixed an orchestration-side parser bug surfaced by
+verifying UAT detection on platform's specs.
+
+**Key actions taken (in order):**
+
+1. **Pre-flight** — confirmed platform working tree clean on `migrate/dabbler-ai-router-pip` branch tracking origin. `dabbler-ai-router` confirmed at 0.1.0. `.claude/settings.json` is a 4-line permission rule (not migration-relevant). `requirements.txt` has loose pin `dabbler-ai-router>=0.1.0` — no file edits needed for the upgrade.
+2. **pip upgrade** — `.venv/Scripts/python.exe -m pip install --upgrade dabbler-ai-router`. **Result: 0.1.0 → 0.1.1 cleanly.** `pip show` and `import ai_router; __version__` both report 0.1.1.
+3. **UAT DSL canary** — `from uat_runner.runner import run_checklist; from uat_runner.triage import FailureRecord, TriageSession` imports succeed. `python -m uat_runner.cli --help` renders correctly. The platform-specific UAT DSL infrastructure is unaffected by the upgrade (as expected — `uat_runner` is a top-level package, separate from `ai_router`).
+4. **UAT detection investigation** — operator asked which platform sets declare `requiresUAT: true` and noticed that `admin-users-cross-links` has it in the spec but might not be parser-detected. Investigation confirmed the parser bug:
+   - The extension parser ([fileSystem.ts:107-138](../../../tools/dabbler-ai-orchestration/src/utils/fileSystem.ts#L107-L138)) looked for a `## Session Set Configuration` heading + yaml block; if not found, it scanned the FIRST 4000 BYTES of the spec.
+   - Two platform specs (`admin-user-creation-flow`, `admin-users-cross-links`) put their yaml block under `## UAT scope` instead of the canonical heading, AND had enough upstream prose to push the yaml past 4000 bytes (line 83 byte 4079, and line 80 byte 4308 respectively).
+   - Result: the extension treated both as `requiresUAT: false` — no UAT badges, no "Open UAT Checklist" context-menu item, no UAT-related affordances.
+5. **Parser fix in orchestration source** — changed the fallback in `fileSystem.ts` from `text.slice(0, 4000)` to scanning the entire file. The line-anchored regex (`^\s*requiresUAT:\s*(true|false)\s*$`) is specific enough that false positives in prose are very unlikely. Added two regression tests in `fileSystem.test.ts` covering the fixed case (yaml past 4000 bytes under non-canonical heading) and a negative case (no declaration anywhere stays false).
+6. **Parser fix verification** — unit-test runner is broken on this Windows host (pre-existing issue per Set 014: mocha BDD/TDD UI mismatch + `vscode` import missing in non-extension-host context). Verified the fix via an ad-hoc Node script that inlined the parser logic and exercised it against real platform specs: 5/5 passing (2 previously-misdetected specs now caught, 1 already-detected spec still works, 1 legitimately-false spec stays false, 1 synthetic prose-mention case correctly stays false).
+7. **Platform spec hygiene** — added `## Session Set Configuration` heading + canonical yaml block to three platform specs:
+   - `admin-user-creation-flow` (now detected by both old and new parser; existing `## UAT scope` block left intact for prose context)
+   - `admin-users-cross-links` (same)
+   - `unified-master-details-composite` (now declares `requiresUAT: true` for the first time, per operator confirmation that the master-details composite control needs visual verification across its four data-entry workflows)
+8. **Operator confirmations** — extension probe shows only canonical `darndestdabbler.dabbler-ai-orchestration` installed (no legacy `dabbler-session-sets`). VS Code smoke test on platform: extension activates without manifest-registration errors, Cost Dashboard renders, Session Set Explorer shows correct bucketing. UAT-detection canary: right-click on any of the four UAT-flagged sets shows "Open UAT Checklist" in the context menu — confirming the platform spec edits are picked up by the currently-installed extension.
+
+### Notable gaps surfaced (queued backlog)
+
+**Both gaps are release-pipeline concerns, not Session 3 scope:**
+
+1. **`python -m ai_router.worktree` not available in pip-installed `dabbler-ai-router 0.1.1`.** The CLI was shipped in Set 017 today (2026-05-06) but PyPI's published version predates that. Will resolve once the next PyPI release of `dabbler-ai-router` includes the worktree module — likely versioned 0.2.0 given the new public API surface.
+2. **Parser fix is in orchestration source but not in the operator's installed VSIX.** The fix will take effect once the next VSIX rebuild + Marketplace republish (or local VSIX install). Until then, the operator's installed extension still uses the old parser — but the platform spec edits work around that by using the canonical heading, so all four UAT-flagged platform sets are correctly detected by both the old and new parser.
+
+Both gaps share a logical resolution: a future "release" session set (or focused commit + Marketplace publish workflow) that bundles the worktree CLI + parser fix into the next dabbler-ai-router PyPI release and dabbler-ai-orchestration VSIX release.
+
+## Set 015 final summary
+
+All three sessions complete:
+
+| Session | Repo | Outcome |
+|---|---|---|
+| 1 | (this set) | Audit + per-repo migration plans authored in ai-assignment.md |
+| 2 | dabbler-access-harvester | Migrated D → B via clone-and-swap; old container preserved for ~1 week; operator VS Code smoke test green |
+| 3 | dabbler-platform + this orchestration repo | pip upgrade 0.1.0 → 0.1.1; parser fix + tests; 3 platform spec hygiene edits; operator VS Code smoke test green |
+
+`dabbler-homehealthcare-accessdb` migration remains in [Set 018](../018-healthcare-accessdb-migration/) — operator-timed; runs when UAT cadence allows.
+
 ## Session 3 readiness (platform)
 
 Migration is dramatically simpler — platform is already at
@@ -86,7 +149,8 @@ package); step 6 smoke-tests imports + CLI as the canary.
 |---|---|---|
 | Session 1 — Audit + per-repo plan authoring + close-out | ~90 min | $0 |
 | Session 2 — Harvester migration (revert / backup / clone / config / venv / smoke / swap / verify / close-out) | ~60 min | $0 |
-| **Set 015 total so far (through Session 2)** | **~150 min** | **$0** |
+| Session 3 — Platform pip upgrade + parser fix side-quest + 3 spec hygiene edits + close-out | ~75 min | $0 |
+| **Set 015 total** | **~225 min** | **$0** |
 
 End-of-session verification route was skipped per the spec's
 amended cost projection (Set 017 precedent — operator review of

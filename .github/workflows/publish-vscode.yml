@@ -119,10 +119,10 @@ jobs:
           JS
 
       - name: Build VSIX
-        # `npx vsce package` produces dabbler-ai-orchestration-<version>.vsix
-        # in the working directory. The CHANGELOG.md / README.md / LICENSE
-        # files referenced from package.json must exist alongside it.
-        run: npx vsce package
+        # `npm run package` compiles TypeScript via esbuild first, then
+        # runs vsce package. Using `npx vsce package` directly would skip
+        # the compile step and bundle whatever dist/ is committed.
+        run: npm run package
 
       - name: Verify VSIX filename
         # Belt-and-suspenders: the produced VSIX's filename must encode the

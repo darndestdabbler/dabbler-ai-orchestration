@@ -140,6 +140,7 @@ external tooling) which gates apply to this set.
 
 requiresUAT: false       # human UAT review required before set closes
 requiresE2E: false       # E2E test coverage required before notifying
+uatStyle: ad-hoc         # dsl | ad-hoc (only meaningful when requiresUAT: true; default ad-hoc)
 uatScope: per-session    # per-session | per-set | none (only meaningful when requiresUAT: true)
 ```
 
@@ -148,7 +149,7 @@ uatScope: per-session    # per-session | per-set | none (only meaningful when re
 - **`requiresUAT: true`** — the set must produce a
   `<slug>-uat-checklist.json` and human-UAT review is a precondition
   for marking the set complete. The orchestrator will invoke
-  `route(task_type="uat-plan-generation")` and
+  `route(task_type="uat-plan-generation")` and (on the DSL path)
   `route(task_type="uat-coverage-review")` at the appropriate steps.
   Pending UAT blocks downstream sets unless the human explicitly
   overrides.
@@ -158,15 +159,34 @@ uatScope: per-session    # per-session | per-set | none (only meaningful when re
   + tests + cross-provider AI verification.
 
 - **`requiresE2E: true`** — every functional checklist item (when UAT
-  is also required) must have matching E2E test coverage before the
-  human is notified. When `requiresUAT: false` but `requiresE2E:
-  true`, the rule degenerates to "behavioral changes ship with E2E
-  tests" — the orchestrator confirms via test discovery before
-  notifying.
+  is also required AND `uatStyle: "dsl"`) must have matching E2E test
+  coverage before the human is notified. When `requiresUAT: false`
+  but `requiresE2E: true`, the rule degenerates to "behavioral
+  changes ship with E2E tests" — the orchestrator confirms via test
+  discovery before notifying.
 
 - **`requiresE2E: false`** — no E2E coverage gate. Unit + integration
   tests are still expected (those are governed by the testing
   hierarchy, not by this flag).
+
+- **`uatStyle: "dsl"`** — checklist items compile to Playwright tests
+  via `dabbler-uat-dsl`. **Requires `requiresE2E: true`.** The
+  `uat-coverage-review` task gates handoff. Appropriate for
+  web/browser UIs where every functional item maps to a Playwright
+  step. **`uatStyle: "dsl"` together with `requiresE2E: false` is
+  an invalid configuration** — the orchestrator rejects it at Step
+  2 rather than silently downgrading to ad-hoc. Authors must either
+  set `requiresE2E: true` or switch to `uatStyle: "ad-hoc"`. See
+  *Choosing `uatStyle`* below.
+
+- **`uatStyle: "ad-hoc"`** — checklist items are human-runnable steps
+  without strict DSL. Each non-judgment functional item declares
+  either a `ProgrammaticVerification` reference (unit/component
+  test, data-layer assert, AI exploratory check) or a
+  `NoProgrammaticPathReason` (one-sentence justification). The
+  orchestrator validates this floor before notifying. Appropriate
+  for non-web surfaces (CLI, native, Access, COM-driven apps, IDE
+  plugins). See *Choosing `uatStyle`* below.
 
 - **`uatScope`** — only meaningful when `requiresUAT: true`:
   - `per-session` — checklist items accumulate across sessions; the
@@ -178,21 +198,34 @@ uatScope: per-session    # per-session | per-set | none (only meaningful when re
 ### Defaults
 
 If the configuration block is **omitted entirely**, the spec is
-treated as `requiresUAT: false`, `requiresE2E: false`, `uatScope:
-none`. Same outcome as writing the block with all three values
-spelled out as their defaults.
+treated as `requiresUAT: false`, `requiresE2E: false`, `uatStyle:
+ad-hoc`, `uatScope: none`. Same outcome as writing the block with
+all four values spelled out as their defaults.
 
 If the block is **present but a field is omitted**, the missing field
-takes its default (`false` for booleans, `none` for `uatScope`).
+takes its default (`false` for booleans, `"ad-hoc"` for `uatStyle`,
+`none` for `uatScope`).
 
 **The safe default is no UAT and no E2E gate.** Authors who want UAT
 or E2E coverage must opt in explicitly. This keeps every set's gates
 visible in one place and lets non-UI repos use the workflow
 out-of-box without touching shared files.
 
-Future flags added to the block follow the same default-false rule.
-Older specs continue to work without modification when new flags are
-introduced.
+**Migration note for `dabbler-platform` (2026-05-11):** the
+`uatStyle` field was introduced in Set 019 of
+`dabbler-ai-orchestration`. Existing `dabbler-platform` UAT-enabled
+specs were written for the DSL/Playwright path; they need to add
+`uatStyle: "dsl"` to preserve current behavior. Without the
+explicit declaration, the default `"ad-hoc"` applies and the
+mechanical gate degrades from `uat-coverage-review` (Playwright
+parity) to "every functional item declares
+`ProgrammaticVerification` or `NoProgrammaticPathReason`." Update
+each spec's Session Set Configuration block at the platform's next
+UAT-touching session set.
+
+Future flags added to the block follow the same opt-in-via-explicit-
+declaration rule. Older specs continue to work without modification
+when new flags are introduced.
 
 ---
 
@@ -220,6 +253,54 @@ infrastructure changes with no UI effect, router or prompt-template
 edits, test-only changes, and documentation. If a session is
 ambiguous (e.g., refactoring an API the UI may depend on), default to
 requiring UAT.
+
+### Choosing `uatStyle`
+
+When `requiresUAT: true`, the spec author also picks `uatStyle`:
+
+- **`uatStyle: "dsl"`** — web/browser UI changes where the checklist
+  compiles to Playwright via the `dabbler-uat-dsl` repo. **Requires
+  `requiresE2E: true`** (the Playwright suite is the mechanical
+  floor). Appropriate when every functional item is naturally
+  expressed as a browser interaction. The
+  `route(task_type="uat-coverage-review")` task verifies every
+  non-judgment item maps to a Playwright step before the human is
+  notified.
+
+- **`uatStyle: "ad-hoc"`** — non-web UI where Playwright is not
+  applicable. CLI tools, native apps, Microsoft Access / COM-driven
+  applications, IDE plugins, anything driven through a non-browser
+  interface. Each non-judgment functional item declares either:
+  - `ProgrammaticVerification: "<reference>"` — naming the unit
+    test, component test, data-layer assert, or AI exploratory
+    check that mechanically satisfies the item.
+  - `NoProgrammaticPathReason: "<justification>"` — a specific
+    one-sentence reason why the item genuinely cannot be verified
+    programmatically.
+
+  The orchestrator validates the floor locally before notifying;
+  there is no `uat-coverage-review` route on the ad-hoc path.
+
+- **Default when `requiresUAT: true` and `uatStyle` omitted:**
+  `"ad-hoc"`. Per universal-core / gated-extensions: the
+  lower-scaffolding path is the default; DSL is opted into
+  explicitly. Repos with active web UAT machinery (notably
+  `dabbler-platform`) must declare `uatStyle: "dsl"` on existing
+  and new UAT-enabled specs — see *Migration note* in the field-
+  semantics section above.
+
+**Mixed surfaces.** A set whose work spans web and non-web should
+split into sibling sessions or sibling sets — that is the cleanest
+path. If splitting is genuinely impractical and the set must
+combine surfaces into one checklist, declare `uatStyle: "ad-hoc"`
+for the whole set. The DSL path requires Playwright parity for
+every non-judgment functional item (no per-item exceptions), so a
+single-`uatStyle: "dsl"` set cannot accommodate non-browser items;
+the ad-hoc gate gracefully covers both surfaces in one checklist
+(browser items can declare a `ProgrammaticVerification` referencing
+an existing Playwright test if any, while non-browser items declare
+their own programmatic-verification reference or a
+`NoProgrammaticPathReason`).
 
 When UAT is required, the checklist is built **during the session set
 that makes the change** — not deferred to a later "UAT session set."

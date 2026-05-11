@@ -409,6 +409,7 @@ structure:
 ```yaml
 requiresUAT: false      # see When-UAT-Is-Required heuristic in authoring guide
 requiresE2E: false      # see When-E2E-Is-Required heuristic in authoring guide
+uatStyle: ad-hoc        # dsl | ad-hoc; only meaningful when requiresUAT: true. Default ad-hoc.
 uatScope: none          # per-session | per-set | none
 ```
 
@@ -637,9 +638,9 @@ cross-provider — that is the one constraint that survives any maxout.
 ### Reading the Session Set Configuration
 
 Every spec begins with a Session Set Configuration block declaring
-`requiresUAT`, `requiresE2E`, and `uatScope`. The orchestrator reads
-this block as part of Step 2 and uses it to decide which UAT/E2E
-gates apply for the rest of the workflow. **The orchestrator does not
+`requiresUAT`, `requiresE2E`, `uatStyle`, and `uatScope`. The
+orchestrator reads this block as part of Step 2 and uses it to
+decide which UAT/E2E gates apply for the rest of the workflow. **The orchestrator does not
 re-litigate these flags during a session.** If a spec declares
 `requiresUAT: false`, the workflow does not invoke
 `uat-plan-generation`, does not author a checklist, and does not
@@ -654,7 +655,7 @@ inform spec authors are documented in
 *execution-time* behavior gated by the spec; the authoring guide
 owns *which spec flags to set in the first place.*
 
-### UAT Checklist Rule
+### UAT Checklist Rule (shared preamble)
 
 > **Applies only when the active spec declares `requiresUAT: true`.**
 > Sets with `requiresUAT: false` skip this rule entirely.
@@ -675,43 +676,34 @@ When a session set includes a human-executed UAT checklist:
   session that depends on or bypasses that review unless the human explicitly
   says to do so
 
-### When UAT Is Required (authoring-time decision)
+Every spec with `requiresUAT: true` also declares `uatStyle: "dsl"`
+or `uatStyle: "ad-hoc"` (defaulting to `"ad-hoc"` if omitted). The
+two paths share this preamble and diverge on the mechanical-
+verification gate the orchestrator enforces before notification.
 
-> The full heuristic for whether a spec should declare `requiresUAT:
-> true` lives in `docs/planning/session-set-authoring-guide.md` →
-> *When UAT is required*. **Spec authors decide; the orchestrator
-> obeys.** This section summarizes the rule for orchestrator
-> reference.
+### UAT Checklist Rule — DSL-driven (`uatStyle: "dsl"`)
 
-A session set should declare `requiresUAT: true` whenever its work
-changes the behavior of a UI surface or a service the UI talks to
-directly: UI pages/components/nav/forms/grids/dialogs (e.g., Blazor, React,
-elements, cross-page interaction patterns, API endpoints the UI
-consumes, authorization rules the UI surfaces, browser-visible
-workflows. Pure refactors, internal-only library/router/test/doc
-work, and infrastructure changes typically declare `requiresUAT:
-false`.
-
-When the active spec declares `requiresUAT: true`, the checklist is
-built **during this session set** — not deferred to a later "UAT
-session set." Deferring UAT across session sets breaks the
-traceability between a change and its human sign-off.
-
-When the active spec declares `requiresUAT: false`, the orchestrator
-does not generate a checklist, does not invoke `uat-plan-generation`
-or `uat-coverage-review`, and Rule #9 (pending UAT blocking) does not
-apply.
-
-### E2E Coverage Before UAT
-
-> **Applies only when the active spec declares both `requiresUAT:
-> true` AND `requiresE2E: true`.** Sets with either flag false skip
-> this gate.
+> **Applies only when the active spec declares `requiresUAT: true`
+> AND `uatStyle: "dsl"`.** This is the path for web/browser UIs
+> whose checklist compiles to Playwright tests via the
+> `dabbler-uat-dsl` repo.
 
 Before a UAT checklist is committed and the human is notified, every
 functional item in the checklist must have matching E2E test coverage.
 This is the procedural form of the "human UAT is not the first line of
-defense" principle in `docs/planning/project-guidance.md`.
+defense" principle in `docs/planning/project-guidance.md`. **The DSL
+path requires `requiresE2E: true`** — without E2E coverage there is no
+mechanical floor.
+
+**Invalid combination.** A spec declaring `uatStyle: "dsl"` together
+with `requiresE2E: false` is rejected at authoring time and at Step
+2 of the workflow. The orchestrator surfaces this as a configuration
+error and does not silently downgrade to ad-hoc — the author must
+either set `requiresE2E: true` (committing to Playwright coverage)
+or switch to `uatStyle: "ad-hoc"` (which has its own mechanical
+floor and does not depend on E2E). Silent downgrade would let a
+DSL-intent author ship a set whose Playwright suite is missing
+without an explicit decision.
 
 Specifically:
 
@@ -730,8 +722,106 @@ Specifically:
   returns `VERIFIED` only when every non-judgment item has a matching
   test. Any mismatch blocks the checklist handoff.
 
-A checklist shipped without this coverage is a session-closeout defect
-and must be rebuilt before the human is notified.
+A DSL-path checklist shipped without this coverage is a
+session-closeout defect and must be rebuilt before the human is
+notified.
+
+### UAT Checklist Rule — Ad-hoc (`uatStyle: "ad-hoc"`)
+
+> **Applies only when the active spec declares `requiresUAT: true`
+> AND `uatStyle: "ad-hoc"`** (the default when `uatStyle` is omitted).
+> This is the path for non-web surfaces — CLI tools, native apps,
+> Microsoft Access / COM-driven apps, IDE plugins, anything Playwright
+> cannot drive.
+
+The "human UAT is not the first line of defense" principle still
+holds — the mechanism for enforcing it relaxes, the principle does
+not. Before the checklist is committed and the human is notified,
+**every non-judgment functional checklist item must declare one of**:
+
+- **`ProgrammaticVerification: "<reference>"`** — a one-line
+  reference to the unit test, component test, data-layer assert, or
+  AI exploratory check that mechanically satisfies the item. Examples:
+  `"bUnit: UsersGridTests.FiltersByRoleWhenAdminSelected"`,
+  `"SqlAssert: AdminUser.Restrictions.LoopbackBlocked"`, or
+  `"AI exploratory check 2026-05-11: drove FormX via COM, asserted dropdown set narrows correctly"`.
+- **`NoProgrammaticPathReason: "<one-sentence justification>"`** —
+  used when the item genuinely has no programmatic path (e.g., a
+  Microsoft Access form whose rendering quirk can only be observed
+  visually by a human operator). The justification must be specific:
+  "Access subform layout cannot be inspected via COM" beats "no test
+  possible."
+
+Items flagged `IsJudgmentItem: true` carry the same meaning as on
+the DSL path — purely aesthetic / copy / layout-feel judgments,
+exempt from the mechanical-verification requirement.
+
+The orchestrator validates that every non-judgment functional item
+has one of the two fields populated **before** notifying the human.
+A mismatch blocks notification. There is no
+`uat-coverage-review` route on the ad-hoc path — the gate is local
+to the orchestrator (no cross-provider review of a Playwright
+suite, because there is no Playwright suite).
+
+A checklist shipped without the verification floor is a
+session-closeout defect and must be rebuilt before the human is
+notified.
+
+### When UAT Is Required (authoring-time decision)
+
+> The full heuristic for whether a spec should declare `requiresUAT:
+> true` (and which `uatStyle` to pick) lives in
+> `docs/planning/session-set-authoring-guide.md` → *When UAT is
+> required*. **Spec authors decide; the orchestrator obeys.** This
+> section summarizes the rule for orchestrator reference.
+
+A session set should declare `requiresUAT: true` whenever its work
+changes the behavior of a UI surface or a service the UI talks to
+directly: UI pages/components/nav/forms/grids/dialogs (e.g., Blazor, React,
+elements, cross-page interaction patterns, API endpoints the UI
+consumes, authorization rules the UI surfaces, browser-visible
+workflows. Pure refactors, internal-only library/router/test/doc
+work, and infrastructure changes typically declare `requiresUAT:
+false`.
+
+When the active spec declares `requiresUAT: true`, the author also
+picks `uatStyle`:
+
+- `uatStyle: "dsl"` — web/browser UI changes where the checklist
+  compiles to Playwright via `dabbler-uat-dsl`. The DSL path
+  requires `requiresE2E: true` too; the Playwright suite is the
+  mechanical floor.
+- `uatStyle: "ad-hoc"` — non-web UI (CLI, native, Access, COM-driven
+  apps, IDE plugins, etc.) where Playwright is not applicable. Each
+  functional item declares `ProgrammaticVerification` or
+  `NoProgrammaticPathReason`.
+- **Default when omitted:** `"ad-hoc"`. Per universal-core /
+  gated-extensions: the lower-scaffolding path is the default; DSL
+  is opted into explicitly.
+
+Mixed surfaces (a set whose work spans web and non-web) should
+split into sibling sessions or sibling sets — that is the cleanest
+path. If splitting is genuinely impractical and the set must
+combine surfaces into one checklist, declare `uatStyle: "ad-hoc"`
+for the whole set: the DSL path requires Playwright parity for
+every non-judgment functional item (no per-item exceptions), so
+a single-`uatStyle: "dsl"` set cannot accommodate non-browser
+items. The ad-hoc gate gracefully covers both surfaces in one
+checklist: browser-driven items declare a `ProgrammaticVerification`
+referencing the relevant Playwright test (if any exists); non-browser
+items declare a `ProgrammaticVerification` referencing the unit /
+component / data-layer / AI-exploratory check that satisfies them,
+or a `NoProgrammaticPathReason` when no programmatic path applies.
+
+When the active spec declares `requiresUAT: true`, the checklist is
+built **during this session set** — not deferred to a later "UAT
+session set." Deferring UAT across session sets breaks the
+traceability between a change and its human sign-off.
+
+When the active spec declares `requiresUAT: false`, the orchestrator
+does not generate a checklist, does not invoke `uat-plan-generation`
+or `uat-coverage-review`, and Rule #9 (pending UAT blocking) does not
+apply.
 
 When the spec declares `requiresE2E: true` but `requiresUAT: false`,
 the rule degenerates to "behavioral changes ship with E2E coverage" —
@@ -1614,14 +1704,22 @@ This is the authoritative rules list. Instruction files (`CLAUDE.md`,
 10. **One UAT checklist per session set** *(applies only when the active
     spec declares `requiresUAT: true`).* Name it
     `<session-set-slug>-uat-checklist.json` and keep human results inline.
-11. **E2E coverage before UAT handoff** *(applies only when the active
-    spec declares both `requiresUAT: true` AND `requiresE2E: true`).*
-    Every functional checklist item must have matching Playwright
-    coverage and pass `uat-coverage-review` before the checklist is
-    committed and the human is notified. Judgment items
-    (`IsJudgmentItem: true`) are exempt from matching-test parity but
-    still require sequence-reachability coverage. See the `E2E Coverage
-    Before UAT` section above.
+11. **UAT mechanical-verification floor** *(applies only when the active
+    spec declares `requiresUAT: true`).* The mechanism depends on
+    `uatStyle`:
+    - **11a. DSL-driven (`uatStyle: "dsl"`)** — also requires
+      `requiresE2E: true`. Every functional checklist item must have
+      matching Playwright coverage and pass `uat-coverage-review`
+      before the checklist is committed and the human is notified.
+      Judgment items (`IsJudgmentItem: true`) are exempt from
+      matching-test parity but still require sequence-reachability
+      coverage. See §"UAT Checklist Rule — DSL-driven" above.
+    - **11b. Ad-hoc (`uatStyle: "ad-hoc"`, the default)** — every
+      non-judgment functional checklist item must declare either a
+      `ProgrammaticVerification` reference (unit/component/data-layer
+      test or AI exploratory check) or a `NoProgrammaticPathReason`
+      (one-sentence justification). The orchestrator validates this
+      before notifying. See §"UAT Checklist Rule — Ad-hoc" above.
 12. **Share screenshots during UI and E2E work when practical.**
 13. **Escalate durable new guidance.** If the human gives an instruction that
     looks like a future principle or convention, ask whether it should be

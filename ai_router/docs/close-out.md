@@ -25,7 +25,9 @@ all of the following are true:
 
 1. The session's work agent has produced a `disposition.json` whose
    `status` field is `"completed"` (see
-   `docs/session-state-schema-example.md` for the full schema).
+   [`docs/disposition-schema.md`](../../docs/disposition-schema.md)
+   for the full schema, field-level invariants, and a copy-paste
+   template).
 2. End-of-session verification (Step 6) has reached a terminal state.
    "Terminal" is mode-dependent:
    - **`outsourceMode: first`** — the synchronous `verify()` call

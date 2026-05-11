@@ -1,0 +1,144 @@
+{
+  "sessionSetName": "019-feedback-disposition-and-uat-two-options",
+  "totalSessions": 2,
+  "sessions": [
+    {
+      "sessionNumber": 1,
+      "startedAt": "2026-05-11T11:00:00-04:00",
+      "completedAt": "2026-05-11T11:46:00-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-4-7",
+        "effort": "normal"
+      },
+      "verificationVerdict": "VERIFIED-BY-OPERATOR-AND-TESTS",
+      "commit": "94260a6",
+      "steps": [
+        {
+          "step": "session-1/read-prerequisites",
+          "status": "complete",
+          "notes": "Read dabbler-platform's upstream-feedback-disposition-gate.md, ai_router/disposition.py (Disposition dataclass + DISPOSITION_STATUSES + VERIFICATION_METHODS), Step 8 of ai-led-session-workflow.md, close_session.py both error sites (lines 670-688 gate remediation, 1304-1311 CLI invalid_invocation), session_state.py for NextOrchestrator/NextOrchestratorReason."
+        },
+        {
+          "step": "session-1/draft-ai-assignment",
+          "status": "complete",
+          "notes": "Authored ai-assignment.md with concrete edit plan (sections 2a-2g), risk callouts, two open decisions (placeholder vs parameterized path; push timing). Operator approved both decisions: parameterize + hold push."
+        },
+        {
+          "step": "session-1/write-disposition-schema",
+          "status": "complete",
+          "notes": "Authored docs/disposition-schema.md (~265 lines): all 7 fields with required-conditions, 3 gate-enforced invariants, minimal viable template, 3 variation examples, '--force is not a substitute' section."
+        },
+        {
+          "step": "session-1/edit-step-8",
+          "status": "complete",
+          "notes": "Edited docs/ai-led-session-workflow.md Step 8: added 'Authoring disposition.json' paragraph naming the file as Step 8 deliverable, linked to schema doc, flagged next_orchestrator + blockers as most-frequently-missed fields."
+        },
+        {
+          "step": "session-1/edit-close-session",
+          "status": "complete",
+          "notes": "Edited ai_router/close_session.py at two sites: run_gate_checks() disposition_present remediation (line ~678) and run() CLI invalid_invocation message (line ~1307). Both now parameterize the actual disposition_path via os.path.join, list required fields, link to docs/disposition-schema.md, preserve --force/incident-recovery clause."
+        },
+        {
+          "step": "session-1/run-tests",
+          "status": "complete",
+          "notes": "python -m pytest ai_router/tests/ — 741/743 passed. 2 failures (test_restart_role.py PID-mismatch) are pre-existing Windows subprocess flakes, confirmed unrelated via stashed-baseline run."
+        },
+        {
+          "step": "session-1/smoke-test",
+          "status": "complete",
+          "notes": "Ran 'python -m ai_router.close_session --session-set-dir C:/Users/denmi/AppData/Local/Temp/sm-019' (empty scratch dir, no disposition.json). Output rendered new message with parameterized path + schema doc link + required-field list."
+        },
+        {
+          "step": "session-1/commit",
+          "status": "complete",
+          "notes": "Staged Session 1 files explicitly (not git add -A). Committed as 94260a6: 'Set 019 Session 1: disposition gate discoverability'. Excluded tools/dabbler-ai-orchestration/package-lock.json (unrelated 0.13.2→0.13.3 lockfile drift from prior extension-publish work). Not pushed per operator's hold-until-end-of-set call."
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "startedAt": "2026-05-11T12:00:00-04:00",
+      "completedAt": "2026-05-11T12:35:00-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-4-7",
+        "effort": "normal"
+      },
+      "verificationVerdict": "VERIFIED (Round 2 of 2; GPT-5.4)",
+      "verificationCost": 0.2131,
+      "steps": [
+        {
+          "step": "session-2/read-prerequisites",
+          "status": "complete",
+          "notes": "Read current UAT Checklist Rule + E2E Coverage Before UAT (workflow.md 657-740), Reading-Session-Set-Configuration prose (637-655), spec template (407-413), Rules list (1584-1640), authoring guide config-block reference (132-196) and When-UAT-Is-Required (199-227), wizard sessionGenPrompt.ts (PROMPT_SYSTEM template), close-out.md section 1 (disposition reference site)."
+        },
+        {
+          "step": "session-2/draft-ai-assignment-extension",
+          "status": "complete",
+          "notes": "Appended Session 2 plan to ai-assignment.md: 7 findings, 4 design decisions (default ad-hoc + skip transition heuristic, rule split shape, forward-compatible fields, API single-verifier route at architecture complexity), 9 edit sites (3a-3i), 3 open decisions (ProgrammaticVerification name, router-picks verifier, optional close-out.md backlink). Operator approved all three."
+        },
+        {
+          "step": "session-2/edit-workflow-doc",
+          "status": "complete",
+          "notes": "Four sequential edits to docs/ai-led-session-workflow.md: (1) spec template added uatStyle; (2) config-block prose enumerates uatStyle; (3) UAT Checklist Rule rewritten into shared preamble + DSL-driven subsection + Ad-hoc subsection (former E2E Coverage Before UAT folded into DSL); (4) Rule 11 split into 11a (DSL) + 11b (Ad-hoc) preserving existing numbering."
+        },
+        {
+          "step": "session-2/edit-authoring-guide",
+          "status": "complete",
+          "notes": "Two sequential edits to docs/planning/session-set-authoring-guide.md: (1) config-block reference adds uatStyle field semantics + migration note for dabbler-platform; (2) new §'Choosing uatStyle' heuristic subsection added after §'When UAT is required'."
+        },
+        {
+          "step": "session-2/edit-wizard-prompt",
+          "status": "complete",
+          "notes": "Edited tools/dabbler-ai-orchestration/src/wizard/sessionGenPrompt.ts PROMPT_SYSTEM template: added uatStyle to the generated spec template + a guideline bullet. No VSIX rebuild needed (prompt is read at clipboard-copy time)."
+        },
+        {
+          "step": "session-2/edit-close-out-md",
+          "status": "complete",
+          "notes": "Edited ai_router/docs/close-out.md Section 1: replaced the dead 'docs/session-state-schema-example.md' reference with a live link to docs/disposition-schema.md (the new Session 1 doc)."
+        },
+        {
+          "step": "session-2/write-upstream-feedback",
+          "status": "complete",
+          "notes": "Authored docs/upstream-feedback/2026-05-11-w0-runner-pre-signin-conflict.md as a GitHub-issue-ready hand-off addressed to darndestdabbler/dabbler-uat-dsl. Restates the W0-runner SeededSignInAsync conflict from the platform feedback with three concrete suggestions (auto-detect, --no-pre-sign-in flag, PreSignIn:false field) and an acceptance smoke test."
+        },
+        {
+          "step": "session-2/run-tests",
+          "status": "complete",
+          "notes": "python -m pytest ai_router/tests/ --ignore=test_restart_role.py — 729 passed. No regressions from doc-only edits. test_restart_role excluded (same pre-existing 2-failure baseline as Session 1)."
+        },
+        {
+          "step": "session-2/verification-round-1",
+          "status": "issues-found",
+          "notes": "Routed to ai_router with task_type=session-verification, complexity_hint=80, prompt 26605 chars (diff 20944 + design summary). Verifier: GPT-5.4 (gpt-5-4 / gpt-5.4), 6937 in / 5728 out tokens, 87.6s, $0.1033. Verdict ISSUES_FOUND with 2 issues: 1 Major (uatStyle=dsl + requiresE2E=false combination not explicit), 1 Minor (mixed-surfaces escape hatch incoherent for DSL mode). RouteResult dumped to JSON before access per memory-feedback rule."
+        },
+        {
+          "step": "session-2/fix-round-1-findings",
+          "status": "complete",
+          "notes": "Major issue: added 'Invalid combination' paragraph to workflow.md UAT Checklist Rule — DSL-driven subsection AND extended authoring guide's uatStyle:'dsl' field-semantics bullet. Both paths now reject uatStyle=dsl + requiresE2E=false at Step 2 rather than silently downgrading. Minor issue: rewrote mixed-surfaces paragraphs in both workflow.md and authoring guide — combined surfaces must use uatStyle='ad-hoc' (DSL path does not permit per-item exceptions). Both fixes mechanical, no scope expansion."
+        },
+        {
+          "step": "session-2/verification-round-2",
+          "status": "verified",
+          "notes": "Re-routed at complexity_hint=85 per Step 7 (Major issue triggers high effort). Verifier: GPT-5.4 again (orchestrator cannot self-verify; provider stays cross to Anthropic). 96.3s, $0.1098. Verdict VERIFIED with empty issues list. Round 1 + Round 2 cumulative $0.2131 (within $0.10-$0.25 projection)."
+        },
+        {
+          "step": "session-2/write-closeout-artifacts",
+          "status": "complete",
+          "notes": "Authored verification/gpt-5-4-round1.md, verification/gpt-5-4-round2.md, change-log.md (narrative summary, migration burden, deferred items, verification trail), disposition.json (status:completed, verification_method:api, files_changed list, next_orchestrator:null since final session of set, blockers:[]), this activity-log.json, and updated session-state.json to lifecycleState:closed."
+        },
+        {
+          "step": "session-2/commit-push-closeout",
+          "status": "pending",
+          "notes": "Final commit + push (both Session 1 commit 94260a6 + Session 2 commit land together per operator's hold-until-end-of-set call). Then python -m ai_router.close_session --session-set-dir docs/session-sets/019-feedback-disposition-and-uat-two-options/ — dogfoods Session 1's disposition gate fix on Set 019 itself."
+        }
+      ]
+    }
+  ],
+  "cumulativeCostUsd": 0.2131,
+  "projection": "0.10-0.25",
+  "withinProjection": true
+}

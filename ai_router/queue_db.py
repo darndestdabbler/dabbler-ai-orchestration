@@ -1,4 +1,11 @@
-"""SQLite-backed queue for cross-CLI verification handoffs.
+"""SQLite-backed queue for cross-CLI verification handoffs — outsource-last / dabbler-platform only.
+
+**Who uses this:** Only consumers with ``outsourceMode: last`` (currently dabbler-platform).
+The queue mediates verification between the orchestrator CLI and the verifier daemon.
+**See also:** ``queue_verification.py`` (the close-out poller); ``ai_router/docs/two-cli-workflow.md``
+(daemon setup and recovery guide).
+
+---
 
 One database per worker provider at ``<base_dir>/<provider>/queue.db``,
 with a per-message state machine that survives worker crashes via lease

@@ -1,4 +1,10 @@
-"""Pushover notification helpers for session workflow events."""
+"""Pushover notification helpers — optional, all tiers.
+
+**Who uses this:** Any consumer that sets ``PUSHOVER_API_KEY`` and
+``PUSHOVER_USER_KEY``. Sends session-complete push notifications. Safe to ignore
+if push notifications are not configured — all calls are no-ops when keys are absent.
+**See also:** ``close_session.py`` (calls ``send_session_complete_notification``
+after gate success)."""
 
 from dataclasses import dataclass
 import json

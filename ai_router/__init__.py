@@ -1,6 +1,18 @@
 """
 AI Router — Lightweight model routing for Claude Code.
 
+Module map (for new contributors):
+  __init__.py            route() — the public routing entry point; start here
+  close_session.py       Close-out gate: deterministic checks + state flip (Full-tier)
+  session_state.py       Lifecycle snapshot (session-state.json) + events ledger (Full-tier)
+  gate_checks.py         Five deterministic close-out predicates (Full-tier)
+  disposition.py         Disposition dataclass + validator — the per-session outcome record
+  queue_verification.py  Outsource-last queue polling (dabbler-platform only)
+  worktree.py            Worktree lifecycle CLI (open / close / list)
+  notifications.py       Session-complete push notifications (optional)
+  queue_db.py            SQLite-backed provider queue (outsource-last only)
+  router-config.yaml     Model selection, task types, tier mapping, complexity weights
+
 Usage:
     from ai_router import (
         route, verify, query, get_costs, print_cost_report,

@@ -1,4 +1,12 @@
 """
+worktree.py — Canonical worktree CLI — all tiers.
+
+**Who uses this:** Any consumer using git worktrees (parallel sessions).
+Enforces the canonical ``<repo>-worktrees/<slug>/`` layout for all tiers.
+**See also:** ``docs/planning/repo-worktree-layout.md`` (layout spec and recipes).
+
+---
+
 worktree.py — Canonical worktree CLI for the dabbler repo layout.
 
 This module is both the public library AND the CLI entry point for

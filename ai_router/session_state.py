@@ -1,4 +1,13 @@
-"""Session-state file management.
+"""Session-state file management — Full-tier consumers only.
+
+**Who uses this:** All Full-tier consumers. Manages the per-session-set
+lifecycle snapshot (``session-state.json``) alongside the append-only events
+ledger (``session-events.jsonl``). The snapshot is the consumer-readable cache;
+the ledger is authoritative for close-out and repair.
+**See also:** ``close_session.py`` (calls ``_flip_state_to_closed``);
+``gate_checks.py`` (reads the state via ``read_session_state``).
+
+---
 
 Writes and updates ``session-state.json`` in a session-set folder so external
 tools (the Session Set Explorer VS Code extension, ``find_active_session_set``,

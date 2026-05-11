@@ -1,4 +1,12 @@
-"""Deterministic close-out gate checks.
+"""Deterministic close-out gate checks — Full-tier consumers only.
+
+**Who uses this:** Called by ``close_session.run_gate_checks()`` on every
+close-out attempt. Five predicates: working-tree-clean, pushed-to-remote,
+activity-log-entry, next-orchestrator-present, change-log-fresh.
+**See also:** ``close_session.py`` (the gate runner); ``disposition.py``
+(the disposition_present synthetic gate).
+
+---
 
 Each public ``check_*`` function returns a ``(passed, remediation)``
 tuple. ``passed`` is the boolean verdict; ``remediation`` is a one-line

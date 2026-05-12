@@ -1401,8 +1401,14 @@ function readSessionSets(root) {
           verificationVerdict: sd.verificationVerdict ?? null,
           forceClosed: sd.forceClosed ?? null
         };
-        if (sessionsCompleted === 0 && typeof sd.currentSession === "number" && sd.currentSession > 1) {
-          sessionsCompleted = sd.currentSession - 1;
+        if (Array.isArray(sd.completedSessions)) {
+          sessionsCompleted = sd.completedSessions.length;
+        } else if (sessionsCompleted === 0) {
+          if (sd.status === "complete" && typeof totalSessions === "number") {
+            sessionsCompleted = totalSessions;
+          } else if (typeof sd.currentSession === "number" && sd.currentSession > 1) {
+            sessionsCompleted = sd.currentSession - 1;
+          }
         }
       } catch {
       }

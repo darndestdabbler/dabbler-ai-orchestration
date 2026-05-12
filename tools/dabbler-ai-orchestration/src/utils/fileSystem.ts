@@ -224,6 +224,7 @@ export function readSessionSets(root: string): SessionSet[] {
       try {
         const sd = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
           totalSessions?: number;
+          completedSessions?: number[];
           completedAt?: string;
           startedAt?: string;
           currentSession?: number;
@@ -246,10 +247,26 @@ export function readSessionSets(root: string): SessionSet[] {
           verificationVerdict: sd.verificationVerdict ?? null,
           forceClosed: sd.forceClosed ?? null,
         };
-        // When no activity-log exists, derive completed count from currentSession:
-        // sessions before the current one are done.
-        if (sessionsCompleted === 0 && typeof sd.currentSession === "number" && sd.currentSession > 1) {
-          sessionsCompleted = sd.currentSession - 1;
+        // sessionsCompleted priority (highest first):
+        //  1. session-state.json `completedSessions` array — authoritative
+        //     under schema v2. Hand-maintained on Lightweight tier;
+        //     written by ai_router on Full tier.
+        //  2. activity-log.json unique sessionNumbers (set above).
+        //  3. Derived from status + currentSession when neither exists.
+        //     - status="complete" => all sessions done; count = totalSessions.
+        //     - status="in-progress" with currentSession>1 => assume the
+        //       current session is in progress, so currentSession-1 are
+        //       done. This can be off by one when the latest session is
+        //       itself complete and the set is still open; only used when
+        //       no more precise signal is available.
+        if (Array.isArray(sd.completedSessions)) {
+          sessionsCompleted = sd.completedSessions.length;
+        } else if (sessionsCompleted === 0) {
+          if (sd.status === "complete" && typeof totalSessions === "number") {
+            sessionsCompleted = totalSessions;
+          } else if (typeof sd.currentSession === "number" && sd.currentSession > 1) {
+            sessionsCompleted = sd.currentSession - 1;
+          }
         }
       } catch { /* ignore */ }
     }

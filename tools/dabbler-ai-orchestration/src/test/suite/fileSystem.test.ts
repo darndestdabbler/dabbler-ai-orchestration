@@ -188,6 +188,50 @@ suite("fileSystem — readSessionSets", () => {
     fs.rmSync(dir, { recursive: true });
   });
 
+  // Authoritative source for sessionsCompleted in schema v2:
+  // `completedSessions` array. The earlier `currentSession - 1`
+  // fallback was wrong whenever the latest session was itself
+  // complete (off-by-one low). Lightweight-tier repos that
+  // hand-maintain session-state.json rely on this field.
+  test("sessionsCompleted reads completedSessions.length from state file", () => {
+    const dir = makeTmpDir();
+    const setDir = path.join(dir, "docs", "session-sets", "completed-array");
+    fs.mkdirSync(setDir, { recursive: true });
+    fs.writeFileSync(path.join(setDir, "spec.md"), "# completed-array\n");
+    fs.writeFileSync(
+      path.join(setDir, "session-state.json"),
+      JSON.stringify({
+        schemaVersion: 2,
+        status: "in-progress",
+        currentSession: 3,
+        totalSessions: 4,
+        completedSessions: [1, 2, 3],
+      })
+    );
+    const sets = readSessionSets(dir);
+    assert.strictEqual(sets[0].sessionsCompleted, 3);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("status='complete' with no completedSessions array falls back to totalSessions", () => {
+    const dir = makeTmpDir();
+    const setDir = path.join(dir, "docs", "session-sets", "complete-no-array");
+    fs.mkdirSync(setDir, { recursive: true });
+    fs.writeFileSync(path.join(setDir, "spec.md"), "# complete-no-array\n");
+    fs.writeFileSync(
+      path.join(setDir, "session-state.json"),
+      JSON.stringify({
+        schemaVersion: 2,
+        status: "complete",
+        currentSession: 4,
+        totalSessions: 4,
+      })
+    );
+    const sets = readSessionSets(dir);
+    assert.strictEqual(sets[0].sessionsCompleted, 4);
+    fs.rmSync(dir, { recursive: true });
+  });
+
   test("status='complete' with currentSession === totalSessions reads as done", () => {
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "real-done");

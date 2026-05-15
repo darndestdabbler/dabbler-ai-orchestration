@@ -890,35 +890,119 @@ layout, or `<container>/<slug>` for repos still on the retired bare-
 repo + flat-worktree layout. See
 `docs/planning/repo-worktree-layout.md`.
 
-```python
-from ai_router.session_log import find_active_session_set, SessionLog
-from ai_router import register_session_start
+#### State first, work second (Set 022)
 
-SESSION_SET = find_active_session_set("docs/session-sets")
-log = SessionLog(SESSION_SET)
-next_session = log.get_next_session_number()
+The orchestrator declares "session N is in flight" on disk **before
+any other work in the session**. This is the prevention layer that
+keeps the Session Set Explorer's bucket transitions clean: the set
+moves to **In Progress** (or advances its fraction between sessions)
+the moment the boundary write lands, not whenever the first
+activity-log entry happens to flush. The v0.13.11 defensive guards
+remain as recovery defense-in-depth; the start-of-session boundary
+write is what keeps them from firing in normal operation.
 
-# Write session-state.json BEFORE the first activity-log entry so
-# external tools (VS Code Session Set Explorer, manager dashboards)
-# see the session as in-progress immediately. Use "unknown" for
-# orchestrator fields the orchestrator cannot reliably introspect.
-register_session_start(
-    session_set=SESSION_SET,
-    current_session=next_session,
-    total_sessions=log.total_sessions,
-    orchestrator={
-        "engine": "claude-code",        # or "codex", "gemini-cli"
-        "provider": "anthropic",        # or "openai", "google"
-        "model": "claude-opus-4-7",     # specific model id
-        "effort": "high",               # low | medium | high | max | unknown
-    },
-)
+The boundary write maintains the state invariant (see
+[`docs/session-state-schema.md`](session-state-schema.md) for the
+canonical statement):
+
+```
+currentSession not in completedSessions[]                  → currentSession is in flight
+currentSession in completedSessions[] AND status="in-progress"  → between sessions
+status = "complete"                                        → set done
 ```
 
+Two tier-symmetric paths produce the same shape on disk:
+
+**Full tier (router-driven).** Run the CLI as the first action of the
+session, then proceed to Step 2:
+
+```bash
+.venv/Scripts/python.exe -m ai_router.start_session \
+    --session-set-dir docs/session-sets/<slug> \
+    --engine claude-code \
+    --provider anthropic \
+    --model claude-opus-4-7 \
+    --effort medium
+```
+
+The CLI infers the next session via
+`compute_effective_completed_sessions(<dir>)` (reads
+`completedSessions[]`, falls back to the events ledger, then to the
+legacy heuristic), writes `session-state.json` (`currentSession`,
+`status: "in-progress"`, `lifecycleState: "work_in_progress"`,
+`startedAt` if previously null, clears `completedAt` and
+`verificationVerdict`), and appends one `work_started` event to
+`session-events.jsonl`. The call is **idempotent** — re-running on the
+same in-flight session is a no-op (the event ledger dedupes
+`work_started` and the snapshot fields are already correct), so a
+context-reset re-entry is safe. The CLI **refuses to skip ahead**
+(`exit 3` boundary violation) if session N is still open and the
+caller asks for N+1, and refuses to re-open a session already in
+`completedSessions[]`. Activity-log writing stays as it was — the
+first real work step adds the first entry; the CLI itself does not
+touch `activity-log.json`.
+
+Pseudo-code for the orchestrator's automation path:
+
+```python
+import subprocess, sys
+
+session_set = "docs/session-sets/<slug>"
+result = subprocess.run(
+    [sys.executable, "-m", "ai_router.start_session",
+     "--session-set-dir", session_set,
+     "--engine", "claude-code",
+     "--provider", "anthropic",
+     "--model", "claude-opus-4-7",
+     "--effort", "medium"],
+    capture_output=True, text=True,
+)
+if result.returncode != 0:
+    # Exit 2 = usage error; exit 3 = boundary violation (e.g., a
+    # prior session is still open and must be closed first).
+    raise SystemExit(result.stderr or result.stdout)
+# Now proceed to Step 2 (read the spec) — state is in flight on disk.
+```
+
+**Lightweight tier (hand-maintained).** No router runs. The
+orchestrator (or human) hand-writes the same fields to
+`session-state.json` before any other work in the session:
+
+```json
+{
+  "schemaVersion": 2,
+  "sessionSetName": "<slug>",
+  "currentSession": <N>,
+  "totalSessions": <N_total>,
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "<existing value, or now if null>",
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": {
+    "engine": "<engine>",
+    "provider": "<provider>",
+    "model": "<model>",
+    "effort": "<low|medium|high|unknown>"
+  },
+  "completedSessions": [<sessions closed so far, sorted, unique>]
+}
+```
+
+The Lightweight branch has no events ledger; `completedSessions[]` is
+the authoritative count signal and must be maintained by hand on
+every session boundary. See `docs/session-state-schema.md` for the
+required field shapes and the worked examples; the Lightweight tier
+exists exactly so projects that opt out of the router still get
+clean tree-view transitions.
+
 `session-state.json` is the single source of truth for in-progress
-detection by external tooling. It is flipped to `complete` at Step 8
-with the verification verdict. Do not rely on activity-log presence
-for in-progress signaling — `register_session_start()` runs first.
+detection by external tooling. It is updated again at Step 8 to flip
+`completedSessions[]` (every close) and on the final session also
+`status: "complete"` + `lifecycleState: "closed"`. Do not rely on
+activity-log presence for in-progress signaling — `start_session`
+(Full) or the hand-write above (Lightweight) is what makes the set
+visibly active.
 
 ### Step 2: Read the Spec and the Configuration Block
 
@@ -1278,6 +1362,41 @@ be hand-maintained, commit it to Lightweight tier from the start —
 don't mix modes mid-set. Recovery for an already-drifted set: see
 `ai_router/docs/close-out.md` § "Mixed-mode drift" — run
 `close_session --repair --apply` to backfill the missing events.
+
+#### Symmetric close protocol (Set 022)
+
+Every close — non-final and final — appends `currentSession` to
+`completedSessions[]` (sorted, unique). Only the **final** close also
+flips `status` to `"complete"` and `lifecycleState` to `"closed"`. The
+final branch is reached when, after appending `currentSession`,
+`len(completedSessions) == totalSessions`. This is the symmetric
+counterpart to the [§State first, work second](#step-1-identify-the-active-session-set-and-register-session-start)
+boundary write at Step 1 and the same invariant the Session Set
+Explorer reads to bucket sets correctly.
+
+| Field                   | Non-final close                              | Final close                                  |
+|-------------------------|----------------------------------------------|----------------------------------------------|
+| `completedSessions[]`   | append `currentSession` (sorted, unique)     | append `currentSession` (sorted, unique)     |
+| `currentSession`        | unchanged (= just-closed session)            | unchanged (= `totalSessions`)                |
+| `status`                | `"in-progress"`                              | `"complete"`                                 |
+| `lifecycleState`        | `"work_in_progress"`                         | `"closed"`                                   |
+| `completedAt`           | unchanged (null)                             | now                                          |
+| Events ledger (Full)    | `closeout_requested` + `closeout_succeeded`  | `closeout_requested` + `closeout_succeeded`  |
+
+**Full tier.** `close_session` runs this protocol automatically —
+`_flip_state_to_closed` appends `currentSession` on every close via
+`compute_effective_completed_sessions` (which also backfills the
+array from the events ledger if it was empty on a legacy set).
+**Lightweight tier.** The orchestrator hand-writes the same field
+changes per the table above.
+
+Final-session detection deliberately uses
+`len(completedSessions) == totalSessions` post-append, with
+`change-log.md` presence as a belt-and-suspenders signal — both must
+indicate final session for the `status: "complete"` flip. This pairs
+with the v0.13.11 extension guard that downgrades a bucket if the
+ledger and snapshot disagree, so a drifted set never displays as
+Done by accident.
 
 #### Last session only — worktree and branch cleanup
 

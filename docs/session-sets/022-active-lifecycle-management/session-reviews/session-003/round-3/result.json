@@ -1,0 +1,19 @@
+{
+  "content": "{\n  \"verdict\": \"VERIFIED\",\n  \"issues\": []\n}",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 9428,
+  "output_tokens": 9025,
+  "cost_usd": 0.158945,
+  "total_cost_usd": 0.158945,
+  "complexity_score": 67,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 89.24710249900818,
+  "truncated": false,
+  "verification": null,
+  "pending": false,
+  "message_id": null,
+  "queue_provider": null
+}

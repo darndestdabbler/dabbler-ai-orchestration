@@ -8,12 +8,101 @@ points here.
 
 Contents:
 
+- [Section 0 — Session-boundary writes (start and close)](#section-0--session-boundary-writes-start-and-close)
 - [Section 1 — When close-out runs](#section-1--when-close-out-runs)
 - [Section 2 — How to run close-out](#section-2--how-to-run-close-out)
 - [Section 3 — What the script does](#section-3--what-the-script-does)
 - [Section 4 — Common failures and remediation](#section-4--common-failures-and-remediation)
 - [Section 5 — Manual close-out flags](#section-5--manual-close-out-flags)
 - [Section 6 — Troubleshooting](#section-6--troubleshooting)
+
+---
+
+## Section 0 — Session-boundary writes (start and close)
+
+Set 022 made `close_session` half of a symmetric pair. Every session
+in a Full-tier set has exactly two router-driven boundary writes:
+`start_session` at the beginning, `close_session` at the end. Both
+share `compute_effective_completed_sessions(session_set_dir)` from
+`ai_router.session_state` as the single source of truth for "how many
+sessions are closed," so the two writers cannot disagree about the
+set's current shape.
+
+### Why two writers
+
+The Session Set Explorer extension reads `session-state.json` and
+`session-events.jsonl` and surfaces the result as a fraction
+(`1/4`, `2/4`, `4/4 Done`) plus an "in flight" annotation
+(`· session 2 in flight`) on the row. For this UI to track reality,
+two transitions must land **on disk** at the right moment:
+
+- **Set first becomes active**, or a between-sessions set's next
+  session begins — the moment `start_session` runs.
+- **Set advances its fraction**, or hits Done — the moment
+  `close_session` returns success.
+
+Before Set 022, the start side was a Python call (`register_session_start`)
+embedded inside the orchestrator's automation script, and the close
+side already had this contract. Promoting the start side to a CLI
+makes the protocol uniform across engines (any orchestrator can
+shell out, even if it can't import `ai_router`) and gives the
+v0.13.11 defensive guards a writer-side mate so they only ever
+have to recover, never prevent.
+
+### Field-by-field protocol
+
+**At session start** (`python -m ai_router.start_session` — see
+[`ai_router/start_session.py`](../start_session.py)):
+
+| Field                  | Value at start                                       |
+|------------------------|------------------------------------------------------|
+| `currentSession`       | inferred via `compute_effective_completed_sessions`  |
+| `status`               | `"in-progress"`                                      |
+| `lifecycleState`       | `"work_in_progress"`                                 |
+| `startedAt`            | now (only if previously null)                        |
+| `completedAt`          | null (cleared if was set)                            |
+| `verificationVerdict`  | null (cleared if was set)                            |
+| `completedSessions[]`  | preserved (or backfilled from events on legacy sets) |
+| `orchestrator`         | refreshed for this session                           |
+| Events ledger          | append exactly one `work_started` (deduped)          |
+| Activity log           | nothing — first real step adds the first entry       |
+
+**At session close** (`python -m ai_router.close_session`, this doc):
+
+| Field                  | Non-final close                              | Final close                                  |
+|------------------------|----------------------------------------------|----------------------------------------------|
+| `completedSessions[]`  | append `currentSession` (sorted, unique)     | append `currentSession` (sorted, unique)     |
+| `currentSession`       | unchanged (= just-closed session)            | unchanged (= `totalSessions`)                |
+| `status`               | `"in-progress"`                              | `"complete"`                                 |
+| `lifecycleState`       | `"work_in_progress"`                         | `"closed"`                                   |
+| `completedAt`          | unchanged (null)                             | now                                          |
+| `verificationVerdict`  | latest verdict / unchanged                   | latest verdict / unchanged                   |
+| Events ledger          | `closeout_requested` + `closeout_succeeded`  | `closeout_requested` + `closeout_succeeded`  |
+
+Final-session detection uses
+`len(completedSessions) == totalSessions` post-append; `change-log.md`
+presence remains a belt-and-suspenders signal so a drift case in
+either direction is caught.
+
+### Idempotency
+
+Both writers are idempotent and safe to re-run:
+
+- `start_session` re-running for the in-flight session is a no-op.
+  The event ledger dedupes `work_started`; the snapshot fields are
+  already correct. Re-running asking for a different session number
+  exits 3 (boundary violation) — close the in-flight one first.
+- `close_session` re-running on an already-closed session exits 0
+  with `result: "noop_already_closed"` (see Section 3 step 4).
+
+### Tier symmetry
+
+The protocol applies tier-symmetrically: Full-tier projects use the
+two CLIs; Lightweight-tier projects hand-write the same fields. See
+[`docs/session-state-schema.md`](../../docs/session-state-schema.md)
+for the canonical field list and worked examples, and Step 1 of
+[`docs/ai-led-session-workflow.md`](../../docs/ai-led-session-workflow.md)
+for the orchestrator-facing pseudo-code.
 
 ---
 
@@ -408,7 +497,15 @@ The drift shapes the walk detects:
    Repair: with `--apply`, append a synthetic `closeout_requested`
    (if missing) and `closeout_succeeded` for the claimed-closed
    session so the events ledger becomes internally consistent and
-   the tree view stops downgrading.
+   the tree view stops downgrading. **Set 022 extension:** the
+   apply path also backfills `completedSessions[]` in
+   `session-state.json` using
+   `compute_effective_completed_sessions` (which now sees the
+   synthesized closeout events). A drifted set with events for
+   sessions 1–4 but a snapshot that claims session 5 done gets
+   `completedSessions: [1, 2, 3, 4]` plus synthetic session-5
+   events (or whatever the helper resolves to), bringing both
+   files into agreement on the same boundary write.
 
 2. **Closeout-succeeded-but-state-not-closed.** The reverse drift:
    events ledger says the session closed but `session-state.json`

@@ -195,6 +195,100 @@
           "costUsd": 0.195242
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/start-session-protocol-self-demo",
+      "dateTime": "2026-05-15T05:34:29-04:00",
+      "description": "Started Session 3 via `python -m ai_router.start_session --session-set-dir docs/session-sets/022-active-lifecycle-management --engine claude-code --provider anthropic --model claude-opus-4-7 --effort medium` before any other work. State file flipped currentSession 2 -> 3, lifecycleState stayed work_in_progress, completedSessions preserved as [1, 2], orchestrator metadata refreshed; work_started event appended. The set is running on its own state-first protocol — same recursive self-demo Session 2 set up.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/workflow-doc",
+      "dateTime": "2026-05-15T06:30:00-04:00",
+      "description": "docs/ai-led-session-workflow.md: Step 1 ('Identify the Active Session Set and Register Session Start') gained an explicit 'State first, work second (Set 022)' subsection with the canonical three-line invariant, a Full-tier CLI invocation (with both bash and Python subprocess pseudo-code), and a Lightweight-tier hand-write template carrying every required field. Step 8 gained a 'Symmetric close protocol (Set 022)' subsection with a non-final-vs-final field-change table and notes on Full-tier writer behavior vs Lightweight hand-maintenance; final-session detection uses len(completedSessions) == totalSessions with change-log.md as belt-and-suspenders. The 'do not skip close_session' warning from commit 7166754 retained and cross-referenced to the new start protocol.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/schema-doc",
+      "dateTime": "2026-05-15T06:30:00-04:00",
+      "description": "docs/session-state-schema.md: added a 'State invariant (Set 022 — canonical)' section directly under the title carrying the load-bearing three-line invariant (in-flight / between-sessions / done). Added completedSessions to the Required-fields JSON schema example. Promoted completedSessions[] from 'optional but planned' to 'always written on Full / always maintained on Lightweight,' with explicit writer-responsibility callouts for each tier. Updated the parser cheat-sheet to (a) add the events-ledger fallback step and (b) drop the currentSession-1 reader-side fallback (matches extension v0.13.12 reader change). Added an 'in flight' predicate computation block. Updated Full-tier mid-set worked example to include completedSessions and an explanatory note. Migration section now declares the array required on both tiers as of Set 022.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/close-out-doc",
+      "dateTime": "2026-05-15T06:30:00-04:00",
+      "description": "ai_router/docs/close-out.md: added Section 0 'Session-boundary writes (start and close)' covering why two writers exist, field-by-field protocol tables for both start and close, idempotency notes, and tier symmetry. Extended Section 5 drift-case-1 description to call out Set 022's --repair --apply behavior: the apply path also backfills completedSessions[] from compute_effective_completed_sessions (which sees synthesized closeout events), so a drifted set's snapshot and ledger come into agreement on the same boundary write. Updated the table of contents to include Section 0.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/consumer-verification-platform",
+      "dateTime": "2026-05-15T06:30:00-04:00",
+      "description": "dabbler-platform: walked 38 session sets. 0 carry completedSessions[]. 8 Full-tier sets (have session-events.jsonl) will heal cleanly via the events-ledger fallback on their next start_session / close_session call: admin-user-creation-flow, admin-user-creation-flow-uat-remediation, admin-users-cross-links, composable-crud-helpers, packaging-and-template-readiness, transactional-system-columns, uat-dsl-verify-input-value, unified-master-details-composite. 30 Lightweight-tier sets continue under hand-maintenance; their hand writes do not invoke the helper, so no stderr warning fires unless one ever transitions to Full-tier CLI writes.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-003/consumer-verification-harvester",
+      "dateTime": "2026-05-15T06:30:00-04:00",
+      "description": "dabbler-access-harvester: walked 33 session sets. 0 carry completedSessions[]. 5 Full-tier sets will heal cleanly via events-ledger fallback: access-object-extractor-spike, form-report-code-and-grouping, generalization-validation-on-non-northwind, structured-form-report-extractor, table-extractor-coverage. 28 Lightweight-tier sets continue under hand-maintenance. Edge cases noted: integration-testing-and-acceptance (cancelled mid-flight) and vba-symbol-resolution-and-enrichment (retired/superseded) are terminal states and won't see another boundary write — no action needed.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-003/consumer-verification-accessdb",
+      "dateTime": "2026-05-15T06:30:00-04:00",
+      "description": "dabbler-homehealthcare-accessdb: walked 6 session sets. 4 are fully compliant with numeric completedSessions[] arrays (001-forms-detail-uat [1,2,3,4], 002-forms-browse-uat [1,2,3,4], 005-cleanup-sweep [1,2], 006-finalize-and-publish [1,2,3]). 2 sets carry string-based session IDs in completedSessions[] (003-reports-client-svc-uat, 004-reports-provider-uat) — these violate the schema doc's integer-array contract but are *present and non-empty* so the backfill helper won't fire. Both are terminal-state Lightweight sets in a Lightweight-tier-candidate repo; surfacing as a follow-up for the consumer repo if/when those sets need to interoperate with numeric ledger semantics. No action from this session set.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-003/cross-provider-verification",
+      "dateTime": "2026-05-15T07:00:00-04:00",
+      "description": "Cross-provider verification across three rounds (all via gpt-5-4 since orchestrator is claude-opus-4-7 and the verifier complexity score / max_tier consistently selected GPT). Round 1 ($0.096): ISSUES_FOUND with 2 Major findings, both in the homehealthcare-inventory narrative — a counting error (5 numeric + 2 strings ≠ stated 6 sets) and a verdict that labeled all 6 as compliant despite calling out 2 non-conformant. Round 2 ($0.163): ISSUES_FOUND with 1 Minor finding — the Lightweight-tier bullet narrative said hand writes would emit a stderr warning, but the helper isn't called on hand writes (only on Full-tier CLI writes). Reworded both Lightweight bullets and the verdict summary to distinguish the two cases. Round 3 ($0.159): VERIFIED, issues: []. Total Session 3 verification spend: $0.4175. All findings were in the verification narrative, not in the doc edits themselves — the workflow, schema, and close-out doc changes verified clean on every round.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 8806,
+          "outputTokens": 4931,
+          "costUsd": 0.09598
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 9182,
+          "outputTokens": 8366,
+          "costUsd": 0.16255
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 9428,
+          "outputTokens": 9025,
+          "costUsd": 0.158945
+        }
+      ]
     }
   ]
 }

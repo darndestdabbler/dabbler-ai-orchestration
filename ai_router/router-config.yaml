@@ -23,6 +23,8 @@ metadata:
 # --- Provider Configuration ---
 providers:
   anthropic:
+    display_label: Anthropic
+    enabled: true
     api_key_env: ANTHROPIC_API_KEY
     base_url: https://api.anthropic.com/v1/messages
     api_version: "2023-06-01"
@@ -35,6 +37,8 @@ providers:
       backoff_base_seconds: 2  # exponential: 2s, 4s
 
   google:
+    display_label: Google
+    enabled: true
     api_key_env: GEMINI_API_KEY
     base_url: https://generativelanguage.googleapis.com/v1beta
     rate_limit:
@@ -46,6 +50,8 @@ providers:
       backoff_base_seconds: 2
 
   openai:
+    display_label: OpenAI
+    enabled: true
     api_key_env: OPENAI_API_KEY
     base_url: https://api.openai.com/v1
     rate_limit:
@@ -200,6 +206,9 @@ models:
 # --- Routing Thresholds ---
 # Complexity score 1-100 mapped to tiers.
 routing:
+  # outsourcing_mode: controls when cross-provider calls are made.
+  # whenever-helpful (default) | verification-only | disabled
+  outsourcing_mode: whenever-helpful
   tier1_max_complexity: 30    # score ≤ 30 → tier 1 (Flash)
   tier2_max_complexity: 65    # score 31–65 → tier 2 (Pro or Sonnet)
   default_tier: 2             # fallback when estimation is uncertain

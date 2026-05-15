@@ -64,6 +64,7 @@ __version__ = "0.3.0"
 from .config import load_config, resolve_generation_params
 from .models import estimate_complexity, pick_model
 from .providers import call_model
+from .secret_resolver import resolve_secret, register_backend
 from .prompting import build_prompt
 from .session_log import SessionLog
 from .session_state import (

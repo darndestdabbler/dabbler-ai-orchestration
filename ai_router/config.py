@@ -13,6 +13,11 @@ import sys
 import yaml
 from pathlib import Path
 
+try:
+    from .secret_resolver import resolve_secret  # package context
+except ImportError:
+    from secret_resolver import resolve_secret  # type: ignore[import-not-found]  # test context
+
 # Default config location is router-config.yaml in the same directory as
 # this file. Keeps the default working regardless of where Python is
 # invoked from.
@@ -116,23 +121,50 @@ def load_config(path: str | None = None) -> dict:
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
-    # Validate API keys exist in environment
+    # Apply defaults for new Set-026 provider fields (display_label, enabled)
+    for prov_name, prov_cfg in config["providers"].items():
+        prov_cfg.setdefault("display_label", prov_name.title())
+        prov_cfg.setdefault("enabled", True)
+
+    # Apply default for routing.outsourcing_mode
+    config.setdefault("routing", {})
+    config["routing"].setdefault("outsourcing_mode", "whenever-helpful")
+
+    # Validate API keys exist in environment (only for enabled providers)
     for name, provider in config["providers"].items():
+        if not provider.get("enabled", True):
+            continue
         env_var = provider["api_key_env"]
-        if not os.environ.get(env_var):
+        if not resolve_secret(env_var):
             raise EnvironmentError(
                 f"Missing environment variable {env_var} "
                 f"for provider '{name}'. "
                 f"Set it with: export {env_var}=your-key-here"
             )
 
-    # Validate model references
+    # Validate model references resolve against the providers block
+    provider_names = set(config["providers"])
+    for model_name, model_cfg in config["models"].items():
+        model_provider = model_cfg.get("provider")
+        if model_provider and model_provider not in provider_names:
+            raise ValueError(
+                f"Model '{model_name}' references unknown provider "
+                f"'{model_provider}'. "
+                f"Available providers: {sorted(provider_names)}"
+            )
+
+    # Validate tier_assignments reference known models
     for tier, model_name in config["routing"]["tier_assignments"].items():
         if model_name not in config["models"]:
             raise ValueError(
                 f"Tier {tier} references unknown model '{model_name}'. "
                 f"Available: {list(config['models'].keys())}"
             )
+
+    # Merge local-overrides.yaml if present (local > shared > default)
+    local_overrides_path = config_path.parent / "local-overrides.yaml"
+    if local_overrides_path.exists():
+        _apply_local_overrides(config, local_overrides_path)
 
     # Resolve prompt template file paths relative to config file location.
     # The integrated repo stores templates under ai_router/prompt-templates,
@@ -318,6 +350,98 @@ def _deep_merge(base: dict, override: dict) -> dict:
         else:
             out[k] = copy.deepcopy(v)
     return out
+
+
+# Paths that local-overrides.yaml is allowed to override per Set 025 Appendix B.
+# Paths NOT in this set are rejected with a clear error.
+_LOCAL_OVERRIDE_ALLOWED: frozenset[str] = frozenset({
+    "routing.outsourcing_mode",
+    # Per-provider fields — expressed as "providers.<id>.<field>"
+    # but validated dynamically by _apply_local_overrides.
+    # Also allow local-only sections entirely:
+    "notifications",
+    "decision_review",
+})
+
+# Provider-level fields allowed to be overridden in local-overrides.yaml
+_PROVIDER_LOCAL_ALLOWED: frozenset[str] = frozenset({"display_label", "enabled"})
+
+
+def _apply_local_overrides(config: dict, path: Path) -> None:
+    """Merge local-overrides.yaml into *config* per Appendix B precedence rules.
+
+    Rules:
+      - Local values win over shared values.
+      - Only paths listed in ``_LOCAL_OVERRIDE_ALLOWED`` (or provider-level
+        fields in ``_PROVIDER_LOCAL_ALLOWED``) may be overridden; others raise
+        ``ValueError``.
+      - New providers or models defined solely in local-overrides are rejected.
+      - Unknown top-level keys produce a warning and are ignored.
+    """
+    with open(path) as fh:
+        overrides = yaml.safe_load(fh) or {}
+
+    existing_providers = set(config.get("providers", {}))
+    existing_models = set(config.get("models", {}))
+
+    for key, value in overrides.items():
+        # --- routing ---
+        if key == "routing" and isinstance(value, dict):
+            for rk, rv in value.items():
+                full_path = f"routing.{rk}"
+                if full_path not in _LOCAL_OVERRIDE_ALLOWED:
+                    raise ValueError(
+                        f"local-overrides.yaml: '{full_path}' is not allowed "
+                        "as a local override per Appendix B."
+                    )
+                config["routing"][rk] = rv
+
+        # --- providers ---
+        elif key == "providers" and isinstance(value, dict):
+            for prov_id, prov_overrides in value.items():
+                if prov_id not in existing_providers:
+                    raise ValueError(
+                        f"local-overrides.yaml: provider '{prov_id}' does not "
+                        "exist in router-config.yaml. Local overrides cannot "
+                        "add new providers."
+                    )
+                if not isinstance(prov_overrides, dict):
+                    continue
+                for field, fval in prov_overrides.items():
+                    if field not in _PROVIDER_LOCAL_ALLOWED:
+                        raise ValueError(
+                            f"local-overrides.yaml: providers.{prov_id}.{field} "
+                            "is not allowed as a local override per Appendix B."
+                        )
+                    config["providers"][prov_id][field] = fval
+
+        # --- models (reject new entries) ---
+        elif key == "models" and isinstance(value, dict):
+            for model_id in value:
+                if model_id not in existing_models:
+                    raise ValueError(
+                        f"local-overrides.yaml: model '{model_id}' does not "
+                        "exist in router-config.yaml. Local overrides cannot "
+                        "add new models."
+                    )
+            # (Model-field overrides not currently in the allowed set; skip silently
+            # with a warning rather than raising, to be forward-compatible.)
+            print(
+                "WARNING: local-overrides.yaml 'models' section — model-field "
+                "overrides are not in the Appendix B allowed set; ignored.",
+                file=sys.stderr,
+            )
+
+        # --- local-only sections (notifications, decision_review) ---
+        elif key in ("notifications", "decision_review"):
+            config[key] = value
+
+        # --- unknown keys ---
+        else:
+            print(
+                f"WARNING: local-overrides.yaml: unknown key '{key}' — ignored.",
+                file=sys.stderr,
+            )
 
 
 def _split_sections(text: str, header_level: int) -> dict[str, str]:

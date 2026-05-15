@@ -26,6 +26,11 @@ import time
 import httpx
 from dataclasses import dataclass
 
+try:
+    from .secret_resolver import resolve_secret  # package context
+except ImportError:
+    from secret_resolver import resolve_secret  # type: ignore[import-not-found]  # test context
+
 
 @dataclass
 class APIResult:
@@ -74,7 +79,11 @@ def call_model(
 
 def _call_anthropic(model_id, system_prompt, user_message,
                     max_tokens, config, gen_params):
-    api_key = os.environ[config["api_key_env"]]
+    api_key = resolve_secret(config["api_key_env"])
+    if not api_key:
+        raise EnvironmentError(
+            f"Missing environment variable {config['api_key_env']} for Anthropic"
+        )
 
     body = {
         "model": model_id,
@@ -141,7 +150,11 @@ def _call_anthropic(model_id, system_prompt, user_message,
 
 def _call_google(model_id, system_prompt, user_message,
                  max_tokens, config, gen_params):
-    api_key = os.environ[config["api_key_env"]]
+    api_key = resolve_secret(config["api_key_env"])
+    if not api_key:
+        raise EnvironmentError(
+            f"Missing environment variable {config['api_key_env']} for Google"
+        )
     base = config.get(
         "base_url",
         "https://generativelanguage.googleapis.com/v1beta"
@@ -208,7 +221,11 @@ def _call_openai(model_id, system_prompt, user_message,
     NOTE: OpenAI's reasoning tokens are billed as output tokens. The router
     merges them into output_tokens below so cost calculation stays correct.
     """
-    api_key = os.environ[config["api_key_env"]]
+    api_key = resolve_secret(config["api_key_env"])
+    if not api_key:
+        raise EnvironmentError(
+            f"Missing environment variable {config['api_key_env']} for OpenAI"
+        )
     base = config.get("base_url", "https://api.openai.com/v1")
     url = f"{base}/responses"
 

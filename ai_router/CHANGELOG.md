@@ -86,6 +86,44 @@ returning zero hits is satisfied as of the Session 1 close commit.
   "What this means at session execution time" section now documents
   `verification_nte_usd` behavior.
 
+### Added (Session 3 — YAML schema + Python reader + resolver abstraction)
+
+- **`ai_router/secret_resolver.py`** — new module exporting
+  `resolve_secret(name, source="env") -> str | None` and
+  `register_backend(name, fn)`. The env-var backend is the only
+  backend in Set 026; additional backends (secretStorage, keyring,
+  etc.) can be registered by future sets without touching callers.
+  Exported from the package public surface alongside `register_backend`.
+- **`ai_router/migrate_router_config.py`** — idempotent forward
+  migration script for `router-config.yaml` and `budget.yaml`. Injects
+  `display_label`, `enabled` per provider, `routing.outsourcing_mode`,
+  renames `threshold_scope` → `scope`, and injects `warn_at_percent: 80`.
+  Preserves YAML comments via `ruamel.yaml` AST round-trip. Exit codes:
+  0 = success/no-op, 1 = parse error. Run with
+  `python -m ai_router.migrate_router_config`.
+- **`ruamel.yaml>=0.18`** added to `requirements.txt`.
+
+### Changed (Session 3)
+
+- **`ai_router/router-config.yaml`** — `display_label` and `enabled`
+  added to each provider block (`anthropic`, `google`, `openai`);
+  `routing.outsourcing_mode: whenever-helpful` added to the `routing:`
+  block. These fields are consumed by the Set 026 Session 4 config
+  editor webview.
+- **`ai_router/budget.yaml`** — `threshold_scope: project-lifetime`
+  renamed to `scope: per-project`; `warn_at_percent: 80` injected (via
+  migration script).
+- **`ai_router/config.py`** — now applies Set-026 field defaults on
+  load (`display_label`, `enabled`, `routing.outsourcing_mode`);
+  validates `models.<id>.provider` against the `providers:` block;
+  reads `ai_router/local-overrides.yaml` if present and merges per
+  Appendix B precedence rules (local > shared > default). API-key
+  validation now goes through `resolve_secret` instead of direct
+  `os.environ.get`.
+- **`ai_router/providers.py`** — all three provider callers
+  (`_call_anthropic`, `_call_google`, `_call_openai`) now look up API
+  keys via `resolve_secret` instead of `os.environ[...]`.
+
 ## [0.2.x] and earlier
 
 Prior versions of `ai_router` did not maintain a CHANGELOG.md. The

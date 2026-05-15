@@ -1,7 +1,7 @@
 # dabbler-ai-orchestration — project verification budget.
 # Used by ai_router for spend reporting and threshold monitoring.
 threshold_usd: 10
-threshold_scope: "project-lifetime"
+scope: per-project
 mode: "limited-budget"
 verification_method: "api"
 verification_nte_usd: 10
@@ -10,3 +10,4 @@ set_by: "adoption-bootstrap-flow"
 notes: |
   Set during Set 026 Session 2. First explicit budget for this
   repo; previously spend was tracked but uncapped.
+warn_at_percent: 80

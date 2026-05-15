@@ -12,6 +12,7 @@ import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleComma
 import { registerInstallAiRouterCommands } from "./commands/installAiRouterCommands";
 import { registerWizardCommands } from "./wizard/WizardPanel";
 import { registerCostDashboardCommand } from "./dashboard/CostDashboard";
+import { registerConfigEditorCommand } from "./configEditor/ConfigEditorPanel";
 import { SessionSet } from "./types";
 
 const SESSION_SETS_REL = path.join("docs", "session-sets");
@@ -188,6 +189,9 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   safeRegister("registerInstallAiRouterCommands", () =>
     registerInstallAiRouterCommands(context),
+  );
+  safeRegister("registerConfigEditorCommand", () =>
+    registerConfigEditorCommand(context),
   );
 
   // Show onboarding on first activation in a workspace with no session sets

@@ -93,6 +93,29 @@ suite("yamlReadWrite — writeYamlFile", () => {
   });
 });
 
+suite("yamlReadWrite — parseErrors surfacing", () => {
+  test("surfaces parse errors on a malformed file", () => {
+    const dir = makeTmpDir();
+    const filePath = path.join(dir, "broken.yaml");
+    fs.writeFileSync(filePath, "key: [unclosed\nother: 1\n", "utf8");
+    const result = readYamlFile(filePath);
+    assert.ok(result !== null);
+    assert.ok(result.parseErrors.length > 0, "should surface at least one parse error");
+    assert.ok(typeof result.parseErrors[0].message === "string");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("empty parseErrors array for a well-formed file", () => {
+    const dir = makeTmpDir();
+    const filePath = path.join(dir, "ok.yaml");
+    fs.writeFileSync(filePath, "key: value\n", "utf8");
+    const result = readYamlFile(filePath);
+    assert.ok(result !== null);
+    assert.strictEqual(result.parseErrors.length, 0);
+    fs.rmSync(dir, { recursive: true });
+  });
+});
+
 suite("yamlReadWrite — parseDocumentFromText", () => {
   test("throws on invalid YAML", () => {
     assert.throws(() => {

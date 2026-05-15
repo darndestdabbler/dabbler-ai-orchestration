@@ -22040,7 +22040,7 @@ function readYamlFile(filePath) {
     return null;
   const text = fs13.readFileSync(filePath, "utf8");
   const doc = parseDocumentFromText(text);
-  return { doc, text };
+  return { doc, text, parseErrors: collectParseErrors(doc) };
 }
 function writeYamlFile(filePath, doc) {
   const content = doc.toString();
@@ -22060,11 +22060,23 @@ function writeYamlFile(filePath, doc) {
 function parseDocumentFromText(text) {
   return (0, import_yaml.parseDocument)(text);
 }
+function collectParseErrors(doc) {
+  const out = [];
+  for (const err of doc.errors ?? []) {
+    const lc = err.linePos?.[0];
+    out.push({
+      message: err.message,
+      line: lc?.line,
+      col: lc?.col
+    });
+  }
+  return out;
+}
 
 // src/configEditor/schemaValidator.ts
 var import_ajv = __toESM(require_ajv());
 var ajv = new import_ajv.default({ allErrors: true, strict: false });
-var ENV_VAR_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
+var ENV_VAR_PATTERN_STR = "^[A-Z_][A-Z0-9_]*$";
 var ROUTER_CONFIG_SCHEMA = {
   type: "object",
   properties: {
@@ -22076,7 +22088,7 @@ var ROUTER_CONFIG_SCHEMA = {
         properties: {
           display_label: { type: "string" },
           enabled: { type: "boolean" },
-          api_key_env: { type: "string" },
+          api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
           base_url: { type: "string" }
         }
       }
@@ -22122,9 +22134,11 @@ var BUDGET_SCHEMA = {
 };
 var LOCAL_OVERRIDES_SCHEMA = {
   type: "object",
+  additionalProperties: false,
   properties: {
     routing: {
       type: "object",
+      additionalProperties: false,
       properties: {
         outsourcing_mode: {
           type: "string",
@@ -22136,23 +22150,47 @@ var LOCAL_OVERRIDES_SCHEMA = {
       type: "object",
       additionalProperties: {
         type: "object",
+        additionalProperties: false,
         properties: {
           enabled: { type: "boolean" },
-          api_key_env: { type: "string" },
+          api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
           base_url: { type: "string" }
         }
       }
     },
-    notifications: { type: "object" },
-    decision_review: { type: "object" }
+    notifications: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        pushover: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            enabled: { type: "boolean" },
+            api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
+            user_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR }
+          }
+        }
+      }
+    },
+    decision_review: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        honor_annotations: { type: "boolean" }
+      }
+    }
   }
 };
 var validateRouterConfig = ajv.compile(ROUTER_CONFIG_SCHEMA);
 var validateBudget = ajv.compile(BUDGET_SCHEMA);
 var validateLocalOverrides = ajv.compile(LOCAL_OVERRIDES_SCHEMA);
-var LOCAL_OVERRIDE_DENIED_PATHS = /* @__PURE__ */ new Set([
+var LOCAL_OVERRIDE_DENIED_TOP_LEVEL = /* @__PURE__ */ new Set([
   "verification_method",
   "scope"
+]);
+var LOCAL_OVERRIDE_DENIED_PROVIDER_KEYS = /* @__PURE__ */ new Set([
+  "display_label"
 ]);
 function validateBatch(input) {
   const errors = [];
@@ -22166,7 +22204,6 @@ function validateBatch(input) {
         });
       }
     }
-    _checkEnvVarNames(input.routerConfig, errors);
     _checkModelProviderRefs(input.routerConfig, errors);
   }
   if (input.budget !== null) {
@@ -22181,36 +22218,32 @@ function validateBatch(input) {
     }
   }
   if (input.localOverrides !== null) {
+    const beforeAllowlist = errors.length;
+    _checkLocalOverridesAllowlist(input.localOverrides, input.routerConfig, errors);
+    const allowlistPaths = new Set(
+      errors.slice(beforeAllowlist).map((e) => e.path)
+    );
     if (!validateLocalOverrides(input.localOverrides)) {
       for (const e of validateLocalOverrides.errors ?? []) {
+        const ajvPath = _ajvErrorPath(e);
+        if (e.keyword === "additionalProperties" && allowlistPaths.has(ajvPath)) {
+          continue;
+        }
+        const reportedPath = e.keyword === "additionalProperties" ? ajvPath : e.instancePath || "/";
         errors.push({
           file: "local-overrides.yaml",
-          path: e.instancePath || "/",
+          path: reportedPath,
           message: e.message ?? "validation error"
         });
       }
     }
-    _checkLocalOverridesAllowlist(input.localOverrides, input.routerConfig, errors);
   }
   return { valid: errors.length === 0, errors };
 }
-function _checkEnvVarNames(routerConfig, errors) {
-  const providers = routerConfig["providers"];
-  if (!providers || typeof providers !== "object")
-    return;
-  for (const [id, providerRaw] of Object.entries(providers)) {
-    const provider = providerRaw;
-    if (!provider || typeof provider !== "object")
-      continue;
-    const envVar = provider["api_key_env"];
-    if (typeof envVar === "string" && envVar.length > 0 && !ENV_VAR_PATTERN.test(envVar)) {
-      errors.push({
-        file: "router-config.yaml",
-        path: `/providers/${id}/api_key_env`,
-        message: `"${envVar}" is not a valid env var name (must match [A-Z_][A-Z0-9_]*)`
-      });
-    }
-  }
+function _ajvErrorPath(e) {
+  const base = e.instancePath || "";
+  const extra = e.params && typeof e.params["additionalProperty"] === "string" ? `/${e.params["additionalProperty"]}` : "";
+  return `${base}${extra}` || "/";
 }
 function _checkModelProviderRefs(routerConfig, errors) {
   const providers = routerConfig["providers"];
@@ -22235,7 +22268,7 @@ function _checkModelProviderRefs(routerConfig, errors) {
   }
 }
 function _checkLocalOverridesAllowlist(localOverrides, routerConfig, errors) {
-  for (const deniedPath of LOCAL_OVERRIDE_DENIED_PATHS) {
+  for (const deniedPath of LOCAL_OVERRIDE_DENIED_TOP_LEVEL) {
     if (deniedPath in localOverrides) {
       errors.push({
         file: "local-overrides.yaml",
@@ -22251,13 +22284,28 @@ function _checkLocalOverridesAllowlist(localOverrides, routerConfig, errors) {
     );
     const localProviders = localOverrides["providers"];
     if (localProviders && typeof localProviders === "object") {
-      for (const id of Object.keys(localProviders)) {
+      for (const [id, providerRaw] of Object.entries(
+        localProviders
+      )) {
         if (!sharedProviderIds.has(id)) {
           errors.push({
             file: "local-overrides.yaml",
             path: `/providers/${id}`,
             message: `provider "${id}" exists only in local-overrides (local overrides cannot add new providers)`
           });
+          continue;
+        }
+        const provider = providerRaw;
+        if (!provider || typeof provider !== "object")
+          continue;
+        for (const deniedKey of LOCAL_OVERRIDE_DENIED_PROVIDER_KEYS) {
+          if (deniedKey in provider) {
+            errors.push({
+              file: "local-overrides.yaml",
+              path: `/providers/${id}/${deniedKey}`,
+              message: `"${deniedKey}" is not locally overridable (project-canonical field)`
+            });
+          }
         }
       }
     }
@@ -22276,6 +22324,7 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
   constructor(panel, extensionUri) {
     this._loaded = null;
     this._validation = null;
+    this._parseIssues = [];
     this._saveState = { lastSavedAt: null, lastSavedHash: null };
     this._panel = panel;
     this._extensionUri = extensionUri;
@@ -22342,9 +22391,28 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
       budgetDoc: budgetResult?.doc ?? null,
       localOverridesDoc: localResult?.doc ?? null
     };
-    const routerConfigObj = routerResult?.doc.toJSON() ?? null;
-    const budgetObj = budgetResult?.doc.toJSON() ?? null;
-    const localObj = localResult?.doc.toJSON() ?? null;
+    this._parseIssues = [];
+    if (routerResult) {
+      for (const err of routerResult.parseErrors) {
+        this._parseIssues.push({ file: "router-config.yaml", err });
+      }
+    }
+    if (budgetResult) {
+      for (const err of budgetResult.parseErrors) {
+        this._parseIssues.push({ file: "budget.yaml", err });
+      }
+    }
+    if (localResult) {
+      for (const err of localResult.parseErrors) {
+        this._parseIssues.push({ file: "local-overrides.yaml", err });
+      }
+    }
+    const routerHasParse = this._parseIssues.some((p2) => p2.file === "router-config.yaml");
+    const budgetHasParse = this._parseIssues.some((p2) => p2.file === "budget.yaml");
+    const localHasParse = this._parseIssues.some((p2) => p2.file === "local-overrides.yaml");
+    const routerConfigObj = !routerHasParse ? routerResult?.doc.toJSON() ?? null : null;
+    const budgetObj = !budgetHasParse ? budgetResult?.doc.toJSON() ?? null : null;
+    const localObj = !localHasParse ? localResult?.doc.toJSON() ?? null : null;
     this._validation = validateBatch({
       routerConfig: routerConfigObj,
       budget: budgetObj,
@@ -22354,6 +22422,12 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
   _handleSave() {
     if (!this._loaded) {
       vscode14.window.showErrorMessage("No config files loaded.");
+      return;
+    }
+    if (this._parseIssues.length > 0) {
+      vscode14.window.showErrorMessage(
+        `Save aborted \u2014 ${this._parseIssues.length} YAML parse error(s). Fix the parse errors in the source files before saving.`
+      );
       return;
     }
     const routerConfigObj = this._loaded.routerConfigDoc?.toJSON() ?? null;
@@ -22404,17 +22478,28 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
     if (!hasRouterConfig) {
       return this._missingFilesHtml(nonce, cspSource, this._loaded.routerConfigPath);
     }
+    if (!hasBudget) {
+      return this._missingFilesHtml(nonce, cspSource, this._loaded.budgetPath);
+    }
     const validationPassed = this._validation?.valid ?? false;
     const errors = this._validation?.errors ?? [];
+    const parseIssues = this._parseIssues;
+    const hasParseIssues = parseIssues.length > 0;
     const savedStatus = this._saveState.lastSavedAt ? `All changes saved (${new Date(this._saveState.lastSavedAt).toLocaleTimeString()}).` : "No unsaved changes.";
     const fileList = [
       "ai_router/router-config.yaml",
-      hasBudget ? "budget.yaml" : null,
-      this._loaded.localOverridesPath ? "local-overrides.yaml" : null
+      hasBudget ? "ai_router/budget.yaml" : null,
+      this._loaded.localOverridesPath ? "ai_router/local-overrides.yaml" : null
     ].filter(Boolean).join(" + ");
-    const driftBanner = !validationPassed ? `<div class="drift-banner">
+    const parseBanner = hasParseIssues ? `<div class="drift-banner">
+          <strong>\u26A0 YAML parse error</strong> \u2014 ${parseIssues.length} parse issue(s). Save is blocked until resolved.
+          <ul>${parseIssues.map(
+      (p2) => `<li><code>${p2.file}</code>${p2.err.line != null ? ` (line ${p2.err.line})` : ""}: ${escapeHtml(p2.err.message)}</li>`
+    ).join("")}</ul>
+        </div>` : "";
+    const driftBanner = !validationPassed && !hasParseIssues ? `<div class="drift-banner">
           <strong>\u26A0 Drift detected</strong> \u2014 ${errors.length} validation error(s). Sections are read-only until resolved.
-          <ul>${errors.map((e) => `<li><code>${e.file}${e.path}</code>: ${escapeHtml(e.message)}</li>`).join("")}</ul>
+          <ul>${errors.map((e) => `<li><code>${escapeHtml(e.file + e.path)}</code>: ${escapeHtml(e.message)}</li>`).join("")}</ul>
         </div>` : "";
     const sections = [
       { num: 1, label: "Routing &amp; Verification" },
@@ -22470,6 +22555,7 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
   <div class="meta">
     Editing: <strong>${escapeHtml(fileList)}</strong> &nbsp;|&nbsp; ${escapeHtml(savedStatus)}
   </div>
+  ${parseBanner}
   ${driftBanner}
   <div class="layout">
     <div class="nav">
@@ -22490,7 +22576,7 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
       if (i === 0) btn.classList.add('active');
       btn.addEventListener('click', () => {
         buttons.forEach(b => b.classList.remove('active'));
-        panels.forEach(p => { (p as HTMLElement).style.display = 'none'; });
+        panels.forEach(p => { p.style.display = 'none'; });
         btn.classList.add('active');
         const sectionNum = btn.getAttribute('data-section');
         const panel = document.getElementById('section-' + sectionNum);
@@ -22512,7 +22598,8 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
       <p>No workspace folder is open. Open a folder containing an <code>ai_router/</code> directory to use the config editor.</p>
     </body></html>`;
   }
-  _missingFilesHtml(nonce, cspSource, routerConfigPath) {
+  _missingFilesHtml(nonce, cspSource, missingFilePath) {
+    const fileName = path15.basename(missingFilePath);
     return `<!DOCTYPE html><html lang="en"><head>
       <meta charset="UTF-8">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline';">
@@ -22520,7 +22607,7 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
       <style>body{font-family:var(--vscode-font-family);padding:16px;color:var(--vscode-foreground);background:var(--vscode-editor-background);}</style>
     </head><body>
       <h1>Dabbler Config Editor</h1>
-      <p>Could not find <code>router-config.yaml</code> at:<br><code>${escapeHtml(routerConfigPath)}</code></p>
+      <p>Could not find <code>${escapeHtml(fileName)}</code> at:<br><code>${escapeHtml(missingFilePath)}</code></p>
       <p>Run the Dabbler project setup wizard to create the config files, or create them manually.</p>
     </body></html>`;
   }

@@ -294,5 +294,104 @@ suite("schemaValidator — local-overrides allowlist", () => {
         });
         assert.ok(result.valid, `Expected valid, got: ${JSON.stringify(result.errors)}`);
     });
+    test("rejects display_label override on a provider (project-canonical)", () => {
+        const localOverrides = {
+            providers: {
+                anthropic: { display_label: "Local Override Label" },
+            },
+        };
+        const result = (0, schemaValidator_1.validateBatch)({
+            routerConfig: VALID_ROUTER_CONFIG,
+            budget: null,
+            localOverrides: localOverrides,
+        });
+        assert.ok(!result.valid);
+        assert.ok(result.errors.some((e) => e.file === "local-overrides.yaml" &&
+            e.path.includes("display_label") &&
+            e.message.toLowerCase().includes("not locally overridable")), `Expected display_label denial, got: ${JSON.stringify(result.errors)}`);
+    });
+    test("rejects invalid api_key_env shape in local-overrides", () => {
+        const localOverrides = {
+            providers: {
+                anthropic: { api_key_env: "lowercase-key" },
+            },
+        };
+        const result = (0, schemaValidator_1.validateBatch)({
+            routerConfig: VALID_ROUTER_CONFIG,
+            budget: null,
+            localOverrides: localOverrides,
+        });
+        assert.ok(!result.valid);
+        assert.ok(result.errors.some((e) => e.file === "local-overrides.yaml" &&
+            e.path.includes("api_key_env")), `Expected local-overrides api_key_env shape error, got: ${JSON.stringify(result.errors)}`);
+    });
+    test("rejects invalid pushover env var shape in notifications", () => {
+        const localOverrides = {
+            notifications: {
+                pushover: { api_key_env: "lowercase_key" },
+            },
+        };
+        const result = (0, schemaValidator_1.validateBatch)({
+            routerConfig: null,
+            budget: null,
+            localOverrides: localOverrides,
+        });
+        assert.ok(!result.valid);
+        assert.ok(result.errors.some((e) => e.file === "local-overrides.yaml" &&
+            e.path.includes("api_key_env")), `Expected pushover api_key_env shape error, got: ${JSON.stringify(result.errors)}`);
+    });
+});
+suite("schemaValidator — local-overrides strict closure", () => {
+    test("rejects top-level unknown key in local-overrides (e.g. threshold_usd)", () => {
+        const localOverrides = { threshold_usd: 5 };
+        const result = (0, schemaValidator_1.validateBatch)({
+            routerConfig: null,
+            budget: null,
+            localOverrides: localOverrides,
+        });
+        assert.ok(!result.valid, "unknown top-level key should fail");
+        assert.ok(result.errors.some((e) => e.file === "local-overrides.yaml"), `Expected local-overrides error, got: ${JSON.stringify(result.errors)}`);
+    });
+    test("rejects models block in local-overrides", () => {
+        const localOverrides = {
+            models: { "foo": { provider: "bar" } },
+        };
+        const result = (0, schemaValidator_1.validateBatch)({
+            routerConfig: null,
+            budget: null,
+            localOverrides: localOverrides,
+        });
+        assert.ok(!result.valid, "models block should not be locally overridable");
+        assert.ok(result.errors.some((e) => e.file === "local-overrides.yaml"), `Expected models-rejection error, got: ${JSON.stringify(result.errors)}`);
+    });
+    test("rejects unknown nested key inside notifications.pushover", () => {
+        const localOverrides = {
+            notifications: {
+                pushover: { typo_key: "x" },
+            },
+        };
+        const result = (0, schemaValidator_1.validateBatch)({
+            routerConfig: null,
+            budget: null,
+            localOverrides: localOverrides,
+        });
+        assert.ok(!result.valid, "unknown nested key should fail");
+    });
+});
+suite("schemaValidator — empty api_key_env", () => {
+    test("rejects empty api_key_env in router-config providers", () => {
+        const routerConfig = {
+            providers: {
+                anthropic: { api_key_env: "" },
+            },
+        };
+        const result = (0, schemaValidator_1.validateBatch)({
+            routerConfig: routerConfig,
+            budget: null,
+            localOverrides: null,
+        });
+        assert.ok(!result.valid, "empty api_key_env should fail");
+        assert.ok(result.errors.some((e) => e.path.includes("api_key_env")), `Expected api_key_env error, got: ${JSON.stringify(result.errors)}`);
+    });
 });
 //# sourceMappingURL=schemaValidator.test.js.map

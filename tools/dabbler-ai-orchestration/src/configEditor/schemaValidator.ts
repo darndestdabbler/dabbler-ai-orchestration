@@ -20,7 +20,13 @@ export interface ValidateBatchInput {
 }
 
 const ENV_VAR_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
+const ENV_VAR_PATTERN_STR = "^[A-Z_][A-Z0-9_]*$";
 
+// router-config.yaml schema is deliberately open: the real config
+// file carries many operational fields beyond Appendix B's editor-
+// facing controls (model_id, tier, input_cost_per_1m, generation_params,
+// etc.). The editor validates only the fields it owns; unknown keys
+// are tolerated so the editor never rejects a valid shipped config.
 const ROUTER_CONFIG_SCHEMA = {
   type: "object",
   properties: {
@@ -32,7 +38,7 @@ const ROUTER_CONFIG_SCHEMA = {
         properties: {
           display_label: { type: "string" },
           enabled: { type: "boolean" },
-          api_key_env: { type: "string" },
+          api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
           base_url: { type: "string" },
         },
       },
@@ -59,6 +65,8 @@ const ROUTER_CONFIG_SCHEMA = {
   },
 };
 
+// budget.yaml schema is similarly open: legacy fields (set_at,
+// set_by, notes) coexist with the editor-controlled ones.
 const BUDGET_SCHEMA = {
   type: "object",
   required: ["threshold_usd"],
@@ -78,11 +86,18 @@ const BUDGET_SCHEMA = {
   },
 };
 
+// local-overrides.yaml is the most restricted file: only the
+// Appendix B "Local-override allowed? Yes" paths are valid.
+// We close it strictly with additionalProperties: false at every
+// known level. Unknown top-level keys (e.g. `threshold_usd`,
+// `models`) and unknown nested keys are rejected.
 const LOCAL_OVERRIDES_SCHEMA = {
   type: "object",
+  additionalProperties: false,
   properties: {
     routing: {
       type: "object",
+      additionalProperties: false,
       properties: {
         outsourcing_mode: {
           type: "string",
@@ -94,15 +109,36 @@ const LOCAL_OVERRIDES_SCHEMA = {
       type: "object",
       additionalProperties: {
         type: "object",
+        additionalProperties: false,
         properties: {
           enabled: { type: "boolean" },
-          api_key_env: { type: "string" },
+          api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
           base_url: { type: "string" },
         },
       },
     },
-    notifications: { type: "object" },
-    decision_review: { type: "object" },
+    notifications: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        pushover: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            enabled: { type: "boolean" },
+            api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
+            user_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
+          },
+        },
+      },
+    },
+    decision_review: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        honor_annotations: { type: "boolean" },
+      },
+    },
   },
 };
 
@@ -110,9 +146,15 @@ const validateRouterConfig = ajv.compile(ROUTER_CONFIG_SCHEMA);
 const validateBudget = ajv.compile(BUDGET_SCHEMA);
 const validateLocalOverrides = ajv.compile(LOCAL_OVERRIDES_SCHEMA);
 
-const LOCAL_OVERRIDE_DENIED_PATHS = new Set([
+// Paths marked "Local-override allowed? No" in Set 025 Appendix B.
+// Top-level keys reserved for project-canonical files (budget.yaml).
+const LOCAL_OVERRIDE_DENIED_TOP_LEVEL = new Set([
   "verification_method",
   "scope",
+]);
+// Per-provider keys that are project-canonical (router-config.yaml only).
+const LOCAL_OVERRIDE_DENIED_PROVIDER_KEYS = new Set([
+  "display_label",
 ]);
 
 export function validateBatch(input: ValidateBatchInput): ValidationResult {
@@ -128,7 +170,6 @@ export function validateBatch(input: ValidateBatchInput): ValidationResult {
         });
       }
     }
-    _checkEnvVarNames(input.routerConfig, errors);
     _checkModelProviderRefs(input.routerConfig, errors);
   }
 
@@ -145,39 +186,51 @@ export function validateBatch(input: ValidateBatchInput): ValidationResult {
   }
 
   if (input.localOverrides !== null) {
+    // Run the custom allowlist checker first so its friendlier
+    // "not locally overridable (project-canonical field)" messages
+    // are recorded before Ajv's generic additionalProperties errors.
+    const beforeAllowlist = errors.length;
+    _checkLocalOverridesAllowlist(input.localOverrides, input.routerConfig, errors);
+    const allowlistPaths = new Set(
+      errors.slice(beforeAllowlist).map((e) => e.path)
+    );
+
     if (!validateLocalOverrides(input.localOverrides)) {
       for (const e of validateLocalOverrides.errors ?? []) {
+        const ajvPath = _ajvErrorPath(e);
+        // Skip Ajv additionalProperties errors when the custom
+        // checker already produced a friendlier message for the
+        // same effective path.
+        if (e.keyword === "additionalProperties" && allowlistPaths.has(ajvPath)) {
+          continue;
+        }
+        // Use ajvPath for additionalProperties so the offending
+        // key surfaces in the drift banner (e.instancePath alone
+        // would point at the parent object).
+        const reportedPath = e.keyword === "additionalProperties"
+          ? ajvPath
+          : (e.instancePath || "/");
         errors.push({
           file: "local-overrides.yaml",
-          path: e.instancePath || "/",
+          path: reportedPath,
           message: e.message ?? "validation error",
         });
       }
     }
-    _checkLocalOverridesAllowlist(input.localOverrides, input.routerConfig, errors);
   }
 
   return { valid: errors.length === 0, errors };
 }
 
-function _checkEnvVarNames(
-  routerConfig: Record<string, unknown>,
-  errors: ValidationError[]
-): void {
-  const providers = routerConfig["providers"];
-  if (!providers || typeof providers !== "object") return;
-  for (const [id, providerRaw] of Object.entries(providers as Record<string, unknown>)) {
-    const provider = providerRaw as Record<string, unknown>;
-    if (!provider || typeof provider !== "object") continue;
-    const envVar = provider["api_key_env"];
-    if (typeof envVar === "string" && envVar.length > 0 && !ENV_VAR_PATTERN.test(envVar)) {
-      errors.push({
-        file: "router-config.yaml",
-        path: `/providers/${id}/api_key_env`,
-        message: `"${envVar}" is not a valid env var name (must match [A-Z_][A-Z0-9_]*)`,
-      });
-    }
-  }
+function _ajvErrorPath(e: { instancePath?: string; params?: Record<string, unknown> }): string {
+  // For additionalProperties errors, params.additionalProperty holds the
+  // offending key. Combine it with instancePath to match the path our
+  // custom checker writes (e.g. "/scope" or "/providers/anthropic/display_label").
+  const base = e.instancePath || "";
+  const extra = e.params && typeof e.params["additionalProperty"] === "string"
+    ? `/${e.params["additionalProperty"]}`
+    : "";
+  return `${base}${extra}` || "/";
 }
 
 function _checkModelProviderRefs(
@@ -208,8 +261,8 @@ function _checkLocalOverridesAllowlist(
   routerConfig: Record<string, unknown> | null,
   errors: ValidationError[]
 ): void {
-  // Reject overrides for paths marked "Local-override allowed? No"
-  for (const deniedPath of LOCAL_OVERRIDE_DENIED_PATHS) {
+  // Reject top-level paths marked "Local-override allowed? No"
+  for (const deniedPath of LOCAL_OVERRIDE_DENIED_TOP_LEVEL) {
     if (deniedPath in localOverrides) {
       errors.push({
         file: "local-overrides.yaml",
@@ -219,7 +272,8 @@ function _checkLocalOverridesAllowlist(
     }
   }
 
-  // Reject providers/models that exist only in local-overrides
+  // Reject providers/models that exist only in local-overrides,
+  // and reject per-provider keys that are project-canonical.
   if (routerConfig !== null) {
     const sharedProviders = routerConfig["providers"];
     const sharedProviderIds = new Set(
@@ -230,15 +284,34 @@ function _checkLocalOverridesAllowlist(
 
     const localProviders = localOverrides["providers"];
     if (localProviders && typeof localProviders === "object") {
-      for (const id of Object.keys(localProviders as Record<string, unknown>)) {
+      for (const [id, providerRaw] of Object.entries(
+        localProviders as Record<string, unknown>
+      )) {
         if (!sharedProviderIds.has(id)) {
           errors.push({
             file: "local-overrides.yaml",
             path: `/providers/${id}`,
             message: `provider "${id}" exists only in local-overrides (local overrides cannot add new providers)`,
           });
+          continue;
+        }
+        const provider = providerRaw as Record<string, unknown>;
+        if (!provider || typeof provider !== "object") continue;
+        for (const deniedKey of LOCAL_OVERRIDE_DENIED_PROVIDER_KEYS) {
+          if (deniedKey in provider) {
+            errors.push({
+              file: "local-overrides.yaml",
+              path: `/providers/${id}/${deniedKey}`,
+              message: `"${deniedKey}" is not locally overridable (project-canonical field)`,
+            });
+          }
         }
       }
     }
   }
+}
+
+// Exported for tests that exercise the env-var shape directly.
+export function isValidEnvVarName(name: string): boolean {
+  return typeof name === "string" && ENV_VAR_PATTERN.test(name);
 }

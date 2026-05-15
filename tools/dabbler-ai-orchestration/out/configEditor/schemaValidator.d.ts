@@ -13,3 +13,4 @@ export interface ValidateBatchInput {
     localOverrides: Record<string, unknown> | null;
 }
 export declare function validateBatch(input: ValidateBatchInput): ValidationResult;
+export declare function isValidEnvVarName(name: string): boolean;

@@ -37,6 +37,7 @@ exports.Document = void 0;
 exports.readYamlFile = readYamlFile;
 exports.writeYamlFile = writeYamlFile;
 exports.parseDocumentFromText = parseDocumentFromText;
+exports.collectParseErrors = collectParseErrors;
 const yaml_1 = require("yaml");
 Object.defineProperty(exports, "Document", { enumerable: true, get: function () { return yaml_1.Document; } });
 const fs = __importStar(require("fs"));
@@ -45,7 +46,7 @@ function readYamlFile(filePath) {
         return null;
     const text = fs.readFileSync(filePath, "utf8");
     const doc = parseDocumentFromText(text);
-    return { doc, text };
+    return { doc, text, parseErrors: collectParseErrors(doc) };
 }
 function writeYamlFile(filePath, doc) {
     const content = doc.toString();
@@ -65,5 +66,17 @@ function writeYamlFile(filePath, doc) {
 }
 function parseDocumentFromText(text) {
     return (0, yaml_1.parseDocument)(text);
+}
+function collectParseErrors(doc) {
+    const out = [];
+    for (const err of doc.errors ?? []) {
+        const lc = err.linePos?.[0];
+        out.push({
+            message: err.message,
+            line: lc?.line,
+            col: lc?.col,
+        });
+    }
+    return out;
 }
 //# sourceMappingURL=yamlReadWrite.js.map

@@ -5,6 +5,7 @@ export declare class ConfigEditorPanel {
     private readonly _extensionUri;
     private _loaded;
     private _validation;
+    private _parseIssues;
     private _saveState;
     static createOrShow(context: vscode.ExtensionContext): void;
     private constructor();

@@ -299,6 +299,39 @@
       "description": "Created 3 test files: yamlReadWrite.test.ts (9 tests: null-on-missing, valid-read, comment-preservation, multi-line, unicode, atomic-write, round-trip, parse-error, parse-correct); schemaValidator.test.ts (20 tests covering all Appendix B validation rules: required fields, threshold bounds, warn_at_percent bounds, verification_method enum, scope enum, provider ref resolve, env-var name shape, allowlist denials, local-only-provider rejection, allowed overrides); configEditor-foundation.test.ts (save-time atomicity x3, load-time validation x3, panel lifecycle x1 in VS Code electron context). tsc clean; 29 unit-testable tests pass via mocha/ts-node.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-004/load-flow",
+      "dateTime": "2026-05-15T18:00:00-04:00",
+      "description": "Load flow wired in ConfigEditorPanel._loadFiles: walks workspace folders for ai_router/, reads router-config.yaml + budget.yaml + local-overrides.yaml (optional) via readYamlFile, surfaces YAML parse errors per-file via _parseIssues, runs validateBatch on cleanly-parsed files only, and renders a 'Drift detected' or 'YAML parse error' banner above the section nav when either fails. Missing-file fallback now triggers for both router-config.yaml and budget.yaml (per Set 025 spec, both are project-canonical).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-004/save-flow",
+      "dateTime": "2026-05-15T18:05:00-04:00",
+      "description": "Save flow wired in ConfigEditorPanel._handleSave: aborts if parse errors are present; otherwise re-runs validateBatch on the in-memory Documents, aborts on validation failure with an inline error message, then writes each Document atomically via writeYamlFile (tmp + rename per Set 025 Appendix B). Saves all three files in sequence; half-batch-recovery dialog ships in Session 5 (Session 4 only records lastSavedAt; content-hash drift detection deferred). Validation paths are HTML-escaped in the drift banner to prevent injection via YAML keys.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-004/verification",
+      "dateTime": "2026-05-15T18:30:00-04:00",
+      "description": "Cross-provider verification via gpt-5-4 (session-verification task type). Five rounds total. Round 1: 4 Major (empty api_key_env bypass; local-overrides api_key_env not validated; additionalProperties: false missing; YAML parse errors not surfaced). Round 2: 3 Major (residual schema closure gaps; models block in local-overrides not rejected; missing budget.yaml silently accepted). Round 3: 1 Major (XSS-style injection in drift banner) + 1 Minor (missing-file message hardcoded to router-config.yaml). Round 4: 1 Major (router-config/budget schema-strictness — declined; documented in code as deliberate scope decision since router-config carries many non-Appendix-B fields) + 2 Minor (duplicate errors between Ajv and custom checker; inconsistent ai_router/ prefix in file list). Round 5: 1 Minor (additionalProperties errors lose offending key path — fixed to use _ajvErrorPath). All Blocker/Major issues resolved or documented as out-of-scope. Final verdict: ACCEPT-WITH-FIXES. Total verification spend: $1.31 across 5 rounds (cumulative Set 026: $1.85 of $10.00 NTE). Files patched in response: schemaValidator.ts (empty-string env-var fix; local-overrides additionalProperties: false; pushover env-var validation; display_label denial; deduped overlapping errors; _ajvErrorPath helper), yamlReadWrite.ts (collectParseErrors; ParsedYaml.parseErrors), ConfigEditorPanel.ts (parse-error banner; drift-banner HTML escaping; required budget.yaml; consistent ai_router/ prefix; missing-file rendering uses path.basename; fixed `as HTMLElement` cast in webview script that would have thrown SyntaxError). Test count: 29 → 38 unit tests passing.",
+      "status": "complete",
+      "routedApiCalls": [
+        {"model": "gpt-5-4", "taskType": "session-verification", "inputTokens": 5958, "outputTokens": 17266, "costUsd": 0.273885},
+        {"model": "gpt-5-4", "taskType": "session-verification", "inputTokens": 6779, "outputTokens": 17025, "costUsd": 0.272322},
+        {"model": "gpt-5-4", "taskType": "session-verification", "inputTokens": 6800, "outputTokens": 17400, "costUsd": 0.277652},
+        {"model": "gpt-5-4", "taskType": "session-verification", "inputTokens": 7100, "outputTokens": 14100, "costUsd": 0.264702},
+        {"model": "gpt-5-4", "taskType": "session-verification", "inputTokens": 7300, "outputTokens": 14006, "costUsd": 0.228340}
+      ]
     }
   ]
 }

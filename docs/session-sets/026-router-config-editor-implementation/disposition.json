@@ -1,11 +1,17 @@
 {
   "status": "completed",
-  "summary": "Session 2 completed the budget-dialog simplification (doc-only). Replaced the three non-zero-tier dialog boxes in adoption-bootstrap.md Step 5 with a single NTE ask backed by empirical range data. Added verification_nte_usd to the budget.yaml schema and field reference. Collapsed the four-row budget tier table in the workflow doc to two rows; removed the 50%-of-threshold tier-upgrade mention; added verification_nte_usd to the 'What this means' section. Created ai_router/budget.yaml for this repo ($10 NTE). Fixed stale outsource-mode terminology in both docs. Verifier (gpt-5-4) found three Minor issues across four rounds (missing explicit tier-to-mode table; stale YAML comment + End-of-bootstrap wording; stale outsourcing/API prefix); all fixed. Final verdict: VERIFIED. Total verification spend: $0.38 of $10.00 NTE.",
+  "summary": "Session 4 completed the webview foundation for the new router-config editor. New module tree at tools/dabbler-ai-orchestration/src/configEditor/: yamlReadWrite.ts (AST-mode read/write via yaml@2.7, atomic tmp+rename writes, parseErrors surfacing for malformed YAML), schemaValidator.ts (three Ajv-compiled schemas + cross-file invariants: env-var pattern with minLength 1, model-provider ref resolution, local-overrides allowlist closing additionalProperties: false on every known nested object, friendly-message dedup against Ajv additionalProperties errors via _ajvErrorPath helper), ConfigEditorPanel.ts (singleton webview panel, 6-section nav shell with 'Coming in Session 5' placeholders, drift-detected + YAML-parse-error banners on load, HTML-escaped error paths, round-trip atomic save flow, missing-file fallback for both router-config.yaml and budget.yaml). Command dabbler.openConfigEditor registered in package.json + wired in extension.ts. Five rounds of cross-provider verification (gpt-5-4) raised 8 Major + 4 Minor across rounds 1-4; round 5 cleared with only one trivial cleanup nit which was fixed. All Blocker/Major findings either resolved or documented in code as deliberate scope decisions (router-config and budget schemas remain open because the real files carry many non-Appendix-B fields). One pre-verification fix: a TypeScript `as HTMLElement` cast inside the inline webview <script> template literal was a runtime SyntaxError; replaced with plain JS. Test count: 29 -> 38 unit tests passing; tsc clean. Total Session 4 verification spend: $1.31 of $10.00 NTE (cumulative Set 026 to date: ~$1.85).",
   "files_changed": [
-    "docs/adoption-bootstrap.md",
-    "docs/ai-led-session-workflow.md",
-    "ai_router/budget.yaml",
-    "ai_router/CHANGELOG.md"
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/package-lock.json",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "tools/dabbler-ai-orchestration/src/configEditor/ConfigEditorPanel.ts",
+    "tools/dabbler-ai-orchestration/src/configEditor/yamlReadWrite.ts",
+    "tools/dabbler-ai-orchestration/src/configEditor/schemaValidator.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/yamlReadWrite.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/schemaValidator.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/configEditor-foundation.test.ts",
+    "scripts/verify_session_026_4.py"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
@@ -13,10 +19,10 @@
     "engine": "claude-code",
     "provider": "anthropic",
     "model": "claude-opus-4-7",
-    "effort": "medium",
+    "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 3 is Python schema + reader + resolver work; Claude Opus at medium effort per spec routing notes."
+      "specifics": "Session 5 implements the six webview sections inside the Session 4 shell — largest single-session surface in the set (~6 section files + ~6 test files, plus half-batch recovery + shared/local indicator). Spec routing notes call for Opus at high effort. Implementing orchestrator may split into 5a + 5b if the conversation budget gets tight."
     }
   },
   "blockers": []

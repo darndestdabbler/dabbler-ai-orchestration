@@ -1,8 +1,15 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { readYamlFile, writeYamlFile, Document } from "./yamlReadWrite";
+import { readYamlFile, writeYamlFile, Document, YamlParseError } from "./yamlReadWrite";
 import { validateBatch, ValidationResult } from "./schemaValidator";
+
+type LoadedFile = "router-config.yaml" | "budget.yaml" | "local-overrides.yaml";
+
+interface ParseIssue {
+  file: LoadedFile;
+  err: YamlParseError;
+}
 
 function getNonce(): string {
   let text = "";
@@ -32,6 +39,7 @@ export class ConfigEditorPanel {
   private readonly _extensionUri: vscode.Uri;
   private _loaded: LoadedFiles | null = null;
   private _validation: ValidationResult | null = null;
+  private _parseIssues: ParseIssue[] = [];
   private _saveState: SaveState = { lastSavedAt: null, lastSavedHash: null };
 
   static createOrShow(context: vscode.ExtensionContext): void {
@@ -108,9 +116,38 @@ export class ConfigEditorPanel {
       localOverridesDoc: localResult?.doc ?? null,
     };
 
-    const routerConfigObj = routerResult?.doc.toJSON() as Record<string, unknown> | null ?? null;
-    const budgetObj = budgetResult?.doc.toJSON() as Record<string, unknown> | null ?? null;
-    const localObj = localResult?.doc.toJSON() as Record<string, unknown> | null ?? null;
+    this._parseIssues = [];
+    if (routerResult) {
+      for (const err of routerResult.parseErrors) {
+        this._parseIssues.push({ file: "router-config.yaml", err });
+      }
+    }
+    if (budgetResult) {
+      for (const err of budgetResult.parseErrors) {
+        this._parseIssues.push({ file: "budget.yaml", err });
+      }
+    }
+    if (localResult) {
+      for (const err of localResult.parseErrors) {
+        this._parseIssues.push({ file: "local-overrides.yaml", err });
+      }
+    }
+
+    // Skip schema validation on files with parse errors — toJSON() can be
+    // partial/misleading. Schema validation runs only on cleanly-parsed files.
+    const routerHasParse = this._parseIssues.some((p) => p.file === "router-config.yaml");
+    const budgetHasParse = this._parseIssues.some((p) => p.file === "budget.yaml");
+    const localHasParse = this._parseIssues.some((p) => p.file === "local-overrides.yaml");
+
+    const routerConfigObj = !routerHasParse
+      ? (routerResult?.doc.toJSON() as Record<string, unknown> | null ?? null)
+      : null;
+    const budgetObj = !budgetHasParse
+      ? (budgetResult?.doc.toJSON() as Record<string, unknown> | null ?? null)
+      : null;
+    const localObj = !localHasParse
+      ? (localResult?.doc.toJSON() as Record<string, unknown> | null ?? null)
+      : null;
 
     this._validation = validateBatch({
       routerConfig: routerConfigObj,
@@ -122,6 +159,12 @@ export class ConfigEditorPanel {
   private _handleSave(): void {
     if (!this._loaded) {
       vscode.window.showErrorMessage("No config files loaded.");
+      return;
+    }
+    if (this._parseIssues.length > 0) {
+      vscode.window.showErrorMessage(
+        `Save aborted — ${this._parseIssues.length} YAML parse error(s). Fix the parse errors in the source files before saving.`
+      );
       return;
     }
     // Session 4: no section UIs yet — validate + write the unchanged docs back
@@ -180,9 +223,14 @@ export class ConfigEditorPanel {
     if (!hasRouterConfig) {
       return this._missingFilesHtml(nonce, cspSource, this._loaded.routerConfigPath);
     }
+    if (!hasBudget) {
+      return this._missingFilesHtml(nonce, cspSource, this._loaded.budgetPath);
+    }
 
     const validationPassed = this._validation?.valid ?? false;
     const errors = this._validation?.errors ?? [];
+    const parseIssues = this._parseIssues;
+    const hasParseIssues = parseIssues.length > 0;
 
     const savedStatus = this._saveState.lastSavedAt
       ? `All changes saved (${new Date(this._saveState.lastSavedAt).toLocaleTimeString()}).`
@@ -190,16 +238,30 @@ export class ConfigEditorPanel {
 
     const fileList = [
       "ai_router/router-config.yaml",
-      hasBudget ? "budget.yaml" : null,
-      this._loaded.localOverridesPath ? "local-overrides.yaml" : null,
+      hasBudget ? "ai_router/budget.yaml" : null,
+      this._loaded.localOverridesPath ? "ai_router/local-overrides.yaml" : null,
     ]
       .filter(Boolean)
       .join(" + ");
 
-    const driftBanner = !validationPassed
+    const parseBanner = hasParseIssues
+      ? `<div class="drift-banner">
+          <strong>⚠ YAML parse error</strong> — ${parseIssues.length} parse issue(s). Save is blocked until resolved.
+          <ul>${parseIssues
+            .map(
+              (p) =>
+                `<li><code>${p.file}</code>${
+                  p.err.line != null ? ` (line ${p.err.line})` : ""
+                }: ${escapeHtml(p.err.message)}</li>`
+            )
+            .join("")}</ul>
+        </div>`
+      : "";
+
+    const driftBanner = !validationPassed && !hasParseIssues
       ? `<div class="drift-banner">
           <strong>⚠ Drift detected</strong> — ${errors.length} validation error(s). Sections are read-only until resolved.
-          <ul>${errors.map((e) => `<li><code>${e.file}${e.path}</code>: ${escapeHtml(e.message)}</li>`).join("")}</ul>
+          <ul>${errors.map((e) => `<li><code>${escapeHtml(e.file + e.path)}</code>: ${escapeHtml(e.message)}</li>`).join("")}</ul>
         </div>`
       : "";
 
@@ -264,6 +326,7 @@ export class ConfigEditorPanel {
   <div class="meta">
     Editing: <strong>${escapeHtml(fileList)}</strong> &nbsp;|&nbsp; ${escapeHtml(savedStatus)}
   </div>
+  ${parseBanner}
   ${driftBanner}
   <div class="layout">
     <div class="nav">
@@ -284,7 +347,7 @@ export class ConfigEditorPanel {
       if (i === 0) btn.classList.add('active');
       btn.addEventListener('click', () => {
         buttons.forEach(b => b.classList.remove('active'));
-        panels.forEach(p => { (p as HTMLElement).style.display = 'none'; });
+        panels.forEach(p => { p.style.display = 'none'; });
         btn.classList.add('active');
         const sectionNum = btn.getAttribute('data-section');
         const panel = document.getElementById('section-' + sectionNum);
@@ -308,7 +371,8 @@ export class ConfigEditorPanel {
     </body></html>`;
   }
 
-  private _missingFilesHtml(nonce: string, cspSource: string, routerConfigPath: string): string {
+  private _missingFilesHtml(nonce: string, cspSource: string, missingFilePath: string): string {
+    const fileName = path.basename(missingFilePath);
     return `<!DOCTYPE html><html lang="en"><head>
       <meta charset="UTF-8">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline';">
@@ -316,7 +380,7 @@ export class ConfigEditorPanel {
       <style>body{font-family:var(--vscode-font-family);padding:16px;color:var(--vscode-foreground);background:var(--vscode-editor-background);}</style>
     </head><body>
       <h1>Dabbler Config Editor</h1>
-      <p>Could not find <code>router-config.yaml</code> at:<br><code>${escapeHtml(routerConfigPath)}</code></p>
+      <p>Could not find <code>${escapeHtml(fileName)}</code> at:<br><code>${escapeHtml(missingFilePath)}</code></p>
       <p>Run the Dabbler project setup wizard to create the config files, or create them manually.</p>
     </body></html>`;
   }

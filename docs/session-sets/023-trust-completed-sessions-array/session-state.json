@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "sessionSetName": "023-trust-completed-sessions-array",
+  "currentSession": null,
+  "totalSessions": 2,
+  "status": "not-started",
+  "lifecycleState": null,
+  "startedAt": null,
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": null,
+  "completedSessions": []
+}

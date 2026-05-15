@@ -40,7 +40,6 @@ totalSessions: 2
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: doc + small-code-edit work in this repo's `ai_router/`

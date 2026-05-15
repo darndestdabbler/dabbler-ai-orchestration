@@ -15,7 +15,6 @@ totalSessions: 2
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: two distinct concerns, each focused. Session 1 is Python correctness work in `ai_router/` (event emission + snapshot-flip wiring) with unit tests. Session 2 is a `.gitignore` carve-out + an `git add -f` of the existing VSIX + a tiny README cleanup. Splitting them keeps Session 1's verification surface focused on Python behavior and Session 2's on file-tracking + doc accuracy, neither of which is mechanically tied to the other. No UAT — both sessions ship Python / configuration changes the workflow's existing tests cover. No E2E — the close-out flow's behavior is exercised by Set 014 itself (Session 2 closes the set using the Session 1 fixes; if those fixes regress, Session 2's own close-out is the test).

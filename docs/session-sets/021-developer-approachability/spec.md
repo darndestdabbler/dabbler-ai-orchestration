@@ -37,7 +37,6 @@ requiresE2E: false
 uatStyle: ad-hoc
 uatScope: none
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: doc + small-code work; no UI surface. Two sessions

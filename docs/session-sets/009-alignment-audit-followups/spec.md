@@ -241,5 +241,4 @@ totalSessions: 5
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```

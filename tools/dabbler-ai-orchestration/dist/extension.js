@@ -1325,8 +1325,7 @@ function parseSessionSetConfig(specPath) {
   const config = {
     requiresUAT: false,
     requiresE2E: false,
-    uatScope: "none",
-    outsourceMode: null
+    uatScope: "none"
   };
   if (!fs3.existsSync(specPath))
     return config;
@@ -1351,12 +1350,6 @@ function parseSessionSetConfig(specPath) {
   const scope = block.match(stringRe("uatScope"));
   if (scope)
     config.uatScope = scope[1];
-  const mode = block.match(stringRe("outsourceMode"));
-  if (mode) {
-    const v = mode[1].toLowerCase();
-    if (v === "first" || v === "last")
-      config.outsourceMode = v;
-  }
   return config;
 }
 function parseUatChecklist(checklistPath) {
@@ -1624,9 +1617,6 @@ function configTooltipLines(set) {
     flags.push("E2E");
   const lines = [];
   lines.push(`Gates: ${flags.length ? flags.join(" + ") : "none"}`);
-  if (set.config.outsourceMode) {
-    lines.push(`Mode: outsource-${set.config.outsourceMode}`);
-  }
   if (set.config.requiresUAT && set.uatSummary) {
     const u = set.uatSummary;
     if (u.totalItems > 0) {
@@ -7906,7 +7896,6 @@ For each session set, produce a spec.md file with this exact structure:
 totalSessions: <estimate 1\u20136>
 requiresUAT: <true|false>
 requiresE2E: <true|false>
-outsourceMode: first          # first (default, synchronous) | last (queue-mediated daemon)
 # Optional \u2014 set only when requiresUAT: true:
 # uatStyle: <ad-hoc|dsl>     # ad-hoc (default, non-web) | dsl (web/Playwright via dabbler-uat-dsl)
 # uatScope: <per-session|per-set>

@@ -55,7 +55,6 @@ Create two files before your first session:
 totalSessions: 1
 requiresUAT: false
 requiresE2E: false
-outsourceMode: first
 ```
 
 ---
@@ -102,7 +101,7 @@ need for a simple set: `uatStyle` and `uatScope` — only relevant when
 
 ---
 
-## The happy path — Full tier, `outsourceMode: first`
+## The happy path — Full tier
 
 A developer runs one session by telling their AI agent:
 

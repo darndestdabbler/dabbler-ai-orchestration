@@ -59,9 +59,9 @@ the events ledger, not through retained dispositions.
 |---|---|---|---|
 | `status` | string | always | One of `"completed"`, `"failed"`, `"requires_review"`. |
 | `summary` | string | always | Non-empty narrative of what landed in the session. Typically mirrors `change-log.md`'s opening paragraph on the final session. |
-| `verification_method` | string | always | `"api"` for the synchronous `outsourceMode: first` path; `"queue"` for the asynchronous `outsourceMode: last` path. |
+| `verification_method` | string | always | `"api"` (synchronous cross-provider verification), `"manual"` (human-attested out of band), or `"skipped"` (zero-budget choice). |
 | `files_changed` | list of strings | always | Paths created or modified during the session. May be empty for sessions that produced only artifacts the gate writes itself (rare). |
-| `verification_message_ids` | list of strings | conditional | **Non-empty when `verification_method == "queue"`**; **empty when `verification_method == "api"`**. References the SQLite queue rows that drove the verification round. |
+| `verification_message_ids` | list of strings | always | Empty list for normal verification paths (`api`, `manual`, `skipped`). |
 | `next_orchestrator` | object or null | conditional | **Required when `status == "completed"` AND the closing session is not the final session of the set.** Specifies who runs the next session and why. Null for the final session of a set, or for `status: "failed"` / `status: "requires_review"` outcomes that block the set's progress. |
 | `blockers` | list of strings | conditional | **Non-empty when `next_orchestrator.reason.code == "switch-due-to-blocker"`**. Empty in all other cases. |
 
@@ -77,8 +77,9 @@ the events ledger, not through retained dispositions.
 
 | Value | When to use |
 |---|---|
-| `"api"` | The verifier returned synchronously via the AI router's API call. The verdict is already on disk by the time disposition is authored. `outsourceMode: first` (the default). |
-| `"queue"` | The verifier verdict is mediated through the per-provider SQLite queue (`provider-queues/<role>/queue.db`). The queue message IDs go into `verification_message_ids` so `close_session` can wait on terminal state. `outsourceMode: last`. |
+| `"api"` | The verifier returned synchronously via the AI router's API call. The verdict is already on disk by the time disposition is authored. The default. |
+| `"manual"` | The operator performed cross-provider verification out of band and attested the result. Requires `--manual-verify` at `close_session` invocation. |
+| `"skipped"` | Verification was explicitly skipped per the project's `budget.yaml` zero-budget choice. |
 
 ### `next_orchestrator` shape
 

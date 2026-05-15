@@ -27,7 +27,6 @@ requiresE2E: false
 uatStyle: ad-hoc
 uatScope: none
 effort: medium
-outsourceMode: first
 ```
 
 > Rationale: code + doc changes touching `ai_router/`, the extension,

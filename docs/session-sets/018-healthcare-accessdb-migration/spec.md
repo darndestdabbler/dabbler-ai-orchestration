@@ -63,7 +63,6 @@ totalSessions: 1
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: single-session migration of one repo. The validation

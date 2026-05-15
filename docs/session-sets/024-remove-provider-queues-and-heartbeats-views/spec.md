@@ -30,7 +30,6 @@ requiresE2E: false
 uatStyle: ad-hoc
 uatScope: none
 effort: low
-outsourceMode: first
 ```
 
 > Rationale: single-session scoped deletion. Bounded TS + package.json

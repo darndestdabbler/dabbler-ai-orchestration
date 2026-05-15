@@ -99,7 +99,6 @@ requiresUAT: true|false        # required
 requiresE2E: true|false        # required
 uatScope: none | per-session | full    # required when requiresUAT: true
 uatStyle: ad-hoc | dsl                  # optional; default ad-hoc
-outsourceMode: first | last             # optional; omit on Lightweight tier
 effort: low | medium | high             # optional; orchestrator hint
 totalSessions: <int>                    # optional; canonical session count
 ```

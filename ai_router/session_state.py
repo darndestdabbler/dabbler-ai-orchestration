@@ -1228,13 +1228,13 @@ def validate_next_orchestrator(
 # Session Set Configuration parser
 # ---------------------------------------------------------------------------
 #
-# Set 026 Session 1 removed the queue-mediated daemon (``outsourceMode: last``)
-# infrastructure. The mode-config dataclass, the OUTSOURCE_MODES /
-# ROLE_VALUES / DEFAULT_OUTSOURCE_MODE constants, parse_mode_config,
-# read_mode_config, and validate_mode_config are gone. The
-# block-extractor below survives because :func:`_read_total_sessions_from_spec`
-# uses it to pull ``totalSessions`` from the same YAML block; it is the
-# only field still consumed at the Python layer.
+# Set 026 Session 1 removed the queue-mediated daemon infrastructure.
+# The mode-config dataclass, the OUTSOURCE_MODES / ROLE_VALUES /
+# DEFAULT_OUTSOURCE_MODE constants, parse_mode_config, read_mode_config,
+# and validate_mode_config are gone. The block-extractor below survives
+# because :func:`_read_total_sessions_from_spec` uses it to pull
+# ``totalSessions`` from the same YAML block; it is the only field
+# still consumed at the Python layer.
 
 
 def _extract_session_set_configuration_block(spec_text: str) -> Optional[dict]:
@@ -1319,7 +1319,6 @@ def _extract_session_set_configuration_block(spec_text: str) -> Optional[dict]:
 
 
 # parse_mode_config / read_mode_config / validate_mode_config were
-# removed by Set 026 Session 1 along with the rest of the
-# ``outsourceMode: last`` infrastructure. The remaining consumer of
-# the block extractor above is ``_read_total_sessions_from_spec``,
-# which reads only the numeric ``totalSessions`` field.
+# removed by Set 026 Session 1. The remaining consumer of the block
+# extractor above is ``_read_total_sessions_from_spec``, which reads
+# only the numeric ``totalSessions`` field.

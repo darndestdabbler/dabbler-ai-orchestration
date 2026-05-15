@@ -15,7 +15,6 @@ totalSessions: 2
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: pure documentation work, no UI or behavioral surface to

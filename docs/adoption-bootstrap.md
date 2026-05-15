@@ -85,7 +85,7 @@ Before diving into deep dialog, look for signals that the human already has a pl
 
 If any of these, ask:
 
-> **You appear to have a plan ready. Do you want to skip the discovery dialog and go straight to the action checklist? I'd build session sets directly from your plan, set up your budget, and configure the outsource mode.**
+> **You appear to have a plan ready. Do you want to skip the discovery dialog and go straight to the action checklist? I'd build session sets directly from your plan and set up your budget.**
 
 If the human says yes, skip Steps 3–6 and go directly to Step 7 with a minimal checklist. If they say no, or you didn't detect any plan signals, proceed to Step 3.
 
@@ -217,27 +217,19 @@ Wait for their choice. Note it for the budget.yaml record.
 
 Tell the human:
 
-> A budget under \$20 is real but tight. I'd recommend the **outsource-last** outsource mode — verification work goes to a long-running daemon backed by a subscription CLI rather than per-call API providers. The setup overhead is a one-time thing; per-verification cost is essentially zero once the daemon is running. I'll watch your spend and warn you as you approach your threshold. Sound good?
+> A budget under \$20 is real but tight. I'll use synchronous per-call API providers for verification and watch your spend closely, warning you as you approach your threshold. Sound good?
 
 #### $20–$99 — middle-tier mode
 
 Tell the human:
 
-> A budget in this range is comfortable for a project of moderate scope. I'd recommend **outsource-last** with active monitoring — same mode as the lower-budget tier, but I'll prompt you when spend crosses 50% of your threshold so you can decide whether to raise the budget or change pace. (The 50% prompt fires against whichever scope you picked — cumulative if `project-lifetime`, current-month if `monthly`.)
+> A budget in this range is comfortable for a project of moderate scope. I'll use synchronous per-call API providers and prompt you when spend crosses 50% of your threshold so you can decide whether to raise the budget or change pace. (The 50% prompt fires against whichever scope you picked — cumulative if `project-lifetime`, current-month if `monthly`.)
 
 #### $100+ — ample-budget mode
 
 Tell the human:
 
-> A budget at this level supports **outsource-first** — synchronous per-call API providers, full automation, no daemon to maintain. I'll monitor spend periodically rather than per-call (the threshold is far enough away that per-call alarming would be noise).
-
-### What outsource-first vs. outsource-last actually means
-
-If the human asks (or seems uncertain), explain briefly:
-
-> **Outsource-first** sends each verification call to an API provider (Anthropic / Google / OpenAI) synchronously. You pay per call. Setup is "set your API keys and go." Best when budgets are comfortable and verification volume is moderate.
->
-> **Outsource-last** queues verification work to a verifier daemon backed by a subscription CLI (e.g., a Claude Code Max plan running locally as the verifier). Setup is heavier — you have to keep the daemon running — but the marginal cost per verification is essentially zero once you're paying the subscription. Best for tight budgets or high verification volume.
+> A budget at this level supports full synchronous per-call API verification. I'll monitor spend periodically rather than per-call (the threshold is far enough away that per-call alarming would be noise).
 
 ### Confirm and note
 
@@ -322,27 +314,24 @@ Recommended actions for your project:
    threshold_usd: 25
    threshold_scope: "project-lifetime"
    mode: "middle-tier"
-   recommended_outsource_mode: "last"
    verification_method: "api"
    set_at: "2026-05-04T15:30:00-04:00"
    set_by: "adoption-bootstrap-flow"
    notes: |
-     Mid-sized side project; outsource-last to keep verification cost flat.
+     Mid-sized side project.
 
-3. Update ai_router/router-config.yaml outsource_mode = "last"
+3. Scaffold docs/session-sets/ folder structure (empty, ready for sets below)
 
-4. Scaffold docs/session-sets/ folder structure (empty, ready for sets below)
-
-5. Create session-set 001-user-auth (3 sessions, spec.md draft below)
+4. Create session-set 001-user-auth (3 sessions, spec.md draft below)
    <inline draft>
 
-6. Create session-set 002-product-catalog (4 sessions, spec.md draft below)
+5. Create session-set 002-product-catalog (4 sessions, spec.md draft below)
    <inline draft>
 
-7. Create session-set 003-checkout-flow (3 sessions, spec.md draft below)
+6. Create session-set 003-checkout-flow (3 sessions, spec.md draft below)
    <inline draft>
 
-8. Add CLAUDE.md (project root, copied from canonical Dabbler repo with
+7. Add CLAUDE.md (project root, copied from canonical Dabbler repo with
    project-specific tweaks; full content below)
    <inline content>
 
@@ -370,7 +359,7 @@ Once approved, walk through items in order. Write files. Update configs. Scaffol
 ```
 ✓ 1. Wrote docs/planning/project-plan.md (42 lines)
 ✓ 2. Saved ai_router/budget.yaml ($25 threshold, middle-tier mode)
-✓ 3. Updated ai_router/router-config.yaml (outsource_mode = "last")
+✓ 3. Scaffolded docs/session-sets/ folder structure
 ...
 ```
 
@@ -459,7 +448,6 @@ This is the file you'll write per-project in Step 7 / 8. Embed it in the action 
 threshold_usd: 25                   # 0 (zero) | <20 (limited) | 20-99 (middle) | 100+ (ample)
 threshold_scope: "project-lifetime" # project-lifetime | monthly
 mode: "middle-tier"                 # zero-budget | limited-budget | middle-tier | ample-budget
-recommended_outsource_mode: "last"  # first | last | none  (matches ai_router/router-config.yaml)
 verification_method: "api"          # api | manual-via-other-engine | skipped
 set_at: "2026-05-04T15:30:00-04:00"
 set_by: "adoption-bootstrap-flow"
@@ -472,7 +460,6 @@ notes: |
 - **`threshold_usd`** — the dollar threshold the human set. Used by report tools and (future) automated enforcement.
 - **`threshold_scope`** — `project-lifetime` (cumulative spend over the life of the project) or `monthly` (recurring). Default is `project-lifetime` for first-time setups; the human can switch to `monthly` if they prefer recurring tracking. Future automated enforcement reads this to decide whether to compare cumulative or windowed spend against `threshold_usd`. **Compatibility rule:** if `threshold_scope` is absent from a `budget.yaml` file (older or hand-authored without it), readers must treat it as `project-lifetime` — that's the safe default and matches the original bootstrap-flow behavior.
 - **`mode`** — one of `zero-budget`, `limited-budget`, `middle-tier`, `ample-budget`. Derived from `threshold_usd` (see Step 5 boundaries).
-- **`recommended_outsource_mode`** — `first` | `last` | `none`. Recommended for the project; the human can override in `ai_router/router-config.yaml`'s `outsource_mode` field if they want to deviate. Short-form values match the `outsource_mode` field in `router-config.yaml` exactly. (Prose elsewhere may say "outsource-first" / "outsource-last" — same thing as `first` / `last`.)
 - **`verification_method`** — `api` (normal API verification), `manual-via-other-engine` (zero-budget option a), or `skipped` (zero-budget option b). **Compatibility rule:** if absent from an older or hand-authored `budget.yaml`, readers must treat it as `api` — matches Rule 2's default behavior in `docs/ai-led-session-workflow.md`.
 - **`set_at`** — ISO-8601 timestamp of when the budget was set.
 - **`set_by`** — who/what set it; `"adoption-bootstrap-flow"` if set during bootstrap.

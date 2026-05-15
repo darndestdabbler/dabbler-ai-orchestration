@@ -91,12 +91,6 @@ paragraph that points at the canonical close-out reference:
   (`--interactive`, `--force`, `--manual-verify`, `--repair`), and
   troubleshooting (stranded sessions, queue-state debugging,
   reconciler behavior).
-- **`ai_router/docs/two-cli-workflow.md`** — operating guide for
-  `outsourceMode: last` session sets: when to use it, initial
-  setup, day-to-day operation, verifier-daemon recovery,
-  orchestrator CLI context-reset recovery, subscription-window
-  fatigue diagnostics, and common pitfalls.
-
 `close_session --help` echoes Section 2 of `close-out.md`; the doc
 is the single source of truth.
 

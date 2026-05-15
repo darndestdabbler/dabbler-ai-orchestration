@@ -4,9 +4,9 @@
 > 5-minute orientation. Then return to this document for the full procedure.
 >
 > **Simple session shortcut:** if the active spec declares
-> `requiresUAT: false` and `outsourceMode: first` (the common case), you
-> only need **Steps 0–10, the Rules list, and the Session Set Configuration
-> table.** Jump to [§Step 0](#step-0-verify-api-keys-and-read-guidance).
+> `requiresUAT: false` (the common case), you only need **Steps 0–10,
+> the Rules list, and the Session Set Configuration table.** Jump to
+> [§Step 0](#step-0-verify-api-keys-and-read-guidance).
 > The UAT procedures and AI Router details below that marker are reference
 > material for specific features — read them when they apply.
 
@@ -22,16 +22,8 @@ session-set close. `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` provide only
 agent-specific bootstrap (API key export, router import snippet) and point
 here for everything else.
 
-The workflow operates in one of two **outsource modes**, declared
-per session set in `spec.md`'s `outsourceMode:` field. **Outsource-first**
-(default) routes reasoning tasks synchronously to per-call API
-providers. **Outsource-last** enqueues verification work to a
-long-running verifier daemon backed by a subscription CLI; the
-two-CLI setup, daemon recovery, and subscription-window quirks live
-in `ai_router/docs/two-cli-workflow.md`. Step 6 (verification) and
-Step 8 (close-out) are mode-aware. The deterministic close-out path,
-gate checks, and reconciler hand-off live in
-`ai_router/docs/close-out.md`.
+The deterministic close-out path, gate checks, and reconciler hand-off
+live in `ai_router/docs/close-out.md`.
 
 The orchestrator can change from session to session at the human's discretion.
 All three orchestrators follow the same workflow — only the instruction file
@@ -109,12 +101,12 @@ threshold** during the adoption-bootstrap flow (see
 `ai_router/budget.yaml` and governs which verification path the
 project uses. Four tiers, with two sub-options under the zero tier:
 
-| Tier (`mode` value) | Threshold (`threshold_usd`) | Recommended `outsource_mode` | `verification_method` |
-|---|---|---|---|
-| **`zero-budget`** | `0` | `none` | (a) **`manual-via-other-engine`** OR (b) **`skipped`** — operator picks |
-| **`limited-budget`** | `< 20` | `last` (outsource-last) | `api` (verifier daemon backed by subscription CLI) |
-| **`middle-tier`** | `20–99` | `last` (outsource-last) | `api` + 50%-of-threshold tier-upgrade prompt |
-| **`ample-budget`** | `100+` | `first` (outsource-first) | `api` (synchronous per-call providers) |
+| Tier (`mode` value) | Threshold (`threshold_usd`) | `verification_method` |
+|---|---|---|
+| **`zero-budget`** | `0` | (a) **`manual-via-other-engine`** OR (b) **`skipped`** — operator picks |
+| **`limited-budget`** | `< 20` | `api` (synchronous per-call providers) |
+| **`middle-tier`** | `20–99` | `api` + 50%-of-threshold tier-upgrade prompt |
+| **`ample-budget`** | `100+` | `api` (synchronous per-call providers) |
 
 The threshold and the chosen verification method are persisted in
 `ai_router/budget.yaml` (see schema in `docs/adoption-bootstrap.md`).
@@ -378,11 +370,6 @@ file accumulates the full history across multiple toggles.
   pure-operator action.
 - Cancellation of an individual session within a set. Cancellation
   applies to whole session sets only.
-- Stopping queued outsource-last verifier messages. The queue keeps
-  running; the verifier daemon has no awareness of the cancel. Use
-  the `Provider Queues` view's `--mark-failed` action to stop a
-  queued message explicitly.
-
 ---
 
 ## Setting Up a New Session Set
@@ -422,7 +409,6 @@ structure:
 totalSessions: <estimate>
 requiresUAT: false       # true only for sets with human-reviewed UI/UAT checklists
 requiresE2E: false       # true only for sets shipping user-visible browser behavior
-outsourceMode: first     # first (synchronous, default) | last (queue-mediated daemon)
 # Optional — only when requiresUAT: true:
 # uatStyle: ad-hoc       # ad-hoc (default, non-web) | dsl (web/Playwright)
 # uatScope: per-set      # per-session | per-set
@@ -1148,25 +1134,11 @@ Log the result with `log.log_step()`.
 **The orchestrator must not verify its own work.** The `route()` function
 dispatches to a different AI provider for independent review.
 
-Verification routing is **mode-aware**. Outsource-first sessions
-(`outsourceMode: first`, the default) verify synchronously through
-the API and the verdict is in hand by the end of this step.
-Outsource-last sessions (`outsourceMode: last`) enqueue the
-verification message to `provider-queues/<verifierRole>/queue.db`
-and the verifier daemon processes it asynchronously; this step
-returns once the message is enqueued, and Step 8's `close_session`
-waits on the queue's terminal state before proceeding.
-
 When this step terminates with a `VERIFIED` verdict and
 `disposition.json` reports `status: "completed"`, the orchestration
-layer fires the mode-aware fresh close-out hook
-(`ai_router.route_fresh_close_out_turn`). In outsource-first it
-routes a new turn with `task_type="session-close-out"` so the
+layer routes a new turn with `task_type="session-close-out"` so the
 close-out agent reads `ai_router/docs/close-out.md` at the moment
-the instructions are needed. In outsource-last it invokes
-`close_session.run` in-process — no fresh API turn — because the
-orchestrator's primary CLI session already holds the queue context
-and the working tree. Hook failures (provider outage, transient
+the instructions are needed. Hook failures (provider outage, transient
 lock contention) are non-fatal; the reconciler sweeps stranded
 sessions on the next orchestrator startup and re-runs close-out.
 
@@ -1317,8 +1289,7 @@ session, `mark_session_complete`). It does **not** run git commit /
 push / notification — those are the caller's responsibility,
 ordered around the close-out call. See `ai_router/docs/close-out.md`
 Section 1 ("Ownership of commit / push / notification") for the
-full contract and rationale. For outsource-last sessions, see also
-`ai_router/docs/two-cli-workflow.md` for daemon setup and recovery.
+full contract and rationale.
 
 **Authoring `disposition.json`.** The disposition is the structured
 per-session outcome record the gate validates (`disposition_present`)

@@ -22,7 +22,6 @@ requiresE2E: false
 uatStyle: ad-hoc
 uatScope: none
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: single-session doc-authoring set. No new code, no UAT,

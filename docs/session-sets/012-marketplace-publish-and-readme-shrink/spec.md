@@ -16,7 +16,6 @@ totalSessions: 3
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: no UI surface that needs human UAT. Session 1 is a small Python change with unit tests. Session 2 is YAML + prose + a one-time human-driven Marketplace publisher account setup. Session 3 is a documentation restructure. Synchronous per-call routing is the right shape; no daemon needed.

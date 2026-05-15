@@ -25,7 +25,6 @@ requiresE2E: false
 uatStyle: ad-hoc
 uatScope: none
 effort: low
-outsourceMode: first
 ```
 
 > Rationale: two narrowly-scoped fixes (one Python, one TypeScript) plus

@@ -117,13 +117,9 @@ all of the following are true:
    [`docs/disposition-schema.md`](../../docs/disposition-schema.md)
    for the full schema, field-level invariants, and a copy-paste
    template).
-2. End-of-session verification (Step 6) has reached a terminal state.
-   "Terminal" is mode-dependent:
-   - **`outsourceMode: first`** — the synchronous `verify()` call
-     returned a verdict (`VERIFIED` or `ISSUES_FOUND`), and any
-     ISSUES_FOUND retries are exhausted.
-   - **`outsourceMode: last`** — the queued verification job has
-     reached `completed`, `failed`, or `timed_out` in `queue.db`.
+2. End-of-session verification (Step 6) has returned a verdict
+   (`VERIFIED` or `ISSUES_FOUND`), and any ISSUES_FOUND retries are
+   exhausted.
 3. **The orchestrator (or its fresh close-out turn — see Set 006
    Session 2) has already committed and pushed the session's work.**
    See "Ownership of commit / push / notification" below for why this
@@ -135,15 +131,11 @@ session. The script is idempotent: running it twice on a session that
 is already `complete` exits 0 with `result: "noop_already_closed"` and
 no events emitted.
 
-The orchestration layer routes to close-out differently per mode.
-**Outsource-first** invokes it as a fresh routed turn after work
-verification terminates, so the close-out agent encounters
-`ai_router/docs/close-out.md` (this file) at the moment the
-instructions are needed — which sidesteps the GPT-5.4-flagged risk that
-collapsing Step 8 in the workflow doc could lower agent compliance.
-**Outsource-last** has the orchestrator daemon self-invoke
-`close_session` directly: it already has queue context and fresh-turn
-routing would be a wasted API call.
+The orchestration layer invokes close-out as a fresh routed turn after
+work verification terminates, so the close-out agent encounters
+`ai_router/docs/close-out.md` (this file) at the moment the instructions
+are needed — which sidesteps the GPT-5.4-flagged risk that collapsing
+Step 8 in the workflow doc could lower agent compliance.
 
 ### Ownership of commit / push / notification
 
@@ -309,14 +301,9 @@ returns the corresponding exit code without touching downstream state.
    Each gate returns `(passed: bool, remediation: str)`. The first
    failing gate stops the phase; the script emits `closeout_failed`
    with the remediation and exits 1.
-8. **Wait for verification to terminate** (mode-dependent, bounded by
-   `--timeout`):
-   - **API mode** (`outsourceMode: first`) — verification is already
-     synchronous; this is a no-op flagged as `method: "api"`.
-   - **Queue mode** (`outsourceMode: last`) — poll `queue.db` for the
-     verifier's response message. Terminal states: `completed`,
-     `failed`, `timed_out`. Non-terminal after `--timeout` minutes →
-     exit 4.
+8. **Wait for verification to terminate** (bounded by `--timeout`):
+   - **API mode** — verification is already synchronous; this is a
+     no-op flagged as `method: "api"`.
    - **Manual mode** (`--manual-verify`) — record the attestation
      text from stdin or `--reason-file` and proceed. Method
      `"manual"`.
@@ -375,17 +362,6 @@ it now (`route(content=..., task_type="analysis")`), append to
 `ai-assignment.md`, commit, push, re-run close-out. The check enforces
 "always route, never self-opine"; do not satisfy it by hand-writing
 the recommendation.
-
-**Queue verification timeout (outsource-last)** — exit 4 with
-`wait_outcome: "timed_out"`. The verifier daemon is offline, slow, or
-crashed. First check `python -m ai_router.role_status` and
-`python -m ai_router.heartbeat_status`. If the verifier is down,
-restart it (`python -m ai_router.restart_role --role verifier
---provider <name> --start`) and re-run close-out — the job is still in
-the queue and the verifier will pick it up. If the verifier is alive
-but stuck on a single message, inspect with
-`python -m ai_router.queue_status get-payload --message-id <id>` and
-either let it finish or `mark_failed` it (then re-enqueue).
 
 **Disposition file missing** — exit 2 with `invalid_invocation`. The
 work agent never produced `disposition.json`, which usually means the
@@ -460,20 +436,18 @@ repair path) to use `force=True` deliberately. The CLI's
 the function-level path is for internal use only and is exercised by
 `test_mark_session_complete_gate.py`.
 
-**`--manual-verify`** — skip queue verification blocking and record a
-human attestation that verification happened out of band. Designed for
-the bootstrapping window when outsource-last is being stood up and
-verifier daemons are not yet reliable. Requires `--interactive` or
-`--reason-file` so the attestation lands in the audit trail. Method
-`"manual"` is recorded in the JSON output and the
+**`--manual-verify`** — skip API verification and record a human
+attestation that verification happened out of band. Requires
+`--interactive` or `--reason-file` so the attestation lands in the
+audit trail. Method `"manual"` is recorded in the JSON output and the
 `closeout_succeeded` event payload.
 
 **`--repair`** — diagnostic mode. Walks the session set's state
 (`session-state.json`, `activity-log.json`, `session-events.jsonl`,
-`disposition.json`, `queue.db` rows) and reports drift between them
-without touching anything. Add `--apply` to actually fix detectable
-drift. `--repair` without `--apply` exits 5 if drift is found, so
-it's safe to script as a pre-flight check.
+`disposition.json`) and reports drift between them without touching
+anything. Add `--apply` to actually fix detectable drift. `--repair`
+without `--apply` exits 5 if drift is found, so it's safe to script as
+a pre-flight check.
 
 The drift shapes the walk detects:
 
@@ -558,12 +532,7 @@ The drift shapes the walk detects:
    `--apply`, call `_flip_state_to_closed` so the snapshot tracks
    the ledger.
 
-3. **Disposition references missing queue messages.**
-   `disposition.json` cites `verification_message_ids` the queue
-   databases do not contain. Reported but not auto-fixed — verifier
-   verdicts cannot be synthesized; rebuild the disposition manually.
-
-4. **Stranded mid-closeout** (`closeout_requested` without a
+3. **Stranded mid-closeout** (`closeout_requested` without a
    terminal companion). Reported only; recovery is the reconciler's
    job. `--repair` does not re-run the gate from inside itself.
 
@@ -662,48 +631,6 @@ the set to Lightweight tier (no router writes, no events ledger,
 maintain `completedSessions[]` manually per
 `docs/session-state-schema.md`) or Full tier (every session
 through `close_session`). Don't switch mid-set.
-
-**Queue-state debugging.** When a session looks fine to the
-orchestrator but close-out won't terminate, the queue is the usual
-culprit:
-
-```bash
-.venv/Scripts/python.exe -m ai_router.queue_status \
-    --provider <name> --base-dir provider-queues
-```
-
-This shows pending / claimed / completed / failed counts plus the
-oldest claimed message and the worker that has it. Combine with
-`heartbeat_status` to see if the worker is actually alive:
-
-```bash
-.venv/Scripts/python.exe -m ai_router.heartbeat_status \
-    --base-dir provider-queues --lookback-minutes 30
-```
-
-If a message is claimed by a dead worker, the lease will expire and
-the next verifier poll will re-claim it. If the lease is long and the
-operator wants to short-circuit, use
-`python -m ai_router.queue_status mark_failed --message-id <id>` and
-re-enqueue the verification.
-
-**Verifier daemon down (outsource-last).** Restart it via:
-
-```bash
-.venv/Scripts/python.exe -m ai_router.restart_role \
-    --role verifier --provider <name> --start
-```
-
-`restart_role` reads the pid file, sends a graceful shutdown signal,
-waits for clean exit, then optionally spawns a replacement
-(`--start`). Without `--start` the operator is responsible for
-spawning a new daemon — the default fits supervisor-managed
-deployments where a process manager handles respawn.
-
-**Outsource-last set-up and recovery.** For day-to-day operation of
-two-CLI / outsource-last sessions, including verifier-daemon restart,
-orchestrator-CLI context reset, and subscription-window fatigue
-diagnostics, see `ai_router/docs/two-cli-workflow.md`.
 
 **Cross-set parallelism on the same `(repo, branch)`.** The close-out
 lock at `<session-set-dir>/.close_session.lock` serializes **same-set

@@ -22,10 +22,9 @@ Usage::
         python -m ai_router.close_session --force --reason-file reason.md
 
 Set 026 Session 1 removed the queue-mediated verification-wait path
-(``outsourceMode: last``) along with the rest of the verifier-daemon
-infrastructure. Verification is now resolved synchronously from the
-disposition's ``verification_method`` field and the ``--manual-verify``
-flag; there is no queue to poll.
+along with the rest of the daemon infrastructure. Verification is now
+resolved synchronously from the disposition's ``verification_method``
+field and the ``--manual-verify`` flag; there is no queue to poll.
 
 Snapshot-flip on success lives in :func:`session_state._flip_state_to_closed`,
 called from this script's success path after ``closeout_succeeded`` is

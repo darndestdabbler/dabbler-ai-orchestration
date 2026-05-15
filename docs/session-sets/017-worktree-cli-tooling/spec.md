@@ -22,7 +22,6 @@ totalSessions: 1
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: pure backend Python CLI. No UI surface for UAT; tests

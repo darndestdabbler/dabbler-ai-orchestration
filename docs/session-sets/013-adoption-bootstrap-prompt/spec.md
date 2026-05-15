@@ -16,7 +16,6 @@ totalSessions: 2
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: the deliverable is a static doc + a workflow-doc-section update + a clipboard-copy extension command + minor package.json / README edits. Split into 2 sessions because the canonical doc + workflow-doc section (Session 1) want a focused prose-quality verification round, distinct from the extension wiring + README cross-link verification (Session 2). Session 1's commit pushing to `origin/master` also makes the canonical URL live before Session 2 smoke-tests the clipboard-copy command against it — avoiding a "URL works locally but not yet on origin" footgun. No UI behavior to UAT. E2E coverage is not meaningful for a clipboard-copy. Cross-provider verification is the load-bearing check on each session — specifically, the verifier (different provider than the orchestrator) must confirm that *it* would understand and act on the canonical doc correctly. That's the principle from feedback memory `feedback_user_facing_ai_prompts_use_session_sets.md`: when the asset orients an arbitrary engine, the verifier doubles as a cross-engine orientation check.

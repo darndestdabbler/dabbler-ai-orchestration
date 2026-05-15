@@ -97,10 +97,9 @@ def _conftest_diff_summary() -> str:
         "the no-longer-accurate 'hyphenated' justification. The "
         "sys.path.insert(0, AI_ROUTER_DIR) mechanism is unchanged — "
         "tests still import submodules by bare filename. With the "
-        "package now installable via `pip install -e .`, "
-        "`import ai_router.queue_db` also works; the bare-filename "
-        "form remains the test convention for backward-compatibility "
-        "with existing test files."
+        "package now installable via `pip install -e .`, package-style "
+        "imports also work; the bare-filename form remains the test "
+        "convention for backward-compatibility with existing test files."
     )
 
 

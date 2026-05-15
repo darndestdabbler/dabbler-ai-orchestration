@@ -28,7 +28,6 @@ totalSessions: 1
 requiresUAT: false
 requiresE2E: false
 effort: normal
-outsourceMode: first
 ```
 
 > Rationale: spike, not migration. Output is a proposal document; no

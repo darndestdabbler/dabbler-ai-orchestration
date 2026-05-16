@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.13.17] — 2026-05-16
+
+### Changed
+- **Electron launch environment: blocklist → allowlist (Set 028 Session 2).** 
+  Previously, `_electronEnv()` started from full `process.env` and blocked only
+  known VS Code IPC vars (`ELECTRON_RUN_AS_NODE`, `VSCODE_*` prefix). Now uses
+  an explicit allowlist of safe vars: universal (PATH, HOME, TEMP, LANG, TERM),
+  Windows-specific (SYSTEMROOT, APPDATA), and GUI/locale (DISPLAY,
+  WAYLAND_DISPLAY, DBUS_SESSION_BUS_ADDRESS, XDG_RUNTIME_DIR, etc.). This
+  guards against future IDE host pollution if new IPC vars are added. Blocklists
+  are brittle; allowlists are maintainable.
+
 ## [0.13.16] — 2026-05-16
 
 ### Added

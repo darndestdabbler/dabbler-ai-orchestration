@@ -61,36 +61,60 @@ function _filteredEnv(): NodeJS.ProcessEnv {
   return out;
 }
 
-// Env vars that VS Code uses to communicate with its own
-// extension-host subprocesses. If the harness inherits these from a
-// parent VS Code or Cursor IDE (very common: a developer runs
-// `npm run test:playwright` from the integrated terminal), the
-// freshly-launched Code.exe sees `ELECTRON_RUN_AS_NODE=1` plus the
-// IPC hook and flips into CLI-arg-parsing mode instead of starting
-// the workbench. The launch then rejects every `--<flag>` arg as
-// "bad option" and exits with code 9. Scrub these aggressively.
-const _ELECTRON_VAR_BLOCKLIST = new Set<string>([
-  "ELECTRON_RUN_AS_NODE",
-  "ATOM_SHELL_INTERNAL_RUN_AS_NODE",
-]);
-const _ELECTRON_PREFIX_BLOCKLIST = ["VSCODE_"];
+// Explicit allowlist for Electron-launch environment variables.
+// This guards against IDE host pollution: if a developer runs
+// `npm run test:playwright` from VS Code's integrated terminal, the
+// child Code.exe should not inherit VS Code's IPC vars (ELECTRON_RUN_AS_NODE,
+// VSCODE_*) which would flip it into CLI-arg-parsing mode. An allowlist
+// is more maintainable than a blocklist: if new IDE vars are added
+// (APPCODE_*, CURSOR_*, etc.), an allowlist won't inadvertently pass them.
+//
+// Variables are organized by platform and context:
+// - Universal: needed on all platforms
+// - Windows-specific: Windows system paths and user config
+// - GUI/locale: needed for GUI windows and i18n on Linux/macOS
+const _ELECTRON_VAR_ALLOWLIST_UNIVERSAL = [
+  "PATH", "PATHEXT",              // executable search path (Windows includes PATHEXT)
+  "HOME", "USERPROFILE", "USER", "USERNAME",
+  "TEMP", "TMP", "TMPDIR",
+  "LANG", "LC_ALL", "LC_CTYPE", "LC_MESSAGES", "LC_NUMERIC", "LC_TIME",
+  "TERM", "COLORTERM",
+];
 
-// Env for the Electron launch. The strict `_filteredEnv` is right for
-// the Python harness subprocess (we want to scrub git/PYTHONPATH
-// pollution), but Electron on Linux needs the GUI session vars
-// (DISPLAY, WAYLAND_DISPLAY, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS)
-// to be able to open a window at all, and macOS needs the standard
-// process env to find the bundled frameworks. Start from process.env
-// for GUI/locale vars, but block the VS Code IPC protocol vars that
-// would flip Code.exe into CLI mode (see _ELECTRON_VAR_BLOCKLIST).
+const _ELECTRON_VAR_ALLOWLIST_WINDOWS = [
+  "SYSTEMROOT", "SYSTEMDRIVE", "COMSPEC", "WINDIR",
+  "APPDATA", "LOCALAPPDATA",
+];
+
+const _ELECTRON_VAR_ALLOWLIST_GUI = [
+  "DISPLAY",                        // X11 (Linux)
+  "WAYLAND_DISPLAY",                // Wayland (Linux/macOS)
+  "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE",  // XDG desktop (Linux)
+  "DBUS_SESSION_BUS_ADDRESS",       // D-Bus session (Linux)
+  "DESKTOP_SESSION", "GDMSESSION",  // GNOME/session (Linux)
+];
+
 function _electronEnv(): { [key: string]: string } {
   const out: { [key: string]: string } = {};
+
+  // Start with universal allowlist
+  const allowed = [..._ELECTRON_VAR_ALLOWLIST_UNIVERSAL, ..._ELECTRON_VAR_ALLOWLIST_GUI];
+
+  // Add platform-specific vars
+  if (process.platform === "win32") {
+    allowed.push(..._ELECTRON_VAR_ALLOWLIST_WINDOWS);
+  }
+
+  const allowedSet = new Set(allowed);
+
+  // Copy allowed vars from process.env
   for (const [k, v] of Object.entries(process.env)) {
     if (typeof v !== "string") continue;
-    if (_ELECTRON_VAR_BLOCKLIST.has(k)) continue;
-    if (_ELECTRON_PREFIX_BLOCKLIST.some((p) => k.startsWith(p))) continue;
-    out[k] = v;
+    if (allowedSet.has(k)) {
+      out[k] = v;
+    }
   }
+
   out.ELECTRON_ENABLE_LOGGING = "1";
   return out;
 }

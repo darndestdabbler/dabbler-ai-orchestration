@@ -149,7 +149,7 @@ var require_ms = __commonJS({
 // node_modules/debug/src/common.js
 var require_common = __commonJS({
   "node_modules/debug/src/common.js"(exports2, module2) {
-    function setup(env5) {
+    function setup(env6) {
       createDebug.debug = createDebug;
       createDebug.default = createDebug;
       createDebug.coerce = coerce;
@@ -158,8 +158,8 @@ var require_common = __commonJS({
       createDebug.enabled = enabled;
       createDebug.humanize = require_ms();
       createDebug.destroy = destroy;
-      Object.keys(env5).forEach((key) => {
-        createDebug[key] = env5[key];
+      Object.keys(env6).forEach((key) => {
+        createDebug[key] = env6[key];
       });
       createDebug.names = [];
       createDebug.skips = [];
@@ -513,20 +513,20 @@ var require_supports_color = __commonJS({
     var os2 = require("os");
     var tty = require("tty");
     var hasFlag = require_has_flag();
-    var { env: env5 } = process;
+    var { env: env6 } = process;
     var forceColor;
     if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
       forceColor = 0;
     } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
       forceColor = 1;
     }
-    if ("FORCE_COLOR" in env5) {
-      if (env5.FORCE_COLOR === "true") {
+    if ("FORCE_COLOR" in env6) {
+      if (env6.FORCE_COLOR === "true") {
         forceColor = 1;
-      } else if (env5.FORCE_COLOR === "false") {
+      } else if (env6.FORCE_COLOR === "false") {
         forceColor = 0;
       } else {
-        forceColor = env5.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env5.FORCE_COLOR, 10), 3);
+        forceColor = env6.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env6.FORCE_COLOR, 10), 3);
       }
     }
     function translateLevel(level) {
@@ -554,7 +554,7 @@ var require_supports_color = __commonJS({
         return 0;
       }
       const min = forceColor || 0;
-      if (env5.TERM === "dumb") {
+      if (env6.TERM === "dumb") {
         return min;
       }
       if (process.platform === "win32") {
@@ -564,34 +564,34 @@ var require_supports_color = __commonJS({
         }
         return 1;
       }
-      if ("CI" in env5) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env5) || env5.CI_NAME === "codeship") {
+      if ("CI" in env6) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env6) || env6.CI_NAME === "codeship") {
           return 1;
         }
         return min;
       }
-      if ("TEAMCITY_VERSION" in env5) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env5.TEAMCITY_VERSION) ? 1 : 0;
+      if ("TEAMCITY_VERSION" in env6) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env6.TEAMCITY_VERSION) ? 1 : 0;
       }
-      if (env5.COLORTERM === "truecolor") {
+      if (env6.COLORTERM === "truecolor") {
         return 3;
       }
-      if ("TERM_PROGRAM" in env5) {
-        const version = parseInt((env5.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-        switch (env5.TERM_PROGRAM) {
+      if ("TERM_PROGRAM" in env6) {
+        const version = parseInt((env6.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env6.TERM_PROGRAM) {
           case "iTerm.app":
             return version >= 3 ? 3 : 2;
           case "Apple_Terminal":
             return 2;
         }
       }
-      if (/-256(color)?$/i.test(env5.TERM)) {
+      if (/-256(color)?$/i.test(env6.TERM)) {
         return 2;
       }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env5.TERM)) {
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env6.TERM)) {
         return 1;
       }
-      if ("COLORTERM" in env5) {
+      if ("COLORTERM" in env6) {
         return 1;
       }
       return min;
@@ -804,10 +804,10 @@ var require_src2 = __commonJS({
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src());
     var log = debug_1.default("@kwsites/file-exists");
-    function check(path17, isFile, isDirectory) {
-      log(`checking %s`, path17);
+    function check(path21, isFile, isDirectory) {
+      log(`checking %s`, path21);
       try {
-        const stat = fs_1.statSync(path17);
+        const stat = fs_1.statSync(path21);
         if (stat.isFile() && isFile) {
           log(`[OK] path represents a file`);
           return true;
@@ -827,8 +827,8 @@ var require_src2 = __commonJS({
         throw e;
       }
     }
-    function exists2(path17, type = exports2.READABLE) {
-      return check(path17, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+    function exists2(path21, type = exports2.READABLE) {
+      return check(path21, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
     }
     exports2.exists = exists2;
     exports2.FILE = 1;
@@ -970,17 +970,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path17) {
-      const ctrl = callVisitor(key, node, visitor, path17);
+    function visit_(key, node, visitor, path21) {
+      const ctrl = callVisitor(key, node, visitor, path21);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path17, ctrl);
-        return visit_(key, ctrl, visitor, path17);
+        replaceNode(key, path21, ctrl);
+        return visit_(key, ctrl, visitor, path21);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path17 = Object.freeze(path17.concat(node));
+          path21 = Object.freeze(path21.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = visit_(i2, node.items[i2], visitor, path17);
+            const ci = visit_(i2, node.items[i2], visitor, path21);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -991,13 +991,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path17 = Object.freeze(path17.concat(node));
-          const ck = visit_("key", node.key, visitor, path17);
+          path21 = Object.freeze(path21.concat(node));
+          const ck = visit_("key", node.key, visitor, path21);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path17);
+          const cv = visit_("value", node.value, visitor, path21);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -1018,17 +1018,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path17) {
-      const ctrl = await callVisitor(key, node, visitor, path17);
+    async function visitAsync_(key, node, visitor, path21) {
+      const ctrl = await callVisitor(key, node, visitor, path21);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path17, ctrl);
-        return visitAsync_(key, ctrl, visitor, path17);
+        replaceNode(key, path21, ctrl);
+        return visitAsync_(key, ctrl, visitor, path21);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path17 = Object.freeze(path17.concat(node));
+          path21 = Object.freeze(path21.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = await visitAsync_(i2, node.items[i2], visitor, path17);
+            const ci = await visitAsync_(i2, node.items[i2], visitor, path21);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -1039,13 +1039,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path17 = Object.freeze(path17.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path17);
+          path21 = Object.freeze(path21.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path21);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path17);
+          const cv = await visitAsync_("value", node.value, visitor, path21);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -1072,23 +1072,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path17) {
+    function callVisitor(key, node, visitor, path21) {
       if (typeof visitor === "function")
-        return visitor(key, node, path17);
+        return visitor(key, node, path21);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path17);
+        return visitor.Map?.(key, node, path21);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path17);
+        return visitor.Seq?.(key, node, path21);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path17);
+        return visitor.Pair?.(key, node, path21);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path17);
+        return visitor.Scalar?.(key, node, path21);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path17);
+        return visitor.Alias?.(key, node, path21);
       return void 0;
     }
-    function replaceNode(key, path17, node) {
-      const parent = path17[path17.length - 1];
+    function replaceNode(key, path21, node) {
+      const parent = path21[path21.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -1698,10 +1698,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path17, value) {
+    function collectionFromPath(schema, path21, value) {
       let v = value;
-      for (let i2 = path17.length - 1; i2 >= 0; --i2) {
-        const k2 = path17[i2];
+      for (let i2 = path21.length - 1; i2 >= 0; --i2) {
+        const k2 = path21[i2];
         if (typeof k2 === "number" && Number.isInteger(k2) && k2 >= 0) {
           const a = [];
           a[k2] = v;
@@ -1720,7 +1720,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path17) => path17 == null || typeof path17 === "object" && !!path17[Symbol.iterator]().next().done;
+    var isEmptyPath = (path21) => path21 == null || typeof path21 === "object" && !!path21[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -1750,11 +1750,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path17, value) {
-        if (isEmptyPath(path17))
+      addIn(path21, value) {
+        if (isEmptyPath(path21))
           this.add(value);
         else {
-          const [key, ...rest] = path17;
+          const [key, ...rest] = path21;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -1768,8 +1768,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path17) {
-        const [key, ...rest] = path17;
+      deleteIn(path21) {
+        const [key, ...rest] = path21;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -1783,8 +1783,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path17, keepScalar) {
-        const [key, ...rest] = path17;
+      getIn(path21, keepScalar) {
+        const [key, ...rest] = path21;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -1802,8 +1802,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path17) {
-        const [key, ...rest] = path17;
+      hasIn(path21) {
+        const [key, ...rest] = path21;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -1813,8 +1813,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path17, value) {
-        const [key, ...rest] = path17;
+      setIn(path21, value) {
+        const [key, ...rest] = path21;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -4329,9 +4329,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path17, value) {
+      addIn(path21, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path17, value);
+          this.contents.addIn(path21, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -4406,14 +4406,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path17) {
-        if (Collection.isEmptyPath(path17)) {
+      deleteIn(path21) {
+        if (Collection.isEmptyPath(path21)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path17) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path21) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -4428,10 +4428,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path17, keepScalar) {
-        if (Collection.isEmptyPath(path17))
+      getIn(path21, keepScalar) {
+        if (Collection.isEmptyPath(path21))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path17, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path21, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -4442,10 +4442,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path17) {
-        if (Collection.isEmptyPath(path17))
+      hasIn(path21) {
+        if (Collection.isEmptyPath(path21))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path17) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path21) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -4462,13 +4462,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path17, value) {
-        if (Collection.isEmptyPath(path17)) {
+      setIn(path21, value) {
+        if (Collection.isEmptyPath(path21)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path17), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path21), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path17, value);
+          this.contents.setIn(path21, value);
         }
       }
       /**
@@ -6424,9 +6424,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path17) => {
+    visit.itemAtPath = (cst, path21) => {
       let item = cst;
-      for (const [field, index] of path17) {
+      for (const [field, index] of path21) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -6435,23 +6435,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path17) => {
-      const parent = visit.itemAtPath(cst, path17.slice(0, -1));
-      const field = path17[path17.length - 1][0];
+    visit.parentCollection = (cst, path21) => {
+      const parent = visit.itemAtPath(cst, path21.slice(0, -1));
+      const field = path21[path21.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path17, item, visitor) {
-      let ctrl = visitor(item, path17);
+    function _visit(path21, item, visitor) {
+      let ctrl = visitor(item, path21);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i2 = 0; i2 < token.items.length; ++i2) {
-            const ci = _visit(Object.freeze(path17.concat([[field, i2]])), token.items[i2], visitor);
+            const ci = _visit(Object.freeze(path21.concat([[field, i2]])), token.items[i2], visitor);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -6462,10 +6462,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path17);
+            ctrl = ctrl(item, path21);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path17) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path21) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -7762,14 +7762,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs16 = this.flowScalar(this.type);
+              const fs19 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs16, sep: [] });
+                map.items.push({ start, key: fs19, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs16);
+                this.stack.push(fs19);
               } else {
-                Object.assign(it, { key: fs16, sep: [] });
+                Object.assign(it, { key: fs19, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7897,13 +7897,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs16 = this.flowScalar(this.type);
+              const fs19 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs16, sep: [] });
+                fc.items.push({ start: [], key: fs19, sep: [] });
               else if (it.sep)
-                this.stack.push(fs16);
+                this.stack.push(fs19);
               else
-                Object.assign(it, { key: fs16, sep: [] });
+                Object.assign(it, { key: fs19, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -11060,20 +11060,20 @@ var require_compile = __commonJS({
     var util_1 = require_util();
     var validate_1 = require_validate();
     var SchemaEnv = class {
-      constructor(env5) {
+      constructor(env6) {
         var _a2;
         this.refs = {};
         this.dynamicAnchors = {};
         let schema;
-        if (typeof env5.schema == "object")
-          schema = env5.schema;
-        this.schema = env5.schema;
-        this.schemaId = env5.schemaId;
-        this.root = env5.root || this;
-        this.baseId = (_a2 = env5.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env5.schemaId || "$id"]);
-        this.schemaPath = env5.schemaPath;
-        this.localRefs = env5.localRefs;
-        this.meta = env5.meta;
+        if (typeof env6.schema == "object")
+          schema = env6.schema;
+        this.schema = env6.schema;
+        this.schemaId = env6.schemaId;
+        this.root = env6.root || this;
+        this.baseId = (_a2 = env6.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env6.schemaId || "$id"]);
+        this.schemaPath = env6.schemaPath;
+        this.localRefs = env6.localRefs;
+        this.meta = env6.meta;
         this.$async = schema === null || schema === void 0 ? void 0 : schema.$async;
         this.refs = {};
       }
@@ -11257,15 +11257,15 @@ var require_compile = __commonJS({
           baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
         }
       }
-      let env5;
+      let env6;
       if (typeof schema != "boolean" && schema.$ref && !(0, util_1.schemaHasRulesButRef)(schema, this.RULES)) {
         const $ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schema.$ref);
-        env5 = resolveSchema.call(this, root, $ref);
+        env6 = resolveSchema.call(this, root, $ref);
       }
       const { schemaId } = this.opts;
-      env5 = env5 || new SchemaEnv({ schema, schemaId, root, baseId });
-      if (env5.schema !== env5.root.schema)
-        return env5;
+      env6 = env6 || new SchemaEnv({ schema, schemaId, root, baseId });
+      if (env6.schema !== env6.root.schema)
+        return env6;
       return void 0;
     }
   }
@@ -11414,8 +11414,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path17) {
-      let input = path17;
+    function removeDotSegments(path21) {
+      let input = path21;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -11614,8 +11614,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path17, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path17 && path17 !== "/" ? path17 : void 0;
+        const [path21, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path21 && path21 !== "/" ? path21 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -11780,49 +11780,49 @@ var require_fast_uri = __commonJS({
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative3, options, skipNormalization) {
+    function resolveComponent(base, relative4, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
         base = parse(serialize(base, options), options);
-        relative3 = parse(serialize(relative3, options), options);
+        relative4 = parse(serialize(relative4, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative3.scheme) {
-        target.scheme = relative3.scheme;
-        target.userinfo = relative3.userinfo;
-        target.host = relative3.host;
-        target.port = relative3.port;
-        target.path = removeDotSegments(relative3.path || "");
-        target.query = relative3.query;
+      if (!options.tolerant && relative4.scheme) {
+        target.scheme = relative4.scheme;
+        target.userinfo = relative4.userinfo;
+        target.host = relative4.host;
+        target.port = relative4.port;
+        target.path = removeDotSegments(relative4.path || "");
+        target.query = relative4.query;
       } else {
-        if (relative3.userinfo !== void 0 || relative3.host !== void 0 || relative3.port !== void 0) {
-          target.userinfo = relative3.userinfo;
-          target.host = relative3.host;
-          target.port = relative3.port;
-          target.path = removeDotSegments(relative3.path || "");
-          target.query = relative3.query;
+        if (relative4.userinfo !== void 0 || relative4.host !== void 0 || relative4.port !== void 0) {
+          target.userinfo = relative4.userinfo;
+          target.host = relative4.host;
+          target.port = relative4.port;
+          target.path = removeDotSegments(relative4.path || "");
+          target.query = relative4.query;
         } else {
-          if (!relative3.path) {
+          if (!relative4.path) {
             target.path = base.path;
-            if (relative3.query !== void 0) {
-              target.query = relative3.query;
+            if (relative4.query !== void 0) {
+              target.query = relative4.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative3.path[0] === "/") {
-              target.path = removeDotSegments(relative3.path);
+            if (relative4.path[0] === "/") {
+              target.path = removeDotSegments(relative4.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative3.path;
+                target.path = "/" + relative4.path;
               } else if (!base.path) {
-                target.path = relative3.path;
+                target.path = relative4.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative3.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative4.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative3.query;
+            target.query = relative4.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -11830,7 +11830,7 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative3.fragment;
+      target.fragment = relative4.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
@@ -12668,8 +12668,8 @@ var require_ref = __commonJS({
       schemaType: "string",
       code(cxt) {
         const { gen, schema: $ref, it } = cxt;
-        const { baseId, schemaEnv: env5, validateName, opts, self } = it;
-        const { root } = env5;
+        const { baseId, schemaEnv: env6, validateName, opts, self } = it;
+        const { root } = env6;
         if (($ref === "#" || $ref === "#/") && baseId === root.baseId)
           return callRootRef();
         const schOrEnv = compile_1.resolveRef.call(self, root, baseId, $ref);
@@ -12679,8 +12679,8 @@ var require_ref = __commonJS({
           return callValidate(schOrEnv);
         return inlineRefSchema(schOrEnv);
         function callRootRef() {
-          if (env5 === root)
-            return callRef(cxt, validateName, env5, env5.$async);
+          if (env6 === root)
+            return callRef(cxt, validateName, env6, env6.$async);
           const rootName = gen.scopeValue("root", { ref: root });
           return callRef(cxt, (0, codegen_1._)`${rootName}.validate`, root, root.$async);
         }
@@ -12710,14 +12710,14 @@ var require_ref = __commonJS({
     exports2.getValidate = getValidate;
     function callRef(cxt, v, sch, $async) {
       const { gen, it } = cxt;
-      const { allErrors, schemaEnv: env5, opts } = it;
+      const { allErrors, schemaEnv: env6, opts } = it;
       const passCxt = opts.passContext ? names_1.default.this : codegen_1.nil;
       if ($async)
         callAsyncRef();
       else
         callSyncRef();
       function callAsyncRef() {
-        if (!env5.$async)
+        if (!env6.$async)
           throw new Error("async schema referenced by sync schema");
         const valid = gen.let("valid");
         gen.try(() => {
@@ -14681,9 +14681,9 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode15 = __toESM(require("vscode"));
-var fs15 = __toESM(require("fs"));
-var path16 = __toESM(require("path"));
+var vscode17 = __toESM(require("vscode"));
+var fs18 = __toESM(require("fs"));
+var path20 = __toESM(require("path"));
 
 // src/providers/SessionSetsProvider.ts
 var vscode2 = __toESM(require("vscode"));
@@ -15605,6 +15605,10 @@ function registerOpenFileCommands(context) {
       "dabblerSessionSets.openUatChecklist",
       (item) => openIfExists(item?.set?.uatChecklistPath, "UAT checklist")
     ),
+    vscode3.commands.registerCommand(
+      "dabblerSessionSets.openSessionState",
+      (item) => openIfExists(item?.set?.statePath, "Session state")
+    ),
     vscode3.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
       if (!item?.set)
         return;
@@ -16278,8 +16282,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = "\n") {
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path17) {
-  return (0, import_file_exists.exists)(path17, import_file_exists.FOLDER);
+function folderExists(path21) {
+  return (0, import_file_exists.exists)(path21, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -16517,9 +16521,9 @@ var init_simple_git_options = __esm({
     };
   }
 });
-function appendTaskOptions(options, commands14 = []) {
+function appendTaskOptions(options, commands16 = []) {
   if (!filterPlainObject(options)) {
-    return commands14;
+    return commands16;
   }
   return Object.keys(options).reduce((commands22, key) => {
     const value = options[key];
@@ -16537,7 +16541,7 @@ function appendTaskOptions(options, commands14 = []) {
       commands22.push(key);
     }
     return commands22;
-  }, commands14);
+  }, commands16);
 }
 function getTrailingOptions(args, initialPrimitive = 0, objectOnly = false) {
   const command = [];
@@ -16667,29 +16671,29 @@ function checkIsRepoTask(action) {
     case "root":
       return checkIsRepoRootTask();
   }
-  const commands14 = ["rev-parse", "--is-inside-work-tree"];
+  const commands16 = ["rev-parse", "--is-inside-work-tree"];
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     onError,
     parser
   };
 }
 function checkIsRepoRootTask() {
-  const commands14 = ["rev-parse", "--git-dir"];
+  const commands16 = ["rev-parse", "--git-dir"];
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     onError,
-    parser(path17) {
-      return /^\.(git)?$/.test(path17.trim());
+    parser(path21) {
+      return /^\.(git)?$/.test(path21.trim());
     }
   };
 }
 function checkIsBareRepoTask() {
-  const commands14 = ["rev-parse", "--is-bare-repository"];
+  const commands16 = ["rev-parse", "--is-bare-repository"];
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     onError,
     parser
@@ -16779,18 +16783,18 @@ function configurationErrorTask(error) {
     }
   };
 }
-function straightThroughStringTask(commands14, trimmed2 = false) {
+function straightThroughStringTask(commands16, trimmed2 = false) {
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser(text) {
       return trimmed2 ? String(text).trim() : text;
     }
   };
 }
-function straightThroughBufferTask(commands14) {
+function straightThroughBufferTask(commands16) {
   return {
-    commands: commands14,
+    commands: commands16,
     format: "buffer",
     parser(buffer) {
       return buffer;
@@ -16836,9 +16840,9 @@ function cleanWithOptionsTask(mode, customArgs) {
   return cleanTask(cleanMode, options);
 }
 function cleanTask(mode, customArgs) {
-  const commands14 = ["clean", `-${mode}`, ...customArgs];
+  const commands16 = ["clean", `-${mode}`, ...customArgs];
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser(text) {
       return cleanSummaryParser(mode === "n", text);
@@ -17001,13 +17005,13 @@ function asConfigScope(scope, fallback) {
   return fallback;
 }
 function addConfigTask(key, value, append2, scope) {
-  const commands14 = ["config", `--${scope}`];
+  const commands16 = ["config", `--${scope}`];
   if (append2) {
-    commands14.push("--add");
+    commands16.push("--add");
   }
-  commands14.push(key, value);
+  commands16.push(key, value);
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser(text) {
       return text;
@@ -17015,12 +17019,12 @@ function addConfigTask(key, value, append2, scope) {
   };
 }
 function getConfigTask(key, scope) {
-  const commands14 = ["config", "--null", "--show-origin", "--get-all", key];
+  const commands16 = ["config", "--null", "--show-origin", "--get-all", key];
   if (scope) {
-    commands14.splice(1, 0, `--${scope}`);
+    commands16.splice(1, 0, `--${scope}`);
   }
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser(text) {
       return configGetParser(text, key);
@@ -17028,12 +17032,12 @@ function getConfigTask(key, scope) {
   };
 }
 function listConfigTask(scope) {
-  const commands14 = ["config", "--list", "--show-origin", "--null"];
+  const commands16 = ["config", "--list", "--show-origin", "--null"];
   if (scope) {
-    commands14.push(`--${scope}`);
+    commands16.push(`--${scope}`);
   }
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser(text) {
       return configListParser(text);
@@ -17116,11 +17120,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path17, line, preview] = input.split(NULL);
-    paths.add(path17);
-    (results[path17] = results[path17] || []).push({
+    const [path21, line, preview] = input.split(NULL);
+    paths.add(path21);
+    (results[path21] = results[path21] || []).push({
       line: asNumber(line),
-      path: path17,
+      path: path21,
       preview
     });
   });
@@ -17145,10 +17149,10 @@ function grep_default() {
       if (typeof searchTerm === "string") {
         searchTerm = grepQueryBuilder().param(searchTerm);
       }
-      const commands14 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
+      const commands16 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
       return this._runTask(
         {
-          commands: commands14,
+          commands: commands16,
           format: "utf-8",
           parser(stdOut) {
             return parseGrep(stdOut);
@@ -17197,12 +17201,12 @@ __export2(reset_exports, {
   resetTask: () => resetTask
 });
 function resetTask(mode, customArgs) {
-  const commands14 = ["reset"];
+  const commands16 = ["reset"];
   if (isValidResetMode(mode)) {
-    commands14.push(`--${mode}`);
+    commands16.push(`--${mode}`);
   }
-  commands14.push(...customArgs);
-  return straightThroughStringTask(commands14);
+  commands16.push(...customArgs);
+  return straightThroughStringTask(commands16);
 }
 function getResetMode(mode) {
   if (isValidResetMode(mode)) {
@@ -17371,10 +17375,10 @@ var init_tasks_pending_queue = __esm({
     };
   }
 });
-function pluginContext(task, commands14) {
+function pluginContext(task, commands16) {
   return {
     method: first(task.commands) || "",
-    commands: commands14
+    commands: commands16
   };
 }
 function onErrorReceived(target, logger) {
@@ -17675,11 +17679,11 @@ var init_change_working_directory = __esm({
   }
 });
 function checkoutTask(args) {
-  const commands14 = ["checkout", ...args];
-  if (commands14[1] === "-b" && commands14.includes("-B")) {
-    commands14[1] = remove(commands14, "-B");
+  const commands16 = ["checkout", ...args];
+  if (commands16[1] === "-b" && commands16.includes("-B")) {
+    commands16[1] = remove(commands16, "-B");
   }
-  return straightThroughStringTask(commands14);
+  return straightThroughStringTask(commands16);
 }
 function checkout_default() {
   return {
@@ -17811,7 +17815,7 @@ var init_parse_commit = __esm({
   }
 });
 function commitTask(message, files, customArgs) {
-  const commands14 = [
+  const commands16 = [
     "-c",
     "core.abbrev=40",
     "commit",
@@ -17820,7 +17824,7 @@ function commitTask(message, files, customArgs) {
     ...customArgs
   ];
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser: parseCommitResult
   };
@@ -17872,11 +17876,11 @@ var init_first_commit = __esm({
   }
 });
 function hashObjectTask(filePath, write) {
-  const commands14 = ["hash-object", filePath];
+  const commands16 = ["hash-object", filePath];
   if (write) {
-    commands14.push("-w");
+    commands16.push("-w");
   }
-  return straightThroughStringTask(commands14, true);
+  return straightThroughStringTask(commands16, true);
 }
 var init_hash_object = __esm({
   "src/lib/tasks/hash-object.ts"() {
@@ -17884,14 +17888,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path17, text) {
+function parseInit(bare, path21, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path17, false, result[1]);
+    return new InitSummary(bare, path21, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path17, true, result[1]);
+    return new InitSummary(bare, path21, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -17902,7 +17906,7 @@ function parseInit(bare, path17, text) {
       break;
     }
   }
-  return new InitSummary(bare, path17, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path21, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -17911,9 +17915,9 @@ var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     "use strict";
     InitSummary = class {
-      constructor(bare, path17, existing, gitDir) {
+      constructor(bare, path21, existing, gitDir) {
         this.bare = bare;
-        this.path = path17;
+        this.path = path21;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -17925,16 +17929,16 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path17, customArgs) {
-  const commands14 = ["init", ...customArgs];
-  if (bare && !hasBareCommand(commands14)) {
-    commands14.splice(1, 0, bareCommand);
+function initTask(bare = false, path21, customArgs) {
+  const commands16 = ["init", ...customArgs];
+  if (bare && !hasBareCommand(commands16)) {
+    commands16.splice(1, 0, bareCommand);
   }
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands14.includes("--bare"), path17, text);
+      return parseInit(commands16.includes("--bare"), path21, text);
     }
   };
 }
@@ -18166,14 +18170,14 @@ __export2(diff_exports, {
 });
 function diffSummaryTask(customArgs) {
   let logFormat = logFormatFromCommand(customArgs);
-  const commands14 = ["diff"];
+  const commands16 = ["diff"];
   if (logFormat === "") {
     logFormat = "--stat";
-    commands14.push("--stat=4096");
+    commands16.push("--stat=4096");
   }
-  commands14.push(...customArgs);
-  return validateLogFormatConfig(commands14) || {
-    commands: commands14,
+  commands16.push(...customArgs);
+  return validateLogFormatConfig(commands16) || {
+    commands: commands16,
     format: "utf-8",
     parser: getDiffParser(logFormat)
   };
@@ -18691,18 +18695,18 @@ function pushTagsTask(ref = {}, customArgs) {
   return pushTask(ref, customArgs);
 }
 function pushTask(ref = {}, customArgs) {
-  const commands14 = ["push", ...customArgs];
+  const commands16 = ["push", ...customArgs];
   if (ref.branch) {
-    commands14.splice(1, 0, ref.branch);
+    commands16.splice(1, 0, ref.branch);
   }
   if (ref.remote) {
-    commands14.splice(1, 0, ref.remote);
+    commands16.splice(1, 0, ref.remote);
   }
-  remove(commands14, "-v");
-  append(commands14, "--verbose");
-  append(commands14, "--porcelain");
+  remove(commands16, "-v");
+  append(commands16, "--verbose");
+  append(commands16, "--porcelain");
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser: parsePushResult
   };
@@ -18717,19 +18721,19 @@ var init_push = __esm({
 function show_default() {
   return {
     showBuffer() {
-      const commands14 = ["show", ...getTrailingOptions(arguments, 1)];
-      if (!commands14.includes("--binary")) {
-        commands14.splice(1, 0, "--binary");
+      const commands16 = ["show", ...getTrailingOptions(arguments, 1)];
+      if (!commands16.includes("--binary")) {
+        commands16.splice(1, 0, "--binary");
       }
       return this._runTask(
-        straightThroughBufferTask(commands14),
+        straightThroughBufferTask(commands16),
         trailingFunctionArgument(arguments)
       );
     },
     show() {
-      const commands14 = ["show", ...getTrailingOptions(arguments, 1)];
+      const commands16 = ["show", ...getTrailingOptions(arguments, 1)];
       return this._runTask(
-        straightThroughStringTask(commands14),
+        straightThroughStringTask(commands16),
         trailingFunctionArgument(arguments)
       );
     }
@@ -18749,12 +18753,12 @@ var init_FileStatusSummary = __esm({
     "use strict";
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path17, index, working_dir) {
-        this.path = path17;
+      constructor(path21, index, working_dir) {
+        this.path = path21;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path17) || [null, path17, path17];
+          const detail = fromPathRegex.exec(path21) || [null, path21, path21];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -18785,14 +18789,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path17) {
+  function data(index, workingDir, path21) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path17);
+      handler(result, path21);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path17, index, workingDir));
+      result.files.push(new FileStatusSummary(path21, index, workingDir));
     }
   }
 }
@@ -18939,7 +18943,7 @@ var init_StatusSummary = __esm({
   }
 });
 function statusTask(customArgs) {
-  const commands14 = [
+  const commands16 = [
     "status",
     "--porcelain",
     "-b",
@@ -18949,7 +18953,7 @@ function statusTask(customArgs) {
   ];
   return {
     format: "utf-8",
-    commands: commands14,
+    commands: commands16,
     parser(text) {
       return parseStatusSummary(text);
     }
@@ -19064,10 +19068,10 @@ var init_clone = __esm({
     init_task();
     init_utils();
     cloneTask = (repo, directory, customArgs) => {
-      const commands14 = ["clone", ...customArgs];
-      filterString(repo) && commands14.push(c(repo));
-      filterString(directory) && commands14.push(c(directory));
-      return straightThroughStringTask(commands14);
+      const commands16 = ["clone", ...customArgs];
+      filterString(repo) && commands16.push(c(repo));
+      filterString(directory) && commands16.push(c(directory));
+      return straightThroughStringTask(commands16);
     };
     cloneMirrorTask = (repo, directory, customArgs) => {
       append(customArgs, "--mirror");
@@ -19143,9 +19147,9 @@ var init_simple_git_api = __esm({
           next
         );
       }
-      hashObject(path17, write) {
+      hashObject(path21, write) {
         return this._runTask(
-          hashObjectTask(path17, write === true),
+          hashObjectTask(path21, write === true),
           trailingFunctionArgument(arguments)
         );
       }
@@ -19421,23 +19425,23 @@ __export2(branch_exports, {
   deleteBranchTask: () => deleteBranchTask,
   deleteBranchesTask: () => deleteBranchesTask
 });
-function containsDeleteBranchCommand(commands14) {
+function containsDeleteBranchCommand(commands16) {
   const deleteCommands = ["-d", "-D", "--delete"];
-  return commands14.some((command) => deleteCommands.includes(command));
+  return commands16.some((command) => deleteCommands.includes(command));
 }
 function branchTask(customArgs) {
   const isDelete = containsDeleteBranchCommand(customArgs);
   const isCurrentOnly = customArgs.includes("--show-current");
-  const commands14 = ["branch", ...customArgs];
-  if (commands14.length === 1) {
-    commands14.push("-a");
+  const commands16 = ["branch", ...customArgs];
+  if (commands16.length === 1) {
+    commands16.push("-a");
   }
-  if (!commands14.includes("-v")) {
-    commands14.splice(1, 0, "-v");
+  if (!commands16.includes("-v")) {
+    commands16.splice(1, 0, "-v");
   }
   return {
     format: "utf-8",
-    commands: commands14,
+    commands: commands16,
     parser(stdOut, stdErr) {
       if (isDelete) {
         return parseBranchDeletions(stdOut, stdErr).all[0];
@@ -19499,8 +19503,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path17 = input.trim().replace(/^["']|["']$/g, "");
-  return path17 && (0, import_node_path.normalize)(path17);
+  const path21 = input.trim().replace(/^["']|["']$/g, "");
+  return path21 && (0, import_node_path.normalize)(path21);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -19587,16 +19591,16 @@ function disallowedCommand(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function fetchTask(remote, branch, customArgs) {
-  const commands14 = ["fetch", ...customArgs];
+  const commands16 = ["fetch", ...customArgs];
   if (remote && branch) {
-    commands14.push(remote, branch);
+    commands16.push(remote, branch);
   }
-  const banned = commands14.find(disallowedCommand);
+  const banned = commands16.find(disallowedCommand);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser: parseFetchResult
   };
@@ -19646,12 +19650,12 @@ __export2(pull_exports, {
   pullTask: () => pullTask
 });
 function pullTask(remote, branch, customArgs) {
-  const commands14 = ["pull", ...customArgs];
+  const commands16 = ["pull", ...customArgs];
   if (remote && branch) {
-    commands14.splice(1, 0, remote, branch);
+    commands16.splice(1, 0, remote, branch);
   }
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser(stdOut, stdErr) {
       return parsePullResult(stdOut, stdErr);
@@ -19717,29 +19721,29 @@ function addRemoteTask(remoteName, remoteRepo, customArgs) {
   return straightThroughStringTask(["remote", "add", ...customArgs, remoteName, remoteRepo]);
 }
 function getRemotesTask(verbose) {
-  const commands14 = ["remote"];
+  const commands16 = ["remote"];
   if (verbose) {
-    commands14.push("-v");
+    commands16.push("-v");
   }
   return {
-    commands: commands14,
+    commands: commands16,
     format: "utf-8",
     parser: verbose ? parseGetRemotesVerbose : parseGetRemotes
   };
 }
 function listRemotesTask(customArgs) {
-  const commands14 = [...customArgs];
-  if (commands14[0] !== "ls-remote") {
-    commands14.unshift("ls-remote");
+  const commands16 = [...customArgs];
+  if (commands16[0] !== "ls-remote") {
+    commands16.unshift("ls-remote");
   }
-  return straightThroughStringTask(commands14);
+  return straightThroughStringTask(commands16);
 }
 function remoteTask(customArgs) {
-  const commands14 = [...customArgs];
-  if (commands14[0] !== "remote") {
-    commands14.unshift("remote");
+  const commands16 = [...customArgs];
+  if (commands16[0] !== "remote") {
+    commands16.unshift("remote");
   }
-  return straightThroughStringTask(commands14);
+  return straightThroughStringTask(commands16);
 }
 function removeRemoteTask(remoteName) {
   return straightThroughStringTask(["remote", "remove", remoteName]);
@@ -19757,14 +19761,14 @@ __export2(stash_list_exports, {
 });
 function stashListTask(opt = {}, customArgs) {
   const options = parseLogOptions(opt);
-  const commands14 = ["stash", "list", ...options.commands, ...customArgs];
+  const commands16 = ["stash", "list", ...options.commands, ...customArgs];
   const parser4 = createListLogSummaryParser(
     options.splitter,
     options.fields,
-    logFormatFromCommand(commands14)
+    logFormatFromCommand(commands16)
   );
-  return validateLogFormatConfig(commands14) || {
-    commands: commands14,
+  return validateLogFormatConfig(commands16) || {
+    commands: commands16,
     format: "utf-8",
     parser: parser4
   };
@@ -19785,18 +19789,18 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path17) {
-  return subModuleTask(["add", repo, path17]);
+function addSubModuleTask(repo, path21) {
+  return subModuleTask(["add", repo, path21]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
 }
 function subModuleTask(customArgs) {
-  const commands14 = [...customArgs];
-  if (commands14[0] !== "submodule") {
-    commands14.unshift("submodule");
+  const commands16 = [...customArgs];
+  if (commands16[0] !== "submodule") {
+    commands16.unshift("submodule");
   }
-  return straightThroughStringTask(commands14);
+  return straightThroughStringTask(commands16);
 }
 function updateSubModuleTask(customArgs) {
   return subModuleTask(["update", ...customArgs]);
@@ -20081,9 +20085,9 @@ var require_git = __commonJS2({
     Git2.prototype.branchLocal = function(then) {
       return this._runTask(branchLocalTask2(), trailingFunctionArgument2(arguments));
     };
-    Git2.prototype.raw = function(commands14) {
-      const createRestCommands = !Array.isArray(commands14);
-      const command = [].slice.call(createRestCommands ? arguments : commands14, 0);
+    Git2.prototype.raw = function(commands16) {
+      const createRestCommands = !Array.isArray(commands16);
+      const command = [].slice.call(createRestCommands ? arguments : commands16, 0);
       for (let i2 = 0; i2 < command.length && createRestCommands; i2++) {
         if (!filterPrimitives2(command[i2])) {
           command.splice(i2, command.length - i2);
@@ -20100,8 +20104,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path17, then) {
-      return this._runTask(addSubModuleTask2(repo, path17), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path21, then) {
+      return this._runTask(addSubModuleTask2(repo, path21), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(
@@ -20218,9 +20222,9 @@ var require_git = __commonJS2({
       return this._runTask(task, trailingFunctionArgument2(arguments));
     };
     Git2.prototype.revparse = function() {
-      const commands14 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
+      const commands16 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
       return this._runTask(
-        straightThroughStringTask2(commands14, true),
+        straightThroughStringTask2(commands16, true),
         trailingFunctionArgument2(arguments)
       );
     };
@@ -20321,8 +20325,8 @@ function abortPlugin(signal) {
 function blockUnsafeOperationsPlugin(options = {}) {
   return {
     type: "spawn.args",
-    action(args, { env: env5 }) {
-      for (const vulnerability of ne(args, env5)) {
+    action(args, { env: env6 }) {
+      for (const vulnerability of ne(args, env6)) {
         if (options[vulnerability.category] !== true) {
           throw new GitPluginError(void 0, "unsafe", vulnerability.message);
         }
@@ -21802,6 +21806,19 @@ var WizardPanel = class _WizardPanel {
         case "troubleshoot":
           vscode12.commands.executeCommand("dabbler.troubleshoot");
           break;
+        case "openConfigEditor":
+          vscode12.commands.executeCommand("dabbler.openConfigEditor");
+          break;
+        case "openExternal": {
+          const url = msg.url;
+          if (url) {
+            try {
+              vscode12.env.openExternal(vscode12.Uri.parse(url, true));
+            } catch {
+            }
+          }
+          break;
+        }
         case "showCost":
           vscode12.commands.executeCommand("dabbler.showCostDashboard");
           break;
@@ -22028,6 +22045,7 @@ function registerCostDashboardCommand(context) {
 }
 
 // src/configEditor/ConfigEditorPanel.ts
+var cp4 = __toESM(require("child_process"));
 var vscode14 = __toESM(require("vscode"));
 var fs14 = __toESM(require("fs"));
 var path15 = __toESM(require("path"));
@@ -22301,10 +22319,10 @@ function _checkLocalOverridesAllowlist(localOverrides, routerConfig, errors) {
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-function getByPath(obj, path17) {
+function getByPath(obj, path21) {
   if (!obj)
     return void 0;
-  const parts = path17.split(".");
+  const parts = path21.split(".");
   let cur = obj;
   for (const p2 of parts) {
     if (cur === null || cur === void 0 || typeof cur !== "object")
@@ -22603,8 +22621,9 @@ function render4(state) {
     </li>
     <li>
       <strong>Add an annotation in source code</strong>
-      <pre class="code-sample"># @dabbler:outsource-review("reason text here")</pre>
-      <p class="section-help">The orchestrator scans open files at session start; any new annotations are queued automatically.</p>
+      <pre class="code-sample"># @dabbler:outsource-review("reason text here")
+// @dabbler:outsource-review("reason text here")</pre>
+      <p class="section-help">Run <code>Dabbler: Scan Workspace for @dabbler:outsource-review Annotations</code> from the command palette to walk workspace source files for these markers and append new findings to the queue (deduplicated against existing entries by file+line+reason). Both <code>#</code> and <code>//</code> comment styles are recognized.</p>
     </li>
   </ol>
 </div>
@@ -22673,8 +22692,7 @@ function render5(state) {
   </p>
 
   <div class="field-row">
-    <button type="button" id="s5-test-notification" class="secondary" disabled>Send a test notification now</button>
-    <span class="section-info">(wired in Set 026 Session 7)</span>
+    <button type="button" id="s5-test-notification" class="secondary">Send a test notification now</button>
   </div>
 </div>
 `;
@@ -22745,9 +22763,9 @@ function collectOverrideRows(localOverrides, state) {
   if (!localOverrides)
     return [];
   const rows = [];
-  walk(localOverrides, [], (path17, value) => {
-    const dotted = path17.join(".");
-    const sharedSource = pickSharedSource(path17[0]);
+  walk(localOverrides, [], (path21, value) => {
+    const dotted = path21.join(".");
+    const sharedSource = pickSharedSource(path21[0]);
     const sharedVal = sharedSource === "routerConfig" ? getByPath(state.routerConfig, dotted) : sharedSource === "budget" ? getByPath(state.budget, dotted) : void 0;
     rows.push({
       path: dotted,
@@ -22779,11 +22797,11 @@ function formatValue(v) {
 }
 function walk(obj, prefix, emit) {
   for (const [k2, v] of Object.entries(obj)) {
-    const path17 = [...prefix, k2];
+    const path21 = [...prefix, k2];
     if (v !== null && typeof v === "object" && !Array.isArray(v)) {
-      walk(v, path17, emit);
+      walk(v, path21, emit);
     } else {
-      emit(path17, v);
+      emit(path21, v);
     }
   }
 }
@@ -22918,40 +22936,40 @@ function applyPatch(routerConfigDoc, budgetDoc, localOverridesDoc, payload) {
   }
   return result;
 }
-function applyOverridableField(routerConfigDoc, localOverridesDoc, path17, value, source, result) {
+function applyOverridableField(routerConfigDoc, localOverridesDoc, path21, value, source, result) {
   if (source === "local") {
-    if (setIfChanged(localOverridesDoc, path17, value)) {
+    if (setIfChanged(localOverridesDoc, path21, value)) {
       result.localOverridesChanged = true;
     }
-    deleteIfPresent(routerConfigDoc, path17, result, "routerConfigChanged");
+    deleteIfPresent(routerConfigDoc, path21, result, "routerConfigChanged");
   } else {
-    if (setIfChanged(routerConfigDoc, path17, value)) {
+    if (setIfChanged(routerConfigDoc, path21, value)) {
       result.routerConfigChanged = true;
     }
-    deleteIfPresent(localOverridesDoc, path17, result, "localOverridesChanged");
+    deleteIfPresent(localOverridesDoc, path21, result, "localOverridesChanged");
   }
 }
-function setIfChanged(doc, path17, value) {
-  const current = doc.getIn(path17);
+function setIfChanged(doc, path21, value) {
+  const current = doc.getIn(path21);
   if (current === value)
     return false;
-  doc.setIn(path17, value);
+  doc.setIn(path21, value);
   return true;
 }
-function deleteIfPresent(doc, path17, result, flag) {
-  if (doc.hasIn(path17)) {
-    doc.deleteIn(path17);
+function deleteIfPresent(doc, path21, result, flag) {
+  if (doc.hasIn(path21)) {
+    doc.deleteIn(path21);
     result[flag] = true;
   }
 }
-function pruneEmptyContainer(doc, path17, result, flag) {
-  if (!doc.hasIn(path17))
+function pruneEmptyContainer(doc, path21, result, flag) {
+  if (!doc.hasIn(path21))
     return;
-  const node = doc.getIn(path17);
+  const node = doc.getIn(path21);
   if (node && typeof node === "object" && "items" in node) {
     const items = node.items;
     if (Array.isArray(items) && items.length === 0) {
-      doc.deleteIn(path17);
+      doc.deleteIn(path21);
       result[flag] = true;
     }
   }
@@ -23029,6 +23047,9 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
           break;
         case "reapplyLastSave":
           this._reapplyLastSave();
+          break;
+        case "sendTestNotification":
+          this._handleTestNotification();
           break;
       }
     });
@@ -23483,14 +23504,78 @@ ${msgs}`,
     this._refresh();
   }
   async _runFlagDecisionCommand() {
-    const all = await vscode14.commands.getCommands();
-    if (all.includes("dabbler.flagDecisionForReview")) {
-      await vscode14.commands.executeCommand("dabbler.flagDecisionForReview");
+    await vscode14.commands.executeCommand("dabbler.flagDecisionForReview");
+  }
+  _handleTestNotification() {
+    const aiRouterDir = this._findAiRouterDir();
+    if (!aiRouterDir) {
+      vscode14.window.showErrorMessage("No ai_router/ directory found in the workspace.");
       return;
     }
-    vscode14.window.showInformationMessage(
-      "dabbler.flagDecisionForReview is not registered yet \u2014 it ships in Set 026 Session 6. Until then, hand-edit the active session-set's decision-review-queue.jsonl directly."
-    );
+    const localObj = this._loaded?.localOverridesDoc?.toJSON() ?? null;
+    const pushover = localObj ? localObj["notifications"]?.["pushover"] : void 0;
+    const apiKeyEnv = (typeof pushover?.["api_key_env"] === "string" ? pushover["api_key_env"] : "PUSHOVER_API_KEY") || "PUSHOVER_API_KEY";
+    const userKeyEnv = (typeof pushover?.["user_key_env"] === "string" ? pushover["user_key_env"] : "PUSHOVER_USER_KEY") || "PUSHOVER_USER_KEY";
+    const apiKeyValue = process.env[apiKeyEnv];
+    const userKeyValue = process.env[userKeyEnv];
+    if (!apiKeyValue) {
+      vscode14.window.showErrorMessage(
+        `Pushover API key env var $${apiKeyEnv} is not set. Export it in your shell before running VS Code.`
+      );
+      return;
+    }
+    if (!userKeyValue) {
+      vscode14.window.showErrorMessage(
+        `Pushover user key env var $${userKeyEnv} is not set. Export it in your shell before running VS Code.`
+      );
+      return;
+    }
+    const pythonPath = ((vscode14.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath")?.workspaceFolderValue ?? vscode14.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath")?.workspaceValue ?? vscode14.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath")?.globalValue) || "python").trim() || "python";
+    const script = [
+      "import json, sys",
+      "try:",
+      "  from ai_router.notifications import send_pushover_notification",
+      "  r = send_pushover_notification('Dabbler test', 'Test notification from Dabbler Config Editor')",
+      "  print(json.dumps({'ok': True, 'request_id': r.request_id}))",
+      "except Exception as e:",
+      "  print(json.dumps({'ok': False, 'error': str(e)}))"
+    ].join("\n");
+    const env6 = { ...process.env, PUSHOVER_API_KEY: apiKeyValue, PUSHOVER_USER_KEY: userKeyValue };
+    const child = cp4.spawn(pythonPath, ["-c", script], {
+      cwd: path15.dirname(aiRouterDir),
+      env: env6,
+      windowsHide: true
+    });
+    let stdout = "";
+    let stderr = "";
+    let spawnErrored = false;
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", (err) => {
+      spawnErrored = true;
+      vscode14.window.showErrorMessage(`Test notification failed \u2014 could not spawn Python: ${err.message}`);
+    });
+    child.on("close", () => {
+      if (spawnErrored)
+        return;
+      try {
+        const result = JSON.parse(stdout.trim());
+        if (result.ok) {
+          vscode14.window.showInformationMessage(
+            `Pushover test notification sent. Request ID: ${result.request_id ?? "(unknown)"}`
+          );
+        } else {
+          vscode14.window.showErrorMessage(`Test notification failed: ${result.error ?? "unknown error"}`);
+        }
+      } catch {
+        const detail = stderr.trim() || stdout.trim() || "no output";
+        vscode14.window.showErrorMessage(`Test notification failed \u2014 unexpected Python output: ${detail}`);
+      }
+    });
   }
   async _openLocalOverridesFile() {
     if (!this._loaded)
@@ -23730,6 +23815,10 @@ ${msgs}`,
       const flagBtn = document.getElementById('s4-run-flag-command');
       if (flagBtn) flagBtn.addEventListener('click', () => { vscode.postMessage({ command: 'runFlagCommand' }); });
 
+      // --- \xA75 test notification button ---
+      const testNotifBtn = document.getElementById('s5-test-notification');
+      if (testNotifBtn) testNotifBtn.addEventListener('click', () => { vscode.postMessage({ command: 'sendTestNotification' }); });
+
       // --- \xA76 open-local-overrides button ---
       const openLocalBtn = document.getElementById('s6-open-local-overrides');
       if (openLocalBtn) openLocalBtn.addEventListener('click', () => { vscode.postMessage({ command: 'openLocalOverrides' }); });
@@ -23883,25 +23972,340 @@ function escapeHtml3(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// src/commands/flagDecisionForReview.ts
+var vscode15 = __toESM(require("vscode"));
+var path17 = __toESM(require("path"));
+
+// src/commands/decisionReviewQueue.ts
+var fs15 = __toESM(require("fs"));
+var path16 = __toESM(require("path"));
+var QUEUE_FILENAME = "decision-review-queue.jsonl";
+function appendQueueEntry(sessionSetDir, entry) {
+  const queuePath = path16.join(sessionSetDir, QUEUE_FILENAME);
+  const line = JSON.stringify(entry) + "\n";
+  fs15.appendFileSync(queuePath, line, "utf8");
+}
+function findActiveSessionSetDir(provider) {
+  const all = provider();
+  const inProgress = all.filter((s) => s.state === "in-progress");
+  if (inProgress.length === 0)
+    return null;
+  inProgress.sort((a, b2) => (b2.lastTouched ?? "").localeCompare(a.lastTouched ?? ""));
+  return inProgress[0].dir;
+}
+
+// src/commands/flagDecisionForReview.ts
+function registerFlagDecisionForReview(context) {
+  context.subscriptions.push(
+    vscode15.commands.registerCommand(
+      "dabbler.flagDecisionForReview",
+      async () => {
+        const activeDir = findActiveSessionSetDir(readAllSessionSets);
+        if (!activeDir) {
+          vscode15.window.showInformationMessage(
+            "No active session set to flag against. Start a session set first (its state must be 'in-progress' for the flag to attach to it)."
+          );
+          return;
+        }
+        const reason = await vscode15.window.showInputBox({
+          title: "Flag Decision for Cross-Provider Review",
+          prompt: "One-line reason this decision should get a second-engine read at the next session start.",
+          placeHolder: "e.g. budget-tier defaulting choice \u2014 confirm with Gemini before shipping",
+          ignoreFocusOut: true
+        });
+        if (reason === void 0)
+          return;
+        const trimmed2 = reason.trim();
+        if (trimmed2.length === 0)
+          return;
+        const entry = {
+          ts: (/* @__PURE__ */ new Date()).toISOString(),
+          reason: trimmed2,
+          source: "command",
+          file: null,
+          line: null
+        };
+        try {
+          appendQueueEntry(activeDir, entry);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          vscode15.window.showErrorMessage(
+            `Failed to append to decision-review queue: ${msg}`
+          );
+          return;
+        }
+        const slug = path17.basename(activeDir);
+        vscode15.window.showInformationMessage(
+          `Flagged for cross-provider review in ${slug}/${QUEUE_FILENAME}. Will surface in the next session's planning checklist.`
+        );
+      }
+    )
+  );
+}
+
+// src/commands/scanAnnotationsForActiveSet.ts
+var vscode16 = __toESM(require("vscode"));
+var fs17 = __toESM(require("fs"));
+var path19 = __toESM(require("path"));
+
+// src/configEditor/annotationParser.ts
+var ANNOTATION_RE = /(?:#|\/\/)\s*@dabbler:outsource-review\(\s*"((?:\\.|[^"\\\r\n])*)"\s*\)/g;
+function findAnnotations(text, filePath, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
+  const out = [];
+  const posixPath = filePath.replace(/\\/g, "/");
+  const ts = now();
+  const lineStarts = [0];
+  for (let i2 = 0; i2 < text.length; i2++) {
+    if (text.charCodeAt(i2) === 10)
+      lineStarts.push(i2 + 1);
+  }
+  ANNOTATION_RE.lastIndex = 0;
+  let m;
+  while ((m = ANNOTATION_RE.exec(text)) !== null) {
+    const reason = unescapeReason(m[1]);
+    if (reason.length === 0)
+      continue;
+    const line = offsetToLine(m.index, lineStarts);
+    out.push({
+      ts,
+      reason,
+      source: "annotation",
+      file: posixPath,
+      line
+    });
+  }
+  return out;
+}
+function deduplicateAnnotations(incoming, existing) {
+  const seen = /* @__PURE__ */ new Set();
+  for (const entry of existing) {
+    seen.add(keyFor(entry));
+  }
+  const out = [];
+  for (const ann of incoming) {
+    const key = keyFor(ann);
+    if (seen.has(key))
+      continue;
+    seen.add(key);
+    out.push(ann);
+  }
+  return out;
+}
+function keyFor(entry) {
+  return `${entry.file}\0${entry.line}\0${entry.reason}`;
+}
+function offsetToLine(offset, lineStarts) {
+  let lo = 0;
+  let hi = lineStarts.length - 1;
+  while (lo < hi) {
+    const mid = lo + hi + 1 >>> 1;
+    if (lineStarts[mid] <= offset)
+      lo = mid;
+    else
+      hi = mid - 1;
+  }
+  return lo + 1;
+}
+function unescapeReason(raw) {
+  let out = "";
+  for (let i2 = 0; i2 < raw.length; i2++) {
+    const c3 = raw.charCodeAt(i2);
+    if (c3 === 92 && i2 + 1 < raw.length) {
+      const next = raw.charAt(i2 + 1);
+      if (next === '"' || next === "\\") {
+        out += next;
+        i2++;
+        continue;
+      }
+    }
+    out += raw.charAt(i2);
+  }
+  return out;
+}
+
+// src/commands/annotationScanner.ts
+var fs16 = __toESM(require("fs"));
+var path18 = __toESM(require("path"));
+var SCAN_EXTENSIONS = [
+  "ts",
+  "tsx",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "py",
+  "rb",
+  "go",
+  "rs",
+  "java",
+  "cs",
+  "kt",
+  "swift",
+  "c",
+  "cc",
+  "cpp",
+  "h",
+  "hpp",
+  "sh",
+  "bash",
+  "zsh",
+  "ps1",
+  "yaml",
+  "yml",
+  "toml"
+];
+var SCAN_GLOB = `**/*.{${SCAN_EXTENSIONS.join(",")}}`;
+var SCAN_EXCLUDE_GLOB = "{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**/.venv/**,**/venv/**,**/__pycache__/**,**/.git/**}";
+function toPosixPath(p2) {
+  return p2.replace(/\\/g, "/");
+}
+function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs16.readFileSync(p2, "utf8")) {
+  const out = [];
+  for (const abs of files) {
+    let text;
+    try {
+      text = readFile(abs);
+    } catch {
+      continue;
+    }
+    const rel = toPosixPath(path18.relative(workspaceRoot2, abs));
+    const anns = findAnnotations(text, rel, now);
+    for (const a of anns)
+      out.push(a);
+  }
+  return out;
+}
+function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
+  const candidate = path18.join(workspaceRoot2, "ai_router", "local-overrides.yaml");
+  const parsed = readYaml(candidate);
+  if (parsed == null)
+    return true;
+  const dr = parsed["decision_review"];
+  if (dr == null || typeof dr !== "object")
+    return true;
+  const v = dr["honor_annotations"];
+  if (typeof v === "boolean")
+    return v;
+  return true;
+}
+function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs16.readFileSync(p2, "utf8")) {
+  const queuePath = path18.join(sessionSetDir, QUEUE_FILENAME);
+  if (!fs16.existsSync(queuePath))
+    return [];
+  let text;
+  try {
+    text = readFile(queuePath);
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line)
+      continue;
+    try {
+      const obj = JSON.parse(line);
+      if (typeof obj.reason === "string" && typeof obj.file === "string" && typeof obj.line === "number") {
+        out.push({ file: toPosixPath(obj.file), line: obj.line, reason: obj.reason });
+      }
+    } catch {
+    }
+  }
+  return out;
+}
+
+// src/commands/scanAnnotationsForActiveSet.ts
+function defaultReadYaml(absPath) {
+  if (!fs17.existsSync(absPath))
+    return null;
+  try {
+    const result = readYamlFile(absPath);
+    if (result === null)
+      return null;
+    const json = result.doc.toJSON();
+    if (json == null || typeof json !== "object" || Array.isArray(json))
+      return null;
+    return json;
+  } catch {
+    return null;
+  }
+}
+function registerScanAnnotationsForActiveSet(context) {
+  context.subscriptions.push(
+    vscode16.commands.registerCommand(
+      "dabbler.scanAnnotationsForActiveSet",
+      async () => {
+        const all = readAllSessionSets();
+        const activeDir = findActiveSessionSetDir(() => all);
+        if (!activeDir) {
+          vscode16.window.showInformationMessage(
+            "No active session set to scan against. Start a session set first."
+          );
+          return;
+        }
+        const activeSet = all.find((s) => s.dir === activeDir);
+        const workspaceRoot2 = activeSet?.root ?? path19.dirname(path19.dirname(activeDir));
+        if (!loadHonorAnnotationsToggle(workspaceRoot2, defaultReadYaml)) {
+          vscode16.window.showInformationMessage(
+            "Annotation scanning is disabled for this project (local-overrides.yaml \u2192 decision_review.honor_annotations: false). No queue entries appended."
+          );
+          return;
+        }
+        const uris = await vscode16.workspace.findFiles(
+          new vscode16.RelativePattern(workspaceRoot2, SCAN_GLOB),
+          new vscode16.RelativePattern(workspaceRoot2, SCAN_EXCLUDE_GLOB)
+        );
+        const filePaths = uris.map((u) => u.fsPath);
+        const annotations = scanFilesForAnnotations(
+          filePaths,
+          workspaceRoot2
+        );
+        const existing = loadExistingQueueEntries(activeDir);
+        const fresh = deduplicateAnnotations(annotations, existing);
+        if (fresh.length === 0) {
+          const msg = annotations.length === 0 ? "No `@dabbler:outsource-review` annotations found in workspace." : `All ${annotations.length} annotation(s) already in the queue \u2014 nothing new appended.`;
+          vscode16.window.showInformationMessage(msg);
+          return;
+        }
+        try {
+          for (const ann of fresh) {
+            appendQueueEntry(activeDir, ann);
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          vscode16.window.showErrorMessage(
+            `Failed to append annotation(s) to queue: ${msg}`
+          );
+          return;
+        }
+        const slug = path19.basename(activeDir);
+        vscode16.window.showInformationMessage(
+          `Appended ${fresh.length} new annotation(s) to ${slug}/${QUEUE_FILENAME}.`
+        );
+      }
+    )
+  );
+}
+
 // src/extension.ts
-var SESSION_SETS_REL2 = path16.join("docs", "session-sets");
+var SESSION_SETS_REL2 = path20.join("docs", "session-sets");
 function evaluateSupportContextKeys(allSets) {
-  const cfg = vscode15.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode17.workspace.getConfiguration("dabblerSessionSets");
   const uatPref = cfg.get("uatSupport.enabled", "auto");
   const e2ePref = cfg.get("e2eSupport.enabled", "auto");
   const anyUat = allSets.some((s) => s.config?.requiresUAT);
   const anyE2e = allSets.some((s) => s.config?.requiresE2E);
   const uatActive = uatPref === "always" || uatPref === "auto" && anyUat;
   const e2eActive = e2ePref === "always" || e2ePref === "auto" && anyE2e;
-  vscode15.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
-  vscode15.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
+  vscode17.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
+  vscode17.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
 }
 function activate(context) {
-  if (!vscode15.workspace.workspaceFolders?.length)
+  if (!vscode17.workspace.workspaceFolders?.length)
     return;
   const provider = new SessionSetsProvider(context.extensionUri);
   context.subscriptions.push(
-    vscode15.window.registerTreeDataProvider("dabblerSessionSets", provider)
+    vscode17.window.registerTreeDataProvider("dabblerSessionSets", provider)
   );
   const evaluateContextKeys = () => {
     evaluateSupportContextKeys(provider._cache ?? readAllSessionSets());
@@ -23920,7 +24324,7 @@ function activate(context) {
     );
   }
   context.subscriptions.push(
-    vscode15.workspace.onDidChangeConfiguration((e) => {
+    vscode17.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") || e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
         evaluateContextKeys();
       }
@@ -23939,12 +24343,12 @@ function activate(context) {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      const sessionSetsAbs = path16.join(root, SESSION_SETS_REL2);
-      const pattern = new vscode15.RelativePattern(
+      const sessionSetsAbs = path20.join(root, SESSION_SETS_REL2);
+      const pattern = new vscode17.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json}"
       );
-      const watcher = vscode15.workspace.createFileSystemWatcher(pattern);
+      const watcher = vscode17.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => provider.refresh();
       watcher.onDidCreate(onEvent);
       watcher.onDidDelete(onEvent);
@@ -23965,11 +24369,11 @@ function activate(context) {
       err
     );
   }
-  context.subscriptions.push(vscode15.workspace.onDidChangeWorkspaceFolders(refreshAll));
+  context.subscriptions.push(vscode17.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 3e4);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
   context.subscriptions.push(
-    vscode15.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
+    vscode17.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
   );
   const safeRegister = (name, fn) => {
     try {
@@ -24003,19 +24407,27 @@ function activate(context) {
     "registerConfigEditorCommand",
     () => registerConfigEditorCommand(context)
   );
+  safeRegister(
+    "registerFlagDecisionForReview",
+    () => registerFlagDecisionForReview(context)
+  );
+  safeRegister(
+    "registerScanAnnotationsForActiveSet",
+    () => registerScanAnnotationsForActiveSet(context)
+  );
   const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
   if (!hasSeenOnboarding) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs15.existsSync(path16.join(r2, SESSION_SETS_REL2));
+        return fs18.existsSync(path20.join(r2, SESSION_SETS_REL2));
       } catch {
         return false;
       }
     });
     if (!hasSessionSets) {
       context.workspaceState.update("hasSeenOnboarding", true);
-      vscode15.commands.executeCommand("dabbler.getStarted");
+      vscode17.commands.executeCommand("dabbler.getStarted");
     }
   }
 }

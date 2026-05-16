@@ -91,6 +91,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabblerSessionSets.openSessionState",
+        "title": "Open Session State",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabblerSessionSets.openFolder",
         "title": "Reveal Folder",
         "category": "Dabbler"
@@ -246,6 +251,11 @@
           "command": "dabblerSessionSets.revealPlaywrightTests",
           "when": "view == dabblerSessionSets && viewItem =~ /:e2e($|:)/ && dabblerSessionSets.e2eSupportActive",
           "group": "1_open@6"
+        },
+        {
+          "command": "dabblerSessionSets.openSessionState",
+          "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:/",
+          "group": "1_open@7"
         },
         {
           "command": "dabblerSessionSets.openFolder",

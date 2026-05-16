@@ -78,6 +78,9 @@ export function registerOpenFileCommands(context: vscode.ExtensionContext): void
     vscode.commands.registerCommand("dabblerSessionSets.openUatChecklist", (item: SetItem) =>
       openIfExists(item?.set?.uatChecklistPath, "UAT checklist")
     ),
+    vscode.commands.registerCommand("dabblerSessionSets.openSessionState", (item: SetItem) =>
+      openIfExists(item?.set?.statePath, "Session state")
+    ),
     vscode.commands.registerCommand("dabblerSessionSets.openFolder", (item: SetItem) => {
       if (!item?.set) return;
       vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(item.set.dir));

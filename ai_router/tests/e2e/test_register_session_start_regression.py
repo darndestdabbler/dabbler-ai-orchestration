@@ -136,3 +136,33 @@ def test_register_session_start_preserves_multi_session_history(tmp_path: Path) 
         state = json.load(f)
 
     assert state.get("completedSessions") == [1, 2, 3]
+
+
+def test_fresh_set_has_empty_completed_sessions(tmp_path: Path) -> None:
+    """Fresh-set snapshots must always emit completedSessions as an empty array.
+
+    Lightweight-tier orchestrators maintain completedSessions[] by hand. If the
+    writer omits the key on fresh sets, Lightweight operators cannot append to
+    a pre-existing array and must invent the schema from scratch. This test
+    guards against the v0.1.1-era convention of "absent means none closed yet".
+    Fresh sets are "in progress" and need an explicit empty array to maintain
+    schema consistency.
+    """
+    set_dir = tmp_path / "docs" / "session-sets" / "fresh-set-test"
+    set_dir.mkdir(parents=True)
+
+    register_session_start(
+        session_set=str(set_dir),
+        session_number=1,
+        total_sessions=3,
+        orchestrator_engine="claude-code",
+        orchestrator_model="claude-opus-4-7",
+        orchestrator_effort="normal",
+        orchestrator_provider="anthropic",
+    )
+
+    with open(set_dir / "session-state.json", "r", encoding="utf-8") as f:
+        state = json.load(f)
+
+    assert "completedSessions" in state, "completedSessions key must be present"
+    assert state["completedSessions"] == [], "fresh set must have empty completedSessions array"

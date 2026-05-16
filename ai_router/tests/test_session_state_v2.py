@@ -107,6 +107,7 @@ class TestRegisterSessionStartV2:
         assert data["lifecycleState"] == "work_in_progress"
         assert data["status"] == "in-progress"  # backward-compat field
         assert data["currentSession"] == 1
+        assert data["completedSessions"] == []  # fresh set always has empty array
 
     def test_register_session_start_emits_work_started(self, session_set_dir):
         """Set 014 Session 1 (a): a fresh ``register_session_start`` call

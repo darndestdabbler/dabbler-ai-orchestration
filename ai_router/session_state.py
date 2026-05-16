@@ -234,12 +234,7 @@ def register_session_start(
             "effort": orchestrator_effort,
         },
     }
-    if prior_completed:
-        # Only emit the key when there's something to record. Keeps the
-        # not-started → session-1-in-flight transition's snapshot
-        # clean (no empty array), matching the schema doc's "absent
-        # means none closed yet" convention.
-        state["completedSessions"] = prior_completed
+    state["completedSessions"] = prior_completed
     path = _state_path(session_set)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)

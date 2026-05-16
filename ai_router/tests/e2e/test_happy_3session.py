@@ -136,18 +136,13 @@ def test_happy_3session_full_cycle(tmp_path: Path) -> None:
         state = read_state(handle)
         _assert_in_flight_snapshot(state, n, total)
 
-        # completedSessions[] must reflect the prior closes. The
-        # writer omits the key entirely when there are zero priors
-        # (Set 022 schema: "absent means none closed yet"), so test
-        # both shapes.
+        # completedSessions[] must reflect the prior closes. Set 028
+        # normalized schema to always emit the key (empty on fresh sets).
         expected_prior = list(range(1, n))
-        if expected_prior:
-            assert state.get("completedSessions") == expected_prior, (
-                f"start_session for N={n} wiped completedSessions[]: "
-                f"saw {state.get('completedSessions')!r}, expected {expected_prior!r}"
-            )
-        else:
-            assert "completedSessions" not in state
+        assert state.get("completedSessions") == expected_prior, (
+            f"start_session for N={n} wiped completedSessions[]: "
+            f"saw {state.get('completedSessions')!r}, expected {expected_prior!r}"
+        )
 
         # Events ledger after start: every session 1..n has exactly one
         # work_started, every session 1..n-1 has exactly one

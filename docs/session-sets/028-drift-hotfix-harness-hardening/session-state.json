@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "sessionSetName": "028-drift-hotfix-harness-hardening",
+  "currentSession": 1,
+  "totalSessions": 3,
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-16T17:50:00.000000-04:00",
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5-20251001",
+    "effort": "normal"
+  },
+  "completedSessions": []
+}

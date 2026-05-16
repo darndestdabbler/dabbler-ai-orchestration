@@ -41,18 +41,67 @@ const vscodeStub = {
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
   MarkdownString: class MarkdownString { constructor(s) { this.value = s; } },
   ThemeIcon: class ThemeIcon { constructor(id) { this.id = id; } },
-  workspace: {
-    workspaceFolders: undefined,
-    getConfiguration: () => ({ get: (_k, dflt) => dflt }),
-    onDidChangeConfiguration: () => ({ dispose: () => {} }),
-    onDidChangeWorkspaceFolders: () => ({ dispose: () => {} }),
-    createFileSystemWatcher: () => ({
-      onDidCreate: () => ({ dispose: () => {} }),
-      onDidDelete: () => ({ dispose: () => {} }),
-      onDidChange: () => ({ dispose: () => {} }),
-      dispose: () => {},
-    }),
-  },
+  workspace: (() => {
+    // Set 027 Session 3: e2e tree-provider tests mutate workspace
+    // folders to point at fixture session sets, then build a
+    // SessionSetsProvider and assert on `getChildren()`. Under
+    // test-electron VS Code provides the real API; under the stub we
+    // synthesize a minimal but behavior-correct version of
+    // `updateWorkspaceFolders` so the same tests can run via
+    // `mocha --require ts-node/register --require vscode-stub.js`
+    // without launching Electron. The synchronous mutation +
+    // listener-fire pattern matches what test-electron observes in
+    // practice (the change is visible immediately after the call
+    // returns).
+    const folderListeners = [];
+    const ws = {
+      workspaceFolders: undefined,
+      getConfiguration: () => ({ get: (_k, dflt) => dflt }),
+      onDidChangeConfiguration: () => ({ dispose: () => {} }),
+      onDidChangeWorkspaceFolders: (cb) => {
+        folderListeners.push(cb);
+        return {
+          dispose: () => {
+            const i = folderListeners.indexOf(cb);
+            if (i >= 0) folderListeners.splice(i, 1);
+          },
+        };
+      },
+      updateWorkspaceFolders: (start, deleteCount, ...toAdd) => {
+        // Verifier (Set 027 Session 3 Round C): emit normalized
+        // WorkspaceFolder objects in `event.added` so consumers see
+        // the same shape under the stub as under real VS Code (where
+        // `event.added[i].name` and `.index` are populated). Fire
+        // listeners asynchronously (queueMicrotask) to mirror real
+        // VS Code's deferred event delivery — sync firing here hides
+        // ordering bugs that would only reproduce under
+        // @vscode/test-electron.
+        const current = ws.workspaceFolders ? [...ws.workspaceFolders] : [];
+        const normalized = toAdd.map((f, i) => ({
+          uri: f.uri,
+          name: f.name || (f.uri && f.uri.fsPath ? f.uri.fsPath : `folder-${i}`),
+          index: start + i,
+        }));
+        const removed = current.splice(start, deleteCount, ...normalized);
+        ws.workspaceFolders = current.length > 0 ? current : undefined;
+        const event = { added: normalized, removed };
+        const listenersSnapshot = [...folderListeners];
+        queueMicrotask(() => {
+          for (const l of listenersSnapshot) {
+            try { l(event); } catch { /* swallow */ }
+          }
+        });
+        return true;
+      },
+      createFileSystemWatcher: () => ({
+        onDidCreate: () => ({ dispose: () => {} }),
+        onDidDelete: () => ({ dispose: () => {} }),
+        onDidChange: () => ({ dispose: () => {} }),
+        dispose: () => {},
+      }),
+    };
+    return ws;
+  })(),
   window: {
     showInformationMessage: async () => undefined,
     showErrorMessage: async () => undefined,

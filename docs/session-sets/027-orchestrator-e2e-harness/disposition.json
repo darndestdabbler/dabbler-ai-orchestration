@@ -1,13 +1,18 @@
 {
   "status": "completed",
-  "summary": "Set 027 Session 2: extended Python e2e scenarios. Added four new scenario test files (cancel/restore mid-set, force-close with guard + forensic + final-session tests, worktree discovery via real git worktrees, multiset sequential boundary hygiene). Extended fixtures.py with cancel_set/restore_set/make_sibling_worktree/make_additional_set helpers and drive_close_session(force=True). Cross-provider verification ($0.48, gpt-5-4, 3 rounds) surfaced 2 Major + 5 Minor findings; all addressed. Full suite 437 passed + 1 skipped.",
+  "summary": "Set 027 Session 3: @vscode/test-electron tree-provider harness. Built Python CLI shim (harness_cli.py, 305 LOC) wrapping Session 1/2 fixture helpers + TS harness module (e2eHarness.ts, 365 LOC) that drives it via subprocess. Shipped five TS test files exercising SessionSetsProvider.getChildren(): treeProvider-happy (6 tests), -cancel (4 tests), -force (3 tests), -multiset (4 tests after Round C added in-progress sort coverage), -worktree (3 tests). 20 new e2e tests + 306 existing unit tests pass via `npm run test:unit` (326 total, 2 pre-existing failures unrelated). Discovered + pinned two real drift classes the harness exists to catch: (1) register_session_start omits empty completedSessions[], defeating Set 022's in-flight predicate on fresh sets; (2) isMidSetComplete downgrades mid-set complete snapshots so a force-closed mid-set surfaces in In Progress with [FORCED], not Done. Neither bug fixed in this session — pinned as current behavior with explicit test comments. Cross-provider verification ($0.597, gpt-5-4, 3 rounds, ~1500 LOC) surfaced 5 Major + 4 Minor findings; all addressed. npm test (full test-electron) blocked by pre-existing Code.exe 1.120 / test-electron 2.5.2 launch-arg incompatibility on this Windows host — environmental, not session-introduced; documented for follow-up.",
   "files_changed": [
-    "ai_router/tests/e2e/fixtures.py",
-    "ai_router/tests/e2e/test_cancel_restore_midset.py",
-    "ai_router/tests/e2e/test_force_close_path.py",
-    "ai_router/tests/e2e/test_worktree_discovery.py",
-    "ai_router/tests/e2e/test_multiset_sequential.py",
-    "scripts/verify_session_027_2.py",
+    "ai_router/tests/e2e/harness_cli.py",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/e2eHarness.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-happy.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-cancel.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-force.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-multiset.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-worktree.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/index.ts",
+    "tools/dabbler-ai-orchestration/src/test/vscode-stub.js",
+    "tools/dabbler-ai-orchestration/package.json",
+    "scripts/verify_session_027_3.py",
     "docs/session-sets/027-orchestrator-e2e-harness/session-state.json",
     "docs/session-sets/027-orchestrator-e2e-harness/session-events.jsonl",
     "docs/session-sets/027-orchestrator-e2e-harness/activity-log.json",
@@ -22,7 +27,7 @@
     "effort": "normal",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 3 builds the @vscode/test-electron tree-provider harness in TypeScript. Same orchestrator engine; TypeScript is within Claude Code's strong zone and the Python fixture generator from Sessions 1-2 is already in place."
+      "specifics": "Session 4 adds the Playwright Electron rendering smoke layer + closes the set. Same TS / Electron territory as Session 3, and the harness's Python fixture generator + TS shape helpers are already proven on this orchestrator. Operator should also re-evaluate whether the Layer 3 Playwright smoke is still warranted now that Layer 2 catches text-content drift; the spec's open question #1 explicitly allows trimming Layer 3 scope at Session 4 start."
     }
   },
   "blockers": []

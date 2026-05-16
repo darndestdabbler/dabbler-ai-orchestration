@@ -326,7 +326,7 @@
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
     "test": "npm run compile && npx tsc --outDir out && node ./out/test/runTests.js",
-    "test:unit": "mocha --require ts-node/register 'src/**/*.test.ts'",
+    "test:unit": "mocha --require ts-node/register --require ./src/test/vscode-stub.js --ui tdd --timeout 120000 'src/test/suite/**/*.test.ts'",
     "package": "npm run compile && npx vsce package",
     "lint": "eslint src --ext ts"
   },

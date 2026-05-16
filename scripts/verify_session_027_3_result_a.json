@@ -1,0 +1,16 @@
+{
+  "content": "- **Major**  \n  **Issue \u2192** `runHarness()` inherits the full parent environment, so ambient `GIT_*`, `PYTHONPATH`, and similar variables can change fixture creation and git subprocess behavior. That breaks the \u201ctmpdir-scoped, deterministic sub-round\u201d guarantee when tests are run from a polluted shell/CI environment.  \n  **Location \u2192** `tools/dabbler-ai-orchestration/src/test/suite/e2e/e2eHarness.ts:70-75`  \n  **Fix \u2192** Pass an explicit `env` to `spawnSync` that preserves only required variables (`PATH`, `SYSTEMROOT`, `ComSpec`, `HOME`/`USERPROFILE`, `TMP`/`TEMP`) and strips git/python-affecting ones such as `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_COMMON_DIR`, `GIT_OBJECT_DIRECTORY`, and `PYTHONPATH`.\n\n- **Major**  \n  **Issue \u2192** `replaceWorkspaceFolders()` resolves successfully even when `updateWorkspaceFolders()` returns `false`. That lets later assertions run against stale workspace state or the `REPO_ROOT` fallback instead of failing at the workspace-swap boundary. It also has no timeout if VS Code accepts the change but never delivers the event, which can leave a listener hanging across test boundaries.  \n  **Location \u2192** `tools/dabbler-ai-orchestration/src/test/suite/e2e/e2eHarness.ts:275-292`  \n  **Fix \u2192** Reject when `updateWorkspaceFolders()` returns `false`. Also add a timeout/reconciliation check: after the event, verify `vscode.workspace.workspaceFolders?.[0]?.uri.fsPath === folderPath`; if that state is not observed within a bounded time, dispose the listener and reject.\n\n- **Minor**  \n  **Issue \u2192** Recursive test discovery is filesystem-order dependent. In a single VS Code instance where suites mutate global workspace state, nondeterministic file order makes failures harder to reproduce across platforms/filesystems.  \n  **Location \u2192** `tools/dabbler-ai-orchestration/src/test/suite/index.ts:11-19, 25-26`  \n  **Fix \u2192** Sort directory entries or sort the final `findTestFiles()` result before calling `mocha.addFile()`.",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 7398,
+  "output_tokens": 14121,
+  "cost_usd": 0.23031000000000001,
+  "total_cost_usd": 0.23031000000000001,
+  "complexity_score": 63,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 168.972021818161,
+  "truncated": false,
+  "verification": null
+}

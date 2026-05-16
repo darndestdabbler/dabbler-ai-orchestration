@@ -1,0 +1,16 @@
+{
+  "content": "- **Major**  \n  **Issue \u2192** The `refresh()` test does not prove that `refresh()` is required. It primes the cache, mutates state, then immediately calls `provider.refresh()` and asserts the updated view. This still passes if the provider stops caching, rereads on every `getChildren()` call, or is implicitly refreshed elsewhere. That misses the exact regression this test claims to pin.  \n  **Location \u2192** `tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-happy.test.ts:175-220`  \n  **Fix \u2192** After `startSession(h, 2)` and before `provider.refresh()`, read `childrenOfGroup(provider, \"in-progress\")` again and assert it is still the stale pre-refresh shape (`1/3`, no `\"in flight\"`). Then call `provider.refresh()` and assert the post-refresh shape (`1/3 \u00b7 session 2 in flight`).\n\n- **Minor**  \n  **Issue \u2192** Several display-shape assertions are too loose for tests whose purpose is to catch silent UI drift. Using `startsWith()` / `includes()` allows extra, conflicting text to slip through, e.g. unexpected badges, duplicate annotations, or wrong suffixes.  \n  **Location \u2192**  \n  - `tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-happy.test.ts:57-61, 93-100, 125-128, 145-149, 163-165, 201-220`  \n  - `tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-force.test.ts:82-95, 123-129, 158-164`  \n  **Fix \u2192** For canonical scenarios, assert exact `description`/tooltip text where stable, or pair positive checks with explicit negative checks for conflicting tokens (`Done`, `[FORCED]`, extra `in flight`, wrong session number, extra suffix text).\n\n- **Minor**  \n  **Issue \u2192** The file header says force-close cases \u201cbucket to Done,\u201d but this same file\u2019s primary behavior under test is that a mid-set force-close is downgraded to **In Progress**. The comment is misleading and documents the wrong reader behavior.  \n  **Location \u2192** `tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-force.test.ts:1-7`  \n  **Fix \u2192** Rewrite the header to say bucket placement is scenario-dependent: final complete snapshots can be `Done`, but mid-set force-closed snapshots are expected to render as `In Progress` with `[FORCED]`.",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 7249,
+  "output_tokens": 9974,
+  "cost_usd": 0.1677325,
+  "total_cost_usd": 0.1677325,
+  "complexity_score": 65,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 119.07644486427307,
+  "truncated": false,
+  "verification": null
+}

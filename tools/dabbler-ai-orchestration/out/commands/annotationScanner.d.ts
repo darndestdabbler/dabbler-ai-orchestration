@@ -17,6 +17,22 @@ export declare const SCAN_GLOB: string;
 export declare const SCAN_EXCLUDE_GLOB = "{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**/.venv/**,**/venv/**,**/__pycache__/**,**/.git/**}";
 export type FileReader = (absPath: string) => string;
 /**
+ * Normalize a path to POSIX forward slashes regardless of host OS.
+ *
+ * `path.sep`-based splits only rewrite the current OS's separator, which
+ * means Windows-style backslashes pass through unchanged on Linux/macOS.
+ * That breaks dedup when a queue entry written on Windows is read on a
+ * POSIX host (or vice versa). Always rewrite `\` to `/` — it's safe
+ * because `\` is not a valid path character on POSIX.
+ *
+ * Defense-in-depth: the annotationParser already POSIX-normalizes the
+ * file it puts in each Annotation, but the scanner's dedup seed comes
+ * from `loadExistingQueueEntries` which reads externally-written queue
+ * lines (could be hand-edited, could be written by older code). Always
+ * normalize so the dedup key is canonical regardless of provenance.
+ */
+export declare function toPosixPath(p: string): string;
+/**
  * Walk `files` (absolute paths), apply `findAnnotations` to each, and
  * return the combined list. Returned annotations carry `file` as a
  * workspace-relative POSIX path; `workspaceRoot` is the prefix that

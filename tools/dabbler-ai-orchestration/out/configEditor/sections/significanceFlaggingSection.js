@@ -38,8 +38,9 @@ function render(state) {
     </li>
     <li>
       <strong>Add an annotation in source code</strong>
-      <pre class="code-sample"># @dabbler:outsource-review("reason text here")</pre>
-      <p class="section-help">The orchestrator scans open files at session start; any new annotations are queued automatically.</p>
+      <pre class="code-sample"># @dabbler:outsource-review("reason text here")
+// @dabbler:outsource-review("reason text here")</pre>
+      <p class="section-help">Run <code>Dabbler: Scan Workspace for @dabbler:outsource-review Annotations</code> from the command palette to walk workspace source files for these markers and append new findings to the queue (deduplicated against existing entries by file+line+reason). Both <code>#</code> and <code>//</code> comment styles are recognized.</p>
     </li>
   </ol>
 </div>

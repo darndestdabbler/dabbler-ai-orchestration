@@ -72,6 +72,20 @@ suite("scanAnnotationsForActiveSet — scanFilesForAnnotations", () => {
         assert.strictEqual(result.length, 1);
         assert.strictEqual(result[0].file, "src/deep/f.py");
     });
+    test("emitted Annotation.file is always POSIX, regardless of host or input separator style", () => {
+        // Host-independent: this test uses a string-literal Windows-style
+        // input that path.relative would treat differently per host, but
+        // toPosixPath inside scanFilesForAnnotations forces the rewrite.
+        // (We deliberately bypass `path.join` here so the input is the
+        // literal Windows shape — what a queue entry hand-edited or
+        // written on Windows might carry.)
+        const root = "C:\\ws";
+        const file = "C:\\ws\\src\\deep\\f.py";
+        const reader = (_p) => '# @dabbler:outsource-review("x")\n';
+        const result = (0, annotationScanner_1.scanFilesForAnnotations)([file], root, now, reader);
+        assert.strictEqual(result.length, 1);
+        assert.ok(!result[0].file.includes("\\"), `expected POSIX path, got ${JSON.stringify(result[0].file)}`);
+    });
     test("file that throws on read is skipped silently", () => {
         const root = "/ws";
         const reader = (p) => {
@@ -182,6 +196,30 @@ suite("scanAnnotationsForActiveSet — loadExistingQueueEntries", () => {
             fs.rmSync(dir, { recursive: true });
         }
     });
+    test("normalizes backslash file paths to POSIX in dedup keys (cross-host queue replay)", () => {
+        // A queue entry written on Windows could carry `src\foo.py`. Reading
+        // that on a POSIX host (or scanning the same file via path.relative
+        // on Linux that produces `src/foo.py`) must collide for dedup to
+        // work. Verifier-flagged: without normalization here, the same
+        // annotation gets double-appended on a re-scan after a host change.
+        const dir = makeTmpDir();
+        try {
+            const queuePath = path.join(dir, decisionReviewQueue_1.QUEUE_FILENAME);
+            const text = [
+                JSON.stringify({
+                    ts: "t1", reason: "win-style", source: "annotation",
+                    file: "src\\foo.py", line: 5,
+                }),
+            ].join("\n");
+            fs.writeFileSync(queuePath, text, "utf8");
+            const result = (0, annotationScanner_1.loadExistingQueueEntries)(dir);
+            assert.strictEqual(result.length, 1);
+            assert.strictEqual(result[0].file, "src/foo.py", "Windows-style file path must normalize to POSIX in the dedup seed");
+        }
+        finally {
+            fs.rmSync(dir, { recursive: true });
+        }
+    });
     test("uses the injected reader (test seam)", () => {
         let calls = 0;
         const reader = (_p) => {
@@ -203,6 +241,20 @@ suite("scanAnnotationsForActiveSet — loadExistingQueueEntries", () => {
         finally {
             fs.rmSync(dir, { recursive: true });
         }
+    });
+});
+suite("scanAnnotationsForActiveSet — toPosixPath", () => {
+    test("rewrites all backslashes to forward slashes", () => {
+        assert.strictEqual((0, annotationScanner_1.toPosixPath)("src\\foo\\bar.py"), "src/foo/bar.py");
+    });
+    test("leaves already-POSIX paths unchanged", () => {
+        assert.strictEqual((0, annotationScanner_1.toPosixPath)("src/foo/bar.py"), "src/foo/bar.py");
+    });
+    test("handles mixed separators", () => {
+        assert.strictEqual((0, annotationScanner_1.toPosixPath)("src\\foo/bar\\baz.py"), "src/foo/bar/baz.py");
+    });
+    test("empty string round-trips", () => {
+        assert.strictEqual((0, annotationScanner_1.toPosixPath)(""), "");
     });
 });
 suite("scanAnnotationsForActiveSet — scan globs", () => {

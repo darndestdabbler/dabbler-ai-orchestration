@@ -123,13 +123,48 @@ suite("annotationParser — findAnnotations: reason content", () => {
         assert.strictEqual(anns.length, 1);
         assert.strictEqual(anns[0].reason, "foo(bar)baz");
     });
+    test("raw newline inside reason does NOT match (annotations are line-comment syntax)", () => {
+        // Unterminated `"` on one line must not stitch to a later line's `")`.
+        // Verifier-flagged false-positive shape: a `") on line N+M would otherwise
+        // close an unintentional `"foo` opened on line N.
+        const text = '# @dabbler:outsource-review("foo\nbar")\n';
+        const anns = (0, annotationParser_1.findAnnotations)(text, "x.py", now);
+        assert.strictEqual(anns.length, 0);
+    });
+    test("CRLF inside reason also does NOT match (CR rejected alongside LF)", () => {
+        const text = '# @dabbler:outsource-review("foo\r\nbar")\n';
+        const anns = (0, annotationParser_1.findAnnotations)(text, "x.py", now);
+        assert.strictEqual(anns.length, 0);
+    });
+    test("unterminated quote on one line does not stitch to a later line's closing quote", () => {
+        const text = [
+            '# @dabbler:outsource-review("never-closed',
+            'something else here',
+            'closer here")',
+            '',
+        ].join("\n");
+        const anns = (0, annotationParser_1.findAnnotations)(text, "x.py", now);
+        assert.strictEqual(anns.length, 0);
+    });
 });
 suite("annotationParser — findAnnotations: path normalization", () => {
-    test("file path uses POSIX separators regardless of input", () => {
+    test("Windows-style backslash separators normalize to POSIX forward slashes", () => {
         const text = '# @dabbler:outsource-review("x")\n';
-        // Windows-style backslash separators in input -> forward slashes out
+        // Contract: this MUST hold regardless of host OS (verifier-flagged
+        // host-dependent normalization). path.sep is `\` on Windows and `/`
+        // on POSIX; we want both inputs to round-trip to forward slashes.
         const anns = (0, annotationParser_1.findAnnotations)(text, "src\\foo\\bar.py", now);
         assert.strictEqual(anns[0].file, "src/foo/bar.py");
+    });
+    test("already-POSIX paths pass through unchanged", () => {
+        const text = '# @dabbler:outsource-review("x")\n';
+        const anns = (0, annotationParser_1.findAnnotations)(text, "src/foo/bar.py", now);
+        assert.strictEqual(anns[0].file, "src/foo/bar.py");
+    });
+    test("mixed-separator path normalizes consistently", () => {
+        const text = '# @dabbler:outsource-review("x")\n';
+        const anns = (0, annotationParser_1.findAnnotations)(text, "src/foo\\bar/baz.py", now);
+        assert.strictEqual(anns[0].file, "src/foo/bar/baz.py");
     });
 });
 suite("annotationParser — deduplicateAnnotations", () => {

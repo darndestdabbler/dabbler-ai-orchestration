@@ -1,0 +1,16 @@
+{
+  "content": "- **Major**\n  - **Issue \u2192** `ANNOTATION_RE` can match across line breaks because `[^\"\\\\]` includes `\\r` and `\\n`. These annotations are line-comment syntax, so a newline between the opening `\"` and the closing `\"` should terminate the match, not let the parser stitch together text from later lines. As written, an unterminated annotation prefix on one line can false-positive if a later line happens to contain `\")`.\n  - **Location \u2192** `tools/dabbler-ai-orchestration/src/configEditor/annotationParser.ts:47-48`\n  - **Fix \u2192** Forbid raw newlines inside the captured reason, e.g. `((?:\\\\.|[^\"\\\\\\r\\n])*)`, and add a test that `# @dabbler:outsource-review(\"foo\\nbar\")` produces no match.\n\n- **Major**\n  - **Issue \u2192** Path normalization is host-dependent. `filePath.split(path.sep).join(\"/\")` only rewrites the current OS separator, so on Linux/macOS a Windows-style input like `src\\\\foo\\\\bar.py` stays unchanged. That violates the stated POSIX-path contract and breaks the existing normalization test off Windows.\n  - **Location \u2192** `tools/dabbler-ai-orchestration/src/configEditor/annotationParser.ts:65`; contract exercised by `tools/dabbler-ai-orchestration/src/test/suite/annotationParser.test.ts:112-117`\n  - **Fix \u2192** Normalize both separator styles regardless of host OS, e.g. `const posixPath = filePath.replace(/\\\\/g, \"/\");` (or equivalent).\n\n- **Major**\n  - **Issue \u2192** The config-editor copy describes the annotation surface incorrectly. It says \u201cThe orchestrator scans open files at session start; any new annotations are queued automatically,\u201d but the implementation described elsewhere in this bundle is a workspace-walk VS Code command (`dabbler.scanAnnotationsForActiveSet`). It also says \u201copen files,\u201d while the documented behavior is \u201cworkspace files.\u201d This will mislead operators about how annotations actually get into `decision-review-queue.jsonl`.\n  - **Location \u2192** `tools/dabbler-ai-orchestration/src/configEditor/sections/significanceFlaggingSection.ts:7-16, 40-42`\n  - **Fix \u2192** Update the rendered text to match the shipped behavior: describe the workspace scan command explicitly, and only mention automatic/session-start scanning if that behavior actually exists.",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 9067,
+  "output_tokens": 15430,
+  "cost_usd": 0.2541175,
+  "total_cost_usd": 0.2541175,
+  "complexity_score": 63,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 220.96273922920227,
+  "truncated": false,
+  "verification": null
+}

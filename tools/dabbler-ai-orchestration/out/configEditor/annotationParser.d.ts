@@ -1,3 +1,22 @@
+/**
+ * Annotation parser for `@dabbler:outsource-review("reason")` markers.
+ *
+ * Source-code annotations are the second of two surfaces operators use to
+ * flag a decision for cross-provider review (the first being the
+ * `dabbler.flagDecisionForReview` command). The scanner registered in
+ * `commands/scanAnnotationsForActiveSet.ts` walks workspace files, calls
+ * `findAnnotations` on each file's text, and appends results to the
+ * active session set's `decision-review-queue.jsonl`.
+ *
+ * Comment styles recognized:
+ *   - Python / shell / YAML:    # @dabbler:outsource-review("...")
+ *   - JS/TS/Java/C#/C/C++/Go:   // @dabbler:outsource-review("...")
+ *
+ * Each comment style is honored regardless of file extension — the parser
+ * does not assume the caller has filtered files by language. This lets
+ * mixed-language repos (Python tests with `// ...` in a comment, or shell
+ * scripts with hashbang plus `//`) pick up annotations either way.
+ */
 export interface Annotation {
     /** ISO timestamp when the annotation was discovered. */
     ts: string;

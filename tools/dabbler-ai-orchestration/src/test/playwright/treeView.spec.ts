@@ -121,7 +121,7 @@ test("renders three not-started sets under Not Started", async () => {
     expect(joined).toContain("scenario-fresh-c");
     // None of the negative-control bucket headers should populate
     expect(joined).toMatch(/In Progress\s+\(0\)/);
-    expect(joined).toMatch(/Done\s+\(0\)/);
+    expect(joined).toMatch(/Complete\s+\(0\)/);
     expect(joined).not.toMatch(/Cancelled\s+\(\d+\)/);
   } finally {
     await teardown(per);
@@ -167,7 +167,7 @@ test("renders an in-flight set with the 'in flight' annotation", async () => {
 // ---------------------------------------------------------------------
 // Scenario 3: all done.
 // ---------------------------------------------------------------------
-test("renders a fully closed set under Done with N/N progress", async () => {
+test("renders a fully closed set under Complete with N/N progress", async () => {
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-done");
@@ -179,9 +179,11 @@ test("renders a fully closed set under Done with N/N progress", async () => {
     await triggerRefresh(per.launch.page);
 
     const joined = (await treeitemTexts(tree)).join("\n");
-    expect(joined).toMatch(/Done\s+\(1\)/);
+    // Set 030 Session 3: bucket label is now "Complete" (was "Done");
+    // row annotation is "N/N Complete".
+    expect(joined).toMatch(/Complete\s+\(1\)/);
     expect(joined).toContain("scenario-done");
-    expect(joined).toMatch(/3\/3/);
+    expect(joined).toMatch(/3\/3 Complete/);
     expect(joined).toMatch(/In Progress\s+\(0\)/);
     expect(joined).not.toContain("in flight");
     expect(joined).not.toContain("[FORCED]");
@@ -217,7 +219,7 @@ test("renders a cancelled set under the Cancelled bucket", async () => {
     expect(joined).toContain("scenario-cancel");
     // Negative controls — must not appear in active buckets
     expect(joined).toMatch(/In Progress\s+\(0\)/);
-    expect(joined).toMatch(/Done\s+\(0\)/);
+    expect(joined).toMatch(/Complete\s+\(0\)/);
   } finally {
     await teardown(per);
   }
@@ -249,14 +251,14 @@ test("renders [FORCED] badge on a force-closed set", async () => {
     const joined = (await treeitemTexts(tree)).join("\n");
     expect(joined).toContain("[FORCED]");
     expect(joined).toContain("scenario-forced");
-    // Per Layer 2 discovery (Set 027 Session 3): isMidSetComplete
-    // downgrades currentSession < totalSessions snapshots to
-    // in-progress regardless of status, so a force-closed mid-set
-    // lives in In Progress with the [FORCED] badge — NOT in Done.
-    // This is the truthful-display invariant from
-    // SessionSetsProvider.ts:36.
-    expect(joined).toMatch(/In Progress\s+\(1\)/);
-    expect(joined).toMatch(/Done\s+\(0\)/);
+    // Set 030 Session 3: force=True now promotes every session in
+    // sessions[] to "complete" (incident-recovery semantic from
+    // Session 2's writer change), so the snapshot satisfies all v3
+    // invariants and buckets as Complete. The [FORCED] badge —
+    // driven by liveSession.forceClosed — remains the operator-facing
+    // cue that the gate was bypassed.
+    expect(joined).toMatch(/Complete\s+\(1\)/);
+    expect(joined).toMatch(/In Progress\s+\(0\)/);
   } finally {
     await teardown(per);
   }

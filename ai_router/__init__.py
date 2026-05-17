@@ -841,6 +841,7 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
     """
     from .session_state import read_status, compute_effective_completed_sessions
     from .session_lifecycle import is_cancelled
+    from .progress import SessionStateInvariantError, read_progress
 
     if not os.path.isdir(base_dir):
         print(f"(no session-sets directory at {base_dir})")
@@ -883,7 +884,9 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
         last_touched: Optional[str] = None
 
         # Activity log still consulted for two non-count signals:
-        # totalSessions (lives at the top level) and the per-step
+        # totalSessions (lives at the top level of activity-log.json,
+        # which is a different artifact / different schema from
+        # session-state.json — outside D13's scope) and the per-step
         # dateTime for the ``last touched`` display, which is more
         # granular than the state-file's session-boundary timestamps
         # while a session is mid-flight.
@@ -891,7 +894,7 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
             try:
                 with open(activity_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                total_sessions = data.get("totalSessions")
+                total_sessions = data.get("totalSessions")  # noqa: D13 - activity-log.json carrier field, not session-state
                 entries = data.get("entries", [])
                 if entries:
                     last_touched = max(
@@ -901,12 +904,21 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
             except Exception:
                 pass
 
+        # Set 030 Session 3: session-state.json's totalSessions is now
+        # derived from the v3 ``sessions[]`` ledger via ``read_progress``
+        # rather than read directly. ``completedAt`` / ``startedAt`` are
+        # top-level timestamp fields outside the legacy progress triple,
+        # so they continue to be read directly.
         if os.path.isfile(state_path):
             try:
                 with open(state_path, "r", encoding="utf-8") as f:
                     state_data = json.load(f)
                 if total_sessions is None:
-                    total_sessions = state_data.get("totalSessions")
+                    try:
+                        view = read_progress(state_data, spec_path)
+                        total_sessions = view.total_sessions
+                    except (SessionStateInvariantError, TypeError, ValueError):
+                        total_sessions = None
                 state_touched = state_data.get("completedAt") or state_data.get("startedAt")
                 if state_touched and (not last_touched or state_touched > last_touched):
                     last_touched = state_touched

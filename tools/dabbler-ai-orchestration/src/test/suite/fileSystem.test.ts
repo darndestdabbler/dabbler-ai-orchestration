@@ -140,7 +140,11 @@ suite("fileSystem — readSessionSets", () => {
     fs.rmSync(dir, { recursive: true });
   });
 
-  test("reads done from session-state.json status='complete'", () => {
+  test("reads complete from session-state.json status='complete' (with per-session evidence)", () => {
+    // Set 030 Session 3: v3 invariants require positive per-session
+    // evidence (sessions[] or completedSessions[]) for top-level
+    // status=complete to validate. A bare {status: "complete"} now
+    // downgrades to in-progress under the default-to-not-started rule.
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "feature-b");
     fs.mkdirSync(setDir, { recursive: true });
@@ -148,24 +152,36 @@ suite("fileSystem — readSessionSets", () => {
     fs.writeFileSync(path.join(setDir, "change-log.md"), "# Changes\n");
     fs.writeFileSync(
       path.join(setDir, "session-state.json"),
-      JSON.stringify({ schemaVersion: 2, status: "complete" })
+      JSON.stringify({
+        schemaVersion: 2,
+        status: "complete",
+        currentSession: 3,
+        totalSessions: 3,
+        completedSessions: [1, 2, 3],
+      })
     );
     const sets = readSessionSets(dir);
-    assert.strictEqual(sets[0].state, "done");
+    assert.strictEqual(sets[0].state, "complete");
     fs.rmSync(dir, { recursive: true });
   });
 
-  test("canonicalizes pre-Set-7 'completed' alias to done", () => {
+  test("canonicalizes pre-Set-7 'completed' alias to complete", () => {
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "feature-c");
     fs.mkdirSync(setDir, { recursive: true });
     fs.writeFileSync(path.join(setDir, "spec.md"), "# feature-c\n");
     fs.writeFileSync(
       path.join(setDir, "session-state.json"),
-      JSON.stringify({ schemaVersion: 2, status: "completed" })
+      JSON.stringify({
+        schemaVersion: 2,
+        status: "completed",
+        currentSession: 3,
+        totalSessions: 3,
+        completedSessions: [1, 2, 3],
+      })
     );
     const sets = readSessionSets(dir);
-    assert.strictEqual(sets[0].state, "done");
+    assert.strictEqual(sets[0].state, "complete");
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -219,11 +235,15 @@ suite("fileSystem — readSessionSets", () => {
     fs.rmSync(dir, { recursive: true });
   });
 
-  test("status='complete' with no completedSessions array falls back to totalSessions", () => {
+  test("status='complete' with full completedSessions[] resolves to N/N", () => {
+    // Set 030 Session 3: v3 requires per-session evidence; the
+    // pre-Set-022 "no completedSessions array" → fallback path now
+    // downgrades to in-progress instead of escalating to N/N. The
+    // bulk migrator (Session 4) heals legacy snapshots.
     const dir = makeTmpDir();
-    const setDir = path.join(dir, "docs", "session-sets", "complete-no-array");
+    const setDir = path.join(dir, "docs", "session-sets", "complete-with-array");
     fs.mkdirSync(setDir, { recursive: true });
-    fs.writeFileSync(path.join(setDir, "spec.md"), "# complete-no-array\n");
+    fs.writeFileSync(path.join(setDir, "spec.md"), "# complete-with-array\n");
     fs.writeFileSync(
       path.join(setDir, "session-state.json"),
       JSON.stringify({
@@ -231,6 +251,7 @@ suite("fileSystem — readSessionSets", () => {
         status: "complete",
         currentSession: 4,
         totalSessions: 4,
+        completedSessions: [1, 2, 3, 4],
       })
     );
     const sets = readSessionSets(dir);
@@ -245,7 +266,7 @@ suite("fileSystem — readSessionSets", () => {
   // raw `sd.status` and missed the alias, falling through to
   // currentSession-1 and displaying N-1/N. Using `state` (already
   // canonicalized via readStatus) keeps both reads in lockstep.
-  test("status='completed' alias flips count to totalSessions, not currentSession-1", () => {
+  test("status='completed' alias resolves to complete with full completedSessions[]", () => {
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "completed-alias");
     fs.mkdirSync(setDir, { recursive: true });
@@ -257,15 +278,16 @@ suite("fileSystem — readSessionSets", () => {
         status: "completed",
         currentSession: 3,
         totalSessions: 3,
+        completedSessions: [1, 2, 3],
       })
     );
     const sets = readSessionSets(dir);
-    assert.strictEqual(sets[0].state, "done");
+    assert.strictEqual(sets[0].state, "complete");
     assert.strictEqual(sets[0].sessionsCompleted, 3);
     fs.rmSync(dir, { recursive: true });
   });
 
-  test("status='complete' with currentSession === totalSessions reads as done", () => {
+  test("status='complete' with full completedSessions[] reads as complete", () => {
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "real-done");
     fs.mkdirSync(setDir, { recursive: true });
@@ -277,10 +299,11 @@ suite("fileSystem — readSessionSets", () => {
         status: "complete",
         currentSession: 5,
         totalSessions: 5,
+        completedSessions: [1, 2, 3, 4, 5],
       })
     );
     const sets = readSessionSets(dir);
-    assert.strictEqual(sets[0].state, "done");
+    assert.strictEqual(sets[0].state, "complete");
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -348,7 +371,7 @@ suite("fileSystem — readSessionSets", () => {
     ].map((e) => JSON.stringify(e)).join("\n") + "\n";
     fs.writeFileSync(path.join(setDir, "session-events.jsonl"), events);
     const sets = readSessionSets(dir);
-    assert.strictEqual(sets[0].state, "done");
+    assert.strictEqual(sets[0].state, "complete");
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -358,7 +381,7 @@ suite("fileSystem — readSessionSets", () => {
   // and done tests above (they have both the legacy presence signal AND
   // a matching status). Round-1 verifier flagged this gap.
 
-  test("status='complete' beats activity-log.json presence", () => {
+  test("status='complete' beats activity-log.json presence (with per-session evidence)", () => {
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "contradict-1");
     fs.mkdirSync(setDir, { recursive: true });
@@ -366,12 +389,19 @@ suite("fileSystem — readSessionSets", () => {
     fs.writeFileSync(path.join(setDir, "activity-log.json"), JSON.stringify({ entries: [] }));
     fs.writeFileSync(
       path.join(setDir, "session-state.json"),
-      JSON.stringify({ schemaVersion: 2, status: "complete" })
+      JSON.stringify({
+        schemaVersion: 2,
+        status: "complete",
+        currentSession: 1,
+        totalSessions: 1,
+        completedSessions: [1],
+      })
     );
     const sets = readSessionSets(dir);
     // Old file-presence rule: change-log absent + activity-log present
-    // = "in-progress". Set 7 rule: status overrides → "done".
-    assert.strictEqual(sets[0].state, "done");
+    // = "in-progress". Set 7 rule: status overrides → "complete".
+    // Set 030 Session 3: status needs per-session evidence to escalate.
+    assert.strictEqual(sets[0].state, "complete");
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -400,29 +430,68 @@ suite("fileSystem — readSessionSets", () => {
   // not-started). readStatus now routes the file-absent path through
   // ensureSessionStateFile, mirroring the Python helper.
 
-  test("lazy-synth infers 'done' from legacy change-log.md presence", () => {
+  test("lazy-synth infers 'complete' from legacy change-log.md presence (with spec totalSessions)", () => {
+    // Set 030 Session 3: lazy-synth now writes v3 sessions[] when
+    // the spec declares totalSessions. Without totalSessions, the
+    // synthesized snapshot would lack per-session evidence and the
+    // v3 invariants would downgrade it to in-progress.
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "legacy-done");
     fs.mkdirSync(setDir, { recursive: true });
-    fs.writeFileSync(path.join(setDir, "spec.md"), "# legacy-done\n");
+    fs.writeFileSync(
+      path.join(setDir, "spec.md"),
+      "# legacy-done\n\n## Session Set Configuration\n\n```yaml\ntotalSessions: 2\n```\n",
+    );
     fs.writeFileSync(path.join(setDir, "change-log.md"), "# Changes\n");
     // Deliberately no session-state.json — exercises the lazy-synth path.
     const sets = readSessionSets(dir);
-    assert.strictEqual(sets[0].state, "done");
+    assert.strictEqual(sets[0].state, "complete");
     // Side effect: a state file was written with the inferred shape.
     const written = JSON.parse(
       fs.readFileSync(path.join(setDir, "session-state.json"), "utf8")
     );
     assert.strictEqual(written.status, "complete");
     assert.strictEqual(written.lifecycleState, "closed");
+    assert.strictEqual(written.schemaVersion, 3);
+    assert.ok(Array.isArray(written.sessions));
+    assert.strictEqual(written.sessions.length, 2);
     fs.rmSync(dir, { recursive: true });
   });
 
-  test("lazy-synth infers 'in-progress' from legacy activity-log.json", () => {
+  test("lazy-synth with change-log.md but NO spec totalSessions stays not-started (Round A fix)", () => {
+    // Round-A regression (Set 030 Session 3 verifier): when spec.md
+    // has no Session Set Configuration totalSessions, buildSessions
+    // returns undefined and the writer cannot emit a reader-valid
+    // status=complete snapshot. The backfill must fall through to
+    // not-started rather than write {status: "complete"} with no
+    // sessions[] / completedSessions[] (which would fail rule 1 +
+    // rule 7 on the next readProgress call).
+    const dir = makeTmpDir();
+    const setDir = path.join(dir, "docs", "session-sets", "plan-less");
+    fs.mkdirSync(setDir, { recursive: true });
+    fs.writeFileSync(path.join(setDir, "spec.md"), "# plan-less\n");
+    fs.writeFileSync(path.join(setDir, "change-log.md"), "# Changes\n");
+    const sets = readSessionSets(dir);
+    // Without a plan, the snapshot can't claim complete — bucket as
+    // not-started.
+    assert.strictEqual(sets[0].state, "not-started");
+    const written = JSON.parse(
+      fs.readFileSync(path.join(setDir, "session-state.json"), "utf8")
+    );
+    assert.strictEqual(written.status, "not-started");
+    assert.strictEqual(written.lifecycleState, null);
+    assert.strictEqual(written.sessions, undefined);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("lazy-synth infers 'in-progress' from legacy activity-log.json (with spec totalSessions)", () => {
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "legacy-active");
     fs.mkdirSync(setDir, { recursive: true });
-    fs.writeFileSync(path.join(setDir, "spec.md"), "# legacy-active\n");
+    fs.writeFileSync(
+      path.join(setDir, "spec.md"),
+      "# legacy-active\n\n## Session Set Configuration\n\n```yaml\ntotalSessions: 3\n```\n",
+    );
     fs.writeFileSync(
       path.join(setDir, "activity-log.json"),
       JSON.stringify({
@@ -436,6 +505,9 @@ suite("fileSystem — readSessionSets", () => {
     );
     assert.strictEqual(written.status, "in-progress");
     assert.strictEqual(written.startedAt, "2026-01-01T00:00:00-04:00");
+    assert.strictEqual(written.schemaVersion, 3);
+    assert.ok(Array.isArray(written.sessions));
+    assert.strictEqual(written.sessions[0].status, "in-progress");
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -578,6 +650,7 @@ suite("fileSystem — readSessionSets", () => {
         status: "complete",
         currentSession: 3,
         totalSessions: 3,
+        completedSessions: [1, 2, 3],
       }),
     );
     const sets = readSessionSets(dir);
@@ -612,13 +685,24 @@ suite("fileSystem — readSessionSets", () => {
   });
 });
 
-// Set 023 Session 4: `isMidSetComplete` now consults
-// `completedSessions[]` before falling through to the events-ledger
-// check. The array is authoritative for *whether* a session is closed;
-// the events ledger remains authoritative for *when* each closeout was
-// recorded. Fixtures F1-F7 lock in the new ordering and the legacy
-// fall-through paths.
-suite("fileSystem — isMidSetComplete (Set 023 Session 4)", () => {
+// Set 030 Session 3: `isMidSetComplete` is now a single-predicate
+// probe that asks "does the snapshot satisfy the 8 v3 invariants?"
+// instead of the Set 023 multi-signal predicate. For v3 files this is
+// a direct invariant check; for v2 files the snapshot is synthesized
+// first (legacy completedSessions[] -> per-session status mapping)
+// then validated. Drift cases that the Set 023 predicate caught
+// (count mismatch, final-session signal gap) now surface as rule 4 or
+// rule 7 violations.
+//
+// Semantic change vs. Set 023: a pre-Set-022 v2 snapshot without
+// `completedSessions[]` synthesizes to all-not-started, so a
+// `status: "complete"` declaration without per-session evidence now
+// downgrades to mid-set even when the events ledger has the closeouts.
+// The bulk migrator (Session 4) heals these by writing v3 sessions[]
+// directly; until then, the bucketing shows in-progress for the
+// affected sets, which is the conservative "default to not-started;
+// require positive evidence to escalate" rule.
+suite("fileSystem — isMidSetComplete (Set 030 Session 3)", () => {
   function writeState(setDir: string, state: object): string {
     fs.mkdirSync(setDir, { recursive: true });
     const statePath = path.join(setDir, "session-state.json");
@@ -626,25 +710,55 @@ suite("fileSystem — isMidSetComplete (Set 023 Session 4)", () => {
     return statePath;
   }
 
-  function writeEvents(setDir: string, sessionsClosed: number[]): void {
-    const events =
-      sessionsClosed
-        .map((n) =>
-          JSON.stringify({
-            timestamp: `2026-05-15T0${n}:00:00Z`,
-            session_number: n,
-            event_type: "closeout_succeeded",
-          })
-        )
-        .join("\n") + "\n";
-    fs.writeFileSync(path.join(setDir, "session-events.jsonl"), events);
-  }
-
-  // F1: array satisfies the guard with no ledger present at all.
-  test("F1: completedSessions includes currentSession + no events ledger → not mid-set", () => {
+  // V3-1: a v3 snapshot whose sessions[] satisfies all invariants
+  // returns NOT mid-set. This is the canonical "set is genuinely
+  // complete" shape.
+  test("v3 snapshot with all sessions complete → not mid-set", () => {
     const dir = makeTmpDir();
-    const setDir = path.join(dir, "f1");
+    const setDir = path.join(dir, "v3-complete");
     const statePath = writeState(setDir, {
+      schemaVersion: 3,
+      status: "complete",
+      lifecycleState: "closed",
+      sessions: [
+        { number: 1, title: "Alpha", status: "complete" },
+        { number: 2, title: "Beta", status: "complete" },
+        { number: 3, title: "Gamma", status: "complete" },
+      ],
+    });
+    assert.strictEqual(isMidSetComplete(statePath), false);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  // V3-2: a v3 snapshot whose top-level status disagrees with
+  // sessions[] (e.g., top=complete but one session not-started) trips
+  // rule 7. Downgrade is the right call — the operator hand-edited
+  // one field but not the other.
+  test("v3 snapshot with status=complete but a not-started session → mid-set (rule 7)", () => {
+    const dir = makeTmpDir();
+    const setDir = path.join(dir, "v3-drift");
+    const statePath = writeState(setDir, {
+      schemaVersion: 3,
+      status: "complete",
+      lifecycleState: "closed",
+      sessions: [
+        { number: 1, title: "Alpha", status: "complete" },
+        { number: 2, title: "Beta", status: "complete" },
+        { number: 3, title: "Gamma", status: "not-started" },
+      ],
+    });
+    assert.strictEqual(isMidSetComplete(statePath), true);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  // V2-1: a v2 snapshot with completedSessions covering every session
+  // and status=complete synthesizes to all-complete, passes rule 7,
+  // returns NOT mid-set. The post-Set-022 / pre-Set-030 happy path.
+  test("v2 snapshot with completedSessions covering every session → not mid-set", () => {
+    const dir = makeTmpDir();
+    const setDir = path.join(dir, "v2-complete");
+    const statePath = writeState(setDir, {
+      schemaVersion: 2,
       status: "complete",
       currentSession: 3,
       totalSessions: 3,
@@ -654,223 +768,93 @@ suite("fileSystem — isMidSetComplete (Set 023 Session 4)", () => {
     fs.rmSync(dir, { recursive: true });
   });
 
-  // F2: array disagrees on the final session AND ledger disagrees → downgrade.
-  test("F2: array missing currentSession + ledger missing closeout → mid-set", () => {
+  // V2-2: v2 snapshot with status=complete but completedSessions
+  // partial → synthesize produces an entry that's not "complete";
+  // rule 7 fires. Drift downgrade.
+  test("v2 snapshot status=complete with partial completedSessions → mid-set", () => {
     const dir = makeTmpDir();
-    const setDir = path.join(dir, "f2");
+    const setDir = path.join(dir, "v2-partial");
     const statePath = writeState(setDir, {
+      schemaVersion: 2,
       status: "complete",
       currentSession: 3,
       totalSessions: 3,
       completedSessions: [1, 2],
     });
-    writeEvents(setDir, [1, 2]);
     assert.strictEqual(isMidSetComplete(statePath), true);
     fs.rmSync(dir, { recursive: true });
   });
 
-  // F3: legacy path unchanged — no array, ledger closes the final session.
-  test("F3: no completedSessions field + ledger has closeout → not mid-set", () => {
+  // V2-3: legacy pre-Set-022 snapshot with no completedSessions[] at
+  // all. Synthesize produces all-not-started, rule 7 fires, downgrade.
+  // The Set 023 events-ledger fallback that used to keep this case
+  // bucketed as Done is intentionally gone — pre-Set-022 snapshots
+  // get healed on their next boundary write or via the Session 4
+  // bulk migrator.
+  test("v2 snapshot status=complete with no completedSessions[] → mid-set (default-to-not-started)", () => {
     const dir = makeTmpDir();
-    const setDir = path.join(dir, "f3");
+    const setDir = path.join(dir, "v2-bare");
     const statePath = writeState(setDir, {
+      schemaVersion: 2,
       status: "complete",
       currentSession: 3,
       totalSessions: 3,
     });
-    writeEvents(setDir, [1, 2, 3]);
-    assert.strictEqual(isMidSetComplete(statePath), false);
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  // F4: legacy drift case unchanged — no array, ledger lacks final closeout.
-  test("F4: no completedSessions field + ledger missing closeout → mid-set", () => {
-    const dir = makeTmpDir();
-    const setDir = path.join(dir, "f4");
-    const statePath = writeState(setDir, {
-      status: "complete",
-      currentSession: 3,
-      totalSessions: 3,
-    });
-    writeEvents(setDir, [1, 2]);
     assert.strictEqual(isMidSetComplete(statePath), true);
     fs.rmSync(dir, { recursive: true });
   });
 
-  // F5 (audit-driven, Gemini on (e)): non-array completedSessions values
-  // are tolerated via Array.isArray; legacy ledger path takes over.
-  test("F5: non-array completedSessions falls through to ledger check", () => {
+  // V2-4: count mismatch (currentSession < totalSessions). Under v3
+  // synthesis: completed=[1,2,3] (current=2 is in completedSet, so
+  // legacy_current_in_progress branch doesn't fire). Sessions become
+  // [c,c,c]. Rule 7 passes. The Set 023 explicit guard against
+  // currentSession < totalSessions is gone — the count mismatch
+  // alone doesn't violate any v3 invariant. The drift surfaces
+  // elsewhere (e.g., progressText shows "3/3" when the legacy
+  // currentSession=2 suggested mid-set) but it no longer drives
+  // the bucketing here.
+  test("v2 count mismatch (completedSessions covers all) → not mid-set under v3 semantics", () => {
     const dir = makeTmpDir();
-    const setDir = path.join(dir, "f5");
+    const setDir = path.join(dir, "v2-count-mismatch");
     const statePath = writeState(setDir, {
-      status: "complete",
-      currentSession: 3,
-      totalSessions: 3,
-      completedSessions: null,
-    });
-    writeEvents(setDir, [1, 2, 3]);
-    assert.strictEqual(isMidSetComplete(statePath), false);
-
-    // Also exercise a non-array object shape — same fall-through behavior.
-    const setDir2 = path.join(dir, "f5b");
-    const statePath2 = writeState(setDir2, {
-      status: "complete",
-      currentSession: 3,
-      totalSessions: 3,
-      completedSessions: { not: "array" },
-    });
-    writeEvents(setDir2, [1, 2, 3]);
-    assert.strictEqual(isMidSetComplete(statePath2), false);
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  // F6 (audit-driven, both on (b) and (e)): a stray out-of-range entry
-  // (e.g., [1, 2, 99] with totalSessions 4 and currentSession 4) does not
-  // accidentally satisfy `.includes(currentSession)`. The array check
-  // returns false for `4`, so the guard falls through to the ledger,
-  // which also lacks closeout for 4 → mid-set.
-  test("F6: stray out-of-range array entry does not satisfy includes(currentSession)", () => {
-    const dir = makeTmpDir();
-    const setDir = path.join(dir, "f6");
-    const statePath = writeState(setDir, {
-      status: "complete",
-      currentSession: 4,
-      totalSessions: 4,
-      completedSessions: [1, 2, 99],
-    });
-    writeEvents(setDir, [1, 2]);
-    assert.strictEqual(isMidSetComplete(statePath), true);
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  // F7 (audit-driven, GPT on (e)): the guard checks `currentSession`
-  // specifically; disagreement on non-final sessions is irrelevant. An
-  // array [1, 2] with currentSession 3 and a ledger that has a closeout
-  // for session 1 only still downgrades to mid-set — neither signal
-  // closes session 3.
-  test("F7: non-final-session disagreement is irrelevant; only currentSession matters", () => {
-    const dir = makeTmpDir();
-    const setDir = path.join(dir, "f7");
-    const statePath = writeState(setDir, {
-      status: "complete",
-      currentSession: 3,
-      totalSessions: 3,
-      completedSessions: [1, 2],
-    });
-    writeEvents(setDir, [1]);
-    assert.strictEqual(isMidSetComplete(statePath), true);
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  // Bonus 1: array satisfies the guard while the ledger lacks the
-  // corresponding closeout — the migration shape Set 023 was authored
-  // to fix. Locks in that the override path returns false (Done) and
-  // emits the observability warn exactly once.
-  test("array overrides missing ledger closeout (migration shape) → not mid-set + warns", () => {
-    const dir = makeTmpDir();
-    const setDir = path.join(dir, "migration");
-    const statePath = writeState(setDir, {
-      status: "complete",
-      currentSession: 4,
-      totalSessions: 4,
-      completedSessions: [1, 2, 3, 4],
-    });
-    writeEvents(setDir, [3]);  // synthetic-only ledger, missing session 4
-
-    const warnings: string[] = [];
-    const originalWarn = console.warn;
-    console.warn = (msg?: unknown) => { warnings.push(String(msg)); };
-    try {
-      assert.strictEqual(isMidSetComplete(statePath), false);
-    } finally {
-      console.warn = originalWarn;
-    }
-    assert.strictEqual(warnings.length, 1, "expected exactly one observability warn");
-    assert.match(warnings[0], /completedSessions\[\] overrides missing ledger closeout for session 4/);
-    assert.match(warnings[0], /\[session-set migration\]/);
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  // Bonus 2 (Session 4 verifier round-1 finding, Q3): the warn must NOT
-  // fire when (a) the ledger file is absent entirely (F1 shape), (b) the
-  // legacy no-array path produces a clean closeout (F3), or (c) the
-  // legacy no-array path falls through to the ledger-missing-closeout
-  // drift case (F4). Locks in the observability contract: warn fires
-  // ONLY on the array-overrides-disagreeing-ledger shape.
-  test("observability warn does not fire on non-override paths", () => {
-    const dir = makeTmpDir();
-
-    const warnings: string[] = [];
-    const originalWarn = console.warn;
-    console.warn = (msg?: unknown) => { warnings.push(String(msg)); };
-    try {
-      // (a) F1 shape: array satisfies guard, no ledger file.
-      const a = path.join(dir, "no-ledger");
-      const aPath = writeState(a, {
-        status: "complete", currentSession: 3, totalSessions: 3,
-        completedSessions: [1, 2, 3],
-      });
-      assert.strictEqual(isMidSetComplete(aPath), false);
-
-      // (b) F3 shape: legacy no-array path, ledger has closeout.
-      const b = path.join(dir, "legacy-ok");
-      const bPath = writeState(b, {
-        status: "complete", currentSession: 3, totalSessions: 3,
-      });
-      writeEvents(b, [1, 2, 3]);
-      assert.strictEqual(isMidSetComplete(bPath), false);
-
-      // (c) F4 shape: legacy no-array drift, ledger lacks closeout.
-      const c = path.join(dir, "legacy-drift");
-      const cPath = writeState(c, {
-        status: "complete", currentSession: 3, totalSessions: 3,
-      });
-      writeEvents(c, [1, 2]);
-      assert.strictEqual(isMidSetComplete(cPath), true);
-    } finally {
-      console.warn = originalWarn;
-    }
-    assert.deepStrictEqual(warnings, [], "no warns expected on non-override paths");
-    fs.rmSync(dir, { recursive: true });
-  });
-
-  // Coverage gap (Session 4 verifier round-1, Q3): the
-  // `currentSession < totalSessions` early-return path is not exercised
-  // by F1-F7. Locks in that a mid-set snapshot returns true regardless
-  // of either authoritative whether-closed signal.
-  test("currentSession < totalSessions early-return → mid-set (regardless of array/ledger)", () => {
-    const dir = makeTmpDir();
-    const setDir = path.join(dir, "mid-set");
-    const statePath = writeState(setDir, {
+      schemaVersion: 2,
       status: "complete",
       currentSession: 2,
       totalSessions: 3,
-      completedSessions: [1, 2, 3],  // array even claims all closed
+      completedSessions: [1, 2, 3],
     });
-    writeEvents(setDir, [1, 2, 3]);  // ledger even agrees
-    // Mid-set: currentSession (2) < totalSessions (3) — the count
-    // mismatch wins over both whether-closed signals.
-    assert.strictEqual(isMidSetComplete(statePath), true);
+    assert.strictEqual(isMidSetComplete(statePath), false);
     fs.rmSync(dir, { recursive: true });
   });
 
-  // Coverage gap (Session 4 verifier round-1, Q3 + Q6): array is present
-  // but does not include currentSession, AND no ledger file exists. The
-  // ledger-fallback branch is gated on `fs.existsSync(eventsPath)`, so
-  // a missing ledger is treated as "no negative evidence" and the
-  // snapshot's `status: complete` is respected. Documents the
-  // intentional semantics: in the absence of any whether-closed signal
-  // saying otherwise, we trust the canonical `status` field.
-  test("array missing currentSession + no ledger file → not mid-set (trust status)", () => {
+  // Defensive: parse errors return false (trust the canonical
+  // status; don't second-guess on garbled input).
+  test("malformed JSON → returns false (trust canonical status)", () => {
     const dir = makeTmpDir();
-    const setDir = path.join(dir, "ambiguous");
-    const statePath = writeState(setDir, {
-      status: "complete",
-      currentSession: 3,
-      totalSessions: 3,
-      completedSessions: [1, 2],  // array says session 3 not closed
-    });
-    // No session-events.jsonl written — the ledger fallback is skipped.
+    const setDir = path.join(dir, "malformed");
+    fs.mkdirSync(setDir, { recursive: true });
+    const statePath = path.join(setDir, "session-state.json");
+    fs.writeFileSync(statePath, "{not-valid-json");
+    assert.strictEqual(isMidSetComplete(statePath), false);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  // Defensive: a missing file is not a drift signal.
+  test("missing file → returns false", () => {
+    assert.strictEqual(
+      isMidSetComplete("/definitely/does/not/exist/state.json"),
+      false,
+    );
+  });
+
+  // Defensive: a non-object JSON value (e.g., a primitive or array)
+  // returns false rather than throwing.
+  test("non-object JSON value → returns false", () => {
+    const dir = makeTmpDir();
+    const setDir = path.join(dir, "primitive");
+    fs.mkdirSync(setDir, { recursive: true });
+    const statePath = path.join(setDir, "session-state.json");
+    fs.writeFileSync(statePath, '"just a string"');
     assert.strictEqual(isMidSetComplete(statePath), false);
     fs.rmSync(dir, { recursive: true });
   });

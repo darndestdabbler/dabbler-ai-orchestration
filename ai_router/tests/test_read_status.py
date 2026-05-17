@@ -148,8 +148,18 @@ def test_lazy_synth_classifies_legacy_changelog_as_complete(
     ``"not-started"`` by the lazy-synth fallback. The fallback now
     routes through :func:`ensure_session_state_file`, which uses the
     same inference rules as the one-shot backfill.
+
+    Set 030 Session 3: spec.md MUST declare totalSessions so the
+    v3 writer can emit a reader-valid sessions[] array. Without it,
+    the backfill correctly stays at not-started (covered by
+    ``test_backfill_payload_change_log_without_spec_total_stays_not_started``
+    in test_session_state_v3.py).
     """
     set_dir = _make_set(tmp_path, "legacy-done")
+    (set_dir / "spec.md").write_text(
+        "# spec\n\n## Session Set Configuration\n\n```yaml\ntotalSessions: 2\n```\n",
+        encoding="utf-8",
+    )
     (set_dir / "change-log.md").write_text("# Done\n", encoding="utf-8")
     state_path = set_dir / SESSION_STATE_FILENAME
     assert not state_path.exists()
@@ -171,6 +181,10 @@ def test_lazy_synth_classifies_legacy_activity_log_as_in_progress(
     a ``startedAt`` derived from the earliest log entry.
     """
     set_dir = _make_set(tmp_path, "legacy-in-progress")
+    (set_dir / "spec.md").write_text(
+        "# spec\n\n## Session Set Configuration\n\n```yaml\ntotalSessions: 3\n```\n",
+        encoding="utf-8",
+    )
     (set_dir / "activity-log.json").write_text(
         json.dumps({
             "entries": [

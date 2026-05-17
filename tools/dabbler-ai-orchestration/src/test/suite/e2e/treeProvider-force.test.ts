@@ -83,39 +83,35 @@ suite("Layer 2 e2e — force-close lifecycle", function () {
     await replaceWorkspaceFolders(h.repo_root);
     const provider = buildProvider();
 
-    // Reader downgrades the mid-set complete snapshot to in-progress.
+    // Set 030 Session 3: under v3, force=True promotes every session
+    // in sessions[] to "complete" (incident-recovery semantic from
+    // Session 2's writer change), so the snapshot satisfies all
+    // invariants and buckets as Complete. The [FORCED] badge — driven
+    // by liveSession.forceClosed — remains the operator-facing cue
+    // that the gate was bypassed.
+    const complete = childrenOfGroup(provider, "complete");
+    assert.strictEqual(complete.length, 1, "force-closed set buckets to Complete under v3 (forced promotes all)");
+    assert.strictEqual(complete[0].label, "force-midset");
+
     const inProgress = childrenOfGroup(provider, "in-progress");
-    assert.strictEqual(inProgress.length, 1, "force-closed mid-set must stay In Progress (downgrade)");
-    assert.strictEqual(inProgress[0].label, "force-midset");
+    assert.strictEqual(inProgress.length, 0, "force-closed set must not also appear in In Progress");
 
-    // The Done bucket must NOT pick this set up. Promoting it to Done
-    // would mask the fact that session 3 never ran.
-    const done = childrenOfGroup(provider, "done");
-    assert.strictEqual(done.length, 0, "mid-set force must not be classified Done");
-
-    const desc = String(inProgress[0].description ?? "");
+    const desc = String(complete[0].description ?? "");
     assert.ok(
       desc.includes("[FORCED]"),
       `force-closed set must carry [FORCED] badge in description; got '${desc}'`,
     );
-    // The set's intrinsic progress fraction must render truthfully.
+    // The v3 writer promotes all sessions to complete on force, so
+    // the count reflects 3/3. The [FORCED] badge — not bucket
+    // downgrade — is the visibility cue that session 3 never ran
+    // through a normal close.
     assert.ok(
-      desc.includes("2/3"),
-      `mid-set force should display truthful 2/3 count; got '${desc}'`,
-    );
-    // Verifier (Round B): tighten — explicit reject of confused
-    // shapes that the downgrade is designed to prevent.
-    assert.ok(
-      !desc.includes("3/3"),
-      `mid-set force must NOT inflate to 3/3; got '${desc}'`,
-    );
-    assert.ok(
-      !desc.includes("Done"),
-      `mid-set force must NOT carry a 'Done' annotation (downgraded to In Progress); got '${desc}'`,
+      desc.includes("3/3"),
+      `force-closed under v3 reports N/N after rule-7 satisfaction; got '${desc}'`,
     );
     assert.ok(
       !desc.includes("in flight"),
-      `mid-set force is a CLOSED snapshot, not in flight; got '${desc}'`,
+      `force-closed snapshot is CLOSED, not in flight; got '${desc}'`,
     );
   });
 
@@ -141,7 +137,7 @@ suite("Layer 2 e2e — force-close lifecycle", function () {
     await replaceWorkspaceFolders(h.repo_root);
     const provider = buildProvider();
 
-    const done = childrenOfGroup(provider, "done");
+    const done = childrenOfGroup(provider, "complete");
     assert.strictEqual(done.length, 1);
     const desc = String(done[0].description ?? "");
     assert.ok(
@@ -149,8 +145,8 @@ suite("Layer 2 e2e — force-close lifecycle", function () {
       `healthy close must NOT carry [FORCED] badge; got '${desc}'`,
     );
     assert.ok(
-      desc.includes("2/2 Done"),
-      `healthy final close should annotate as N/N Done; got '${desc}'`,
+      desc.includes("2/2 Complete"),
+      `healthy final close should annotate as N/N Complete; got '${desc}'`,
     );
     // Verifier (Round B): tighten — reject any in-flight annotation
     // leaking onto a fully closed set.
@@ -161,15 +157,16 @@ suite("Layer 2 e2e — force-close lifecycle", function () {
   });
 
   test("force-closed set tooltip carries the gate-bypass diagnostic line", async () => {
-    // The tooltip's force-closed line (SessionSetsProvider.ts:120) is
+    // The tooltip's force-closed line (SessionSetsProvider.ts) is
     // the operator-facing breadcrumb explaining how to dig further
     // (closeout_force_used in session-events.jsonl). It's surfaced
     // only on hover, so easy to silently drop in a refactor.
     //
-    // The set is force-closed on session 1 of 2 — currentSession=1 <
-    // totalSessions=2 → `isMidSetComplete` downgrades to In Progress
-    // (same path as the mid-set test above). The badge and the
-    // tooltip line both surface in the in-progress bucket.
+    // Set 030 Session 3: force=True on session 1 of 2 promotes both
+    // sessions to "complete" in v3 sessions[], so the snapshot
+    // satisfies all invariants and buckets as Complete. The
+    // [FORCED] badge plus tooltip remain the operator visibility
+    // cues that a gate bypass occurred.
     const h = makeSet(tmpPath, "force-tooltip", 2);
     startSession(h, 1);
     makeChangeLog(h, 1);
@@ -179,10 +176,10 @@ suite("Layer 2 e2e — force-close lifecycle", function () {
     await replaceWorkspaceFolders(h.repo_root);
     const provider = buildProvider();
 
-    const inProgress = childrenOfGroup(provider, "in-progress");
-    assert.strictEqual(inProgress.length, 1);
+    const complete = childrenOfGroup(provider, "complete");
+    assert.strictEqual(complete.length, 1);
 
-    const tooltip = inProgress[0].tooltip;
+    const tooltip = complete[0].tooltip;
     const tooltipText =
       tooltip instanceof vscode.MarkdownString ? tooltip.value : String(tooltip ?? "");
     assert.ok(

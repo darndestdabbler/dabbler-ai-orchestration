@@ -72,26 +72,19 @@ suite("Layer 2 e2e — happy 3-session path", function () {
         // a stray "Done" or "in flight" annotation to a not-started row
         // must fail this test.
         assert.ok(desc.includes("0/3"), `expected '0/3' in description, got '${desc}'`);
-        assert.ok(!desc.includes("Done"), `not-started must not say Done; got '${desc}'`);
+        assert.ok(!desc.includes("Complete"), `not-started must not say Complete; got '${desc}'`);
         assert.ok(!desc.includes("in flight"), `not-started must not say 'in flight'; got '${desc}'`);
         assert.ok(!desc.includes("[FORCED]"), `not-started must not have [FORCED]; got '${desc}'`);
         assert.strictEqual(notStarted[0].contextValue, "sessionSet:not-started", "contextValue must reflect bucket for menu visibility predicates");
     });
-    test("session 1 in flight: bucket flips to In Progress with '0/3' base label", async () => {
-        // Drift call-out (caught by this harness on first run):
-        // register_session_start at session_state.py:237 omits the
-        // ``completedSessions`` key when the value is an empty list,
-        // citing schema-doc convention "absent means none closed yet."
-        // ``isCurrentSessionInFlight`` (SessionSetsProvider.ts:32)
-        // requires ``Array.isArray(completedSessions)`` and so returns
-        // false on a fresh-start snapshot. The result: the production
-        // session-1-of-a-fresh-set view shows "0/N" *without* the
-        // "session N in flight" annotation the Set 022 unit tests assume.
-        // This file pins the *current* shape; a future change that
-        // restores the Set 022 annotation needs to either (a) flip the
-        // writer to always emit ``completedSessions: []`` or (b) relax
-        // the predicate to treat absent-array as []. Updating this
-        // test is the deliberate marker that the choice was made.
+    test("session 1 in flight: bucket flips to In Progress with '0/3 · session 1 in flight'", async () => {
+        // Set 030 Session 3: the v3 writer emits sessions[1=in-progress, ...]
+        // on register_session_start, and the v3 reader surfaces
+        // currentSession=1 in liveSession unambiguously. The "session 1
+        // in flight" annotation now fires on a fresh start — restoring
+        // the Set 022 spec's intended endpoint behavior (option (b) of
+        // the old test's call-out: predicate now treats v3 current_session
+        // as the sole signal).
         const h = (0, e2eHarness_1.makeSet)(tmpPath, "happy-inflight", 3);
         (0, e2eHarness_1.startSession)(h, 1);
         await (0, e2eHarness_1.replaceWorkspaceFolders)(h.repo_root);
@@ -100,9 +93,7 @@ suite("Layer 2 e2e — happy 3-session path", function () {
         assert.strictEqual(inProgress.length, 1, "set must have flipped to In Progress");
         const desc = String(inProgress[0].description ?? "");
         assert.ok(desc.startsWith("0/3"), `expected '0/3' base label, got '${desc}'`);
-        assert.ok(!desc.includes("in flight"), `current writer omits empty completedSessions[]; no in-flight annotation expected. ` +
-            `If this assertion starts failing, the writer or predicate has been fixed — ` +
-            `flip back to the Set 022 expected shape. Got '${desc}'`);
+        assert.ok(desc.includes("session 1 in flight"), `v3 writer emits sessions[1=in-progress]; annotation expected. Got '${desc}'`);
         const notStarted = (0, e2eHarness_1.childrenOfGroup)(provider, "not-started");
         assert.strictEqual(notStarted.length, 0, "set must have left Not Started");
     });
@@ -126,7 +117,7 @@ suite("Layer 2 e2e — happy 3-session path", function () {
         const desc = String(inProgress[0].description ?? "");
         // Verifier (Round B): tighten — exact annotation, no Done, no [FORCED].
         assert.ok(desc.includes("1/3 · session 2 in flight"), `session 2 of a set with completedSessions: [1] must carry the in-flight annotation; got '${desc}'`);
-        assert.ok(!desc.includes("Done"), `in-progress row must not say Done; got '${desc}'`);
+        assert.ok(!desc.includes("Complete"), `in-progress row must not say Complete; got '${desc}'`);
         assert.ok(!desc.includes("[FORCED]"), `healthy in-flight must not have [FORCED]; got '${desc}'`);
         assert.ok(!desc.includes("session 1 in flight"), `must be session 2, not session 1; got '${desc}'`);
         assert.ok(!desc.includes("session 3 in flight"), `must be session 2, not session 3; got '${desc}'`);
@@ -146,21 +137,21 @@ suite("Layer 2 e2e — happy 3-session path", function () {
         // Verifier (Round B): tighten — also reject Done / [FORCED] tokens.
         assert.ok(desc.startsWith("1/3"), `expected label to start with '1/3', got '${desc}'`);
         assert.ok(!desc.includes("in flight"), `between-sessions row must not carry 'in flight' annotation, got '${desc}'`);
-        assert.ok(!desc.includes("Done"), `between-sessions row must not say Done; got '${desc}'`);
+        assert.ok(!desc.includes("Complete"), `between-sessions row must not say Complete; got '${desc}'`);
         assert.ok(!desc.includes("[FORCED]"), `healthy between-sessions must not have [FORCED]; got '${desc}'`);
     });
-    test("full close-out: set lands in Done with 'N/N Done'", async () => {
+    test("full close-out: set lands in Complete with N/N Complete", async () => {
         const h = (0, e2eHarness_1.makeSet)(tmpPath, "happy-done", 3);
         (0, e2eHarness_1.driveHappyPath)(h, 3);
         await (0, e2eHarness_1.replaceWorkspaceFolders)(h.repo_root);
         const provider = (0, e2eHarness_1.buildProvider)();
-        const done = (0, e2eHarness_1.childrenOfGroup)(provider, "done");
+        const done = (0, e2eHarness_1.childrenOfGroup)(provider, "complete");
         assert.strictEqual(done.length, 1, "completed set must bucket to Done");
         const desc = String(done[0].description ?? "");
         // Verifier (Round B): tighten — exact N/N Done shape + reject
         // [FORCED] / in-flight tokens that would falsely appear on a
         // healthy close.
-        assert.ok(desc.includes("3/3 Done"), `expected 'N/N Done' annotation on completed set, got '${desc}'`);
+        assert.ok(desc.includes("3/3 Complete"), `expected N/N Complete annotation on completed set, got '${desc}'`);
         assert.ok(!desc.includes("[FORCED]"), `healthy close must not have [FORCED] badge; got '${desc}'`);
         assert.ok(!desc.includes("in flight"), `Done row must not have 'in flight' annotation; got '${desc}'`);
         const inProgress = (0, e2eHarness_1.childrenOfGroup)(provider, "in-progress");

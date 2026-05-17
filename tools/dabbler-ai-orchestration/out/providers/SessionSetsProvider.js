@@ -42,7 +42,7 @@ const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
 const fileSystem_1 = require("../utils/fileSystem");
 const ICON_FILES = {
-    done: "done.svg",
+    complete: "done.svg",
     "in-progress": "in-progress.svg",
     "not-started": "not-started.svg",
     cancelled: "cancelled.svg",
@@ -51,22 +51,16 @@ function iconUriFor(extensionUri, state) {
     const file = ICON_FILES[state];
     return file ? vscode.Uri.joinPath(extensionUri, "media", file) : undefined;
 }
-// Set 022 Session 2: the "currentSession is in flight" predicate from
-// the lifecycle spec's state invariant. Returns true when the snapshot
-// declares a current session and that session is not yet in
-// `completedSessions[]` — i.e., session N has started but not closed.
-// Requires the array to be present; legacy snapshots without it return
-// false so a fresh-set Not Started row doesn't gain a stray
-// annotation. Exported for unit-test reuse.
+// Set 030 Session 3: the v3 "in-flight" predicate is a direct read of
+// the canonical `liveSession.currentSession` field, which `fileSystem.ts`
+// populates from `readProgress` as the single in-progress session's
+// number (or null when no session is in flight). v2's
+// "currentSession not in completedSessions[]" predicate is gone — the
+// v3 reader resolves the ambiguity at the source rather than letting
+// it propagate into a downstream invariant check.
+// Exported for unit-test reuse.
 function isCurrentSessionInFlight(set) {
-    const ls = set.liveSession;
-    if (!ls)
-        return false;
-    if (typeof ls.currentSession !== "number")
-        return false;
-    if (!Array.isArray(ls.completedSessions))
-        return false;
-    return !ls.completedSessions.includes(ls.currentSession);
+    return set.liveSession?.currentSession != null;
 }
 function progressText(set) {
     // Always show X/total. The earlier "X/X" shape on done sets assumed
@@ -74,10 +68,12 @@ function progressText(set) {
     // "complete" that fires before all sessions ran. Truthful display
     // surfaces the discrepancy at a glance.
     //
-    // Set 022 Session 2 added two annotations to disambiguate the row:
-    //   * `N/N Done` on done rows — operator-facing "yes this really
-    //     reached terminal state" cue. Distinguishes a healthy final
-    //     close from a stale `N/N` snapshot that's about to be
+    // Set 022 Session 2 added two annotations to disambiguate the row.
+    // Set 030 Session 3 renamed the terminal annotation to "Complete"
+    // so the display vocabulary matches the JSON status glossary:
+    //   * `N/N Complete` on complete rows — operator-facing "yes this
+    //     really reached terminal state" cue. Distinguishes a healthy
+    //     final close from a stale `N/N` snapshot that's about to be
     //     downgraded by isMidSetComplete.
     //   * `0/N · session 1 in flight` on rows where session N has
     //     started but not yet closed. Removes the operator confusion
@@ -85,14 +81,14 @@ function progressText(set) {
     //     Both lifecycle endpoints (0/N at start of session 1; N/N
     //     between session N's start and its close on the final
     //     session) used to be indistinguishable from their "no work
-    //     started yet" / "set is done" siblings.
+    //     started yet" / "set is complete" siblings.
     const base = set.totalSessions && set.totalSessions > 0
         ? `${set.sessionsCompleted}/${set.totalSessions}`
         : set.sessionsCompleted > 0
-            ? `${set.sessionsCompleted} done`
+            ? `${set.sessionsCompleted} complete`
             : "";
-    if (set.state === "done" && base) {
-        return `${base} Done`;
+    if (set.state === "complete" && base) {
+        return `${base} Complete`;
     }
     if (set.state === "in-progress" && isCurrentSessionInFlight(set)) {
         const n = set.liveSession?.currentSession;
@@ -227,12 +223,12 @@ class SessionSetsProvider {
             }
             const inProgress = all.filter((s) => s.state === "in-progress");
             const notStarted = all.filter((s) => s.state === "not-started");
-            const done = all.filter((s) => s.state === "done");
+            const complete = all.filter((s) => s.state === "complete");
             const cancelled = all.filter((s) => s.state === "cancelled");
             const groups = [
                 this.makeGroup("In Progress", "in-progress", inProgress.length),
                 this.makeGroup("Not Started", "not-started", notStarted.length),
-                this.makeGroup("Done", "done", done.length),
+                this.makeGroup("Complete", "complete", complete.length),
             ];
             // Set 8: the Cancelled group only renders when ≥ 1 cancelled set
             // exists (parallels the existing spec rule for not-emitting empty
@@ -247,7 +243,7 @@ class SessionSetsProvider {
         if (group.contextValue === "group") {
             const subset = all.filter((s) => s.state === group.groupKey);
             if (group.groupKey === "in-progress" ||
-                group.groupKey === "done" ||
+                group.groupKey === "complete" ||
                 group.groupKey === "cancelled") {
                 subset.sort((a, b) => (b.lastTouched || "").localeCompare(a.lastTouched || ""));
             }

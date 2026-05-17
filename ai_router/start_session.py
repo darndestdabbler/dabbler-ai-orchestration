@@ -54,12 +54,20 @@ import sys
 from typing import Optional
 
 try:
+    from progress import (  # type: ignore[import-not-found]
+        SessionStateInvariantError,
+        read_progress,
+    )
     from session_state import (  # type: ignore[import-not-found]
         compute_effective_completed_sessions,
         read_session_state,
         register_session_start,
     )
 except ImportError:
+    from .progress import (  # type: ignore[no-redef]
+        SessionStateInvariantError,
+        read_progress,
+    )
     from .session_state import (  # type: ignore[no-redef]
         compute_effective_completed_sessions,
         read_session_state,
@@ -174,12 +182,21 @@ def run(args: argparse.Namespace) -> int:
     state = read_session_state(session_set_dir) or {}
     closed = compute_effective_completed_sessions(session_set_dir)
     closed_set = set(closed)
-    current = state.get("currentSession")
-    current_in_flight = (
-        isinstance(current, int)
-        and not isinstance(current, bool)
-        and current not in closed_set
-    )
+
+    # Set 030 Session 3: route progress reads through the v3 helper.
+    # ``read_progress`` branches v2/v3 internally; on a brand-new set
+    # (empty state) or a v2 file whose synthesizer trips an invariant,
+    # we fall through with view=None and skip the in-flight check.
+    # ``compute_effective_completed_sessions`` remains the source of
+    # truth for the closed set (v2-compat carve-out per D13) so this
+    # migration does not touch the boundary-enforcement math.
+    spec_md_path = os.path.join(session_set_dir, "spec.md")
+    try:
+        view = read_progress(state, spec_md_path) if state else None
+    except (SessionStateInvariantError, TypeError, ValueError):
+        view = None
+    current = view.current_session if view is not None else None
+    current_in_flight = current is not None
 
     requested = args.session_number
     if requested is None:
@@ -261,9 +278,11 @@ def run(args: argparse.Namespace) -> int:
     # startedAt so the tree view's "session 1 in flight" annotation
     # reflects the most recent resume. This matches the existing
     # behavior register_session_start has had since Set 1.
-    total_sessions = state.get("totalSessions")
-    if not isinstance(total_sessions, int) or total_sessions <= 0:
-        total_sessions = None  # register_session_start tolerates None
+    #
+    # Set 030 Session 3: derive total via the v3 view when available;
+    # ``register_session_start`` tolerates None and falls back to its
+    # own resolution chain (caller-supplied -> existing state -> spec).
+    total_sessions = view.total_sessions if view is not None and view.total_sessions > 0 else None
 
     register_session_start(
         session_set=session_set_dir,

@@ -1,23 +1,6 @@
 {
   "schemaVersion": 3,
   "sessionSetName": "030-session-state-v3-sessions-ledger",
-  "currentSession": null,
-  "totalSessions": 5,
-  "status": "in-progress",
-  "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-17T12:25:13.434038-04:00",
-  "completedAt": null,
-  "verificationVerdict": null,
-  "orchestrator": {
-    "engine": "claude",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high"
-  },
-  "completedSessions": [
-    1,
-    2
-  ],
   "sessions": [
     {
       "number": 1,
@@ -32,7 +15,7 @@
     {
       "number": 3,
       "title": "Phase 3 reader migration + Explorer \"Done\" \u2192 \"Complete\"",
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "number": 4,
@@ -44,5 +27,22 @@
       "title": "Alignment migration UX + loading state + FINAL release",
       "status": "not-started"
     }
-  ]
+  ],
+  "currentSession": 3,
+  "totalSessions": 5,
+  "completedSessions": [
+    1,
+    2
+  ],
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-17T13:23:13.159887-04:00",
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high"
+  }
 }

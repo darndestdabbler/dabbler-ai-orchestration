@@ -263,6 +263,150 @@
           "issuesFound": 0
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/start",
+      "dateTime": "2026-05-17T13:23:13-04:00",
+      "description": "Registered Session 3 start via python -m ai_router.start_session. Snapshot now currentSession=3, completedSessions=[1,2]. sessions[] from Session 2's writer is preserved with sessions[2].status flipped from complete to in-progress (actually, Session 3 in-progress; sessions 1,2 stayed complete). work_started event #3 appended to session-events.jsonl. Set 030 progress: 2/5 (40%) starting Session 3.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/audit",
+      "dateTime": "2026-05-17T13:30:00-04:00",
+      "description": "Grep audit for direct legacy-field reads across both codebases. Python: 33 files matched; production readers identified in close_session.py, gate_checks.py, start_session.py, __init__.py (plus the writer-allowed session_state.py and the carrier-field reader session_log.py). TypeScript: 20 files matched; production readers identified in fileSystem.ts (readSessionSets + isMidSetComplete) and SessionSetsProvider.ts (predicate + label). Carve-outs identified per D13: progress.py/progress.ts (helpers), session_state.py/sessionState.ts (writers), close_session._run_repair (v2-compat repair walk).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/read-progress-wrapper",
+      "dateTime": "2026-05-17T13:40:00-04:00",
+      "description": "Added read_progress(state, spec_md_path) to ai_router/progress.py as the canonical reader entry point per D13. Branches v3 (state.sessions present) vs v2 (synthesize first) internally. Mirror readProgress(state, specMdPath) added to tools/.../utils/progress.ts. Both raise SessionStateInvariantError on invariant violation; application readers wrapping in try/catch get defensive degradation. Added 5 pytest cases + 5 mocha cases covering the wrapper.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/python-readers-migrated",
+      "dateTime": "2026-05-17T13:50:00-04:00",
+      "description": "Migrated 4 Python reader sites: gate_checks.py three gates (check_activity_log_entry, check_next_orchestrator_present, check_change_log_fresh) via two new helpers (_read_progress_or_none + _session_in_focus); start_session.py preflight (current_in_flight + total_sessions derivation); close_session.py _peek_session_number; __init__.py print_session_set_status cost reporter. close_session._run_repair retains 3 inline # noqa: D13 markers (file-level allowlist; repair walks are v2-compat by definition). __init__.py line 898 keeps # noqa: D13 for the activity-log carrier-field read (different artifact's schema).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/ts-rename-done-to-complete",
+      "dateTime": "2026-05-17T14:00:00-04:00",
+      "description": "Renamed SessionState union literal 'done' -> 'complete' across the TypeScript codebase per spec D3. Touched: types.ts (the union), fileSystem.ts (STATE_RANK + isMidSetComplete return), SessionSetsProvider.ts (ICON_FILES key + group label 'Done' -> 'Complete' + progressText annotation + groupKey checks), troubleshoot.ts (user-visible help string), e2eHarness.ts (key type), 4 e2e test files (childrenOfGroup arg), 2 unit test files (state fixtures), 5 readSessionSets test assertions. tsc --noEmit clean after the cascade.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/ts-reader-migration",
+      "dateTime": "2026-05-17T14:10:00-04:00",
+      "description": "Migrated tools/.../utils/fileSystem.ts: isMidSetComplete collapsed from the Set 022 + Set 023 multi-signal predicate to a single v3 invariant probe (try readProgress; rule-N violation -> mid-set). v2-compat ledger-merge pre-processing populates completedSessions[] from session-events.jsonl when missing (preserves pre-Set-022 snapshots). readSessionSets state-file block migrated through readProgress; liveSession.currentSession/completedSessions/totalSessions/sessionsCompleted all derive from the v3 view. New helper readClosedSessionsFromLedger replaces the inlined version. SessionSetsProvider.ts isCurrentSessionInFlight simplified to a null-check on the v3 currentSession field (no longer needs the v2 'currentSession not in completedSessions[]' predicate).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/ts-writer-mirror",
+      "dateTime": "2026-05-17T14:20:00-04:00",
+      "description": "Updated tools/.../utils/sessionState.ts lazy-synth writers to mirror Session 2's Python writer changes. SCHEMA_VERSION bumped 2->3. New buildSessions(total, topStatus) helper produces v3 sessions[] for the inferred top-status. notStartedPayload and backfillPayload now emit the v3 dual-write shape (sessions[] + derived legacy triple) when spec.md declares totalSessions. Per rule 1, sessions[] is omitted when totalSessions is unknown - in that case the original (pre-fix) backfill code still escalated to status=complete which would fail readProgress; this is the Round A finding and is fixed in step 12 below.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/d13-lint-tests",
+      "dateTime": "2026-05-17T14:30:00-04:00",
+      "description": "Added two D13 lint tests. ai_router/tests/test_no_legacy_field_reads.py: pytest grep guard targeting dict-access patterns (.get('X'), ['X']); allowlist progress.py + session_state.py + session_log.py + close_session.py (file-level: _run_repair is v2-compat) + tests/ + scripts/ + lines with '# noqa: D13'; sanity-check test confirms the scanner walks the tree. tools/.../test/suite/noLegacyFieldReads.test.ts: Mocha equivalent targeting raw state-dict access patterns (sd.X, state.X, etc.) so downstream SessionSet/ProgressView reads aren't false-positives; allowlist mirrors the Python side plus providers/SessionSetsProvider.ts (reads SessionSet model, not raw state).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/test-fixture-updates",
+      "dateTime": "2026-05-17T14:40:00-04:00",
+      "description": "Updated 24 test cases for v3 semantics: e2e treeProvider-{force,happy,multiset,worktree}.test.ts (Done -> Complete strings, force-closed bucket change, session-1-in-flight annotation now fires); fileSystem.test.ts (state='done' -> 'complete', v2 fixtures need completedSessions[] for status=complete to validate, lazy-synth tests need spec totalSessions); cancelTreeView.test.ts (setupSet helper now emits v3-shape snapshots); sessionSetsProvider.test.ts (rewrote isCurrentSessionInFlight tests around v3 semantic - currentSession=null between sessions vs in-progress); fleshed out tests for v3 currentSession=null after each close. All test fixtures consistent with v3 invariants after edits.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-3/full-suite-pretest",
+      "dateTime": "2026-05-17T14:50:00-04:00",
+      "description": "Full pytest: 536 passed, 1 skipped, 8 e2e deselected (+2 from the new D13 lint test). Mocha test:unit: 375 passing, 2 failing (both pre-existing baseline failures: configEditor-foundation panel-lifecycle + notificationsSection rendering — verified baseline failures pre-existed). tsc --noEmit: clean. Layer 3 Playwright: 5/5 passing against v3 fixtures (Complete bucket label, N/N Complete annotation, force-closed buckets to Complete with [FORCED] badge under v3 force-promotes-all semantic).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "session-3/verification-round-a",
+      "dateTime": "2026-05-17T15:10:00-04:00",
+      "description": "Round A verification: gpt-5-4 via ai_router.route(task_type='session-verification'). Focused slice across 5 files (~770 LOC across 8 ranges per memory feedback_split_large_verification_bundles): progress.py read_progress wrapper, gate_checks.py 3 migrated gates, fileSystem.ts isMidSetComplete + readSessionSets state-file block + readClosedSessionsFromLedger, sessionState.ts buildSessions + notStartedPayload + backfillPayload. Cost: $0.28155, elapsed 543s, in=16644 out=15996 tokens, no escalation. Verifier returned REJECTED with 1 must-fix issue: backfillPayload no-plan promotion can emit reader-invalid {status: complete, no sessions[]} snapshots when spec.md lacks totalSessions.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "taskType": "session-verification",
+          "model": "gpt-5-4",
+          "costUsd": 0.28155,
+          "elapsedSeconds": 543.568,
+          "verdict": "REJECTED",
+          "issuesFound": 1
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "session-3/round-a-fix",
+      "dateTime": "2026-05-17T15:25:00-04:00",
+      "description": "Applied Round A fix: backfillPayload (both TS and Python) now falls through to the not-started shape when buildSessions returns undefined (totalSessions unknown). Prevents emitting {status: complete, no sessions[]} or {status: in-progress, no sessions[]} snapshots that readProgress would reject. Operator intent is preserved via file-presence signals; next boundary write with a known plan re-promotes. Added 2 Python regression tests in test_session_state_v3.py + 1 TS regression test in fileSystem.test.ts. Updated 2 test_read_status.py fixtures to include spec totalSessions (so they exercise the escalation path rather than the new not-started fallback).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 13,
+      "stepKey": "session-3/full-suite-postfix",
+      "dateTime": "2026-05-17T15:30:00-04:00",
+      "description": "Re-ran full suite after Round A fix. pytest: 538 passed (+2 regression tests + 2 read_status fixture updates pass), 1 skipped. Mocha test:unit: 376 passing (+1 regression test), 2 failing (same pre-existing baseline). tsc --noEmit: clean. All Session 3 deltas regression-tested.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 14,
+      "stepKey": "session-3/verification-round-b",
+      "dateTime": "2026-05-17T15:40:00-04:00",
+      "description": "Round B verification: gpt-5-4 via ai_router.route(task_type='session-verification'). Same slice strategy as Round A; updated line ranges. Cost: $0.23331, elapsed 187s, in=15030 out=13049 tokens, no escalation. Verifier confirmed all 4 Round A scope items VERIFIED (the read_progress wrapper, gate migration, fileSystem.ts migration, sessionState.ts writer fix). Round B introduced 1 NEW finding: synthesize_v3_from_v2's strict-int filter silently drops malformed legacy values rather than raising. Deliberately deferred — this is a Session 1 design decision the Session 1 verifier explicitly approved ('Pre-filter currentSession and completedSessions[] to strict positive ints'). The filter is defensive (don't crash readers on garbled v2 input) vs strict (raise on garbage). Per memory feedback_verifier_spiral_recruit_codex, Session 3 closes out here rather than spiraling on a strict-vs-defensive philosophy debate.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "taskType": "session-verification",
+          "model": "gpt-5-4",
+          "costUsd": 0.23331,
+          "elapsedSeconds": 187.43,
+          "verdict": "REJECTED",
+          "issuesFound": 1
+        }
+      ]
     }
   ]
 }

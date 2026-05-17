@@ -1,4 +1,29 @@
-export type SessionState = "done" | "in-progress" | "not-started" | "cancelled";
+export type SessionState = "complete" | "in-progress" | "not-started" | "cancelled";
+export type SessionStatus = "not-started" | "in-progress" | "complete" | "cancelled";
+export interface SessionRecord {
+    number: number;
+    title: string;
+    status: SessionStatus;
+}
+export interface ProgressView {
+    sessions: SessionRecord[];
+    totalSessions: number;
+    completedSessions: number[];
+    currentSession: number | null;
+    nextSession: number | null;
+    isBetweenSessions: boolean;
+}
+export interface SessionStateV3 {
+    schemaVersion: 3;
+    sessionSetName: string;
+    status: "not-started" | "in-progress" | "complete" | "cancelled";
+    lifecycleState: "work_in_progress" | "closed" | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    verificationVerdict: string | null;
+    orchestrator: OrchestratorInfo | null;
+    sessions: SessionRecord[];
+}
 export interface SessionSetConfig {
     requiresUAT: boolean;
     requiresE2E: boolean;

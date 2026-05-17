@@ -279,15 +279,41 @@ def synthesize_v3_from_v2(state: dict, spec_md_path: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def read_progress(state: dict, spec_md_path: Path) -> ProgressView:
+    """Single reader entry point for any session-state.json shape.
+
+    This is the canonical reader path application code (close-out
+    gates, the Session Set Explorer, the reconciler, repair logic)
+    MUST use under D13. Branches v2/v3 internally so callers never
+    touch the legacy ``currentSession`` / ``totalSessions`` /
+    ``completedSessions`` triple directly.
+
+    For v3 inputs (``sessions[]`` present), calls :func:`get_progress`
+    directly. For v2 inputs, runs :func:`synthesize_v3_from_v2` first,
+    then validates through ``get_progress``. The ``spec_md_path`` is
+    only consulted on the v2 branch — pass any path on v3 inputs;
+    missing/unreadable spec.md just falls back to ``"Session N"`` titles.
+
+    Raises :class:`SessionStateInvariantError` on invariant violation.
+    Application readers that want defensive fallback (e.g. degrade to
+    in-progress rather than throw) should wrap the call in try/except.
+    """
+    if state is None:
+        raise TypeError("read_progress: state is None")
+    if state.get("sessions") is not None:
+        return get_progress(state)
+    return get_progress(synthesize_v3_from_v2(state, spec_md_path))
+
+
 def get_progress(state: dict) -> ProgressView:
     """Return a normalized progress view over ``state``.
 
     Accepts a v3 state (with ``sessions[]``) directly. For v2 inputs,
     callers must first run :func:`synthesize_v3_from_v2` with the
     set's ``spec.md`` path — this keeps the helper pure and free of
-    filesystem coupling. The Session 2 writer path will always emit
-    v3, so production reads after migration will rarely take the v2
-    branch.
+    filesystem coupling. Application readers should prefer
+    :func:`read_progress` (which branches v2/v3 internally) over
+    calling this directly.
 
     Validates the 8 v3 invariants and raises
     :class:`SessionStateInvariantError` on violation. Readers that
@@ -547,6 +573,7 @@ __all__ = [
     "canonicalize_status",
     "extract_session_titles_from_spec",
     "synthesize_v3_from_v2",
+    "read_progress",
     "get_progress",
     "validate_invariants",
 ]

@@ -7762,14 +7762,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs19 = this.flowScalar(this.type);
+              const fs20 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs19, sep: [] });
+                map.items.push({ start, key: fs20, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs19);
+                this.stack.push(fs20);
               } else {
-                Object.assign(it, { key: fs19, sep: [] });
+                Object.assign(it, { key: fs20, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7897,13 +7897,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs19 = this.flowScalar(this.type);
+              const fs20 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs19, sep: [] });
+                fc.items.push({ start: [], key: fs20, sep: [] });
               else if (it.sep)
-                this.stack.push(fs19);
+                this.stack.push(fs20);
               else
-                Object.assign(it, { key: fs19, sep: [] });
+                Object.assign(it, { key: fs20, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -14682,7 +14682,7 @@ __export(extension_exports, {
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode17 = __toESM(require("vscode"));
-var fs18 = __toESM(require("fs"));
+var fs19 = __toESM(require("fs"));
 var path20 = __toESM(require("path"));
 
 // src/providers/SessionSetsProvider.ts
@@ -14691,7 +14691,7 @@ var path5 = __toESM(require("path"));
 
 // src/utils/fileSystem.ts
 var vscode = __toESM(require("vscode"));
-var fs3 = __toESM(require("fs"));
+var fs4 = __toESM(require("fs"));
 var path4 = __toESM(require("path"));
 
 // src/utils/git.ts
@@ -14724,8 +14724,23 @@ function listGitWorktrees(cwd) {
 // src/utils/sessionState.ts
 var fs = __toESM(require("fs"));
 var path2 = __toESM(require("path"));
-var SCHEMA_VERSION = 2;
+var SCHEMA_VERSION = 3;
 var SESSION_STATE_FILENAME = "session-state.json";
+function buildSessions(totalSessions, topStatus) {
+  if (totalSessions === null || totalSessions <= 0)
+    return void 0;
+  const out = [];
+  for (let n = 1; n <= totalSessions; n++) {
+    let status = "not-started";
+    if (topStatus === "complete") {
+      status = "complete";
+    } else if (topStatus === "in-progress" && n === 1) {
+      status = "in-progress";
+    }
+    out.push({ number: n, title: `Session ${n}`, status });
+  }
+  return out;
+}
 var STATUS_ALIASES = {
   completed: "complete",
   done: "complete"
@@ -14756,11 +14771,13 @@ function readTotalSessionsFromSpec(sessionSetDir) {
   return value;
 }
 function notStartedPayload(sessionSetDir) {
-  return {
+  const totalSessions = readTotalSessionsFromSpec(sessionSetDir);
+  const sessions = buildSessions(totalSessions, "not-started");
+  const base = {
     schemaVersion: SCHEMA_VERSION,
     sessionSetName: path2.basename(sessionSetDir.replace(/[\\/]+$/, "")),
     currentSession: null,
-    totalSessions: readTotalSessionsFromSpec(sessionSetDir),
+    totalSessions,
     status: "not-started",
     lifecycleState: null,
     startedAt: null,
@@ -14768,11 +14785,17 @@ function notStartedPayload(sessionSetDir) {
     verificationVerdict: null,
     orchestrator: null
   };
+  if (sessions !== void 0) {
+    base.sessions = sessions;
+    base.completedSessions = [];
+  }
+  return base;
 }
 function backfillPayload(sessionSetDir) {
-  const base = notStartedPayload(sessionSetDir);
+  const totalSessions = readTotalSessionsFromSpec(sessionSetDir);
   const changelogPath = path2.join(sessionSetDir, "change-log.md");
   if (fs.existsSync(changelogPath)) {
+    const base = notStartedPayload(sessionSetDir);
     base.status = "complete";
     base.lifecycleState = "closed";
     try {
@@ -14781,10 +14804,17 @@ function backfillPayload(sessionSetDir) {
     } catch {
       base.completedAt = null;
     }
+    const sessions = buildSessions(totalSessions, "complete");
+    if (sessions !== void 0) {
+      base.sessions = sessions;
+      base.completedSessions = sessions.map((s) => s.number);
+      base.currentSession = null;
+    }
     return base;
   }
   const activityPath = path2.join(sessionSetDir, "activity-log.json");
   if (fs.existsSync(activityPath)) {
+    const base = notStartedPayload(sessionSetDir);
     base.status = "in-progress";
     base.lifecycleState = "work_in_progress";
     try {
@@ -14799,9 +14829,15 @@ function backfillPayload(sessionSetDir) {
     } catch {
       base.startedAt = null;
     }
+    const sessions = buildSessions(totalSessions, "in-progress");
+    if (sessions !== void 0) {
+      base.sessions = sessions;
+      base.completedSessions = [];
+      base.currentSession = 1;
+    }
     return base;
   }
-  return base;
+  return notStartedPayload(sessionSetDir);
 }
 function atomicWriteJson(filePath, payload) {
   const directory = path2.dirname(filePath);
@@ -14995,11 +15031,304 @@ async function restoreSessionSet(sessionSetDir, reason = "") {
   }
 }
 
+// src/utils/progress.ts
+var fs3 = __toESM(require("fs"));
+var SCHEMA_VERSION_V3 = 3;
+var SESSION_STATUS_NOT_STARTED = "not-started";
+var SESSION_STATUS_IN_PROGRESS = "in-progress";
+var SESSION_STATUS_COMPLETE = "complete";
+var SESSION_STATUSES = [
+  SESSION_STATUS_NOT_STARTED,
+  SESSION_STATUS_IN_PROGRESS,
+  SESSION_STATUS_COMPLETE
+];
+var TOP_LEVEL_STATUSES = [
+  "not-started",
+  "in-progress",
+  "complete",
+  "cancelled"
+];
+var LIFECYCLE_STATE_CLOSED = "closed";
+var STATUS_ALIASES2 = {
+  completed: SESSION_STATUS_COMPLETE,
+  done: SESSION_STATUS_COMPLETE
+};
+function canonicalizeStatus2(value) {
+  if (value === null || value === void 0) {
+    return null;
+  }
+  return STATUS_ALIASES2[value] ?? value;
+}
+var SessionStateInvariantError = class extends Error {
+  constructor(rule, message) {
+    super(`[v3 invariant rule ${rule}] ${message}`);
+    this.rule = rule;
+    this.name = "SessionStateInvariantError";
+  }
+};
+var SESSION_HEADING_RE = /^###\s+Session\s+(\d+)(?:\s+of\s+\d+)?\s*:\s*(.+?)\s*$/gm;
+function extractSessionTitlesFromSpec(specMdPath) {
+  let text;
+  try {
+    text = fs3.readFileSync(specMdPath, "utf-8");
+  } catch {
+    return [];
+  }
+  const out = [];
+  let m;
+  SESSION_HEADING_RE.lastIndex = 0;
+  while ((m = SESSION_HEADING_RE.exec(text)) !== null) {
+    out.push({ number: parseInt(m[1], 10), title: m[2].trim() });
+  }
+  out.sort((a, b2) => a.number - b2.number);
+  return out;
+}
+function isStrictPositiveInt(v) {
+  return typeof v === "number" && Number.isInteger(v) && v > 0 && typeof v !== "boolean";
+}
+function synthesizeV3FromV2(state, specMdPath) {
+  if (state === null || state === void 0) {
+    throw new TypeError("synthesizeV3FromV2: state is null");
+  }
+  const legacyCurrent = isStrictPositiveInt(state.currentSession) ? state.currentSession : null;
+  const legacyTotal = isStrictPositiveInt(state.totalSessions) ? state.totalSessions : 0;
+  const legacyCompleted = Array.isArray(state.completedSessions) ? state.completedSessions.filter((n) => isStrictPositiveInt(n)) : [];
+  const topStatusRaw = state.status ?? null;
+  const topStatus = canonicalizeStatus2(topStatusRaw);
+  const titles = extractSessionTitlesFromSpec(specMdPath);
+  const titlesByNumber = /* @__PURE__ */ new Map();
+  for (const t2 of titles) {
+    titlesByNumber.set(t2.number, t2.title);
+  }
+  let total = legacyTotal;
+  for (const n of titlesByNumber.keys()) {
+    if (n > total)
+      total = n;
+  }
+  for (const n of legacyCompleted) {
+    if (n > total)
+      total = n;
+  }
+  if (legacyCurrent !== null && legacyCurrent > total) {
+    total = legacyCurrent;
+  }
+  const completedSet = new Set(legacyCompleted);
+  const sessions = [];
+  for (let n = 1; n <= total; n++) {
+    const title = titlesByNumber.get(n) ?? `Session ${n}`;
+    let status;
+    if (completedSet.has(n)) {
+      status = SESSION_STATUS_COMPLETE;
+    } else if (legacyCurrent === n && topStatus === "in-progress" && !completedSet.has(n)) {
+      status = SESSION_STATUS_IN_PROGRESS;
+    } else {
+      status = SESSION_STATUS_NOT_STARTED;
+    }
+    sessions.push({ number: n, title, status });
+  }
+  const out = { ...state };
+  out.schemaVersion = SCHEMA_VERSION_V3;
+  out.sessions = sessions;
+  if (topStatus !== null && topStatus !== topStatusRaw) {
+    out.status = topStatus;
+  }
+  return out;
+}
+function readProgress(state, specMdPath) {
+  if (state === null || state === void 0) {
+    throw new TypeError("readProgress: state is null");
+  }
+  if (state.sessions !== void 0 && state.sessions !== null) {
+    return getProgress(state);
+  }
+  return getProgress(synthesizeV3FromV2(state, specMdPath));
+}
+function getProgress(state) {
+  if (state === null || state === void 0) {
+    throw new TypeError("getProgress: state is null");
+  }
+  const rawSessions = state.sessions;
+  if (rawSessions === void 0 || rawSessions === null) {
+    throw new SessionStateInvariantError(
+      1,
+      "sessions[] is missing; synthesize v3 from v2 first or pass a v3 state"
+    );
+  }
+  const sessions = parseSessions(rawSessions);
+  const topStatus = canonicalizeStatus2(state.status ?? null);
+  const lifecycleState = state.lifecycleState ?? null;
+  validateInvariants(sessions, topStatus, lifecycleState);
+  const completedNumbers = sessions.filter((s) => s.status === SESSION_STATUS_COMPLETE).map((s) => s.number);
+  const inProgress = sessions.filter((s) => s.status === SESSION_STATUS_IN_PROGRESS);
+  const currentSession = inProgress.length > 0 ? inProgress[0].number : null;
+  const notStarted = sessions.filter((s) => s.status === SESSION_STATUS_NOT_STARTED);
+  const nextSession = notStarted.length > 0 ? notStarted[0].number : null;
+  const isBetweenSessions = currentSession === null && completedNumbers.length >= 1 && nextSession !== null;
+  return {
+    sessions,
+    totalSessions: sessions.length,
+    completedSessions: completedNumbers,
+    currentSession,
+    nextSession,
+    isBetweenSessions
+  };
+}
+function validateInvariants(sessions, topStatus, lifecycleState) {
+  if (sessions.length === 0) {
+    throw new SessionStateInvariantError(1, "sessions[] must be non-empty");
+  }
+  const seen = /* @__PURE__ */ new Set();
+  let expected = 1;
+  for (const s of sessions) {
+    if (!Number.isInteger(s.number) || typeof s.number === "boolean") {
+      throw new SessionStateInvariantError(
+        2,
+        `session number must be an integer (not bool/float/string); got ${JSON.stringify(s.number)} of type ${typeof s.number}`
+      );
+    }
+    if (s.number <= 0) {
+      throw new SessionStateInvariantError(
+        2,
+        `session number must be positive, got ${s.number}`
+      );
+    }
+    if (seen.has(s.number)) {
+      throw new SessionStateInvariantError(
+        2,
+        `duplicate session number: ${s.number}`
+      );
+    }
+    if (s.number !== expected) {
+      throw new SessionStateInvariantError(
+        2,
+        `session numbers must be contiguous starting at 1; expected ${expected} next, got ${s.number}`
+      );
+    }
+    seen.add(s.number);
+    expected = s.number + 1;
+    if (!SESSION_STATUSES.includes(s.status)) {
+      throw new SessionStateInvariantError(
+        2,
+        `session ${s.number} has unknown status ${JSON.stringify(s.status)}; expected one of ${SESSION_STATUSES.join(", ")}`
+      );
+    }
+  }
+  const inProgress = sessions.filter((s) => s.status === SESSION_STATUS_IN_PROGRESS);
+  if (inProgress.length > 1) {
+    throw new SessionStateInvariantError(
+      3,
+      `only one session may be in-progress at a time; found: ${inProgress.map((s) => s.number).join(", ")}`
+    );
+  }
+  let blockerNumber = null;
+  let blockerStatus = null;
+  for (const s of sessions) {
+    if (s.status === SESSION_STATUS_NOT_STARTED || s.status === SESSION_STATUS_IN_PROGRESS) {
+      if (blockerNumber === null) {
+        blockerNumber = s.number;
+        blockerStatus = s.status;
+      }
+    } else if (s.status === SESSION_STATUS_COMPLETE && blockerNumber !== null) {
+      throw new SessionStateInvariantError(
+        4,
+        `session ${s.number} is complete but earlier session ${blockerNumber} is ${JSON.stringify(blockerStatus)}; complete sessions must form a contiguous prefix`
+      );
+    }
+  }
+  if (lifecycleState === LIFECYCLE_STATE_CLOSED) {
+    if (topStatus !== "complete" && topStatus !== "cancelled") {
+      throw new SessionStateInvariantError(
+        8,
+        `lifecycleState 'closed' requires status 'complete' or 'cancelled', got ${JSON.stringify(topStatus)}`
+      );
+    }
+  }
+  if (topStatus === null) {
+    return;
+  }
+  if (!TOP_LEVEL_STATUSES.includes(topStatus)) {
+    throw new SessionStateInvariantError(
+      2,
+      `top-level status must be one of ${TOP_LEVEL_STATUSES.join(", ")}, got ${JSON.stringify(topStatus)}`
+    );
+  }
+  if (topStatus === "not-started") {
+    const offenders = sessions.filter((s) => s.status !== SESSION_STATUS_NOT_STARTED).map((s) => s.number);
+    if (offenders.length > 0) {
+      throw new SessionStateInvariantError(
+        5,
+        `top-level status 'not-started' but sessions [${offenders.join(", ")}] are not 'not-started'`
+      );
+    }
+  }
+  if (topStatus === "complete") {
+    const offenders = sessions.filter((s) => s.status !== SESSION_STATUS_COMPLETE).map((s) => s.number);
+    if (offenders.length > 0) {
+      throw new SessionStateInvariantError(
+        7,
+        `top-level status 'complete' but sessions [${offenders.join(", ")}] are not 'complete'`
+      );
+    }
+  }
+  if (topStatus === "in-progress") {
+    const completeCount = sessions.filter((s) => s.status === SESSION_STATUS_COMPLETE).length;
+    const notStartedCount = sessions.filter(
+      (s) => s.status === SESSION_STATUS_NOT_STARTED
+    ).length;
+    const inProgressCount = inProgress.length;
+    const okActive = inProgressCount === 1;
+    const okBetween = inProgressCount === 0 && completeCount >= 1 && notStartedCount >= 1;
+    if (!okActive && !okBetween) {
+      throw new SessionStateInvariantError(
+        6,
+        `top-level status 'in-progress' requires either exactly one in-progress session or a between-sessions state (>=1 complete, >=1 not-started, 0 in-progress); got in_progress=${inProgressCount}, complete=${completeCount}, not_started=${notStartedCount}`
+      );
+    }
+  }
+}
+function parseSessions(raw) {
+  if (!Array.isArray(raw)) {
+    throw new SessionStateInvariantError(
+      1,
+      `sessions[] must be an array, got ${typeof raw}`
+    );
+  }
+  const out = [];
+  for (let i2 = 0; i2 < raw.length; i2++) {
+    const entry = raw[i2];
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new SessionStateInvariantError(
+        2,
+        `sessions[${i2}] must be an object, got ${Array.isArray(entry) ? "array" : typeof entry}`
+      );
+    }
+    if (!("number" in entry)) {
+      throw new SessionStateInvariantError(
+        2,
+        `sessions[${i2}] missing required key 'number'`
+      );
+    }
+    if (!("status" in entry)) {
+      throw new SessionStateInvariantError(
+        2,
+        `sessions[${i2}] missing required key 'status'`
+      );
+    }
+    const status = canonicalizeStatus2(entry.status) ?? entry.status;
+    out.push({
+      number: entry.number,
+      title: entry.title ?? `Session ${entry.number}`,
+      status
+    });
+  }
+  return out;
+}
+
 // src/utils/fileSystem.ts
 var SESSION_SETS_REL = path4.join("docs", "session-sets");
 var PLAYWRIGHT_REL_DEFAULT = "tests";
 var STATE_RANK = {
-  done: 3,
+  complete: 3,
   "in-progress": 2,
   "not-started": 1,
   cancelled: 0
@@ -15012,7 +15341,7 @@ function discoverRoots() {
       return;
     const canonical = path4.resolve(p2);
     const key = canonical.toLowerCase();
-    if (seen.has(key) || !fs3.existsSync(canonical))
+    if (seen.has(key) || !fs4.existsSync(canonical))
       return;
     seen.set(key, canonical);
     order.push(canonical);
@@ -15028,62 +15357,65 @@ function discoverRoots() {
   return order;
 }
 function isMidSetComplete(statePath) {
-  if (!fs3.existsSync(statePath))
+  if (!fs4.existsSync(statePath))
     return false;
+  let sd;
   try {
-    const sd = JSON.parse(fs3.readFileSync(statePath, "utf8"));
-    if (typeof sd.currentSession !== "number")
-      return false;
-    if (typeof sd.totalSessions !== "number")
-      return false;
-    if (sd.currentSession < sd.totalSessions)
-      return true;
-    if (Array.isArray(sd.completedSessions) && sd.completedSessions.includes(sd.currentSession)) {
-      const eventsPath2 = path4.join(path4.dirname(statePath), "session-events.jsonl");
-      if (fs3.existsSync(eventsPath2) && !hasCloseoutEventForSession(eventsPath2, sd.currentSession)) {
-        const slug = path4.basename(path4.dirname(statePath));
-        console.warn(
-          `[session-set ${slug}] completedSessions[] overrides missing ledger closeout for session ${sd.currentSession}`
-        );
-      }
-      return false;
-    }
-    const eventsPath = path4.join(path4.dirname(statePath), "session-events.jsonl");
-    if (fs3.existsSync(eventsPath) && !hasCloseoutEventForSession(eventsPath, sd.currentSession)) {
-      return true;
-    }
-    return false;
+    sd = JSON.parse(fs4.readFileSync(statePath, "utf8"));
   } catch {
+    return false;
+  }
+  if (sd === null || typeof sd !== "object" || Array.isArray(sd))
+    return false;
+  let stateForProgress = sd;
+  if (sd.sessions === void 0 && (!Array.isArray(sd.completedSessions) || sd.completedSessions.length === 0)) {
+    const eventsPath = path4.join(path4.dirname(statePath), "session-events.jsonl");
+    const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
+    if (ledgerSessions.length > 0) {
+      stateForProgress = { ...sd, completedSessions: ledgerSessions };
+    }
+  }
+  const specPath = path4.join(path4.dirname(statePath), "spec.md");
+  try {
+    readProgress(stateForProgress, specPath);
+    return false;
+  } catch (e) {
+    if (e instanceof SessionStateInvariantError) {
+      return true;
+    }
     return false;
   }
 }
-function hasCloseoutEventForSession(eventsPath, sessionNumber) {
+function readClosedSessionsFromLedger(eventsPath) {
+  if (!fs4.existsSync(eventsPath))
+    return [];
   let text;
   try {
-    text = fs3.readFileSync(eventsPath, "utf8");
+    text = fs4.readFileSync(eventsPath, "utf8");
   } catch {
-    return false;
+    return [];
   }
+  const seen = /* @__PURE__ */ new Set();
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line)
       continue;
     try {
       const event = JSON.parse(line);
-      if (event.event_type === "closeout_succeeded" && event.session_number === sessionNumber) {
-        return true;
+      if (event.event_type === "closeout_succeeded" && typeof event.session_number === "number" && Number.isInteger(event.session_number) && event.session_number > 0) {
+        seen.add(event.session_number);
       }
     } catch {
     }
   }
-  return false;
+  return [...seen].sort((a, b2) => a - b2);
 }
 function countDistinctCloseoutSessions(eventsPath) {
-  if (!fs3.existsSync(eventsPath))
+  if (!fs4.existsSync(eventsPath))
     return 0;
   let text;
   try {
-    text = fs3.readFileSync(eventsPath, "utf8");
+    text = fs4.readFileSync(eventsPath, "utf8");
   } catch {
     return 0;
   }
@@ -15108,11 +15440,11 @@ function parseSessionSetConfig(specPath) {
     requiresE2E: false,
     uatScope: "none"
   };
-  if (!fs3.existsSync(specPath))
+  if (!fs4.existsSync(specPath))
     return config;
   let text;
   try {
-    text = fs3.readFileSync(specPath, "utf8");
+    text = fs4.readFileSync(specPath, "utf8");
   } catch {
     return config;
   }
@@ -15134,11 +15466,11 @@ function parseSessionSetConfig(specPath) {
   return config;
 }
 function parseUatChecklist(checklistPath) {
-  if (!fs3.existsSync(checklistPath))
+  if (!fs4.existsSync(checklistPath))
     return null;
   let data;
   try {
-    data = JSON.parse(fs3.readFileSync(checklistPath, "utf8"));
+    data = JSON.parse(fs4.readFileSync(checklistPath, "utf8"));
   } catch {
     return null;
   }
@@ -15173,16 +15505,16 @@ function parseUatChecklist(checklistPath) {
 }
 function readSessionSets(root) {
   const sessionSetsDir = path4.join(root, SESSION_SETS_REL);
-  if (!fs3.existsSync(sessionSetsDir))
+  if (!fs4.existsSync(sessionSetsDir))
     return [];
-  const entries = fs3.readdirSync(sessionSetsDir, { withFileTypes: true });
+  const entries = fs4.readdirSync(sessionSetsDir, { withFileTypes: true });
   const sets = [];
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith("_"))
       continue;
     const dir = path4.join(sessionSetsDir, entry.name);
     const specPath = path4.join(dir, "spec.md");
-    if (!fs3.existsSync(specPath))
+    if (!fs4.existsSync(specPath))
       continue;
     const activityPath = path4.join(dir, "activity-log.json");
     const changeLogPath = path4.join(dir, "change-log.md");
@@ -15195,7 +15527,7 @@ function readSessionSets(root) {
     } else {
       const status = readStatus(dir);
       if (status === "complete") {
-        state = isMidSetComplete(statePath) ? "in-progress" : "done";
+        state = isMidSetComplete(statePath) ? "in-progress" : "complete";
       } else if (status === "in-progress") {
         state = "in-progress";
       } else {
@@ -15207,9 +15539,9 @@ function readSessionSets(root) {
     let lastTouched = null;
     let liveSession = null;
     const eventsPath = path4.join(dir, "session-events.jsonl");
-    if (fs3.existsSync(activityPath)) {
+    if (fs4.existsSync(activityPath)) {
       try {
-        const data = JSON.parse(fs3.readFileSync(activityPath, "utf8"));
+        const data = JSON.parse(fs4.readFileSync(activityPath, "utf8"));
         if (typeof data.totalSessions === "number")
           totalSessions = data.totalSessions;
         for (const e of data.entries ?? []) {
@@ -15219,32 +15551,53 @@ function readSessionSets(root) {
       } catch {
       }
     }
-    if (fs3.existsSync(statePath)) {
+    if (fs4.existsSync(statePath)) {
       try {
-        const sd = JSON.parse(fs3.readFileSync(statePath, "utf8"));
-        if (typeof sd.totalSessions === "number") {
-          totalSessions = sd.totalSessions;
+        const sd = JSON.parse(fs4.readFileSync(statePath, "utf8"));
+        let progressTotal = null;
+        let progressCompleted = null;
+        let progressCurrent = null;
+        let stateForProgress = sd;
+        if (sd.sessions === void 0 && (!Array.isArray(sd.completedSessions) || // noqa: D13 - v2-compat ledger-merge for synthesizer input
+        (sd.completedSessions?.length ?? 0) === 0)) {
+          const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
+          if (ledgerSessions.length > 0) {
+            stateForProgress = { ...sd, completedSessions: ledgerSessions };
+          }
+        }
+        try {
+          const view = readProgress(stateForProgress, specPath);
+          progressTotal = view.totalSessions;
+          progressCompleted = [...view.completedSessions];
+          progressCurrent = view.currentSession;
+        } catch (e) {
+          if (!(e instanceof SessionStateInvariantError)) {
+            throw e;
+          }
+        }
+        if (progressTotal !== null && progressTotal > 0) {
+          totalSessions = progressTotal;
         }
         const stateTouched = sd.completedAt || sd.startedAt;
         if (stateTouched && (!lastTouched || stateTouched > lastTouched))
           lastTouched = stateTouched;
         liveSession = {
-          currentSession: sd.currentSession ?? null,
+          currentSession: progressCurrent,
           status: sd.status ?? null,
           orchestrator: sd.orchestrator ?? null,
           startedAt: sd.startedAt ?? null,
           completedAt: sd.completedAt ?? null,
           verificationVerdict: sd.verificationVerdict ?? null,
           forceClosed: sd.forceClosed ?? null,
-          completedSessions: Array.isArray(sd.completedSessions) ? sd.completedSessions : null
+          completedSessions: progressCompleted
         };
-        if (Array.isArray(sd.completedSessions)) {
-          sessionsCompleted = sd.completedSessions.length;
+        if (progressCompleted !== null) {
+          sessionsCompleted = progressCompleted.length;
         } else {
           const ledgerCount = countDistinctCloseoutSessions(eventsPath);
           if (ledgerCount > 0) {
             sessionsCompleted = ledgerCount;
-          } else if (state === "done" && typeof totalSessions === "number") {
+          } else if (state === "complete" && typeof totalSessions === "number") {
             sessionsCompleted = totalSessions;
           }
         }
@@ -15281,7 +15634,7 @@ function readSessionSets(root) {
       {}
     );
     console.log(
-      `[dabbler-ai-orchestration] readSessionSets(${path4.basename(root)}): ${sets.length} set(s) \u2014 done=${counts.done ?? 0}, in-progress=${counts["in-progress"] ?? 0}, not-started=${counts["not-started"] ?? 0}, cancelled=${counts.cancelled ?? 0}`
+      `[dabbler-ai-orchestration] readSessionSets(${path4.basename(root)}): ${sets.length} set(s) \u2014 complete=${counts.complete ?? 0}, in-progress=${counts["in-progress"] ?? 0}, not-started=${counts["not-started"] ?? 0}, cancelled=${counts.cancelled ?? 0}`
     );
   }
   return sets;
@@ -15310,7 +15663,7 @@ function readAllSessionSets() {
 
 // src/providers/SessionSetsProvider.ts
 var ICON_FILES = {
-  done: "done.svg",
+  complete: "done.svg",
   "in-progress": "in-progress.svg",
   "not-started": "not-started.svg",
   cancelled: "cancelled.svg"
@@ -15320,19 +15673,12 @@ function iconUriFor(extensionUri, state) {
   return file ? vscode2.Uri.joinPath(extensionUri, "media", file) : void 0;
 }
 function isCurrentSessionInFlight(set) {
-  const ls = set.liveSession;
-  if (!ls)
-    return false;
-  if (typeof ls.currentSession !== "number")
-    return false;
-  if (!Array.isArray(ls.completedSessions))
-    return false;
-  return !ls.completedSessions.includes(ls.currentSession);
+  return set.liveSession?.currentSession != null;
 }
 function progressText(set) {
-  const base = set.totalSessions && set.totalSessions > 0 ? `${set.sessionsCompleted}/${set.totalSessions}` : set.sessionsCompleted > 0 ? `${set.sessionsCompleted} done` : "";
-  if (set.state === "done" && base) {
-    return `${base} Done`;
+  const base = set.totalSessions && set.totalSessions > 0 ? `${set.sessionsCompleted}/${set.totalSessions}` : set.sessionsCompleted > 0 ? `${set.sessionsCompleted} complete` : "";
+  if (set.state === "complete" && base) {
+    return `${base} Complete`;
   }
   if (set.state === "in-progress" && isCurrentSessionInFlight(set)) {
     const n = set.liveSession?.currentSession;
@@ -15448,12 +15794,12 @@ var SessionSetsProvider = class {
       }
       const inProgress = all.filter((s) => s.state === "in-progress");
       const notStarted = all.filter((s) => s.state === "not-started");
-      const done = all.filter((s) => s.state === "done");
+      const complete = all.filter((s) => s.state === "complete");
       const cancelled = all.filter((s) => s.state === "cancelled");
       const groups = [
         this.makeGroup("In Progress", "in-progress", inProgress.length),
         this.makeGroup("Not Started", "not-started", notStarted.length),
-        this.makeGroup("Done", "done", done.length)
+        this.makeGroup("Complete", "complete", complete.length)
       ];
       if (cancelled.length > 0) {
         groups.push(this.makeGroup("Cancelled", "cancelled", cancelled.length));
@@ -15463,7 +15809,7 @@ var SessionSetsProvider = class {
     const group = element;
     if (group.contextValue === "group") {
       const subset = all.filter((s) => s.state === group.groupKey);
-      if (group.groupKey === "in-progress" || group.groupKey === "done" || group.groupKey === "cancelled") {
+      if (group.groupKey === "in-progress" || group.groupKey === "complete" || group.groupKey === "cancelled") {
         subset.sort(
           (a, b2) => (b2.lastTouched || "").localeCompare(a.lastTouched || "")
         );
@@ -15521,10 +15867,10 @@ var SessionSetsProvider = class {
 
 // src/commands/openFile.ts
 var vscode3 = __toESM(require("vscode"));
-var fs4 = __toESM(require("fs"));
+var fs5 = __toESM(require("fs"));
 var path6 = __toESM(require("path"));
 function openIfExists(filePath, label) {
-  if (!filePath || !fs4.existsSync(filePath)) {
+  if (!filePath || !fs5.existsSync(filePath)) {
     vscode3.window.showInformationMessage(
       `${label} does not exist yet: ${filePath ? path6.basename(filePath) : "<unknown>"}`
     );
@@ -15536,7 +15882,7 @@ function findPlaywrightTests(set) {
   const cfg = vscode3.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
   const playwrightDir = path6.join(set.root, testDirRel);
-  if (!fs4.existsSync(playwrightDir))
+  if (!fs5.existsSync(playwrightDir))
     return [];
   const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
   const testRefs = set.uatSummary?.e2eRefs ?? [];
@@ -15546,7 +15892,7 @@ function findPlaywrightTests(set) {
       return;
     let entries;
     try {
-      entries = fs4.readdirSync(dir, { withFileTypes: true });
+      entries = fs5.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
@@ -15567,7 +15913,7 @@ function findPlaywrightTests(set) {
       }
       if (testRefs.length > 0) {
         try {
-          const txt = fs4.readFileSync(p2, "utf8");
+          const txt = fs5.readFileSync(p2, "utf8");
           for (const ref of testRefs) {
             const short = String(ref).split(".").pop();
             if (short && txt.includes(short)) {
@@ -15689,7 +16035,7 @@ function registerCopyCommands(context) {
 
 // src/commands/gitScaffold.ts
 var vscode5 = __toESM(require("vscode"));
-var fs5 = __toESM(require("fs"));
+var fs6 = __toESM(require("fs"));
 var path7 = __toESM(require("path"));
 
 // node_modules/simple-git/dist/esm/index.js
@@ -20690,8 +21036,8 @@ function registerGitScaffoldCommand(context) {
       }
       for (const rel of SCAFFOLD_DIRS) {
         const full = path7.join(projectDir, rel);
-        if (!fs5.existsSync(full))
-          fs5.mkdirSync(full, { recursive: true });
+        if (!fs6.existsSync(full))
+          fs6.mkdirSync(full, { recursive: true });
       }
       vscode5.window.showInformationMessage("Folder skeleton created.");
       const worktreeAnswer = await vscode5.window.showInformationMessage(
@@ -20707,8 +21053,8 @@ function registerGitScaffoldCommand(context) {
             await git.commit("init", { "--allow-empty": null });
           }
           const worktreesDir = path7.join(projectDir, "worktrees");
-          if (!fs5.existsSync(worktreesDir))
-            fs5.mkdirSync(worktreesDir, { recursive: true });
+          if (!fs6.existsSync(worktreesDir))
+            fs6.mkdirSync(worktreesDir, { recursive: true });
           await git.raw(["worktree", "add", path7.join(worktreesDir, "main"), "HEAD"]);
           vscode5.window.showInformationMessage(
             "Worktrees set up. Work from worktrees/main/ for parallel sessions."
@@ -20753,7 +21099,7 @@ function registerCopyAdoptionBootstrapPromptCommand(context) {
 
 // src/commands/troubleshoot.ts
 var vscode7 = __toESM(require("vscode"));
-var fs6 = __toESM(require("fs"));
+var fs7 = __toESM(require("fs"));
 var path8 = __toESM(require("path"));
 var cp2 = __toESM(require("child_process"));
 function workspaceRoot() {
@@ -20771,7 +21117,7 @@ function checkActivation() {
     return;
   }
   const dir = path8.join(root, SESSION_SETS_REL);
-  const exists2 = fs6.existsSync(dir);
+  const exists2 = fs7.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
   if (!exists2) {
@@ -20790,7 +21136,7 @@ function checkStateStuck() {
   ch.appendLine("Session-set state machine:");
   ch.appendLine("  not-started  \u2192  only spec.md exists");
   ch.appendLine("  in-progress  \u2192  activity-log.json OR session-state.json exists");
-  ch.appendLine("  done         \u2192  change-log.md exists");
+  ch.appendLine("  complete     \u2192  change-log.md exists");
   ch.appendLine("");
   ch.appendLine(
     "If a session appears stuck, check that the AI router wrote the expected files. Open 'Activity Log' from the context menu to inspect the raw log."
@@ -20865,7 +21211,7 @@ function checkLayout() {
   ch.appendLine("");
   for (const d of dirs) {
     const full = path8.join(root, d);
-    const exists2 = fs6.existsSync(full);
+    const exists2 = fs7.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
   ch.appendLine("");
@@ -20992,7 +21338,7 @@ function registerCancelLifecycleCommands(context, deps) {
 
 // src/commands/installAiRouterCommands.ts
 var cp3 = __toESM(require("child_process"));
-var fs7 = __toESM(require("fs"));
+var fs8 = __toESM(require("fs"));
 var os = __toESM(require("os"));
 var path10 = __toESM(require("path"));
 var vscode9 = __toESM(require("vscode"));
@@ -21413,7 +21759,7 @@ async function runInstallFlow(mode) {
   }
   vscode9.window.showInformationMessage(outcome.message);
   const routerConfig = path10.join(root, ROUTER_CONFIG_REL);
-  if (fs7.existsSync(routerConfig)) {
+  if (fs8.existsSync(routerConfig)) {
     try {
       const doc = await vscode9.workspace.openTextDocument(routerConfig);
       await vscode9.window.showTextDocument(doc, { preview: false });
@@ -21493,8 +21839,8 @@ function makeSpawner() {
 }
 function makeFileOps() {
   return {
-    exists: (p2) => fs7.existsSync(p2),
-    readFile: (p2) => fs7.readFileSync(p2, "utf8"),
+    exists: (p2) => fs8.existsSync(p2),
+    readFile: (p2) => fs8.readFileSync(p2, "utf8"),
     // Always ensure the parent directory exists before writing. The
     // GitHub-fallback flow can momentarily leave the destination
     // ai_router/ directory missing (between `removeRecursive(dst)` and
@@ -21504,30 +21850,30 @@ function makeFileOps() {
     // cost of dropping it is silent data loss in a narrow but real
     // failure window. Round-3 verifier catch.
     writeFile: (p2, content) => {
-      fs7.mkdirSync(path10.dirname(p2), { recursive: true });
-      fs7.writeFileSync(p2, content, "utf8");
+      fs8.mkdirSync(path10.dirname(p2), { recursive: true });
+      fs8.writeFileSync(p2, content, "utf8");
     },
-    mkdirp: (p2) => fs7.mkdirSync(p2, { recursive: true }),
+    mkdirp: (p2) => fs8.mkdirSync(p2, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),
     removeRecursive: (p2) => {
-      if (fs7.existsSync(p2))
-        fs7.rmSync(p2, { recursive: true, force: true });
+      if (fs8.existsSync(p2))
+        fs8.rmSync(p2, { recursive: true, force: true });
     },
-    mkdtemp: (prefix) => fs7.mkdtempSync(path10.join(os.tmpdir(), prefix))
+    mkdtemp: (prefix) => fs8.mkdtempSync(path10.join(os.tmpdir(), prefix))
   };
 }
 function copyDirSync(src, dst) {
-  fs7.mkdirSync(dst, { recursive: true });
-  for (const entry of fs7.readdirSync(src, { withFileTypes: true })) {
+  fs8.mkdirSync(dst, { recursive: true });
+  for (const entry of fs8.readdirSync(src, { withFileTypes: true })) {
     const s = path10.join(src, entry.name);
     const d = path10.join(dst, entry.name);
     if (entry.isDirectory()) {
       copyDirSync(s, d);
     } else if (entry.isSymbolicLink()) {
-      const target = fs7.readlinkSync(s);
-      fs7.symlinkSync(target, d);
+      const target = fs8.readlinkSync(s);
+      fs8.symlinkSync(target, d);
     } else {
-      fs7.copyFileSync(s, d);
+      fs8.copyFileSync(s, d);
     }
   }
 }
@@ -21577,11 +21923,11 @@ function makePrompts() {
 
 // src/wizard/WizardPanel.ts
 var vscode12 = __toESM(require("vscode"));
-var fs10 = __toESM(require("fs"));
+var fs11 = __toESM(require("fs"));
 
 // src/wizard/planImport.ts
 var vscode10 = __toESM(require("vscode"));
-var fs8 = __toESM(require("fs"));
+var fs9 = __toESM(require("fs"));
 var path11 = __toESM(require("path"));
 var PLAN_DEST = path11.join("docs", "planning", "project-plan.md");
 var PLAN_AUTHORING_PROMPT = `You are a project planning assistant for an AI-led development workflow.
@@ -21634,9 +21980,9 @@ function registerPlanImportCommand(context) {
       }
       const destPath = path11.join(root, PLAN_DEST);
       const destDir = path11.dirname(destPath);
-      if (!fs8.existsSync(destDir))
-        fs8.mkdirSync(destDir, { recursive: true });
-      if (fs8.existsSync(destPath)) {
+      if (!fs9.existsSync(destDir))
+        fs9.mkdirSync(destDir, { recursive: true });
+      if (fs9.existsSync(destPath)) {
         const overwrite = await vscode10.window.showWarningMessage(
           `${PLAN_DEST} already exists. Overwrite it?`,
           { modal: true },
@@ -21645,7 +21991,7 @@ function registerPlanImportCommand(context) {
         if (overwrite !== "Overwrite")
           return;
       }
-      fs8.copyFileSync(picked[0].fsPath, destPath);
+      fs9.copyFileSync(picked[0].fsPath, destPath);
       vscode10.commands.executeCommand("vscode.open", vscode10.Uri.file(destPath));
       vscode10.window.showInformationMessage(
         `Plan imported to ${PLAN_DEST}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
@@ -21656,7 +22002,7 @@ function registerPlanImportCommand(context) {
 
 // src/wizard/sessionGenPrompt.ts
 var vscode11 = __toESM(require("vscode"));
-var fs9 = __toESM(require("fs"));
+var fs10 = __toESM(require("fs"));
 var path12 = __toESM(require("path"));
 var PLAN_PATH = path12.join("docs", "planning", "project-plan.md");
 var PROMPT_SYSTEM = `You are a session-set architect for an AI-led software development workflow.
@@ -21734,7 +22080,7 @@ function registerSessionGenPromptCommand(context) {
         return;
       }
       const planPath = path12.join(root, PLAN_PATH);
-      if (!fs9.existsSync(planPath)) {
+      if (!fs10.existsSync(planPath)) {
         const action = await vscode11.window.showWarningMessage(
           `No project plan found at ${PLAN_PATH}. Import one first?`,
           "Import Plan"
@@ -21743,7 +22089,7 @@ function registerSessionGenPromptCommand(context) {
           vscode11.commands.executeCommand("dabbler.importPlan");
         return;
       }
-      const planText = fs9.readFileSync(planPath, "utf8");
+      const planText = fs10.readFileSync(planPath, "utf8");
       const prompt = `${PROMPT_SYSTEM}
 
 ---
@@ -21828,7 +22174,7 @@ var WizardPanel = class _WizardPanel {
   _getHtml() {
     const htmlPath = vscode12.Uri.joinPath(this._extensionUri, "webview", "wizard.html");
     try {
-      let html = fs10.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs11.readFileSync(htmlPath.fsPath, "utf8");
       const nonce = getNonce();
       const cspSource = this._panel.webview.cspSource;
       html = html.replace(/{{NONCE}}/g, nonce).replace(/{{CSP_SOURCE}}/g, cspSource);
@@ -21850,19 +22196,19 @@ function registerWizardCommands(context) {
 
 // src/dashboard/CostDashboard.ts
 var vscode13 = __toESM(require("vscode"));
-var fs12 = __toESM(require("fs"));
+var fs13 = __toESM(require("fs"));
 var path14 = __toESM(require("path"));
 
 // src/utils/metrics.ts
-var fs11 = __toESM(require("fs"));
+var fs12 = __toESM(require("fs"));
 var path13 = __toESM(require("path"));
 var METRICS_FILE = path13.join("ai_router", "metrics.jsonl");
 function readMetrics(workspaceRoot2) {
   const metricsPath = path13.join(workspaceRoot2, METRICS_FILE);
-  if (!fs11.existsSync(metricsPath))
+  if (!fs12.existsSync(metricsPath))
     return [];
   try {
-    const lines = fs11.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
+    const lines = fs12.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
     return lines.map((line) => {
       try {
         return JSON.parse(line);
@@ -21981,7 +22327,7 @@ var CostDashboard = class _CostDashboard {
     const csv = exportToCsv(entries);
     const outPath = path14.join(root, "ai_router", "cost-export.csv");
     try {
-      fs12.writeFileSync(outPath, csv, "utf8");
+      fs13.writeFileSync(outPath, csv, "utf8");
       vscode13.commands.executeCommand("vscode.open", vscode13.Uri.file(outPath));
     } catch (err) {
       vscode13.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -22002,7 +22348,7 @@ var CostDashboard = class _CostDashboard {
     const sparkline = buildSparkline(summary.dailyCosts);
     const htmlPath = vscode13.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
     try {
-      let html = fs12.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs13.readFileSync(htmlPath.fsPath, "utf8");
       const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
         ([slug, d]) => `<tr><td>${slug}</td><td>${d.sessions}</td><td>$${d.cost.toFixed(3)}</td><td>${d.lastRun ? new Date(d.lastRun).toLocaleDateString("en-CA") : "\u2014"}</td></tr>`
       ).join("\n");
@@ -22047,16 +22393,16 @@ function registerCostDashboardCommand(context) {
 // src/configEditor/ConfigEditorPanel.ts
 var cp4 = __toESM(require("child_process"));
 var vscode14 = __toESM(require("vscode"));
-var fs14 = __toESM(require("fs"));
+var fs15 = __toESM(require("fs"));
 var path15 = __toESM(require("path"));
 
 // src/configEditor/yamlReadWrite.ts
 var import_yaml = __toESM(require_dist3());
-var fs13 = __toESM(require("fs"));
+var fs14 = __toESM(require("fs"));
 function readYamlFile(filePath) {
-  if (!fs13.existsSync(filePath))
+  if (!fs14.existsSync(filePath))
     return null;
-  const text = fs13.readFileSync(filePath, "utf8");
+  const text = fs14.readFileSync(filePath, "utf8");
   const doc = parseDocumentFromText(text);
   return { doc, text, parseErrors: collectParseErrors(doc) };
 }
@@ -23077,7 +23423,7 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
       return null;
     for (const folder of roots) {
       const candidate = path15.join(folder.uri.fsPath, "ai_router");
-      if (fs14.existsSync(candidate))
+      if (fs15.existsSync(candidate))
         return candidate;
     }
     return null;
@@ -23274,13 +23620,13 @@ ${msgs}`,
     const writeAtomic = (file, target, content) => {
       const tmp = target + ".tmp";
       try {
-        fs14.writeFileSync(tmp, content, "utf8");
-        fs14.renameSync(tmp, target);
+        fs15.writeFileSync(tmp, content, "utf8");
+        fs15.renameSync(tmp, target);
         succeeded.push(file);
       } catch (err) {
         try {
-          if (fs14.existsSync(tmp))
-            fs14.unlinkSync(tmp);
+          if (fs15.existsSync(tmp))
+            fs15.unlinkSync(tmp);
         } catch {
         }
         failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
@@ -23378,13 +23724,13 @@ ${msgs}`,
       }
       const tmp = target + ".tmp";
       try {
-        fs14.writeFileSync(tmp, cachedContent, "utf8");
-        fs14.renameSync(tmp, target);
+        fs15.writeFileSync(tmp, cachedContent, "utf8");
+        fs15.renameSync(tmp, target);
         newSucceeded.push(f.file);
       } catch (err) {
         try {
-          if (fs14.existsSync(tmp))
-            fs14.unlinkSync(tmp);
+          if (fs15.existsSync(tmp))
+            fs15.unlinkSync(tmp);
         } catch {
         }
         stillFailed.push({ file: f.file, reason: err instanceof Error ? err.message : String(err) });
@@ -23451,13 +23797,13 @@ ${msgs}`,
       pendingContents[file] = content;
       const tmp = target + ".tmp";
       try {
-        fs14.writeFileSync(tmp, content, "utf8");
-        fs14.renameSync(tmp, target);
+        fs15.writeFileSync(tmp, content, "utf8");
+        fs15.renameSync(tmp, target);
         succeeded.push(file);
       } catch (err) {
         try {
-          if (fs14.existsSync(tmp))
-            fs14.unlinkSync(tmp);
+          if (fs15.existsSync(tmp))
+            fs15.unlinkSync(tmp);
         } catch {
         }
         failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
@@ -23467,9 +23813,9 @@ ${msgs}`,
     reapply("budget.yaml", this._loaded.budgetPath, this._lastSaveSnapshot.budgetText);
     if (this._lastSaveSnapshot.localOverridesText !== null) {
       reapply("local-overrides.yaml", this._loaded.localOverridesPath, this._lastSaveSnapshot.localOverridesText);
-    } else if (fs14.existsSync(this._loaded.localOverridesPath)) {
+    } else if (fs15.existsSync(this._loaded.localOverridesPath)) {
       try {
-        fs14.unlinkSync(this._loaded.localOverridesPath);
+        fs15.unlinkSync(this._loaded.localOverridesPath);
         succeeded.push("local-overrides.yaml");
       } catch (err) {
         failed.push({
@@ -23581,7 +23927,7 @@ ${msgs}`,
     if (!this._loaded)
       return;
     const target = this._loaded.localOverridesPath;
-    if (!fs14.existsSync(target)) {
+    if (!fs15.existsSync(target)) {
       vscode14.window.showInformationMessage(
         "local-overrides.yaml does not exist yet. Save any per-operator override and the file is created automatically."
       );
@@ -23977,13 +24323,13 @@ var vscode15 = __toESM(require("vscode"));
 var path17 = __toESM(require("path"));
 
 // src/commands/decisionReviewQueue.ts
-var fs15 = __toESM(require("fs"));
+var fs16 = __toESM(require("fs"));
 var path16 = __toESM(require("path"));
 var QUEUE_FILENAME = "decision-review-queue.jsonl";
 function appendQueueEntry(sessionSetDir, entry) {
   const queuePath = path16.join(sessionSetDir, QUEUE_FILENAME);
   const line = JSON.stringify(entry) + "\n";
-  fs15.appendFileSync(queuePath, line, "utf8");
+  fs16.appendFileSync(queuePath, line, "utf8");
 }
 function findActiveSessionSetDir(provider) {
   const all = provider();
@@ -24045,7 +24391,7 @@ function registerFlagDecisionForReview(context) {
 
 // src/commands/scanAnnotationsForActiveSet.ts
 var vscode16 = __toESM(require("vscode"));
-var fs17 = __toESM(require("fs"));
+var fs18 = __toESM(require("fs"));
 var path19 = __toESM(require("path"));
 
 // src/configEditor/annotationParser.ts
@@ -24124,7 +24470,7 @@ function unescapeReason(raw) {
 }
 
 // src/commands/annotationScanner.ts
-var fs16 = __toESM(require("fs"));
+var fs17 = __toESM(require("fs"));
 var path18 = __toESM(require("path"));
 var SCAN_EXTENSIONS = [
   "ts",
@@ -24159,7 +24505,7 @@ var SCAN_EXCLUDE_GLOB = "{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**
 function toPosixPath(p2) {
   return p2.replace(/\\/g, "/");
 }
-function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs16.readFileSync(p2, "utf8")) {
+function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs17.readFileSync(p2, "utf8")) {
   const out = [];
   for (const abs of files) {
     let text;
@@ -24188,9 +24534,9 @@ function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
     return v;
   return true;
 }
-function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs16.readFileSync(p2, "utf8")) {
+function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs17.readFileSync(p2, "utf8")) {
   const queuePath = path18.join(sessionSetDir, QUEUE_FILENAME);
-  if (!fs16.existsSync(queuePath))
+  if (!fs17.existsSync(queuePath))
     return [];
   let text;
   try {
@@ -24216,7 +24562,7 @@ function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs16.readFil
 
 // src/commands/scanAnnotationsForActiveSet.ts
 function defaultReadYaml(absPath) {
-  if (!fs17.existsSync(absPath))
+  if (!fs18.existsSync(absPath))
     return null;
   try {
     const result = readYamlFile(absPath);
@@ -24420,7 +24766,7 @@ function activate(context) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs18.existsSync(path20.join(r2, SESSION_SETS_REL2));
+        return fs19.existsSync(path20.join(r2, SESSION_SETS_REL2));
       } catch {
         return false;
       }

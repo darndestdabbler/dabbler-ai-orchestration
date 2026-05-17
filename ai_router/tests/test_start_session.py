@@ -310,9 +310,19 @@ def test_emits_work_started_for_each_new_session(tmp_path: Path):
     )
     # Mark session 1 closed on the snapshot (mimics
     # _flip_state_to_closed's effect without invoking the gate).
+    # Under v3 (Set 030 Session 2 dual-write), the per-session
+    # status in `sessions[]` is authoritative; the legacy
+    # `completedSessions[]` is derived from it. Both must be flipped
+    # to keep the snapshot internally consistent — otherwise the
+    # v3 reader sees session 1 still in-progress and start_session
+    # refuses to advance to session 2.
     state_path = set_dir / "session-state.json"
     state = json.loads(state_path.read_text(encoding="utf-8"))
     state["completedSessions"] = [1]
+    state["currentSession"] = None
+    for session in state.get("sessions", []):
+        if session.get("number") == 1:
+            session["status"] = "complete"
     state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
     rc = start_session.run(_args(set_dir))

@@ -48,7 +48,7 @@ function checkStateStuck(): void {
   ch.appendLine("Session-set state machine:");
   ch.appendLine("  not-started  →  only spec.md exists");
   ch.appendLine("  in-progress  →  activity-log.json OR session-state.json exists");
-  ch.appendLine("  done         →  change-log.md exists");
+  ch.appendLine("  complete     →  change-log.md exists");
   ch.appendLine("");
   ch.appendLine(
     "If a session appears stuck, check that the AI router wrote the expected files. " +

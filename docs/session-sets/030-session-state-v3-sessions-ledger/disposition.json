@@ -1,21 +1,46 @@
 {
   "status": "completed",
-  "summary": "Set 030 Session 2: Phase 2 dual-write writers shipped per spec D5. ai_router/session_state.py: SCHEMA_VERSION 2->3; register_session_start and _flip_state_to_closed emit BOTH v3 sessions[] and the legacy progress triple (currentSession / totalSessions / completedSessions derived from sessions[] via _derive_legacy_fields). Five new helpers (_existing_sessions_records, _spec_titles_for_set, _build_sessions_array, _derive_legacy_fields, _validate_sessions_or_raise). Scaffolding (_not_started_payload, _backfill_payload) writes v3 when totalSessions is known. Writer-side invariant enforcement is fail-loud per spec D6 - SessionStateInvariantError raised BEFORE any file write or event emission. New forced-incident-recovery semantic: force=True promotes every session in sessions[] to complete so rule 7 holds by construction. Round A verification (gpt-5-4, $0.266495) found 4 must-fix issues: (1) silent out-of-range truncation in _build_sessions_array; (2) natural last-session close promoting all; (3) unvalidated legacy-only fallback; (4) work_started event emitted before validation. All four addressed with +7 regression tests. Round B verification (gpt-5-4, $0.193638) VERIFIED line-by-line. Tests: 529 pytest passed, 1 skipped, 8 e2e deselected (+45 from new test_session_state_v3.py + Round-A regression tests + v2 file updates for v3 dual-write shape). TypeScript tsc --noEmit clean. Operator-visible behavior change: currentSession is now derived strictly as the in-progress session's number (or null when no session is in-flight), resolving the v2 'in-flight OR most-recently-closed' ambiguity called out in the spec problem statement. Consumer-repo reader migration ships in Session 3.",
+  "summary": "Set 030 Session 3: Phase 3 reader migration + Explorer label alignment per spec D13 + D3. Added read_progress/readProgress wrappers to both progress helpers as the canonical reader entry point; migrated every application reader in ai_router/ (close-out gates check_activity_log_entry / check_next_orchestrator_present / check_change_log_fresh, start_session preflight, close_session _peek_session_number, __init__.py cost reporter) and the TS extension (fileSystem.ts readSessionSets state-file block + isMidSetComplete rewritten as a v3-invariant probe + new readClosedSessionsFromLedger v2-compat helper, SessionSetsProvider.ts isCurrentSessionInFlight null-check + Explorer label 'Done' -> 'Complete' + ICON_FILES key rename). SessionState TypeScript union literal 'done' -> 'complete' across types.ts and 24 downstream test fixtures. TS lazy-synth writers (sessionState.ts notStartedPayload + backfillPayload) updated to mirror Python Session 2's v3 dual-write shape via new buildSessions helper. Added two D13 lint guards (Python pytest + Mocha) that scan for direct legacy-field dict-access patterns and allowlist progress.py + writers + close_session._run_repair (v2-compat carve-out) + tests + lines with '# noqa: D13' / '// noqa: D13'. Round A verification (gpt-5-4, $0.28155) found 1 must-fix: backfillPayload could emit reader-invalid {status: complete, no sessions[]} snapshots when spec.md lacks totalSessions; fixed on both TS and Python sides (fall through to not-started shape when buildSessions returns undefined) + 3 regression tests. Round B verification (gpt-5-4, $0.23331) VERIFIED all 4 Round A scope items line-by-line and surfaced 1 NEW finding (strict-vs-defensive handling of malformed v2 fields in synthesize_v3_from_v2) — deliberately deferred per memory feedback_verifier_spiral_recruit_codex (the filter behavior was explicitly approved by the Session 1 verifier; the new finding is a strict-vs-defensive philosophy debate not a regression). Tests: pytest 538 passed + 1 skipped + 8 e2e deselected (+9 from new D13 lint tests + Round-A regression tests + read_progress wrapper tests); Mocha unit 376 passing + 2 failing (both pre-existing baseline failures unrelated to v3); Layer 3 Playwright 5/5 passing against v3 fixtures (Complete bucket label, N/N Complete annotation, force-closed buckets to Complete with [FORCED] badge per v3 force-promotes-all semantic from Session 2); tsc --noEmit clean. Operator-visible behavior changes: (1) Explorer label 'Done' -> 'Complete'; (2) v2 bare {status: complete} snapshots without per-session evidence now bucket as In Progress (Session 4 bulk migrator heals them); (3) force-closed sets now bucket as Complete with [FORCED] badge (was In Progress with badge under v2).",
   "verification_method": "manual",
   "files_changed": [
+    "ai_router/__init__.py",
+    "ai_router/close_session.py",
+    "ai_router/gate_checks.py",
+    "ai_router/progress.py",
     "ai_router/session_state.py",
-    "ai_router/tests/test_session_state_v2.py",
+    "ai_router/start_session.py",
+    "ai_router/tests/test_no_legacy_field_reads.py",
+    "ai_router/tests/test_progress.py",
+    "ai_router/tests/test_read_status.py",
     "ai_router/tests/test_session_state_v3.py",
-    "ai_router/tests/e2e/test_force_close_path.py",
-    "ai_router/tests/e2e/test_happy_3session.py",
-    "ai_router/tests/test_close_session_snapshot_flip.py",
+    "ai_router/tests/test_start_session.py",
     "docs/session-sets/030-session-state-v3-sessions-ledger/activity-log.json",
     "docs/session-sets/030-session-state-v3-sessions-ledger/change-log.md",
     "docs/session-sets/030-session-state-v3-sessions-ledger/disposition.json",
+    "docs/session-sets/030-session-state-v3-sessions-ledger/session-events.jsonl",
     "docs/session-sets/030-session-state-v3-sessions-ledger/session-state.json",
-    "docs/session-sets/030-session-state-v3-sessions-ledger/verification-output/round-a-session-2-result.json",
-    "docs/session-sets/030-session-state-v3-sessions-ledger/verification-output/round-b-session-2-result.json",
-    "docs/session-sets/030-session-state-v3-sessions-ledger/verify_session2.py"
+    "docs/session-sets/030-session-state-v3-sessions-ledger/verification-output/round-a-session-3-result.json",
+    "docs/session-sets/030-session-state-v3-sessions-ledger/verification-output/round-b-session-3-result.json",
+    "docs/session-sets/030-session-state-v3-sessions-ledger/verify_session3.py",
+    "tools/dabbler-ai-orchestration/src/commands/troubleshoot.ts",
+    "tools/dabbler-ai-orchestration/src/providers/SessionSetsProvider.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/treeView.spec.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/cancelTreeView.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/e2eHarness.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-force.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-happy.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-multiset.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/e2e/treeProvider-worktree.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/flagDecisionForReview.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/forceClosedBadge.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/noLegacyFieldReads.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/progress.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionSetsProvider.test.ts",
+    "tools/dabbler-ai-orchestration/src/types.ts",
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/utils/progress.ts",
+    "tools/dabbler-ai-orchestration/src/utils/sessionState.ts"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -25,7 +50,7 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 3 migrates readers (close-out gates, the extension tree provider, the reconciler, repair logic) from direct legacy-field reads to get_progress() calls and adds the D13 lint rule. Cross-cutting refactor across Python and TypeScript; the writer-side contract Session 2 just shipped is the load-bearing precondition. Keeping Claude Opus 4.7 @ effort=high preserves the architectural context of what dual-write parity guarantees the readers can rely on and how the Explorer's 'Done' to 'Complete' label migration interacts with the v3 status glossary."
+      "specifics": "Session 4 ships the bulk migrator CLI (python -m ai_router.migrate_session_state) and runs it against the 28+ in-repo state files to flip them from v2 to v3 dual-write shape. Also includes the Lightweight-tier ergonomics dry-run against a representative dabbler-homehealthcare-accessdb state file (per spec D16) and the consumer-repo dry-run docs (docs/migration-v3-dry-run.md). Builds a v0.14.0-rc.1 VSIX for internal smoke-test; NO publish (publishing moves to Session 5 per spec D14 revision, after the in-extension migration UX is in place). Keeping Claude Opus 4.7 @ effort=high preserves the architectural context of how the v3 invariants interact with the bulk-migration UX (which the Session 5 in-extension lazy migrator will share)."
     }
   },
   "blockers": []

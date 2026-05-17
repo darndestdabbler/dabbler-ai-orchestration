@@ -69,12 +69,22 @@ from typing import List, Optional, Tuple
 
 try:
     from .disposition import Disposition  # type: ignore[import-not-found]
+    from .progress import (  # type: ignore[import-not-found]
+        ProgressView,
+        SessionStateInvariantError,
+        read_progress,
+    )
     from .session_state import (  # type: ignore[import-not-found]
         read_session_state,
         validate_next_orchestrator,
     )
 except ImportError:
     from disposition import Disposition  # type: ignore[no-redef]
+    from progress import (  # type: ignore[no-redef]
+        ProgressView,
+        SessionStateInvariantError,
+        read_progress,
+    )
     from session_state import (  # type: ignore[no-redef]
         read_session_state,
         validate_next_orchestrator,
@@ -82,6 +92,41 @@ except ImportError:
 
 
 GateOutcome = Tuple[bool, str]
+
+
+# Set 030 Session 3: route every progress read through the v3
+# helper. ``read_progress`` branches v2/v3 internally and validates the
+# 8 invariants; gates downgrade to a "malformed state" failure rather
+# than crashing the close-out flow. ``_session_in_focus`` mirrors the
+# v2 "in-flight OR most-recently-closed" semantic so idempotent close
+# retries still find the session the gate cares about.
+def _read_progress_or_none(
+    state: dict,
+    session_set_dir: str,
+) -> Tuple[Optional[ProgressView], Optional[str]]:
+    """Return ``(view, error_remediation)``. Exactly one is non-None."""
+    spec_md_path = os.path.join(session_set_dir, "spec.md")
+    try:
+        return read_progress(state, spec_md_path), None
+    except SessionStateInvariantError as exc:
+        return None, f"session-state.json fails v3 invariants: {exc}"
+    except (TypeError, ValueError) as exc:
+        return None, f"session-state.json malformed: {type(exc).__name__}: {exc}"
+
+
+def _session_in_focus(view: ProgressView) -> Optional[int]:
+    """Session number the gate is reasoning about.
+
+    Prefers the in-flight session (v3 ``currentSession``); falls back
+    to the most recently closed session so idempotent close-session
+    retries (where the writer already flipped the session to complete)
+    still find a target. Returns ``None`` for a never-started set.
+    """
+    if view.current_session is not None:
+        return view.current_session
+    if view.completed_sessions:
+        return max(view.completed_sessions)
+    return None
 
 
 # Patterns ignored by check_working_tree_clean even when they appear as
@@ -426,11 +471,14 @@ def check_activity_log_entry(
             False,
             "session-state.json missing or unreadable; cannot determine current session",
         )
-    current = state.get("currentSession")
-    if not isinstance(current, int):
+    view, err = _read_progress_or_none(state, session_set_dir)
+    if view is None:
+        return False, err  # type: ignore[return-value]
+    current = _session_in_focus(view)
+    if current is None:
         return (
             False,
-            "session-state.json has no currentSession; "
+            "no session in flight and none closed; "
             "register_session_start() likely not called",
         )
 
@@ -493,15 +541,14 @@ def check_next_orchestrator_present(
             False,
             "session-state.json missing or unreadable",
         )
-    current = state.get("currentSession")
-    total = state.get("totalSessions")
-    if not isinstance(current, int):
-        return False, "session-state.json has no currentSession"
-    # totalSessions may legitimately be None during early bootstrapping;
-    # treat that as "we don't know" and require next_orchestrator to be
-    # safe — close-out without the field is the same failure either way.
+    view, err = _read_progress_or_none(state, session_set_dir)
+    if view is None:
+        return False, err  # type: ignore[return-value]
+    current = _session_in_focus(view)
+    if current is None:
+        return False, "no session in flight and none closed"
 
-    is_final = isinstance(total, int) and total > 0 and current >= total
+    is_final = view.total_sessions > 0 and current >= view.total_sessions
     if is_final:
         return True, ""
 
@@ -573,12 +620,14 @@ def check_change_log_fresh(
     state = read_session_state(session_set_dir)
     if not state:
         return False, "session-state.json missing or unreadable"
-    current = state.get("currentSession")
-    total = state.get("totalSessions")
-    if not isinstance(current, int):
-        return False, "session-state.json has no currentSession"
+    view, err = _read_progress_or_none(state, session_set_dir)
+    if view is None:
+        return False, err  # type: ignore[return-value]
+    current = _session_in_focus(view)
+    if current is None:
+        return False, "no session in flight and none closed"
 
-    is_final = isinstance(total, int) and total > 0 and current >= total
+    is_final = view.total_sessions > 0 and current >= view.total_sessions
     if not is_final:
         return True, ""
 

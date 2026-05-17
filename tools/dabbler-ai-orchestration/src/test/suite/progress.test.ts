@@ -20,6 +20,7 @@ import {
   canonicalizeStatus,
   extractSessionTitlesFromSpec,
   getProgress,
+  readProgress,
   synthesizeV3FromV2,
   validateInvariants,
 } from "../../utils/progress";
@@ -657,5 +658,105 @@ suite("progress — validateInvariants directly", () => {
     ];
     // top_status=null skips rules 5-8; only structural rules 1-4 apply
     validateInvariants(sessions, null, null);
+  });
+});
+
+suite("progress — readProgress (Set 030 Session 3)", () => {
+  // readProgress is the application-reader entry point per D13.
+  // Branches v2 vs v3 internally so callers in the tree provider,
+  // count derivation, and badge logic never reach into the legacy
+  // currentSession / totalSessions / completedSessions triple.
+  test("v3 state dispatches to getProgress", () => {
+    const dir = mkTmpDir();
+    try {
+      const state = v3State(
+        [
+          sess(1, SESSION_STATUS_COMPLETE),
+          sess(2, SESSION_STATUS_IN_PROGRESS),
+          sess(3, SESSION_STATUS_NOT_STARTED),
+        ],
+        "in-progress",
+        LIFECYCLE_STATE_WORK_IN_PROGRESS,
+      );
+      const view = readProgress(state, path.join(dir, "absent-spec.md"));
+      assert.strictEqual(view.totalSessions, 3);
+      assert.deepStrictEqual(view.completedSessions, [1]);
+      assert.strictEqual(view.currentSession, 2);
+      assert.strictEqual(view.nextSession, 3);
+    } finally {
+      rmTmpDir(dir);
+    }
+  });
+
+  test("v2 state synthesizes then validates", () => {
+    const dir = mkTmpDir();
+    try {
+      const specPath = path.join(dir, "spec.md");
+      fs.writeFileSync(
+        specPath,
+        "### Session 1 of 3: Alpha\n" +
+          "### Session 2 of 3: Beta\n" +
+          "### Session 3 of 3: Gamma\n",
+        "utf8",
+      );
+      const v2 = {
+        schemaVersion: 2,
+        sessionSetName: "legacy",
+        status: "in-progress",
+        lifecycleState: "work_in_progress",
+        currentSession: 2,
+        totalSessions: 3,
+        completedSessions: [1],
+      };
+      const view = readProgress(v2, specPath);
+      assert.strictEqual(view.totalSessions, 3);
+      assert.deepStrictEqual(view.completedSessions, [1]);
+      assert.strictEqual(view.currentSession, 2);
+      assert.strictEqual(view.sessions[0].title, "Alpha");
+      assert.strictEqual(view.sessions[1].title, "Beta");
+    } finally {
+      rmTmpDir(dir);
+    }
+  });
+
+  test("v3 state ignores spec.md path (file may be missing)", () => {
+    const dir = mkTmpDir();
+    try {
+      const state = v3State(
+        [sess(1, SESSION_STATUS_COMPLETE), sess(2, SESSION_STATUS_COMPLETE)],
+        "complete",
+        LIFECYCLE_STATE_CLOSED,
+      );
+      const view = readProgress(state, path.join(dir, "does-not-exist.md"));
+      assert.strictEqual(view.totalSessions, 2);
+      assert.deepStrictEqual(view.completedSessions, [1, 2]);
+    } finally {
+      rmTmpDir(dir);
+    }
+  });
+
+  test("v2 invariant violation raises (rule 7)", () => {
+    const dir = mkTmpDir();
+    try {
+      // v2 with status=complete but completedSessions=[] synthesizes
+      // to all-not-started; rule 7 fail-louds on the contradiction.
+      const v2 = {
+        schemaVersion: 2,
+        status: "complete",
+        currentSession: null,
+        totalSessions: 3,
+        completedSessions: [],
+      };
+      expectInvariantError(
+        () => readProgress(v2, path.join(dir, "no-spec.md")),
+        7,
+      );
+    } finally {
+      rmTmpDir(dir);
+    }
+  });
+
+  test("null state raises TypeError", () => {
+    assert.throws(() => readProgress(null, "/tmp/spec.md"), TypeError);
   });
 });

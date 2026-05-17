@@ -207,6 +207,33 @@ export function synthesizeV3FromV2(state: any, specMdPath: string): any {
 // getProgress: the one reader path
 // ---------------------------------------------------------------------------
 
+// Single reader entry point for any session-state.json shape.
+//
+// This is the canonical reader path application code (the tree
+// provider, count derivation, badge logic, drift guards) MUST use
+// under D13. Branches v2/v3 internally so callers never touch the
+// legacy currentSession / totalSessions / completedSessions triple
+// directly.
+//
+// For v3 inputs (`sessions[]` present), calls `getProgress` directly.
+// For v2 inputs, runs `synthesizeV3FromV2` first, then validates via
+// `getProgress`. The `specMdPath` is only consulted on the v2 branch
+// — pass any path on v3 inputs; missing/unreadable spec.md just falls
+// back to "Session N" titles.
+//
+// Raises `SessionStateInvariantError` on invariant violation.
+// Application readers that want defensive fallback (e.g. degrade to
+// in-progress rather than throw) should wrap the call in try/catch.
+export function readProgress(state: any, specMdPath: string): ProgressView {
+  if (state === null || state === undefined) {
+    throw new TypeError("readProgress: state is null");
+  }
+  if (state.sessions !== undefined && state.sessions !== null) {
+    return getProgress(state);
+  }
+  return getProgress(synthesizeV3FromV2(state, specMdPath));
+}
+
 export function getProgress(state: any): ProgressView {
   if (state === null || state === undefined) {
     throw new TypeError("getProgress: state is null");

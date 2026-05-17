@@ -1,13 +1,14 @@
-export type SessionState = "done" | "in-progress" | "not-started" | "cancelled";
+export type SessionState = "complete" | "in-progress" | "not-started" | "cancelled";
 
 // Set 030 Session 1 — session-state.json schema v3 ledger.
 // The set-level `SessionState` above is the extension's bucketing
-// state (Cancelled / Done / Active / Not Started); the union below
-// is the per-session status used in v3's `sessions[]` ledger and
-// must match Python's `SESSION_STATUSES` in `ai_router/progress.py`.
-// (Set 030 Session 3 will migrate the user-visible "Done" label to
-// "Complete"; the bucketing string literal stays "done" until then so
-// existing readers don't break.)
+// state (Cancelled / Complete / Active / Not Started). Set 030
+// Session 3 unified the bucketing literal with the per-session
+// status under the canonical name `complete`, retiring the older
+// `done` label so JSON and display vocabulary match.
+// The union below is the per-session status used in v3's
+// `sessions[]` ledger and must match Python's `SESSION_STATUSES` in
+// `ai_router/progress.py`.
 export type SessionStatus = "not-started" | "in-progress" | "complete" | "cancelled";
 
 export interface SessionRecord {

@@ -57,7 +57,37 @@ function setupSet(rootDir, slug, files) {
         fs.writeFileSync(path.join(setDir, "change-log.md"), `# ${slug} change log\n`);
     }
     if (files.status) {
-        fs.writeFileSync(path.join(setDir, "session-state.json"), JSON.stringify({ schemaVersion: 2, status: files.status }));
+        // Set 030 Session 3: emit a v3-shape snapshot so the v3 invariants
+        // can validate. Bare {status: ...} snapshots are no longer enough;
+        // per-session evidence is required for any status other than
+        // "not-started" to escalate.
+        const totalSessions = 3;
+        const sessions = [];
+        for (let n = 1; n <= totalSessions; n++) {
+            let s = "not-started";
+            if (files.status === "complete") {
+                s = "complete";
+            }
+            else if (files.status === "in-progress" && n === 1) {
+                s = "in-progress";
+            }
+            sessions.push({ number: n, title: `Session ${n}`, status: s });
+        }
+        const snapshot = {
+            schemaVersion: 3,
+            status: files.status,
+            sessions,
+            totalSessions,
+            completedSessions: files.status === "complete" ? [1, 2, 3] : [],
+            currentSession: files.status === "in-progress" ? 1 : null,
+        };
+        if (files.status === "complete") {
+            snapshot.lifecycleState = "closed";
+        }
+        else if (files.status === "in-progress") {
+            snapshot.lifecycleState = "work_in_progress";
+        }
+        fs.writeFileSync(path.join(setDir, "session-state.json"), JSON.stringify(snapshot));
     }
     return setDir;
 }
@@ -152,7 +182,7 @@ suite("SessionSetsProvider — cancelled group", () => {
         return provider;
     }
     test("Cancelled group is hidden when there are no cancelled sets", async () => {
-        const provider = makeProviderWithFixture(["in-progress", "done", "not-started"]);
+        const provider = makeProviderWithFixture(["in-progress", "complete", "not-started"]);
         const groups = await provider.getChildren();
         const labels = (groups ?? []).map((g) => String(g.label));
         assert.ok(!labels.some((l) => l.startsWith("Cancelled")), `unexpected Cancelled group in ${labels.join(", ")}`);
@@ -167,7 +197,7 @@ suite("SessionSetsProvider — cancelled group", () => {
         assert.ok(/\(1\)$/.test(cancelledLabel), `expected count of 1 in label "${cancelledLabel}"`);
     });
     test("Cancelled group renders set items via getChildren(group)", async () => {
-        const provider = makeProviderWithFixture(["cancelled", "cancelled", "done"]);
+        const provider = makeProviderWithFixture(["cancelled", "cancelled", "complete"]);
         const groups = await provider.getChildren();
         const cancelledGroup = (groups ?? []).find((g) => String(g.label).startsWith("Cancelled"));
         assert.ok(cancelledGroup);
@@ -224,11 +254,11 @@ suite("Cancel/restore round-trip via readSessionSets", () => {
         await (0, cancelLifecycle_1.cancelSessionSet)(setDir, "");
         await (0, cancelLifecycle_1.restoreSessionSet)(setDir, "");
         const sets = (0, fileSystem_1.readSessionSets)(dir);
-        // change-log.md is still present so the inferred fallback is "done";
+        // change-log.md is still present so the inferred fallback is "complete";
         // the captured preCancelStatus on the state file is "complete" so the
-        // primary path also returns to done. Either way the tree-view label
-        // is "done".
-        assert.strictEqual(sets[0].state, "done");
+        // primary path also returns to complete. Either way the tree-view label
+        // is "complete".
+        assert.strictEqual(sets[0].state, "complete");
         fs.rmSync(dir, { recursive: true });
     });
     test("restoring an in-progress-only set returns to in-progress", async () => {

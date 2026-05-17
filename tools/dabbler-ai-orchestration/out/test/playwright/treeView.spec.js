@@ -94,7 +94,7 @@ async function treeitemTexts(tree) {
         (0, test_1.expect)(joined).toContain("scenario-fresh-c");
         // None of the negative-control bucket headers should populate
         (0, test_1.expect)(joined).toMatch(/In Progress\s+\(0\)/);
-        (0, test_1.expect)(joined).toMatch(/Done\s+\(0\)/);
+        (0, test_1.expect)(joined).toMatch(/Complete\s+\(0\)/);
         (0, test_1.expect)(joined).not.toMatch(/Cancelled\s+\(\d+\)/);
     }
     finally {
@@ -139,7 +139,7 @@ async function treeitemTexts(tree) {
 // ---------------------------------------------------------------------
 // Scenario 3: all done.
 // ---------------------------------------------------------------------
-(0, test_1.test)("renders a fully closed set under Done with N/N progress", async () => {
+(0, test_1.test)("renders a fully closed set under Complete with N/N progress", async () => {
     const per = {};
     try {
         per.tmpPath = (0, electronLaunch_1.makeTmpDir)("dabbler-pw-done");
@@ -149,9 +149,11 @@ async function treeitemTexts(tree) {
         const tree = await (0, electronLaunch_1.openSessionSetsView)(per.launch.page);
         await (0, electronLaunch_1.triggerRefresh)(per.launch.page);
         const joined = (await treeitemTexts(tree)).join("\n");
-        (0, test_1.expect)(joined).toMatch(/Done\s+\(1\)/);
+        // Set 030 Session 3: bucket label is now "Complete" (was "Done");
+        // row annotation is "N/N Complete".
+        (0, test_1.expect)(joined).toMatch(/Complete\s+\(1\)/);
         (0, test_1.expect)(joined).toContain("scenario-done");
-        (0, test_1.expect)(joined).toMatch(/3\/3/);
+        (0, test_1.expect)(joined).toMatch(/3\/3 Complete/);
         (0, test_1.expect)(joined).toMatch(/In Progress\s+\(0\)/);
         (0, test_1.expect)(joined).not.toContain("in flight");
         (0, test_1.expect)(joined).not.toContain("[FORCED]");
@@ -186,7 +188,7 @@ async function treeitemTexts(tree) {
         (0, test_1.expect)(joined).toContain("scenario-cancel");
         // Negative controls — must not appear in active buckets
         (0, test_1.expect)(joined).toMatch(/In Progress\s+\(0\)/);
-        (0, test_1.expect)(joined).toMatch(/Done\s+\(0\)/);
+        (0, test_1.expect)(joined).toMatch(/Complete\s+\(0\)/);
     }
     finally {
         await teardown(per);
@@ -218,14 +220,14 @@ async function treeitemTexts(tree) {
         const joined = (await treeitemTexts(tree)).join("\n");
         (0, test_1.expect)(joined).toContain("[FORCED]");
         (0, test_1.expect)(joined).toContain("scenario-forced");
-        // Per Layer 2 discovery (Set 027 Session 3): isMidSetComplete
-        // downgrades currentSession < totalSessions snapshots to
-        // in-progress regardless of status, so a force-closed mid-set
-        // lives in In Progress with the [FORCED] badge — NOT in Done.
-        // This is the truthful-display invariant from
-        // SessionSetsProvider.ts:36.
-        (0, test_1.expect)(joined).toMatch(/In Progress\s+\(1\)/);
-        (0, test_1.expect)(joined).toMatch(/Done\s+\(0\)/);
+        // Set 030 Session 3: force=True now promotes every session in
+        // sessions[] to "complete" (incident-recovery semantic from
+        // Session 2's writer change), so the snapshot satisfies all v3
+        // invariants and buckets as Complete. The [FORCED] badge —
+        // driven by liveSession.forceClosed — remains the operator-facing
+        // cue that the gate was bypassed.
+        (0, test_1.expect)(joined).toMatch(/Complete\s+\(1\)/);
+        (0, test_1.expect)(joined).toMatch(/In Progress\s+\(0\)/);
     }
     finally {
         await teardown(per);

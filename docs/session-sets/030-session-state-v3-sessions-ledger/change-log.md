@@ -1,8 +1,8 @@
 # Set 030: Session-state v3 `sessions` ledger + terminology alignment
 
-**Status:** In progress (2 of 5 sessions complete)
+**Status:** In progress (3 of 5 sessions complete)
 **Created:** 2026-05-17
-**Cost so far:** $0.74 (Session 1: $0.28 Round A; Session 2: $0.27 Round A + $0.19 Round B)
+**Cost so far:** $1.25 (Session 1: $0.28 Round A; Session 2: $0.27 Round A + $0.19 Round B; Session 3: $0.28 Round A + $0.23 Round B)
 
 ---
 
@@ -326,9 +326,218 @@ forced on consumers mid-migration.
   asserts the SET is done"; promote every session to complete so
   rule 7 holds by construction.
 
-## Session 3: (pending — reader migration + Explorer label)
+## Session 3: Phase 3 reader migration + Explorer "Done" → "Complete"
 
-(populated at session close)
+**Status:** Complete (2026-05-17)
+**Orchestrator:** Claude Opus 4.7 @ effort=high
+**Verification:** gpt-5-4, $0.51486 across two rounds.
+- Round A ($0.28155) found 1 must-fix issue; addressed.
+- Round B ($0.23331) confirmed all four Round-A scope items (the
+  Session 1+2 wrappers, the gate migration, the
+  fileSystem.ts/SessionSetsProvider.ts reader migration, the
+  sessionState.ts writer dual-write) and surfaced 1 NEW finding
+  about strict-vs-filter handling of malformed v2 progress fields
+  — deliberately deferred (see "Round B new finding" below).
+
+### Shipped
+
+1. **`ai_router/progress.py`** — added `read_progress(state,
+   spec_md_path)`, the canonical reader entry point per spec D13.
+   Branches v3 (state.sessions present) vs v2 (synthesize first)
+   internally so callers never reach into the legacy progress triple.
+   `__all__` updated.
+
+2. **`tools/dabbler-ai-orchestration/src/utils/progress.ts`** —
+   added `readProgress(state, specMdPath)` mirror.
+
+3. **`ai_router/gate_checks.py`** — three close-out gate predicates
+   migrated to `read_progress`:
+   - `check_activity_log_entry`
+   - `check_next_orchestrator_present` (the `is_final` predicate)
+   - `check_change_log_fresh`
+   Added two helpers: `_read_progress_or_none(state, dir)` and
+   `_session_in_focus(view)`. The latter preserves the v2 "in flight
+   OR most-recently-closed" semantic so idempotent close-out retries
+   still find a target.
+
+4. **`ai_router/start_session.py`** — preflight migrated.
+   `current_in_flight` now derived from `view.current_session`.
+   `total_sessions` for `register_session_start` derived from
+   `view.total_sessions`.
+
+5. **`ai_router/close_session.py`** — `_peek_session_number`
+   migrated through `read_progress`. The `_run_repair` walk's
+   v2-compat reads retain inline `# noqa: D13` markers
+   (file-level allowlist in the lint rule below; the repair logic
+   reconciles legacy fields by definition).
+
+6. **`ai_router/__init__.py`** — `print_session_set_status` cost
+   reporter migrated. `session-state.json` totalSessions read now
+   routes through `read_progress`; the activity-log.json
+   `totalSessions` carrier field keeps the direct read with a
+   `# noqa: D13` annotation (different artifact's schema).
+
+7. **`tools/dabbler-ai-orchestration/src/utils/fileSystem.ts`** —
+   TWO migrations:
+   - `isMidSetComplete` rewritten to a single v3 invariant probe
+     (collapses the Set 022 + Set 023 multi-signal predicate). Pre-
+     populates `completedSessions[]` from the events ledger for
+     pre-Set-022 snapshots (`readClosedSessionsFromLedger` helper).
+   - `readSessionSets` state-file block migrated through
+     `readProgress`. `liveSession.currentSession` /
+     `liveSession.completedSessions` / `totalSessions` /
+     `sessionsCompleted` all derive from the v3 view, with a
+     v2-compat fallback chain preserved for snapshots that fail
+     invariants.
+
+8. **`tools/dabbler-ai-orchestration/src/providers/SessionSetsProvider.ts`** —
+   Explorer label "Done" → "Complete" per spec D3. `ICON_FILES` key
+   `done` → `complete` (file name `done.svg` unchanged for
+   continuity). `isCurrentSessionInFlight` simplified to a null-check
+   on the v3 `liveSession.currentSession` (which is now strictly the
+   in-progress session's number, or null). `progressText` annotation
+   "N/N Done" → "N/N Complete".
+
+9. **`tools/dabbler-ai-orchestration/src/types.ts`** — `SessionState`
+   union literal `"done"` renamed to `"complete"` per spec D3.
+
+10. **`tools/dabbler-ai-orchestration/src/utils/sessionState.ts`** —
+    TS lazy-synth writers updated to mirror Session 2's Python
+    writer changes. `SCHEMA_VERSION` bumped 2 → 3. New
+    `buildSessions(total, topStatus)` helper produces v3 sessions[]
+    for the inferred top-status: complete → all complete,
+    in-progress → session 1 in-progress (conservative), not-started
+    → all not-started. `notStartedPayload` and `backfillPayload`
+    now emit the v3 dual-write shape (sessions[] + derived legacy
+    triple) when spec.md declares totalSessions. Per Round-A fix,
+    backfill stays at not-started when totalSessions is unknown
+    (the writer cannot emit a reader-valid `status: "complete"`
+    snapshot without per-session evidence).
+
+11. **`tools/dabbler-ai-orchestration/src/commands/troubleshoot.ts`** —
+    user-visible state-machine help string updated `done` →
+    `complete`.
+
+12. **`ai_router/tests/test_no_legacy_field_reads.py`** — NEW D13
+    lint guard. Scans `ai_router/*.py` for direct dict-access
+    patterns (`.get("currentSession")`, `["completedSessions"]`,
+    etc.) outside an allowlist. Allowlist: `progress.py`,
+    `session_state.py`, `session_log.py`, `close_session.py`
+    (file-level: `_run_repair` is v2-compat), `tests/`, `scripts/`,
+    plus any line carrying `# noqa: D13`. Sanity-check test
+    confirms the scanner actually walks the tree.
+
+13. **`tools/dabbler-ai-orchestration/src/test/suite/noLegacyFieldReads.test.ts`** —
+    NEW Mocha equivalent. Targets raw state-dict access patterns
+    (`sd.completedSessions`, `state.currentSession`, etc.) rather
+    than any field-named access, so downstream `SessionSet` /
+    `ProgressView` reads aren't false-positives. Allowlist:
+    `utils/progress.ts`, `utils/sessionState.ts`, `types.ts`,
+    `providers/SessionSetsProvider.ts` (reads the SessionSet
+    model, not raw state), `test/`, plus `// noqa: D13` lines.
+
+14. **`tools/dabbler-ai-orchestration/src/test/playwright/treeView.spec.ts`** —
+    5/5 Layer 3 scenarios updated for the new "Complete" bucket
+    label and the v3 "force=True promotes all sessions" semantic
+    (forced sets now bucket as Complete with the [FORCED] badge,
+    not In Progress).
+
+### Round A verifier fix applied
+
+Round A REJECTED with 1 must-fix issue. Addressed:
+
+1. **`backfillPayload` no-plan promotion fixed.** When
+   `readTotalSessionsFromSpec` returns null (spec.md has no Session
+   Set Configuration block), `buildSessions` returns undefined. The
+   pre-fix `backfillPayload` still wrote `status: "complete"` /
+   `lifecycleState: "closed"` (or `status: "in-progress"`) without
+   `sessions[]` or `completedSessions[]`, producing a snapshot the
+   v3 reader would reject (rule 1 + rule 7 / rule 6 violation).
+   Fix: when `buildSessions` returns undefined, fall through to
+   `notStartedPayload` so the snapshot stays at not-started until
+   the next boundary write with a known plan. Mirrored on the
+   Python side (`ai_router/session_state.py::_backfill_payload`).
+   Added regression tests on both sides
+   (`test_session_state_v3.py::TestBackfillPayloadV2Promotion::test_backfill_payload_change_log_without_spec_total_stays_not_started`,
+   etc., and `fileSystem.test.ts::lazy-synth with change-log.md
+   but NO spec totalSessions stays not-started (Round A fix)`).
+
+### Round B new finding (deferred)
+
+Round B raised one NEW finding outside the Round-A scope: the v2
+synthesizer's strict-int filter in `synthesize_v3_from_v2`
+(`progress.py:215-228`) silently drops malformed legacy values
+(e.g. `currentSession: true` becomes `None`; `completedSessions:
+[1.0]` becomes `[]`) rather than raising. The verifier interprets
+this as a D6 ("fail loud") violation.
+
+**Deliberately deferred** — this is a Session 1 design decision the
+Session 1 verifier explicitly approved ("Pre-filter currentSession
+and completedSessions[] to strict positive ints before using them
+for totals, membership, or status escalation"). The filter is
+**defensive**, not strict: a garbage value in a legacy v2 file
+shouldn't crash the close-out gate or the Explorer tree provider;
+operators should see a sensible synthesized view instead. The
+synthesizer's silent-clean behavior is consistent with the
+extension's "trust the canonical status; don't second-guess on
+garbled input" stance in `isMidSetComplete` (which returns false
+on parse errors). Per memory
+`feedback_verifier_spiral_recruit_codex`, a new finding in Round B
+that contradicts a prior verifier's design call is exactly the
+spiral signal — Session 3 stops here rather than thrashing on a
+strict-vs-defensive philosophy debate. If the operator wants strict
+fail-loud handling of malformed v2 inputs in a future set, the
+change is a one-line edit in `synthesize_v3_from_v2`.
+
+### Operator-visible behavior changes
+
+1. **Explorer label change.** The Session Set Explorer's bucket
+   label "Done" is now "Complete"; the row annotation "N/N Done"
+   is "N/N Complete". (Spec D3.)
+2. **v2 bare-status downgrade.** A v2 snapshot with
+   `{status: "complete"}` and no per-session evidence (no
+   `completedSessions[]`, no events ledger) now buckets as In
+   Progress instead of Done. The Session 4 bulk migrator heals
+   these by writing v3 `sessions[]` directly. (Default-to-not-
+   started rule per memory
+   `feedback_default_not_started_evidence_to_escalate`.)
+3. **Force-closed bucket flip.** Per Session 2's writer change
+   (`force=True` promotes every session in `sessions[]` to
+   complete), force-closed sets now satisfy all v3 invariants and
+   bucket as Complete. The `[FORCED]` badge remains the operator-
+   facing cue that the gate was bypassed.
+
+### Test results
+
+- pytest: **538 passed, 1 skipped, 8 e2e deselected** (was 529
+  pre-Session-3; +9 from the new lint tests + Round-A regression
+  tests + the `read_progress` wrapper tests).
+- mocha unit: **376 passing, 2 failing** (both pre-existing,
+  unrelated: `configEditor-foundation` panel-lifecycle and
+  `notificationsSection` rendering).
+- Layer 3 Playwright: **5/5 passing** against v3 fixtures.
+- TypeScript `tsc --noEmit`: clean.
+
+### Decisions reified (from spec.md)
+
+- **D3** — Explorer label "Done" → "Complete" landed (both string
+  literals and TypeScript `SessionState` union literal renamed).
+- **D13** — "No application reader may read legacy fields except
+  through approved compatibility helpers" enforced via the two new
+  lint tests. The only remaining direct legacy-field reads outside
+  the approved helpers are in `close_session._run_repair` (v2-compat
+  carve-out, file-level allowlist) and four `// noqa: D13` /
+  `# noqa: D13` annotated lines (the v2-compat ledger-merge
+  pre-processor in `fileSystem.ts` / `isMidSetComplete`, and the
+  activity-log.json carrier-field read in `__init__.py`).
+
+### What did NOT ship in Session 3
+
+- No bulk migrator. Session 4.
+- No in-extension migration UX, no loading state. Session 5.
+- No PyPI / Marketplace publish. Session 5 (per spec D14 revision).
+- The Round B new finding (strict-vs-defensive synthesizer) is
+  deferred — see "Round B new finding (deferred)" above.
 
 ## Session 4: (pending — bulk migrator + in-repo migration + RC build, NO publish)
 

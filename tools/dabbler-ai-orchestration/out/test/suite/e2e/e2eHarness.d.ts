@@ -83,4 +83,4 @@ export declare function topLevelGroups(provider: SessionSetsProvider): vscode.Tr
  * children. Returns an empty array when the group is absent (e.g.
  * "cancelled" doesn't render when no cancelled sets exist).
  */
-export declare function childrenOfGroup(provider: SessionSetsProvider, key: "in-progress" | "not-started" | "done" | "cancelled"): vscode.TreeItem[];
+export declare function childrenOfGroup(provider: SessionSetsProvider, key: "in-progress" | "not-started" | "complete" | "cancelled"): vscode.TreeItem[];

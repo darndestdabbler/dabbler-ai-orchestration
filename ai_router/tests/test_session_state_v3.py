@@ -596,6 +596,59 @@ class TestScaffoldingWritesV3:
         assert all(s["status"] == "complete" for s in data["sessions"])
         assert data["completedSessions"] == [1, 2, 3]
 
+    def test_backfill_payload_change_log_without_spec_total_stays_not_started(
+        self, tmp_path: Path,
+    ):
+        # Round-A regression (Set 030 Session 3): when spec.md has no
+        # Session Set Configuration totalSessions, buildSessions
+        # returns no sessions[] array. The change-log branch MUST NOT
+        # escalate to status=complete in that case — it would write a
+        # snapshot violating rule 1 (sessions[] required) and rule 7
+        # (top-status complete requires every session complete) that
+        # readProgress would then reject. The fix: fall through to
+        # the not-started shape; the next boundary write with a plan
+        # re-promotes.
+        session_set_dir_ = tmp_path / "plan-less-set"
+        session_set_dir_.mkdir()
+        (session_set_dir_ / "spec.md").write_text(
+            "# plan-less-set\n\nNo Session Set Configuration block.\n",
+            encoding="utf-8",
+        )
+        (session_set_dir_ / "change-log.md").write_text(
+            "# Change log\n", encoding="utf-8",
+        )
+        path = ensure_session_state_file(str(session_set_dir_))
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        assert data["schemaVersion"] == 3
+        # Must NOT escalate to complete without per-session evidence.
+        assert data["status"] == "not-started"
+        assert data["lifecycleState"] is None
+        # readProgress must accept the snapshot (no rule-1/rule-7 fail).
+        # An empty sessions[] case (totalSessions unknown) means
+        # sessions[] is omitted entirely; readProgress falls into the
+        # v2 synthesis path which produces an all-not-started view —
+        # consistent with status=not-started.
+        assert "sessions" not in data
+
+    def test_backfill_payload_activity_log_without_spec_total_stays_not_started(
+        self, tmp_path: Path,
+    ):
+        # Same Round-A regression for the activity-log-only branch.
+        session_set_dir_ = tmp_path / "plan-less-set-active"
+        session_set_dir_.mkdir()
+        (session_set_dir_ / "spec.md").write_text(
+            "# plan-less-set-active\n", encoding="utf-8",
+        )
+        (session_set_dir_ / "activity-log.json").write_text(
+            json.dumps({"entries": [{"sessionNumber": 1, "dateTime": "2026-05-17T10:00:00-04:00"}]}),
+            encoding="utf-8",
+        )
+        path = ensure_session_state_file(str(session_set_dir_))
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        assert data["schemaVersion"] == 3
+        assert data["status"] == "not-started"
+        assert "sessions" not in data
+
     def test_backfill_payload_activity_log_only_marks_session_one_in_progress(
         self, session_set_dir, spec_md,
     ):

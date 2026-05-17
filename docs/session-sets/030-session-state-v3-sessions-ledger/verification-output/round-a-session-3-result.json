@@ -1,0 +1,16 @@
+{
+  "content": "- **REJECTED:**\n  - **Issue** \u2192 `backfillPayload()` can emit `schemaVersion: 3` snapshots that the canonical reader rejects. When `readTotalSessionsFromSpec()` returns `null`, `buildSessions()` returns `undefined`, but the change-log branch still writes `status: \"complete\"` and the activity-log branch still writes `status: \"in-progress\"` without `sessions[]`, without `completedSessions[]`, and with `currentSession` left at `null`. `readProgress()` then takes the v2 path, synthesizes no in-progress/complete session evidence, and raises `SessionStateInvariantError` (the exact failure E.5 asks to detect: complete/no evidence and in-progress/no current session). This breaks the \u201cwriter outputs are reader-valid\u201d guarantee.\n    **Location** \u2192 `tools/dabbler-ai-orchestration/src/utils/sessionState.ts:150-166` and `:170-193` (specifically the unconditional status promotion at `:152-153` / `:172-173`, combined with the evidence being added only inside `:161-165` / `:188-192`).\n    **Fix** \u2192 When `buildSessions()` returns `undefined`, do not emit `\"complete\"` / `\"in-progress\"` backfill states without matching progress evidence. Either:\n    1. keep the unknown-plan backfill at the not-started shape, or\n    2. emit a reader-valid legacy proof (`currentSession` / `completedSessions` / coherent `totalSessions`) so `readProgress()` validates.\n    Apply the same fix on the Python writer side to preserve parity.",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 16644,
+  "output_tokens": 15996,
+  "cost_usd": 0.28154999999999997,
+  "total_cost_usd": 0.28154999999999997,
+  "complexity_score": 62,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 543.5682463645935,
+  "truncated": false,
+  "verification": null
+}

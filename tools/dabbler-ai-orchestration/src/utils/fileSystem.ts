@@ -4,6 +4,7 @@ import * as path from "path";
 import { listGitWorktrees } from "./git";
 import { readStatus } from "./sessionState";
 import { isCancelled } from "./cancelLifecycle";
+import { readProgress, SessionStateInvariantError } from "./progress";
 import {
   SessionSet,
   SessionState,
@@ -21,7 +22,7 @@ export const PLAYWRIGHT_REL_DEFAULT = "tests";
 // dedup-merging. Within a single root the file-presence rule still wins
 // because readSessionSets has already resolved each entry's state.
 const STATE_RANK: Record<SessionState, number> = {
-  done: 3,
+  complete: 3,
   "in-progress": 2,
   "not-started": 1,
   cancelled: 0,
@@ -50,86 +51,71 @@ export function discoverRoots(): string[] {
 }
 
 // Detect a stale `status: "complete"` snapshot that doesn't actually
-// reflect a finished set. Two authoritative signals govern the guard,
-// per the Set 022 + Set 023 sharpened invariant:
-// `completedSessions[]` is authoritative for *whether* a session is
-// closed; `session-events.jsonl` is authoritative for *when* each
-// closeout was recorded. The guard downgrades to in-progress only when
-// neither whether-closed signal agrees with the snapshot's
-// `status: "complete"`. Two drift shapes still downgrade:
+// reflect a finished set. Set 030 Session 3 collapses the old Set 022 +
+// Set 023 multi-signal guard into a single v3-invariant probe: the v3
+// reader (`readProgress`) validates that `sessions[]` matches the
+// top-level `status`, and any drift surfaces as a rule-4/7 violation.
+// The v2 read path goes through `synthesizeV3FromV2` first; a v2
+// snapshot with `status: "complete"` but an empty/short
+// `completedSessions[]` synthesizes to a sessions[] that fails rule 7,
+// flagging the same drift cases (count mismatch, final-session signal
+// gap) without the explicit predicate ladder.
 //
-//   1. **Count mismatch.** `currentSession < totalSessions`. Pre-0.2.1
-//      ai_router flipped to complete after every session, and manual
-//      edits / stale consumer snapshots still produce this shape.
+// V2-compat: pre-Set-022 snapshots without `completedSessions[]` get
+// their array pre-populated from the events ledger before synthesis,
+// so a legacy snapshot whose ledger has all closeouts still validates
+// cleanly (no false drift downgrade).
 //
-//   2. **Final-session signal gap.** `currentSession === totalSessions`
-//      and the snapshot claims complete, but neither
-//      `completedSessions[]` nor the events ledger records the final
-//      session as closed. Set 023: `completedSessions[]` is consulted
-//      *before* the ledger so a migrated pre-Set-022 set whose
-//      operator hand-added the array displays as Done without also
-//      needing a synthesized `closeout_succeeded` event. The legacy
-//      ledger-only path remains for sets without the array.
-//
-// Returns false on any read/parse failure — trust the canonical status
-// rather than second-guessing on garbled input.
+// Returns false on parse failure — trust the canonical status rather
+// than second-guessing on garbled input. Returns true ONLY when the v3
+// invariants themselves reject the snapshot.
 export function isMidSetComplete(statePath: string): boolean {
   if (!fs.existsSync(statePath)) return false;
+  let sd: any;
   try {
-    const sd = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
-      currentSession?: number;
-      totalSessions?: number;
-      completedSessions?: unknown;
-    };
-    if (typeof sd.currentSession !== "number") return false;
-    if (typeof sd.totalSessions !== "number") return false;
-
-    if (sd.currentSession < sd.totalSessions) return true;
-
-    // Set 023 Session 4: `completedSessions[]` is an alternative
-    // authoritative signal to the events ledger. The array check fires
-    // first so a migrated pre-Set-022 set whose snapshot carries
-    // `completedSessions: [1..N]` is recognized as Done even when its
-    // ledger lacks the corresponding `closeout_succeeded` event. When
-    // the array satisfies the guard but the ledger does not, surface
-    // the drift via console.warn so the operator can choose to heal
-    // the ledger with `--repair --apply` — the override is correct,
-    // the warn is observability only.
-    if (Array.isArray(sd.completedSessions) &&
-        sd.completedSessions.includes(sd.currentSession)) {
-      const eventsPath = path.join(path.dirname(statePath), "session-events.jsonl");
-      if (fs.existsSync(eventsPath) &&
-          !hasCloseoutEventForSession(eventsPath, sd.currentSession)) {
-        const slug = path.basename(path.dirname(statePath));
-        console.warn(
-          `[session-set ${slug}] completedSessions[] overrides missing ledger ` +
-          `closeout for session ${sd.currentSession}`
-        );
-      }
-      return false;
-    }
-
-    const eventsPath = path.join(path.dirname(statePath), "session-events.jsonl");
-    if (fs.existsSync(eventsPath) &&
-        !hasCloseoutEventForSession(eventsPath, sd.currentSession)) {
-      return true;
-    }
-    return false;
+    sd = JSON.parse(fs.readFileSync(statePath, "utf8"));
   } catch {
-    return false;
+    return false; // parse error: trust the canonical status
+  }
+  if (sd === null || typeof sd !== "object" || Array.isArray(sd)) return false;
+  // V2-compat ledger merge: same shape as the readSessionSets path.
+  let stateForProgress: any = sd;
+  if (
+    sd.sessions === undefined &&
+    (!Array.isArray(sd.completedSessions) || sd.completedSessions.length === 0)  // noqa: D13 - v2-compat ledger-merge for synthesizer input
+  ) {
+    const eventsPath = path.join(path.dirname(statePath), "session-events.jsonl");
+    const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
+    if (ledgerSessions.length > 0) {
+      stateForProgress = { ...sd, completedSessions: ledgerSessions };
+    }
+  }
+  const specPath = path.join(path.dirname(statePath), "spec.md");
+  try {
+    readProgress(stateForProgress, specPath);
+    return false; // invariants hold — snapshot is internally consistent
+  } catch (e) {
+    if (e instanceof SessionStateInvariantError) {
+      return true; // drift: invariants violated
+    }
+    return false; // TypeError / other: trust canonical status
   }
 }
 
-function hasCloseoutEventForSession(
-  eventsPath: string,
-  sessionNumber: number
-): boolean {
+// Set 030 Session 3: v2-compat helper used to pre-populate
+// `completedSessions[]` on a v2 snapshot whose state file lacks the
+// field. Returns the sorted, deduplicated list of session numbers the
+// events ledger records as closed via `closeout_succeeded`. Empty
+// list on any read/parse failure or when the file is absent.
+function readClosedSessionsFromLedger(eventsPath: string): number[] {
+  if (!fs.existsSync(eventsPath)) return [];
   let text: string;
   try {
     text = fs.readFileSync(eventsPath, "utf8");
   } catch {
-    return false;
+    return [];
   }
+  const seen = new Set<number>();
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
@@ -140,26 +126,28 @@ function hasCloseoutEventForSession(
       };
       if (
         event.event_type === "closeout_succeeded" &&
-        event.session_number === sessionNumber
+        typeof event.session_number === "number" &&
+        Number.isInteger(event.session_number) &&
+        event.session_number > 0
       ) {
-        return true;
+        seen.add(event.session_number);
       }
     } catch {
       // skip malformed lines — append-only ledger may carry partial writes
     }
   }
-  return false;
+  return [...seen].sort((a, b) => a - b);
 }
 
-// Set 022 Session 2: generalization of `hasCloseoutEventForSession` to
-// "how many distinct sessions does the ledger record as closed." Used
-// as the Full-tier fallback for `sessionsCompleted` when
-// `completedSessions[]` is missing from the snapshot (e.g., a set
-// that pre-dates Set 022's writer changes and hasn't had its next
-// boundary-write heal it yet). Returns 0 on any read/parse failure
-// or when the file is absent — the caller treats 0 as "no
-// authoritative signal" and falls through to the next derivation
-// step rather than asserting "0 sessions done."
+// Set 022 Session 2: events-ledger fallback for `sessionsCompleted`.
+// Returns the count of distinct `closeout_succeeded` session numbers
+// in `session-events.jsonl`. Used as the v2-compat fallback for
+// pre-Set-022 snapshots (and pre-Set-030 consumer-repo snapshots)
+// whose state file lacks both v3 sessions[] and v2 completedSessions[]
+// — without a snapshot signal, the ledger is the next-best source.
+// Returns 0 on any read/parse failure or when the file is absent —
+// the caller treats 0 as "no authoritative signal" and falls through
+// to the next derivation step rather than asserting "0 sessions done."
 export function countDistinctCloseoutSessions(eventsPath: string): number {
   if (!fs.existsSync(eventsPath)) return 0;
   let text: string;
@@ -290,13 +278,13 @@ export function readSessionSets(root: string): SessionSet[] {
     } else {
       const status = readStatus(dir);
       if (status === "complete") {
-        // Defensive: a status of "complete" with currentSession <
-        // totalSessions is a stale mid-set close-out — written either
-        // by ai_router < 0.2.1 (which flipped to complete after every
-        // session), a manual edit, or a snapshot a consumer repo
-        // hasn't refreshed yet. Treat as in-progress so the set
-        // doesn't briefly show Done in the window between sessions.
-        state = isMidSetComplete(statePath) ? "in-progress" : "done";
+        // Defensive: a snapshot with status: "complete" that doesn't
+        // actually satisfy the v3 invariants (e.g., sessions[] still
+        // contains a not-started entry) is a stale mid-set close-out —
+        // either a manual edit or a snapshot a consumer repo hasn't
+        // refreshed yet. Downgrade so the set doesn't briefly show
+        // Complete in the window between sessions.
+        state = isMidSetComplete(statePath) ? "in-progress" : "complete";
       } else if (status === "in-progress") {
         state = "in-progress";
       } else {
@@ -310,16 +298,12 @@ export function readSessionSets(root: string): SessionSet[] {
     let liveSession: LiveSession | null = null;
     const eventsPath = path.join(dir, "session-events.jsonl");
 
-    // Activity log is a step log, not a count source. Set 022 Session 2
-    // removed the unique-`sessionNumber` count derivation that used to
-    // live here — under the state-first lifecycle protocol,
-    // `completedSessions[]` (writer-maintained on Full tier;
-    // hand-maintained on Lightweight) is authoritative, with the
-    // events ledger as the Full-tier fallback. The activity-log read
-    // is retained for two non-count signals: `totalSessions` (which
-    // the schema places at the top level of the file) and the
-    // per-entry `dateTime` for the `lastTouched` display, which is
-    // more granular than the state-file's session-boundary timestamps
+    // Activity log is a step log, not a count source. The activity-log
+    // read is retained for two non-count signals: `totalSessions` (which
+    // lives at the top level of activity-log.json — a different artifact
+    // / different schema from session-state.json, outside D13's scope)
+    // and the per-entry `dateTime` for the `lastTouched` display, which
+    // is more granular than the state-file's session-boundary timestamps
     // while a session is mid-flight.
     if (fs.existsSync(activityPath)) {
       try {
@@ -327,7 +311,7 @@ export function readSessionSets(root: string): SessionSet[] {
           totalSessions?: number;
           entries?: Array<{ sessionNumber?: number; dateTime?: string }>;
         };
-        if (typeof data.totalSessions === "number") totalSessions = data.totalSessions;
+        if (typeof data.totalSessions === "number") totalSessions = data.totalSessions;  // noqa: D13 - activity-log.json carrier field, not session-state
         for (const e of data.entries ?? []) {
           if (e.dateTime && (!lastTouched || e.dateTime > lastTouched)) lastTouched = e.dateTime;
         }
@@ -337,73 +321,104 @@ export function readSessionSets(root: string): SessionSet[] {
     if (fs.existsSync(statePath)) {
       try {
         const sd = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
-          totalSessions?: number;
-          completedSessions?: number[];
           completedAt?: string;
           startedAt?: string;
-          currentSession?: number;
           status?: string;
           orchestrator?: { engine?: string; model?: string; effort?: string };
           verificationVerdict?: string;
           forceClosed?: boolean;
         };
-        // State file is authoritative for `totalSessions`. The
-        // activity-log carries the field at its top level (and we
-        // read it above for legacy compatibility), but if both are
-        // present the state-file value wins — a Set 022 Session 2
-        // round-1 verifier finding caught the inverted preference,
-        // which would silently mis-display the fraction whenever a
-        // Lightweight-tier set hand-edited one file but not the
-        // other.
-        if (typeof sd.totalSessions === "number") {
-          totalSessions = sd.totalSessions;
+
+        // Set 030 Session 3: route progress reads through the v3
+        // helper. `readProgress` branches v2/v3 internally; on a v3
+        // file it reads sessions[] directly, and on a v2 file it
+        // synthesizes from the legacy triple first. We trap invariant
+        // violations and fall through to the v2-compat events-ledger
+        // fallback below so a pre-Set-022 snapshot lacking
+        // completedSessions[] still derives a sensible count.
+        //
+        // V2-compat pre-processing: if the snapshot is v2 (no sessions[])
+        // and lacks a non-empty completedSessions[], pre-populate it
+        // from the events ledger BEFORE synthesizing. This keeps the
+        // ledger as a count signal for pre-Set-022 sets that have not
+        // yet been healed by the next boundary write. Pure-v3 snapshots
+        // skip this entirely — sessions[] is authoritative.
+        let progressTotal: number | null = null;
+        let progressCompleted: number[] | null = null;
+        let progressCurrent: number | null = null;
+        let stateForProgress: any = sd;
+        if (
+          (sd as { sessions?: unknown }).sessions === undefined &&
+          (!Array.isArray((sd as { completedSessions?: unknown }).completedSessions) ||  // noqa: D13 - v2-compat ledger-merge for synthesizer input
+            ((sd as { completedSessions?: unknown[] }).completedSessions?.length ?? 0) === 0)  // noqa: D13 - v2-compat ledger-merge for synthesizer input
+        ) {
+          const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
+          if (ledgerSessions.length > 0) {
+            stateForProgress = { ...sd, completedSessions: ledgerSessions };
+          }
+        }
+        try {
+          const view = readProgress(stateForProgress, specPath);
+          progressTotal = view.totalSessions;
+          progressCompleted = [...view.completedSessions];
+          progressCurrent = view.currentSession;
+        } catch (e) {
+          if (!(e instanceof SessionStateInvariantError)) {
+            throw e;
+          }
+          // Invariant violation: state is drift-shaped. Leave the
+          // progress-derived signals null and fall through to the
+          // v2-compat heuristics below.
+        }
+
+        // State file is authoritative for `totalSessions` when the
+        // v3 reader succeeded. The activity-log carries the field at
+        // its top level (read above for legacy compatibility), but if
+        // both are present the state-file value wins — a Set 022
+        // Session 2 round-1 verifier finding caught the inverted
+        // preference, which would silently mis-display the fraction
+        // whenever a Lightweight-tier set hand-edited one file but
+        // not the other.
+        if (progressTotal !== null && progressTotal > 0) {
+          totalSessions = progressTotal;
         }
         const stateTouched = sd.completedAt || sd.startedAt;
         if (stateTouched && (!lastTouched || stateTouched > lastTouched)) lastTouched = stateTouched;
         liveSession = {
-          currentSession: sd.currentSession ?? null,
+          currentSession: progressCurrent,
           status: sd.status ?? null,
           orchestrator: sd.orchestrator ?? null,
           startedAt: sd.startedAt ?? null,
           completedAt: sd.completedAt ?? null,
           verificationVerdict: sd.verificationVerdict ?? null,
           forceClosed: sd.forceClosed ?? null,
-          completedSessions: Array.isArray(sd.completedSessions) ? sd.completedSessions : null,
+          completedSessions: progressCompleted,
         };
-        // sessionsCompleted priority (highest first) — see Set 022
-        // spec § "Readers" for the rationale:
-        //  1. session-state.json `completedSessions` array —
-        //     authoritative under schema v2 + Set 022 protocol.
-        //     Hand-maintained on Lightweight tier; written by
-        //     ai_router on Full tier on every close.
+        // sessionsCompleted priority (highest first):
+        //  1. v3 `readProgress` derivation — authoritative for any
+        //     state file whose sessions[] satisfies the invariants
+        //     (every Full-tier write since Set 030 Session 2; every
+        //     Lightweight-tier file with proper sessions[] entries).
         //  2. Distinct `closeout_succeeded` session numbers in
-        //     `session-events.jsonl` — Full-tier fallback for sets
-        //     that pre-date the writer changes and haven't been
-        //     healed by their next boundary write yet.
-        //  3. `state === "done"` plus `totalSessions` — terminal
+        //     `session-events.jsonl` — v2-compat fallback for sets
+        //     whose snapshot fails the invariants (pre-Set-022 sets
+        //     that haven't been healed by their next boundary write
+        //     yet, or consumer repos awaiting the bulk migrator).
+        //  3. `state === "complete"` plus `totalSessions` — terminal
         //     state with no granular count signal (e.g., a
-        //     Lightweight-tier set marked complete without writing
-        //     the array). Using the canonicalized `state` instead
-        //     of raw `sd.status` keeps this in lockstep with the
-        //     bucketing alias map; also naturally skips the
-        //     mid-set-complete drift case where `state` is
-        //     downgraded to in-progress.
-        //
-        // No `currentSession - 1` fallback. Set 022 Session 1's
-        // writer protocol guarantees `completedSessions[]` is
-        // present after the first boundary write; legacy sets are
-        // covered by the events-ledger fallback. The pre-Set-022
-        // off-by-one shape ("0/4" stuck displayed while session 1
-        // is in flight; "N-1/N" stuck while final session is
-        // wrapping up) is eliminated by removing the heuristic
-        // rather than refining it.
-        if (Array.isArray(sd.completedSessions)) {
-          sessionsCompleted = sd.completedSessions.length;
+        //     Lightweight-tier set marked complete without sessions[]
+        //     or completedSessions[]). Using the canonicalized
+        //     `state` instead of raw `sd.status` keeps this in
+        //     lockstep with the bucketing alias map; also naturally
+        //     skips the mid-set-complete drift case where `state`
+        //     is downgraded to in-progress.
+        if (progressCompleted !== null) {
+          sessionsCompleted = progressCompleted.length;
         } else {
           const ledgerCount = countDistinctCloseoutSessions(eventsPath);
           if (ledgerCount > 0) {
             sessionsCompleted = ledgerCount;
-          } else if (state === "done" && typeof totalSessions === "number") {
+          } else if (state === "complete" && typeof totalSessions === "number") {
             sessionsCompleted = totalSessions;
           }
         }
@@ -446,7 +461,7 @@ export function readSessionSets(root: string): SessionSet[] {
     console.log(
       `[dabbler-ai-orchestration] readSessionSets(${path.basename(root)}): ` +
         `${sets.length} set(s) — ` +
-        `done=${counts.done ?? 0}, ` +
+        `complete=${counts.complete ?? 0}, ` +
         `in-progress=${counts["in-progress"] ?? 0}, ` +
         `not-started=${counts["not-started"] ?? 0}, ` +
         `cancelled=${counts.cancelled ?? 0}`,

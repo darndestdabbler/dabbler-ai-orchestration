@@ -74,60 +74,51 @@ function fakeSet(over = {}) {
     };
 }
 suite("SessionSetsProvider — isCurrentSessionInFlight", () => {
-    // Set 022 Session 2: the "currentSession in flight" predicate from
-    // the state invariant — `currentSession not in completedSessions[]`
-    // means session N has started but not closed. Drives the in-flight
-    // progressText annotation; locked here so the predicate cannot
-    // silently change shape.
+    // Set 030 Session 3: the v3 in-flight predicate is a direct read of
+    // the canonical `liveSession.currentSession` field, which fileSystem.ts
+    // populates from `readProgress` as the single in-progress session's
+    // number (or null when no session is in flight). The v2-era predicate
+    // (`currentSession not in completedSessions[]`) is gone — the v3
+    // reader resolves the ambiguity at source so the downstream check is
+    // a simple null-check.
     test("returns false when liveSession is null", () => {
         assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({ liveSession: null })), false);
     });
-    test("returns false when currentSession is null", () => {
+    test("returns false when currentSession is null (between sessions or complete)", () => {
+        // The v3 reader sets currentSession=null when no session is
+        // in-progress. This is the canonical signal for "between sessions"
+        // OR "set complete"; both render without the in-flight annotation.
         assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
-            liveSession: fakeLive({ currentSession: null, completedSessions: [] }),
+            liveSession: fakeLive({ currentSession: null, completedSessions: [1] }),
         })), false);
     });
-    test("returns false when completedSessions array is absent (legacy snapshot)", () => {
-        // Legacy sets without the array shouldn't gain a stray annotation.
-        assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
-            liveSession: fakeLive({ currentSession: 1, completedSessions: null }),
-        })), false);
-    });
-    test("returns true when currentSession is not in completedSessions[]", () => {
+    test("returns true when currentSession is a number (session in-progress)", () => {
         assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
             liveSession: fakeLive({ currentSession: 2, completedSessions: [1] }),
         })), true);
     });
-    test("returns true for session 1 of a fresh set (completedSessions: [])", () => {
+    test("returns true for session 1 of a fresh set", () => {
         // The endpoint the Set 022 spec called out specifically: "0/4
-        // stuck displayed while session 1 is in flight." With the array
-        // present-but-empty, the predicate fires and progressText adds
-        // the "session 1 in flight" annotation.
+        // stuck displayed while session 1 is in flight." With v3, the
+        // currentSession=1 signal directly drives the annotation — no
+        // dependence on the legacy completedSessions[] array.
         assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
             liveSession: fakeLive({ currentSession: 1, completedSessions: [] }),
         })), true);
-    });
-    test("returns false when currentSession is in completedSessions[] (between sessions)", () => {
-        // currentSession == 1 and completedSessions == [1] is the
-        // "session 1 just closed; session 2 hasn't started" interlude.
-        // Spec invariant: status="in-progress" + currentSession in
-        // completedSessions[] means between sessions, not in flight.
-        assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
-            liveSession: fakeLive({ currentSession: 1, completedSessions: [1] }),
-        })), false);
     });
 });
 suite("SessionSetsProvider — progressText", () => {
     // Set 022 Session 2: the two new annotations make the lifecycle
     // visible at a glance without operator hover.
     test("renders 'N/total' for an in-progress row between sessions (no annotation)", () => {
-        // Just-closed session 1; session 2 not yet started.
-        // completedSessions: [1], currentSession: 1 → between sessions.
+        // Just-closed session 1; session 2 not yet started. Under v3,
+        // between-sessions state means currentSession=null and
+        // completedSessions=[1]. No in-flight annotation.
         const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
             state: "in-progress",
             sessionsCompleted: 1,
             totalSessions: 4,
-            liveSession: fakeLive({ currentSession: 1, completedSessions: [1], status: "in-progress" }),
+            liveSession: fakeLive({ currentSession: null, completedSessions: [1], status: "in-progress" }),
         }));
         assert.strictEqual(text, "1/4");
     });
@@ -150,18 +141,18 @@ suite("SessionSetsProvider — progressText", () => {
         }));
         assert.strictEqual(text, "2/4 · session 3 in flight");
     });
-    test("appends 'Done' annotation on a done row", () => {
+    test("appends 'Complete' annotation on a complete row", () => {
         const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
-            state: "done",
+            state: "complete",
             sessionsCompleted: 4,
             totalSessions: 4,
             liveSession: fakeLive({
-                currentSession: 4,
+                currentSession: null,
                 completedSessions: [1, 2, 3, 4],
                 status: "complete",
             }),
         }));
-        assert.strictEqual(text, "4/4 Done");
+        assert.strictEqual(text, "4/4 Complete");
     });
     test("not-started rows render as '0/N' with no annotation", () => {
         const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
@@ -181,10 +172,13 @@ suite("SessionSetsProvider — progressText", () => {
         }));
         assert.strictEqual(text, "");
     });
-    test("legacy in-flight row (no completedSessions[]) renders 'N/total' without annotation", () => {
-        // Predicate guards against legacy snapshots: no completedSessions
-        // array means no authoritative in-flight signal, so no annotation
-        // is added. The base fraction still renders.
+    test("v2-shape liveSession (currentSession set, completedSessions null) still renders the annotation", () => {
+        // Set 030 Session 3: under v3, currentSession is strictly the
+        // in-progress session's number, so a non-null value unambiguously
+        // means "in flight" regardless of whether completedSessions[] was
+        // populated. This replaces the v2-era "no array → no annotation"
+        // guard, which existed only because v2's currentSession could
+        // also mean "most recently closed."
         const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
             state: "in-progress",
             sessionsCompleted: 1,
@@ -195,7 +189,7 @@ suite("SessionSetsProvider — progressText", () => {
                 status: "in-progress",
             }),
         }));
-        assert.strictEqual(text, "1/3");
+        assert.strictEqual(text, "1/3 · session 2 in flight");
     });
 });
 //# sourceMappingURL=sessionSetsProvider.test.js.map

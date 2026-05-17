@@ -38,8 +38,35 @@ exports.ensureSessionStateFile = ensureSessionStateFile;
 exports.readStatus = readStatus;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const SCHEMA_VERSION = 2;
+// Set 030 Session 2 (Python) / Session 3 (TS) bumped writers to schema
+// v3 with dual-write: legacy currentSession / totalSessions /
+// completedSessions are still emitted (derived from sessions[]) until a
+// future set retires legacy emission.
+const SCHEMA_VERSION = 3;
 const SESSION_STATE_FILENAME = "session-state.json";
+function buildSessions(totalSessions, topStatus) {
+    // Mirror of _not_started_payload / _backfill_payload in Python
+    // session_state.py. Per rule 1, sessions[] is omitted when
+    // totalSessions is unknown — "any set with a known plan" gets the
+    // array; an unknown-plan set legitimately has no ledger.
+    if (totalSessions === null || totalSessions <= 0)
+        return undefined;
+    const out = [];
+    for (let n = 1; n <= totalSessions; n++) {
+        let status = "not-started";
+        if (topStatus === "complete") {
+            status = "complete";
+        }
+        else if (topStatus === "in-progress" && n === 1) {
+            // Conservative inference: when only activity-log.json is present,
+            // we know SOME work has begun but not which session. Default
+            // session 1 to in-progress so the snapshot satisfies rule 6.
+            status = "in-progress";
+        }
+        out.push({ number: n, title: `Session ${n}`, status });
+    }
+    return out;
+}
 // Tolerant aliases mirroring _STATUS_ALIASES in session_state.py. Pre-Set-7
 // state files may carry "completed" or "done" instead of the canonical
 // "complete"; we normalize on read so consumers don't regress on existing
@@ -81,13 +108,18 @@ function readTotalSessionsFromSpec(sessionSetDir) {
 }
 // Mirror of _not_started_payload in Python. Must produce byte-identical
 // content to the Python writer for any folder, since either side may be
-// the one that lazy-synthesizes during a sweep.
+// the one that lazy-synthesizes during a sweep. Set 030 Session 3
+// (mirroring Python Session 2): writes v3 dual-write shape — sessions[]
+// when totalSessions is known, plus the legacy progress triple derived
+// from it.
 function notStartedPayload(sessionSetDir) {
-    return {
+    const totalSessions = readTotalSessionsFromSpec(sessionSetDir);
+    const sessions = buildSessions(totalSessions, "not-started");
+    const base = {
         schemaVersion: SCHEMA_VERSION,
         sessionSetName: path.basename(sessionSetDir.replace(/[\\/]+$/, "")),
         currentSession: null,
-        totalSessions: readTotalSessionsFromSpec(sessionSetDir),
+        totalSessions,
         status: "not-started",
         lifecycleState: null,
         startedAt: null,
@@ -95,6 +127,11 @@ function notStartedPayload(sessionSetDir) {
         verificationVerdict: null,
         orchestrator: null,
     };
+    if (sessions !== undefined) {
+        base.sessions = sessions;
+        base.completedSessions = [];
+    }
+    return base;
 }
 // Mirror of _backfill_payload in Python. Used by the lazy-synth
 // fallback in readStatus so a legacy folder that slipped through Set 7
@@ -115,9 +152,15 @@ function notStartedPayload(sessionSetDir) {
 // not lifecycle drivers — but we keep them aligned so a folder
 // synthesized by either side reads the same way.
 function backfillPayload(sessionSetDir) {
-    const base = notStartedPayload(sessionSetDir);
+    // Set 030 Session 3 (mirroring Python Session 2): re-derive
+    // sessions[] from the inferred top-status so the snapshot satisfies
+    // the v3 invariants. change-log present -> all complete;
+    // activity-log only -> session 1 in-progress; neither -> all
+    // not-started (the notStartedPayload default).
+    const totalSessions = readTotalSessionsFromSpec(sessionSetDir);
     const changelogPath = path.join(sessionSetDir, "change-log.md");
     if (fs.existsSync(changelogPath)) {
+        const base = notStartedPayload(sessionSetDir);
         base.status = "complete";
         base.lifecycleState = "closed";
         try {
@@ -127,10 +170,17 @@ function backfillPayload(sessionSetDir) {
         catch {
             base.completedAt = null;
         }
+        const sessions = buildSessions(totalSessions, "complete");
+        if (sessions !== undefined) {
+            base.sessions = sessions;
+            base.completedSessions = sessions.map((s) => s.number);
+            base.currentSession = null;
+        }
         return base;
     }
     const activityPath = path.join(sessionSetDir, "activity-log.json");
     if (fs.existsSync(activityPath)) {
+        const base = notStartedPayload(sessionSetDir);
         base.status = "in-progress";
         base.lifecycleState = "work_in_progress";
         try {
@@ -146,9 +196,15 @@ function backfillPayload(sessionSetDir) {
         catch {
             base.startedAt = null;
         }
+        const sessions = buildSessions(totalSessions, "in-progress");
+        if (sessions !== undefined) {
+            base.sessions = sessions;
+            base.completedSessions = [];
+            base.currentSession = 1;
+        }
         return base;
     }
-    return base;
+    return notStartedPayload(sessionSetDir);
 }
 // Atomic write via unique temp file + rename. Mirrors _atomic_write_json
 // in Python: a fixed `path + ".tmp"` would let two concurrent writers

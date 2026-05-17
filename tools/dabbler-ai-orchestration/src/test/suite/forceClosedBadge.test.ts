@@ -33,7 +33,7 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
     statePath: "/x/session-state.json",
     aiAssignmentPath: "/x/ai-assignment.md",
     uatChecklistPath: "/x/x-uat-checklist.json",
-    state: "done",
+    state: "complete",
     totalSessions: null,
     sessionsCompleted: 0,
     lastTouched: null,

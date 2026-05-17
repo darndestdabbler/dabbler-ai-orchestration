@@ -176,7 +176,7 @@ suite("Layer 2 e2e — sibling-worktree discovery", function () {
     const allLabels = [
       ...childrenOfGroup(provider, "in-progress"),
       ...childrenOfGroup(provider, "not-started"),
-      ...childrenOfGroup(provider, "done"),
+      ...childrenOfGroup(provider, "complete"),
       ...childrenOfGroup(provider, "cancelled"),
     ].map((it) => String(it.label));
     const dupCount = allLabels.filter((l) => l === "wt-dup").length;

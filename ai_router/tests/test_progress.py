@@ -34,6 +34,7 @@ from progress import (
     canonicalize_status,
     extract_session_titles_from_spec,
     get_progress,
+    read_progress,
     synthesize_v3_from_v2,
     validate_invariants,
 )
@@ -657,3 +658,87 @@ class TestValidateInvariantsDirect:
         ]
         # top_status=None skips rules 5-8; only structural rules 1-4 apply
         validate_invariants(sessions, top_status=None, lifecycle_state=None)
+
+
+# ---------------------------------------------------------------------------
+# read_progress wrapper: v2-or-v3 dispatch (Set 030 Session 3)
+# ---------------------------------------------------------------------------
+
+
+class TestReadProgress:
+    """``read_progress`` is the application-reader entry point per D13.
+
+    Branches v2 vs v3 internally so callers in close_session.py,
+    gate_checks.py, and the extension tree provider never reach into
+    the legacy progress triple themselves.
+    """
+
+    def test_v3_state_dispatches_to_get_progress(self, tmp_path: Path):
+        state = _v3_state(
+            [
+                _session(1, SESSION_STATUS_COMPLETE),
+                _session(2, SESSION_STATUS_IN_PROGRESS),
+                _session(3, SESSION_STATUS_NOT_STARTED),
+            ],
+            top_status=SESSION_STATUS_IN_PROGRESS,
+            lifecycle_state=LIFECYCLE_STATE_WORK_IN_PROGRESS,
+        )
+        view = read_progress(state, tmp_path / "absent-spec.md")
+        assert view.total_sessions == 3
+        assert view.completed_sessions == (1,)
+        assert view.current_session == 2
+        assert view.next_session == 3
+
+    def test_v2_state_synthesizes_then_validates(self, tmp_path: Path):
+        spec = tmp_path / "spec.md"
+        spec.write_text(
+            "### Session 1 of 3: Alpha\n"
+            "### Session 2 of 3: Beta\n"
+            "### Session 3 of 3: Gamma\n",
+            encoding="utf-8",
+        )
+        v2_state = {
+            "schemaVersion": 2,
+            "sessionSetName": "legacy",
+            "status": "in-progress",
+            "lifecycleState": "work_in_progress",
+            "currentSession": 2,
+            "totalSessions": 3,
+            "completedSessions": [1],
+        }
+        view = read_progress(v2_state, spec)
+        assert view.total_sessions == 3
+        assert view.completed_sessions == (1,)
+        assert view.current_session == 2
+        assert view.sessions[0].title == "Alpha"
+        assert view.sessions[1].title == "Beta"
+
+    def test_v3_state_ignores_spec_md(self, tmp_path: Path):
+        # On v3 inputs the spec.md path is unused; missing files must
+        # not cause an error or affect the returned view.
+        state = _v3_state(
+            [_session(1, SESSION_STATUS_COMPLETE), _session(2, SESSION_STATUS_COMPLETE)],
+            top_status=SESSION_STATUS_COMPLETE,
+            lifecycle_state=LIFECYCLE_STATE_CLOSED,
+        )
+        view = read_progress(state, tmp_path / "does-not-exist.md")
+        assert view.total_sessions == 2
+        assert view.completed_sessions == (1, 2)
+
+    def test_v2_invariant_violation_raises(self, tmp_path: Path):
+        # v2 with status=complete but completedSessions=[] synthesizes
+        # to all-not-started; rule 7 fail-louds on the contradiction.
+        v2_state = {
+            "schemaVersion": 2,
+            "status": "complete",
+            "currentSession": None,
+            "totalSessions": 3,
+            "completedSessions": [],
+        }
+        with pytest.raises(SessionStateInvariantError) as exc:
+            read_progress(v2_state, tmp_path / "no-spec.md")
+        assert exc.value.rule == 7
+
+    def test_none_state_raises(self):
+        with pytest.raises(TypeError):
+            read_progress(None, Path("/tmp/spec.md"))  # type: ignore[arg-type]

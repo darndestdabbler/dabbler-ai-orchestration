@@ -1402,47 +1402,57 @@ def _backfill_payload(session_set_dir: str) -> dict:
     base = _not_started_payload(session_set_dir)
 
     if os.path.isfile(os.path.join(session_set_dir, "change-log.md")):
+        # Round-A fix (Set 030 Session 3): only escalate to
+        # status=complete when sessions[] is populated. Without it,
+        # the snapshot would violate rule 1 (sessions[] required for
+        # any set with a known plan) AND rule 7 (top-status complete
+        # requires every session complete) — readProgress would
+        # reject the file we just wrote. When sessions[] is absent
+        # (totalSessions unknown from spec.md), preserve operator
+        # intent via the file presence itself and leave the snapshot
+        # at the not-started shape; the next boundary write with a
+        # plan will re-promote.
+        if not isinstance(base.get("sessions"), list):
+            return base
         base["status"] = COMPLETE_STATUS
         base["lifecycleState"] = SessionLifecycleState.CLOSED.value
         base["completedAt"] = _change_log_mtime_iso(session_set_dir)
-        # Promote every session in the ledger to complete (rule 7
-        # requires top-level "complete" pairs with every session
-        # complete). If sessions[] is absent (totalSessions unknown),
-        # leave the legacy fields alone — backfill stays as-is.
-        if isinstance(base.get("sessions"), list):
-            for entry in base["sessions"]:
-                entry["status"] = SESSION_STATUS_COMPLETE
-            _validate_sessions_or_raise(
-                base["sessions"],
-                top_status=SESSION_STATUS_COMPLETE,
-                lifecycle_state=SessionLifecycleState.CLOSED.value,
-            )
-            _, _, derived_completed = _derive_legacy_fields(base["sessions"])
-            base["completedSessions"] = derived_completed
+        # Promote every session in the ledger to complete (rule 7).
+        for entry in base["sessions"]:
+            entry["status"] = SESSION_STATUS_COMPLETE
+        _validate_sessions_or_raise(
+            base["sessions"],
+            top_status=SESSION_STATUS_COMPLETE,
+            lifecycle_state=SessionLifecycleState.CLOSED.value,
+        )
+        _, _, derived_completed = _derive_legacy_fields(base["sessions"])
+        base["completedSessions"] = derived_completed
         return base
 
     if os.path.isfile(os.path.join(session_set_dir, "activity-log.json")):
+        # Round-A fix (Set 030 Session 3): same as the change-log
+        # branch above — only escalate to in-progress when sessions[]
+        # is populated. Without it, rule 1 and rule 6 would reject
+        # the snapshot on read.
+        if not isinstance(base.get("sessions"), list) or not base["sessions"]:
+            return base
         base["status"] = IN_PROGRESS_STATUS
         base["lifecycleState"] = SessionLifecycleState.WORK_IN_PROGRESS.value
         base["startedAt"] = _earliest_activity_log_timestamp(session_set_dir)
-        # Conservatively promote session 1 to in-progress in the v3
-        # ledger when totalSessions is known. Rule 6 allows exactly
-        # one in-progress session; session 1 is the safest assumption
-        # for a legacy folder with no other signal. The next
-        # legitimate writer call (register_session_start or
-        # close_session) will resync the ledger.
-        if isinstance(base.get("sessions"), list) and base["sessions"]:
-            base["sessions"][0]["status"] = SESSION_STATUS_IN_PROGRESS
-            _validate_sessions_or_raise(
-                base["sessions"],
-                top_status=SESSION_STATUS_IN_PROGRESS,
-                lifecycle_state=SessionLifecycleState.WORK_IN_PROGRESS.value,
-            )
-            derived_current, _, derived_completed = _derive_legacy_fields(
-                base["sessions"]
-            )
-            base["currentSession"] = derived_current
-            base["completedSessions"] = derived_completed
+        # Conservatively promote session 1 to in-progress (rule 6
+        # allows exactly one in-progress session; session 1 is the
+        # safest assumption for a legacy folder).
+        base["sessions"][0]["status"] = SESSION_STATUS_IN_PROGRESS
+        _validate_sessions_or_raise(
+            base["sessions"],
+            top_status=SESSION_STATUS_IN_PROGRESS,
+            lifecycle_state=SessionLifecycleState.WORK_IN_PROGRESS.value,
+        )
+        derived_current, _, derived_completed = _derive_legacy_fields(
+            base["sessions"]
+        )
+        base["currentSession"] = derived_current
+        base["completedSessions"] = derived_completed
         return base
 
     return base

@@ -109,6 +109,10 @@ try:
         Disposition,
         read_disposition,
     )
+    from progress import (  # type: ignore[import-not-found]
+        SessionStateInvariantError,
+        read_progress,
+    )
     from session_events import (  # type: ignore[import-not-found]
         SessionLifecycleState,
         append_event,
@@ -126,6 +130,10 @@ except ImportError:
     from .disposition import (  # type: ignore[no-redef]
         Disposition,
         read_disposition,
+    )
+    from .progress import (  # type: ignore[no-redef]
+        SessionStateInvariantError,
+        read_progress,
     )
     from .session_events import (  # type: ignore[no-redef]
         SessionLifecycleState,
@@ -537,12 +545,26 @@ def _peek_session_number(session_set_dir: str) -> Optional[int]:
     Best-effort and unauthoritative — used only for the JSON output
     payload. Real consumers of the session number look at the events
     ledger or the disposition; we just want a label for the output.
+
+    Set 030 Session 3: routes through ``read_progress`` so this reader
+    sees the v3 ``sessions[]`` ledger (or a synthesized view for legacy
+    v2 files) rather than the raw legacy field. Mirrors the v2 "in
+    flight OR most recently closed" semantic so idempotent close
+    retries still produce a useful label.
     """
     state = read_session_state(session_set_dir)
     if not state:
         return None
-    sn = state.get("currentSession")
-    return sn if isinstance(sn, int) else None
+    spec_md_path = os.path.join(session_set_dir, "spec.md")
+    try:
+        view = read_progress(state, spec_md_path)
+    except (SessionStateInvariantError, TypeError, ValueError):
+        return None
+    if view.current_session is not None:
+        return view.current_session
+    if view.completed_sessions:
+        return max(view.completed_sessions)
+    return None
 
 
 def _read_disposition_or_none(session_set_dir: str) -> Optional[Disposition]:
@@ -719,6 +741,7 @@ def _run_repair(
     disposition = read_disposition(session_set_dir)
 
     state_lifecycle = (state or {}).get("lifecycleState")
+    # noqa: D13 - repair walk is a v2-compat path that reconciles legacy fields
     state_session_number = (state or {}).get("currentSession")
     if not isinstance(state_session_number, int):
         state_session_number = None
@@ -828,6 +851,7 @@ def _run_repair(
                 and not isinstance(ev.session_number, bool)
                 and ev.session_number > 0
             })
+            # noqa: D13 - repair walk is a v2-compat path that reconciles legacy fields
             existing_completed = (state or {}).get("completedSessions")
             # ``existing_clean`` is the sanitized view used for the
             # union math (drops non-int, booleans, non-positive).
@@ -963,6 +987,7 @@ def _run_repair(
     # surfaces in practice, add a third repair branch that calls
     # _flip_state_to_closed when len(completedSessions)==totalSessions
     # and change-log.md is present and ``status != complete``.
+    # noqa: D13 - repair walk is a v2-compat path that reconciles legacy fields
     completed_in_state = [
         c for c in ((state or {}).get("completedSessions") or [])
         if isinstance(c, int)

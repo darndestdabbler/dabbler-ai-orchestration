@@ -61,7 +61,7 @@ suite("Layer 2 e2e — multi-set workspace", function () {
     await replaceWorkspaceFolders(a.repo_root);
     const provider = buildProvider();
 
-    const done = childrenOfGroup(provider, "done");
+    const done = childrenOfGroup(provider, "complete");
     assert.strictEqual(done.length, 1, "exactly one set should be Done");
     assert.strictEqual(done[0].label, "alpha-done");
 
@@ -165,7 +165,7 @@ suite("Layer 2 e2e — multi-set workspace", function () {
     assert.strictEqual(notStarted.length, 1);
     assert.strictEqual(notStarted[0].label, "charlie-not-started");
 
-    const done = childrenOfGroup(provider, "done");
+    const done = childrenOfGroup(provider, "complete");
     assert.strictEqual(done.length, 0);
   });
 });

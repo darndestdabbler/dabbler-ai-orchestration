@@ -127,14 +127,14 @@ suite("flagDecisionForReview — findActiveSessionSetDir", () => {
     test("returns null when no session set is in-progress", () => {
         const result = (0, decisionReviewQueue_1.findActiveSessionSetDir)(() => [
             ssStub({ state: "not-started" }),
-            ssStub({ state: "done" }),
+            ssStub({ state: "complete" }),
             ssStub({ state: "cancelled" }),
         ]);
         assert.strictEqual(result, null);
     });
     test("returns the dir of the single in-progress set", () => {
         const result = (0, decisionReviewQueue_1.findActiveSessionSetDir)(() => [
-            ssStub({ state: "done", dir: "/old" }),
+            ssStub({ state: "complete", dir: "/old" }),
             ssStub({ state: "in-progress", dir: "/active" }),
             ssStub({ state: "not-started", dir: "/pending" }),
         ]);

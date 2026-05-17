@@ -71,7 +71,7 @@ suite("Layer 2 e2e — multi-set workspace", function () {
         void c; // c is intentionally left untouched
         await (0, e2eHarness_1.replaceWorkspaceFolders)(a.repo_root);
         const provider = (0, e2eHarness_1.buildProvider)();
-        const done = (0, e2eHarness_1.childrenOfGroup)(provider, "done");
+        const done = (0, e2eHarness_1.childrenOfGroup)(provider, "complete");
         assert.strictEqual(done.length, 1, "exactly one set should be Done");
         assert.strictEqual(done[0].label, "alpha-done");
         const inProgress = (0, e2eHarness_1.childrenOfGroup)(provider, "in-progress");
@@ -146,7 +146,7 @@ suite("Layer 2 e2e — multi-set workspace", function () {
         const notStarted = (0, e2eHarness_1.childrenOfGroup)(provider, "not-started");
         assert.strictEqual(notStarted.length, 1);
         assert.strictEqual(notStarted[0].label, "charlie-not-started");
-        const done = (0, e2eHarness_1.childrenOfGroup)(provider, "done");
+        const done = (0, e2eHarness_1.childrenOfGroup)(provider, "complete");
         assert.strictEqual(done.length, 0);
     });
 });

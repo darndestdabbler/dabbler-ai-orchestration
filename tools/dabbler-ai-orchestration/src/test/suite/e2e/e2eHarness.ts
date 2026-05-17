@@ -410,7 +410,7 @@ export function topLevelGroups(
  */
 export function childrenOfGroup(
   provider: SessionSetsProvider,
-  key: "in-progress" | "not-started" | "done" | "cancelled",
+  key: "in-progress" | "not-started" | "complete" | "cancelled",
 ): vscode.TreeItem[] {
   const groups = topLevelGroups(provider);
   const group = groups.find(

@@ -77,6 +77,19 @@ class WizardPanel {
                 case "troubleshoot":
                     vscode.commands.executeCommand("dabbler.troubleshoot");
                     break;
+                case "openConfigEditor":
+                    vscode.commands.executeCommand("dabbler.openConfigEditor");
+                    break;
+                case "openExternal": {
+                    const url = msg.url;
+                    if (url) {
+                        try {
+                            vscode.env.openExternal(vscode.Uri.parse(url, true));
+                        }
+                        catch { /* ignore malformed URLs */ }
+                    }
+                    break;
+                }
                 case "showCost":
                     vscode.commands.executeCommand("dabbler.showCostDashboard");
                     break;

@@ -1,0 +1,16 @@
+{
+  "content": "- **Major** \u2014 The happy-path event checks do not actually prove ledger history is preserved across later CLI calls. A regression that truncates or duplicates earlier sessions\u2019 events on session 2/3 would still pass, because the test only checks the current session\u2019s `work_started` / `closeout_succeeded` count.  \n  **Location** \u2192 `ai_router/tests/e2e/test_happy_3session.py:109-111`, `ai_router/tests/e2e/test_happy_3session.py:132-136`  \n  **Fix** \u2192 After each `start_session`, assert historical stability for all sessions seen so far, not just `n`:\n  - after start of `n`: `work_started` count is exactly 1 for every session `1..n`, `closeout_succeeded` count is exactly 1 for every session `1..n-1`, and total event count is `2*n - 1`\n  - after close of `n`: `work_started` count is exactly 1 for every session `1..n`, `closeout_succeeded` count is exactly 1 for every session `1..n`, and total event count is `2*n`\n  If ordering matters, also assert the append order.\n\n- **Minor** \u2014 The happy-path post-close assertions miss key state invariants, so `close_session` could incorrectly advance/clear `currentSession` or corrupt `totalSessions` and this test would still pass.  \n  **Location** \u2192 `ai_router/tests/e2e/test_happy_3session.py:126-145`  \n  **Fix** \u2192 After every close, also assert at least:\n  - `state.get(\"currentSession\") == n`\n  - `state.get(\"totalSessions\") == total`\n  - `state.get(\"startedAt\") is not None`\n  - orchestrator block still has the expected engine/model/provider/effort if that is intended to persist across close-out\n\n- **Minor** \u2014 The regression test is intentionally narrow/unit-fast, but it is marked `e2e`, so it is excluded from `pytest -m \"not e2e\"` and only runs in the slower harness slice. That weakens fast feedback on the exact writer regression this file is meant to pin.  \n  **Location** \u2192 `ai_router/tests/e2e/test_register_session_start_regression.py:34`; related marker definition in `pytest.ini:6`  \n  **Fix** \u2192 Remove `pytestmark = pytest.mark.e2e` from this module, or move the file into the regular unit suite. Keep only the real CLI/git harness tests under the `e2e` marker.",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 9282,
+  "output_tokens": 19787,
+  "cost_usd": 0.32000999999999996,
+  "total_cost_usd": 0.32000999999999996,
+  "complexity_score": 68,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 263.14223766326904,
+  "truncated": false,
+  "verification": null
+}

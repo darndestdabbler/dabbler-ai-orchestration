@@ -1,0 +1,16 @@
+{
+  "content": "- **Blocker**\n  - **Issue:** End-to-end wizard wiring is broken. The new `openConfigEditor` case in `WizardPanel.ts` is correctly separated and does **not** fall through, but `wizard.html` triggers it with inline `onclick` handlers while the page CSP forbids inline script. In a VS Code webview, a nonce on the `<script>` block does not authorize `onclick=\"...\"`. Result: the new **Configure AI Router** button, plus the other wizard action buttons, never post any message.\n  - **Location:** `tools/dabbler-ai-orchestration/webview/wizard.html:5-8,118-125`\n  - **Fix:** Remove all inline `onclick` attributes. Give each button an `id` or `data-command` and bind `addEventListener(\"click\", ...)` from the existing nonce-bearing `<script>` block.\n\n- **Minor**\n  - **Issue:** The pricing link posts `{ command: \"openExternal\" }`, but the panel never handles that message, so the link is a no-op.\n  - **Location:** `tools/dabbler-ai-orchestration/webview/wizard.html:137-139`; `tools/dabbler-ai-orchestration/src/wizard/WizardPanel.ts:40-60`\n  - **Fix:** Add an `openExternal` case that validates/parses the URL and calls `vscode.env.openExternal(vscode.Uri.parse(url))`.\n\n- **Minor**\n  - **Issue:** A Python spawn failure can produce duplicate error notifications. `child.on(\"error\")` shows one toast, then `child.on(\"close\")` still runs and reports a second failure when `stdout` is empty or non-JSON.\n  - **Location:** `tools/dabbler-ai-orchestration/src/configEditor/ConfigEditorPanel.ts:717-733`\n  - **Fix:** Track a `spawnErrored`/`handled` flag and return early from the `close` handler if `error` fired, or consolidate all subprocess result handling into one code path keyed off spawn/exit state.",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 17734,
+  "output_tokens": 20896,
+  "cost_usd": 0.357775,
+  "total_cost_usd": 0.357775,
+  "complexity_score": 63,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 253.04916882514954,
+  "truncated": false,
+  "verification": null
+}

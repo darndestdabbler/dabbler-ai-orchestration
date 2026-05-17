@@ -1,0 +1,16 @@
+{
+  "content": "- **Major** \u2014 Multiset commits are not isolated per session set \u2192 `ai_router/tests/e2e/fixtures.py:161-192` (especially `git add -A` at line 175) \u2192 `git add -A` stages every pending change in the repo, not just the current session set. In the stated multi-set scenarios, a commit for set B will not overwrite set A if A is already committed, but it **will** sweep any uncommitted A changes into B\u2019s commit and can hide interleaving/state-contention bugs. Change `_commit_and_push()` to stage only `handle.set_dir` plus explicit shared artifacts, or accept a `paths` parameter so callers control exactly what gets committed.\n\n- **Minor** \u2014 Negative force-close tests rely on external env scrubbing instead of helper-local isolation \u2192 `ai_router/tests/e2e/fixtures.py:120-135` \u2192 `_subprocess_env()` clones the full parent environment. If `drive_close_session(force=True, inject_force_env=False)` later uses this env unchanged, any same-test/fixture reintroduction of `AI_ROUTER_ALLOW_FORCE_CLOSE_OUT` will leak into the subprocess and let the guard test pass accidentally. In `drive_close_session()`, start from `_subprocess_env()`, then `env.pop(\"AI_ROUTER_ALLOW_FORCE_CLOSE_OUT\", None)` unless `inject_force_env=True`; only set the variable in the positive force-close path.",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 4942,
+  "output_tokens": 10568,
+  "cost_usd": 0.170875,
+  "total_cost_usd": 0.170875,
+  "complexity_score": 62,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 138.4858615398407,
+  "truncated": false,
+  "verification": null
+}

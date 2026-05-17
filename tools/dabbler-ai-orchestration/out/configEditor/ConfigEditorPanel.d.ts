@@ -28,6 +28,7 @@ export declare class ConfigEditorPanel {
     private _acceptHalfBatchAsBaseline;
     private _reapplyLastSave;
     private _runFlagDecisionCommand;
+    private _handleTestNotification;
     private _openLocalOverridesFile;
     private _refresh;
     private _getHtml;

@@ -1,0 +1,16 @@
+{
+  "content": "VERIFIED",
+  "model_name": "gpt-5-4",
+  "model_id": "gpt-5.4",
+  "tier": 3,
+  "input_tokens": 4534,
+  "output_tokens": 8373,
+  "cost_usd": 0.13693000000000002,
+  "total_cost_usd": 0.13693000000000002,
+  "complexity_score": 65,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 116.58812046051025,
+  "truncated": false,
+  "verification": null
+}

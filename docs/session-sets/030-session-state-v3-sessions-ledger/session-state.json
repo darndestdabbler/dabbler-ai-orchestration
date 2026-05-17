@@ -14,5 +14,7 @@
     "model": "claude-opus-4-7",
     "effort": "high"
   },
-  "completedSessions": []
+  "completedSessions": [
+    1
+  ]
 }

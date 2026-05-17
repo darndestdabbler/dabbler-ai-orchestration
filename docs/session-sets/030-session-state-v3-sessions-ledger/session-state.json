@@ -20,7 +20,7 @@
     {
       "number": 4,
       "title": "Bulk migrator + in-repo migration + consumer dry-run docs (NO publish)",
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "number": 5,
@@ -28,7 +28,7 @@
       "status": "not-started"
     }
   ],
-  "currentSession": null,
+  "currentSession": 4,
   "totalSessions": 5,
   "completedSessions": [
     1,
@@ -37,7 +37,7 @@
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-17T13:23:13.159887-04:00",
+  "startedAt": "2026-05-17T17:42:32.285161-04:00",
   "completedAt": null,
   "verificationVerdict": null,
   "orchestrator": {

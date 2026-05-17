@@ -407,6 +407,132 @@
           "issuesFound": 1
         }
       ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-4/start",
+      "dateTime": "2026-05-17T17:42:00-04:00",
+      "description": "Registered Session 4 start via python -m ai_router.start_session. Snapshot now currentSession=4, completedSessions=[1,2,3]; sessions[].3 flipped to in-progress (sessions 1-2 stayed complete from Session 1+2; session 3 flipped complete via Session 3 close). work_started event #4 appended to session-events.jsonl.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-4/migrator-cli",
+      "dateTime": "2026-05-17T17:50:00-04:00",
+      "description": "Created ai_router/migrate_session_state.py (~770 LOC). Inferential v2->v3 migration core: _resolve_total (picks max of legacy total / spec.md / completedSessions / currentSession), _build_v3_sessions (force-promote-all on closed signal else trust completedSessions[]), _strict_positive_int (rejects bool/float/non-int even when ==int), _derive_legacy_triple (v3 -> dual-write derivation), _migrate_state_dict (pure function; runs validate_invariants before any write), migrate_one_set (public entry; returns structured MigrationResult for the CLI and Session 5 in-extension lazy migrator to consume), migrate_all + discover_session_sets. CLI argparse: --scan / --in-place / --strategy {regex,generic,ai,interactive} / --only / --verbose / --json. Atomic write via _atomic_write_json.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-4/migrator-tests",
+      "dateTime": "2026-05-17T17:55:00-04:00",
+      "description": "Created ai_router/tests/test_migrate_session_state.py with 38 initial cases covering idempotency (v3 skip), closed sets (lifecycle + currentSession>=total branches; spec.md-widened totals; missing completedSessions[]; with full array), in-flight + between-sessions + not-started, cancelled (top status preserved, sessions reflect actual completion), status aliases done/completed -> complete, strict bool/float filtering, title resolution (regex/generic/missing-spec/partial-spec), malformed inputs (no state, bad JSON, top-level array, no totalSessions signal), dry-run vs in-place atomicity + tmpfile cleanup, AI strategy NotImplementedError, unknown-strategy ValueError, discovery sort + filter, CLI exit codes + JSON output + non-TTY interactive fallback. All 38 pass.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-4/in-repo-migration",
+      "dateTime": "2026-05-17T18:00:00-04:00",
+      "description": "Ran python -m ai_router.migrate_session_state --scan docs/session-sets --strategy regex --in-place against the 29 in-repo v2 state files (001-029). 0 violations, 0 malformed; Set 030 itself skipped (already v3 from Session 1). Each migrated file round-trips through read_progress() cleanly. Closed sets without completedSessions[] (007/008/010/011/012/014/etc.) correctly force-promote-all via the lifecycle=closed signal. Set 029 (not-started) becomes all-not-started sessions[]. Committed as its own commit per spec D7 step 2: 0106d97 'Set 030 Session 4: bulk-migrate 29 v2 state files to v3 (dual-write)' so the diff is reviewable independently of the migrator code commit.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-4/lightweight-ergonomics",
+      "dateTime": "2026-05-17T18:05:00-04:00",
+      "description": "D16 Lightweight-tier ergonomics dry-run. Copied dabbler-homehealthcare-accessdb/docs/session-sets/001-forms-detail-uat (4-session closed UAT set, representative Lightweight-tier shape) to C:/tmp/v3-ergonomics-dry-run/. Ran migrator: [migrated] 001-forms-detail-uat (4 complete, 0 in-progress, 0 not-started) - regex titles parsed from spec.md (frmClientDetail UAT (Old #5), frmBudgetServicePlan UAT (Old #6), etc.). Then wrote demo.py walking each transition (start session 1, close session 1, start session 2) with explicit field-by-field diffs; each step round-trips through get_progress() cleanly. Saved to verification-output/lightweight-ergonomics-demo.txt. Finding: D10's 'one field change per transition' holds for mid-set transitions (session-level flip only); set-level status + lifecycleState fields flip at the boundaries (first-ever start and final close).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-4/consumer-dry-run-doc",
+      "dateTime": "2026-05-17T18:10:00-04:00",
+      "description": "Authored docs/migration-v3-dry-run.md (~250 lines). Sections: what the migrator does, what it doesn't do, running a dry-run (CLI examples), applying the migration, rolling back (git checkout), inference rules table mapping v2 input shapes to v3 outputs, Lightweight-tier hand-edit ergonomics with worked examples + pointer to the verification-output demo, when to migrate (before vs after GA release), set-ordering note (D15: both orders supported), pre-RC smoke test (this repo's 29-file migration summary), reporting issues, cross-references to schema doc + spec + proposal.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-4/rc-bumps-and-build",
+      "dateTime": "2026-05-17T18:15:00-04:00",
+      "description": "Bumped versions (NOT PUBLISHED per spec D14): dabbler-ai-router 0.3.2 -> 0.4.0rc1 (PEP 440 canonical form for the wheel; also updated ai_router.__version__) and extension 0.13.17 -> 0.14.0-rc.1 (semver). Updated ai_router/CHANGELOG.md + tools/dabbler-ai-orchestration/CHANGELOG.md with explicit 'NOT PUBLISHED' notes pointing at Session 5 as the publish point. Built RC artifacts locally: python -m build produces dist/dabbler_ai_router-0.4.0rc1-py3-none-any.whl (includes ai_router/migrate_session_state.py); cd tools/dabbler-ai-orchestration && npx vsce package --no-dependencies produces dabbler-ai-orchestration-0.14.0-rc.1.vsix (728 KB, 20 files). Neither vsce publish nor twine upload invoked.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-4/full-suite-pretest",
+      "dateTime": "2026-05-17T18:20:00-04:00",
+      "description": "Full pytest (Layer 1): 568 passed + 1 skipped + 8 e2e deselected. ONE initial fail: test_no_application_reader_accesses_legacy_fields fired against the new migrator's intentional v2-field reads. Fix: added migrate_session_state.py to the file-level D13 allowlist in test_no_legacy_field_reads.py (the migrator IS the v2-compat path; mirrors progress.py and session_state.py allowlist entries). Mocha test:unit (Layer 2): 376 passing, 2 failing (both pre-existing baseline failures unrelated to v3, identical to Session 3's set: configEditor-foundation panel-lifecycle and notificationsSection rendering). Layer 3 Playwright: 5/5 passing in 1.7m total against v3 fixtures (Complete bucket, N/N annotation, [FORCED] badge, in-flight annotation, cancelled bucket).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "session-4/verification-round-a",
+      "dateTime": "2026-05-17T18:25:00-04:00",
+      "description": "Round A verification: gpt-5-4 via ai_router.route(task_type='session-verification'). Focused slice of migrate_session_state.py (~470 LOC across 3 ranges per memory feedback_split_large_verification_bundles; bundled the inferential core + public entry points; skipped CLI argparse / output formatting / __all__). Cost: $0.189845, elapsed 163s, in=7442 out=11416 tokens, no escalation. Verifier returned REJECTED with 3 must-fix issues: (1) closed-signal disjunct compares currentSession to resolved total (after spec.md widening) instead of LEGACY totalSessions, causing a v2 file like {status:complete, totalSessions:3, currentSession:3, completedSessions:[], spec.md:4} to fall out of the closed branch and surface as rule-7 WOULD-VIOLATE; (2) future-schema files (schemaVersion>3) not refused — fell through and were re-migrated by v2 inference, silently downgrading; (3) _atomic_write_json uses a fixed .{basename}.tmp path (collision risk on concurrent runs) and leaves the temp file behind if json.dump/write raises mid-write.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "taskType": "session-verification",
+          "model": "gpt-5-4",
+          "costUsd": 0.189845,
+          "elapsedSeconds": 163.433,
+          "verdict": "REJECTED",
+          "issuesFound": 3
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 10,
+      "stepKey": "session-4/round-a-fixes",
+      "dateTime": "2026-05-17T18:30:00-04:00",
+      "description": "Applied all 3 must-fix issues from Round A: (1) _build_v3_sessions now reads legacy_total_int = state.get('totalSessions') gated by _strict_positive_int, and the closed-signal alternative branch compares current_int >= legacy_total_int (not resolved total) — preserves the operator's 'I closed here' signal even when spec.md is later widened; (2) migrate_one_set now refuses schemaVersion > 3 (returns ACTION_SKIPPED_FUTURE_SCHEMA) and refuses v3 files missing sessions[] (returns ACTION_SKIPPED_MALFORMED instead of re-running v2 inference); (3) _atomic_write_json now uses tempfile.mkstemp(prefix='.{basename}.', suffix='.tmp', dir=...) for a unique per-call path + try/finally with best-effort os.unlink on the temp before re-raising on any failure path. Added 6 regression tests in TestRoundAFixes class: test_closed_signal_uses_legacy_total_not_resolved_total, test_closed_signal_no_legacy_total_only_lifecycle_branch_fires, test_future_schema_version_refused, test_v3_without_sessions_is_malformed_not_re_migrated, test_atomic_write_uses_unique_tempfile_and_cleans_up_on_failure, test_atomic_write_two_concurrent_calls_dont_collide. All 44 migrator tests pass.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 11,
+      "stepKey": "session-4/full-suite-postfix",
+      "dateTime": "2026-05-17T18:35:00-04:00",
+      "description": "Re-ran full pytest suite after Round A fixes: 574 passed, 1 skipped, 8 e2e deselected (+6 from new TestRoundAFixes regression tests). No regressions in any pre-existing tests. Mocha + Playwright still green from pre-fix run (Round A fixes are scoped to migrate_session_state.py + its tests; no extension code touched).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 12,
+      "stepKey": "session-4/verification-round-b",
+      "dateTime": "2026-05-17T18:40:00-04:00",
+      "description": "Round B verification: gpt-5-4 via ai_router.route(task_type='session-verification'). Same slice strategy as Round A; updated line ranges for the post-fix file. Cost: $0.0676625, elapsed (in=6023, out=3507) tokens, no escalation. Verifier returned VERIFIED with explicit line-by-line confirmation for each of the 3 Round A issues: (1) line 241-244 reads legacy_total_int; line 246-253 uses it in the disjunct; line 257-258 force-promote all sessions in resolved total when signal fires — 'no new contradiction'; (2) line 434-444 SKIPPED_FUTURE_SCHEMA for >3; line 445-453 idempotent skip for exact v3+sessions[]; line 454-468 SKIPPED_MALFORMED for v3-without-sessions[] — 'fail-loud per D6, avoids silent recovery/downgrade'; (3) confirmed dual-write parity still holds at line 335-353 (sessions[] validates before write; legacy triple derived after). No new must-fix issues surfaced. Session 4 total verification cost: $0.190 + $0.068 = $0.258.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "taskType": "session-verification",
+          "model": "gpt-5-4",
+          "costUsd": 0.0676625,
+          "elapsedSeconds": null,
+          "verdict": "VERIFIED",
+          "issuesFound": 0
+        }
+      ]
     }
   ]
 }

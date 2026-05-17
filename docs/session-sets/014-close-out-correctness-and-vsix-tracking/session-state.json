@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "014-close-out-correctness-and-vsix-tracking",
-  "currentSession": 2,
+  "currentSession": null,
   "totalSessions": 2,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,21 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Close-out workflow correctness",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "VSIX tracking exception + README accuracy",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2
+  ]
 }

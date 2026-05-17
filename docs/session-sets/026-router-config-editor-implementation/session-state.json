@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "026-router-config-editor-implementation",
-  "currentSession": 7,
+  "currentSession": null,
   "totalSessions": 7,
   "status": "complete",
   "lifecycleState": "closed",
@@ -22,5 +22,42 @@
     5,
     6,
     7
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "`outsourceMode` clean-sweep",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Budget-dialog simplification (NTE framing)",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "YAML schema + Python reader updates + resolver abstraction",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "Webview foundation",
+      "status": "complete"
+    },
+    {
+      "number": 5,
+      "title": "Webview sections",
+      "status": "complete"
+    },
+    {
+      "number": 6,
+      "title": "Significance flagging \u2014 command + annotation handling",
+      "status": "complete"
+    },
+    {
+      "number": 7,
+      "title": "Wizard integration + test-notification + end-to-end + release",
+      "status": "complete"
+    }
   ]
 }

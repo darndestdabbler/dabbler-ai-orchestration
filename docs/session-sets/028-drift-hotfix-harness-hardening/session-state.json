@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "028-drift-hotfix-harness-hardening",
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 3,
   "status": "complete",
   "lifecycleState": "closed",
@@ -14,5 +14,26 @@
     "model": "claude-haiku-4-5-20251001",
     "effort": "normal"
   },
-  "completedSessions": [1, 2, 3]
+  "completedSessions": [
+    1,
+    2,
+    3
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Session 1",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Session 2",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Session 3",
+      "status": "complete"
+    }
+  ]
 }

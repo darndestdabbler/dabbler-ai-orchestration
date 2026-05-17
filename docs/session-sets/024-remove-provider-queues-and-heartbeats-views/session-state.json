@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "024-remove-provider-queues-and-heartbeats-views",
-  "currentSession": 1,
+  "currentSession": null,
   "totalSessions": 1,
   "status": "complete",
   "lifecycleState": "closed",
@@ -16,5 +16,12 @@
   },
   "completedSessions": [
     1
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Strip the two views + their settings",
+      "status": "complete"
+    }
   ]
 }

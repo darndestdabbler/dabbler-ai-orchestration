@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "022-active-lifecycle-management",
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 3,
   "status": "complete",
   "lifecycleState": "closed",
@@ -18,5 +18,22 @@
     1,
     2,
     3
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "ai_router writer changes",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Extension reader changes",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Workflow doc + orchestrator protocol + cross-consumer verification",
+      "status": "complete"
+    }
   ]
 }

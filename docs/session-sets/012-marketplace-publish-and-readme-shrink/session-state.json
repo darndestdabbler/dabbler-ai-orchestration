@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "012-marketplace-publish-and-readme-shrink",
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 3,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,27 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Workspace-relative config + metrics auto-discovery",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "VS Code Marketplace publishing",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "README shrink + technical-detail spinout to `docs/repository-reference.md`",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3
+  ]
 }

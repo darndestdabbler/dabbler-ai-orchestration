@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "011-readme-polish",
   "currentSession": null,
   "totalSessions": 2,
@@ -8,5 +8,18 @@
   "startedAt": null,
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": null,
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Generate supporting content (retrofit + sample reports + screenshot specs)",
+      "status": "not-started"
+    },
+    {
+      "number": 2,
+      "title": "README polish (framing + screenshots + sample-report excerpts) + cross-provider verification + close-out",
+      "status": "not-started"
+    }
+  ],
+  "completedSessions": []
 }

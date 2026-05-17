@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "025-router-config-editor-spec",
-  "currentSession": 1,
-  "totalSessions": 1,
+  "currentSession": null,
+  "totalSessions": 5,
   "status": "complete",
   "lifecycleState": "closed",
   "startedAt": "2026-05-15T10:04:13.333849-04:00",
@@ -15,6 +15,37 @@
     "effort": "medium"
   },
   "completedSessions": [
-    1
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Author the implementation spec, schema example, and wireframes",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Extend `providers:` schema + `budget.yaml` migration + resolver abstraction",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Webview implementation (extension side)",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "Significance-flagging command + annotation handling",
+      "status": "complete"
+    },
+    {
+      "number": 5,
+      "title": "Wizard integration + test-notification + end-to-end + release",
+      "status": "complete"
+    }
   ]
 }

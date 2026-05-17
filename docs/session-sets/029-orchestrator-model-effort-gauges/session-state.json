@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "029-orchestrator-model-effort-gauges",
   "currentSession": null,
   "totalSessions": 4,
@@ -9,5 +9,27 @@
   "completedAt": null,
   "verificationVerdict": null,
   "orchestrator": null,
-  "completedSessions": []
+  "completedSessions": [],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Cross-provider design audit",
+      "status": "not-started"
+    },
+    {
+      "number": 2,
+      "title": "Core webview + Claude detection + hook installer",
+      "status": "not-started"
+    },
+    {
+      "number": 3,
+      "title": "Non-Claude provider detection + manual override",
+      "status": "not-started"
+    },
+    {
+      "number": 4,
+      "title": "Polish, README, marketplace publish",
+      "status": "not-started"
+    }
+  ]
 }

@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "008-cancelled-session-set-status",
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 3,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,27 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "File-shape helpers + Python parallel + tests",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Extension UI \u2014 tree view, icons, commands, dialogs",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Workflow doc + cross-provider alignment + cleanup",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3
+  ]
 }

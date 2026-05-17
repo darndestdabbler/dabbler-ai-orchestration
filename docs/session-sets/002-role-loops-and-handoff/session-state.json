@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "002-role-loops-and-handoff",
-  "currentSession": 4,
+  "currentSession": null,
   "totalSessions": 4,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,33 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Verifier-role daemon",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Orchestrator-role daemon",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Mode-aware `route()` and `verify()` + restart command",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "Failure-injection integration tests",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3,
+    4
+  ]
 }

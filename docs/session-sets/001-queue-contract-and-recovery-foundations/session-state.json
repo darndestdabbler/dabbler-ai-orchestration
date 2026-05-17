@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "001-queue-contract-and-recovery-foundations",
-  "currentSession": 5,
+  "currentSession": null,
   "totalSessions": 5,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,39 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "SQLite queue schema + state machine",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Message envelope + follow-up rounds",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Mode config schema additions + nextOrchestrator rubric",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "disposition.json schema + writer",
+      "status": "complete"
+    },
+    {
+      "number": 5,
+      "title": "session-events.jsonl ledger + backfill",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ]
 }

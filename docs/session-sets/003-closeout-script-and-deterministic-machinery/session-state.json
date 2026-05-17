@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "003-closeout-script-and-deterministic-machinery",
-  "currentSession": 4,
+  "currentSession": null,
   "totalSessions": 4,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,33 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "`close_session` skeleton + flags + idempotency",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Hardened gate checks + concurrency lock",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Verification-wait (queue mode) + reconciler",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "`--manual-verify`, `--repair`, full integration",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3,
+    4
+  ]
 }

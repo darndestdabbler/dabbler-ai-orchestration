@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "007-uniform-session-state-file",
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 3,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,27 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Schema + synthesizer + backfill CLI",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Reader collapses",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Bootstrap, docs, cross-provider review",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3
+  ]
 }

@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "027-orchestrator-e2e-harness",
-  "currentSession": 4,
+  "currentSession": null,
   "totalSessions": 4,
   "status": "complete",
   "lifecycleState": "closed",
@@ -19,5 +19,27 @@
     2,
     3,
     4
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Python integration harness foundation",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Extended Python scenarios",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "`@vscode/test-electron` tree-provider harness",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "Playwright Electron rendering smoke + close-out",
+      "status": "complete"
+    }
   ]
 }

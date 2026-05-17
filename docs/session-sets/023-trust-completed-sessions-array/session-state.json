@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "023-trust-completed-sessions-array",
-  "currentSession": 4,
+  "currentSession": null,
   "totalSessions": 4,
   "status": "complete",
   "lifecycleState": "closed",
@@ -19,5 +19,27 @@
     2,
     3,
     4
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "ai_router writer fix",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Cross-provider design-alignment audit",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "System-wide audit of events-ledger consumers",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "Extension reader fix",
+      "status": "complete"
+    }
   ]
 }

@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "004-cost-enforcement-and-capacity",
-  "currentSession": 4,
+  "currentSession": null,
   "totalSessions": 4,
   "status": "complete",
   "lifecycleState": "closed",
@@ -14,5 +14,32 @@
     "model": "claude-opus-4-7",
     "effort": "high"
   },
-  "completedSessions": [1, 2, 3, 4]
+  "completedSessions": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Dual-sourced `print_cost_report()` (outsource-first mode)",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Subscription-window utilization heuristic + capacity_signal.json",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Wire `mark_session_complete()` to the gate; add `--force` transitional",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "Schema-drift fix \u2014 generator script for session-state.json example",
+      "status": "complete"
+    }
+  ]
 }

@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "009-alignment-audit-followups",
-  "currentSession": 5,
+  "currentSession": null,
   "totalSessions": 5,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,39 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "D-3 \u2014 Resolve commit / push / notification ownership",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "D-1 \u2014 `(repo, branch)` parallel-session exclusion",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "D-2 \u2014 `--force` flag resolution",
+      "status": "complete"
+    },
+    {
+      "number": 4,
+      "title": "Session 4",
+      "status": "complete"
+    },
+    {
+      "number": 5,
+      "title": "Re-audit",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ]
 }

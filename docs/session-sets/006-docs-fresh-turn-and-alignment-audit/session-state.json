@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "006-docs-fresh-turn-and-alignment-audit",
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 3,
   "status": "complete",
   "lifecycleState": "closed",
@@ -14,5 +14,26 @@
     "model": "claude-opus-4-7",
     "effort": "high"
   },
-  "completedSessions": [1, 2, 3]
+  "completedSessions": [
+    1,
+    2,
+    3
+  ],
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Docs collapse + close-out doc + two-CLI workflow doc",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Fresh close-out turn (mode-aware) + reconciler hook",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Cross-provider alignment audit + executable failure-injection (verified by Gemini Pro AND GPT-5.4)",
+      "status": "complete"
+    }
+  ]
 }

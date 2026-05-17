@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "015-consumer-repo-alignment",
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 3,
   "status": "complete",
   "lifecycleState": "closed",
@@ -13,5 +13,27 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Audit + per-repo migration plans",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "Execute `dabbler-access-harvester` alignment",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "Execute `dabbler-platform` alignment",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3
+  ]
 }

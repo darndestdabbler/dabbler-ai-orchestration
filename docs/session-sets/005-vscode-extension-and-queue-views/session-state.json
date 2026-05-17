@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "sessionSetName": "005-vscode-extension-and-queue-views",
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 3,
-  "status": "completed",
-  "lifecycleState": "verified",
+  "status": "complete",
+  "lifecycleState": "closed",
   "startedAt": "2026-04-30T15:27:04.552080-04:00",
   "completedAt": "2026-04-30T18:30:00-04:00",
   "verificationVerdict": "VERIFIED",
@@ -13,5 +13,27 @@
     "provider": "anthropic",
     "model": "claude-opus-4-7",
     "effort": "high"
-  }
+  },
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Helper Python script (`queue_status`) + activity-bar wiring",
+      "status": "complete"
+    },
+    {
+      "number": 2,
+      "title": "`Provider Queues` tree view",
+      "status": "complete"
+    },
+    {
+      "number": 3,
+      "title": "`Provider Heartbeats` view + mode badges + polish",
+      "status": "complete"
+    }
+  ],
+  "completedSessions": [
+    1,
+    2,
+    3
+  ]
 }

@@ -32,7 +32,7 @@
     "model": "claude-opus-4-7",
     "effort": "high",
     "reason": {
-      "code": "ai-assignment-recommendation",
+      "code": "continue-current-trajectory",
       "specifics": "Session 2 ships the gauge UI end-to-end for the Claude Code surface: webview view registration + provider + CSS gauges + marker-file reader/watcher + Claude SessionStart hook installer + UserPromptSubmit hook (effort tracking) + multi-writer precedence helper + Layer 3 Playwright smoke. ai-assignment.md recommends Claude Opus 4.7 @ effort=high for substantial TypeScript + HTML/CSS + Node hook script + Playwright work with non-trivial multi-file coherence requirements (webview message-passing, idempotent settings.json edits in the hook installer, shared marker-writer helper)."
     }
   },

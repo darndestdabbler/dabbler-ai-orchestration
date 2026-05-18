@@ -5,7 +5,7 @@
     {
       "number": 1,
       "title": "Cross-provider design audit",
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "number": 2,
@@ -23,9 +23,11 @@
       "status": "not-started"
     }
   ],
-  "currentSession": 1,
+  "currentSession": null,
   "totalSessions": 4,
-  "completedSessions": [],
+  "completedSessions": [
+    1
+  ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
   "startedAt": "2026-05-18T03:33:49.170960-04:00",

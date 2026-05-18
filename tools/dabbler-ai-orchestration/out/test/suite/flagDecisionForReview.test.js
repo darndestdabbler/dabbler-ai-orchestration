@@ -59,6 +59,7 @@ function ssStub(over = {}) {
         config: { requiresUAT: false, requiresE2E: false, uatScope: "none" },
         uatSummary: null,
         root: "/tmp",
+        needsMigration: false,
         ...over,
     };
 }

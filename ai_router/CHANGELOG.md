@@ -5,6 +5,47 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-17 (GA)
+
+### Added — Session 5 deliverables
+
+- **AI title-extraction strategy (`--strategy ai`) in the bulk
+  migrator.** The Session 4 RC reserved the flag and raised
+  `NotImplementedError`; this release wires it. Routes via
+  `ai_router.route(task_type='spec-title-extraction')` and validates
+  the response: exact JSON shape, count match against the spec's
+  expected session count, numbered 1..N in order. Each failure mode
+  has a distinct ``ACTION_FAILED_AI_*`` action code
+  (`no-creds` / `provider-error` / `bad-output` / `count-mismatch`)
+  so the in-extension lazy migrator can surface kind-specific
+  notifications. ``RouteResult`` is dumped via ``dataclasses.asdict
+  → json.dumps`` before any attribute access (per memory
+  `feedback_ai_router_route_result_handling`). Per cross-provider
+  design audit (2026-05-17, Option A locked): the route() call site
+  lives in Python so the extension subprocesses the same migrator
+  for all three strategies.
+- **Structured exception classes** (`AiTitleResolutionError` and
+  four subclasses) re-exported from `ai_router.migrate_session_state`
+  for library callers.
+- **10 new pytest cases** under `TestAIStrategy` covering each
+  failure mode (missing credentials, 401 unauthorized, 429 rate
+  limit, non-JSON output, truncated response, wrong-shape JSON,
+  count mismatch with no silent truncate, out-of-order numbering,
+  zero-count-state never-calls-route, plus a happy path + markdown
+  code-fence stripping). All hermetic — mock `ai_router.route` via
+  `sys.modules` injection; no real provider calls.
+
+### Release notes
+
+- **`0.4.0` is the Session 5 GA release.** Published to PyPI in
+  lockstep with the dabbler-ai-orchestration extension v0.14.0 so
+  operators upgrading the extension see the migration UX (which
+  consumes this AI path) at the same time as the AI strategy
+  becomes available.
+- Schema v3, the bulk migrator, dual-write writers, and the eight
+  invariants (all shipped in Sessions 1-4 of Set 030 under the
+  0.4.0rc1 RC) are GA in this release.
+
 ## [0.4.0rc1] — 2026-05-17 (release candidate, not published)
 
 ### Added

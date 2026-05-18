@@ -38,7 +38,9 @@ exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const SessionSetsProvider_1 = require("./providers/SessionSetsProvider");
+const sessionSetsProvider_1 = require("./providers/sessionSetsProvider");
+const scanState_1 = require("./providers/scanState");
+const migrateSet_1 = require("./commands/migrateSet");
 const fileSystem_1 = require("./utils/fileSystem");
 const openFile_1 = require("./commands/openFile");
 const copyCommand_1 = require("./commands/copyCommand");
@@ -67,7 +69,17 @@ function evaluateSupportContextKeys(allSets) {
 function activate(context) {
     if (!vscode.workspace.workspaceFolders?.length)
         return;
-    const provider = new SessionSetsProvider_1.SessionSetsProvider(context.extensionUri);
+    // Set 030 Session 5: scanState lifecycle. Flip to "loading" BEFORE
+    // we register the tree provider so the very first `getChildren()`
+    // sees `phase === "loading"` and returns the sentinel — no
+    // welcome-CTA flash window. The async `setImmediate` below flips
+    // to "ready" after the synchronous body of `activate` returns,
+    // which lets the tree provider's reactive `onDidChange` refresh
+    // swap the sentinel for real rows on the next render tick.
+    const scanState = new scanState_1.ScanState();
+    context.subscriptions.push({ dispose: () => scanState.dispose() });
+    scanState.setLoading();
+    const provider = new sessionSetsProvider_1.SessionSetsProvider(context.extensionUri, scanState);
     context.subscriptions.push(vscode.window.registerTreeDataProvider("dabblerSessionSets", provider));
     const evaluateContextKeys = () => {
         evaluateSupportContextKeys(provider._cache ?? (0, fileSystem_1.readAllSessionSets)());
@@ -191,6 +203,17 @@ function activate(context) {
     safeRegister("registerConfigEditorCommand", () => (0, ConfigEditorPanel_1.registerConfigEditorCommand)(context));
     safeRegister("registerFlagDecisionForReview", () => (0, flagDecisionForReview_1.registerFlagDecisionForReview)(context));
     safeRegister("registerScanAnnotationsForActiveSet", () => (0, scanAnnotationsForActiveSet_1.registerScanAnnotationsForActiveSet)(context));
+    safeRegister("registerMigrateSetCommand", () => (0, migrateSet_1.registerMigrateSetCommand)(context, { refreshView: refreshAll }));
+    // Set 030 Session 5: flip scanState to "ready" once activation
+    // finishes. `setImmediate` yields the event loop one tick so the
+    // synchronous body of activate() returns first (VS Code measures
+    // extension-activation time; we don't want the scan in that
+    // metric). The tree provider's `onDidChange` subscription on
+    // scanState triggers a re-render the moment the phase flips, so
+    // the loading sentinel is replaced by real rows the same frame.
+    setImmediate(() => {
+        scanState.setReady();
+    });
     // Show onboarding on first activation in a workspace with no session sets
     const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
     if (!hasSeenOnboarding) {

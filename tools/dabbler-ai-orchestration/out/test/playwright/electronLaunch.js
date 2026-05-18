@@ -63,6 +63,8 @@ exports.makeChangeLog = makeChangeLog;
 exports.closeSession = closeSession;
 exports.cancelSet = cancelSet;
 exports.makeAdditionalSet = makeAdditionalSet;
+exports.downgradeStateFileToV2 = downgradeStateFileToV2;
+exports.readStateFile = readStateFile;
 exports.driveHappyPath = driveHappyPath;
 exports.launchVSCode = launchVSCode;
 exports.openSessionSetsView = openSessionSetsView;
@@ -236,6 +238,36 @@ function makeAdditionalSet(base, newSlug, newTotalSessions) {
         "--new-slug", newSlug,
         "--new-total-sessions", String(newTotalSessions),
     ]);
+}
+/**
+ * Set 030 Session 5 — rewrite a fixture's ``session-state.json`` from
+ * the v3 dual-write shape (what the harness emits today) back to a
+ * pure-v2 snapshot the migration UX must detect and offer to migrate.
+ *
+ * Used by Layer 3 smokes for the "(needs migration)" badge + the
+ * migrate command. Round-trips through ``readSessionSets`` afterwards
+ * still works — the extension's tolerant v3 reader synthesizes a
+ * sessions[] from the legacy triple, so the row renders normally
+ * apart from the migration badge.
+ */
+function downgradeStateFileToV2(h) {
+    const statePath = path.join(h.set_dir, "session-state.json");
+    const raw = fs.readFileSync(statePath, "utf8");
+    const state = JSON.parse(raw);
+    // Strip the v3-only fields. Keep the legacy triple and the rest of
+    // the snapshot exactly as-is so the v2-reader path produces a
+    // matching display.
+    delete state.schemaVersion;
+    delete state.sessions;
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + "\n", "utf8");
+}
+/**
+ * Read a state file from disk — used by smokes that need to assert
+ * the file was rewritten in v3 shape after a migration round-trip.
+ */
+function readStateFile(h) {
+    const statePath = path.join(h.set_dir, "session-state.json");
+    return JSON.parse(fs.readFileSync(statePath, "utf8"));
 }
 function driveHappyPath(h, throughSession) {
     for (let n = 1; n <= throughSession; n++) {

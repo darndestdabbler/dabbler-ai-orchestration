@@ -5,6 +5,62 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-05-17 (GA)
+
+### Added — Session 5 deliverables
+
+- **In-extension lazy migration UX for v2 → v3 state files.** Tree
+  rows whose `session-state.json` is still v2 (or broken-v3) render
+  a "(needs migration)" badge. Right-clicking exposes a new
+  "Migrate to v3 schema" command with a quickpick offering three
+  strategies: "Use spec.md headings" (regex, zero cost, default),
+  "Use AI to refine titles" (routes via `ai_router`,
+  ~$0.05/spec, opt-in with cost-confirmation modal), and "Use
+  generic labels" (fallback). All three strategies share the same
+  Python migrator entry point (`migrate_one_set`) via subprocess,
+  so the in-extension migrator and the bulk CLI emit identical
+  files set-for-set.
+- **AI failure modes get kind-specific notifications.** Per
+  cross-provider design audit (2026-05-17), each AI-strategy
+  failure has its own action code and operator-actionable
+  message: missing provider credentials (instructs which env var
+  to set), provider error (rate limit / network — instructs to
+  retry), bad output (the model returned non-JSON or wrong shape
+  — instructs to retry once or fall back to regex), count
+  mismatch (the model returned the wrong number of titles —
+  instructs to edit spec.md or use deterministic strategies).
+  Distinct from malformed-input-state errors so "your file is
+  broken" never overlaps with "the model answered badly."
+- **Activation-time scanState lifecycle ("loading" → "ready").** A
+  new `ScanState` manager publishes a `dabblerSessionSets.scanState`
+  context key. The tree provider renders a "Setting up your
+  project…" sentinel TreeItem with the Dabbler icon during the
+  loading window; the `viewsWelcome` "No session sets" CTA is now
+  gated on `scanState == ready`, eliminating the welcome-CTA
+  flash on first activation. The setImmediate flip happens on the
+  same tick activation returns, so the loading window is brief on
+  warm filesystems and unmissable on cold ones.
+
+### Changed
+
+- Mock SessionSet objects in the test suite gained the new
+  required `needsMigration` field. The `SessionSet.needsMigration`
+  flag is set by `readSessionSets()` whenever the parsed state
+  file lacks `schemaVersion: 3` or has v3 but with a missing
+  `sessions[]` array — the same heuristic the bulk migrator's
+  ACTION_SKIPPED_MALFORMED case uses.
+
+### Release notes
+
+- **`0.14.0` is the Session 5 GA release.** Published to the
+  Marketplace in lockstep with `dabbler-ai-router` 0.4.0 so the
+  in-extension migrator's AI-strategy quickpick connects to a
+  Python migrator that knows how to handle `--strategy ai`.
+- Operators upgrading from any prior 0.13.x version see no
+  disruption — v2 state files continue to render correctly; the
+  new badge surfaces sets that *could* be migrated, but migration
+  remains operator-driven. No automatic background rewrites.
+
 ## [0.14.0-rc.1] — 2026-05-17 (release candidate, not published)
 
 ### Added

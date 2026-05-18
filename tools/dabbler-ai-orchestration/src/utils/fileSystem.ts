@@ -296,6 +296,15 @@ export function readSessionSets(root: string): SessionSet[] {
     let sessionsCompleted = 0;
     let lastTouched: string | null = null;
     let liveSession: LiveSession | null = null;
+    // Set 030 Session 5: v2-detection signal for the migration CTA.
+    // Default false (no nag on absent / unreadable state — the rest
+    // of the read path already degrades gracefully). Flipped to true
+    // only when the parsed state file is an object with either no
+    // schemaVersion / a non-3 value, OR schemaVersion === 3 but
+    // sessions[] is missing (a broken v3 shape that the bulk migrator
+    // refuses to rewrite — see migrate_session_state.py's
+    // ACTION_SKIPPED_MALFORMED case for the same heuristic).
+    let needsMigration = false;
     const eventsPath = path.join(dir, "session-events.jsonl");
 
     // Activity log is a step log, not a count source. The activity-log
@@ -327,7 +336,31 @@ export function readSessionSets(root: string): SessionSet[] {
           orchestrator?: { engine?: string; model?: string; effort?: string };
           verificationVerdict?: string;
           forceClosed?: boolean;
+          schemaVersion?: number;
+          sessions?: unknown;
         };
+
+        // Set 030 Session 5: v2 detection. The criteria match the
+        // bulk migrator's "would migrate" rule so the badge and the
+        // CLI agree set-for-set:
+        //   - schemaVersion absent or not the literal 3: legacy v2.
+        //   - schemaVersion === 3 but sessions[] missing or not an
+        //     array: broken-v3 shape the migrator refuses to rewrite
+        //     (operator must hand-repair) — still a needs-attention
+        //     signal in the tree.
+        // Files with schemaVersion > 3 are future-schema and treated
+        // as already-current (the migrator refuses to downgrade them
+        // for the same reason).
+        if (sd && typeof sd === "object" && !Array.isArray(sd)) {
+          const sv = sd.schemaVersion;
+          if (sv === 3) {
+            if (!Array.isArray(sd.sessions)) {
+              needsMigration = true;
+            }
+          } else if (typeof sv !== "number" || sv < 3) {
+            needsMigration = true;
+          }
+        }
 
         // Set 030 Session 3: route progress reads through the v3
         // helper. `readProgress` branches v2/v3 internally; on a v3
@@ -445,6 +478,7 @@ export function readSessionSets(root: string): SessionSet[] {
       config,
       uatSummary,
       root,
+      needsMigration,
     });
   }
   // Diagnostic: one-line summary in the dev console showing how the

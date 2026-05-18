@@ -102,6 +102,13 @@ export interface SessionSet {
   config: SessionSetConfig;
   uatSummary: UatSummary | null;
   root: string;
+  // Set 030 Session 5: true when this set's session-state.json is
+  // v2 (schemaVersion missing or != 3, OR schemaVersion == 3 but
+  // sessions[] absent). The tree renders a "(needs migration)" badge
+  // and exposes a context-menu "Migrate to v3 schema" command. Default
+  // false; absent / broken state files do not flag (the v3 reader's
+  // tolerant path already handles missing-file display).
+  needsMigration: boolean;
 }
 
 export interface MetricsEntry {

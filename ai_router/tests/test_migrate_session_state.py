@@ -46,6 +46,10 @@ import pytest
 import migrate_session_state as mss
 import progress
 from migrate_session_state import (
+    ACTION_FAILED_AI_BAD_OUTPUT,
+    ACTION_FAILED_AI_COUNT_MISMATCH,
+    ACTION_FAILED_AI_NO_CREDS,
+    ACTION_FAILED_AI_PROVIDER_ERROR,
     ACTION_MIGRATED,
     ACTION_SKIPPED_FUTURE_SCHEMA,
     ACTION_SKIPPED_MALFORMED,
@@ -53,6 +57,10 @@ from migrate_session_state import (
     ACTION_SKIPPED_OPERATOR,
     ACTION_SKIPPED_V3,
     ACTION_WOULD_VIOLATE,
+    AiBadOutputError,
+    AiCountMismatchError,
+    AiNoCredentialsError,
+    AiProviderError,
     STRATEGY_AI,
     STRATEGY_GENERIC,
     STRATEGY_INTERACTIVE,
@@ -674,22 +682,415 @@ class TestWriteSemantics:
 
 
 class TestAIStrategy:
-    def test_ai_strategy_raises_NotImplementedError(self, tmp_path):
-        set_dir = tmp_path / "ai"
+    """Set 030 Session 5: the AI strategy resolves spec.md → titles via
+    ``ai_router.route()`` with structured failure handling.
+
+    Per the cross-provider audit (2026-05-17) the call site lives in
+    Python (Option A), so the extension subprocesses into this module
+    rather than owning its own route() invocation. Each failure mode
+    maps to a distinct ``ACTION_FAILED_AI_*`` code; the on-disk state
+    file is never written when AI resolution fails.
+
+    The tests below mock ``ai_router.route`` so the suite is
+    hermetic — no real provider calls, no network, no API keys
+    required. The mock is installed via ``sys.modules['ai_router']``
+    so the deferred import inside ``_resolve_titles_via_ai`` resolves
+    to the stub.
+    """
+
+    def _install_route_stub(self, monkeypatch, route_callable):
+        """Plant a fake ``ai_router.route`` for the deferred import.
+
+        The migrator does ``from ai_router import route`` inside the
+        helper, so we set ``sys.modules['ai_router']`` to a stub
+        module exposing the right callable. Doing it this way also
+        works when ``ai_router`` is already loaded (which it always
+        is during the test suite — the migrator's own module imports
+        ``progress`` from the package).
+        """
+        import sys as _sys
+        import types as _types
+        stub = _types.SimpleNamespace(route=route_callable)
+        monkeypatch.setitem(_sys.modules, "ai_router", stub)
+
+    def _make_route_result(self, content: str, *, truncated: bool = False):
+        """Build a fake RouteResult-like object the migrator can asdict()."""
+        import dataclasses as _dc
+
+        @_dc.dataclass
+        class _FakeResult:
+            content: str
+            model_name: str = "gemini-flash"
+            model_id: str = "gemini-flash-stub"
+            tier: int = 1
+            input_tokens: int = 100
+            output_tokens: int = 50
+            cost_usd: float = 0.05
+            total_cost_usd: float = 0.05
+            complexity_score: int = 20
+            escalated: bool = False
+            escalation_history: list = _dc.field(default_factory=list)
+            elapsed_seconds: float = 0.5
+            truncated: bool = False
+            verification: object = None
+
+        return _FakeResult(content=content, truncated=truncated)
+
+    # --- Happy path ---
+
+    def test_ai_strategy_happy_path_writes_v3_with_ai_titles(
+        self, tmp_path, monkeypatch
+    ):
+        set_dir = tmp_path / "ai-happy"
         _write_state(
             set_dir,
             {
                 "schemaVersion": 2,
-                "sessionSetName": "ai",
+                "sessionSetName": "ai-happy",
+                "currentSession": 3,
+                "totalSessions": 3,
+                "status": "complete",
+                "lifecycleState": "closed",
+                "completedSessions": [1, 2, 3],
+            },
+            spec_n=3,
+        )
+        captured_prompt = {}
+
+        def _route(content, task_type, **kw):
+            captured_prompt["content"] = content
+            captured_prompt["task_type"] = task_type
+            return self._make_route_result(
+                json.dumps(
+                    [
+                        {"number": 1, "title": "AI-refined alpha"},
+                        {"number": 2, "title": "AI-refined beta"},
+                        {"number": 3, "title": "AI-refined gamma"},
+                    ]
+                )
+            )
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=False)
+        assert r.action == ACTION_MIGRATED
+        assert r.reason == "v2 → v3 (AI-refined titles)"
+        assert r.after["sessions"][0]["title"] == "AI-refined alpha"
+        assert r.after["sessions"][2]["title"] == "AI-refined gamma"
+        # File on disk reflects the migration.
+        on_disk = json.loads((set_dir / "session-state.json").read_text(encoding="utf-8"))
+        assert on_disk["sessions"][1]["title"] == "AI-refined beta"
+        # task_type is the registered routing label.
+        assert captured_prompt["task_type"] == "spec-title-extraction"
+
+    def test_ai_strategy_strips_markdown_code_fence_around_json(
+        self, tmp_path, monkeypatch
+    ):
+        """Some providers wrap JSON in ```json … ``` despite explicit instruction."""
+        set_dir = tmp_path / "ai-fenced"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-fenced",
+                "currentSession": 2,
+                "totalSessions": 2,
+                "status": "complete",
+                "lifecycleState": "closed",
+                "completedSessions": [1, 2],
+            },
+            spec_n=2,
+        )
+        fenced = "```json\n" + json.dumps(
+            [
+                {"number": 1, "title": "Fenced one"},
+                {"number": 2, "title": "Fenced two"},
+            ]
+        ) + "\n```"
+
+        def _route(content, task_type, **kw):
+            return self._make_route_result(fenced)
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
+        assert r.action == ACTION_MIGRATED
+        assert r.after["sessions"][0]["title"] == "Fenced one"
+        assert r.after["sessions"][1]["title"] == "Fenced two"
+
+    # --- Failure: missing credentials ---
+
+    def test_ai_strategy_no_creds_failure_no_write(self, tmp_path, monkeypatch):
+        set_dir = tmp_path / "ai-no-creds"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-no-creds",
+                "currentSession": 3,
+                "totalSessions": 3,
+                "status": "complete",
+                "lifecycleState": "closed",
+                "completedSessions": [1, 2, 3],
+            },
+            spec_n=3,
+        )
+
+        def _route(content, task_type, **kw):
+            raise RuntimeError("ANTHROPIC_API_KEY is not set")
+
+        self._install_route_stub(monkeypatch, _route)
+        before_disk = (set_dir / "session-state.json").read_text(encoding="utf-8")
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=False)
+        assert r.action == ACTION_FAILED_AI_NO_CREDS
+        assert "credentials" in r.reason.lower() or "api" in r.reason.lower()
+        # File on disk is unchanged.
+        after_disk = (set_dir / "session-state.json").read_text(encoding="utf-8")
+        assert before_disk == after_disk
+
+    def test_ai_strategy_unauthorized_classified_as_no_creds(
+        self, tmp_path, monkeypatch
+    ):
+        set_dir = tmp_path / "ai-401"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-401",
+                "currentSession": None,
+                "totalSessions": 2,
+                "status": "not-started",
+                "lifecycleState": None,
+                "completedSessions": [],
+            },
+            spec_n=2,
+        )
+
+        def _route(content, task_type, **kw):
+            raise RuntimeError("HTTP 401 Unauthorized — invalid credential")
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
+        assert r.action == ACTION_FAILED_AI_NO_CREDS
+
+    # --- Failure: provider error (rate limit, network, etc.) ---
+
+    def test_ai_strategy_rate_limit_classified_as_provider_error(
+        self, tmp_path, monkeypatch
+    ):
+        set_dir = tmp_path / "ai-429"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-429",
+                "currentSession": None,
+                "totalSessions": 2,
+                "status": "not-started",
+                "lifecycleState": None,
+                "completedSessions": [],
+            },
+            spec_n=2,
+        )
+
+        def _route(content, task_type, **kw):
+            raise RuntimeError("HTTP 429 — rate limit exceeded")
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
+        assert r.action == ACTION_FAILED_AI_PROVIDER_ERROR
+        assert "rate limit" in r.reason.lower()
+
+    # --- Failure: bad output (non-JSON, wrong shape, truncated) ---
+
+    def test_ai_strategy_non_json_output_classified_as_bad_output(
+        self, tmp_path, monkeypatch
+    ):
+        set_dir = tmp_path / "ai-nonjson"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-nonjson",
+                "currentSession": None,
+                "totalSessions": 2,
+                "status": "not-started",
+                "lifecycleState": None,
+                "completedSessions": [],
+            },
+            spec_n=2,
+        )
+
+        def _route(content, task_type, **kw):
+            return self._make_route_result("here you go: title 1, title 2")
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=False)
+        assert r.action == ACTION_FAILED_AI_BAD_OUTPUT
+        assert "JSON" in r.reason or "json" in r.reason
+
+    def test_ai_strategy_truncated_response_classified_as_bad_output(
+        self, tmp_path, monkeypatch
+    ):
+        """RouteResult.truncated=True → AiBadOutputError → no-write outcome."""
+        set_dir = tmp_path / "ai-truncated"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-truncated",
+                "currentSession": None,
+                "totalSessions": 2,
+                "status": "not-started",
+                "lifecycleState": None,
+                "completedSessions": [],
+            },
+            spec_n=2,
+        )
+
+        def _route(content, task_type, **kw):
+            # Output looks like valid JSON head, but truncated flag is set —
+            # the migrator must refuse before parsing.
+            return self._make_route_result(
+                '[{"number": 1, "title": "alpha"}, {"number": 2, "title":',
+                truncated=True,
+            )
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
+        assert r.action == ACTION_FAILED_AI_BAD_OUTPUT
+        assert "truncated" in r.reason.lower()
+
+    def test_ai_strategy_wrong_shape_classified_as_bad_output(
+        self, tmp_path, monkeypatch
+    ):
+        set_dir = tmp_path / "ai-wrong-shape"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-wrong-shape",
+                "currentSession": None,
+                "totalSessions": 2,
+                "status": "not-started",
+                "lifecycleState": None,
+                "completedSessions": [],
+            },
+            spec_n=2,
+        )
+
+        def _route(content, task_type, **kw):
+            # Valid JSON, but a dict instead of an array.
+            return self._make_route_result('{"titles": ["one", "two"]}')
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
+        assert r.action == ACTION_FAILED_AI_BAD_OUTPUT
+        assert "array" in r.reason.lower()
+
+    # --- Failure: count mismatch ---
+
+    def test_ai_strategy_count_mismatch_no_silent_truncate(
+        self, tmp_path, monkeypatch
+    ):
+        set_dir = tmp_path / "ai-count"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-count",
                 "currentSession": None,
                 "totalSessions": 3,
                 "status": "not-started",
                 "lifecycleState": None,
                 "completedSessions": [],
             },
+            spec_n=3,
         )
-        with pytest.raises(NotImplementedError):
-            migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
+
+        def _route(content, task_type, **kw):
+            return self._make_route_result(
+                json.dumps(
+                    [
+                        {"number": 1, "title": "only one"},
+                        {"number": 2, "title": "only two"},
+                    ]
+                )
+            )
+
+        self._install_route_stub(monkeypatch, _route)
+        before_disk = (set_dir / "session-state.json").read_text(encoding="utf-8")
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=False)
+        assert r.action == ACTION_FAILED_AI_COUNT_MISMATCH
+        assert "2" in r.reason and "3" in r.reason
+        # Critically: file unchanged. No padded titles, no silent truncate.
+        after_disk = (set_dir / "session-state.json").read_text(encoding="utf-8")
+        assert before_disk == after_disk
+
+    def test_ai_strategy_out_of_order_number_classified_as_bad_output(
+        self, tmp_path, monkeypatch
+    ):
+        """Number sequence must run 1..N in order; otherwise reject."""
+        set_dir = tmp_path / "ai-out-of-order"
+        _write_state(
+            set_dir,
+            {
+                "schemaVersion": 2,
+                "sessionSetName": "ai-out-of-order",
+                "currentSession": None,
+                "totalSessions": 2,
+                "status": "not-started",
+                "lifecycleState": None,
+                "completedSessions": [],
+            },
+            spec_n=2,
+        )
+
+        def _route(content, task_type, **kw):
+            return self._make_route_result(
+                json.dumps(
+                    [
+                        {"number": 2, "title": "second first"},
+                        {"number": 1, "title": "first second"},
+                    ]
+                )
+            )
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
+        assert r.action == ACTION_FAILED_AI_BAD_OUTPUT
+
+    def test_ai_strategy_zero_count_state_returns_bad_output(
+        self, tmp_path, monkeypatch
+    ):
+        """If we cannot derive an expected count, AI route is never called."""
+        set_dir = tmp_path / "ai-no-count"
+        # State file has nothing useful — no totalSessions, no
+        # completedSessions, and spec.md will be empty (no _spec written).
+        state_path = set_dir / "session-state.json"
+        set_dir.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 2,
+                    "sessionSetName": "ai-no-count",
+                    "status": "not-started",
+                }
+            ),
+            encoding="utf-8",
+        )
+        # Empty spec.md so regex finds 0 titles.
+        (set_dir / "spec.md").write_text("# Empty\n", encoding="utf-8")
+
+        called = {"count": 0}
+
+        def _route(content, task_type, **kw):
+            called["count"] += 1
+            return self._make_route_result("[]")
+
+        self._install_route_stub(monkeypatch, _route)
+        r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
+        assert r.action == ACTION_FAILED_AI_BAD_OUTPUT
+        assert called["count"] == 0  # Route was never invoked.
+        assert "session count" in r.reason
 
     def test_interactive_strategy_resolves_to_regex_when_called_directly(self, tmp_path):
         """Library callers passing 'interactive' get the safe default (regex)."""

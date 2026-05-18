@@ -69,7 +69,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 try:
     from progress import (  # type: ignore[import-not-found]
@@ -118,6 +118,41 @@ ACTION_SKIPPED_MALFORMED = "skipped-malformed"
 ACTION_SKIPPED_OPERATOR = "skipped-operator"
 ACTION_SKIPPED_FUTURE_SCHEMA = "skipped-future-schema"
 ACTION_WOULD_VIOLATE = "would-violate"
+# Set 030 Session 5: AI-strategy failure modes (per cross-provider audit
+# 2026-05-17). Distinct codes per failure kind let the in-extension lazy
+# migrator surface operator-actionable messages — "the model answered
+# badly" reads differently from "your provider key is missing" and
+# different again from "the spec has 4 sessions but the model returned
+# 3 titles." Each maps to a no-write outcome; the migrator never writes
+# a partial v3 file when AI resolution fails.
+ACTION_FAILED_AI_NO_CREDS = "failed-ai-no-creds"
+ACTION_FAILED_AI_PROVIDER_ERROR = "failed-ai-provider-error"
+ACTION_FAILED_AI_BAD_OUTPUT = "failed-ai-bad-output"
+ACTION_FAILED_AI_COUNT_MISMATCH = "failed-ai-count-mismatch"
+
+
+class AiTitleResolutionError(Exception):
+    """Base class for the AI-strategy failure exceptions.
+
+    Each subclass maps to a distinct ``ACTION_FAILED_AI_*`` code so the
+    in-extension migrator can render a kind-specific notification.
+    """
+
+
+class AiNoCredentialsError(AiTitleResolutionError):
+    """Provider credentials not available (missing env var)."""
+
+
+class AiProviderError(AiTitleResolutionError):
+    """``ai_router.route()`` raised mid-call (rate limit, network, etc.)."""
+
+
+class AiBadOutputError(AiTitleResolutionError):
+    """Response content is not valid JSON or has the wrong shape."""
+
+
+class AiCountMismatchError(AiTitleResolutionError):
+    """Response had a different number of titles than spec.md requires."""
 
 
 @dataclass(frozen=True)
@@ -304,6 +339,7 @@ def _migrate_state_dict(
     spec_md_path: Path,
     *,
     use_generic_titles: bool,
+    titles_override: Optional[Dict[int, str]] = None,
 ) -> Tuple[dict, List[dict]]:
     """Return ``(migrated_state_dict, sessions_array)``. Pure function.
 
@@ -311,9 +347,20 @@ def _migrate_state_dict(
     returning. Raises :class:`SessionStateInvariantError` if the
     inference produced an invalid shape — callers translate that into
     an ``ACTION_WOULD_VIOLATE`` result.
+
+    ``titles_override`` (Set 030 Session 5): when provided, replaces
+    the spec.md regex titles entirely. Used by the AI strategy after
+    :func:`_resolve_titles_via_ai` produces a validated title list.
+    The override is preferred for both ``total`` resolution AND the
+    per-session title lookup; ``use_generic_titles`` is forced to
+    False so the lookup actually consults the override map.
     """
     spec_titles = {n: t for n, t in extract_session_titles_from_spec(spec_md_path)}
-    total = _resolve_total(state, spec_titles)
+    title_source = titles_override if titles_override is not None else spec_titles
+    # When AI titles are supplied, they are the authoritative count
+    # signal — _resolve_total picks max(spec_titles.keys()), so we
+    # must pass the AI title map there too.
+    total = _resolve_total(state, title_source)
     if total < 1:
         raise SessionStateInvariantError(
             1,
@@ -323,9 +370,12 @@ def _migrate_state_dict(
 
     sessions = _build_v3_sessions(
         state,
-        spec_titles,
+        title_source,
         total=total,
-        use_generic_titles=use_generic_titles,
+        # The override is the explicit-titles path; "generic" would
+        # ignore it. When the caller provides an override they want
+        # those titles, period.
+        use_generic_titles=use_generic_titles and titles_override is None,
     )
 
     top_status_raw = state.get("status")
@@ -352,6 +402,195 @@ def _migrate_state_dict(
     out["totalSessions"] = derived_total
     out["completedSessions"] = completed
     return out, sessions
+
+
+def _build_ai_title_prompt(spec_text: str, expected_count: int) -> str:
+    """Render the system+user prompt for ``task_type='spec-title-extraction'``.
+
+    Kept as a small pure helper so unit tests can assert the prompt
+    shape without invoking the router. The shape is:
+
+      * Ask explicitly for JSON, no preamble.
+      * State the expected count to make a count-mismatch error
+        attributable to the model rather than to ambiguity in the spec.
+      * Emit each record as ``{"number": <int>, "title": <str>}`` so
+        the response matches v3's ``sessions[]`` entry shape.
+
+    Including the entire spec.md is OK at gemini-flash pricing — the
+    longest specs in this repo run ~700 lines.
+    """
+    return (
+        "You are extracting session titles from a Dabbler AI workflow "
+        "spec.md to seed a v3 session-state.json migration. Read the "
+        f"spec below and return EXACTLY {expected_count} session "
+        "records as a JSON array of {\"number\": int, \"title\": str} "
+        "objects.\n\n"
+        "Rules:\n"
+        "  * Return JSON ONLY. No preamble, no markdown fence, no\n"
+        "    trailing commentary.\n"
+        "  * The array MUST have exactly "
+        f"{expected_count} entries, with `number` running 1..{expected_count}.\n"
+        "  * Each `title` should be a short human-friendly label "
+        "(under 80 chars), distilled from the spec's session "
+        "headings or section descriptions.\n\n"
+        "spec.md content:\n\n"
+        f"{spec_text}\n"
+    )
+
+
+def _resolve_titles_via_ai(
+    spec_md_path: Path,
+    expected_count: int,
+) -> Dict[int, str]:
+    """Resolve session titles via ``ai_router.route()``.
+
+    Returns ``{session_number: title}`` for ``1..expected_count`` on
+    success. Raises one of the :class:`AiTitleResolutionError`
+    subclasses on failure so :func:`migrate_one_set` can map the
+    failure kind to the right ``ACTION_FAILED_AI_*`` code.
+
+    The RouteResult is dumped to JSON via ``dataclasses.asdict`` +
+    ``json.dumps`` before any attribute access (per memory
+    ``feedback_ai_router_route_result_handling`` — wrappers have
+    crashed during attribute access in the past). The ``content``
+    field is read from the dumped dict, not the dataclass directly.
+
+    Failure mapping:
+      * ``RuntimeError`` containing "API key" / "credentials" /
+        "auth" — :class:`AiNoCredentialsError`.
+      * Any other ``RuntimeError`` / ``ConnectionError`` /
+        ``TimeoutError`` from ``route()`` — :class:`AiProviderError`.
+      * JSON parse failure or non-list shape —
+        :class:`AiBadOutputError`.
+      * Title array length != ``expected_count``, or any record
+        missing the required keys —
+        :class:`AiCountMismatchError` / :class:`AiBadOutputError`.
+    """
+    # Read spec.md content. If it's missing, we still let the AI try
+    # — the prompt explicitly states the count, and a model can
+    # generate plausible "Session 1, 2, …" titles from the slug
+    # alone. Empty file is fine; the model receives the empty
+    # context and falls back to generic-style output.
+    try:
+        spec_text = spec_md_path.read_text(encoding="utf-8") if spec_md_path.is_file() else ""
+    except OSError as exc:
+        raise AiBadOutputError(f"could not read spec.md: {exc}") from exc
+
+    # Deferred import: keeps the migrator's import lightweight when
+    # only regex/generic strategies are used. ai_router's top-level
+    # __init__ loads router-config.yaml on first call, which is
+    # expensive on cold starts.
+    try:
+        from ai_router import route as _route  # type: ignore[no-redef]
+    except ImportError as exc:
+        raise AiNoCredentialsError(
+            f"ai_router module unavailable: {exc}. Install with "
+            f"`pip install dabbler-ai-router`."
+        ) from exc
+
+    prompt = _build_ai_title_prompt(spec_text, expected_count)
+
+    try:
+        result = _route(content=prompt, task_type="spec-title-extraction")
+    except Exception as exc:  # noqa: BLE001 — route() can raise provider-specific exceptions
+        msg = str(exc).lower()
+        if any(token in msg for token in ("api key", "api_key", "apikey", "credential", "unauthorized", "401")):
+            raise AiNoCredentialsError(
+                f"provider credentials not available: {exc}. Set the "
+                f"appropriate provider API key env var "
+                f"(ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY) "
+                f"and retry."
+            ) from exc
+        raise AiProviderError(f"ai_router.route() failed: {exc}") from exc
+
+    # Per memory feedback_ai_router_route_result_handling: dump the
+    # RouteResult to JSON BEFORE any attribute access. If the
+    # wrapper crashes on serialization, we catch it as a bad-output
+    # error instead of letting the exception bubble through
+    # migrate_one_set as a raw traceback.
+    try:
+        result_payload = json.loads(json.dumps(dataclasses.asdict(result)))
+    except Exception as exc:  # noqa: BLE001
+        raise AiBadOutputError(
+            f"could not serialize RouteResult ({type(result).__name__}): {exc}"
+        ) from exc
+
+    if result_payload.get("truncated"):
+        # Truncation means the model ran out of output tokens; the
+        # response body is almost certainly an incomplete JSON
+        # fragment. Surface this as bad-output with the truncation
+        # cause spelled out — the operator's next step is usually
+        # to bump max_output_tokens on the gemini-flash entry in
+        # router-config.yaml.
+        raise AiBadOutputError(
+            "RouteResult.truncated=True — the model output was cut "
+            "off mid-response (max_output_tokens reached). Increase "
+            "the limit for gemini-flash in router-config.yaml or "
+            "retry with a shorter spec."
+        )
+
+    content = result_payload.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise AiBadOutputError(
+            "RouteResult.content is missing or empty; the model "
+            "returned no usable text."
+        )
+
+    # Strip a possible Markdown code fence (``` … ```), which some
+    # providers wrap around JSON despite the prompt instruction.
+    text = content.strip()
+    if text.startswith("```"):
+        # Drop the opening fence (with optional language tag) and the
+        # closing fence.
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise AiBadOutputError(
+            f"could not parse model output as JSON: {exc}. "
+            f"First 200 chars of output: {text[:200]!r}"
+        ) from exc
+
+    if not isinstance(parsed, list):
+        raise AiBadOutputError(
+            f"expected a JSON array, got {type(parsed).__name__}. "
+            f"First 200 chars: {text[:200]!r}"
+        )
+
+    if len(parsed) != expected_count:
+        raise AiCountMismatchError(
+            f"model returned {len(parsed)} title(s) but the spec "
+            f"requires exactly {expected_count}. The migrator will "
+            f"not silently truncate or pad; rerun with --strategy "
+            f"regex or hand-edit spec.md to match."
+        )
+
+    titles: Dict[int, str] = {}
+    for i, record in enumerate(parsed, start=1):
+        if not isinstance(record, dict):
+            raise AiBadOutputError(
+                f"array entry {i} is {type(record).__name__}, "
+                f"expected an object with 'number' and 'title'."
+            )
+        number = record.get("number")
+        title = record.get("title")
+        if not isinstance(number, int) or number != i:
+            raise AiBadOutputError(
+                f"array entry {i} has number={number!r} (expected {i}). "
+                "The model's 'number' field must run 1..N in order."
+            )
+        if not isinstance(title, str) or not title.strip():
+            raise AiBadOutputError(
+                f"array entry {i} has title={title!r} (expected non-empty string)."
+            )
+        titles[number] = title.strip()
+    return titles
 
 
 def migrate_one_set(
@@ -381,12 +620,6 @@ def migrate_one_set(
     if strategy not in STRATEGIES:
         raise ValueError(
             f"unknown strategy {strategy!r}; expected one of {STRATEGIES}"
-        )
-    if strategy == STRATEGY_AI:
-        raise NotImplementedError(
-            "strategy='ai' is wired in Session 5 (per spec D7 / D14). "
-            "Use strategy='regex' (default) or strategy='generic' for "
-            "Session 4 migrations."
         )
     if strategy == STRATEGY_INTERACTIVE:
         # The CLI resolves interactive into regex/generic before calling
@@ -469,11 +702,72 @@ def migrate_one_set(
 
     spec_md_path = Path(set_dir) / "spec.md"
     use_generic = strategy == STRATEGY_GENERIC
+
+    titles_override: Optional[Dict[int, str]] = None
+    if strategy == STRATEGY_AI:
+        # Resolve the expected count once from existing signals
+        # (legacy fields + regex titles) so the AI prompt can state
+        # an exact target. If even this fails, the file genuinely
+        # has nothing to work with — fall through with a count of 0
+        # and let the helper return AiBadOutputError on the
+        # mismatch, which is the right operator-facing message.
+        regex_spec_titles = {
+            n: t for n, t in extract_session_titles_from_spec(spec_md_path)
+        }
+        expected_count = _resolve_total(state, regex_spec_titles)
+        if expected_count < 1:
+            return MigrationResult(
+                set_dir=set_dir,
+                action=ACTION_FAILED_AI_BAD_OUTPUT,
+                reason=(
+                    "cannot determine target session count from state file "
+                    "or spec.md; AI strategy needs a numeric anchor. "
+                    "Hand-edit spec.md to include `### Session 1 of N: ...` "
+                    "headings or use --strategy generic."
+                ),
+                before=state,
+            )
+        try:
+            titles_override = _resolve_titles_via_ai(spec_md_path, expected_count)
+        except AiNoCredentialsError as exc:
+            return MigrationResult(
+                set_dir=set_dir,
+                action=ACTION_FAILED_AI_NO_CREDS,
+                reason=str(exc),
+                before=state,
+                error=str(exc),
+            )
+        except AiProviderError as exc:
+            return MigrationResult(
+                set_dir=set_dir,
+                action=ACTION_FAILED_AI_PROVIDER_ERROR,
+                reason=str(exc),
+                before=state,
+                error=str(exc),
+            )
+        except AiCountMismatchError as exc:
+            return MigrationResult(
+                set_dir=set_dir,
+                action=ACTION_FAILED_AI_COUNT_MISMATCH,
+                reason=str(exc),
+                before=state,
+                error=str(exc),
+            )
+        except AiBadOutputError as exc:
+            return MigrationResult(
+                set_dir=set_dir,
+                action=ACTION_FAILED_AI_BAD_OUTPUT,
+                reason=str(exc),
+                before=state,
+                error=str(exc),
+            )
+
     try:
         new_state, _sessions = _migrate_state_dict(
             state,
             spec_md_path,
             use_generic_titles=use_generic,
+            titles_override=titles_override,
         )
     except SessionStateInvariantError as exc:
         return MigrationResult(
@@ -495,10 +789,16 @@ def migrate_one_set(
     if not dry_run:
         _atomic_write_json(state_path, new_state)
 
+    if strategy == STRATEGY_AI:
+        reason = "v2 → v3 (AI-refined titles)"
+    elif use_generic:
+        reason = "v2 → v3 (generic titles)"
+    else:
+        reason = "v2 → v3 (regex titles)"
     return MigrationResult(
         set_dir=set_dir,
         action=ACTION_MIGRATED,
-        reason="v2 → v3 (regex titles)" if not use_generic else "v2 → v3 (generic titles)",
+        reason=reason,
         before=state,
         after=new_state,
     )
@@ -801,6 +1101,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         "skipped_operator": sum(1 for r in results if r.action == ACTION_SKIPPED_OPERATOR),
         "skipped_future_schema": sum(1 for r in results if r.action == ACTION_SKIPPED_FUTURE_SCHEMA),
         "would_violate": sum(1 for r in results if r.action == ACTION_WOULD_VIOLATE),
+        # Set 030 Session 5: AI-strategy outcomes counted distinctly so
+        # `--strategy ai --json` callers (incl. the in-extension migrator)
+        # can render kind-specific summaries when a bulk run fans out.
+        "failed_ai_no_creds": sum(1 for r in results if r.action == ACTION_FAILED_AI_NO_CREDS),
+        "failed_ai_provider_error": sum(1 for r in results if r.action == ACTION_FAILED_AI_PROVIDER_ERROR),
+        "failed_ai_bad_output": sum(1 for r in results if r.action == ACTION_FAILED_AI_BAD_OUTPUT),
+        "failed_ai_count_mismatch": sum(1 for r in results if r.action == ACTION_FAILED_AI_COUNT_MISMATCH),
         "total": len(results),
     }
 
@@ -852,6 +1159,15 @@ __all__ = [
     "ACTION_SKIPPED_OPERATOR",
     "ACTION_SKIPPED_FUTURE_SCHEMA",
     "ACTION_WOULD_VIOLATE",
+    "ACTION_FAILED_AI_NO_CREDS",
+    "ACTION_FAILED_AI_PROVIDER_ERROR",
+    "ACTION_FAILED_AI_BAD_OUTPUT",
+    "ACTION_FAILED_AI_COUNT_MISMATCH",
+    "AiTitleResolutionError",
+    "AiNoCredentialsError",
+    "AiProviderError",
+    "AiBadOutputError",
+    "AiCountMismatchError",
     "MigrationResult",
     "migrate_one_set",
     "migrate_all",

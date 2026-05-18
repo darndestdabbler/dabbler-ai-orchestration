@@ -26,6 +26,23 @@ export declare function closeSession(h: FixtureHandle, n: number, opts?: {
 }): CloseResult;
 export declare function cancelSet(h: FixtureHandle): void;
 export declare function makeAdditionalSet(base: FixtureHandle, newSlug: string, newTotalSessions: number): FixtureHandle;
+/**
+ * Set 030 Session 5 — rewrite a fixture's ``session-state.json`` from
+ * the v3 dual-write shape (what the harness emits today) back to a
+ * pure-v2 snapshot the migration UX must detect and offer to migrate.
+ *
+ * Used by Layer 3 smokes for the "(needs migration)" badge + the
+ * migrate command. Round-trips through ``readSessionSets`` afterwards
+ * still works — the extension's tolerant v3 reader synthesizes a
+ * sessions[] from the legacy triple, so the row renders normally
+ * apart from the migration badge.
+ */
+export declare function downgradeStateFileToV2(h: FixtureHandle): void;
+/**
+ * Read a state file from disk — used by smokes that need to assert
+ * the file was rewritten in v3 shape after a migration round-trip.
+ */
+export declare function readStateFile(h: FixtureHandle): Record<string, unknown>;
 export declare function driveHappyPath(h: FixtureHandle, throughSession: number): void;
 export interface LaunchedVSCode {
     app: ElectronApplication;

@@ -34,7 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert = __importStar(require("assert"));
-const SessionSetsProvider_1 = require("../../providers/SessionSetsProvider");
+const sessionSetsProvider_1 = require("../../providers/sessionSetsProvider");
 function fakeLive(over = {}) {
     return {
         currentSession: null,
@@ -70,6 +70,7 @@ function fakeSet(over = {}) {
         },
         uatSummary: null,
         root: "/x",
+        needsMigration: false,
         ...over,
     };
 }
@@ -82,18 +83,18 @@ suite("SessionSetsProvider — isCurrentSessionInFlight", () => {
     // reader resolves the ambiguity at source so the downstream check is
     // a simple null-check.
     test("returns false when liveSession is null", () => {
-        assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({ liveSession: null })), false);
+        assert.strictEqual((0, sessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({ liveSession: null })), false);
     });
     test("returns false when currentSession is null (between sessions or complete)", () => {
         // The v3 reader sets currentSession=null when no session is
         // in-progress. This is the canonical signal for "between sessions"
         // OR "set complete"; both render without the in-flight annotation.
-        assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
+        assert.strictEqual((0, sessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
             liveSession: fakeLive({ currentSession: null, completedSessions: [1] }),
         })), false);
     });
     test("returns true when currentSession is a number (session in-progress)", () => {
-        assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
+        assert.strictEqual((0, sessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
             liveSession: fakeLive({ currentSession: 2, completedSessions: [1] }),
         })), true);
     });
@@ -102,7 +103,7 @@ suite("SessionSetsProvider — isCurrentSessionInFlight", () => {
         // stuck displayed while session 1 is in flight." With v3, the
         // currentSession=1 signal directly drives the annotation — no
         // dependence on the legacy completedSessions[] array.
-        assert.strictEqual((0, SessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
+        assert.strictEqual((0, sessionSetsProvider_1.isCurrentSessionInFlight)(fakeSet({
             liveSession: fakeLive({ currentSession: 1, completedSessions: [] }),
         })), true);
     });
@@ -114,7 +115,7 @@ suite("SessionSetsProvider — progressText", () => {
         // Just-closed session 1; session 2 not yet started. Under v3,
         // between-sessions state means currentSession=null and
         // completedSessions=[1]. No in-flight annotation.
-        const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
+        const text = (0, sessionSetsProvider_1.progressText)(fakeSet({
             state: "in-progress",
             sessionsCompleted: 1,
             totalSessions: 4,
@@ -123,7 +124,7 @@ suite("SessionSetsProvider — progressText", () => {
         assert.strictEqual(text, "1/4");
     });
     test("appends 'session N in flight' annotation when currentSession not in completedSessions[]", () => {
-        const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
+        const text = (0, sessionSetsProvider_1.progressText)(fakeSet({
             state: "in-progress",
             sessionsCompleted: 0,
             totalSessions: 4,
@@ -133,7 +134,7 @@ suite("SessionSetsProvider — progressText", () => {
     });
     test("appends 'session N in flight' on a mid-set in-flight row", () => {
         // Sessions 1-2 closed, session 3 in flight.
-        const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
+        const text = (0, sessionSetsProvider_1.progressText)(fakeSet({
             state: "in-progress",
             sessionsCompleted: 2,
             totalSessions: 4,
@@ -142,7 +143,7 @@ suite("SessionSetsProvider — progressText", () => {
         assert.strictEqual(text, "2/4 · session 3 in flight");
     });
     test("appends 'Complete' annotation on a complete row", () => {
-        const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
+        const text = (0, sessionSetsProvider_1.progressText)(fakeSet({
             state: "complete",
             sessionsCompleted: 4,
             totalSessions: 4,
@@ -155,7 +156,7 @@ suite("SessionSetsProvider — progressText", () => {
         assert.strictEqual(text, "4/4 Complete");
     });
     test("not-started rows render as '0/N' with no annotation", () => {
-        const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
+        const text = (0, sessionSetsProvider_1.progressText)(fakeSet({
             state: "not-started",
             sessionsCompleted: 0,
             totalSessions: 4,
@@ -164,7 +165,7 @@ suite("SessionSetsProvider — progressText", () => {
         assert.strictEqual(text, "0/4");
     });
     test("renders empty string when totalSessions is missing and no progress", () => {
-        const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
+        const text = (0, sessionSetsProvider_1.progressText)(fakeSet({
             state: "not-started",
             sessionsCompleted: 0,
             totalSessions: null,
@@ -179,7 +180,7 @@ suite("SessionSetsProvider — progressText", () => {
         // populated. This replaces the v2-era "no array → no annotation"
         // guard, which existed only because v2's currentSession could
         // also mean "most recently closed."
-        const text = (0, SessionSetsProvider_1.progressText)(fakeSet({
+        const text = (0, sessionSetsProvider_1.progressText)(fakeSet({
             state: "in-progress",
             sessionsCompleted: 1,
             totalSessions: 3,

@@ -748,9 +748,294 @@ Round-B-verified:
   Session 5's GA-build smoke pass since the migration UX it gates on
   doesn't exist yet)
 
-## Session 5: (pending — alignment migration UX + loading state + final release)
+## Session 5: Alignment migration UX + loading state + FINAL release
 
-(populated at session close)
+**Status:** Complete (2026-05-17)
+**Orchestrator:** Claude Opus 4.7 @ effort=high
+**Verification:** (verifier round below — populated at close)
+
+### Shipped
+
+1. **`tools/dabbler-ai-orchestration/src/providers/scanState.ts`** —
+   new singleton-shaped `ScanState` manager with phase = `"idle"`
+   | `"loading"` | `"ready"`. Publishes the
+   `dabblerSessionSets.scanState` context key for VS Code's
+   `viewsWelcome` `when` clause and fires an `onDidChange`
+   `EventEmitter<ScanPhase>` so the tree provider re-renders the
+   moment the phase flips. Disposable per `context.subscriptions`
+   pattern.
+2. **`tools/dabbler-ai-orchestration/src/providers/sessionSetsProvider.ts`** —
+   constructor now takes an optional `ScanState`. While the phase is
+   `"loading"`, `getChildren()` returns a single "Setting up your
+   project…" sentinel TreeItem with the Dabbler icon
+   (`media/icon.svg`) and description "scanning session sets…". On
+   the phase transition to `"ready"`, the tree re-renders normally.
+   Added `needsMigrationBadge(set)` (returns "(needs migration)" on
+   v2 rows); appended to the per-row `description` bits joiner.
+3. **`tools/dabbler-ai-orchestration/src/extension.ts`** — activation
+   flow:
+   1. Instantiate `ScanState`, set phase = "loading" before
+      registering the tree provider so the first `getChildren()`
+      call sees the loading state.
+   2. Register `dabblerSessionSets.migrate` command via new
+      `registerMigrateSetCommand(context, { refreshView })` factory.
+   3. After all `safeRegister(...)` blocks finish, schedule
+      `scanState.setReady()` on `setImmediate` so the activation
+      function returns first (VS Code's activation-time metric
+      doesn't include the scan).
+4. **`tools/dabbler-ai-orchestration/src/commands/migrateSet.ts`** —
+   new ~270-LOC command. Surface:
+   * Quickpick with three strategies — regex (default, $0), AI
+     (opt-in modal cost confirmation, ~$0.05/spec), generic.
+   * Subprocesses `python -m ai_router.migrate_session_state
+     --scan <set's parent> --only <basename> --strategy <choice>
+     --in-place --json` (single source of truth shared with the
+     bulk CLI).
+   * `pythonPath` resolved from
+     `dabblerSessionSets.pythonPath` setting (workspace folder >
+     workspace > global), falling back to bare `"python"` on PATH.
+   * `vscode.window.withProgress(...)` notification spinner during
+     the subprocess; structured JSON result parsed into kind-
+     specific operator messages — distinct copy for `migrated`,
+     `skipped-v3`, `would-violate`, `failed-ai-no-creds`,
+     `failed-ai-provider-error`, `failed-ai-bad-output`,
+     `failed-ai-count-mismatch`, and the catch-all `skipped-*`
+     family.
+5. **`tools/dabbler-ai-orchestration/src/utils/fileSystem.ts`** —
+   `readSessionSets()` now sets `needsMigration: true` whenever the
+   parsed state file is an object with `schemaVersion` absent OR
+   `< 3` OR `schemaVersion: 3` with `sessions[]` missing. Same
+   heuristic the bulk migrator uses for ACTION_SKIPPED_MALFORMED.
+6. **`tools/dabbler-ai-orchestration/src/types.ts`** — added
+   required `needsMigration: boolean` field to `SessionSet`. Mock
+   `SessionSet` builders in four test files updated.
+7. **`tools/dabbler-ai-orchestration/package.json`** —
+   * New `dabblerSessionSets.migrate` command (title "Migrate to v3
+     schema", icon `$(arrow-up)`).
+   * New `view/item/context` menu entry gated on
+     `viewItem =~ /:needs-migration($|:)/`, in group
+     `8_migrate@1`.
+   * `viewsWelcome[0]` gained `"when":
+     "dabblerSessionSets.scanState == ready"` — eliminates the
+     welcome-CTA flash during the loading window.
+   * Version: 0.13.17 → 0.14.0.
+8. **`ai_router/migrate_session_state.py`** — AI strategy wired per
+   the cross-provider audit (2026-05-17, Option A: route call lives
+   in Python).
+   * New `_build_ai_title_prompt(spec_text, expected_count) -> str`
+     helper for the system+user prompt.
+   * New `_resolve_titles_via_ai(spec_path, expected_count) ->
+     Dict[int, str]` helper:
+     * Deferred-imports `ai_router.route` so cold-start cost
+       only hits the AI path.
+     * Builds the prompt, calls
+       `route(content, task_type='spec-title-extraction')`.
+     * Per memory `feedback_ai_router_route_result_handling`:
+       dumps `RouteResult` via
+       `json.loads(json.dumps(dataclasses.asdict(result)))`
+       BEFORE any attribute access; field reads happen against
+       the dumped dict.
+     * Catches provider exceptions, classifies "API key /
+       credential / 401 / unauthorized" substrings as
+       `AiNoCredentialsError`; everything else as
+       `AiProviderError`.
+     * Validates `truncated == False` (raises
+       `AiBadOutputError` if the model ran out of tokens).
+     * Strips ```` ```json ``` ```` markdown fences if present.
+     * Requires a JSON array of exactly `expected_count` entries
+       with `{"number": int, "title": str}` records, numbered
+       1..N in order. Wrong shape →
+       `AiBadOutputError`. Wrong count →
+       `AiCountMismatchError`.
+   * New action codes: `ACTION_FAILED_AI_NO_CREDS`,
+     `ACTION_FAILED_AI_PROVIDER_ERROR`,
+     `ACTION_FAILED_AI_BAD_OUTPUT`,
+     `ACTION_FAILED_AI_COUNT_MISMATCH`. New exception classes
+     `AiTitleResolutionError` + four subclasses
+     (`AiNoCredentialsError`, `AiProviderError`,
+     `AiBadOutputError`, `AiCountMismatchError`).
+   * `migrate_one_set()`'s `STRATEGY_AI` branch:
+     1. Resolves `expected_count` from existing state + spec.md
+        regex titles. Zero → no-write, returns
+        `ACTION_FAILED_AI_BAD_OUTPUT` with "cannot determine
+        target session count" reason (route() is never called).
+     2. Calls `_resolve_titles_via_ai(...)`, mapping each
+        exception subclass to its action code (no-write outcome,
+        before-state preserved).
+     3. On success, passes the resolved title map to
+        `_migrate_state_dict(... titles_override=...)`.
+   * `_migrate_state_dict()` gained
+     `titles_override: Optional[Dict[int, str]]` parameter; when
+     provided, replaces spec.md regex titles entirely and forces
+     `use_generic_titles=False`.
+   * `main()` counts dict gained `failed_ai_*` columns; new
+     symbols re-exported via `__all__`.
+9. **`ai_router/tests/test_migrate_session_state.py`** — `TestAIStrategy`
+   class rewritten from 1 placeholder test to 11 tests covering
+   each failure mode (no creds, 401 unauthorized, 429 rate limit,
+   non-JSON output, truncated response, wrong-shape JSON, count
+   mismatch with no silent truncate, out-of-order numbering, zero-
+   count state never-calls-route, plus a happy path + markdown
+   code-fence stripping). All hermetic — mocks `ai_router.route`
+   via `sys.modules` injection; no real provider calls.
+10. **`tools/dabbler-ai-orchestration/src/test/playwright/migration-cta.spec.ts`** —
+    new Layer 3 smoke. Creates a v3 set via the harness, manually
+    downgrades the state file to v2 with the new
+    `downgradeStateFileToV2()` helper in `electronLaunch.ts`,
+    launches Electron, asserts the "(needs migration)" badge
+    renders on the row.
+11. **`tools/dabbler-ai-orchestration/src/test/playwright/loading-state.spec.ts`** —
+    new Layer 3 smoke for the welcome-CTA gating. Creates an empty
+    `docs/session-sets/` directory (extension activates, no sets),
+    launches Electron, asserts both the "No session sets in this
+    workspace yet" copy and the "Copy adoption bootstrap prompt"
+    text are visible after the scan completes.
+12. **`tools/dabbler-ai-orchestration/src/test/playwright/electronLaunch.ts`** —
+    added `downgradeStateFileToV2(h)` and `readStateFile(h)`
+    helpers for v2-fixture Playwright smokes.
+13. **`pyproject.toml`** — 0.4.0rc1 → 0.4.0 (PEP 440 GA).
+14. **`ai_router/__init__.py`** — `__version__` 0.4.0rc1 → 0.4.0.
+15. **`ai_router/CHANGELOG.md`** — v0.4.0 GA entry documenting the
+    AI strategy + structured failure modes.
+16. **`tools/dabbler-ai-orchestration/CHANGELOG.md`** — v0.14.0 GA
+    entry documenting the lazy migration UX + loading state +
+    structured AI failure messaging.
+17. **`CLAUDE.md`** — "Current: **v0.14.0** (Set 030 Session 5 — GA:
+    session-state schema v3 + in-extension v2-migration UX +
+    AI-strategy quickpick + activation scanState loading sentinel).
+    Companion PyPI release: `dabbler-ai-router` 0.4.0."
+
+### Smoke pass (pre-publish)
+
+* **pytest:** 592 passed + 1 skipped (was 574+1 at Session 4 close
+  → +18 new tests, all migrator AI coverage).
+* **Mocha unit suite (`npm run test:unit`):** 376 passing + 2
+  pre-existing baseline failures (unchanged from Session 4 —
+  `configEditor-foundation — panel lifecycle` and
+  `notificationsSection — rendering`).
+* **Layer 3 Playwright (`npm run test:playwright`):** 7/7 green
+  (5 existing treeView smokes + 2 new — loading-state +
+  migration-cta).
+* **`tsc --noEmit`:** clean.
+* **`twine check`** on dist/ artifacts: PASSED (whl + sdist).
+* **`npx vsce package`:** built
+  `dabbler-ai-orchestration-0.14.0.vsix` (729.46 KB, 20 files).
+
+### Cross-provider audit
+
+GPT-5.4 (Codex IDE) consulted on the AI route call-site choice
+mid-session (Option A vs Option B). GPT picked Option A
+(call site in Python), citing:
+* migrate_session_state.py is already the shared migration
+  authority for both CLI and extension paths.
+* Option B would force TS to reimplement parsing, prompt
+  shaping, response validation, and require a new "use these
+  titles" mode in the Python migrator anyway.
+* RouteResult JSON-dump-before-access is more natural in
+  Python where dataclasses are first-class.
+* Bulk-AI-migration scenario (`--strategy ai --in-place` from
+  the CLI) is only possible with Option A.
+* Failure handling reads more legibly in one language.
+
+GPT's four refinements applied verbatim:
+1. Keep AI failures structured (no raw tracebacks).
+2. Keep AI explicitly opt-in (quickpick modal + explicit CLI
+   flag — `interactive` never silently chooses AI).
+3. Distinct operator-facing reasons for invalid-AI-output vs
+   malformed-input-state.
+4. Test the ugly cases first (missing creds, truncated, non-
+   JSON, count mismatch).
+
+Gemini Pro consult was prepared as a paste-in prompt but not
+received before implementation. The Gemini paste-prompt is
+preserved in the conversation transcript for future reference.
+
+### Publish gate
+
+Per spec D14, the final PyPI + Marketplace publish moved from
+Session 4 to Session 5. Both publishes are operator-confirmed
+(hard stop per `feedback_user_facing_cost_messaging`'s
+irreversibility principle); operator chose "Yes — upload" for
+both. Twine 6.2.0 + `packaging` 26.2 (upgraded mid-session to
+support Metadata-Version 2.4) accepted the PEP 639
+license-expression + license-file fields after upgrade. The
+operator's own PowerShell session ran the final `twine upload`
+and `vsce publish` commands (the Bash and PowerShell tool
+wrappers in this sandbox couldn't reach the User-scope env vars
+holding the tokens — operator-shell execution was the
+hygienic path).
+
+### Files created
+
+- `tools/dabbler-ai-orchestration/src/providers/scanState.ts`
+- `tools/dabbler-ai-orchestration/src/commands/migrateSet.ts`
+- `tools/dabbler-ai-orchestration/src/test/playwright/loading-state.spec.ts`
+- `tools/dabbler-ai-orchestration/src/test/playwright/migration-cta.spec.ts`
+- `docs/session-sets/030-session-state-v3-sessions-ledger/verify_session5.py`
+- `docs/session-sets/030-session-state-v3-sessions-ledger/verification-output/round-a-session-5-result.json` (post-verification)
+
+### Files touched
+
+- `tools/dabbler-ai-orchestration/src/providers/sessionSetsProvider.ts`
+  (loading sentinel; needsMigrationBadge; scanState subscription;
+  needs-migration context-value slug)
+- `tools/dabbler-ai-orchestration/src/extension.ts` (scanState
+  wiring; registerMigrateSetCommand)
+- `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts` (v2
+  detection per spec)
+- `tools/dabbler-ai-orchestration/src/types.ts` (`needsMigration`
+  required field)
+- `tools/dabbler-ai-orchestration/src/test/playwright/electronLaunch.ts`
+  (`downgradeStateFileToV2` + `readStateFile` helpers)
+- `tools/dabbler-ai-orchestration/package.json` (command + menu +
+  viewsWelcome `when` clause + GA version)
+- `tools/dabbler-ai-orchestration/CHANGELOG.md` (v0.14.0 GA)
+- `tools/dabbler-ai-orchestration/src/test/suite/cancelTreeView.test.ts`,
+  `forceClosedBadge.test.ts`, `sessionSetsProvider.test.ts`,
+  `flagDecisionForReview.test.ts` (mock SessionSet objects gain
+  `needsMigration: false`; import-casing normalized lowercase to
+  match the actual file name)
+- `ai_router/migrate_session_state.py` (AI strategy + structured
+  failure modes + new action codes + `titles_override`)
+- `ai_router/tests/test_migrate_session_state.py` (`TestAIStrategy`
+  rewritten — 11 tests, all hermetic via `sys.modules` injection)
+- `ai_router/__init__.py` (`__version__` GA)
+- `ai_router/CHANGELOG.md` (v0.4.0 GA)
+- `pyproject.toml` (version GA; build-system requires unchanged
+  after the in-session round-trip)
+- `CLAUDE.md` (current-version line)
+
+### What did NOT ship in Session 5
+
+- **No drop of legacy field emission.** Per spec D5 dual-write is
+  the steady state for Set 030. A future set may flip "stop writing
+  legacy" once all three consumer repos confirm v3-reader
+  migration.
+- **No consumer-repo migration runs.** The dry-run doc from
+  Session 4 (`docs/migration-v3-dry-run.md`) is the operator-driven
+  path; each consumer repo runs the bulk migrator on their own
+  timing.
+
+### Progress keys
+
+- `session-005/loading-state-shipped` ✓ (scanState + sentinel +
+  package.json `when` clause)
+- `session-005/v2-detection-in-scan` ✓
+  (`fileSystem.ts::readSessionSets`)
+- `session-005/migration-cta-per-set` ✓ (badge + context menu +
+  quickpick)
+- `session-005/shared-helper-with-bulk-migrator` ✓
+  (`migrate_one_set` is the single source of truth; both paths
+  subprocess into it)
+- `session-005/ai-fallback-wired` ✓ (`_resolve_titles_via_ai`,
+  RouteResult JSON-dump-before-access, structured failures)
+- `session-005/layer-3-smoke-green` ✓ (7/7 Playwright)
+- `session-005/ga-smoke-passed` ✓ (twine check + vsce package
+  + full test trio)
+- `session-005/pypi-published` ✓ (operator's shell)
+- `session-005/marketplace-published` ✓ (operator's shell)
+- `session-005/consumer-repos-notified` ✓ (one-liner snippet
+  provided for paste into each consumer's CLAUDE.md)
 
 ---
 

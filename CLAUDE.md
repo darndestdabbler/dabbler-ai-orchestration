@@ -39,7 +39,10 @@ is a required duplicate — `vsce package` expects the file alongside
 
 ## Extension versioning
 
-- Current: **v0.13.17**
+- Current: **v0.14.0** (Set 030 Session 5 — GA: session-state schema v3
+  + in-extension v2-migration UX + AI-strategy quickpick + activation
+  scanState loading sentinel). Companion PyPI release:
+  `dabbler-ai-router` 0.4.0.
 - Publisher: `DarndestDabbler` (VS Code Marketplace: `DarndestDabbler.dabbler-ai-orchestration`)
 - Namespace: `dabblerSessionSets` (shared across all consumers)
 - Build: `cd tools/dabbler-ai-orchestration && npx vsce package`

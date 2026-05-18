@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { forceClosedBadge } from "../../providers/SessionSetsProvider";
+import { forceClosedBadge } from "../../providers/sessionSetsProvider";
 import { LiveSession, SessionSet } from "../../types";
 
 // Set 9 Session 3 (D-2 hard-scoping of ``--force``): the [FORCED]
@@ -45,6 +45,7 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
     },
     uatSummary: null,
     root: "/x",
+    needsMigration: false,
   };
 }
 

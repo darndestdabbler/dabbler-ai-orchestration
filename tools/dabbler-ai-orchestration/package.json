@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Project wizard, session-set explorer, cost dashboard, and adoption-bootstrap entry point for the Dabbler AI-led workflow.",
-  "version": "0.14.0-rc.1",
+  "version": "0.14.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -64,6 +64,7 @@
     "viewsWelcome": [
       {
         "view": "dabblerSessionSets",
+        "when": "dabblerSessionSets.scanState == ready",
         "contents": "No session sets in this workspace yet.\n\nThe quickest way to get started is to copy the adoption bootstrap prompt and paste it into a fresh AI chat (Claude Code, Gemini Code Assist, or any GPT-based tool). The AI will fetch the canonical setup instructions, talk you through a budget-threshold dialog, and present a numbered checklist of every intended write for batch approval before executing — no per-write prompts.\n[Copy adoption bootstrap prompt](command:dabbler.copyAdoptionBootstrapPrompt)\nPrefer a guided wizard? The Get Started panel offers the same starting points without leaving VS Code.\n[Open Get Started](command:dabbler.getStarted)\nMore on the workflow: [Dabbler AI Orchestration on GitHub](https://github.com/darndestdabbler/dabbler-ai-orchestration#readme)"
       }
     ],
@@ -205,6 +206,12 @@
         "command": "dabbler.scanAnnotationsForActiveSet",
         "title": "Scan Workspace for @dabbler:outsource-review Annotations",
         "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.migrate",
+        "title": "Migrate to v3 schema",
+        "category": "Dabbler",
+        "icon": "$(arrow-up)"
       }
     ],
     "menus": {
@@ -300,6 +307,11 @@
           "command": "dabblerSessionSets.restore",
           "when": "view == dabblerSessionSets && viewItem =~ /^sessionSet:cancelled/",
           "group": "9_lifecycle@2"
+        },
+        {
+          "command": "dabblerSessionSets.migrate",
+          "when": "view == dabblerSessionSets && viewItem =~ /:needs-migration($|:)/",
+          "group": "8_migrate@1"
         }
       ]
     },

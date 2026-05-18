@@ -25,7 +25,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
-import { SessionSetsProvider } from "../../../providers/SessionSetsProvider";
+import { SessionSetsProvider } from "../../../providers/sessionSetsProvider";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..", "..", "..");
 const HARNESS_CLI = path.join(

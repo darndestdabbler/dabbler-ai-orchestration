@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { SessionSetsProvider } from "../../../providers/SessionSetsProvider";
+import { SessionSetsProvider } from "../../../providers/sessionSetsProvider";
 export interface FixtureHandle {
     repo_root: string;
     set_dir: string;

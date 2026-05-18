@@ -76,7 +76,7 @@ const fs = __importStar(require("fs"));
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const vscode = __importStar(require("vscode"));
-const SessionSetsProvider_1 = require("../../../providers/SessionSetsProvider");
+const sessionSetsProvider_1 = require("../../../providers/sessionSetsProvider");
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..", "..", "..");
 const HARNESS_CLI = path.join(REPO_ROOT, "ai_router", "tests", "e2e", "harness_cli.py");
 // Default to ``python`` on PATH. CI / dev shells with a venv-bound
@@ -332,7 +332,7 @@ function buildProvider() {
     // it at the workspace folder is a safe stand-in.
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri
         ?? vscode.Uri.file(REPO_ROOT);
-    return new SessionSetsProvider_1.SessionSetsProvider(workspaceFolder);
+    return new sessionSetsProvider_1.SessionSetsProvider(workspaceFolder);
 }
 // ---------------------------------------------------------------------
 // Cleanup

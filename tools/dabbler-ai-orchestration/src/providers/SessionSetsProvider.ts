@@ -2,6 +2,16 @@ import * as vscode from "vscode";
 import * as path from "path";
 import { readAllSessionSets, discoverRoots } from "../utils/fileSystem";
 import { SessionSet, SessionState } from "../types";
+import { ScanState } from "./scanState";
+
+// Set 030 Session 5: badge surfaced on any v2 (or broken-v3) state
+// file. Tracked separately from the lifecycle-state badges so reviewers
+// can see at a glance which sets still need a one-shot v3 migration
+// even if they're otherwise healthy. Migration is invoked via the
+// `dabblerSessionSets.migrate` command (context menu on the row).
+export function needsMigrationBadge(set: SessionSet): string {
+  return set.needsMigration ? "(needs migration)" : "";
+}
 
 const ICON_FILES: Record<SessionState, string> = {
   complete: "done.svg",
@@ -152,6 +162,11 @@ function contextValueFor(set: SessionSet): string {
   const parts = [`sessionSet:${set.state}`];
   if (set.config?.requiresUAT) parts.push("uat");
   if (set.config?.requiresE2E) parts.push("e2e");
+  // Set 030 Session 5: append a `needs-migration` slug to the
+  // contextValue when the set's state file is still v2. The package.json
+  // `view/item/context` menu uses this to gate the "Migrate to v3
+  // schema" entry — only rows that actually need it see the command.
+  if (set.needsMigration) parts.push("needs-migration");
   return parts.join(":");
 }
 
@@ -174,7 +189,16 @@ export class SessionSetsProvider
 
   _cache: SessionSet[] | null = null;
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly scanState?: ScanState,
+  ) {
+    // When the scan transitions from "loading" → "ready" the tree
+    // needs to refresh so the loading sentinel is replaced by real
+    // rows. Subscribe once; the constructor instance lives for the
+    // lifetime of the extension so no dispose tracking needed.
+    this.scanState?.onDidChange(() => this._onDidChangeTreeData.fire());
+  }
 
   refresh(): void {
     this._cache = null;
@@ -188,21 +212,29 @@ export class SessionSetsProvider
   getChildren(element?: vscode.TreeItem): vscode.TreeItem[] {
     if (!vscode.workspace.workspaceFolders?.length) return [];
 
+    // Set 030 Session 5: while the activation-time scan is in flight,
+    // render a single loading sentinel TreeItem instead of "[]". The
+    // welcome view's `when` clause (in package.json) suppresses the
+    // CTA content until scanState == "ready", so this is what the
+    // operator sees during the loading window. Once `onDidChange`
+    // fires "ready", the tree re-renders normally below.
+    if (!element && this.scanState?.phase === "loading") {
+      return [this.makeLoadingSentinel()];
+    }
+
     if (!this._cache) {
       this._cache = readAllSessionSets();
     }
     const all = this._cache;
 
     if (!element) {
-      // v0.13.1: when the workspace has no session sets at all, return an
-      // empty array so VS Code renders the `viewsWelcome` content
-      // (configured in package.json under `contributes.viewsWelcome`).
-      // The welcome content shows a Copy-adoption-bootstrap-prompt link
-      // and a Get Started pointer — the discoverable starting point for
-      // first-time users sits at the empty state itself rather than
-      // hiding behind context-menu actions on rows that don't exist
-      // yet. Once any session set exists in the workspace, the groups
-      // below render and the welcome content suppresses automatically.
+      // v0.13.1 / Set 030 S5: when the workspace has no session sets
+      // at all AND the scan has completed, return an empty array so VS
+      // Code renders the `viewsWelcome` content. The welcome view's
+      // `when` clause now requires `dabblerSessionSets.scanState ==
+      // ready` so the content no longer flashes during the loading
+      // window — only after the scan finishes and confirms the
+      // workspace is genuinely empty does the welcome CTA appear.
       if (all.length === 0) {
         return [];
       }
@@ -245,6 +277,28 @@ export class SessionSetsProvider
     return [];
   }
 
+  // Set 030 Session 5: the loading sentinel shown while the
+  // activation-time scan is in flight. Uses the Dabbler brand icon
+  // (already shipped under `media/icon.svg` for the activity-bar
+  // viewsContainer) so the operator sees the same visual identifier
+  // they're about to interact with. `description` carries the
+  // "scanning…" hint — VS Code renders it dimmer than the label, which
+  // matches the "transient activity" cue.
+  private makeLoadingSentinel(): vscode.TreeItem {
+    const item = new vscode.TreeItem(
+      "Setting up your project…",
+      vscode.TreeItemCollapsibleState.None,
+    );
+    item.description = "scanning session sets…";
+    item.iconPath = vscode.Uri.joinPath(this.extensionUri, "media", "icon.svg");
+    item.contextValue = "loading";
+    item.tooltip =
+      "Dabbler is scanning `docs/session-sets/` for session sets. " +
+      "This usually completes within a frame; longer means a slow " +
+      "filesystem or many sets to read.";
+    return item;
+  }
+
   private makeGroup(label: string, groupKey: SessionState, count: number): GroupItem {
     const item = new vscode.TreeItem(
       `${label}  (${count})`,
@@ -269,6 +323,7 @@ export class SessionSetsProvider
       modeBadge(set),
       uatBadge(set),
       forceClosedBadge(set),
+      needsMigrationBadge(set),
     ].filter(Boolean);
     item.description = bits.join("  ·  ");
     item.tooltip = new vscode.MarkdownString(

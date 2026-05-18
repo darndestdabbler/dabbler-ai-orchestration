@@ -2,7 +2,7 @@ import * as assert from "assert";
 import {
   isCurrentSessionInFlight,
   progressText,
-} from "../../providers/SessionSetsProvider";
+} from "../../providers/sessionSetsProvider";
 import { LiveSession, SessionSet } from "../../types";
 
 function fakeLive(over: Partial<LiveSession> = {}): LiveSession {
@@ -41,6 +41,7 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     },
     uatSummary: null,
     root: "/x",
+    needsMigration: false,
     ...over,
   };
 }

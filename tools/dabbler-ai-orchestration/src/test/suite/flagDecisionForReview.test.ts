@@ -31,6 +31,7 @@ function ssStub(over: Partial<SessionSet> = {}): SessionSet {
     config: { requiresUAT: false, requiresE2E: false, uatScope: "none" },
     uatSummary: null,
     root: "/tmp",
+    needsMigration: false,
     ...over,
   };
 }

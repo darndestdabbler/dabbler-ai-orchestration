@@ -4,7 +4,7 @@ import * as os from "os";
 import * as path from "path";
 import * as vscode from "vscode";
 import { readSessionSets } from "../../utils/fileSystem";
-import { SessionSetsProvider } from "../../providers/SessionSetsProvider";
+import { SessionSetsProvider } from "../../providers/sessionSetsProvider";
 import { cancelSessionSet, restoreSessionSet } from "../../utils/cancelLifecycle";
 
 function makeTmpDir(): string {
@@ -159,6 +159,7 @@ suite("SessionSetsProvider — cancelled group", () => {
       config: { requiresUAT: false, requiresE2E: false, uatScope: "none"},
       uatSummary: null,
       root: "/tmp",
+      needsMigration: false,
     }));
     provider._cache = fakeSets;
     return provider;

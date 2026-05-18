@@ -66,6 +66,7 @@ export interface SessionSet {
     config: SessionSetConfig;
     uatSummary: UatSummary | null;
     root: string;
+    needsMigration: boolean;
 }
 export interface MetricsEntry {
     session_set: string;

@@ -1,0 +1,40 @@
+{
+  "status": "completed",
+  "summary": "Set 029 Session 1 (cross-provider design audit): locks the audit synthesis for the orchestrator model + effort indicator gauges feature. Round A verification ($0.264, gpt-5-4) returned REJECTED with 12 must-fix items (5 Bucket-1 doc-accuracy drifts + 7 Bucket-2 design refinements). The 7 design refinements were routed through a cross-engine consensus call ($0.085, gpt-5-4 + gemini-pro) per the new memory feedback_prefer_ai_consensus_over_human_prompt (saved this session from operator's directive); both engines accepted the proposed direction and gpt-5-4 added five tightening modifications (race-window re-read, attempt-count math, scrollable-not-horizontally wording, confidence-low producer rule, dual-condition /clear check) all absorbed. Round B ($0.138) confirmed all 12 fixes addressed and surfaced one new Goal-state drift item (fixed verbatim from D8/Q6 locked decisions). Round C ($0.358 — higher than typical due to gpt-5-4's 22k output tokens; flag for future bundle sizing) confirmed the Goal-state fix and surfaced two more mechanical drift items in previously-uninspected regions (per-surface-hooks wording understated D8's mix; Session 3 Creates list still listed installOrchestratorHookCodex.ts contradicting D8's no-user-facing-install for Codex). Both fixed mechanically; per memory feedback_verifier_spiral_recruit_codex no Round D was chained — the pattern was each round exposing different un-bundled spec.md regions, not new design issues against the same content. Session 1 total cost: $0.845 against the operator's $5.00 NTE for the set. Key locked design decisions Session 2 implements verbatim: marker schema v2 at ~/.dabbler/current-orchestrator.json with signalKind/confidence/effort.signalKind/effort.observedAt and stalenessMaxSec default 28800s (8h); Claude SessionStart hook (NOT Stop — Stop has no model field per audit S1); UserPromptSubmit hook for /think* effort tracking (field-availability gated); multi-writer precedence policy (current > manual > last-observed > configured-default) with read → re-read immediately before atomic rename → skip-if-weaker semantics + manual-override force-override escape hatch; Windows retry loop bumped to 5 attempts at 50/200/600/1200ms backoff (~2050ms ceiling); confidence-low producer rule emitting confidence:low + model:unknown on missing/null/unparseable payload; pre-implementation /clear dual-condition verification (clobber last-observed only if /clear both fires SessionStart AND resets effort); revised visual-treatment matrix (stripes are stale-only; configured-default = dashed rim + DEFAULT pill; last-observed = hollow rim + clock-icon overlay + time-elapsed; manual = solid + operator-icon overlay); no initialSize (container height cannot be guaranteed, documented in CHANGELOG, Playwright screenshot assertions clean-profile only). Process notes: spec step 2 (route_audit.py) waiver durably documented in spec.md; activity-log.json rewritten to canonical sessionNumber schema (was Set-028-style 'session' field which check_activity_log_entry gate doesn't read). New memory saved: feedback_prefer_ai_consensus_over_human_prompt (operator's in-session delegation directive); project_delegation_consensus_candidate updated to note 2026-05-18 re-emphasis.",
+  "verification_method": "routed",
+  "files_changed": [
+    "docs/proposals/2026-05-17-model-effort-gauges-design-audit/audit-summary.md",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/activity-log.json",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/change-log.md",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/disposition.json",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-events.jsonl",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/consensus-gemini-pro.json",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/consensus-gpt-5-4.json",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/prompt-round-b.rendered.md",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/prompt-round-c.rendered.md",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/prompt.md",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/prompt.rendered.md",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/route_consensus.py",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/route_verify.py",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/route_verify_round_b.py",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/route_verify_round_c.py",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/session-001-review.md",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/verify-result-round-b.json",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/verify-result-round-c.json",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-reviews/session-001/verify-result.json",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/session-state.json",
+    "docs/session-sets/029-orchestrator-model-effort-gauges/spec.md"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "reason": {
+      "code": "ai-assignment-recommendation",
+      "specifics": "Session 2 ships the gauge UI end-to-end for the Claude Code surface: webview view registration + provider + CSS gauges + marker-file reader/watcher + Claude SessionStart hook installer + UserPromptSubmit hook (effort tracking) + multi-writer precedence helper + Layer 3 Playwright smoke. ai-assignment.md recommends Claude Opus 4.7 @ effort=high for substantial TypeScript + HTML/CSS + Node hook script + Playwright work with non-trivial multi-file coherence requirements (webview message-passing, idempotent settings.json edits in the hook installer, shared marker-writer helper)."
+    }
+  },
+  "blockers": []
+}

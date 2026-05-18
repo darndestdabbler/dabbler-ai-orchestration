@@ -20,7 +20,7 @@
     {
       "number": 4,
       "title": "Custom-tree pivot",
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "number": 5,
@@ -33,12 +33,13 @@
       "status": "not-started"
     }
   ],
-  "currentSession": 4,
+  "currentSession": null,
   "totalSessions": 6,
   "completedSessions": [
     1,
     2,
-    3
+    3,
+    4
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",

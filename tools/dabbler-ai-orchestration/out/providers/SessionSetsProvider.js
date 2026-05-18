@@ -33,108 +33,32 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SessionSetsProvider = void 0;
-exports.needsMigrationBadge = needsMigrationBadge;
-exports.isCurrentSessionInFlight = isCurrentSessionInFlight;
-exports.progressText = progressText;
-exports.forceClosedBadge = forceClosedBadge;
-exports.modeBadge = modeBadge;
+exports.SessionSetsProvider = exports.progressText = exports.needsMigrationBadge = exports.modeBadge = exports.isCurrentSessionInFlight = exports.forceClosedBadge = void 0;
 const vscode = __importStar(require("vscode"));
 const path = __importStar(require("path"));
 const fileSystem_1 = require("../utils/fileSystem");
-// Set 030 Session 5: badge surfaced on any v2 (or broken-v3) state
-// file. Tracked separately from the lifecycle-state badges so reviewers
-// can see at a glance which sets still need a one-shot v3 migration
-// even if they're otherwise healthy. Migration is invoked via the
-// `dabblerSessionSets.migrate` command (context menu on the row).
-function needsMigrationBadge(set) {
-    return set.needsMigration ? "(needs migration)" : "";
+const SessionSetsModel_1 = require("./SessionSetsModel");
+Object.defineProperty(exports, "forceClosedBadge", { enumerable: true, get: function () { return SessionSetsModel_1.forceClosedBadge; } });
+Object.defineProperty(exports, "isCurrentSessionInFlight", { enumerable: true, get: function () { return SessionSetsModel_1.isCurrentSessionInFlight; } });
+Object.defineProperty(exports, "modeBadge", { enumerable: true, get: function () { return SessionSetsModel_1.modeBadge; } });
+Object.defineProperty(exports, "needsMigrationBadge", { enumerable: true, get: function () { return SessionSetsModel_1.needsMigrationBadge; } });
+Object.defineProperty(exports, "progressText", { enumerable: true, get: function () { return SessionSetsModel_1.progressText; } });
+function folderTooltip(set) {
+    const roots = (0, fileSystem_1.discoverRoots)();
+    const rel = path.relative(set.root, set.dir);
+    return roots.length > 1 ? `${path.basename(set.root)} / ${rel}` : rel;
 }
-const ICON_FILES = {
-    complete: "done.svg",
-    "in-progress": "in-progress.svg",
-    "not-started": "not-started.svg",
-    cancelled: "cancelled.svg",
-};
-function iconUriFor(extensionUri, state) {
-    const file = ICON_FILES[state];
-    return file ? vscode.Uri.joinPath(extensionUri, "media", file) : undefined;
-}
-// Set 030 Session 3: the v3 "in-flight" predicate is a direct read of
-// the canonical `liveSession.currentSession` field, which `fileSystem.ts`
-// populates from `readProgress` as the single in-progress session's
-// number (or null when no session is in flight). v2's
-// "currentSession not in completedSessions[]" predicate is gone — the
-// v3 reader resolves the ambiguity at the source rather than letting
-// it propagate into a downstream invariant check.
-// Exported for unit-test reuse.
-function isCurrentSessionInFlight(set) {
-    return set.liveSession?.currentSession != null;
-}
-function progressText(set) {
-    // Always show X/total. The earlier "X/X" shape on done sets assumed
-    // completed === total, which masks bugs like a SET-level flip to
-    // "complete" that fires before all sessions ran. Truthful display
-    // surfaces the discrepancy at a glance.
-    //
-    // Set 022 Session 2 added two annotations to disambiguate the row.
-    // Set 030 Session 3 renamed the terminal annotation to "Complete"
-    // so the display vocabulary matches the JSON status glossary:
-    //   * `N/N Complete` on complete rows — operator-facing "yes this
-    //     really reached terminal state" cue. Distinguishes a healthy
-    //     final close from a stale `N/N` snapshot that's about to be
-    //     downgraded by isMidSetComplete.
-    //   * `0/N · session 1 in flight` on rows where session N has
-    //     started but not yet closed. Removes the operator confusion
-    //     of "I started session 1 — why does it still say 0/4?"
-    //     Both lifecycle endpoints (0/N at start of session 1; N/N
-    //     between session N's start and its close on the final
-    //     session) used to be indistinguishable from their "no work
-    //     started yet" / "set is complete" siblings.
-    const base = set.totalSessions && set.totalSessions > 0
-        ? `${set.sessionsCompleted}/${set.totalSessions}`
-        : set.sessionsCompleted > 0
-            ? `${set.sessionsCompleted} complete`
-            : "";
-    if (set.state === "complete" && base) {
-        return `${base} Complete`;
-    }
-    if (set.state === "in-progress" && isCurrentSessionInFlight(set)) {
-        const n = set.liveSession?.currentSession;
-        const annotation = `session ${n} in flight`;
-        return base ? `${base} · ${annotation}` : annotation;
-    }
-    return base;
-}
-function touchedDate(set) {
-    if (!set.lastTouched)
-        return "";
-    return new Date(set.lastTouched).toLocaleDateString("en-CA");
-}
-function uatBadge(set) {
-    if (!set.config?.requiresUAT || !set.uatSummary)
-        return "";
-    if (set.uatSummary.pendingItems > 0)
-        return `[UAT ${set.uatSummary.pendingItems}]`;
-    if (set.uatSummary.totalItems > 0)
-        return "[UAT done]";
-    return "";
-}
-// Set 9 Session 3 (D-2 hard-scoping of ``--force``): the badge surfaces
-// the rare case where a session set was closed via the hard-scoped
-// ``--force`` bypass instead of the deterministic gate. The flag is
-// written by ``_flip_state_to_closed(forced=True)`` in
-// ``ai_router/session_state.py``; absent or false on every snapshot
-// written by a normal close-out, so the badge never appears for
-// healthy sets.
-function forceClosedBadge(set) {
-    return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
-}
-// modeBadge kept as a no-op stub for existing imports / tests. Set 026
-// Session 1 removed the outsource-last path; there is no longer any
-// mode distinction to badge.
-function modeBadge(_set) {
-    return "";
+function contextValueFor(set) {
+    const parts = [`sessionSet:${set.state}`];
+    if (set.config?.requiresUAT)
+        parts.push("uat");
+    if (set.config?.requiresE2E)
+        parts.push("e2e");
+    // Set 030 Session 5: append a `needs-migration` slug to the
+    // contextValue when the set's state file is still v2.
+    if (set.needsMigration)
+        parts.push("needs-migration");
+    return parts.join(":");
 }
 function liveSessionTooltipLines(set) {
     if (!set.liveSession)
@@ -183,25 +107,6 @@ function configTooltipLines(set) {
     }
     return lines;
 }
-function folderTooltip(set) {
-    const roots = (0, fileSystem_1.discoverRoots)();
-    const rel = path.relative(set.root, set.dir);
-    return roots.length > 1 ? `${path.basename(set.root)} / ${rel}` : rel;
-}
-function contextValueFor(set) {
-    const parts = [`sessionSet:${set.state}`];
-    if (set.config?.requiresUAT)
-        parts.push("uat");
-    if (set.config?.requiresE2E)
-        parts.push("e2e");
-    // Set 030 Session 5: append a `needs-migration` slug to the
-    // contextValue when the set's state file is still v2. The package.json
-    // `view/item/context` menu uses this to gate the "Migrate to v3
-    // schema" entry — only rows that actually need it see the command.
-    if (set.needsMigration)
-        parts.push("needs-migration");
-    return parts.join(":");
-}
 class SessionSetsProvider {
     constructor(extensionUri, scanState) {
         this.extensionUri = extensionUri;
@@ -209,10 +114,6 @@ class SessionSetsProvider {
         this._onDidChangeTreeData = new vscode.EventEmitter();
         this.onDidChangeTreeData = this._onDidChangeTreeData.event;
         this._cache = null;
-        // When the scan transitions from "loading" → "ready" the tree
-        // needs to refresh so the loading sentinel is replaced by real
-        // rows. Subscribe once; the constructor instance lives for the
-        // lifetime of the extension so no dispose tracking needed.
         this.scanState?.onDidChange(() => this._onDidChangeTreeData.fire());
     }
     refresh() {
@@ -225,12 +126,6 @@ class SessionSetsProvider {
     getChildren(element) {
         if (!vscode.workspace.workspaceFolders?.length)
             return [];
-        // Set 030 Session 5: while the activation-time scan is in flight,
-        // render a single loading sentinel TreeItem instead of "[]". The
-        // welcome view's `when` clause (in package.json) suppresses the
-        // CTA content until scanState == "ready", so this is what the
-        // operator sees during the loading window. Once `onDidChange`
-        // fires "ready", the tree re-renders normally below.
         if (!element && this.scanState?.phase === "loading") {
             return [this.makeLoadingSentinel()];
         }
@@ -239,56 +134,46 @@ class SessionSetsProvider {
         }
         const all = this._cache;
         if (!element) {
-            // v0.13.1 / Set 030 S5: when the workspace has no session sets
-            // at all AND the scan has completed, return an empty array so VS
-            // Code renders the `viewsWelcome` content. The welcome view's
-            // `when` clause now requires `dabblerSessionSets.scanState ==
-            // ready` so the content no longer flashes during the loading
-            // window — only after the scan finishes and confirms the
-            // workspace is genuinely empty does the welcome CTA appear.
             if (all.length === 0) {
                 return [];
             }
-            const inProgress = all.filter((s) => s.state === "in-progress");
-            const notStarted = all.filter((s) => s.state === "not-started");
-            const complete = all.filter((s) => s.state === "complete");
-            const cancelled = all.filter((s) => s.state === "cancelled");
+            const buckets = (0, SessionSetsModel_1.bucketSets)(all);
             const groups = [
-                this.makeGroup("In Progress", "in-progress", inProgress.length),
-                this.makeGroup("Not Started", "not-started", notStarted.length),
-                this.makeGroup("Complete", "complete", complete.length),
+                this.makeGroup("In Progress", "in-progress", buckets.inProgress.length),
+                this.makeGroup("Not Started", "not-started", buckets.notStarted.length),
+                this.makeGroup("Complete", "complete", buckets.complete.length),
             ];
             // Set 8: the Cancelled group only renders when ≥ 1 cancelled set
-            // exists (parallels the existing spec rule for not-emitting empty
-            // groups noted in spec.md scope). A repo that never cancels a set
-            // should not see the group at all.
-            if (cancelled.length > 0) {
-                groups.push(this.makeGroup("Cancelled", "cancelled", cancelled.length));
+            // exists. A repo that never cancels a set should not see the group.
+            if (buckets.cancelled.length > 0) {
+                groups.push(this.makeGroup("Cancelled", "cancelled", buckets.cancelled.length));
             }
             return groups;
         }
         const group = element;
         if (group.contextValue === "group") {
-            const subset = all.filter((s) => s.state === group.groupKey);
-            if (group.groupKey === "in-progress" ||
-                group.groupKey === "complete" ||
-                group.groupKey === "cancelled") {
-                subset.sort((a, b) => (b.lastTouched || "").localeCompare(a.lastTouched || ""));
+            const buckets = (0, SessionSetsModel_1.bucketSets)(all);
+            let subset;
+            switch (group.groupKey) {
+                case "in-progress":
+                    subset = buckets.inProgress;
+                    break;
+                case "not-started":
+                    subset = buckets.notStarted;
+                    break;
+                case "complete":
+                    subset = buckets.complete;
+                    break;
+                case "cancelled":
+                    subset = buckets.cancelled;
+                    break;
             }
-            else {
-                subset.sort((a, b) => a.name.localeCompare(b.name));
-            }
-            return subset.map((s) => this.makeSetItem(s));
+            return (0, SessionSetsModel_1.sortBucket)(subset, group.groupKey).map((s) => this.makeSetItem(s));
         }
         return [];
     }
     // Set 030 Session 5: the loading sentinel shown while the
-    // activation-time scan is in flight. Uses the Dabbler brand icon
-    // (already shipped under `media/icon.svg` for the activity-bar
-    // viewsContainer) so the operator sees the same visual identifier
-    // they're about to interact with. `description` carries the
-    // "scanning…" hint — VS Code renders it dimmer than the label, which
-    // matches the "transient activity" cue.
+    // activation-time scan is in flight.
     makeLoadingSentinel() {
         const item = new vscode.TreeItem("Setting up your project…", vscode.TreeItemCollapsibleState.None);
         item.description = "scanning session sets…";
@@ -304,7 +189,7 @@ class SessionSetsProvider {
         const item = new vscode.TreeItem(`${label}  (${count})`, count > 0
             ? vscode.TreeItemCollapsibleState.Expanded
             : vscode.TreeItemCollapsibleState.Collapsed);
-        item.iconPath = iconUriFor(this.extensionUri, groupKey);
+        item.iconPath = (0, SessionSetsModel_1.iconUriFor)(this.extensionUri, groupKey);
         item.contextValue = "group";
         item.groupKey = groupKey;
         return item;
@@ -312,12 +197,12 @@ class SessionSetsProvider {
     makeSetItem(set) {
         const item = new vscode.TreeItem(set.name, vscode.TreeItemCollapsibleState.None);
         const bits = [
-            progressText(set),
-            touchedDate(set),
-            modeBadge(set),
-            uatBadge(set),
-            forceClosedBadge(set),
-            needsMigrationBadge(set),
+            (0, SessionSetsModel_1.progressText)(set),
+            (0, SessionSetsModel_1.touchedDate)(set),
+            (0, SessionSetsModel_1.modeBadge)(set),
+            (0, SessionSetsModel_1.uatBadge)(set),
+            (0, SessionSetsModel_1.forceClosedBadge)(set),
+            (0, SessionSetsModel_1.needsMigrationBadge)(set),
         ].filter(Boolean);
         item.description = bits.join("  ·  ");
         item.tooltip = new vscode.MarkdownString([
@@ -332,7 +217,7 @@ class SessionSetsProvider {
             .join("\n\n"));
         item.contextValue = contextValueFor(set);
         item.set = set;
-        item.iconPath = iconUriFor(this.extensionUri, set.state);
+        item.iconPath = (0, SessionSetsModel_1.iconUriFor)(this.extensionUri, set.state);
         item.command = {
             command: "dabblerSessionSets.openSpec",
             title: "Open Spec",

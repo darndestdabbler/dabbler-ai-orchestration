@@ -1,9 +1,9 @@
 # Set 029: Orchestrator Model & Effort Indicator Gauges
 
-**Status:** In progress (2 of 6 sessions complete; mid-set pivot 2026-05-18 reshaped 4 → 6 sessions)
+**Status:** In progress (3 of 6 sessions complete; mid-set pivot 2026-05-18 reshaped 4 → 6 sessions)
 **Created:** 2026-05-17
-**Cost so far:** $1.464 (S1 $0.845 + S2 $0.578 + mid-set custom-tree-pivot audit $0.022 Gemini Pro; GPT-5.4 via manual paste = $0.00).
-**Forecast remaining:** $0.40–$1.25 across S3 + S4 audit + S4/S5/S6 verifications.
+**Cost so far:** $1.548 (S1 $0.845 + S2 $0.578 + mid-set custom-tree-pivot audit $0.022 Gemini Pro + S3 $0.085 Gemini Pro × 3 rounds; GPT-5.4 via manual paste = $0.00).
+**Forecast remaining:** $0.30–$1.00 across S4 audit + S4/S5/S6 verifications.
 **NTE ceiling:** $5.00 (operator-confirmed 2026-05-18 at S1 resume).
 
 ---
@@ -191,9 +191,134 @@ state of the extension until S3 ships 0.15.0.
 
 **Cost:** $0.022 (Gemini Pro consensus call; GPT-5.4 manual = $0.00).
 
-## Session 3: (pending — per-session-set identity)
+## Session 3: per-session-set identity (COMPLETE 2026-05-18)
 
-(populated at session close)
+**Verdict:** VERIFIED after three verification rounds (Round A
+writer + schema doc VERIFIED clean; Round B reader + model + tests
+3 MUST-FIX; Round C confirmation pass VERIFIED). All three Round-B
+issues addressed and confirmed. No spiral per memory
+`feedback_verifier_spiral_recruit_codex`.
+
+**Verifier:** Gemini Pro for all three rounds — gpt-5-4 returned
+429 on the OpenAI Responses endpoint twice (initial bundle attempt
+at 101k chars + Round-A re-try at 37k chars), so the round-A
+script was pinned to `model="gemini-pro"` to dodge the sticky rate
+limit. Cross-provider verification satisfied: Claude orchestrator
++ Gemini Pro verifier.
+
+**Deliverables (v0.15.0, breaking-within-v0.14.2-preview):**
+
+- `tools/dabbler-ai-orchestration/scripts/write-orchestrator-marker.js`
+  (~613 LOC, rewritten) — marker schema v3 with top-level
+  `sessionSetSlug` integrity field; walk-up resolver
+  (`walkUpResolveSet(startCwd)`) replaces the hardcoded
+  `~/.dabbler/current-orchestrator.json` path. Fail-closed posture:
+  on zero / multiple in-progress sets or no reachable
+  `docs/session-sets/`, skip the write and append a JSON entry
+  (`reason`, `candidates`, `cwd`) to
+  `~/.dabbler/orchestrator-writer.log`. Writer log stays global so
+  one log captures every writer attempt across every set. The
+  per-set `.dabbler/` directory gets a self-protecting `.gitignore`
+  (`*\n!.gitignore\n`) dropped automatically on first create —
+  consumer repos inherit untracked-marker behavior without any
+  operator intervention. `mergeEffort()` re-stamps `sessionSetSlug`
+  + `schemaVersion: 3` so a marker that survives a cross-set
+  boundary converges on the right slug.
+- `tools/dabbler-ai-orchestration/src/providers/orchestratorIndicatorProvider.ts`
+  (~946 LOC, modified) — new `resolveActiveSet()` runs the same
+  walk-up algorithm rooted at `workspaceFolders[0]`. Two watchers:
+  state watcher on `docs/session-sets/*/session-state.json` for
+  re-resolution on transition; per-set marker watcher rebound on
+  resolution change. Slug-integrity check: marker whose
+  `sessionSetSlug` doesn't match the resolved slug falls back to
+  the empty-state CTA and logs to the
+  "Dabbler Orchestrator Indicator" output channel.
+- `tools/dabbler-ai-orchestration/src/providers/SessionSetsModel.ts`
+  (~131 LOC, new) — data-layer extraction. Pulled `progressText`,
+  `isCurrentSessionInFlight`, `iconUriFor`, `needsMigrationBadge`,
+  `forceClosedBadge`, `modeBadge`, `touchedDate`, `uatBadge`,
+  `bucketSets`, `sortBucket`, `ICON_FILES` out of
+  `SessionSetsProvider.ts`. Both the current native tree (S3 ship)
+  and the future custom webview tree (S4) consume the same model.
+- `tools/dabbler-ai-orchestration/src/providers/SessionSetsProvider.ts`
+  (~246 LOC, refactored) — collapsed to a thin VS Code adapter
+  consuming `SessionSetsModel`. Re-exports the helper subset that
+  callers (`cancelTreeView.test.ts`, `forceClosedBadge.test.ts`)
+  still import from this module, so no upstream import surface
+  broke. The Layer-2 test
+  `src/test/suite/sessionSetsProvider.test.ts` was repointed to
+  import directly from `SessionSetsModel` to track the canonical
+  home.
+- `tools/dabbler-ai-orchestration/src/test/playwright/orchestrator-indicator.spec.ts`
+  (~751 LOC, rewritten) — 12 scenarios total (A–L). All existing
+  A–H scenarios updated to seed markers at the per-set path +
+  call `startSession(seed, 1)` so the resolver finds an
+  in-progress set. New: I (mismatched slug → empty state),
+  J (helper ambiguous → write skipped + log), K (helper happy
+  path verifies schema-v3 + slug + `.gitignore` self-protect),
+  L (helper outside `docs/session-sets/` → skip).
+- `docs/orchestrator-marker-schema.md` (new) — authoritative
+  reference for the v3 marker shape, the walk-up resolver, the
+  fail-closed posture, the self-protecting `.gitignore`, and the
+  multi-writer precedence/retry policy.
+- `.gitignore` — workspace-root patch adding
+  `docs/session-sets/*/.dabbler/` as belt-and-suspenders.
+
+**Significant verifier findings + fixes:**
+
+| Round | Finding | Fix |
+|---|---|---|
+| Round A | All four Qs VERIFIED clean | — |
+| Round B Q5 | Slug-validation truthiness bug: `marker.sessionSetSlug && ...` would let `null` / `""` through as "absent" rather than "mismatch" | Tightened to `marker.sessionSetSlug !== undefined && ...`. An empty-string slug now correctly fails the mismatch check and routes to empty state |
+| Round B Q6 | `setUpStateWatcher()` is only called once at view resolution; if `workspaceFolders` is empty then, the watcher never binds and the 60s poll is the only signal for set transitions | Added `vscode.workspace.onDidChangeWorkspaceFolders` listener; on fire, disposes the stale state watcher and re-runs `setUpStateWatcher()` + `rebindMarkerWatcher()` + `scheduleRender()`. Listener is itself disposed by `tearDownWatchers()` |
+| Round B Q8 | Spec says reader "logs" on slug mismatch, but the implementation fell silent | Added lazy `getOutputChannel()` creating "Dabbler Orchestrator Indicator" on first append; slug-mismatch branch in `computeState()` now logs timestamped line with both slugs + the resolved marker path |
+
+**Deferred suggest item (Round B Q8):** end-to-end ambiguous
+scenario launching VS Code with two in-progress sets. The
+helper-side scenario J already exercises the writer's fail-closed
+behavior; the reader's empty-state-on-unresolved is exercised by
+G + I. An end-to-end ambiguous launch would add coverage but no
+new failure-mode visibility; deferred to S4 alongside the custom
+tree's empty-state rework.
+
+**Process notes:**
+
+- The 101k-char single-bundle verification round hit gpt-5-4 429
+  immediately; even the 37k-char Round A pinned-to-gpt-5-4 was
+  sticky on the same rate limit. Switching to Gemini Pro on Round A
+  cleared in one attempt and stayed clean for B + C. Memory
+  `feedback_split_large_verification_bundles` already documents the
+  bundle-size threshold; the new observation is that the
+  sticky-rate-limit window can outlast the failed call by minutes.
+  Cross-provider escape (Gemini) was the right move.
+- The Gemini Pro verifier surfaced concrete, code-grade fixes
+  (specific lines + replacement code blocks) rather than the
+  meta-commentary failure mode flagged in earlier memories. The
+  three MUST-FIX items were all narrowly-scoped and converged
+  cleanly on a single confirmation pass.
+- The self-protecting `.gitignore` (`*\n!.gitignore\n`) inside each
+  `.dabbler/` directory is a clean alternative to the
+  "auto-patch the workspace-root `.gitignore`" path the spec
+  originally called for. No `scripts/init-workflow.py` exists in
+  this repo, so the writer-side drop became the canonical
+  mechanism. Idempotent; harmless if already present; consumer
+  repos inherit the protection on first marker write.
+
+**Cost breakdown:**
+
+| Round | Tokens (in/out) | Cost | Verdict |
+|---|---|---|---|
+| Round A verification (writer + schema doc) | 10,889 / 428 | $0.018 | VERIFIED clean |
+| Round B verification (reader + model + provider + tests + CHANGELOG) | 27,264 / 1,296 | $0.047 | MUST-FIX (3) |
+| Round C confirmation (post-fix reader only) | 13,129 / 333 | $0.020 | VERIFIED |
+| **Session 3 total** | — | **$0.085** | VERIFIED |
+
+Bundle splitting per memory `feedback_split_large_verification_bundles`:
+the initial single-round 101k-char bundle hit gpt-5-4 429; split into
+Round A (writer + doc, ~38k chars), Round B (reader + model +
+provider + tests + CHANGELOG, ~95k chars), and Round C (post-fix
+reader only, ~46k chars). Verifier pinned to `gemini-pro` after the
+two gpt-5-4 429s. Cost came in well under the $0.10–$0.30 forecast.
 
 ## Session 4: (pending — custom-tree pivot; gated by own pre-session audit)
 

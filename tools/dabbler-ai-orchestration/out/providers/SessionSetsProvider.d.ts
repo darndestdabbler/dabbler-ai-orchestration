@@ -1,11 +1,8 @@
 import * as vscode from "vscode";
 import { SessionSet } from "../types";
 import { ScanState } from "./scanState";
-export declare function needsMigrationBadge(set: SessionSet): string;
-export declare function isCurrentSessionInFlight(set: SessionSet): boolean;
-export declare function progressText(set: SessionSet): string;
-export declare function forceClosedBadge(set: SessionSet): string;
-export declare function modeBadge(_set: SessionSet): string;
+import { forceClosedBadge, isCurrentSessionInFlight, modeBadge, needsMigrationBadge, progressText } from "./SessionSetsModel";
+export { forceClosedBadge, isCurrentSessionInFlight, modeBadge, needsMigrationBadge, progressText, };
 export declare class SessionSetsProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     private readonly extensionUri;
     private readonly scanState?;

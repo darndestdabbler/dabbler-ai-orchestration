@@ -1,0 +1,16 @@
+{
+  "content": "### F1. Q5 fix — stricter slug-presence check\n\n**VERIFIED**\n\nThe `marker.sessionSetSlug !== undefined` guard correctly promotes `null` and `\"\"` from \"absent\" to \"mismatched\". An omitted `sessionSetSlug` field (which resolves to `undefined`) correctly passes the check as intended for forward compatibility. The truthiness bug is resolved.\n\n### F2. Q6 fix — `onDidChangeWorkspaceFolders` listener\n\n**VERIFIED**\n\nThe `onDidChangeWorkspaceFolders` listener is correctly wired in `resolveWebviewView` before the initial watcher setup, ensuring no race conditions. The callback correctly disposes the old state watcher before setting up a new one and rebinding the marker watcher. Disposal is handled correctly in `tearDownWatchers`. The logic correctly handles the edge case of a folder being opened and then closed, resulting in a clean fallback to the empty state.\n\n### F3. Q8 fix — slug-mismatch log to output channel\n\n**VERIFIED**\n\nThe output channel is created lazily via `getOutputChannel()` only when a slug mismatch occurs. The log message written by `appendLine` is purely informational and contains sufficient diagnostic detail (timestamp, marker path, both slugs). The use of `String()` correctly handles non-string slug values like `null` without crashing.\n\n---\n\n`VERDICT: VERIFIED`\n\nAll three MUST-FIX items from Round B have been addressed correctly. The slug validation is now stricter, the state watcher correctly binds when workspace folders change after activation, and slug mismatches are properly logged for diagnostics.",
+  "model_name": "gemini-pro",
+  "model_id": "gemini-2.5-pro",
+  "tier": 2,
+  "input_tokens": 13129,
+  "output_tokens": 333,
+  "cost_usd": 0.01974125,
+  "total_cost_usd": 0.01974125,
+  "complexity_score": -1,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 15.911046028137207,
+  "truncated": false,
+  "verification": null
+}

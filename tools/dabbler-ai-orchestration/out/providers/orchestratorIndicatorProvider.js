@@ -2,9 +2,13 @@
 // Orchestrator Indicator webview view provider.
 //
 // Renders two side-by-side semi-circle CSS gauges (Model + Effort)
-// driven by ~/.dabbler/current-orchestrator.json. Per Set 029 audit
-// (audit-summary.md §"Visual treatment by signalKind" REVISED
-// 2026-05-18 + §Q6 stale-state policy + §"Multi-writer precedence").
+// driven by the active session set's per-set marker file —
+// `<workspace>/docs/session-sets/<slug>/.dabbler/orchestrator.json`
+// (schema v3, Set 029 Session 3 custom-tree-pivot identity model). Per
+// Set 029 audit (audit-summary.md §"Visual treatment by signalKind"
+// REVISED 2026-05-18 + §Q6 stale-state policy + §"Multi-writer
+// precedence") + 2026-05-18 custom-tree-pivot synthesis (per-set
+// identity replaces the legacy global `~/.dabbler/current-orchestrator.json`).
 //
 // Height budget: ≤150px content (revised 2026-05-18 from the
 // original ≤100px audit D3 after operator-on-device feedback that
@@ -14,11 +18,12 @@
 // (audit S3).
 //
 // Watching strategy: vscode.workspace.createFileSystemWatcher on the
-// absolute marker path. We do NOT use chokidar or fs.watch — the VS
-// Code-managed watcher integrates with the host's file-system events
-// and avoids the Windows ENOSPC failure modes raw fs.watch is known
-// for. A 60s poll backstops the watcher for the rare case where the
-// watcher misses an event under aggressive antivirus (per R5).
+// resolved per-set marker path PLUS a second watcher on the workspace's
+// `docs/session-sets/**/session-state.json` files so the resolution
+// re-runs when the active set transitions (e.g., on close-out of the
+// current set or start of the next). A 60s poll backstops the watcher
+// for the rare case where it misses an event under aggressive antivirus
+// (per R5).
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -56,14 +61,77 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrchestratorIndicatorProvider = void 0;
 const vscode = __importStar(require("vscode"));
 const fs = __importStar(require("fs"));
-const os = __importStar(require("os"));
 const path = __importStar(require("path"));
 const fileSystem_1 = require("../utils/fileSystem");
-const MARKER_DIR = path.join(os.homedir(), ".dabbler");
-const MARKER_PATH = path.join(MARKER_DIR, "current-orchestrator.json");
 const DEFAULT_STALENESS_MAX_SEC = 28800; // 8h
 const POLL_BACKSTOP_MS = 60000;
 const RENDER_DEBOUNCE_MS = 50;
+const SESSION_STATE_GLOB = "docs/session-sets/*/session-state.json";
+function resolveActiveSet() {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        return { kind: "unresolved", reason: "no-workspace" };
+    }
+    // Walk the workspace folders in order; the FIRST folder with a
+    // docs/session-sets/ directory is the canonical resolution root.
+    // Multi-root workspaces with multiple session-set-bearing folders
+    // are rare; when they exist, the canonical SessionSetsProvider's
+    // discoverRoots() preserves the same ordering.
+    for (const folder of folders) {
+        const root = folder.uri.fsPath;
+        const candidate = path.join(root, "docs", "session-sets");
+        let candidateIsDir = false;
+        try {
+            candidateIsDir = fs.statSync(candidate).isDirectory();
+        }
+        catch {
+            candidateIsDir = false;
+        }
+        if (!candidateIsDir)
+            continue;
+        let entries;
+        try {
+            entries = fs.readdirSync(candidate, { withFileTypes: true });
+        }
+        catch {
+            continue;
+        }
+        const inProgress = [];
+        for (const entry of entries) {
+            if (!entry.isDirectory())
+                continue;
+            const statePath = path.join(candidate, entry.name, "session-state.json");
+            let state = null;
+            try {
+                state = JSON.parse(fs.readFileSync(statePath, "utf8"));
+            }
+            catch {
+                continue;
+            }
+            if (state && state.status === "in-progress") {
+                inProgress.push(entry.name);
+            }
+        }
+        if (inProgress.length === 1) {
+            const slug = inProgress[0];
+            const setDir = path.join(candidate, slug);
+            return {
+                kind: "resolved",
+                resolved: {
+                    workspaceRoot: root,
+                    slug,
+                    setDir,
+                    markerPath: path.join(setDir, ".dabbler", "orchestrator.json"),
+                },
+            };
+        }
+        if (inProgress.length === 0) {
+            return { kind: "unresolved", reason: "no-in-progress-set" };
+        }
+        return { kind: "unresolved", reason: "multiple-in-progress-sets", candidates: inProgress };
+    }
+    return { kind: "unresolved", reason: "no-docs-session-sets" };
+}
 // Tier rank for the < / > than-suggested direction calculation.
 // low<mid<flagship within any provider's ladder. flagship-of-Claude
 // and flagship-of-Codex are treated as the same rank — providers are
@@ -195,6 +263,13 @@ function classifyRecommendationTier(providerName, modelName) {
 class OrchestratorIndicatorProvider {
     constructor(extensionUri) {
         this.extensionUri = extensionUri;
+        this.currentMarkerPath = null;
+    }
+    getOutputChannel() {
+        if (!this.outputChannel) {
+            this.outputChannel = vscode.window.createOutputChannel("Dabbler Orchestrator Indicator");
+        }
+        return this.outputChannel;
     }
     resolveWebviewView(webviewView, _context, _token) {
         this.view = webviewView;
@@ -219,31 +294,92 @@ class OrchestratorIndicatorProvider {
             this.tearDownWatchers();
             this.view = undefined;
         });
-        this.setUpWatchers();
+        // Round-B verifier fix (Q6): listen to workspace-folder changes so
+        // the indicator wires up cleanly even when the view activates
+        // before any folder is open. Without this, the state watcher
+        // would never bind (it depends on `workspaceFolders[0]`), and
+        // the 60s poll backstop would be the only signal for set
+        // transitions until the operator manually closed/reopened the view.
+        this.workspaceFoldersListener = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            // Re-create the state watcher (its RelativePattern is rooted
+            // at `folders[0]`, which is now stale or freshly available).
+            this.stateWatcherDisposable?.dispose();
+            this.stateWatcherDisposable = undefined;
+            this.setUpStateWatcher();
+            this.rebindMarkerWatcher();
+            this.scheduleRender();
+        });
+        this.setUpStateWatcher();
+        this.rebindMarkerWatcher();
         this.scheduleRender();
     }
-    setUpWatchers() {
-        this.tearDownWatchers();
-        // VS Code's RelativePattern requires either a workspace folder or an
-        // absolute Uri base. We give it the .dabbler dir as the absolute
-        // base; the watcher fires for creates/changes/deletes on the marker
-        // file regardless of whether the file exists at the time the watcher
-        // is created.
-        const pattern = new vscode.RelativePattern(vscode.Uri.file(MARKER_DIR), "current-orchestrator.json");
+    // Watcher on every workspace session-state.json file. Fires when the
+    // active in-progress set changes (close-out flip, start_session,
+    // cancellation, restore). On fire we re-run the resolver, re-bind the
+    // marker watcher if the resolved path moved, and re-render.
+    setUpStateWatcher() {
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0)
+            return;
+        const pattern = new vscode.RelativePattern(folders[0], SESSION_STATE_GLOB);
+        const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+        const trigger = () => {
+            this.rebindMarkerWatcher();
+            this.scheduleRender();
+        };
+        watcher.onDidCreate(trigger);
+        watcher.onDidChange(trigger);
+        watcher.onDidDelete(trigger);
+        this.stateWatcherDisposable = watcher;
+    }
+    // (Re-)bind the per-set marker watcher to the currently-resolved
+    // marker path. Idempotent — if the resolved path hasn't changed, the
+    // existing watcher is kept; if it has, the old watcher is disposed
+    // and a fresh one is bound.
+    rebindMarkerWatcher() {
+        const res = resolveActiveSet();
+        const nextPath = res.kind === "resolved" ? res.resolved.markerPath : null;
+        if (nextPath === this.currentMarkerPath && this.markerWatcherDisposable) {
+            return;
+        }
+        this.markerWatcherDisposable?.dispose();
+        this.markerWatcherDisposable = undefined;
+        this.currentMarkerPath = nextPath;
+        if (!nextPath) {
+            this.ensurePollBackstop();
+            return;
+        }
+        // Watch the file by name within its parent directory. The watcher
+        // fires on create/change/delete regardless of whether the file
+        // exists at the time the watcher is created — important because
+        // the marker file may not be written until the first hook fire
+        // after the per-set .dabbler/ directory is created.
+        const markerDir = path.dirname(nextPath);
+        const pattern = new vscode.RelativePattern(vscode.Uri.file(markerDir), "orchestrator.json");
         const watcher = vscode.workspace.createFileSystemWatcher(pattern);
         const trigger = () => this.scheduleRender();
         watcher.onDidCreate(trigger);
         watcher.onDidChange(trigger);
         watcher.onDidDelete(trigger);
-        // Poll backstop: re-evaluate every 60s so even a watcher miss can't
-        // leave the gauge displaying days-stale data without the stale
-        // overlay kicking in.
-        this.pollHandle = setInterval(trigger, POLL_BACKSTOP_MS);
-        this.watcherDisposable = watcher;
+        this.markerWatcherDisposable = watcher;
+        this.ensurePollBackstop();
+    }
+    ensurePollBackstop() {
+        if (this.pollHandle)
+            return;
+        this.pollHandle = setInterval(() => {
+            this.rebindMarkerWatcher();
+            this.scheduleRender();
+        }, POLL_BACKSTOP_MS);
     }
     tearDownWatchers() {
-        this.watcherDisposable?.dispose();
-        this.watcherDisposable = undefined;
+        this.markerWatcherDisposable?.dispose();
+        this.markerWatcherDisposable = undefined;
+        this.stateWatcherDisposable?.dispose();
+        this.stateWatcherDisposable = undefined;
+        this.workspaceFoldersListener?.dispose();
+        this.workspaceFoldersListener = undefined;
+        this.currentMarkerPath = null;
         if (this.pollHandle) {
             clearInterval(this.pollHandle);
             this.pollHandle = undefined;
@@ -267,9 +403,16 @@ class OrchestratorIndicatorProvider {
         this.view.webview.html = this.renderHtml(state);
     }
     computeState() {
+        const res = resolveActiveSet();
+        if (res.kind === "unresolved") {
+            // Fail-closed: surface the existing empty-state CTA. The reason
+            // detail isn't displayed inline (the gauges stay simple) — it's
+            // available via the writer-log command for diagnostics.
+            return { kind: "empty" };
+        }
         let raw;
         try {
-            raw = fs.readFileSync(MARKER_PATH, "utf8");
+            raw = fs.readFileSync(res.resolved.markerPath, "utf8");
         }
         catch {
             return { kind: "empty" };
@@ -279,12 +422,31 @@ class OrchestratorIndicatorProvider {
             marker = JSON.parse(raw);
         }
         catch {
-            // Treat a malformed marker as empty so the operator gets the
-            // install-CTA path instead of a frozen gauge. The writer log
-            // will have the diagnostic if anyone needs to investigate.
             return { kind: "empty" };
         }
         if (!marker || typeof marker !== "object" || !marker.signalKind) {
+            return { kind: "empty" };
+        }
+        // Slug-integrity check (Set 029 Session 3 schema-v3 requirement):
+        // a marker whose `sessionSetSlug` doesn't match the resolved set's
+        // slug is treated as orphaned/stale (e.g., a marker file that
+        // survived a slug rename or a cross-set copy-paste). Fall back to
+        // the empty state rather than render data attached to the wrong work.
+        // Round-B verifier fix (Q5): use `!== undefined` rather than the
+        // truthiness guard so null / empty-string slugs are correctly
+        // treated as MISMATCH (fail closed) rather than ABSENT (permissive).
+        // Only an actually-omitted `sessionSetSlug` field passes through
+        // unchecked, which is the intended forward-compat path for a
+        // hypothetical v4 marker that drops the field.
+        if (marker.sessionSetSlug !== undefined && marker.sessionSetSlug !== res.resolved.slug) {
+            // Round-B verifier fix (Q8): log to the output channel on
+            // mismatch so an operator investigating "why does my gauge show
+            // empty?" can find the diagnostic without grepping the
+            // orchestrator-writer.log (which is writer-side and won't carry
+            // a reader-side mismatch).
+            this.getOutputChannel().appendLine(`[${new Date().toISOString()}] Slug mismatch at ${res.resolved.markerPath}: ` +
+                `marker has '${String(marker.sessionSetSlug)}', resolved set is '${res.resolved.slug}'. ` +
+                `Falling back to empty state.`);
             return { kind: "empty" };
         }
         const ageSec = (Date.now() - Date.parse(marker.updatedAt)) / 1000;
@@ -566,7 +728,6 @@ class OrchestratorIndicatorProvider {
         const actualSection = mismatch
             ? `<div class="model-section">
       <div class="model-section-header">Actual Model</div>
-      <div class="model-section-rule"></div>
       <div class="model-section-text">${this.escHtml(actualDescription)}</div>
     </div>`
             : `<div class="model-section">
@@ -575,7 +736,6 @@ class OrchestratorIndicatorProvider {
         const suggestedSection = mismatch
             ? `<div class="model-section model-section-suggested" title="${this.escAttr(mismatch.reason)}">
       <div class="model-section-header">Suggested</div>
-      <div class="model-section-rule"></div>
       <div class="model-section-text">${this.escHtml(describeRecommendation(mismatch.recommendation))}</div>
     </div>`
             : "";

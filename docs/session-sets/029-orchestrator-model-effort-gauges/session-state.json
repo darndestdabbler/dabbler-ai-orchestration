@@ -15,7 +15,7 @@
     {
       "number": 3,
       "title": "Per-session-set identity",
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "number": 4,
@@ -33,7 +33,7 @@
       "status": "not-started"
     }
   ],
-  "currentSession": null,
+  "currentSession": 3,
   "totalSessions": 6,
   "completedSessions": [
     1,
@@ -41,7 +41,7 @@
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-18T05:19:23.781667-04:00",
+  "startedAt": "2026-05-18T17:04:10.471143-04:00",
   "completedAt": null,
   "verificationVerdict": null,
   "orchestrator": {

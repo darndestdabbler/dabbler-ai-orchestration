@@ -1,8 +1,12 @@
 import * as assert from "assert";
+// Set 029 Session 3: tests target the extracted data-layer module
+// directly. SessionSetsProvider re-exports these for backwards
+// compatibility, but the model is the canonical home — the future
+// custom webview tree (S4) will consume the same exports.
 import {
   isCurrentSessionInFlight,
   progressText,
-} from "../../providers/SessionSetsProvider";
+} from "../../providers/SessionSetsModel";
 import { LiveSession, SessionSet } from "../../types";
 
 function fakeLive(over: Partial<LiveSession> = {}): LiveSession {

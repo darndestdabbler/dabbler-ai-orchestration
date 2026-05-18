@@ -126,6 +126,46 @@ backward-compatibility handling, and the test rewrites.
 
 $0.10 – $0.30 (one session-verification call only).
 
+### Actuals (filled after the session)
+
+- **Orchestrator used:** Claude Code (Claude Opus 4.7 @ effort=high) — matches recommendation.
+- **Total routed cost: $0.085** — three Gemini Pro verification
+  rounds (Round A writer + schema doc $0.018; Round B reader +
+  model + provider + tests $0.047; Round C confirmation $0.020).
+  Came in BELOW the $0.10–$0.30 forecast.
+- **Deviations from recommendation:** verifier-engine deviation only —
+  the spec called for `task_type='session-verification'` defaulting
+  to gpt-5-4, but gpt-5-4 returned 429 on the OpenAI Responses
+  endpoint twice in a row (first on the initial 101k-char bundle,
+  then on the 37k-char retry). Pinned the route to `model="gemini-pro"`
+  to dodge the sticky rate limit. Cross-provider verification was
+  still satisfied (Claude orchestrator + Gemini Pro verifier).
+- **Notes for next-session calibration:**
+  - The sticky-rate-limit on OpenAI Responses can outlast the
+    failed call by minutes. Splitting into smaller bundles AFTER
+    hitting the 429 doesn't help if the window is still active —
+    the right escape is cross-provider (Gemini). Worth adding to
+    memory `feedback_split_large_verification_bundles` as a
+    secondary observation.
+  - Round B surfaced 3 narrowly-scoped MUST-FIX items that all
+    converged cleanly on Round C. The Gemini Pro verifier emitted
+    code-grade fixes (specific lines + replacement blocks) rather
+    than meta-commentary — quality was at least equivalent to
+    typical gpt-5-4 sessions, possibly better on the
+    "actionable-output" axis.
+  - The verifier's structured per-question response format
+    (VERIFIED / MUST-FIX / SUGGEST) worked cleanly. Worth keeping
+    as the standard for S4–S6 verification prompts.
+
+**Next-session orchestrator recommendation (Session 4):**
+Claude Code (Claude Opus 4.7 @ effort=high) — unchanged from the
+original recommendation. S4 is the custom-tree pivot (large
+reimplementation surface; multi-file coherence at scale) gated
+by its own pre-session audit. The audit itself should reuse the
+Gemini-Pro escape pattern proven in S3 (router-driven Gemini Pro
+call + manual GPT-5.4 paste in GitHub Copilot per
+`feedback_split_large_verification_bundles`).
+
 ---
 
 ## Session 4 of 6: Custom-tree pivot (NEW, REVISED 2026-05-18 custom-tree pivot)
@@ -201,14 +241,15 @@ $0.05 – $0.15.
 
 ## Total set cost forecast
 
-**REVISED 2026-05-18 custom-tree pivot:** $1.85 – $2.70
-(actuals + forecast across the new 6-session shape). S1 actual
-$0.85 + S2 actual $0.58 + custom-tree pivot audit $0.022 +
-forecast $0.40 – $1.25 across S3 / S4 audit / S4-S5-S6
-verifications. Against the operator's $5.00 NTE for the set;
-comfortable headroom remains.
+**REVISED 2026-05-18 S3 close:** $1.85 – $2.55 (actuals + forecast
+across the new 6-session shape). S1 actual $0.85 + S2 actual
+$0.58 + custom-tree pivot audit $0.022 + **S3 actual $0.085** +
+forecast $0.30 – $1.00 across S4 audit / S4-S5-S6 verifications.
+Against the operator's $5.00 NTE for the set; comfortable
+headroom remains (~$2.45–$3.15 unused).
 
-Prior forecast (pre-pivot, 4 sessions): $0.55 – $1.55.
+Prior forecasts: pre-pivot 4 sessions $0.55 – $1.55; post-pivot
+pre-S3 $1.85 – $2.70 (S3 came in $0.015 below the midpoint).
 
 ---
 

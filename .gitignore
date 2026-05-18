@@ -14,3 +14,9 @@ dist/*.whl
 ai_router/local-overrides.yaml
 .session-reasons/
 tools/dabbler-ai-orchestration/test-results/
+# Set 029 Session 3 (per-session-set orchestrator marker, schema v3).
+# The writer also drops a self-protecting `.gitignore` inside each
+# `.dabbler/` directory so consumer repos that haven't patched their
+# root `.gitignore` still avoid committing marker files; this entry
+# is the workspace-root belt-and-suspenders.
+docs/session-sets/*/.dabbler/

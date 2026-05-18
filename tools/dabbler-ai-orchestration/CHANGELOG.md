@@ -5,25 +5,94 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Set 029 mid-set pivot (2026-05-18, spec-only — no shipped code change)
+## [0.15.0] — 2026-05-18 (Set 029 Session 3 — per-session-set identity)
 
-Cross-provider audit reshaped Set 029 from 4 → 6 sessions. v0.14.2's
-identity model (single global `~/.dabbler/current-orchestrator.json`)
-will be retired in S3 (target 0.15.0) in favor of per-session-set
-markers under `<workspace>/docs/session-sets/<slug>/.dabbler/orchestrator.json`.
-The custom-tree pivot (replacing the native `dabblerSessionSets`
-TreeView with a webview-rendered accordion that embeds the gauges
-into each in-progress set's row) splits out to its own S4 with its
-own pre-session audit. Non-Claude provider detection (old S3)
-renumbers to S5; README + Marketplace publish (old S4) to S6.
+### Changed — orchestrator-marker identity model (BREAKING within the v0.14.2 preview)
 
-- Audit + decisions: [`docs/proposals/2026-05-18-custom-tree-pivot/`](../../docs/proposals/2026-05-18-custom-tree-pivot/)
-  (proposal.md, GPT-5.4 + Gemini Pro consensus, synthesis.md, s3-spec-delta.md)
-- Spec applied: [`docs/session-sets/029-orchestrator-model-effort-gauges/spec.md`](../../docs/session-sets/029-orchestrator-model-effort-gauges/spec.md)
-- Per-workspace-markers audit at [`docs/proposals/2026-05-18-per-workspace-orchestrator-markers/`](../../docs/proposals/2026-05-18-per-workspace-orchestrator-markers/)
-  is **superseded** by the custom-tree pivot — kept for reference only.
-- No code shipped this checkpoint; v0.14.2 still represents the
-  released-but-unpublished state.
+- **Marker schema bumped to v3.** New top-level `sessionSetSlug` field
+  carries the slug of the session set the marker belongs to. The
+  reader validates `sessionSetSlug` against the resolved set before
+  rendering; a mismatch falls back to the empty-state CTA (treats the
+  marker as orphaned).
+- **Per-session-set marker path.** Markers now live at
+  `<workspace>/docs/session-sets/<slug>/.dabbler/orchestrator.json`
+  instead of the legacy global `~/.dabbler/current-orchestrator.json`.
+  Three parallel VS Code windows on three different consumer repos
+  now render their own correct orchestrator state — the cross-window
+  contamination bug from the v0.14.2 preview is eliminated.
+- **Walk-up resolver in `scripts/write-orchestrator-marker.js`.** The
+  writer walks up from `cwd` looking for `docs/session-sets/`, then
+  scans subdirectories for the single set whose `session-state.json`
+  reports `status: "in-progress"`. The reader runs the same algorithm
+  rooted at the workspace folder.
+- **Fail-closed posture.** When zero or more than one in-progress
+  sets are resolvable (or no `docs/session-sets/` directory is reachable
+  from `cwd`), the writer SKIPS the write and appends a diagnostic
+  line to `~/.dabbler/orchestrator-writer.log` (which stays global so
+  one log captures every writer attempt across every session set).
+  No workspace-level orphan marker is created. The renderer surfaces
+  its existing empty-state CTA on the same conditions.
+- **Watcher re-binding on set transitions.** The indicator now watches
+  every workspace `docs/session-sets/*/session-state.json` file in
+  addition to the resolved per-set marker, so close-out flips and
+  start_session events trigger an immediate re-resolution + re-render.
+- **`.gitignore` self-protection.** On first write, the writer drops
+  a `.gitignore` containing `*\n!.gitignore\n` into the per-set
+  `.dabbler/` directory. The workspace's root `.gitignore` does not
+  need to be patched for the marker file to stay untracked —
+  consumer repos inherit the protection automatically. This canonical
+  repo's `.gitignore` also lists `docs/session-sets/*/.dabbler/` as
+  belt-and-suspenders.
+- **`SessionSetsModel` data-layer extraction.** Pulled `progressText`,
+  `isCurrentSessionInFlight`, `iconUriFor`, `needsMigrationBadge`,
+  `forceClosedBadge`, `bucketSets`, `sortBucket`, and friends out of
+  `SessionSetsProvider.ts` into `src/providers/SessionSetsModel.ts`.
+  The provider is now a thin VS Code adapter; the model is the
+  canonical home and is what the Set 029 S4 custom webview tree will
+  consume. Existing callers continue to import from
+  `SessionSetsProvider` via re-exports — no breakage.
+
+### Removed
+
+- **Legacy global marker path.** `~/.dabbler/current-orchestrator.json`
+  is no longer read or written. Operators who installed the v0.14.2
+  Claude Code hook must re-run `Dabbler: Install Orchestrator Hook
+  (Claude Code)` to pick up the new walk-up resolver in the helper
+  script (the installer is idempotent; helper-script path unchanged).
+  Acceptable because v0.14.2 never shipped to Marketplace — no
+  external consumer is affected.
+
+### Known limitations
+
+- **Wrong-set attachment (R8).** A stale `session-state.json` that
+  lingers as `in-progress` after a forgotten close-out causes the
+  walk-up resolver to attach the marker to the wrong work. Mitigation
+  in this release: the indicator's hover tooltip surfaces the
+  resolved set slug so the operator can spot the mismatch. Set 029 S4
+  may add a small "attached to: \<slug\>" badge in the gauge frame.
+- **`.gitignore` auto-patch (R9).** Workspaces that haven't been
+  re-initialized still have their root `.gitignore` un-patched. The
+  per-set `.dabbler/.gitignore` self-protection covers this case —
+  the marker file stays untracked even without the root patch.
+
+### Documentation
+
+- **`docs/orchestrator-marker-schema.md`** — new file documenting the
+  v3 marker shape, the per-set path, the walk-up resolver algorithm,
+  the fail-closed posture, and the migration from the legacy v2
+  global marker.
+
+### Set 029 mid-set pivot (2026-05-18, S3 spec basis)
+
+Cross-provider audit reshaped Set 029 from 4 → 6 sessions. Audit +
+decisions:
+[`docs/proposals/2026-05-18-custom-tree-pivot/`](../../docs/proposals/2026-05-18-custom-tree-pivot/)
+(proposal.md, GPT-5.4 + Gemini Pro consensus, synthesis.md,
+s3-spec-delta.md). The custom-tree pivot (replacing the native
+`dabblerSessionSets` TreeView with a webview-rendered accordion that
+embeds the gauges into each in-progress set's row) is S4 with its own
+pre-session audit. Non-Claude provider detection is S5; README +
+Marketplace publish is S6.
 
 ## [0.14.2] — 2026-05-18 (Set 029 Session 2 — orchestrator indicator gauges, Claude-only v1 preview)
 

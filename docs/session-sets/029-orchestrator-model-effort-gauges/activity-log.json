@@ -282,6 +282,123 @@
       ]
     },
     {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/writer-rewrite",
+      "dateTime": "2026-05-18T17:30:00-04:00",
+      "description": "Session 3 step 1: rewrote scripts/write-orchestrator-marker.js (~613 LOC) for marker schema v3 + per-set identity. Added walkUpResolveSet(startCwd) that walks from cwd upward looking for docs/session-sets/, then scans for the single in-progress set; returns slug + setDir on success or a reason (no-docs-session-sets, no-in-progress-set, multiple-in-progress-sets) on failure. New ensurePerSetMarkerDir(perSetMarkerDir) drops a self-protecting .gitignore (containing '*' then '!.gitignore') alongside the marker on first create — consumer repos inherit untracked-marker behavior without needing a workspace-root patch. buildMarker() adds sessionSetSlug + bumps SCHEMA_VERSION to 3; mergeEffort() also re-stamps both so a marker that survives a cross-set boundary converges on the right slug. Fail-closed posture: on resolver failure the writer logs reason+candidates+cwd to ~/.dabbler/orchestrator-writer.log and exits 0 (semantically a no-op). New --cwd CLI flag pins the resolution root for tests.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/reader-per-set-resolution",
+      "dateTime": "2026-05-18T17:30:00-04:00",
+      "description": "Session 3 step 2: rewrote orchestratorIndicatorProvider.ts for per-set path resolution. Added module-level resolveActiveSet() running the same walk-up algorithm rooted at vscode.workspace.workspaceFolders[0]. The provider now uses TWO watchers: a state watcher on docs/session-sets/*/session-state.json that fires on close-out flips / start_session events and triggers rebindMarkerWatcher(), and a per-set marker watcher rebound whenever resolution changes. computeState() resolves first, then reads + parses the marker, then runs the slug-integrity check; mismatch returns kind:'empty' (falls through to the empty-state CTA).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/sessionsetsmodel-extraction",
+      "dateTime": "2026-05-18T17:30:00-04:00",
+      "description": "Session 3 step 3: extracted SessionSetsModel.ts (~131 LOC) from SessionSetsProvider.ts. Pulled progressText, isCurrentSessionInFlight, iconUriFor, needsMigrationBadge, forceClosedBadge, modeBadge, touchedDate, uatBadge, bucketSets, sortBucket, ICON_FILES out of the provider. SessionSetsProvider.ts collapsed to a thin VS Code adapter (~246 LOC) that delegates bucket/sort decisions to the model. Re-exports forceClosedBadge, isCurrentSessionInFlight, modeBadge, needsMigrationBadge, progressText so cancelTreeView.test.ts and forceClosedBadge.test.ts (which import from this module) don't break. Layer-2 unit test sessionSetsProvider.test.ts repointed to import directly from SessionSetsModel (canonical home). Both the current native tree and the future S4 custom webview tree now consume the same data layer.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/playwright-rewrite",
+      "dateTime": "2026-05-18T17:30:00-04:00",
+      "description": "Session 3 step 4: rewrote src/test/playwright/orchestrator-indicator.spec.ts (~751 LOC, 12 scenarios A-L). Existing A-H scenarios updated to seed markers at the per-set path (seed.set_dir/.dabbler/orchestrator.json) and call startSession(seed, 1) so the resolver finds an in-progress set; all markers now declare schemaVersion: 3 + sessionSetSlug: seed.slug. New scenarios: I (mismatched sessionSetSlug -> empty state), J (helper-script ambiguous resolution -> write skipped, log carries reason: multiple-in-progress-sets + candidates), K (helper happy path verifies schema-v3 marker + slug match + .gitignore self-protect presence + content), L (helper cwd outside any docs/session-sets/ -> skip, log carries reason: no-docs-session-sets, no legacy global marker).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/version-bumped",
+      "dateTime": "2026-05-18T17:30:00-04:00",
+      "description": "Session 3 step 5: package.json version 0.14.2 -> 0.15.0 (minor bump per audit consensus Q9). CHANGELOG [0.15.0] section authored documenting the breaking-within-the-v0.14.2-preview changes (marker schema v3, per-set identity, walk-up resolver, fail-closed posture, watcher re-binding, .gitignore self-protect, SessionSetsModel extraction, R8 wrong-set-attachment risk, R9 gitignore-not-auto-patched risk). New docs/orchestrator-marker-schema.md (208 LOC) — authoritative reference for v3 marker shape, walk-up resolver, fail-closed posture, multi-writer precedence. .gitignore patched at workspace root with `docs/session-sets/*/.dabbler/` as belt-and-suspenders.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-003/build-and-tests",
+      "dateTime": "2026-05-18T17:30:00-04:00",
+      "description": "Session 3 step 6: TypeScript compiles clean (npx tsc, no errors). npm run test:unit: 376 passing, 2 failing — both pre-existing (configEditor-foundation stub harness ViewColumn.One undefined; notificationsSection 'wired in Set 026 Session 7' label assertion). pytest 585 passed, 1 skipped — three pre-existing ImportErrors on migrate_router_config tests due to missing ruamel module (unrelated). Smoke-tested the writer against this very repo: helper wrote a valid schema-v3 marker at docs/session-sets/029-orchestrator-model-effort-gauges/.dabbler/orchestrator.json with the self-protect .gitignore; git status confirmed the directory is fully ignored.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-003/round-a-verification",
+      "dateTime": "2026-05-18T17:35:00-04:00",
+      "description": "Session 3 step 7: Round A verification (writer + schema doc, ~38k chars). The initial single-round bundle at 101k chars hit gpt-5-4 429 on the OpenAI Responses endpoint; the retry of just Round A at 37k chars ALSO hit 429 — the sticky-rate-limit window outlasted the failed call. Switched verifier to model='gemini-pro' (different provider; satisfies cross-provider verification since the orchestrator is Claude). Verifier: gemini-pro. Verdict: VERIFIED clean across Q1 (walk-up algorithm), Q2 (sessionSetSlug + schema v3), Q3 (fail-closed posture), Q4 (.gitignore self-protect). Cost: $0.018.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 10889,
+          "outputTokens": 428,
+          "costUsd": 0.01789125,
+          "resultArtifact": "session-reviews/session-003/verify-result-round-a.json"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-003/round-b-verification",
+      "dateTime": "2026-05-18T17:40:00-04:00",
+      "description": "Session 3 step 8: Round B verification (reader + SessionSetsModel + refactored SessionSetsProvider + Playwright spec + CHANGELOG, ~95k chars). Verifier: gemini-pro. Verdict: MUST-FIX (3): Q5 slug-validation truthiness bug — 'marker.sessionSetSlug && ...' would let null/empty-string through as 'absent' rather than 'mismatch'; Q6 setUpStateWatcher() only called at view resolution — if workspaceFolders is empty then, the watcher never binds and the 60s poll is the only signal; Q8 spec says reader 'logs' on slug mismatch but implementation fell silent. Plus one SUGGEST (deferred): end-to-end ambiguous scenario launching VS Code with two in-progress sets. Cost: $0.047.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 27264,
+          "outputTokens": 1296,
+          "costUsd": 0.04704,
+          "resultArtifact": "session-reviews/session-003/verify-result-round-b.json"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-003/round-b-fixes-applied",
+      "dateTime": "2026-05-18T17:45:00-04:00",
+      "description": "Session 3 step 9: applied all three Round-B MUST-FIX items to orchestratorIndicatorProvider.ts. Q5: tightened slug check from 'if (marker.sessionSetSlug && ...)' to 'if (marker.sessionSetSlug !== undefined && ...)' — null/empty-string now correctly fail-closed to empty state; only an actually-omitted field (forward-compat for hypothetical v4) passes. Q6: added private workspaceFoldersListener field + vscode.workspace.onDidChangeWorkspaceFolders subscription in resolveWebviewView; on fire, disposes the stale state watcher and re-runs setUpStateWatcher() + rebindMarkerWatcher() + scheduleRender(). Listener disposed by tearDownWatchers(). Q8: added lazy getOutputChannel() creating 'Dabbler Orchestrator Indicator' on first append; slug-mismatch branch in computeState() now logs timestamped line with both slugs + the resolved marker path before returning kind:'empty'. SUGGEST deferred to S4. TypeScript re-compiled clean.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-003/round-c-confirmation",
+      "dateTime": "2026-05-18T17:50:00-04:00",
+      "description": "Session 3 step 10: Round C confirmation pass — bundled ONLY the post-fix reader source (~46k chars) and asked the verifier to confirm F1 (slug-presence), F2 (workspace-folders listener), F3 (mismatch log). Verifier: gemini-pro. Verdict: VERIFIED across all three Fs. 'The slug validation is now stricter, the state watcher correctly binds when workspace folders change after activation, and slug mismatches are properly logged for diagnostics.' Cost: $0.020. Total S3 routed cost: $0.085 (A $0.018 + B $0.047 + C $0.020). Round-by-round finding count: 0 -> 3 -> 0 (clean convergence, no spiral per feedback_verifier_spiral_recruit_codex).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "session-verification",
+          "inputTokens": 13129,
+          "outputTokens": 333,
+          "costUsd": 0.01974125,
+          "resultArtifact": "session-reviews/session-003/verify-result-round-c.json"
+        }
+      ]
+    },
+    {
       "sessionNumber": 2,
       "stepNumber": 11,
       "stepKey": "session-002/round-c-confirmation",

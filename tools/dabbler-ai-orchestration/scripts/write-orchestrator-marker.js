@@ -123,12 +123,14 @@ function classifyTier(provider, model) {
 
 function deriveModelDisplayName(provider, model) {
   if (!model || model === "unknown") {
-    const p = provider === "anthropic" ? "Claude"
-            : provider === "google"    ? "Gemini"
-            : provider === "openai"    ? "Codex"
-            : provider === "github"    ? "Copilot"
-            : "Orchestrator";
-    return `${p} (model unknown)`;
+    // Operator feedback 2026-05-18 round 3 (item 7): no provider
+    // prefix in the modelDisplayName when the model is unknown — the
+    // renderer puts the provider on its own line and "(model unknown)"
+    // as a suffix line below, which avoids the "Claude Claude" duplicate
+    // the prior prefix produced. The provider name is already carried
+    // separately in providerDisplayName, so this field can be pure
+    // suffix text.
+    return "(model unknown)";
   }
   // Best-effort canonicalization. Marker writers can override by sending
   // `modelDisplayName` explicitly in the payload (the manual-override

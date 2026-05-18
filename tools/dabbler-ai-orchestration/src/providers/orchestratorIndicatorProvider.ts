@@ -23,6 +23,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { readAllSessionSets } from "../utils/fileSystem";
 
 const MARKER_DIR = path.join(os.homedir(), ".dabbler");
 const MARKER_PATH = path.join(MARKER_DIR, "current-orchestrator.json");
@@ -52,9 +53,148 @@ interface OrchestratorMarker {
   stalenessMaxSec: number;
 }
 
+interface Recommendation {
+  rawText: string;        // the full paragraph, for the tooltip
+  providerName: string;   // e.g., "Claude"
+  modelName: string;      // e.g., "Opus 4.7"
+  effort: string;         // e.g., "high"
+  sessionLabel: string;   // e.g., "Session 3 of 4"
+  setName: string;        // e.g., "029-orchestrator-model-effort-gauges"
+}
+
+interface Mismatch {
+  recommendation: Recommendation;  // the parsed ai-assignment.md entry, used to format the Suggested row
+  reason: string;                  // tooltip text with axis-by-axis specifics
+}
+
 type RenderState =
   | { kind: "empty" }
-  | { kind: "loaded"; marker: OrchestratorMarker; stale: boolean; ageSec: number };
+  | { kind: "loaded"; marker: OrchestratorMarker; stale: boolean; ageSec: number; mismatch: Mismatch | null };
+
+// Tier rank for the < / > than-suggested direction calculation.
+// low<mid<flagship within any provider's ladder. flagship-of-Claude
+// and flagship-of-Codex are treated as the same rank — providers are
+// distinct but their tier ladders map onto a common 3-level scale.
+function tierRank(tier: string | undefined): number {
+  switch ((tier || "").toLowerCase()) {
+    case "low":      return 0;
+    case "mid":      return 1;
+    case "flagship": return 2;
+    default:         return -1;
+  }
+}
+
+function effortRank(effort: string | undefined): number {
+  switch ((effort || "").toLowerCase()) {
+    case "low":        return 0;
+    case "medium":     return 1;
+    case "high":       return 2;
+    case "extra-high": return 3;
+    case "max":        return 4;
+    default:           return -1;
+  }
+}
+
+// File-scope twin of the class's fmtAge (kept lean so the capacity
+// helper can call it without a class instance).
+function fmtAgeStandalone(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) return "?";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  return `${Math.round(seconds / 86400)}d`;
+}
+
+// Providers with at least one extra-capacity parameter (thinking,
+// extended reasoning, etc.). The "thinking" clause in the model
+// description is shown only for these. Codex/Copilot have no native
+// extra-capacity parameter per audit Q3/Q4.
+function providerHasExtraCapacity(provider: string): boolean {
+  const p = (provider || "").toLowerCase();
+  return p === "anthropic" || p === "google" || p.includes("claude") || p.includes("gemini");
+}
+
+// Compose the full "Actual Model" description from a marker. This
+// is the canonical textual description shown in the model table.
+// Future-proof: new capacity parameters (extended thinking, adaptive
+// reasoning, etc.) become extra clauses appended here. No new UI
+// elements needed.
+function describeMarker(marker: OrchestratorMarker): string {
+  const provider = marker.providerDisplayName || "";
+  const modelIsUnknown = !marker.model || marker.model === "unknown";
+  const modelText = modelIsUnknown ? "(model unknown)" : (marker.modelDisplayName || "");
+  const effortText = effortDisplayNameStandalone(marker.effort.normalized).toLowerCase();
+
+  // Configured-default is a parenthetical modifier on the model name.
+  const modelClause = marker.signalKind === "configured-default"
+    ? `${provider} ${modelText} (configured default)`
+    : `${provider} ${modelText}`;
+
+  let desc = `${modelClause}, ${effortText} effort`;
+
+  // Thinking clause — only for providers that have the capability.
+  if (providerHasExtraCapacity(marker.provider)) {
+    const thinkingOn = marker.effort.thinking === true;
+    if (thinkingOn && marker.effort.signalKind === "last-observed" && marker.effort.observedAt) {
+      const ageSec = (Date.now() - Date.parse(marker.effort.observedAt)) / 1000;
+      const native = marker.effort.native || "/think";
+      desc += `, thinking on (last ${native} ${fmtAgeStandalone(ageSec)} ago)`;
+    } else if (thinkingOn) {
+      desc += `, thinking on`;
+    } else {
+      desc += `, thinking off`;
+    }
+  }
+
+  return desc.trim().replace(/\s+/g, " ");
+}
+
+// Compose the suggested-model description from an ai-assignment.md
+// recommendation. Format mirrors describeMarker() so the two table
+// rows are visually parallel.
+function describeRecommendation(rec: Recommendation): string {
+  return `${rec.providerName} ${rec.modelName}, ${rec.effort.toLowerCase()} effort`.replace(/\s+/g, " ");
+}
+
+// File-scope twin of the class's effortDisplayName.
+function effortDisplayNameStandalone(effort: string): string {
+  switch (effort) {
+    case "low":        return "Low";
+    case "medium":     return "Medium";
+    case "high":       return "High";
+    case "extra-high": return "Extra-high";
+    case "max":        return "Max";
+    default:           return "Unknown";
+  }
+}
+
+// Mirror the producer's classifyTier logic for parsing
+// recommendation strings out of ai-assignment.md. The recommendation
+// carries human-readable "Provider" + "Model" text (e.g., "Claude" +
+// "Opus 4.7"); we classify those into the same low/mid/flagship
+// buckets the marker uses, so the < / > direction is computed off a
+// common rank scale.
+function classifyRecommendationTier(providerName: string, modelName: string): string {
+  const p = (providerName || "").toLowerCase();
+  const m = (modelName || "").toLowerCase();
+  if (p.includes("claude") || m.includes("claude")) {
+    if (m.includes("opus")) return "flagship";
+    if (m.includes("sonnet")) return "mid";
+    if (m.includes("haiku")) return "low";
+  }
+  if (p.includes("gemini") || m.includes("gemini")) {
+    if (m.includes("pro")) return "flagship";
+    if (m.includes("flash 2") || m.includes("2.5")) return "mid";
+    if (m.includes("flash")) return "low";
+  }
+  if (p.includes("codex") || p.includes("openai") || m.startsWith("gpt-") || m.includes("codex") || m.startsWith("o1") || m.startsWith("o3")) {
+    if (m.includes("mini")) return "low";
+    if (m.startsWith("o1") || m.startsWith("o3") || m.includes("5") || (m.includes("4o") && !m.includes("mini"))) return "flagship";
+    return "mid";
+  }
+  if (p.includes("copilot") || m.includes("copilot")) return "mid";
+  return "unknown";
+}
 
 export class OrchestratorIndicatorProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "dabblerOrchestratorIndicator";
@@ -175,7 +315,207 @@ export class OrchestratorIndicatorProvider implements vscode.WebviewViewProvider
         ? marker.stalenessMaxSec
         : DEFAULT_STALENESS_MAX_SEC;
     const stale = ageSec > stalenessMaxSec;
-    return { kind: "loaded", marker, stale, ageSec };
+
+    // Compute mismatch against the active session set's ai-assignment.md
+    // recommendation. Operator-revised design 2026-05-18 round 2:
+    // valence-neutral badge — surfaces the difference, doesn't judge it.
+    // (Higher-than-recommended IS sometimes intentional — operator has
+    // credits, or task is harder than the recommendation anticipated.)
+    let mismatch: Mismatch | null = null;
+    try {
+      const rec = this.findActiveRecommendation();
+      if (rec) {
+        mismatch = this.computeMismatch(marker, rec);
+      }
+    } catch {
+      // Defensive — recommendation reading is best-effort. Any error
+      // (workspace not initialized, ai-assignment.md unparseable,
+      // permissions) silently falls back to "no badge". The gauges
+      // themselves keep working.
+      mismatch = null;
+    }
+    return { kind: "loaded", marker, stale, ageSec, mismatch };
+  }
+
+  // Find the recommendation from the active session set's
+  // ai-assignment.md. "Active" = the in-progress session set; "the
+  // recommended session" = currentSession if non-null, else the
+  // next-to-start (max(completedSessions) + 1) if any sessions
+  // remain. If neither applies, returns null.
+  private findActiveRecommendation(): Recommendation | null {
+    let sets;
+    try {
+      sets = readAllSessionSets();
+    } catch {
+      return null;
+    }
+    // Prefer in-progress sets; among them, prefer one whose state file
+    // says lifecycleState === "work_in_progress" (set 030 schema). We
+    // don't have direct visibility into lifecycleState from SessionSet,
+    // but the `state === "in-progress"` filter is close enough — the
+    // SessionSet type's `state` field is derived from session-state.json.
+    const inProgress = sets.filter((s) => s.state === "in-progress");
+    if (inProgress.length === 0) return null;
+    // If multiple in-progress sets, pick the most recently touched.
+    inProgress.sort((a, b) => (b.lastTouched ?? "").localeCompare(a.lastTouched ?? ""));
+    const set = inProgress[0];
+
+    // Determine which session number's recommendation to compare against.
+    const live = set.liveSession;
+    let targetSession: number | null = null;
+    if (live && typeof live.currentSession === "number") {
+      targetSession = live.currentSession;
+    } else if (
+      live &&
+      Array.isArray(live.completedSessions) &&
+      typeof set.totalSessions === "number" &&
+      live.completedSessions.length < set.totalSessions
+    ) {
+      const maxCompleted = live.completedSessions.length === 0
+        ? 0
+        : Math.max(...live.completedSessions);
+      targetSession = maxCompleted + 1;
+    }
+    if (targetSession === null) return null;
+
+    // Read + parse ai-assignment.md.
+    let text: string;
+    try {
+      text = fs.readFileSync(set.aiAssignmentPath, "utf8");
+    } catch {
+      return null;
+    }
+    return this.extractRecommendation(text, targetSession, set.name);
+  }
+
+  // Parse ai-assignment.md to extract the recommendation for a
+  // specific session number. Format (per the workflow doc § Step 3.5):
+  //   ## Session N: <title>           (or "## Session N of M: <title>")
+  //   ### Recommended orchestrator
+  //   <Provider> <Model> @ effort=<level>. <Optional rationale...>
+  //
+  // We grep for the session heading, then for the next
+  // "### Recommended orchestrator" within that block, then the next
+  // non-blank paragraph. Defensive — returns null on any parse failure
+  // rather than guessing.
+  private extractRecommendation(
+    text: string,
+    sessionNumber: number,
+    setName: string,
+  ): Recommendation | null {
+    const lines = text.split(/\r?\n/);
+    const headingRe = new RegExp(
+      `^##\\s+Session\\s+${sessionNumber}(?:\\s+of\\s+\\d+)?\\s*:\\s*(.*)$`,
+      "i",
+    );
+    let sessionStartIdx = -1;
+    let sessionTitle = "";
+    for (let i = 0; i < lines.length; i++) {
+      const m = headingRe.exec(lines[i]);
+      if (m) {
+        sessionStartIdx = i;
+        sessionTitle = m[1].trim();
+        break;
+      }
+    }
+    if (sessionStartIdx === -1) return null;
+
+    // Find the next ### Recommended orchestrator before the next ## block.
+    let recHeadingIdx = -1;
+    for (let i = sessionStartIdx + 1; i < lines.length; i++) {
+      if (/^##\s+/.test(lines[i])) break; // next session block — stop
+      if (/^###\s+Recommended\s+orchestrator/i.test(lines[i])) {
+        recHeadingIdx = i;
+        break;
+      }
+    }
+    if (recHeadingIdx === -1) return null;
+
+    // Find the next non-blank paragraph after the heading.
+    let paragraphStart = -1;
+    for (let i = recHeadingIdx + 1; i < lines.length; i++) {
+      if (/^###\s+/.test(lines[i]) || /^##\s+/.test(lines[i])) break;
+      if (lines[i].trim().length > 0) {
+        paragraphStart = i;
+        break;
+      }
+    }
+    if (paragraphStart === -1) return null;
+
+    // Read until blank line or next heading.
+    const paragraphLines: string[] = [];
+    for (let i = paragraphStart; i < lines.length; i++) {
+      if (lines[i].trim().length === 0) break;
+      if (/^###\s+/.test(lines[i]) || /^##\s+/.test(lines[i])) break;
+      paragraphLines.push(lines[i]);
+    }
+    const paragraph = paragraphLines.join(" ").trim();
+
+    // Parse "Provider Model @ effort=level."
+    const recRe = /^([A-Z][A-Za-z]+)\s+([^@]+?)\s*@\s*effort\s*=\s*([a-z-]+)/i;
+    const m = recRe.exec(paragraph);
+    if (!m) return null;
+
+    return {
+      rawText: paragraph,
+      providerName: m[1].trim(),
+      modelName: m[2].trim().replace(/[.,;]+$/, ""),
+      effort: m[3].trim().toLowerCase(),
+      sessionLabel: `Session ${sessionNumber}: ${sessionTitle}`,
+      setName,
+    };
+  }
+
+  // Compare a marker to a recommendation. Returns a Mismatch with a
+  // formatted "Suggested:" line if any axis differs, else null.
+  //
+  // Operator feedback 2026-05-18 round 4: replaced the directional
+  // "< / > than suggested" badge with a yellow-bold-italic prose line
+  // stating the actual recommendation. Rationale: shows the operator
+  // exactly what was suggested (so they don't need to hover/think to
+  // compute the diff), wraps gracefully on narrow panels, and feels
+  // less visually heavy than a pill badge. Any axis mismatch
+  // (provider OR model OR effort) triggers the suggestion line —
+  // including cross-provider same-level cases (Codex active when
+  // Claude was recommended is information worth surfacing, even if
+  // the tier rank happens to match).
+  private computeMismatch(marker: OrchestratorMarker, rec: Recommendation): Mismatch | null {
+    const norm = (s: string) => String(s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+
+    const providerOk = norm(marker.providerDisplayName).includes(norm(rec.providerName)) ||
+                       norm(rec.providerName).includes(norm(marker.providerDisplayName));
+    const modelOk = norm(marker.modelDisplayName).includes(norm(rec.modelName)) ||
+                    norm(rec.modelName).includes(norm(marker.modelDisplayName));
+    const effortOk = norm(marker.effort.normalized) === norm(rec.effort);
+
+    if (providerOk && modelOk && effortOk) return null;
+
+    // Round 7: the recommendation itself rides on the Mismatch
+    // object so the renderer can format the "Suggested" row of the
+    // model table from it directly (describeRecommendation()).
+
+    const diffs: string[] = [];
+    if (!providerOk || !modelOk) {
+      diffs.push(
+        `model: actual "${marker.providerDisplayName} ${marker.modelDisplayName}", recommended "${rec.providerName} ${rec.modelName}"`,
+      );
+    }
+    if (!effortOk) {
+      diffs.push(`effort: actual "${marker.effort.normalized}", recommended "${rec.effort}"`);
+    }
+    if (!providerOk && diffs.length === 0) {
+      diffs.push(`provider: actual "${marker.providerDisplayName}", recommended "${rec.providerName}"`);
+    }
+
+    return {
+      recommendation: rec,
+      reason:
+        `Current orchestrator differs from ${rec.setName} ${rec.sessionLabel} recommendation. ` +
+        diffs.join("; ") +
+        ". This may be intentional (e.g., extra credits, task harder or simpler than anticipated) — " +
+        `the Suggested row surfaces the recommendation; you decide. ` +
+        `Switch via "Dabbler: Set Orchestrator Model & Effort".`,
+    };
   }
 
   // ------- rendering helpers -------
@@ -192,7 +532,7 @@ export class OrchestratorIndicatorProvider implements vscode.WebviewViewProvider
 
     const body = state.kind === "empty"
       ? this.renderEmpty()
-      : this.renderLoaded(state.marker, state.stale, state.ageSec);
+      : this.renderLoaded(state.marker, state.stale, state.ageSec, state.mismatch);
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -219,14 +559,14 @@ export class OrchestratorIndicatorProvider implements vscode.WebviewViewProvider
   private renderEmpty(): string {
     return `<div class="empty-state">
   <div class="grey-gauges">
-    ${this.renderGaugeSvg("unknown", "current", 0)}
-    ${this.renderGaugeSvg("unknown", "current", 0)}
+    <div class="gauge-svg-wrap">${this.renderGaugeSvg("unknown", "current", 0)}</div>
+    <div class="gauge-svg-wrap">${this.renderGaugeSvg("unknown", "current", 0)}</div>
   </div>
   <span>No signal — </span><span class="install-cta" data-command="installHookClaudeCode">install hook</span>
 </div>`;
   }
 
-  private renderLoaded(marker: OrchestratorMarker, stale: boolean, ageSec: number): string {
+  private renderLoaded(marker: OrchestratorMarker, stale: boolean, ageSec: number, mismatch: Mismatch | null): string {
     const modelClasses = [
       "gauge-cell",
       `tier-${marker.tier || "unknown"}`,
@@ -241,63 +581,73 @@ export class OrchestratorIndicatorProvider implements vscode.WebviewViewProvider
     const modelNeedle = this.tierToNeedleAngle(marker.tier);
     const effortNeedle = this.effortToNeedleAngle(marker.effort.normalized);
 
-    const modelSuffix = marker.signalKind === "configured-default"
-      ? ` <span class="default-pill">DEFAULT</span>`
-      : "";
-    // Effort suffix is driven by EFFORT'S signalKind, not the top-level
-    // model signalKind. (Round B verifier finding Q1, 2026-05-18: the
-    // (default) / (manual) branches were incorrectly keyed off the
-    // top-level marker.signalKind, which means a Codex configured-default
-    // session with a /think* observation would show "(default)" on the
-    // effort gauge instead of the time-elapsed suffix it should show.
-    // Effort and model signals are independent axes per audit schema v2.)
-    const effortSuffix = marker.effort.signalKind === "last-observed" && marker.effort.observedAt
-      ? `<div class="gauge-suffix">(last ${marker.effort.native || "/think"} ${this.fmtAge(
-          (Date.now() - Date.parse(marker.effort.observedAt)) / 1000,
-        )} ago)</div>`
-      : marker.effort.signalKind === "configured-default"
-        ? `<div class="gauge-suffix">(default)</div>`
-        : marker.effort.signalKind === "manual"
-          ? `<div class="gauge-suffix">(manual)</div>`
-          : "";
+    // Model sublabel — provider name + model name on one line, or
+    // just provider name when model is unknown (the table below
+    // carries the "(model unknown)" detail in the description).
+    const modelIsUnknown = !marker.model || marker.model === "unknown";
+    const modelSublabelText = modelIsUnknown
+      ? this.escHtml(marker.providerDisplayName)
+      : `${this.escHtml(marker.providerDisplayName)} ${this.escHtml(marker.modelDisplayName)}`;
 
+    // Clock overlay (top-left of the gauge wrapper) — visual cue that
+    // the gauge's signalKind is last-observed. The table description
+    // also says "(last /think Xm ago)" — clock overlay is the
+    // associated visual.
     const modelOverlay = marker.signalKind === "last-observed"
       ? `<span class="clock-overlay" title="last observed signal">⏱</span>`
-      : marker.signalKind === "manual"
-        ? `<span class="operator-overlay" title="set manually">✋</span>`
-        : "";
+      : "";
     const effortOverlay = marker.effort.signalKind === "last-observed"
       ? `<span class="clock-overlay" title="last observed signal">⏱</span>`
-      : marker.effort.signalKind === "manual"
-        ? `<span class="operator-overlay" title="set manually">✋</span>`
-        : "";
+      : "";
 
     const modelTooltip = this.modelTooltip(marker);
     const effortTooltip = this.effortTooltip(marker);
-
-    const thinkingHidden = marker.effort.thinking === undefined ? "hidden" : "";
-    const thinkingOn = marker.effort.thinking ? "on" : "";
 
     const staleClass = stale ? "stale" : "";
     const staleAnnotation = stale
       ? `<div class="last-updated">last updated ${this.fmtAge(ageSec)} ago — stale</div>`
       : `<div class="last-updated">updated ${this.fmtAge(ageSec)} ago</div>`;
 
+    // Model description sections — vertical stack at the bottom.
+    // Round 9: replaces the round-7 table. When no mismatch, only
+    // the description is rendered (no header, no rule — avoids
+    // redundant chrome). When a mismatch exists, both sections get
+    // the full header + rule + description treatment.
+    const actualDescription = describeMarker(marker);
+    const actualSection = mismatch
+      ? `<div class="model-section">
+      <div class="model-section-header">Actual Model</div>
+      <div class="model-section-text">${this.escHtml(actualDescription)}</div>
+    </div>`
+      : `<div class="model-section">
+      <div class="model-section-text">${this.escHtml(actualDescription)}</div>
+    </div>`;
+    const suggestedSection = mismatch
+      ? `<div class="model-section model-section-suggested" title="${this.escAttr(mismatch.reason)}">
+      <div class="model-section-header">Suggested</div>
+      <div class="model-section-text">${this.escHtml(describeRecommendation(mismatch.recommendation))}</div>
+    </div>`
+      : "";
+    const modelSections = `<div class="model-sections">${actualSection}${suggestedSection}</div>`;
+
     return `<div class="gauges ${staleClass}">
   <div class="${modelClasses}" title="${this.escAttr(modelTooltip)}">
-    ${modelOverlay}
-    ${this.renderGaugeSvg(marker.tier, marker.signalKind, modelNeedle)}
-    <div class="gauge-sublabel">${this.escHtml(marker.providerDisplayName)} ${this.escHtml(marker.modelDisplayName)}${modelSuffix}</div>
+    <div class="gauge-svg-wrap">
+      ${this.renderGaugeSvg(marker.tier, marker.signalKind, modelNeedle)}
+      ${modelOverlay}
+    </div>
+    <div class="gauge-sublabel">${modelSublabelText}</div>
   </div>
   <div class="${effortClasses}" title="${this.escAttr(effortTooltip)}">
-    ${effortOverlay}
-    ${this.renderGaugeSvg(this.effortColorBucket(marker.effort.normalized), marker.effort.signalKind, effortNeedle)}
-    <span class="thinking-led ${thinkingOn} ${thinkingHidden}" title="thinking ${marker.effort.thinking ? "on" : "off"}"></span>
+    <div class="gauge-svg-wrap">
+      ${this.renderGaugeSvg(this.effortColorBucket(marker.effort.normalized), marker.effort.signalKind, effortNeedle)}
+      ${effortOverlay}
+    </div>
     <div class="gauge-sublabel">${this.escHtml(this.effortDisplayName(marker.effort.normalized))}</div>
-    ${effortSuffix}
   </div>
 </div>
-${staleAnnotation}`;
+${staleAnnotation}
+${modelSections}`;
   }
 
   private renderGaugeSvg(tier: string, signalKind: string, needleAngleDeg: number): string {

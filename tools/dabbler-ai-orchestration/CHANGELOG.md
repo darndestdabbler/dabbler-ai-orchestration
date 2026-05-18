@@ -125,6 +125,57 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   confirmation) all ship together in 0.14.3.** The 0.14.2 stub for
   `Dabbler: Set Orchestrator Model & Effort` surfaces an
   informational dialog rather than a quickpick.
+### Post-S2 polish — operator-feedback round 2 (2026-05-18)
+
+After viewing the standalone `C:\temp\orchestrator-gauges-preview.html`
+that Session 2 generated, the operator flagged three more issues and
+asked for the mismatch warning to be wired up. All addressed before
+Session 3:
+
+- **Container query replaces `@media (max-width: 260px)`.** The
+  responsive wrap fired against the BROWSER viewport, not the panel
+  width — useless in a wide browser window where only the side-bar
+  panel was being resized (the failure mode the operator caught in
+  the preview). Switched to `@container (max-width: 260px)` with
+  `container-type: inline-size` on `.container`. The wrap now fires
+  when the panel itself narrows, regardless of browser viewport.
+- **Thinking LED repositioned to the gauge wrapper, not the cell.**
+  The LED was at `right: -3px` relative to `.gauge-cell`, but the
+  cell stretches to the grid column width (~140px+), so the LED was
+  floating in the column gap rather than next to the gauge — looked
+  like the LED wasn't there at all. Introduced a `.gauge-svg-wrap`
+  positioned div around the SVG; the LED, clock-overlay, and
+  operator-overlay now anchor to the gauge's top-right corner.
+- **Switched to IBM colorblind-safe categorical palette.** The
+  audit-locked D5 red→green polarity ("Haiku is red, Opus is green")
+  was semantically wrong — Haiku is the right pick for cheap tasks,
+  not a failure state. Replaced with the IBM 5-color colorblind-safe
+  palette (`#648FFF` blue, `#785EF0` purple, `#DC267F` magenta,
+  `#FE6100` orange, `#FFB000` yellow). Tiers and effort levels both
+  draw from this palette; gauge color is now purely categorical
+  encoding (which level, not good/bad). The Thinking LED also moved
+  to IBM purple when on.
+- **Mismatch badge driven by `ai-assignment.md`.** When the active
+  session set's `ai-assignment.md` recommends a different
+  orchestrator than the current marker (provider, model, OR effort),
+  a `≠ recommended` badge appears next to the last-updated annotation
+  at the bottom of the indicator. Tooltip enumerates which axes
+  differ. **Valence-neutral by design** per operator directive:
+  higher-than-recommended is sometimes intentional (extra credits,
+  task harder than anticipated), lower might be intentional too.
+  The badge surfaces the difference; the operator decides. No color
+  warning. The badge is sourced from `ai-assignment.md` parsed via
+  a regex against the `## Session N` heading + `### Recommended
+  orchestrator` block; defensive — any parse failure (missing file,
+  malformed text) silently falls back to no badge.
+
+The audit-locked D5 ("red = low-tier, green = flagship") phrasing is
+now **superseded** alongside D3 (the 100px → 150px revision earlier
+in S2). Both are documented as in-flight design relaxations the
+operator drove during on-device review; the audit-summary.md still
+shows the original D3/D5 text with revision notes pointing at this
+CHANGELOG.
+
 ### Mid-S2 sizing + responsive-wrap revision (operator feedback 2026-05-18)
 
 After seeing the rendered gauges in the Playwright diagnostic, the

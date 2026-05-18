@@ -20,6 +20,41 @@
 
 * { box-sizing: border-box; }
 
+/* Theme-aware custom properties. VS Code automatically applies one
+ * of these classes to the webview <body>: vscode-dark, vscode-light,
+ * vscode-high-contrast, or vscode-high-contrast-light. Default values
+ * here target dark mode (most common); light/high-contrast overrides
+ * below. Operator feedback round 6 — without these, mismatch yellow
+ * text was unreadable on a light background and stale stripes were
+ * invisible.
+ *
+ * The gauge-fill IBM palette colors are NOT themed — they're chosen
+ * to be vivid in both light and dark backgrounds (the audit's
+ * colorblind-safe rationale already covers light/dark visibility).
+ * Only color choices that fail in one theme are themed. */
+:root {
+  /* Stale stripes — light-color stripes for dark backgrounds. */
+  --indicator-stripe-color: rgba(255, 255, 255, 0.30);
+
+  /* Inverted-band header colors (round 10). Default = dark theme:
+   * band uses light foreground, text uses dark background. */
+  --indicator-band-bg: var(--vscode-foreground);
+  --indicator-band-fg: var(--vscode-editor-background, #1e1e1e);
+}
+body.vscode-light, body.vscode-high-contrast-light {
+  /* Dark stripes for light backgrounds — flips the polarity so
+   * the diagonal hatch is visible against the lighter gauge
+   * background. */
+  --indicator-stripe-color: rgba(0, 0, 0, 0.22);
+
+  /* Light-mode band: softer dark-gray instead of near-black —
+   * operator feedback round 10 follow-up. RGB(60, 60, 60) reads
+   * as "subdued dark" rather than the harsh black-on-white the
+   * default --vscode-foreground (#1e1e1e or similar) produced. */
+  --indicator-band-bg: #3C3C3C;
+  --indicator-band-fg: #ffffff;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -30,11 +65,15 @@ html, body {
 }
 
 .container {
-  height: 100vh;
-  max-height: 150px;
-  overflow-y: auto;     /* per audit S3 — scrollable if compressed below 150px */
-  overflow-x: hidden;
+  /* Operator feedback 2026-05-18 round 3: "ensure that vertical
+   * scrolling isn't needed in the final result." Dropped max-height
+   * + overflow-y; content sizes itself. VS Code's view pane handles
+   * outer scrolling if the operator has shrunk the pane below the
+   * indicator's natural height. */
   padding: 6px 8px 4px 8px;
+  /* Container query context so the gauge layout reflows against the
+   * INDICATOR width, not the browser viewport. */
+  container-type: inline-size;
 }
 
 .gauges {
@@ -50,7 +89,7 @@ html, body {
  * ~100px-wide gauges still fit side-by-side with sublabel text
  * readable. Operator-flagged 2026-05-18.
  */
-@media (max-width: 260px) {
+@container (max-width: 260px) {
   .gauges {
     grid-template-columns: 1fr;
   }
@@ -71,6 +110,20 @@ html, body {
  * → rim → needle → overlays. We use SVG inside .gauge-svg so the arc
  * geometry is precise across DPI.
  */
+/* Positioning context for the thinking LED and the overlay icons.
+ * Before this wrapper existed, the LED was anchored to .gauge-cell
+ * with `right: -3px` — but with .gauge-cell stretched to the grid
+ * column width (~140px+), the LED ended up in the column gap, not
+ * next to the gauge. Operator feedback 2026-05-18 round 2: "thinking
+ * doesn't have a color indicator" — it WAS there, just rendered off
+ * to the side of the cell. */
+.gauge-svg-wrap {
+  position: relative;
+  display: inline-block;
+  width: 100px;
+  height: 54px;
+}
+
 .gauge-svg {
   width: 100px;
   height: 54px;          /* 2:1 aspect, semi-circle. ~43% bigger than v0.14.2-initial */
@@ -116,95 +169,85 @@ html, body {
   max-width: 100%;
 }
 
-.gauge-suffix {
-  font-size: 12px;
-  opacity: 0.75;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
 
-/* Tier color polarity (Set 029 D5): red=low/low-effort, green=flagship/max-effort */
-.tier-low      .gauge-arc-fill { stroke: #e06c75; }   /* red */
-.tier-mid      .gauge-arc-fill { stroke: #e5c07b; }   /* yellow */
-.tier-flagship .gauge-arc-fill { stroke: #98c379; }   /* green */
+/* Valence-neutral gauge colors. Operator feedback 2026-05-18 round 2:
+ * the audit-locked D5 red→green polarity ("Haiku is red, Opus is
+ * green") is semantically wrong because Haiku is the right pick for
+ * cheap tasks — not a failure state. Switched to IBM's 5-color
+ * colorblind-safe categorical palette
+ * (https://carbondesignsystem.com/data-visualization/color-palettes/).
+ * Color encodes "which level this is" categorically; no good/bad
+ * meaning. The "doesn't match recommended orchestrator" signal lives
+ * in the badge under the gauges (see .mismatch-badge below), not in
+ * the gauge color.
+ *
+ * IBM palette: #648FFF #785EF0 #DC267F #FE6100 #FFB000
+ */
+.tier-low      .gauge-arc-fill { stroke: #648FFF; }   /* IBM blue */
+.tier-mid      .gauge-arc-fill { stroke: #785EF0; }   /* IBM purple */
+.tier-flagship .gauge-arc-fill { stroke: #DC267F; }   /* IBM magenta */
 .tier-unknown  .gauge-arc-fill { stroke: var(--vscode-disabledForeground, #888); }
 
-.effort-low        .gauge-arc-fill { stroke: #e06c75; }
-.effort-medium     .gauge-arc-fill { stroke: #d19a66; }   /* orange */
-.effort-high       .gauge-arc-fill { stroke: #e5c07b; }   /* yellow */
-.effort-extra-high .gauge-arc-fill { stroke: #b5cea8; }   /* light green */
-.effort-max        .gauge-arc-fill { stroke: #98c379; }   /* green */
+.effort-low        .gauge-arc-fill { stroke: #648FFF; }   /* IBM blue */
+.effort-medium     .gauge-arc-fill { stroke: #785EF0; }   /* IBM purple */
+.effort-high       .gauge-arc-fill { stroke: #DC267F; }   /* IBM magenta */
+.effort-extra-high .gauge-arc-fill { stroke: #FE6100; }   /* IBM orange */
+.effort-max        .gauge-arc-fill { stroke: #FFB000; }   /* IBM yellow */
 .effort-unknown    .gauge-arc-fill { stroke: var(--vscode-disabledForeground, #888); }
 
 /* signalKind treatments */
-.signal-current      .gauge-arc-fill { stroke-opacity: 1; }
+/* Operator feedback 2026-05-18 round 3: gauges should have color
+ * whenever there's information to display. The audit's "hollow rim +
+ * filled needle" for last-observed was REMOVING the color signal —
+ * that's wrong. The clock-overlay + time-elapsed suffix on the
+ * sublabel already say "not live"; we don't need to also drain the
+ * gauge of color. Same logic for `manual` (item 8): the mismatch
+ * badge with directional `< than suggested` / `> than suggested`
+ * already conveys "operator deviated from recommendation" — no need
+ * for a separate operator-icon overlay or (manual) suffix.
+ *
+ * signal-current and signal-manual both render as solid fill —
+ * indistinguishable visually, and that's intentional. */
+.signal-current            .gauge-arc-fill { stroke-opacity: 1; }
+.signal-manual             .gauge-arc-fill { stroke-opacity: 1; }
+.signal-last-observed      .gauge-arc-fill { stroke-opacity: 1; }
 .signal-configured-default .gauge-arc-fill { stroke-opacity: 0.85; }
 .signal-configured-default .gauge-rim {
   stroke-dasharray: 2 2;
   stroke-opacity: 1;
 }
-.signal-last-observed .gauge-arc-fill {
-  stroke-opacity: 0;        /* hollow rim — no fill */
-}
-.signal-last-observed .gauge-rim {
-  stroke-opacity: 1;
-  stroke-width: 1.5;
-}
-.signal-manual .gauge-arc-fill { stroke-opacity: 1; }
 
 /* Pill badge for configured-default */
-.default-pill {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 5px;
-  margin-left: 4px;
-  border: 1px solid var(--vscode-foreground);
-  border-radius: 4px;
-  opacity: 0.8;
-  vertical-align: middle;
-}
-
-/* Clock-icon overlay for last-observed */
+/* Clock-icon overlay for last-observed — positioned at the top-LEFT
+ * of the gauge wrapper. Was at top-RIGHT but now shares space with
+ * the thinking LED on the effort gauge; moved to the opposite corner
+ * so both indicators can be visible without collision. */
 .clock-overlay {
   position: absolute;
-  top: 0;
-  right: 6px;
+  top: -2px;
+  left: -2px;
   font-size: 14px;
   opacity: 0.85;
   line-height: 1;
+  z-index: 1;
 }
 
-/* Operator-icon overlay for manual */
-.operator-overlay {
-  position: absolute;
-  top: 0;
-  right: 6px;
-  font-size: 14px;
-  opacity: 0.85;
-  line-height: 1;
-}
-
-/* Thinking LED — a small dot right of the effort gauge */
-.thinking-led {
-  position: absolute;
-  top: 20px;
-  right: -3px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid var(--vscode-foreground);
-  background: transparent;
-  opacity: 0.5;
-}
-.thinking-led.on {
-  background: #98c379;
-  opacity: 1;
-  box-shadow: 0 0 3px #98c379;
-}
-.thinking-led.hidden { display: none; }
+/* Capacity asterisk — small pill-shaped "*" placed inline after the
+ * effort gauge sublabel ("High*" / "Medium*"). Hover (or focus) opens
+ * a custom CSS tooltip ABOVE the asterisk that describes the current
+ * model's extra-capacity parameters: thinking state, /think* history,
+ * and (future) any new capability the marker schema starts carrying.
+ *
+ * Replaces the v0.14.2-round-3 Thinking LED ("T"-disc) per operator
+ * feedback 2026-05-18 round 5: the LED communicated a single binary
+ * (thinking on/off) via an opaque glyph; the asterisk + footnote idiom
+ * is self-explanatory AND future-proofs the UI for evolving model
+ * capabilities (extended thinking, adaptive reasoning, agentic mode,
+ * etc.) — adding a new capacity is just an extra line in the tooltip,
+ * no new visual.
+ *
+ * Tooltip positioned above the asterisk (not below) so the cursor
+ * never obstructs the tooltip text. */
 
 /* Stale-state overlay — diagonal stripes painted ON TOP of the gauge
  * artwork, not behind it (Round A verifier finding 2026-05-18: a
@@ -213,29 +256,29 @@ html, body {
  * per audit-summary §Q6 — overlays on top of whatever the underlying
  * signalKind treatment is.
  *
- * Implementation: position the .gauge-cell as a positioning context;
- * a ::before pseudo-element absolute-positioned over the SVG paints
- * the diagonal stripes at higher opacity than the prior background-
- * image approach (~45% vs. the audit's "50%" target).
+ * Implementation: position the .gauge-svg-wrap as a positioning
+ * context; a ::after pseudo-element absolute-positioned over the
+ * gauge paints the diagonal stripes at ~45% alpha (close to the
+ * audit's "50% opacity" target). The wrapper anchor means the
+ * stripes overlay just the gauge artwork, not the sublabel below.
  */
-.stale .gauge-cell {
-  /* .gauge-cell is already position: relative; pseudo-element will
-   * overlay its bounding box, which is just slightly larger than the
-   * SVG itself. */
-}
-.stale .gauge-cell::before {
+.stale .gauge-svg-wrap::after {
   content: "";
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
-  height: 54px;  /* matches .gauge-svg height — only stripe over the gauge, not the sublabel */
+  height: 100%;
   pointer-events: none;
-  z-index: 2;    /* SVG renders at default z-index 0; pseudo above */
+  z-index: 2;
+  /* Stripe alpha lowered from 0.45 to 0.30 per operator round 3.
+   * Theme-aware in round 6: white-on-transparent in dark mode,
+   * black-on-transparent in light mode (via the body class
+   * override on --indicator-stripe-color). */
   background-image: repeating-linear-gradient(
     -45deg,
-    rgba(255, 255, 255, 0.45) 0px,
-    rgba(255, 255, 255, 0.45) 4px,
+    var(--indicator-stripe-color) 0px,
+    var(--indicator-stripe-color) 4px,
     transparent 4px,
     transparent 10px
   );
@@ -270,3 +313,68 @@ html, body {
   text-decoration: underline;
 }
 .empty-state .install-cta:hover { color: var(--vscode-textLink-activeForeground); }
+
+/* Model description sections — vertical stack at the bottom of the
+ * panel. When no mismatch, just the description text is rendered
+ * (no header, no rule). When mismatch exists, both sections appear
+ * each with a centered small-caps header, a subtle horizontal rule,
+ * and a left-aligned description below.
+ *
+ * Operator feedback 2026-05-18 round 9: replaces the round-7 table.
+ * The table's two-column layout created tension at narrow panel
+ * widths (operator round-8 surfaced this). Vertical stack uses the
+ * full panel width for each description, eliminates the column-
+ * percentage trade-off, and gives clearer visual hierarchy via the
+ * caps headers + rules. Trade-off accepted: more vertical space
+ * when mismatch is active (~50-70px overhead vs. ~30px for the
+ * table). Consistent with round-4's "no internal scrolling, content
+ * sizes itself" direction.
+ *
+ * Styling decisions (operator round-9 confirm):
+ *   - Header in small-caps (softer than full caps)
+ *   - Rule at ~50% opacity (hairline, not heavy)
+ *   - Description left-aligned (centered prose is harder to read)
+ *   - Suggested description italicized (the differentiation cue;
+ *     no special color, valence-neutral)
+ *   - No header on the actual section when there is no Suggested
+ *     section to compare against (avoids redundant chrome) */
+.model-sections {
+  margin-top: 6px;
+}
+.model-section + .model-section {
+  margin-top: 8px;
+}
+/* Inverted-band header — operator feedback round 10. Replaces the
+ * round-9 hairline rule with a full-bleed band whose colors are the
+ * inverse of the panel's theme (dark band + light text in light
+ * mode, light band + dark text in dark mode). The band is more
+ * visually distinctive than the rule and removes the need for a
+ * separate horizontal-rule element. Theme inversion is free via
+ * VS Code's foreground/background variables.
+ *
+ * The horizontal negative margins (0 -8px) extend the band past
+ * .container's 8px horizontal padding so it spans the FULL panel
+ * width edge-to-edge. */
+.model-section-header {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+  line-height: 1.5;
+  padding: 2px 6px;
+  background: var(--indicator-band-bg);
+  color: var(--indicator-band-fg);
+  margin: 0 -8px 4px -8px;
+}
+.model-section-text {
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.model-section-suggested .model-section-text {
+  font-style: italic;
+}
+

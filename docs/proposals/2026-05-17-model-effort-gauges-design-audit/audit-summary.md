@@ -6,17 +6,30 @@
 verdicts. Five showstoppers identified and resolved with concrete
 mitigations. Spec and implementation plan updated accordingly.
 
-> **Post-implementation revision (2026-05-18, Set 029 Session 2 mid-S2):**
-> the audit-locked **"≤100px hard constraint" in D3** was relaxed by the
-> operator after seeing the rendered gauges on-device. New target budget:
-> **≤150px** content (~50% more headroom). Gauge SVG dimensions
-> 70×38 → 100×54 (~43% bigger); font sizes bumped ~40-50%; responsive
-> wrap added so the second gauge stacks below the first at panel widths
-> <260px. The "≤100px hard constraint" phrasing in this doc and in
-> spec.md D3 is superseded — the operator IS the one who set the
-> original constraint AND the one who relaxed it. See CHANGELOG
-> [0.14.2] §"Mid-S2 sizing + responsive-wrap revision" and memory
-> `gauges-sizing-followup` for the full mid-S2 revision detail.
+> **Post-implementation revisions (2026-05-18, Set 029 Session 2):**
+> Two audit-locked decisions were relaxed by the operator after
+> on-device review of the rendered gauges. Both phrasings in this doc
+> are now superseded; the spec.md sections carry the same revision
+> notes pointing at CHANGELOG [0.14.2].
+>
+> **D3 (height budget): ≤100px → ≤150px.** Original constraint felt
+> too small for legibility once gauges + fonts were rendered. Gauge
+> SVG dimensions 70×38 → 100×54 (~43% bigger); font sizes bumped
+> ~40-50%; responsive wrap (now via `@container`, not `@media`) so
+> the second gauge stacks below the first at panel widths <260px.
+>
+> **D5 (color polarity): red→green → IBM 5-color colorblind-safe
+> categorical palette** (`#648FFF` `#785EF0` `#DC267F` `#FE6100`
+> `#FFB000`). The red→green encoding implied "Haiku is bad, Opus is
+> good" — but Haiku is the right pick for cheap tasks, not a failure
+> state. Gauge color is now purely categorical (which level, not
+> good/bad). The "current orchestrator doesn't match the
+> recommendation" signal moved from gauge color to a separate
+> valence-neutral `≠ recommended` badge driven by ai-assignment.md.
+>
+> See CHANGELOG [0.14.2] §"Post-S2 polish — operator-feedback round 2"
+> and memory `gauges-sizing-followup` (which also covers the palette
+> shift now) for the full detail.
 
 > **Process note.** The audit was conducted by manual paste-and-collect
 > rather than via `ai_router.route()`, per operator preference and

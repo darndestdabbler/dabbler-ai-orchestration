@@ -24911,6 +24911,61 @@ var MARKER_PATH = path21.join(MARKER_DIR, "current-orchestrator.json");
 var DEFAULT_STALENESS_MAX_SEC = 28800;
 var POLL_BACKSTOP_MS = 6e4;
 var RENDER_DEBOUNCE_MS = 50;
+function fmtAgeStandalone(seconds) {
+  if (!isFinite(seconds) || seconds < 0)
+    return "?";
+  if (seconds < 60)
+    return `${Math.round(seconds)}s`;
+  if (seconds < 3600)
+    return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400)
+    return `${Math.round(seconds / 3600)}h`;
+  return `${Math.round(seconds / 86400)}d`;
+}
+function providerHasExtraCapacity(provider) {
+  const p2 = (provider || "").toLowerCase();
+  return p2 === "anthropic" || p2 === "google" || p2.includes("claude") || p2.includes("gemini");
+}
+function describeMarker(marker) {
+  const provider = marker.providerDisplayName || "";
+  const modelIsUnknown = !marker.model || marker.model === "unknown";
+  const modelText = modelIsUnknown ? "(model unknown)" : marker.modelDisplayName || "";
+  const effortText = effortDisplayNameStandalone(marker.effort.normalized).toLowerCase();
+  const modelClause = marker.signalKind === "configured-default" ? `${provider} ${modelText} (configured default)` : `${provider} ${modelText}`;
+  let desc = `${modelClause}, ${effortText} effort`;
+  if (providerHasExtraCapacity(marker.provider)) {
+    const thinkingOn = marker.effort.thinking === true;
+    if (thinkingOn && marker.effort.signalKind === "last-observed" && marker.effort.observedAt) {
+      const ageSec = (Date.now() - Date.parse(marker.effort.observedAt)) / 1e3;
+      const native = marker.effort.native || "/think";
+      desc += `, thinking on (last ${native} ${fmtAgeStandalone(ageSec)} ago)`;
+    } else if (thinkingOn) {
+      desc += `, thinking on`;
+    } else {
+      desc += `, thinking off`;
+    }
+  }
+  return desc.trim().replace(/\s+/g, " ");
+}
+function describeRecommendation(rec) {
+  return `${rec.providerName} ${rec.modelName}, ${rec.effort.toLowerCase()} effort`.replace(/\s+/g, " ");
+}
+function effortDisplayNameStandalone(effort) {
+  switch (effort) {
+    case "low":
+      return "Low";
+    case "medium":
+      return "Medium";
+    case "high":
+      return "High";
+    case "extra-high":
+      return "Extra-high";
+    case "max":
+      return "Max";
+    default:
+      return "Unknown";
+  }
+}
 var OrchestratorIndicatorProvider = class {
   constructor(extensionUri) {
     this.extensionUri = extensionUri;
@@ -24998,7 +25053,160 @@ var OrchestratorIndicatorProvider = class {
     const ageSec = (Date.now() - Date.parse(marker.updatedAt)) / 1e3;
     const stalenessMaxSec = typeof marker.stalenessMaxSec === "number" ? marker.stalenessMaxSec : DEFAULT_STALENESS_MAX_SEC;
     const stale = ageSec > stalenessMaxSec;
-    return { kind: "loaded", marker, stale, ageSec };
+    let mismatch = null;
+    try {
+      const rec = this.findActiveRecommendation();
+      if (rec) {
+        mismatch = this.computeMismatch(marker, rec);
+      }
+    } catch {
+      mismatch = null;
+    }
+    return { kind: "loaded", marker, stale, ageSec, mismatch };
+  }
+  // Find the recommendation from the active session set's
+  // ai-assignment.md. "Active" = the in-progress session set; "the
+  // recommended session" = currentSession if non-null, else the
+  // next-to-start (max(completedSessions) + 1) if any sessions
+  // remain. If neither applies, returns null.
+  findActiveRecommendation() {
+    let sets;
+    try {
+      sets = readAllSessionSets();
+    } catch {
+      return null;
+    }
+    const inProgress = sets.filter((s) => s.state === "in-progress");
+    if (inProgress.length === 0)
+      return null;
+    inProgress.sort((a, b2) => (b2.lastTouched ?? "").localeCompare(a.lastTouched ?? ""));
+    const set = inProgress[0];
+    const live = set.liveSession;
+    let targetSession = null;
+    if (live && typeof live.currentSession === "number") {
+      targetSession = live.currentSession;
+    } else if (live && Array.isArray(live.completedSessions) && typeof set.totalSessions === "number" && live.completedSessions.length < set.totalSessions) {
+      const maxCompleted = live.completedSessions.length === 0 ? 0 : Math.max(...live.completedSessions);
+      targetSession = maxCompleted + 1;
+    }
+    if (targetSession === null)
+      return null;
+    let text;
+    try {
+      text = fs19.readFileSync(set.aiAssignmentPath, "utf8");
+    } catch {
+      return null;
+    }
+    return this.extractRecommendation(text, targetSession, set.name);
+  }
+  // Parse ai-assignment.md to extract the recommendation for a
+  // specific session number. Format (per the workflow doc § Step 3.5):
+  //   ## Session N: <title>           (or "## Session N of M: <title>")
+  //   ### Recommended orchestrator
+  //   <Provider> <Model> @ effort=<level>. <Optional rationale...>
+  //
+  // We grep for the session heading, then for the next
+  // "### Recommended orchestrator" within that block, then the next
+  // non-blank paragraph. Defensive — returns null on any parse failure
+  // rather than guessing.
+  extractRecommendation(text, sessionNumber, setName) {
+    const lines = text.split(/\r?\n/);
+    const headingRe = new RegExp(
+      `^##\\s+Session\\s+${sessionNumber}(?:\\s+of\\s+\\d+)?\\s*:\\s*(.*)$`,
+      "i"
+    );
+    let sessionStartIdx = -1;
+    let sessionTitle = "";
+    for (let i2 = 0; i2 < lines.length; i2++) {
+      const m2 = headingRe.exec(lines[i2]);
+      if (m2) {
+        sessionStartIdx = i2;
+        sessionTitle = m2[1].trim();
+        break;
+      }
+    }
+    if (sessionStartIdx === -1)
+      return null;
+    let recHeadingIdx = -1;
+    for (let i2 = sessionStartIdx + 1; i2 < lines.length; i2++) {
+      if (/^##\s+/.test(lines[i2]))
+        break;
+      if (/^###\s+Recommended\s+orchestrator/i.test(lines[i2])) {
+        recHeadingIdx = i2;
+        break;
+      }
+    }
+    if (recHeadingIdx === -1)
+      return null;
+    let paragraphStart = -1;
+    for (let i2 = recHeadingIdx + 1; i2 < lines.length; i2++) {
+      if (/^###\s+/.test(lines[i2]) || /^##\s+/.test(lines[i2]))
+        break;
+      if (lines[i2].trim().length > 0) {
+        paragraphStart = i2;
+        break;
+      }
+    }
+    if (paragraphStart === -1)
+      return null;
+    const paragraphLines = [];
+    for (let i2 = paragraphStart; i2 < lines.length; i2++) {
+      if (lines[i2].trim().length === 0)
+        break;
+      if (/^###\s+/.test(lines[i2]) || /^##\s+/.test(lines[i2]))
+        break;
+      paragraphLines.push(lines[i2]);
+    }
+    const paragraph = paragraphLines.join(" ").trim();
+    const recRe = /^([A-Z][A-Za-z]+)\s+([^@]+?)\s*@\s*effort\s*=\s*([a-z-]+)/i;
+    const m = recRe.exec(paragraph);
+    if (!m)
+      return null;
+    return {
+      rawText: paragraph,
+      providerName: m[1].trim(),
+      modelName: m[2].trim().replace(/[.,;]+$/, ""),
+      effort: m[3].trim().toLowerCase(),
+      sessionLabel: `Session ${sessionNumber}: ${sessionTitle}`,
+      setName
+    };
+  }
+  // Compare a marker to a recommendation. Returns a Mismatch with a
+  // formatted "Suggested:" line if any axis differs, else null.
+  //
+  // Operator feedback 2026-05-18 round 4: replaced the directional
+  // "< / > than suggested" badge with a yellow-bold-italic prose line
+  // stating the actual recommendation. Rationale: shows the operator
+  // exactly what was suggested (so they don't need to hover/think to
+  // compute the diff), wraps gracefully on narrow panels, and feels
+  // less visually heavy than a pill badge. Any axis mismatch
+  // (provider OR model OR effort) triggers the suggestion line —
+  // including cross-provider same-level cases (Codex active when
+  // Claude was recommended is information worth surfacing, even if
+  // the tier rank happens to match).
+  computeMismatch(marker, rec) {
+    const norm = (s) => String(s ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+    const providerOk = norm(marker.providerDisplayName).includes(norm(rec.providerName)) || norm(rec.providerName).includes(norm(marker.providerDisplayName));
+    const modelOk = norm(marker.modelDisplayName).includes(norm(rec.modelName)) || norm(rec.modelName).includes(norm(marker.modelDisplayName));
+    const effortOk = norm(marker.effort.normalized) === norm(rec.effort);
+    if (providerOk && modelOk && effortOk)
+      return null;
+    const diffs = [];
+    if (!providerOk || !modelOk) {
+      diffs.push(
+        `model: actual "${marker.providerDisplayName} ${marker.modelDisplayName}", recommended "${rec.providerName} ${rec.modelName}"`
+      );
+    }
+    if (!effortOk) {
+      diffs.push(`effort: actual "${marker.effort.normalized}", recommended "${rec.effort}"`);
+    }
+    if (!providerOk && diffs.length === 0) {
+      diffs.push(`provider: actual "${marker.providerDisplayName}", recommended "${rec.providerName}"`);
+    }
+    return {
+      recommendation: rec,
+      reason: `Current orchestrator differs from ${rec.setName} ${rec.sessionLabel} recommendation. ` + diffs.join("; ") + `. This may be intentional (e.g., extra credits, task harder or simpler than anticipated) \u2014 the Suggested row surfaces the recommendation; you decide. Switch via "Dabbler: Set Orchestrator Model & Effort".`
+    };
   }
   // ------- rendering helpers -------
   renderHtml(state) {
@@ -25007,7 +25215,7 @@ var OrchestratorIndicatorProvider = class {
     );
     const nonce = String(Math.floor(Math.random() * 1e16));
     const csp = `default-src 'none'; style-src ${this.view.webview.cspSource}; script-src 'nonce-${nonce}';`;
-    const body = state.kind === "empty" ? this.renderEmpty() : this.renderLoaded(state.marker, state.stale, state.ageSec);
+    const body = state.kind === "empty" ? this.renderEmpty() : this.renderLoaded(state.marker, state.stale, state.ageSec, state.mismatch);
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25032,13 +25240,13 @@ var OrchestratorIndicatorProvider = class {
   renderEmpty() {
     return `<div class="empty-state">
   <div class="grey-gauges">
-    ${this.renderGaugeSvg("unknown", "current", 0)}
-    ${this.renderGaugeSvg("unknown", "current", 0)}
+    <div class="gauge-svg-wrap">${this.renderGaugeSvg("unknown", "current", 0)}</div>
+    <div class="gauge-svg-wrap">${this.renderGaugeSvg("unknown", "current", 0)}</div>
   </div>
   <span>No signal \u2014 </span><span class="install-cta" data-command="installHookClaudeCode">install hook</span>
 </div>`;
   }
-  renderLoaded(marker, stale, ageSec) {
+  renderLoaded(marker, stale, ageSec, mismatch) {
     const modelClasses = [
       "gauge-cell",
       `tier-${marker.tier || "unknown"}`,
@@ -25051,33 +25259,44 @@ var OrchestratorIndicatorProvider = class {
     ].join(" ");
     const modelNeedle = this.tierToNeedleAngle(marker.tier);
     const effortNeedle = this.effortToNeedleAngle(marker.effort.normalized);
-    const modelSuffix = marker.signalKind === "configured-default" ? ` <span class="default-pill">DEFAULT</span>` : "";
-    const effortSuffix = marker.effort.signalKind === "last-observed" && marker.effort.observedAt ? `<div class="gauge-suffix">(last ${marker.effort.native || "/think"} ${this.fmtAge(
-      (Date.now() - Date.parse(marker.effort.observedAt)) / 1e3
-    )} ago)</div>` : marker.effort.signalKind === "configured-default" ? `<div class="gauge-suffix">(default)</div>` : marker.effort.signalKind === "manual" ? `<div class="gauge-suffix">(manual)</div>` : "";
-    const modelOverlay = marker.signalKind === "last-observed" ? `<span class="clock-overlay" title="last observed signal">\u23F1</span>` : marker.signalKind === "manual" ? `<span class="operator-overlay" title="set manually">\u270B</span>` : "";
-    const effortOverlay = marker.effort.signalKind === "last-observed" ? `<span class="clock-overlay" title="last observed signal">\u23F1</span>` : marker.effort.signalKind === "manual" ? `<span class="operator-overlay" title="set manually">\u270B</span>` : "";
+    const modelIsUnknown = !marker.model || marker.model === "unknown";
+    const modelSublabelText = modelIsUnknown ? this.escHtml(marker.providerDisplayName) : `${this.escHtml(marker.providerDisplayName)} ${this.escHtml(marker.modelDisplayName)}`;
+    const modelOverlay = marker.signalKind === "last-observed" ? `<span class="clock-overlay" title="last observed signal">\u23F1</span>` : "";
+    const effortOverlay = marker.effort.signalKind === "last-observed" ? `<span class="clock-overlay" title="last observed signal">\u23F1</span>` : "";
     const modelTooltip = this.modelTooltip(marker);
     const effortTooltip = this.effortTooltip(marker);
-    const thinkingHidden = marker.effort.thinking === void 0 ? "hidden" : "";
-    const thinkingOn = marker.effort.thinking ? "on" : "";
     const staleClass = stale ? "stale" : "";
     const staleAnnotation = stale ? `<div class="last-updated">last updated ${this.fmtAge(ageSec)} ago \u2014 stale</div>` : `<div class="last-updated">updated ${this.fmtAge(ageSec)} ago</div>`;
+    const actualDescription = describeMarker(marker);
+    const actualSection = mismatch ? `<div class="model-section">
+      <div class="model-section-header">Actual Model</div>
+      <div class="model-section-text">${this.escHtml(actualDescription)}</div>
+    </div>` : `<div class="model-section">
+      <div class="model-section-text">${this.escHtml(actualDescription)}</div>
+    </div>`;
+    const suggestedSection = mismatch ? `<div class="model-section model-section-suggested" title="${this.escAttr(mismatch.reason)}">
+      <div class="model-section-header">Suggested</div>
+      <div class="model-section-text">${this.escHtml(describeRecommendation(mismatch.recommendation))}</div>
+    </div>` : "";
+    const modelSections = `<div class="model-sections">${actualSection}${suggestedSection}</div>`;
     return `<div class="gauges ${staleClass}">
   <div class="${modelClasses}" title="${this.escAttr(modelTooltip)}">
-    ${modelOverlay}
-    ${this.renderGaugeSvg(marker.tier, marker.signalKind, modelNeedle)}
-    <div class="gauge-sublabel">${this.escHtml(marker.providerDisplayName)} ${this.escHtml(marker.modelDisplayName)}${modelSuffix}</div>
+    <div class="gauge-svg-wrap">
+      ${this.renderGaugeSvg(marker.tier, marker.signalKind, modelNeedle)}
+      ${modelOverlay}
+    </div>
+    <div class="gauge-sublabel">${modelSublabelText}</div>
   </div>
   <div class="${effortClasses}" title="${this.escAttr(effortTooltip)}">
-    ${effortOverlay}
-    ${this.renderGaugeSvg(this.effortColorBucket(marker.effort.normalized), marker.effort.signalKind, effortNeedle)}
-    <span class="thinking-led ${thinkingOn} ${thinkingHidden}" title="thinking ${marker.effort.thinking ? "on" : "off"}"></span>
+    <div class="gauge-svg-wrap">
+      ${this.renderGaugeSvg(this.effortColorBucket(marker.effort.normalized), marker.effort.signalKind, effortNeedle)}
+      ${effortOverlay}
+    </div>
     <div class="gauge-sublabel">${this.escHtml(this.effortDisplayName(marker.effort.normalized))}</div>
-    ${effortSuffix}
   </div>
 </div>
-${staleAnnotation}`;
+${staleAnnotation}
+${modelSections}`;
   }
   renderGaugeSvg(tier, signalKind, needleAngleDeg) {
     const cx = 35;

@@ -189,7 +189,9 @@ test("renders current Opus marker with flagship tier classes + label", async () 
     per.launch = await launchVSCode(workspace);
     const frame = await openIndicatorFrame(per.launch);
     await expect(frame.locator(".gauge-cell.tier-flagship.signal-current")).toBeVisible();
-    await expect(frame.getByText(/Claude\s+Opus 4\.7/)).toBeVisible();
+    // Scoped to the model gauge sublabel (the table description also
+    // contains "Claude Opus 4.7" — strict-mode requires a unique match).
+    await expect(frame.locator(".gauge-cell.tier-flagship .gauge-sublabel")).toContainText(/Claude\s+Opus 4\.7/);
     // Stale stripe overlay should NOT be present on a fresh marker.
     await expect(frame.locator(".gauges.stale")).toHaveCount(0);
   } finally {
@@ -229,7 +231,9 @@ test("renders Haiku marker with low-tier classes", async () => {
     per.launch = await launchVSCode(workspace);
     const frame = await openIndicatorFrame(per.launch);
     await expect(frame.locator(".gauge-cell.tier-low.signal-current")).toBeVisible();
-    await expect(frame.getByText(/Claude\s+Haiku 4\.5/)).toBeVisible();
+    // Scoped to the model gauge sublabel (the table description also
+    // contains "Claude Haiku 4.5" — strict-mode requires a unique match).
+    await expect(frame.locator(".gauge-cell.tier-low .gauge-sublabel")).toContainText(/Claude\s+Haiku 4\.5/);
   } finally {
     await teardown(per);
   }
@@ -313,18 +317,26 @@ test("renders last-observed effort with clock overlay and elapsed time suffix", 
     const effortCell = frame.locator(".gauge-cell.signal-last-observed").first();
     await expect(effortCell).toBeVisible();
     await expect(effortCell.locator(".clock-overlay")).toBeVisible();
-    await expect(frame.getByText(/last \/think 12m ago/)).toBeVisible();
+    // Round 9: descriptive text moved from the round-7 table to a
+    // vertical-stack of sections. The first .model-section-text
+    // element (the actual model description) carries the
+    // "(last /think 12m ago)" clause.
+    await expect(frame.locator(".model-section-text").first()).toContainText(/last \/think 12m ago/);
   } finally {
     await teardown(per);
   }
 });
 
 // -----------------------------------------------------------------------
-// Scenario E: signalKind=configured-default → dashed rim hook + DEFAULT pill.
-//             (Verifies stripes are NOT used for configured-default per
-//             REVISED 2026-05-18 audit decision — stripes are stale-only.)
+// Scenario E: signalKind=configured-default → dashed rim + (default) suffix
+//             line. (Stripes are NOT used for configured-default per the
+//             REVISED 2026-05-18 audit decision — stripes are stale-only.
+//             The DEFAULT pill badge was replaced with a (default) suffix
+//             line per operator feedback 2026-05-18 round 3 item 6 —
+//             more compact, matches the effort gauge's parenthetical
+//             style.)
 // -----------------------------------------------------------------------
-test("renders configured-default marker with DEFAULT pill (no stripes)", async () => {
+test("renders configured-default marker with (default) suffix (no stripes)", async () => {
   const per: PerTest = {};
   try {
     per.fakeHome = makeTmpDir("dabbler-pw-fakehome-E");
@@ -353,10 +365,17 @@ test("renders configured-default marker with DEFAULT pill (no stripes)", async (
     per.launch = await launchVSCode(workspace);
     const frame = await openIndicatorFrame(per.launch);
     await expect(frame.locator(".gauge-cell.signal-configured-default").first()).toBeVisible();
-    await expect(frame.locator(".default-pill")).toContainText("DEFAULT");
+    // Round 9: the "(configured default)" annotation lives in the
+    // .model-section-text (vertical stack replaced the round-7 table).
+    await expect(frame.locator(".model-section-text").first()).toContainText("configured default");
     // Critical: this is configured-default — stripes overlay class
     // must NOT be present on .gauges (stripes are stale-only).
     await expect(frame.locator(".gauges.stale")).toHaveCount(0);
+    // No legacy chrome remaining: .default-pill dropped in round 3;
+    // .gauge-suffix dropped in round 7; .model-table dropped in round 9.
+    await expect(frame.locator(".default-pill")).toHaveCount(0);
+    await expect(frame.locator(".gauge-suffix")).toHaveCount(0);
+    await expect(frame.locator(".model-table")).toHaveCount(0);
   } finally {
     await teardown(per);
   }

@@ -13,6 +13,9 @@ export declare class OrchestratorIndicatorProvider implements vscode.WebviewView
     private scheduleRender;
     render(): void;
     private computeState;
+    private findActiveRecommendation;
+    private extractRecommendation;
+    private computeMismatch;
     private renderHtml;
     private renderEmpty;
     private renderLoaded;

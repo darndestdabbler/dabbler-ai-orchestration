@@ -161,6 +161,12 @@ def load_config(path: str | None = None) -> dict:
                 f"Available: {list(config['models'].keys())}"
             )
 
+    # Validate delegation.decision_consensus sub-block (Set 031).
+    # Default-opt-out: absent block is fine; present block must satisfy
+    # the V1 invariants. Unknown sub-keys are tolerated (forward-compat
+    # for V1.5/V2 additions); only known-bad values are rejected.
+    _validate_decision_consensus(config)
+
     # Merge local-overrides.yaml if present (local > shared > default)
     local_overrides_path = config_path.parent / "local-overrides.yaml"
     if local_overrides_path.exists():
@@ -275,6 +281,140 @@ def load_config(path: str | None = None) -> dict:
         config["_metrics_base_dir"] = str(config_path.resolve().parent)
 
     return config
+
+
+# V1 category whitelist for delegation.decision_consensus.categories.
+# Operators can opt any subset of these in via router-config.yaml; the
+# default in the shipped YAML is the four "mechanical" ones. Broader
+# slots (testing-strategy, api-surface, design, architecture) are
+# accepted at load time so consumer repos can opt in without a schema
+# bump. Update this list deliberately — adding a slug here is a public
+# API change.
+_DECISION_CONSENSUS_KNOWN_CATEGORIES: frozenset[str] = frozenset({
+    "refactor-placement",
+    "file-layout",
+    "scoping",
+    "spec-clarification",
+    "testing-strategy",
+    "api-surface",
+    "design",
+    "architecture",
+})
+
+_DECISION_CONSENSUS_UNRESOLVED_ACTIONS: frozenset[str] = frozenset({
+    "ask_user",
+    "proceed_with_orchestrator_judgment",
+})
+
+
+def _validate_decision_consensus(config: dict) -> None:
+    """Validate the optional delegation.decision_consensus sub-block.
+
+    Absent block is fine (default opt-out). Present block must satisfy:
+      - enabled is bool
+      - engines is a list of "provider:model" strings where model resolves
+        in config['models'] AND the named provider matches that model's
+        configured provider
+      - categories is a list of recognized slugs (see
+        _DECISION_CONSENSUS_KNOWN_CATEGORIES)
+      - unresolved_action is one of _DECISION_CONSENSUS_UNRESOLVED_ACTIONS
+      - journal_path is a string or None
+      - journal_full_payloads_dir is a string or None
+
+    Unknown sub-keys are tolerated (forward-compat for V1.5/V2 additions).
+    """
+    delegation = config.get("delegation") or {}
+    block = delegation.get("decision_consensus")
+    if block is None:
+        return
+    if not isinstance(block, dict):
+        raise ValueError(
+            "delegation.decision_consensus must be a mapping, "
+            f"got {type(block).__name__}"
+        )
+
+    enabled = block.get("enabled", False)
+    if not isinstance(enabled, bool):
+        raise ValueError(
+            "delegation.decision_consensus.enabled must be a boolean, "
+            f"got {type(enabled).__name__}"
+        )
+
+    engines = block.get("engines")
+    if engines is not None:
+        if not isinstance(engines, list) or not all(
+            isinstance(e, str) for e in engines
+        ):
+            raise ValueError(
+                "delegation.decision_consensus.engines must be a list of "
+                "'provider:model' strings"
+            )
+        for entry in engines:
+            if ":" not in entry:
+                raise ValueError(
+                    f"delegation.decision_consensus.engines entry "
+                    f"'{entry}' must be 'provider:model' (colon-separated)"
+                )
+            provider_slug, _, model_name = entry.partition(":")
+            provider_slug = provider_slug.strip()
+            model_name = model_name.strip()
+            model_cfg = config.get("models", {}).get(model_name)
+            if model_cfg is None:
+                raise ValueError(
+                    f"delegation.decision_consensus.engines references "
+                    f"unknown model '{model_name}' "
+                    f"(available: {sorted(config.get('models', {}))})"
+                )
+            model_provider = str(model_cfg.get("provider", "")).strip()
+            if not model_provider:
+                raise ValueError(
+                    f"delegation.decision_consensus.engines entry "
+                    f"'{entry}' references model '{model_name}' which "
+                    f"is missing a 'provider' key — the orchestrator "
+                    f"cannot route to a provider-less model"
+                )
+            if model_provider != provider_slug:
+                raise ValueError(
+                    f"delegation.decision_consensus.engines entry "
+                    f"'{entry}' provider mismatch: model '{model_name}' "
+                    f"is registered under provider '{model_provider}'"
+                )
+
+    categories = block.get("categories")
+    if categories is not None:
+        if not isinstance(categories, list) or not all(
+            isinstance(c, str) for c in categories
+        ):
+            raise ValueError(
+                "delegation.decision_consensus.categories must be a list "
+                "of strings"
+            )
+        unknown = [
+            c for c in categories
+            if c not in _DECISION_CONSENSUS_KNOWN_CATEGORIES
+        ]
+        if unknown:
+            raise ValueError(
+                f"delegation.decision_consensus.categories has unknown "
+                f"slugs: {unknown}. "
+                f"Known: {sorted(_DECISION_CONSENSUS_KNOWN_CATEGORIES)}"
+            )
+
+    action = block.get("unresolved_action", "ask_user")
+    if action not in _DECISION_CONSENSUS_UNRESOLVED_ACTIONS:
+        raise ValueError(
+            f"delegation.decision_consensus.unresolved_action must be one "
+            f"of {sorted(_DECISION_CONSENSUS_UNRESOLVED_ACTIONS)}, "
+            f"got {action!r}"
+        )
+
+    for path_field in ("journal_path", "journal_full_payloads_dir"):
+        value = block.get(path_field, None)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(
+                f"delegation.decision_consensus.{path_field} must be a "
+                f"string or null, got {type(value).__name__}"
+            )
 
 
 def _check_pricing_staleness(config: dict) -> None:

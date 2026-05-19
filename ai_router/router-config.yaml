@@ -290,6 +290,47 @@ delegation:
     - test-generation
     - session-close-out
 
+  # decision_consensus: opt-in cross-engine consult for in-session design /
+  # architecture / process decisions. When enabled, the orchestrator routes
+  # an eligible question to the listed engines in parallel and synthesizes
+  # their responses into a single recommendation BEFORE falling back to
+  # AskUserQuestion. Default is opt-out (enabled: false) — every existing
+  # repo's behavior is unchanged until the operator explicitly flips it on.
+  # See docs/ai-led-session-workflow.md "Decision-time consensus" for the
+  # decision tree, eligible/human-only category examples, and the journal
+  # format. Design proposal: docs/planning/delegation-consensus-config.md.
+  decision_consensus:
+    enabled: false
+    # Engines the orchestrator consults in parallel. Each entry is a
+    # "provider:model" reference that must resolve against the
+    # models: table above. Independent of verification.preferred_pairings
+    # — verify and consult are different roles and may want different
+    # pairings.
+    engines:
+      - openai:gpt-5-4
+      - google:gemini-pro
+    # V1 starts narrow: the four highest-convergence "mechanical" question
+    # categories where engines reliably agree. Broader categories
+    # (testing-strategy, api-surface, design, architecture) are V1.5+;
+    # operators can opt in any category at any time by editing this list.
+    categories:
+      - refactor-placement
+      - file-layout
+      - scoping
+      - spec-clarification
+    # What the orchestrator does when the engines disagree materially or
+    # the synthesis hinges on information neither engine has.
+    #   ask_user: surface the synthesized conflict via AskUserQuestion (safe default)
+    #   proceed_with_orchestrator_judgment: orchestrator picks a side (power-user)
+    unresolved_action: ask_user
+    # Per-call structured log line (append-only JSONL, one object per call).
+    # Mirrors router-metrics.jsonl precedent. Set to null to disable.
+    journal_path: ai_router/consensus-decisions.jsonl
+    # Full-payload sibling directory (one file per call: prompt + per-engine
+    # responses + synthesized recommendation). Set to null to disable.
+    # The directory is gitignored by default — see repo-root .gitignore.
+    journal_full_payloads_dir: ai_router/consensus-decisions
+
 # --- Per-Task-Type Generation Parameter Overrides ---
 # Structure: task_type_params.<task_type>.<model_name> = {params to override}
 # These override the model-level generation_params above. Missing entries

@@ -62,6 +62,52 @@ const ROUTER_CONFIG_SCHEMA = {
         },
       },
     },
+    // delegation.decision_consensus is the Set 031 opt-in sub-block.
+    // The router-config schema is deliberately open elsewhere; this
+    // entry validates only the fields the visual editor needs to render
+    // correctly. Unknown sub-keys are tolerated (forward-compat for the
+    // V1.5/V2 fields the design doc reserved).
+    delegation: {
+      type: "object",
+      properties: {
+        decision_consensus: {
+          type: "object",
+          properties: {
+            enabled: { type: "boolean" },
+            engines: {
+              type: "array",
+              items: {
+                type: "string",
+                // "provider:model" with non-empty halves
+                pattern: "^[^:]+:[^:]+$",
+              },
+            },
+            categories: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: [
+                  "refactor-placement",
+                  "file-layout",
+                  "scoping",
+                  "spec-clarification",
+                  "testing-strategy",
+                  "api-surface",
+                  "design",
+                  "architecture",
+                ],
+              },
+            },
+            unresolved_action: {
+              type: "string",
+              enum: ["ask_user", "proceed_with_orchestrator_judgment"],
+            },
+            journal_path: { type: ["string", "null"] },
+            journal_full_payloads_dir: { type: ["string", "null"] },
+          },
+        },
+      },
+    },
   },
 };
 

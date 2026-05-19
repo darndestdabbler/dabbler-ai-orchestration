@@ -1871,6 +1871,166 @@ never handle directly.
 
 ---
 
+## Decision-time consensus
+
+`delegation.always_route_task_types` covers **task** delegation —
+which kinds of work the orchestrator must route to the router rather
+than perform itself. Decision-time consensus is the parallel
+mechanism for **in-session decisions** — design / architecture /
+process questions the orchestrator hits mid-session, the kind that
+historically surfaced as `AskUserQuestion` prompts to the operator.
+When the `delegation.decision_consensus.enabled` flag is `true`, the
+orchestrator first routes eligible questions to a configured pair of
+engines in parallel, synthesizes their responses, and only falls back
+to `AskUserQuestion` if the engines disagree materially or the
+synthesis hinges on information neither engine has.
+
+The behavior is **opt-out by default** (`enabled: false`). Every
+existing repo's `AskUserQuestion`-first behavior is preserved until an
+operator explicitly flips the flag in their `router-config.yaml`.
+
+### When to consult the engines (decision tree)
+
+1. **Is this a human-only question?** Some decisions are
+   operator-only by their nature. Skip consensus and go straight to
+   `AskUserQuestion`. Examples:
+   - Business priority ("ship now vs. polish first")
+   - Taste calls the operator owns ("which name reads better")
+   - Irreversible or high-blast-radius actions (force-push, drop
+     table, delete branch, publish to PyPI)
+   - Anything that asks the operator to commit time or money
+2. **Is the category in `decision_consensus.categories`?** If not,
+   `AskUserQuestion` is still the path. The category whitelist is the
+   declarative gate that keeps the consult mechanism scoped to
+   questions where engines reliably converge.
+3. **Route the question to both engines in parallel.** Use
+   `ai_router.query()` once per engine (V1 has no `consensus()`
+   helper; orchestrator manages the two calls itself). Pass the same
+   prompt verbatim; do not nudge either engine toward a preferred
+   answer.
+4. **Synthesize the two responses into ONE concrete recommendation.**
+   The orchestrator's job is judgment, not just relay. Write the
+   recommendation as a single sentence that the next step in the
+   session can act on directly.
+5. **Apply the synthesis OR fall back per `unresolved_action`.** When
+   the engines converge and the synthesis is concrete, apply it. When
+   they disagree materially (different architectural sides, different
+   file-layout proposals) or the synthesis depends on information
+   neither engine has (operator-specific deadline, internal policy),
+   honor `unresolved_action`:
+   - `ask_user` (default, recommended) — surface the synthesized
+     conflict to the operator via `AskUserQuestion` with both
+     positions clearly stated.
+   - `proceed_with_orchestrator_judgment` — the orchestrator picks a
+     side and records it in the journal with `applied: true` and a
+     reasoned `chosen_recommendation_summary`. Reserved for
+     power-user setups that have accepted the autonomy trade.
+6. **Write one journal record per call.** Whether the synthesis was
+   applied or punted to the operator, every consensus call appends
+   one line to `journal_path`. The journal is the audit trail; a
+   skipped write is a missing decision.
+
+### Eligible (V1) vs. human-only categories — examples
+
+The four V1 categories are intentionally **mechanical** — placement,
+layout, scoping. They are the highest-convergence questions, where
+engines reliably reach the same answer because the choice is
+structural rather than aesthetic.
+
+| Category | Engine-eligible examples | Human-only escalation |
+|---|---|---|
+| `refactor-placement` | "Where should this helper live — `utils.py` or a new `parsers/` module?" | "Should we refactor at all, or ship this as-is?" |
+| `file-layout` | "One file per provider, or one file with sections?" | "Should we adopt the company-wide src layout?" |
+| `scoping` | "Is this change spec-scoped, or does it belong in a follow-on session?" | "Should we cut scope to make Friday's deadline?" |
+| `spec-clarification` | "The spec says `X`; given the surrounding context, does it mean X1 or X2?" | "The spec says X; do we want X or Y?" |
+
+V1.5 and V2 categories (`testing-strategy`, `api-surface`, `design`,
+`architecture`) are accepted at load time so a consumer repo can opt
+them in without a schema bump — but the V1 default keeps them off
+because the orchestrator's track record of engine-converging on
+those categories is not yet established.
+
+### Journal format
+
+Each consensus call appends one JSON object to `journal_path`
+(default `ai_router/consensus-decisions.jsonl`). The format mirrors
+`router-metrics.jsonl` — append-only JSONL, one record per call,
+git-tracked by default so the audit trail follows the repo.
+
+```jsonc
+{
+  "timestamp": "2026-05-19T14:03:21.456-04:00",
+  "session_set": "031-delegation-consensus-config",
+  "session_number": 1,
+  "category": "refactor-placement",
+  "question_summary": "Where to strip the VBA Attribute VB_* header?",
+  "question_hash": "sha256:9f3a…",
+  "engines": ["openai:gpt-5-4", "google:gemini-pro"],
+  "agreement_level": "aligned",
+  "chosen_recommendation_summary": "Shared module-body loader (B); audit every production call site",
+  "applied": true,
+  "fallback_action": null,
+  "fallback_reason": null,
+  "input_tokens_total": 2206,
+  "output_tokens_total": 4768,
+  "cost_usd": 0.0618
+}
+```
+
+When `journal_full_payloads_dir` is set (default
+`ai_router/consensus-decisions`), each consensus call also writes a
+Markdown sibling file `<timestamp>-<hash6>.md` containing the prompt,
+both engine responses verbatim, and the synthesized recommendation.
+The directory is gitignored — full payloads stay local while the
+per-line summary travels with the repo. Set
+`journal_full_payloads_dir: null` in `router-config.yaml` to skip
+full-payload capture entirely.
+
+The `agreement_level` field is one of `aligned`, `partial`,
+`conflict`, or `degraded`. `fallback_action` is `null` when the
+synthesis was applied; otherwise it records which branch of
+`unresolved_action` ran (`ask_user` or `orchestrator_judgment`).
+
+### Opt-in path
+
+1. Edit `router-config.yaml` and set
+   `delegation.decision_consensus.enabled: true`.
+2. Optionally trim or extend `categories` and `engines` (defaults
+   work out of the box for a Claude orchestrator with the standard
+   GPT + Gemini consult pair).
+3. Add `ai_router/consensus-decisions/` to the consumer repo's
+   `.gitignore` if the canonical one is not already inherited. The
+   per-line JSONL itself stays committed.
+
+There is no migration required for existing journal files — the file
+is created on first write. Operators who want to disable the
+behavior re-set `enabled: false`; the schema accepts the block in
+either state.
+
+### Limits of consensus
+
+Engine consensus is not the same as ground truth. Both engines can
+converge on a wrong answer — particularly on questions whose answer
+depends on local context the engines have not been shown. Three
+guardrails apply:
+
+- **Human-only categories.** The decision tree's step 1 is the
+  bright line: business priority, taste, irreversibility, time/money
+  commitments are not consensus-eligible regardless of what the
+  flags allow.
+- **Synthesis discipline.** The orchestrator's job is to read both
+  responses and write ONE concrete recommendation, not to relay
+  "Engine A says X, Engine B says Y, what do you want?". A relay is
+  a failed consensus call — fall back to `unresolved_action`
+  instead.
+- **Auditable journal.** Every consensus call appends a record. The
+  operator can review `consensus-decisions.jsonl` at any time, grep
+  for `applied: true` to see what shipped without their prompt, and
+  pull the full payload from the sibling Markdown file if they want
+  to second-guess a synthesis after the fact.
+
+---
+
 ## Rules (Apply to All Orchestrators)
 
 This is the authoritative rules list. Instruction files (`CLAUDE.md`,

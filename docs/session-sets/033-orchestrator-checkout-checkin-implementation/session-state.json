@@ -5,7 +5,7 @@
     {
       "number": 1,
       "title": "State machine in session-state.json + start_session refactor",
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "number": 2,
@@ -33,9 +33,11 @@
       "status": "not-started"
     }
   ],
-  "currentSession": 1,
+  "currentSession": null,
   "totalSessions": 6,
-  "completedSessions": [],
+  "completedSessions": [
+    1
+  ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
   "startedAt": "2026-05-20T01:35:14.743069-04:00",

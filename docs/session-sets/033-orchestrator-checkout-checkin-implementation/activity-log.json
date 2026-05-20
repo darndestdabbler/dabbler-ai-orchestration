@@ -65,6 +65,96 @@
           "task_type": "session-verification"
         }
       ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/list-in-progress-sets-introduced",
+      "dateTime": "2026-05-20T03:05:00-04:00",
+      "description": "Audited all consumers of MarkerWatchService.resolveActiveSet() and readers/writers of .dabbler/orchestrator.json across src/, scripts/, media/, and tests. Source-side touchpoints identified: providers/MarkerWatchService.ts (the service itself), providers/CustomSessionSetsView.ts (consumer), providers/OrchestratorAccordion.ts (pure renderer), commands/{setOrchestratorManual,installOrchestratorHookClaudeCode,openOrchestratorWriterLog}.ts (S3 scope — keep compiling, refactor in S3), codex/configWatcher.ts (S3 scope — same), scripts/write-orchestrator-marker.js (delete), tests, media/session-sets-tree/client.js. Resolved two spec-flagged in-session decisions via AskUserQuestion: (1) rename MarkerWatchService.ts → inProgressSetsService.ts (operator preference for clarity post-migration); (2) delete docs/orchestrator-marker-schema.md outright (spec default). git mv preserved blame on the rename. Renamed module exports listInProgressSets(all?) + extractRecommendation() + recommendationFor(set); the class + watcher + polling-backstop + slug-integrity check were retired entirely since the workspace-level file-watcher in extension.ts already watches session-state.json.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/custom-view-multi-set-rendering",
+      "dateTime": "2026-05-20T03:20:00-04:00",
+      "description": "Refactored providers/CustomSessionSetsView.ts: dropped the MarkerWatchService constructor parameter; reshaped postSnapshot to compute every in-progress row's accordion via accordionStateFromOrchestratorBlock(); buildBuckets now sorts the in-progress bucket via listInProgressSets() (startedAt asc, per spec) instead of SessionSetsModel.sortBucket's lastTouched-desc default; buildRow renders accordionHtml for EVERY in-progress row (not just the resolver's single 'active set'). Suppression key field renamed across the wire: markerUpdatedAt → accordionUpdatedAt, sourced from orchestrator.lastActivityAt (S1's bump-on-re-attach field — preserves the naturally-aging suppression semantic). Extended types.ts OrchestratorInfo with the S1 fields (provider, checkedOutAt, lastActivityAt) and updated fileSystem.ts's state-file reader to parse them. Added accordionStateFromOrchestratorBlock(block, recommendation) to providers/OrchestratorAccordion.ts: synthesizes the unchanged RenderState/OrchestratorMarker shape with signalKind='current' + confidence='high' (writer is authoritative; retired last-observed/configured-default/manual signal kinds no longer apply); tier via classifyRecommendationTier(); thinking=false; updatedAt falls back through lastActivityAt → checkedOutAt → now. Returns kind='empty' on null block or missing provider+model identity.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/banner-removed",
+      "dateTime": "2026-05-20T03:30:00-04:00",
+      "description": "Removed the ambiguityBanner end-to-end: types/sessionSetsWebviewProtocol.ts dropped SnapshotPayload.ambiguityBanner + RowPayload.isResolvedSet (renamed ToggleRowMsg.markerUpdatedAt → accordionUpdatedAt); media/session-sets-tree/client.js dropped the .ambiguity-banner DIV render path; renderRow's isExpandable predicate simplified from (isResolvedSet && accordionHtml !== null) to just (accordionHtml !== null) — multi-in-progress is the supported case; isSuppressedForRow now reads row.accordionUpdatedAt and compares against the host-echoed suppression record (the lookup is concrete now that the wire carries per-row updatedAt). DOM attribute renamed: data-marker-updated-at → data-accordion-updated-at.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/marker-writes-deleted",
+      "dateTime": "2026-05-20T03:35:00-04:00",
+      "description": "git rm tools/dabbler-ai-orchestration/scripts/write-orchestrator-marker.js (613-line writer). Spec risk R1 acknowledged: between S2 ship and S3 ship the Claude SessionStart hook + Codex configWatcher + setOrchestratorManual command all reference the deleted script via HELPER_REL = path.join('scripts', 'write-orchestrator-marker.js') as a string path. Compile-time clean (no symbolic imports). Runtime invocations will fail until S3 refactors those three call sites to invoke `python -m ai_router.start_session` per H1 (hooks become invokers). extension.ts updated to drop the `MarkerWatchService` import + construction; the workspace-level file-watcher already in extension.ts (watching **/session-state.json) covers every signal the new reader needs.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/stale-markers-purged",
+      "dateTime": "2026-05-20T03:40:00-04:00",
+      "description": "Deleted docs/session-sets/029-orchestrator-model-effort-gauges/.dabbler/ directory entirely (it held the one stale orchestrator.json marker file in this repo; the directory's self-protecting .gitignore meant the marker was never tracked, so only the working-tree directory needed removal). Searched for additional .dabbler/orchestrator.json files under docs/session-sets/ — none remained. Consumer-repo cleanup is S6's cross-repo CLAUDE.md notification job, not S2.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/marker-schema-doc-resolved",
+      "dateTime": "2026-05-20T03:42:00-04:00",
+      "description": "git rm docs/orchestrator-marker-schema.md per the operator's spec-default decision (delete outright vs redirect). The doc described the retired .dabbler/orchestrator.json schema; no consumers reference it for live behavior. docs/session-state-schema.md is the surviving canonical reference, already updated by Session 1 with the Check-out / check-in section.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/layer2-tests-green",
+      "dateTime": "2026-05-20T03:50:00-04:00",
+      "description": "git mv markerWatchService.test.ts → inProgressSetsService.test.ts; updated the import to point at the renamed module. Preserved all 7 extractRecommendation tests verbatim (regex contract unchanged). Authored 3 new listInProgressSets tests covering (i) filter+sort by startedAt asc, (ii) empty-result handling, (iii) tolerance of null startedAt (verifies the spec's 'oldest-in-flight first' intent treats missing timestamps as earliest). All 10 tests pass via `npm run test:unit` (Mocha stub harness). Full suite: 401 pass + 2 pre-existing failures (configEditor-foundation + notificationsSection — unrelated, neither touches changed files). `npx tsc -p tsconfig.json --noEmit` clean across the full src tree.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/layer3-tests-green",
+      "dateTime": "2026-05-20T03:55:00-04:00",
+      "description": "Rewrote test/playwright/electronLaunch.ts: replaced seedOrchestratorMarker (wrote .dabbler/orchestrator.json with the retired marker shape) with seedOrchestratorBlock (merges the Set 033 Session 1 orchestrator block into session-state.json). Rewrote test/playwright/session-sets-tree.spec.ts: removed the 'configured-default Codex marker' + 'manual Gemini marker' scenarios (the retired signalKind affordance they tested no longer applies in the writer-as-authority model); added (1) 'seeded orchestrator block renders provider sublabel' + (2) 'two in-progress sets each render their own accordion body' — the second scenario asserts both rows carry data-expandable='1' AND the ambiguity banner has count 0 (the H2 + banner-removal contract painted on screen). Layer-3 scenarios not run end-to-end in this session (Set 027's note: Playwright matrix is exercised in CI on Linux via xvfb-run; local execution deferred to operator review pending S4's dedicated scenario expansion).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-002/round-a-verification",
+      "dateTime": "2026-05-20T04:05:00-04:00",
+      "description": "Authored verify_session2.py following the Session 1 template (RouteResult JSON-dump-first per feedback_ai_router_route_result_handling). Bundled the seven primary deliverables (inProgressSetsService.ts, OrchestratorAccordion.ts full file, CustomSessionSetsView.ts full file, sessionSetsWebviewProtocol.ts, client.js, inProgressSetsService.test.ts, session-sets-tree.spec.ts) plus the extension.ts activation excerpt (proving the MarkerWatchService import + construction were removed) plus three ground-truth references (proposal-addendum §9 H2 verdict, spec.md Session 2 only, session-state-schema.md Check-out / check-in section). Bundle 96,477 chars — larger than Session 1's 56,053 but well under the gemini-pro limits demonstrated by Session 1's clean round. Round A verdict: VERIFIED with no must-fix issues. All seven assertion groups (A H2 retirement, B synthesizer correctness, C suppression continuity, D banner removal, E Layer-2 coverage, F Layer-3 coverage, G edge cases) cross-referenced to named functions / cited code. Round B not required.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "engine": "gemini-pro",
+          "provider": "google",
+          "cost_usd": 0.0510425,
+          "input_tokens": 29922,
+          "output_tokens": 1364,
+          "task_type": "session-verification"
+        }
+      ]
     }
   ]
 }

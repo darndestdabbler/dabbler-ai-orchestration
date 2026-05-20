@@ -238,6 +238,79 @@ export function cancelSet(h: FixtureHandle): void {
   runHarness(["cancel", ..._handleArgs(h), "--reason", "playwright cancel scenario"]);
 }
 
+export interface StartSessionAttemptResult {
+  exit: number;
+  stdout: string;
+  stderr: string;
+}
+
+/**
+ * Set 033 Session 4 — invoke ``python -m ai_router.start_session``
+ * with an explicit identity (engine + provider + model + effort) and
+ * capture exit / stdout / stderr without raising on non-zero exit.
+ *
+ * Distinct from the harness shim's ``start`` command (which uses the
+ * handle's identity and throws on non-zero) because the H3 + H4
+ * Layer-3 scenarios need to:
+ *   - Drive ``start_session`` as a DIFFERENT holder than the seeded
+ *     orchestrator block, to exercise the refusal path; and
+ *   - Inspect non-zero exit + stderr without the helper masking the
+ *     failure.
+ *
+ * Optional ``homeOverride`` redirects ``~/.dabbler/orchestrator-
+ * writer.log`` (where ``--force`` lands its audit trail) by setting
+ * HOME + USERPROFILE on the subprocess env. Use a tmpdir-scoped
+ * override so force-override scenarios don't pollute the dev's home
+ * dir.
+ */
+export function attemptStartSession(
+  h: FixtureHandle,
+  sessionNumber: number,
+  identity: {
+    engine: string;
+    provider: string;
+    model: string;
+    effort?: string;
+  },
+  opts: { force?: boolean; homeOverride?: string } = {},
+): StartSessionAttemptResult {
+  const args = [
+    "-m", "ai_router.start_session",
+    "--session-set-dir", h.set_dir,
+    "--session-number", String(sessionNumber),
+    "--engine", identity.engine,
+    "--provider", identity.provider,
+    "--model", identity.model,
+    "--effort", identity.effort ?? "medium",
+  ];
+  if (opts.force) args.push("--force");
+
+  const env = _filteredEnv();
+  if (opts.homeOverride) {
+    // os.path.expanduser checks USERPROFILE on Windows and HOME on
+    // POSIX; setting both keeps the redirect cross-platform.
+    env.HOME = opts.homeOverride;
+    env.USERPROFILE = opts.homeOverride;
+  }
+
+  const proc = cp.spawnSync(PYTHON, args, {
+    encoding: "utf8",
+    timeout: 60_000,
+    cwd: REPO_ROOT,
+    env,
+  });
+  if (proc.error) {
+    throw new Error(
+      `attemptStartSession spawn error (${PYTHON}): ${proc.error.message}`,
+    );
+  }
+  return {
+    exit: proc.status ?? -1,
+    stdout: proc.stdout?.toString() ?? "",
+    stderr: proc.stderr?.toString() ?? "",
+  };
+}
+
 /**
  * Set 033 Session 2 — seed the `orchestrator` block on a fixture's
  * `session-state.json` so Layer-3 smokes can verify the painted-on-

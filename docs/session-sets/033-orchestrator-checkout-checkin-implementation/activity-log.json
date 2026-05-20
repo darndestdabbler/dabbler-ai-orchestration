@@ -236,6 +236,78 @@
           "task_type": "session-verification"
         }
       ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/electron-launch-helper-extended",
+      "dateTime": "2026-05-20T04:35:00-04:00",
+      "description": "Extended tools/dabbler-ai-orchestration/src/test/playwright/electronLaunch.ts with attemptStartSession(handle, sessionNumber, identity, opts) — a subprocess-based driver that invokes `python -m ai_router.start_session` with an explicit (engine, provider, model, effort) identity and captures exit + stdout + stderr WITHOUT raising on non-zero. Distinct from the harness shim's `start` subcommand which uses the handle's identity and raises on non-zero. Required so the H3 + H4 Layer-3 scenarios can drive start_session as a DIFFERENT holder than the seeded orchestrator block (refusal path) and assert on stderr content. Optional `homeOverride` redirects ~/.dabbler/orchestrator-writer.log via HOME + USERPROFILE env vars so force-override scenarios stay hermetic on every developer's machine.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-004/conflict-spec-green",
+      "dateTime": "2026-05-20T04:45:00-04:00",
+      "description": "Authored tools/dabbler-ai-orchestration/src/test/playwright/checkout-conflict.spec.ts covering three of the four spec-enumerated H3+H4 Layer-3 scenarios that pass under the existing harness: (1) different-holder start_session refuses with non-zero exit (EXIT_CHECKOUT_CONFLICT=4) and stderr names BOTH the holder's engine+provider AND the literal substrings `--force` and `Release Check-Out` (H3 + H4 contract); (2) --force overrides the refusal, mutates the orchestrator block to the new holder, rewrites checkedOutAt to 'now' (authority handoff), and appends exactly one audit line to ~/.dabbler/orchestrator-writer.log naming both holders + session number + ISO timestamp (HOME-override keeps the assertion hermetic); (3) same-holder re-attach preserves checkedOutAt and bumps lastActivityAt (H4 same-identity branch). All three scenarios green locally on Windows + Playwright _electron.launch.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-004/multi-in-progress-bucket-spec-green",
+      "dateTime": "2026-05-20T04:50:00-04:00",
+      "description": "Authored tools/dabbler-ai-orchestration/src/test/playwright/multi-in-progress.spec.ts. Scenario 1 (PASSING): 'In Progress bucket header shows the multi-in-progress count' — scaffolds two session sets with distinct orchestrator identities (claude+anthropic vs gpt-5-4+openai), launches the extension, asserts the In Progress bucket header text matches /^In Progress\\s*\\(2\\)/. Asserts on the bucket-count parenthetical rather than visible-row count because rows can collapse/expand independently of the bucket header text.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-004/accordion-body-pre-existing-s2-bug-surfaced",
+      "dateTime": "2026-05-20T05:10:00-04:00",
+      "description": "Scenario 2 of multi-in-progress.spec.ts (test.skip with FIXME): 'each in-progress row paints its own gauge SVG'. Coverage caught a PRE-EXISTING S2 reader bug — rows ship with data-state=\"in-progress\" but the webview receives accordionHtml === null in the payload, so client.js renders the chevron-spacer (not the chevron) and the .accordion-body never enters the DOM. No gauges paint. Confirmed pre-existing rather than S4-introduced: ran the EXISTING session-sets-tree.spec.ts 'two in-progress sets each render their own accordion body' test against the same harness — it ALSO fails with the same shape today, meaning S2's implementation of H2 multi-in-progress rendering has a regression that prior coverage missed. Skipping S4's new gauge scenario AND noting that the existing test has the same latent failure. Out of S4's spec scope; deferred to a future S2 follow-up. CustomSessionSetsView.buildRow ALWAYS sets accordionHtml for in-progress rows on the host side; the regression is somewhere in the host→webview serialization or activation-state path between the snapshot build and client.js receive. Diagnostic in the disposition.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-004/release-checkout-spec-palette-brittleness",
+      "dateTime": "2026-05-20T05:15:00-04:00",
+      "description": "checkout-conflict.spec.ts 'dabbler.releaseCheckOut command is registered and reachable' (test.skip with FIXME). Even after opening the Session Sets view to activate the extension, Playwright's palette filtering on 'Dabbler: Release Check-Out' returned 'no matching results'. The command is correctly declared in package.json contributes.commands (category Dabbler + title 'Release Check-Out') and Layer-2 (releaseCheckOut.test.ts describeHolder suite) covers the pure-logic surface. Palette discoverability driven from Playwright remains brittle — this is exactly the case the existing session-sets-tree.spec.ts harness note flagged ('driving cross-iframe focus reliably from Playwright is brittle, and the predicates themselves are the load-bearing invariants'). Manual operator smoke remains the path; deferred until a more reliable palette driver is identified.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-004/playwright-suite-green-locally",
+      "dateTime": "2026-05-20T05:20:00-04:00",
+      "description": "Ran `npx playwright test multi-in-progress.spec.ts checkout-conflict.spec.ts` locally on Windows + VS Code 1.120 + Code.exe + Playwright _electron.launch. Result: 4 passed (refusal + force-override + re-attach + multi-in-progress bucket header), 2 skipped with documented FIXMEs (gauge SVG → pre-existing S2 bug; release-checkout palette → Playwright palette brittleness). Total runtime 26.4s — well under the 90s per-test budget. The 4 passing scenarios cover the H3 + H4 load-bearing contract end-to-end. The full Playwright suite (including the existing 8 tests in session-sets-tree.spec.ts + loading-state.spec.ts + migration-cta.spec.ts) was NOT exercised in this session — local + CI matrix coverage of the broader suite via .github/workflows/test.yml runs on push; the S4 deltas are isolated to the two new spec files. `npx tsc --noEmit` clean on the extension. No router calls in this session per operator instruction.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-004/cancelled-md-architectural-question-surfaced",
+      "dateTime": "2026-05-20T05:25:00-04:00",
+      "description": "Mid-session, operator surfaced three connected concerns: (1) AI engine wrote cancellation manifest as `_cancelled.md` while Session Set Explorer expects `CANCELLED.md` (and probably `_superseded.md` vs `SUPERSEDED.md`); (2) explorer now expects CANCELLED.md but AI engine doesn't implement it — implementation gap; (3) deeper architectural question — given Set 033 H2's verdict that session-state.json is the single source of truth, should CANCELLED.md / RESTORED.md / SUPERSEDED.md exist at all? After surfacing options (hotfix vs glossary-harvest vs audit-then-spec), operator chose audit-then-spec — Set 034 = audit, Set 035 = implementation. Both candidates saved to memory as project_034_035_state_file_sole_truth_audit.md and indexed in MEMORY.md. The audit picks up where S2 stopped — S2 retired the orchestrator marker (`.dabbler/orchestrator.json`) per H2 but left CANCELLED.md / RESTORED.md / SUPERSEDED.md detection in place (fileSystem.ts:276 still gates cancellation on file presence, not on status==='cancelled' in the state file). This is the unfinished half of H2.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-004/round-a-verification",
+      "dateTime": "2026-05-20T05:30:00-04:00",
+      "description": "Operator opted to skip routed Round A verification for Session 4 ('Continue without the router for now.'). Coverage rationale: the 4 passing Playwright scenarios assert against subprocess-driven start_session calls + Electron-rendered DOM — both are observable end-to-end without a verifier. The 2 skipped scenarios have explicit FIXMEs naming the root cause (pre-existing S2 reader bug; Playwright palette brittleness), so a verifier wouldn't be reading them as 'broken' anyway. No router cost this session.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

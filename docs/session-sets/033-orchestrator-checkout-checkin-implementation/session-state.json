@@ -15,7 +15,7 @@
     {
       "number": 3,
       "title": "UI rename + ActionRegistry + Command Palette release action",
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "number": 4,
@@ -33,11 +33,12 @@
       "status": "not-started"
     }
   ],
-  "currentSession": 3,
+  "currentSession": null,
   "totalSessions": 6,
   "completedSessions": [
     1,
-    2
+    2,
+    3
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",

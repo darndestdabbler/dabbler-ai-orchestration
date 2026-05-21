@@ -30,29 +30,23 @@
     {
       "number": 6,
       "title": "Close-out parity + docs + cross-repo notifications + PyPI release",
-      "status": "in-progress"
+      "status": "complete"
     }
   ],
-  "currentSession": 6,
+  "currentSession": null,
   "totalSessions": 6,
   "completedSessions": [
     1,
     2,
     3,
     4,
-    5
+    5,
+    6
   ],
-  "status": "in-progress",
-  "lifecycleState": "work_in_progress",
+  "status": "complete",
+  "lifecycleState": "closed",
   "startedAt": "2026-05-21T02:40:31.435055-04:00",
-  "completedAt": null,
+  "completedAt": "2026-05-21T04:29:34.884623-04:00",
   "verificationVerdict": null,
-  "orchestrator": {
-    "engine": "claude",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high",
-    "checkedOutAt": "2026-05-20T01:35:14.743069-04:00",
-    "lastActivityAt": "2026-05-21T02:40:31.435055-04:00"
-  }
+  "orchestrator": null
 }

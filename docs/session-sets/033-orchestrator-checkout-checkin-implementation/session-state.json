@@ -25,7 +25,7 @@
     {
       "number": 5,
       "title": "Queueing / polling feature",
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "number": 6,
@@ -33,13 +33,14 @@
       "status": "not-started"
     }
   ],
-  "currentSession": 5,
+  "currentSession": null,
   "totalSessions": 6,
   "completedSessions": [
     1,
     2,
     3,
-    4
+    4,
+    5
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",

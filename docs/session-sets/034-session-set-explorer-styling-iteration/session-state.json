@@ -5,23 +5,18 @@
     {
       "number": 1,
       "title": "Land styling + version bump + Marketplace publish (re-scoped from 2 sessions to 1 mid-set per operator review)",
-      "status": "in-progress"
+      "status": "complete"
     }
   ],
-  "currentSession": 1,
+  "currentSession": null,
   "totalSessions": 1,
-  "completedSessions": [],
-  "status": "in-progress",
-  "lifecycleState": "work_in_progress",
+  "completedSessions": [
+    1
+  ],
+  "status": "complete",
+  "lifecycleState": "closed",
   "startedAt": "2026-05-21T08:16:18.362251-04:00",
-  "completedAt": null,
+  "completedAt": "2026-05-21T11:06:37.541919-04:00",
   "verificationVerdict": null,
-  "orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "medium",
-    "checkedOutAt": "2026-05-21T08:16:18.362251-04:00",
-    "lastActivityAt": "2026-05-21T08:16:18.362251-04:00"
-  }
+  "orchestrator": null
 }

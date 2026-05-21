@@ -39,7 +39,20 @@ is a required duplicate — `vsce package` expects the file alongside
 
 ## Extension versioning
 
-- Current: **v0.18.1** (Set 035 — state-file sole truth for
+- Current: **v0.19.0** (Set 034 — Session Set Explorer honesty pass;
+  per-row orchestrator-tracking accordion + ActionRegistry
+  orchestrator group RETIRED from the UI surface, replaced by a
+  bold color-coded progress-fraction list-icon and a cursor-anchored
+  popup right-click menu; bucket-level collapse remains as the sole
+  expand/collapse affordance; the cascading-checkout preview is
+  saved as an artifact for Set 036+ reactivation). No companion
+  PyPI release this set. The version walk:
+  - **0.18.1** (Set 035) — state-file sole truth for cancellation /
+    restoration extended from the Set 033 H2 verdict (orchestrator
+    block) to the cancellation lifecycle. See below for the prior
+    Set 035 description.
+
+- Previous: **v0.18.1** (Set 035 — state-file sole truth for
   cancellation/restoration; Marketplace publish gated on operator
   confirmation). No companion PyPI release this set
   (`ai_router/session_lifecycle.py` verified byte-equivalent with the

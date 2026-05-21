@@ -34,21 +34,16 @@ import {
   ICON_FILES,
   isCurrentSessionInFlight,
   needsMigrationBadge,
-  progressText,
   sortBucket,
   touchedDate,
   uatBadge,
 } from "./SessionSetsModel";
-import {
-  listInProgressSets,
-  recommendationFor,
-} from "./inProgressSetsService";
-import {
-  accordionStateFromOrchestratorBlock,
-  renderAccordionBody,
-  RenderState,
-} from "./OrchestratorAccordion";
-import { pickEmptyStateCta } from "./detectOrchestrators";
+// Set 034: the per-row orchestrator-tracking accordion (gauges + model
+// description) is retired from the UI. The OrchestratorAccordion +
+// detectOrchestrators modules are still present in the source for
+// possible future re-enable; this view no longer imports them. The
+// in-progress ordering helper still ships from inProgressSetsService.
+import { listInProgressSets } from "./inProgressSetsService";
 import {
   applicableActions,
   ActionSupports,
@@ -91,13 +86,12 @@ const COMMAND_ALLOWLIST: ReadonlySet<string> = new Set([
   "dabblerSessionSets.migrate",
   "dabblerSessionSets.cancel",
   "dabblerSessionSets.restore",
-  // Indicator-action buttons (Session 4 + Session 5 multi-provider)
-  "dabbler.installOrchestratorHook.claudeCode",
-  "dabbler.installOrchestratorHook.gemini",
-  "dabbler.installOrchestratorHook.copilot",
-  "dabbler.checkOutOrchestrator",
-  "dabbler.releaseCheckOut",
-  "dabbler.openOrchestratorWriterLog",
+  // Set 034: the orchestrator-control commands (checkOutOrchestrator /
+  // releaseCheckOut / openOrchestratorWriterLog / installOrchestratorHook.*)
+  // are no longer dispatched from the webview — they're removed from
+  // both ActionRegistry (right-click menu) and the empty-state CTA
+  // (which itself is gone). The commands remain registered in
+  // extension.ts and are still accessible via the Command Palette.
 ]);
 
 function contextValueFor(set: SessionSet): string {
@@ -108,15 +102,38 @@ function contextValueFor(set: SessionSet): string {
   return parts.join(":");
 }
 
+// Set 034: row description drops the fraction prefix (which now lives
+// in the right-aligned fraction list-icon column) and the trailing
+// "Complete" word. For in-progress rows: just "session N in flight".
+// For not-started / complete / cancelled rows: empty (the fraction
+// IS the signal). UAT / force-closed / needs-migration / touched-date
+// badges still tack on if present.
 function descriptionFor(set: SessionSet): string {
-  const bits = [
-    progressText(set),
+  const bits: string[] = [];
+  if (set.state === "in-progress" && set.liveSession?.currentSession != null) {
+    bits.push(`session ${set.liveSession.currentSession} in flight`);
+  }
+  const extras = [
     touchedDate(set),
     uatBadge(set),
     forceClosedBadge(set),
     needsMigrationBadge(set),
   ].filter(Boolean);
+  bits.push(...extras);
   return bits.join("  ·  ");
+}
+
+// Set 034: right-aligned bold colored progress fraction now lives in
+// its own list-icon column. Compute once here instead of embedding in
+// the description string.
+function fractionFor(set: SessionSet): string {
+  if (set.totalSessions && set.totalSessions > 0) {
+    return `${set.sessionsCompleted}/${set.totalSessions}`;
+  }
+  if (set.sessionsCompleted > 0) {
+    return `${set.sessionsCompleted}`;
+  }
+  return "";
 }
 
 export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode.Disposable {
@@ -183,6 +200,14 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       case "executeCommand":
         this.dispatchCommand(msg.commandId, msg.args);
         return;
+      case "executeRowCommand": {
+        // Set 034: cursor-anchored context-menu item selection. Look
+        // up the set by slug and dispatch the command with [{ set }].
+        const set = this.findSetBySlug(msg.slug);
+        if (!set) return;
+        this.dispatchCommand(msg.commandId, [{ set }]);
+        return;
+      }
       case "showRowContextMenu":
         void this.showContextMenu(msg.slug);
         return;
@@ -204,21 +229,24 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     void vscode.commands.executeCommand(commandId, ...(args ?? []));
   }
 
+  // Set 034: replaced the v0.18.1 showQuickPick-at-top-of-window flow
+  // with a cursor-anchored popup rendered by the webview. The host
+  // computes applicable actions and posts them back as a flat
+  // `renderContextMenu` message; the webview paints the popup at the
+  // cursor position it captured on the contextmenu event.
   private async showContextMenu(slug: string): Promise<void> {
+    if (!this.view) return;
     const set = this.findSetBySlug(slug);
     if (!set) return;
     const supports: ActionSupports = await this.readSupports();
     const actions = applicableActions(set, supports);
     if (actions.length === 0) return;
-    const picked = await vscode.window.showQuickPick(
-      actions.map((a) => ({ label: a.label, id: a.id })),
-      {
-        placeHolder: `${set.name} — choose an action`,
-        matchOnDescription: false,
-      },
-    );
-    if (!picked) return;
-    this.dispatchCommand(picked.id, [{ set }]);
+    const msg: HostToWebview = {
+      type: "renderContextMenu",
+      slug,
+      items: actions.map((a) => ({ label: a.label, commandId: a.id })),
+    };
+    this.view.webview.postMessage(msg);
   }
 
   private async readSupports(): Promise<ActionSupports> {
@@ -298,10 +326,8 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     // state CTA is shared across in-progress rows that have no
     // orchestrator block yet (e.g., a pre-Set-033 in-flight set, or
     // a freshly-started set that hasn't run start_session yet).
-    const emptyCta = pickEmptyStateCta();
-
     const payload: SnapshotPayload = {
-      buckets: this.buildBuckets(all, emptyCta),
+      buckets: this.buildBuckets(all),
       hasAnySets: all.length > 0,
       welcomeHtml: this.welcomeHtml,
     };
@@ -345,24 +371,16 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     return this.scanState.phase === "loading" ? "loading" : "ready";
   }
 
-  private buildBuckets(
-    all: SessionSet[],
-    emptyCta: import("./OrchestratorAccordion").EmptyCta | null,
-  ): BucketPayload[] {
+  private buildBuckets(all: SessionSet[]): BucketPayload[] {
     const buckets = bucketSets(all);
-    // Set 033 Session 2: order in-progress sets by `startedAt` ascending
-    // (the older the in-flight set, the higher it ranks) — same order
-    // as `listInProgressSets()`. SessionSetsModel.sortBucket still
-    // sorts by `lastTouched` desc for the visual rows; we apply the
-    // in-progress-specific ordering here.
     const inProgressOrdered = listInProgressSets(buckets.inProgress);
     const groups: BucketPayload[] = [
-      this.buildBucket("in-progress", "In Progress", inProgressOrdered, emptyCta),
-      this.buildBucket("not-started", "Not Started", buckets.notStarted, emptyCta),
-      this.buildBucket("complete", "Complete", buckets.complete, emptyCta),
+      this.buildBucket("in-progress", "In Progress", inProgressOrdered),
+      this.buildBucket("not-started", "Not Started", buckets.notStarted),
+      this.buildBucket("complete", "Complete", buckets.complete),
     ];
     if (buckets.cancelled.length > 0) {
-      groups.push(this.buildBucket("cancelled", "Cancelled", buckets.cancelled, emptyCta));
+      groups.push(this.buildBucket("cancelled", "Cancelled", buckets.cancelled));
     }
     return groups;
   }
@@ -371,45 +389,43 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     key: BucketPayload["key"],
     label: string,
     subset: SessionSet[],
-    emptyCta: import("./OrchestratorAccordion").EmptyCta | null,
   ): BucketPayload {
     const sorted = key === "in-progress" ? subset : sortBucket(subset, key);
-    const rows = sorted.map((set) => this.buildRow(set, emptyCta));
+    const rows = sorted.map((set) => this.buildRow(set));
     return { key, label, count: subset.length, rows };
   }
 
-  private buildRow(
-    set: SessionSet,
-    emptyCta: import("./OrchestratorAccordion").EmptyCta | null,
-  ): RowPayload {
-    // Set 033 Session 2: every in-progress row gets an accordion body
-    // (multi-in-progress is the supported case). The body is computed
-    // from this set's `orchestrator` block on session-state.json + its
-    // ai-assignment.md recommendation. Non-in-progress rows still
-    // skip the accordion entirely per S4 Q3 = a.
-    let accordionHtml: string | null = null;
-    let accordionUpdatedAt: string | null = null;
-    if (set.state === "in-progress") {
-      const block = set.liveSession?.orchestrator ?? null;
-      const recommendation = recommendationFor(set);
-      let state: RenderState = accordionStateFromOrchestratorBlock(block, recommendation);
-      if (state.kind === "empty") {
-        state = { kind: "empty", cta: emptyCta };
-      } else {
-        accordionUpdatedAt = state.marker.updatedAt;
-      }
-      accordionHtml = renderAccordionBody(state);
-    }
+  private buildRow(set: SessionSet): RowPayload {
+    // Set 034: the per-row accordion is GONE. Operator feedback
+    // 2026-05-21 (mid-Set-034 Session 1) — the gauges and the
+    // orchestrator-info text below them read as more authoritative
+    // than the underlying signal warrants: signalKind is always
+    // "current" under the Set 033 adapter regardless of how stale
+    // the recorded check-out is, effort tracking via /think_* slash
+    // commands was retired in Set 033 H2 (no longer observed), and
+    // for orchestrators without a hook path (Copilot, Gemini) the
+    // gauge area was either empty or whatever the last manual
+    // checkout claimed. Rather than try to honestly caveat all of
+    // that visually, retire the entire orchestrator-tracking display
+    // surface until Set 036+ delivers a real signal. Rows now show
+    // just name + fraction + description.
+    //
+    // Net effect: accordionHtml is null on every row; client.js no
+    // longer renders any accordion body. The `orchestrator` block on
+    // session-state.json continues to be written by start_session /
+    // close_session (the check-out semantics still serve coordination
+    // and audit-log purposes); only the UI surface retires.
     return {
       slug: set.name,
       name: set.name,
       state: set.state,
+      fraction: fractionFor(set),
       description: descriptionFor(set),
       contextValue: contextValueFor(set),
       iconSlug: ICON_FILES[set.state] ?? "",
       needsMigration: set.needsMigration,
-      accordionHtml,
-      accordionUpdatedAt,
+      accordionHtml: null,
+      accordionUpdatedAt: null,
     };
   }
 

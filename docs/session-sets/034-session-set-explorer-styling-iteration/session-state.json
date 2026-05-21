@@ -4,22 +4,24 @@
   "sessions": [
     {
       "number": 1,
-      "title": "HTML-preview rounds 3-N + land styling",
-      "status": "not-started"
-    },
-    {
-      "number": 2,
-      "title": "README screenshot + version bump + Marketplace re-publish",
-      "status": "not-started"
+      "title": "Land styling + version bump + Marketplace publish (re-scoped from 2 sessions to 1 mid-set per operator review)",
+      "status": "in-progress"
     }
   ],
-  "currentSession": null,
-  "totalSessions": 2,
+  "currentSession": 1,
+  "totalSessions": 1,
   "completedSessions": [],
-  "status": "not-started",
+  "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": null,
+  "startedAt": "2026-05-21T08:16:18.362251-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "medium",
+    "checkedOutAt": "2026-05-21T08:16:18.362251-04:00",
+    "lastActivityAt": "2026-05-21T08:16:18.362251-04:00"
+  }
 }

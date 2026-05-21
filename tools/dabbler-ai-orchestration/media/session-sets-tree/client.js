@@ -23,6 +23,18 @@
   // user click). Persists across re-renders so a fresh snapshot
   // doesn't snap-back an operator's manual collapse / expand.
   const manualToggles = {};
+  // Set 034: bucket-level collapse state. Keyed by bucket.key
+  // ("in-progress" / "not-started" / "complete" / "cancelled");
+  // value true = expanded, false = collapsed. Persists across
+  // re-renders for the session so a watcher tick doesn't snap a
+  // user-collapsed bucket back open.
+  const bucketCollapsed = {};
+  // Set 034: cursor-anchored context menu state. The contextmenu
+  // event captures the cursor position; when the host responds with
+  // `renderContextMenu`, the popup is painted at that position. One
+  // popup element is appended to the body lazily on first use.
+  let lastContextMenuPos = { x: 0, y: 0 };
+  let contextMenuEl = null;
 
   // ----- Escape helpers (defense-in-depth) -----
   function escHtml(s) {
@@ -61,8 +73,96 @@
         suppressed = msg.suppressed || {};
         render();
         return;
+      case "renderContextMenu":
+        // Set 034: cursor-anchored context menu. Host computed
+        // applicable actions from ActionRegistry; paint the popup at
+        // the cursor position we captured on the contextmenu event.
+        showCursorContextMenu(msg.slug, msg.items || []);
+        return;
     }
   });
+
+  // ----- Cursor-anchored context menu (Set 034) -----
+  function ensureContextMenuEl() {
+    if (contextMenuEl) return contextMenuEl;
+    contextMenuEl = document.createElement("div");
+    contextMenuEl.className = "context-menu";
+    document.body.appendChild(contextMenuEl);
+    return contextMenuEl;
+  }
+  function hideContextMenu() {
+    if (contextMenuEl) {
+      contextMenuEl.classList.remove("is-open");
+      contextMenuEl.innerHTML = "";
+    }
+  }
+  function showCursorContextMenu(slug, items) {
+    if (!items || items.length === 0) return;
+    const menu = ensureContextMenuEl();
+    let html = "";
+    let lastBand = -1;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      // Group-band separators are implicit in ActionRegistry's group
+      // numbering (100s = open, 200s = navigate, 300s = copy command,
+      // 400s = copy meta, 800s = migrate, 900s = lifecycle). The host
+      // ships items pre-sorted; insert separators on band transitions.
+      // We can't know the band from {label, commandId} alone, so derive
+      // by commandId prefix as a best-effort.
+      const band = bandForCommandId(it.commandId);
+      if (lastBand !== -1 && band !== lastBand) {
+        html += '<div class="context-menu-separator"></div>';
+      }
+      lastBand = band;
+      html +=
+        '<div class="context-menu-item" data-command="' + escAttr(it.commandId) +
+        '" data-slug="' + escAttr(slug) + '">' + escHtml(it.label) + '</div>';
+    }
+    menu.innerHTML = html;
+    menu.style.left = lastContextMenuPos.x + "px";
+    menu.style.top = lastContextMenuPos.y + "px";
+    menu.classList.add("is-open");
+    // Flip if overflowing the viewport's right or bottom edge.
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 4) {
+      menu.style.left = Math.max(4, lastContextMenuPos.x - rect.width) + "px";
+    }
+    if (rect.bottom > window.innerHeight - 4) {
+      menu.style.top = Math.max(4, lastContextMenuPos.y - rect.height) + "px";
+    }
+  }
+  function bandForCommandId(id) {
+    if (id.indexOf("open") >= 0 || id.indexOf("revealPlaywright") >= 0) return 1;
+    if (id.indexOf("openFolder") >= 0) return 2;
+    if (id.indexOf("copyStartCommand") >= 0) return 3;
+    if (id.indexOf("copySlug") >= 0) return 4;
+    if (id.indexOf("migrate") >= 0) return 8;
+    if (id.indexOf("cancel") >= 0 || id.indexOf("restore") >= 0) return 9;
+    return 0;
+  }
+  // Clicks on menu items dispatch to the host; clicks elsewhere close.
+  document.addEventListener("click", function (ev) {
+    if (!contextMenuEl || !contextMenuEl.classList.contains("is-open")) return;
+    const item = ev.target.closest(".context-menu-item");
+    if (item && contextMenuEl.contains(item)) {
+      const commandId = item.getAttribute("data-command");
+      const slug = item.getAttribute("data-slug");
+      if (commandId && slug) {
+        vscode.postMessage({ type: "executeRowCommand", slug: slug, commandId: commandId });
+      }
+      hideContextMenu();
+      return;
+    }
+    hideContextMenu();
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape" && contextMenuEl && contextMenuEl.classList.contains("is-open")) {
+      hideContextMenu();
+    }
+  });
+  // Close on resize / scroll so the menu doesn't float untethered.
+  window.addEventListener("resize", hideContextMenu);
+  window.addEventListener("scroll", hideContextMenu, true);
 
   // ----- Render -----
   function render() {
@@ -108,67 +208,61 @@
   function renderBucket(bucket) {
     const labelText = bucket.label + "  (" + bucket.count + ")";
     const groupId = "group-" + bucket.key;
+    const bodyId = "body-" + bucket.key;
     if (bucket.count === 0) {
       return (
         '<div role="group" aria-labelledby="' + groupId + '" class="bucket bucket-empty">' +
-          '<div id="' + groupId + '" class="bucket-header">' + escHtml(labelText) + '</div>' +
+          '<div id="' + groupId + '" class="bucket-header">' +
+            '<span class="bucket-chevron" aria-hidden="true"></span>' +
+            '<span>' + escHtml(labelText) + '</span>' +
+          '</div>' +
         '</div>'
       );
     }
+    // Set 034: bucket-level collapse. Default expanded; respect
+    // manual operator toggles via `bucketCollapsed[key] === false`.
+    const expanded = bucketCollapsed[bucket.key] !== false;
+    const chevronGlyph = expanded ? "▾" : "▸";
     const rows = bucket.rows.map(function (row) { return renderRow(row); }).join("");
     return (
-      '<div role="group" aria-labelledby="' + groupId + '" class="bucket">' +
-        '<div id="' + groupId + '" class="bucket-header">' + escHtml(labelText) + '</div>' +
-        rows +
+      '<div role="group" aria-labelledby="' + groupId + '" class="bucket"' +
+        ' aria-expanded="' + (expanded ? "true" : "false") + '"' +
+        ' data-bucket-key="' + escAttr(bucket.key) + '">' +
+        '<div id="' + groupId + '" class="bucket-header" data-collapsible="true"' +
+        ' aria-controls="' + bodyId + '">' +
+          '<span class="bucket-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
+          '<span>' + escHtml(labelText) + '</span>' +
+        '</div>' +
+        '<div class="bucket-body" id="' + bodyId + '">' + rows + '</div>' +
       '</div>'
     );
   }
 
   function renderRow(row) {
-    // Set 033 Session 2: every in-progress row is expandable when
-    // accordionHtml is non-null (multi-in-progress is the supported
-    // case). Non-in-progress rows still skip the accordion entirely.
-    const isExpandable = row.accordionHtml !== null;
-    // Default expansion: expandable + not currently suppressed for
-    // this occurrence. Manual override (current session click) takes
-    // precedence.
-    let expanded;
-    if (Object.prototype.hasOwnProperty.call(manualToggles, row.slug)) {
-      expanded = manualToggles[row.slug];
-    } else {
-      expanded = isExpandable && !isSuppressedForRow(row);
-    }
-    const ariaExpanded = isExpandable ? ' aria-expanded="' + (expanded ? "true" : "false") + '"' : "";
-    const chevron = isExpandable
-      ? '<span class="chevron" aria-hidden="true">' + (expanded ? "▾" : "▸") + '</span>'
-      : '<span class="chevron-spacer" aria-hidden="true"></span>';
-    const accordionAttrs = isExpandable
-      ? (' data-expandable="1" data-accordion-updated-at="' +
-          (row.accordionUpdatedAt ? escAttr(row.accordionUpdatedAt) : "") + '"')
+    // Set 034: row layout simplified. Per-row chevron + state-badge
+    // icon retired; the bold color-coded `row.fraction` is the
+    // right-aligned list-icon on the LEFT (fixed-width column). The
+    // per-row orchestrator-tracking accordion is also retired (gauges
+    // + model description + smart CTA all gone). Rows are never
+    // expandable in this view — `accordionHtml` is always null from
+    // the host.
+    const fractionCls = "row-fraction row-fraction-" + escAttr(row.state);
+    const descSpan = row.description
+      ? '<span class="row-description">' + escHtml(row.description) + '</span>'
       : "";
-
-    const bodyHtml = isExpandable && expanded
-      ? '<div class="accordion-body" role="region" aria-label="Orchestrator">' +
-          // accordionHtml is host-escaped (OrchestratorAccordion.escHtml
-          // / escAttr) — safe to inject.
-          row.accordionHtml +
-        '</div>'
-      : "";
-
     return (
-      '<div role="treeitem" tabindex="-1" aria-level="2"' + ariaExpanded +
+      '<div role="treeitem" tabindex="-1" aria-level="2"' +
       ' aria-selected="false" data-slug="' + escAttr(row.slug) + '"' +
       ' data-state="' + escAttr(row.state) + '"' +
       ' data-context-value="' + escAttr(row.contextValue) + '"' +
-      accordionAttrs +
       ' class="row row-' + escAttr(row.state) + '">' +
         '<div class="row-header" role="presentation">' +
-          chevron +
-          '<span class="row-icon" aria-hidden="true" data-icon="' + escAttr(row.iconSlug) + '"></span>' +
-          '<span class="row-name">' + escHtml(row.name) + '</span>' +
-          '<span class="row-description">' + escHtml(row.description) + '</span>' +
+          '<span class="' + fractionCls + '" aria-hidden="true">' + escHtml(row.fraction || "") + '</span>' +
+          '<span class="row-text">' +
+            '<span class="row-name">' + escHtml(row.name) + '</span>' +
+            descSpan +
+          '</span>' +
         '</div>' +
-        bodyHtml +
       '</div>'
     );
   }
@@ -247,18 +341,31 @@
 
   // ----- Interaction wiring (after each render) -----
   function wireInteraction() {
-    // Click on row header → activate (default = openSpec).
+    // Set 034: bucket-level collapse. Click on a collapsible
+    // bucket-header toggles aria-expanded on the bucket; CSS hides
+    // the .bucket-body when aria-expanded="false".
+    Array.from(root.querySelectorAll('.bucket-header[data-collapsible="true"]')).forEach(function (header) {
+      header.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        const bucket = header.parentElement;
+        if (!bucket) return;
+        const key = bucket.getAttribute("data-bucket-key");
+        const wasExpanded = bucket.getAttribute("aria-expanded") === "true";
+        const next = !wasExpanded;
+        bucket.setAttribute("aria-expanded", next ? "true" : "false");
+        const chev = header.querySelector(".bucket-chevron");
+        if (chev) chev.textContent = next ? "▾" : "▸";
+        if (key) bucketCollapsed[key] = next;
+      });
+    });
+
+    // Set 034: per-row chevron retired, accordion retired. Click on
+    // the row header activates (default = openSpec). No expand/
+    // collapse toggle path because there's nothing to expand.
     Array.from(root.querySelectorAll('.row-header')).forEach(function (header) {
       header.addEventListener("click", function (ev) {
         const item = ev.currentTarget.closest('[role="treeitem"]');
         if (!item) return;
-        // Click on the chevron toggles expand/collapse; click
-        // elsewhere on the header activates.
-        if (ev.target && ev.target.classList && ev.target.classList.contains("chevron")) {
-          toggleRow(item);
-          ev.stopPropagation();
-          return;
-        }
         focusItem(item);
         const slug = item.getAttribute("data-slug");
         if (slug) {
@@ -267,13 +374,17 @@
       });
     });
 
-    // Right-click → context menu.
+    // Right-click → context menu. Set 034: capture cursor position
+    // so the cursor-anchored popup (rendered when host responds with
+    // `renderContextMenu`) appears AT the cursor instead of at the
+    // top of the window.
     Array.from(root.querySelectorAll('[role="treeitem"]')).forEach(function (item) {
       item.addEventListener("contextmenu", function (ev) {
         ev.preventDefault();
         focusItem(item);
         const slug = item.getAttribute("data-slug");
         if (slug) {
+          lastContextMenuPos = { x: ev.clientX, y: ev.clientY };
           vscode.postMessage({ type: "showRowContextMenu", slug: slug });
         }
       });
@@ -330,18 +441,11 @@
         focusLast();
         return;
       case "ArrowRight":
-        ev.preventDefault();
-        if (item.getAttribute("data-expandable") === "1") {
-          if (item.getAttribute("aria-expanded") !== "true") {
-            toggleRow(item, true);
-          }
-        }
-        return;
       case "ArrowLeft":
+        // Set 034: per-row accordion is retired; ArrowRight/Left no
+        // longer expand/collapse anything. Keep the keys consumed so
+        // they don't bubble to the editor unexpectedly.
         ev.preventDefault();
-        if (item.getAttribute("data-expandable") === "1" && item.getAttribute("aria-expanded") === "true") {
-          toggleRow(item, false);
-        }
         return;
       case "Enter":
       case " ":

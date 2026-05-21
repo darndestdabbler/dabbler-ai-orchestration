@@ -62,17 +62,16 @@ export const ROW_ACTIONS: RowAction[] = [
   { id: "dabblerSessionSets.copyStartCommand.parallel", label: "Copy: Start next parallel session", group: 302,
     when: (s) => inFlightLike(s) },
   { id: "dabblerSessionSets.copySlug",          label: "Copy: Slug only",                    group: 401, when: () => true },
-  // Orchestrator group — relegated from the accordion-body buttons in
-  // Set 029 Session 6. Set 033 S3 renamed "Set Orchestrator…" to
-  // "Check Out As…" to match the H1+H3+H4 check-out / check-in model,
-  // and added "Release Check-Out" as the H3-named release path. Both
-  // act on the in-progress set's `orchestrator` block; the writer-log
-  // is global diagnostic and always available.
-  { id: "dabbler.checkOutOrchestrator",         label: "Check Out As…",                      group: 501,
-    when: (s) => s.state === "in-progress" },
-  { id: "dabbler.releaseCheckOut",              label: "Release Check-Out",                  group: 502,
-    when: (s) => s.state === "in-progress" },
-  { id: "dabbler.openOrchestratorWriterLog",    label: "Open Orchestrator Writer Log",       group: 503, when: () => true },
+  // Set 034: orchestrator group (Check Out As… / Release Check-Out /
+  // Open Orchestrator Writer Log) RETIRED from the right-click menu.
+  // The per-row orchestrator-tracking accordion is also gone; without
+  // the gauges + model-description display, surfacing these manual-
+  // override commands here misled operators into thinking the menu
+  // controlled a live signal. The commands stay registered in
+  // extension.ts and are still callable from the Command Palette as
+  // a power-user / recovery affordance. Re-enable here when Set 036+
+  // lands a real chatSessionId-backed signal so the manual override
+  // surface has something to coordinate with.
   { id: "dabblerSessionSets.migrate",           label: "Migrate to v3 schema",               group: 801, when: needsMigration },
   { id: "dabblerSessionSets.cancel",            label: "Cancel Session Set",                 group: 901,
     when: (s) => cancellable(s) },

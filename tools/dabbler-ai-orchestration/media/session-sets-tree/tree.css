@@ -93,16 +93,45 @@ body.vscode-light, body.vscode-high-contrast-light {
   margin-bottom: 4px;
 }
 .bucket-header {
-  padding: 4px 12px 2px 12px;
+  /* Set 034: bottom padding bumped so there's ample air between
+   * the bucket heading and the first row even after the row
+   * spacing tightens below. The bucket header is now the SOLE
+   * collapse affordance (per-row chevron / per-row accordion both
+   * retired); clicking toggles the bucket-body display. */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px 8px 12px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.72;
   user-select: none;
+  cursor: pointer;
+}
+.bucket-header:hover {
+  background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.10));
 }
 .bucket-empty .bucket-header {
   opacity: 0.45;
+  cursor: default;
+}
+.bucket-empty .bucket-header:hover {
+  background: transparent;
+}
+.bucket-chevron {
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.bucket-empty .bucket-chevron {
+  visibility: hidden;
+}
+.bucket[aria-expanded="false"] .bucket-body {
+  display: none;
 }
 
 /* ---- Row ---- */
@@ -124,58 +153,131 @@ body.vscode-light, body.vscode-high-contrast-light {
   outline-offset: -1px;
 }
 
+/* Set 034: row layout overhauled.
+ *
+ * Round-5 operator feedback: the per-row chevron + per-row state-badge
+ * icon were redundant signal (chevron implied collapse not present at
+ * the row level after bucket-collapse moved up; the state icon
+ * duplicated the bucket grouping). Both are retired. The bold
+ * color-coded progress fraction becomes the right-aligned list icon
+ * on the LEFT (fixed-width column, text-align right) — same shape as a
+ * traditional "01.", "02." list-icon — and the row text wraps freely
+ * on the right.
+ *
+ * The .chevron / .chevron-spacer / .row-icon[data-icon] rules from
+ * v0.18.1 are intentionally gone; client.js no longer emits those
+ * spans. */
 .row-header {
   display: flex;
-  align-items: center;
-  padding: 3px 10px 3px 8px;
-  gap: 4px;
+  align-items: baseline;
+  padding: 2px 12px;
+  gap: 0;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.2;
   user-select: none;
 }
 .row-header:hover {
   background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.10));
 }
-.chevron, .chevron-spacer {
-  display: inline-block;
-  width: 14px;
-  flex-shrink: 0;
-  text-align: center;
-  opacity: 0.7;
-  cursor: pointer;
-}
-.row-icon {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  margin-right: 2px;
-  /* Icons resolved at runtime via data-icon attribute; the host
-   * could swap to actual sprite URIs, but for v1 a textual badge
-   * via the bucket header + row-state class is enough visual
-   * signal. */
-}
-.row-icon[data-icon="done.svg"]::before        { content: "✓"; opacity: 0.7; }
-.row-icon[data-icon="in-progress.svg"]::before { content: "▶"; opacity: 0.85; }
-.row-icon[data-icon="not-started.svg"]::before { content: "○"; opacity: 0.55; }
-.row-icon[data-icon="cancelled.svg"]::before   { content: "✕"; opacity: 0.55; }
 
-.row-name {
+/* Right-aligned fraction list-icon. Fixed-width column so fractions
+ * line up across all rows; doesn't shrink under flex pressure (so the
+ * row name wraps before the fraction collides with it). */
+.row-fraction {
   flex: 0 0 auto;
-  max-width: 60%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  text-align: right;
+  width: 3em;
+  margin-right: 12px;
+  line-height: 1.2;
+}
+
+/* Fraction colors per row state. Theme-aware via the body class
+ * VS Code paints (body.vscode-light / body.vscode-dark) — defaults
+ * to the dark-mode palette since the :root rule applies regardless. */
+:root {
+  --frac-in-progress: rgb(86, 180, 233);
+  --frac-not-started: rgb(187, 187, 187);
+  --frac-complete:    rgb(0, 197, 140);
+}
+body.vscode-light, body.vscode-high-contrast-light {
+  --frac-in-progress: rgb(86, 180, 233);
+  --frac-not-started: rgb(127, 127, 127);
+  --frac-complete:    rgb(0, 158, 115);
+}
+.row-fraction-in-progress { color: var(--frac-in-progress); }
+.row-fraction-not-started { color: var(--frac-not-started); }
+.row-fraction-complete    { color: var(--frac-complete); }
+.row-fraction-cancelled   { color: var(--frac-not-started); opacity: 0.7; }
+
+.row-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Row name wraps freely; when it wraps, the second line indents
+ * under the first line of the name (the fraction column stays
+ * outdented on the left). */
+.row-name {
+  display: inline;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   font-weight: 500;
 }
 .row-description {
-  flex: 1 1 auto;
-  margin-left: 8px;
+  display: inline;
+  margin-left: 6px;
   font-size: 12px;
   opacity: 0.7;
+  white-space: normal;
+  overflow: visible;
+}
+
+/* ---- Cursor-anchored context menu (Set 034) ---- */
+/*
+ * Right-clicking a row paints a native-style popup AT THE CURSOR
+ * (replacing the v0.18.1 showQuickPick that opened at the top of the
+ * window). Items come from ActionRegistry.applicableActions via the
+ * new `renderContextMenu` host → webview message.
+ *
+ * Theme variables (--vscode-menu-*) come from VS Code automatically
+ * inside the webview; the fallbacks below cover the standalone-
+ * preview render path.
+ */
+.context-menu {
+  position: fixed;
+  display: none;
+  z-index: 10000;
+  min-width: 220px;
+  padding: 4px 0;
+  background: var(--vscode-menu-background, #252526);
+  color: var(--vscode-menu-foreground, #cccccc);
+  border: 1px solid var(--vscode-menu-border, var(--vscode-editorWidget-border, #454545));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  font-family: var(--vscode-font-family, 'Segoe UI', sans-serif);
+  font-size: 13px;
+  user-select: none;
+  line-height: 1.4;
+}
+.context-menu.is-open { display: block; }
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 18px 3px 12px;
+  cursor: pointer;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+.context-menu-item:hover,
+.context-menu-item.is-active {
+  background: var(--vscode-menu-selectionBackground, #094771);
+  color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+.context-menu-separator {
+  height: 1px;
+  background: var(--vscode-menu-separatorBackground, var(--vscode-editorWidget-border, #454545));
+  margin: 4px 0;
 }
 
 /* ---- Accordion body ---- */

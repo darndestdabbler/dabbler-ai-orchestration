@@ -32,12 +32,21 @@ export interface RowPayload {
   slug: string;
   name: string;
   state: "in-progress" | "not-started" | "complete" | "cancelled";
-  description: string;             // already-formatted: "3/6 · session 4 in flight · 2026-05-18"
+  // Set 034: progress fraction moved out of `description` into its own
+  // right-aligned bold colored list-icon column on the left side of
+  // the row. Always non-empty when totalSessions > 0; may be "" only
+  // when the set has no totalSessions on disk yet.
+  fraction: string;                // e.g. "3/6", "0/4", "3/3"
+  description: string;             // remaining description after fraction extraction (e.g. "session 4 in flight  ·  2026-05-18")
   contextValue: string;            // for ActionRegistry membership tests (e.g., "sessionSet:in-progress:uat")
   iconSlug: string;                // "in-progress.svg" / "done.svg" / etc.
   needsMigration: boolean;
-  accordionHtml: string | null;    // pre-rendered (for in-progress rows) or null (for everything else)
-  accordionUpdatedAt: string | null; // suppression key — orchestrator.lastActivityAt or null on empty-state accordion
+  // Set 034: the per-row orchestrator-tracking accordion is retired.
+  // These fields remain on the protocol so older host/webview pairings
+  // stay structurally compatible, but the host always emits null and
+  // the webview never renders an accordion body.
+  accordionHtml: string | null;
+  accordionUpdatedAt: string | null;
 }
 
 export interface BucketPayload {
@@ -79,7 +88,27 @@ export interface SuppressionEchoMsg {
   suppressed: Record<string, string>;  // slug → accordion.updatedAt
 }
 
-export type HostToWebview = RowsSnapshotMsg | ScanStateChangedMsg | SuppressionEchoMsg;
+// Set 034: cursor-anchored context menu. The host computes
+// applicable actions from ActionRegistry and posts them back as a
+// flat list of {label, commandId} pairs; the webview paints the
+// popup at the cursor position it captured on the contextmenu event.
+// Replaces the v0.18.1 host-side `showQuickPick` that opened at the
+// top of the window.
+export interface ContextMenuItem {
+  label: string;
+  commandId: string;
+}
+export interface RenderContextMenuMsg {
+  type: "renderContextMenu";
+  slug: string;
+  items: ContextMenuItem[];
+}
+
+export type HostToWebview =
+  | RowsSnapshotMsg
+  | ScanStateChangedMsg
+  | SuppressionEchoMsg
+  | RenderContextMenuMsg;
 
 // ----- Webview → Host -----
 
@@ -128,8 +157,20 @@ export interface ReadyMsg {
   type: "ready";
 }
 
+// Set 034: cursor-anchored context-menu item selection. The webview
+// emits this when the operator clicks an item in the popup; the host
+// looks up the SessionSet by slug and dispatches the underlying
+// vscode command with `[{ set }]` as args (same shape commands have
+// expected since the original showQuickPick flow).
+export interface ExecuteRowCommandMsg {
+  type: "executeRowCommand";
+  slug: string;
+  commandId: string;
+}
+
 export type WebviewToHost =
   | ExecuteCommandMsg
+  | ExecuteRowCommandMsg
   | ShowRowContextMenuMsg
   | ToggleRowMsg
   | ActivateRowMsg

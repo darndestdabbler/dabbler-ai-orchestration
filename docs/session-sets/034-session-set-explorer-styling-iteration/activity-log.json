@@ -1,0 +1,97 @@
+{
+  "sessionSetName": "034-session-set-explorer-styling-iteration",
+  "createdDate": "2026-05-21",
+  "totalSessions": 1,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/preview-refreshed-against-set-033",
+      "dateTime": "2026-05-21T08:20:00-04:00",
+      "description": "Refreshed docs/proposals/2026-05-19-explorer-styling/preview.html against post-Set-033 reality. The round-2 file had diverged from what the operator actually sees today (the bucket-level chevron + row-name wrap experiments were not landed in production; the ambiguity banner was retired in Set 033 S2; the empty-state grey gauges were retired in Set 035; the per-row chevron + multi-set rendering both shipped). Resyncs the preview tree shell + accordion body to mirror what v0.18.1 paints so subsequent iteration rounds explore changes from current reality.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/round-4-applied",
+      "dateTime": "2026-05-21T08:40:00-04:00",
+      "description": "Round 4 applied seven operator-flagged changes: (1) per-row chevron + state-badge icon dropped (one icon per In Progress row); (2) bucket-level (heading-level) accordion is the sole collapse affordance; (3) vendor prefix dropped from gauge sublabel + describeMarker (no anthropic/google/openai); (4) gauges max-width 240px so they don't fly apart in wide panes; (5) row name wraps when narrow; (6) trailing 'Complete' word dropped from descriptions; (7) progress fraction promoted to right-side bold color-coded 'list icon' on the LEFT (fixed-width 3em column, right-aligned within). Round 4b moved the fraction from the right edge to the left edge per operator clarification ('like a list icon, but right-aligned WITHIN its column'). Friendly model-name mapper added to the preview's adapter so 'claude-opus-4-7' renders as 'Claude Opus 4.7'.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/round-5-color-line-height-and-mismatch-prefixes",
+      "dateTime": "2026-05-21T09:05:00-04:00",
+      "description": "Round 5a — Completed-fraction color corrected: light rgb(0,158,115) / dark rgb(0,197,140) (operator's first RGB triples decoded to earth-tone, not green; second pair is the actual green). In Progress color changed to sky blue rgb(86,180,233) both themes (yellow was illegible on white). Line-height tightened to 1.2 (from 1.4 default). Row vertical padding tightened ~50% (2px from 4px); bucket-header padding-bottom kept ample (8px) so the heading doesn't crowd the first row. Model section labels (ACTUAL / SUGGESTED) converted from band-styled <div class='model-section-header'> to inline bold small-caps prefixes on the same line as the model description text — addresses dark-mode legibility (band-bg was light-grey on dark which read as inverted, jarring).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/round-5-cursor-anchored-cascade-preview",
+      "dateTime": "2026-05-21T09:25:00-04:00",
+      "description": "Round 5b — Cursor-anchored cascading 'Check Out As…' submenu prototyped in the preview as Path A demonstration: right-click any row pops a native-style menu at the cursor; Check Out As… cascades into Provider → Model → Effort. CSS uses VS Code's --vscode-menu-* variables; preview adds menu-theme shims to the pane-body classes. Toast in bottom-right corner shows 'Would dispatch → <commandId> <args>' so the operator can see the cascade-resolved selection without dispatching anything for real.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/operator-decision-defer-checkout-and-retire-gauges",
+      "dateTime": "2026-05-21T09:55:00-04:00",
+      "description": "Operator review surfaced three concerns with the cascade as a primary UX: (1) Claude Code + Codex CLIs don't accept effort flags — effort is set inside the chat via /think_*; (2) the Claude Code SessionStart hook + Codex config-toml watcher already auto-detect engine/provider/model, so the manual cascade is a rare-edge-case path; (3) GitHub Copilot has no auto-detection path (deprecated keys, no replacement per installOrchestratorHookCopilot.ts:3-7) AND no CLI for model selection — the cascade would be pure declarative bookkeeping for Copilot-bound users. Operator decision: defer Set 036 (chatSessionId implementation), retire the entire orchestrator-tracking display surface (gauges + model description + smart CTA + mismatch row) AND the right-click orchestrator group (Check Out As… / Release Check-Out / Open Orchestrator Writer Log) until 036+ delivers a real chatSessionId-backed signal. Cascade preview archived at docs/proposals/2026-05-21-context-menu-cascade/preview.html for future reactivation. Cursor-anchored popup PRESERVED for non-orchestrator menu items (UX win independent of cascade).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/styling-landed",
+      "dateTime": "2026-05-21T10:30:00-04:00",
+      "description": "Round-5 styling ported to production. tree.css: row-header restructured (per-row chevron + state-icon CSS retired, replaced by row-fraction CSS — fixed 3em width, text-align right, margin-right 12px between fraction column and text; row name uses white-space:normal + word-break:break-word so it wraps freely; bucket-header padding 6/8 top/bottom; .row-fraction-{in-progress,not-started,complete,cancelled} color rules driven by CSS variables on :root + body.vscode-light; bucket-header gains display:flex + cursor:pointer + chevron-toggle behavior; .bucket[aria-expanded=false] .bucket-body { display:none }). client.js: renderRow emits <span class='row-fraction'> before <span class='row-text'>, no chevron, no row-icon; renderBucket emits bucket-chevron + bucket-body wrapper; wireInteraction adds bucket-header click toggle persisted via bucketCollapsed map; ArrowRight/ArrowLeft handlers collapsed to no-ops (nothing per-row to expand). CustomSessionSetsView.ts: buildRow no longer invokes OrchestratorAccordion.renderAccordionBody / accordionStateFromOrchestratorBlock / recommendationFor / pickEmptyStateCta; new descriptionFor drops the N/M prefix + 'Complete' trailing word; new fractionFor extracts 'N/M'; row payload ships accordionHtml: null universally. Protocol: added fraction field, RenderContextMenuMsg, ExecuteRowCommandMsg. ActionRegistry: dropped Check Out As / Release Check-Out / Open Orchestrator Writer Log (was groups 501-503); test assertions updated to 14-action shape + explicit assertion that orchestrator group is absent. CustomSessionSetsView.showContextMenu rewired: instead of calling vscode.window.showQuickPick (top-of-window), the host posts renderContextMenu with applicable actions to the webview, which paints the popup at the cursor position it captured on the contextmenu event. New executeRowCommand handler looks up set by slug and dispatches with [{ set }]. COMMAND_ALLOWLIST trimmed.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/tests-pass",
+      "dateTime": "2026-05-21T10:50:00-04:00",
+      "description": "Type-check (npx tsc --noEmit) clean. Layer 1 (python -m pytest -q): 643 passed, 1 skipped. Layer 2 (npm run test:unit): 462 passing; 2 pre-existing failures unrelated to this release (configEditor-foundation panel-lifecycle on vscode-stub ViewColumn.One gap; notificationsSection rendered-HTML regex mismatch — both predate Set 034). Layer 3 Playwright not re-run — three session-sets-tree.spec.ts scenarios from Set 035 still need refresh to match the new row shape (no chevron, no per-row accordion, fraction list-icon); queued for follow-on cleanup.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/version-bump-and-package",
+      "dateTime": "2026-05-21T11:00:00-04:00",
+      "description": "Version bumped 0.18.1 → 0.19.0 in package.json + package-lock.json. CHANGELOG.md 0.19.0 entry authored covering: row layout overhaul, fraction colors (sky blue / grey / green), bucket-level collapse, vendor prefix drop, gauges + accordion retirement, ActionRegistry orchestrator group removal, cursor-anchored cascade preserved as artifact, Layer-2 baseline notes. CLAUDE.md Extension versioning section updated. VSIX packaged: dabbler-ai-orchestration-0.19.0.vsix (840.31 KB, 27 files). Operator installed via 'code --install-extension … --force' + Developer: Reload Window, verified in extension host. APPROVED for publish.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-001/marketplace-published",
+      "dateTime": "2026-05-21T11:15:00-04:00",
+      "description": "vsce publish ran clean against AZURE_VSCODE_MARKETPLACE_TOKEN: DarndestDabbler.dabbler-ai-orchestration v0.19.0 LIVE on Marketplace at https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration. No companion PyPI release this set — ai_router Python writer is unchanged (orchestrator block writing path untouched; only the extension's UI consumption surface retires).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-001/change-log-generated",
+      "dateTime": "2026-05-21T11:20:00-04:00",
+      "description": "Set 034 change-log.md authored at docs/session-sets/034-session-set-explorer-styling-iteration/change-log.md covering: re-scope decision rationale (gauges/accordion misleading because signalKind always 'current' + effort tracking retired in Set 033 H2 + Gemini/Copilot have no auto-detect); what shipped (tree shell, fraction colors, bucket collapse, cursor-anchored menu, orchestrator group removal); files touched; tests (643 + 462 + 2 pre-existing); Round-A verification deferred reasoning (operator on-device validation > routed verifier for visual surface); deferred follow-ups (Set 036 remains not-started; Layer-3 Playwright refresh; pre-existing Layer-2 failures; dead-code cleanup pending Set 036 design).",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

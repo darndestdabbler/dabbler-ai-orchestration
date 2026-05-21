@@ -2,7 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Session Set Explorer — styling preview (round 4)</title>
+<title>Cascading context menu — deferred proposal (Set 034 artifact, 2026-05-21)</title>
+<!--
+  ARCHIVED: cascading "Check Out As…" submenu preview.
+
+  Captured 2026-05-21 during Set 034 Session 1 styling iteration.
+  The cascading menu (Provider → Model → Effort) demoed here was
+  DEFERRED entirely on operator review for three reasons:
+
+    1. CLI effort flags are limited or absent across all orchestrators —
+       Claude Code uses /think_* slash commands, Codex uses runtime
+       reasoning effort. The cascade's effort selection writes to
+       state-file metadata only; it doesn't configure a running chat.
+    2. The Claude Code SessionStart hook + Codex config-toml watcher
+       already auto-detect engine/provider/model. The manual cascade
+       is a rare-edge-case path, not a primary workflow.
+    3. GitHub Copilot has no auto-detection path (deprecated keys,
+       no public replacement) AND no CLI for model selection — for
+       Copilot-bound users the cascade is purely declarative bookkeeping.
+
+  Future activation: once Set 036's chatSessionId work + watcher-scope
+  discipline land, the cascade could meaningfully launch sessions
+  (Claude Code / Codex) or coordinate with chat-side selection. Until
+  then, the existing multi-step quickpick (`dabbler.checkOutOrchestrator`)
+  remains the manual fallback.
+
+  This file is preserved as a design reference, NOT as an active
+  iteration target.
+-->
 <!--
   Round 4 (2026-05-21, Set 034 Session 1) — first iteration from the
   round 3 baseline. Operator feedback on round 3:

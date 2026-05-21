@@ -5,6 +5,88 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-05-21 (Set 034 — Session Set Explorer honesty pass)
+
+Retires the per-row orchestrator-tracking accordion (gauges + model
+description + smart CTA + Actual/Suggested mismatch row) and the
+right-click orchestrator group (Check Out As… / Release Check-Out /
+Open Orchestrator Writer Log) from the Session Set Explorer. Operator
+feedback (2026-05-21) called out the gauges as nonfunctional and
+misleading: signalKind was always "current" under the Set 033 adapter
+regardless of recorded staleness, effort tracking via `/think_*` slash
+commands was retired in Set 033 H2 (no longer observed), and for
+orchestrators without a hook path (Copilot, Gemini) the gauge area
+was either empty or whatever the last manual checkout claimed. Rather
+than caveat all of that visually, the entire orchestrator-tracking
+display surface is shelved until Set 036+ delivers a real
+chatSessionId-backed signal.
+
+The `orchestrator` block on `session-state.json` is still written by
+`start_session` / `close_session` (the check-out semantics serve
+coordination + audit-log purposes); only the UI surface retires.
+Companion `dabbler-ai-router` release: none — Python side is
+unchanged.
+
+### Changed (rendering)
+
+- **Tree shell:** per-row chevron + per-row state-badge icon retired.
+  The bold color-coded progress fraction (`3/6`, `0/4`, `3/3`)
+  becomes the row's right-aligned LEFT-column list icon. Fixed-width
+  fraction column right-aligns within itself; the row name + optional
+  description sit to its right and wrap freely. When the name wraps,
+  the second line indents under the first line of the name (fraction
+  column stays outdented).
+- **Fraction colors** (theme-aware via CSS variables on body):
+  - In Progress: `rgb(86, 180, 233)` (sky blue) both themes
+  - Not Started: `rgb(127, 127, 127)` light / `rgb(187, 187, 187)` dark
+  - Complete: `rgb(0, 158, 115)` light / `rgb(0, 197, 140)` dark
+- **Bucket headers** (IN PROGRESS / NOT STARTED / COMPLETE / CANCELLED)
+  are the SOLE collapse affordance. Clicking the header toggles the
+  body display; chevron flips between `▾` and `▸`. Empty buckets
+  show the heading without a chevron. Heading padding bumped (6/8
+  top/bottom) so there's ample air between heading and first row.
+- Row description format: drops the `N/M ·` prefix (fraction is now
+  the icon column) and the trailing `Complete` word. For in-progress
+  rows reads just `session N in flight`; not-started + complete +
+  cancelled rows have no description, only the fraction.
+
+### Removed
+
+- `dabbler.checkOutOrchestrator` / `dabbler.releaseCheckOut` /
+  `dabbler.openOrchestratorWriterLog` from `ActionRegistry.ROW_ACTIONS`
+  (and the right-click context menu). The commands stay registered in
+  `extension.ts`; Command Palette access preserved as a power-user
+  escape hatch.
+- `CustomSessionSetsView.buildRow` no longer invokes
+  `OrchestratorAccordion.renderAccordionBody` /
+  `accordionStateFromOrchestratorBlock` / `pickEmptyStateCta` /
+  `recommendationFor`. Those modules remain in the tree (still used by
+  `start_session` / `close_session` plumbing in the router) but the
+  webview never calls them.
+- ArrowRight / ArrowLeft per-row expand-collapse keyboard handlers in
+  `client.js` — accordion is gone, nothing to expand.
+- Set 034 Session 1 spec re-scoped mid-session per operator review
+  (per `change-log.md`); Session 2 (screenshot + version-bump +
+  publish) folded into this release.
+
+### Cleanup
+
+- Updated `actionRegistry.test.ts` to assert the 14-action shape
+  (down from 17) and to assert the orchestrator group is NOT exposed.
+- Saved the deferred cascading-context-menu preview as a separate
+  artifact at
+  `docs/proposals/2026-05-21-context-menu-cascade/preview.html` for
+  reactivation when Set 036+ delivers a real session-launch path.
+
+### Known limitations carried forward
+
+- 2 Layer-2 unit-test failures persist (configEditor-foundation
+  panel-lifecycle stub gap; notificationsSection rendered-HTML regex)
+  — both pre-existing and unrelated to this release.
+- 3 Layer-3 Playwright scenarios in `session-sets-tree.spec.ts`
+  (carried from Set 035) still need refresh to match the new row
+  shape; queued for a follow-on cleanup set.
+
 ## [0.18.1] — 2026-05-21 (Set 035 — state-file sole truth for cancellation)
 
 Extends the Set 033 H2 verdict (`session-state.json` is canonical) to

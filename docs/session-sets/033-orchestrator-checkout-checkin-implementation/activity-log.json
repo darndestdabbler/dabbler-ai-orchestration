@@ -407,6 +407,114 @@
           "task_type": "session-verification"
         }
       ]
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 1,
+      "stepKey": "session-006/close-session-cross-tier-checkin",
+      "dateTime": "2026-05-21T02:55:00-04:00",
+      "description": "ai_router/session_state.py: _flip_state_to_closed now sets state[\"orchestrator\"] = None unconditionally just before the snapshot file write. The assignment lives after the forceClosed branch and before json.dump, so every path through the function (mid-set close, final close, forced incident-recovery close) clears the orchestrator block. Idempotent: a block that was already None lands the same write. The clear is universal across any caller of _flip_state_to_closed — new writer paths (a hypothetical force-recover CLI, a repair path that flips a snapshot, etc.) inherit the check-in without opting in. Inline comment expanded post-Round-A per the gemini-pro nice-to-have suggestion to be more emphatic about the unconditional propagation.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 2,
+      "stepKey": "session-006/close-session-tests-green",
+      "dateTime": "2026-05-21T03:05:00-04:00",
+      "description": "ai_router/tests/test_close_session_snapshot_flip.py: three new tests under a Set 033 Session 6 banner — (a) test_close_session_clears_orchestrator_block_on_final_close exercises the gate-running close_session.run() on a 1-session set and asserts the post-close orchestrator block is None; (b) test_close_session_clears_orchestrator_block_on_mid_set_close runs a session-1-of-5 mid-set close (no change-log.md; SET stays in-progress; orchestrator block clears), pinning the per-session-not-per-set release contract; (c) test_close_session_orchestrator_clear_is_idempotent_tier_agnostic invokes _flip_state_to_closed directly on two synthetic state files (block populated, block already None) and asserts both end at orchestrator: None — covers Lightweight-tier behavior via the shared writer path. ai_router/tests/e2e/test_happy_3session.py: the post-close invariant assertion now reads state.get(\"orchestrator\") is None (was: asserting engine/model/provider/effort persisted). Full ai_router test suite: 643 pass + 1 skipped (no regressions from the writer change).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 3,
+      "stepKey": "session-006/schema-doc-updated",
+      "dateTime": "2026-05-21T03:15:00-04:00",
+      "description": "docs/session-state-schema.md: refined the existing Check-out / check-in (Set 033) section authored in S1. The Block-null invariant paragraph was rewritten to make tier symmetry + idempotence explicit (Full-tier close_session writer does it automatically; Lightweight humans write null by hand at the same boundary; already-null lands the same write). The OQ2 Documentation Aliases paragraph now surfaces the literal alias names work_checked_out / work_checked_in alongside the ledger event names work_started / closeout_succeeded; clarifies the ledger names are NOT renamed (no schema break). New Stranded-checkout recovery paragraph names both release paths (start_session --force, Release Check-Out Command Palette) and notes the writer-log audit trail.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 4,
+      "stepKey": "session-006/close-out-doc-updated",
+      "dateTime": "2026-05-21T03:25:00-04:00",
+      "description": "ai_router/docs/close-out.md: three additions. (a) Section 2 (the section close_session --help echoes verbatim) gains an Orchestrator check-in paragraph after the flag-combination-rules block — names the cross-tier behavior + idempotence + pointers to the schema doc. (b) Section 3 step 9 (mark_session_complete bullet) extended to mention 'clears the orchestrator block to null' with an inline reference to Set 033 Session 6. (c) Section 4 (Common failures and remediation) gains a new Stranded check-out (Set 033 Session 6) failure pattern naming the two recovery paths and clarifying the H3 refusal fires at the NEXT start_session, not at close-out (close-out never sees the stranded state). The latter recovery paragraph addresses the spec's Section 5 mention — note the spec author labeled it Section 5 but the actual failure-modes section in close-out.md is Section 4.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 5,
+      "stepKey": "session-006/workflow-doc-invariant-codified",
+      "dateTime": "2026-05-21T03:30:00-04:00",
+      "description": "docs/ai-led-session-workflow.md: new Orchestrator check-out / check-in (Set 033) subsection inserted under Session-Set Lifecycle and State File, between Hand-authored session-set folders and Cancelling and restoring. Codifies the within-set sequential invariant (at most one in-progress session per set) AND the across-set parallel invariant (different sets can each have their own in-progress session), names force-override as the one explicit deviation, states H4 holder identity as engine + provider composite, calls out tier symmetry. Switching Orchestrators Between Sessions section extended with a brief pointer at the new subsection so the two surfaces don't drift.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 6,
+      "stepKey": "session-006/cross-repo-notice-authored",
+      "dateTime": "2026-05-21T03:35:00-04:00",
+      "description": "docs/cross-repo-checkout-notice.md (new file): one-time copy source for the three consumer repos' CLAUDE.md files (dabbler-platform, dabbler-access-harvester, dabbler-homehealthcare-accessdb). Self-contained snippet between horizontal-rule lines: introduces the check-out / check-in model, names the within-set sequential + across-set parallel invariants, shows the H3 refusal-error body verbatim, names the three forward paths (wait / --force / Release Check-Out), states cross-tier behavior, surfaces the OQ2 alias names, points at the canonical references via absolute GitHub URLs (master). Notes-for-the-paster section covers per-consumer adjustments + the Lightweight-tier (dabbler-homehealthcare-accessdb) caveat. Operator pulls into each consumer manually; no PRs from this repo.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 7,
+      "stepKey": "session-006/change-log-generated",
+      "dateTime": "2026-05-21T03:40:00-04:00",
+      "description": "docs/session-sets/033-orchestrator-checkout-checkin-implementation/change-log.md (new file): final-session aggregation across S1-S6 per the [[project_final_session_changelog_pre_close]] pattern. Top context block points at the Set 032 audit verdicts + this set's six-session split. One section per session capturing what shipped (writer / reader / UI / tests / queueing / cross-tier close-out + docs + release). Closing sections: 'What ships across the framework' (one-paragraph summary of the user-facing surface), 'Risks closed' (R1-R7 from the spec, status), 'Follow-ups out of scope' (pre-existing S2 accordion-body bug, Set 034/035 audit candidate).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 8,
+      "stepKey": "session-006/version-bumps-applied",
+      "dateTime": "2026-05-21T03:45:00-04:00",
+      "description": "pyproject.toml: 0.5.1 -> 0.6.0. tools/dabbler-ai-orchestration/package.json: 0.17.1 -> 0.18.0. ai_router/CHANGELOG.md: new 0.6.0 entry covering Added (start_session H3 gate, --force flag, +2 nested timestamps, cross-tier check-in with idempotence), Changed (H4 holder-identity composite, OQ2 doc aliases), Migration (pre-0.6.0 in-flight tolerance, stranded-checkout recovery). tools/dabbler-ai-orchestration/CHANGELOG.md: new 0.18.0 entry covering Added (releaseCheckOut command, polling/queueing service, timeout setting, multi-in-progress rendering), Changed (command rename, listInProgressSets resolver, Claude hook -> invoker), Removed (.dabbler/orchestrator.json marker), Layer-3 tests, Migration (cross-repo notice path). CLAUDE.md: Extension versioning walk extended with 0.18.0 entry + Current line bumped + companion 0.6.0 PyPI reference.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 9,
+      "stepKey": "session-006/round-a-verification",
+      "dateTime": "2026-05-21T03:50:00-04:00",
+      "description": "Authored verify_session6.py following the S1-S5 template (RouteResult JSON-dump-first per [[feedback_ai_router_route_result_handling]]). Bundled the writer change (session_state.py excerpt) + three new tests + e2e assertion update + all three doc changes + cross-repo notice + change-log + version-bump artifacts (pyproject.toml, package.json, both CHANGELOG entries, CLAUDE.md version walk) + Session 6 spec contract + proposal-addendum §9 verdicts. Bundle 72,424 chars. Eight assertion groups (A writer correctness, B test contract pinning, C-E doc fidelity for schema/close-out/workflow, F cross-repo notice self-containment, G version-bumps consistency, H risky/missing edge cases). Round A verdict: VERIFIED with no must-fix issues. One nice-to-have applied: expanded the inline comment in session_state.py to be more emphatic about the unconditional propagation of the orchestrator clear. Round B not required. Session 6 single-round routed cost $0.032; cumulative routed Set 033 spend ~$0.197 of $1.25 NTE.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "engine": "gemini-pro",
+          "provider": "google",
+          "cost_usd": 0.031883749999999995,
+          "input_tokens": 24387,
+          "output_tokens": 140,
+          "task_type": "session-verification"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 10,
+      "stepKey": "session-006/pypi-release-pushed",
+      "dateTime": "2026-05-21T04:25:00-04:00",
+      "description": "dabbler-ai-router 0.6.0 published to PyPI (https://pypi.org/project/dabbler-ai-router/0.6.0/). Build via .venv/Scripts/python.exe -m build; upload via .venv/Scripts/python.exe -m twine upload dist/dabbler_ai_router-0.6.0*. Two-step issue resolution on auth: first attempt 403 Forbidden because the operator's $env:PYPI_USERNAME was not set to the literal '__token__' that PyPI's token-based auth requires; resolved by overriding TWINE_USERNAME=__token__ explicitly while keeping the token in $env:PYPI_AIROUTER_API_TOKEN. Note for the operator's future-release env: setting PYPI_USERNAME=__token__ (or aliasing TWINE_USERNAME to that value) would let twine pick credentials up automatically without the override. Also: an unrelated incident during the publish prep — a buggy bash idiom leaked the Marketplace PAT to stdout; operator rotated the PAT in Azure DevOps and the Marketplace publish (Step 11) is deferred until they confirm the new token is in place. Memory entry [[feedback_no_env_var_probing]] captures the lesson.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 11,
+      "stepKey": "session-006/marketplace-publish-deferred",
+      "dateTime": "2026-05-21T04:30:00-04:00",
+      "description": "VS Code Marketplace publish of DarndestDabbler.dabbler-ai-orchestration 0.18.0 DEFERRED. Reason: the buggy env-var probe earlier in the session leaked the AZURE_VSCODE_MARKETPLACE_TOKEN to stdout. Operator chose 'rotate now; defer Marketplace publish' so the leaked PAT could be revoked in Azure DevOps before any publish attempt with the new PAT. Version artifacts (package.json 0.18.0, CHANGELOG entry, CLAUDE.md version walk) are committed locally and shipped via the Session 6 implementation commit. The publish itself is a follow-on action the operator runs when ready: cd tools/dabbler-ai-orchestration && npx vsce package && npx vsce publish --pat $env:AZURE_VSCODE_MARKETPLACE_TOKEN (per [[reference_vsce_pat]]). Not a Set 033 blocker — close_session can proceed without it because the gates don't include 'Marketplace published'.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

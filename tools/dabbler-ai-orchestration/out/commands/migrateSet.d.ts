@@ -1,35 +1,25 @@
 /**
- * Set 030 Session 5 — in-extension lazy migrator for v2 → v3
- * session-state.json.
+ * In-extension lazy migrator for v2 → v3 session-state.json.
  *
- * The bulk migrator (Session 4) ships as a CLI under
- * `python -m ai_router.migrate_session_state`. This command is the
- * single-set front door operators reach via the tree-view context
- * menu on any row flagged "(needs migration)". The subprocess
- * invocation pattern matches the config editor's notification-test
- * path (cp.spawn with windowsHide + env inheritance).
+ * Single-set front door reached via the tree-view context menu on
+ * any row flagged "(needs migration)". The migration runs entirely
+ * in-process via `utils/migrateSessionState.ts`'s `migrateOneSet()`
+ * — no Python subprocess, no ai-router dependency. This makes the
+ * command work on every consumer repo, including Lightweight-tier
+ * repos that never install ai-router.
  *
- * Strategy quickpick → CLI flag mapping:
- *   "Use spec.md headings"       → --strategy regex  (default)
- *   "Use AI to refine titles"    → --strategy ai     (Session 5 wires this)
- *   "Use generic labels"         → --strategy generic
+ * Strategy choices (two; the AI strategy was retired — any
+ * orchestrator the operator is chatting with can refine titles
+ * in-line if they want that):
  *
- * Both call paths (this command + the bulk CLI) call into the same
- * `migrate_one_set` Python entry point, so the migration semantics
- * are identical regardless of where the operator triggers it.
+ *   "Use spec.md headings"   → regex extraction · zero cost (default)
+ *   "Use generic labels"     → "Session 001", "Session 002", …
  *
- * Failure handling: the Python migrator never raises for "file isn't
- * there / file is broken" cases — those come back as structured
- * MigrationResult records (ACTION_SKIPPED_MALFORMED etc.). The
- * command surfaces the result's reason in a notification so the
- * operator can decide whether to hand-repair, run --dry-run, or
- * file an issue.
- *
- * Why no `simulateProcess` injection point: the install-ai-router
- * command splits spawning into a `ProcessSpawner` interface so the
- * Mocha stub harness can drive it deterministically. This command's
- * unit tests live in Playwright (Layer 3), which uses a real Electron
- * process and a real Python — no need for a spawner abstraction.
+ * Failure handling: the migrator never throws for "file isn't there
+ * / file is broken" cases — those come back as structured
+ * `MigrationResult` records (`skipped-malformed`, `would-violate`,
+ * etc.). The command surfaces the result's reason in a notification
+ * so the operator can decide whether to hand-repair or file an issue.
  */
 import * as vscode from "vscode";
 interface CommandDeps {

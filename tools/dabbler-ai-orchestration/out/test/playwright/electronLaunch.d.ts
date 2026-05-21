@@ -25,6 +25,60 @@ export declare function closeSession(h: FixtureHandle, n: number, opts?: {
     force?: boolean;
 }): CloseResult;
 export declare function cancelSet(h: FixtureHandle): void;
+export interface StartSessionAttemptResult {
+    exit: number;
+    stdout: string;
+    stderr: string;
+}
+/**
+ * Set 033 Session 4 — invoke ``python -m ai_router.start_session``
+ * with an explicit identity (engine + provider + model + effort) and
+ * capture exit / stdout / stderr without raising on non-zero exit.
+ *
+ * Distinct from the harness shim's ``start`` command (which uses the
+ * handle's identity and throws on non-zero) because the H3 + H4
+ * Layer-3 scenarios need to:
+ *   - Drive ``start_session`` as a DIFFERENT holder than the seeded
+ *     orchestrator block, to exercise the refusal path; and
+ *   - Inspect non-zero exit + stderr without the helper masking the
+ *     failure.
+ *
+ * Optional ``homeOverride`` redirects ``~/.dabbler/orchestrator-
+ * writer.log`` (where ``--force`` lands its audit trail) by setting
+ * HOME + USERPROFILE on the subprocess env. Use a tmpdir-scoped
+ * override so force-override scenarios don't pollute the dev's home
+ * dir.
+ */
+export declare function attemptStartSession(h: FixtureHandle, sessionNumber: number, identity: {
+    engine: string;
+    provider: string;
+    model: string;
+    effort?: string;
+}, opts?: {
+    force?: boolean;
+    homeOverride?: string;
+}): StartSessionAttemptResult;
+/**
+ * Set 033 Session 2 — seed the `orchestrator` block on a fixture's
+ * `session-state.json` so Layer-3 smokes can verify the painted-on-
+ * screen treatment without driving the writer (`start_session`) end-
+ * to-end. Replaces the pre-Set-033 `seedOrchestratorMarker` helper
+ * which wrote `.dabbler/orchestrator.json` (now retired per H2).
+ *
+ * Defaults produce a Claude Opus claim that mirrors the canonical
+ * Set 033 Session 1 schema: engine + provider + model + effort +
+ * timestamps. Callers override for other-provider variants. Merges
+ * into the existing `orchestrator` block rather than replacing the
+ * full state file.
+ */
+export declare function seedOrchestratorBlock(h: FixtureHandle, overrides?: Partial<{
+    engine: string;
+    provider: string;
+    model: string;
+    effort: string;
+    checkedOutAt: string;
+    lastActivityAt: string;
+}>): void;
 export declare function makeAdditionalSet(base: FixtureHandle, newSlug: string, newTotalSessions: number): FixtureHandle;
 /**
  * Set 030 Session 5 — rewrite a fixture's ``session-state.json`` from
@@ -59,10 +113,18 @@ export interface LaunchedVSCode {
 export declare function launchVSCode(workspacePath: string): Promise<LaunchedVSCode>;
 /**
  * Activate the Dabbler activity-bar view container and wait for the
- * Session Sets tree view to render. Returns the locator for the
- * tree role element so callers can chain treeitem queries off it.
+ * Session Sets webview tree to render. Returns a FrameLocator into
+ * the webview's inner content frame so callers can chain treeitem
+ * queries off it.
+ *
+ * Set 029 Session 4 pivot: the Session Sets view is now a webview
+ * (CustomSessionSetsView), not a native TreeDataProvider. VS Code
+ * wraps webview content in a two-level iframe stack: an outer
+ * sandboxing iframe and an inner content iframe. Both must be
+ * traversed before locating the `role="tree"` element rendered by
+ * the webview's client.js.
  */
-export declare function openSessionSetsView(page: Page): Promise<import("@playwright/test").Locator>;
+export declare function openSessionSetsView(page: Page): Promise<import("@playwright/test").FrameLocator>;
 /**
  * Trigger the refresh command — equivalent to clicking the
  * activity-bar refresh button. Used after the harness mutates state

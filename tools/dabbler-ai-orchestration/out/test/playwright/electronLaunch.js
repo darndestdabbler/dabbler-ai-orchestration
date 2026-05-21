@@ -62,6 +62,8 @@ exports.makeDisposition = makeDisposition;
 exports.makeChangeLog = makeChangeLog;
 exports.closeSession = closeSession;
 exports.cancelSet = cancelSet;
+exports.attemptStartSession = attemptStartSession;
+exports.seedOrchestratorBlock = seedOrchestratorBlock;
 exports.makeAdditionalSet = makeAdditionalSet;
 exports.downgradeStateFileToV2 = downgradeStateFileToV2;
 exports.readStateFile = readStateFile;
@@ -231,6 +233,88 @@ function closeSession(h, n, opts = {}) {
 function cancelSet(h) {
     runHarness(["cancel", ..._handleArgs(h), "--reason", "playwright cancel scenario"]);
 }
+/**
+ * Set 033 Session 4 — invoke ``python -m ai_router.start_session``
+ * with an explicit identity (engine + provider + model + effort) and
+ * capture exit / stdout / stderr without raising on non-zero exit.
+ *
+ * Distinct from the harness shim's ``start`` command (which uses the
+ * handle's identity and throws on non-zero) because the H3 + H4
+ * Layer-3 scenarios need to:
+ *   - Drive ``start_session`` as a DIFFERENT holder than the seeded
+ *     orchestrator block, to exercise the refusal path; and
+ *   - Inspect non-zero exit + stderr without the helper masking the
+ *     failure.
+ *
+ * Optional ``homeOverride`` redirects ``~/.dabbler/orchestrator-
+ * writer.log`` (where ``--force`` lands its audit trail) by setting
+ * HOME + USERPROFILE on the subprocess env. Use a tmpdir-scoped
+ * override so force-override scenarios don't pollute the dev's home
+ * dir.
+ */
+function attemptStartSession(h, sessionNumber, identity, opts = {}) {
+    const args = [
+        "-m", "ai_router.start_session",
+        "--session-set-dir", h.set_dir,
+        "--session-number", String(sessionNumber),
+        "--engine", identity.engine,
+        "--provider", identity.provider,
+        "--model", identity.model,
+        "--effort", identity.effort ?? "medium",
+    ];
+    if (opts.force)
+        args.push("--force");
+    const env = _filteredEnv();
+    if (opts.homeOverride) {
+        // os.path.expanduser checks USERPROFILE on Windows and HOME on
+        // POSIX; setting both keeps the redirect cross-platform.
+        env.HOME = opts.homeOverride;
+        env.USERPROFILE = opts.homeOverride;
+    }
+    const proc = cp.spawnSync(PYTHON, args, {
+        encoding: "utf8",
+        timeout: 60000,
+        cwd: REPO_ROOT,
+        env,
+    });
+    if (proc.error) {
+        throw new Error(`attemptStartSession spawn error (${PYTHON}): ${proc.error.message}`);
+    }
+    return {
+        exit: proc.status ?? -1,
+        stdout: proc.stdout?.toString() ?? "",
+        stderr: proc.stderr?.toString() ?? "",
+    };
+}
+/**
+ * Set 033 Session 2 — seed the `orchestrator` block on a fixture's
+ * `session-state.json` so Layer-3 smokes can verify the painted-on-
+ * screen treatment without driving the writer (`start_session`) end-
+ * to-end. Replaces the pre-Set-033 `seedOrchestratorMarker` helper
+ * which wrote `.dabbler/orchestrator.json` (now retired per H2).
+ *
+ * Defaults produce a Claude Opus claim that mirrors the canonical
+ * Set 033 Session 1 schema: engine + provider + model + effort +
+ * timestamps. Callers override for other-provider variants. Merges
+ * into the existing `orchestrator` block rather than replacing the
+ * full state file.
+ */
+function seedOrchestratorBlock(h, overrides = {}) {
+    const statePath = path.join(h.set_dir, "session-state.json");
+    const raw = fs.readFileSync(statePath, "utf8");
+    const state = JSON.parse(raw);
+    const now = new Date().toISOString();
+    state.orchestrator = {
+        engine: "claude",
+        provider: "anthropic",
+        model: "claude-opus-4-7",
+        effort: "high",
+        checkedOutAt: now,
+        lastActivityAt: now,
+        ...overrides,
+    };
+    fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + "\n", "utf8");
+}
 function makeAdditionalSet(base, newSlug, newTotalSessions) {
     return runHarness([
         "make-additional-set",
@@ -378,25 +462,31 @@ async function launchVSCode(workspacePath) {
 }
 /**
  * Activate the Dabbler activity-bar view container and wait for the
- * Session Sets tree view to render. Returns the locator for the
- * tree role element so callers can chain treeitem queries off it.
+ * Session Sets webview tree to render. Returns a FrameLocator into
+ * the webview's inner content frame so callers can chain treeitem
+ * queries off it.
+ *
+ * Set 029 Session 4 pivot: the Session Sets view is now a webview
+ * (CustomSessionSetsView), not a native TreeDataProvider. VS Code
+ * wraps webview content in a two-level iframe stack: an outer
+ * sandboxing iframe and an inner content iframe. Both must be
+ * traversed before locating the `role="tree"` element rendered by
+ * the webview's client.js.
  */
 async function openSessionSetsView(page) {
-    // The view container's aria-label comes from package.json
-    // `viewsContainers.activitybar[0].title` ("Dabbler AI Orchestration").
-    // VS Code renders both the action-icon `<a>` and a hidden
-    // badge `<div>` with the same aria-label — narrow to
-    // `.action-label` so we only match the clickable icon.
     const activityIcon = page.locator('.activitybar .action-label[aria-label*="Dabbler AI Orchestration"]');
     await activityIcon.waitFor({ state: "visible", timeout: 30000 });
     await activityIcon.click();
-    // Once the side bar opens, the "Session Sets" view ID (from
-    // contributes.views[].id == "dabblerSessionSets", name == "Session Sets")
-    // becomes the section header. The tree element itself carries
-    // role="tree" and an aria-label derived from the view name.
-    const tree = page.locator('[role="tree"][aria-label*="Session Sets" i]');
-    await tree.waitFor({ state: "visible", timeout: 30000 });
-    return tree;
+    // The webview shell lives inside `iframe.webview` (outer sandbox)
+    // → `iframe#active-frame` (inner content). The role="tree" element
+    // is rendered by client.js into <main id="root"> in the inner
+    // frame.
+    const outer = page.frameLocator('iframe.webview.ready');
+    const inner = outer.frameLocator('iframe');
+    // Wait for the tree to render (client.js has received the first
+    // rowsSnapshot or welcomeHtml fallback fired).
+    await inner.locator("#root").waitFor({ state: "attached", timeout: 30000 });
+    return inner;
 }
 /**
  * Trigger the refresh command — equivalent to clicking the

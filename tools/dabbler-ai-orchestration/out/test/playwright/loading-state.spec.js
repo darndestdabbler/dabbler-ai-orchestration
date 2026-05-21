@@ -111,19 +111,16 @@ async function teardown(per) {
         const activityIcon = page.locator('.activitybar .action-label[aria-label*="Dabbler AI Orchestration"]');
         await activityIcon.waitFor({ state: "visible", timeout: 30000 });
         await activityIcon.click();
-        // Playwright's expect retries until the text appears (or
-        // timeout). The key invariant: the welcome content DOES
-        // eventually render — which means the `when: scanState == ready`
-        // clause activated correctly. If the gate were absent the
-        // content would flash; if the gate were broken the content
-        // would never render.
-        await (0, test_1.expect)(page.getByText(/No session sets in this workspace yet/)).toBeVisible({ timeout: 30000 });
-        // The "Copy adoption bootstrap prompt" string is rendered inside
-        // the viewsWelcome viewlet. VS Code's rendering of the
-        // [text](command:foo) markdown syntax doesn't expose a
-        // role="link" — it's an `<a class="monaco-button">`-style
-        // element — so we assert on the plain text instead.
-        await (0, test_1.expect)(page.getByText(/Copy adoption bootstrap prompt/i)).toBeVisible();
+        // Set 029 Session 4: welcome content now renders inside the
+        // CustomSessionSetsView webview (the host parses viewsWelcome
+        // contents from package.json and passes the HTML to the
+        // webview via the initial rowsSnapshot when hasAnySets=false).
+        // We assert visibility inside the webview iframe instead of on
+        // the outer Monaco viewlet.
+        const outer = page.frameLocator('iframe.webview.ready');
+        const inner = outer.frameLocator('iframe');
+        await (0, test_1.expect)(inner.getByText(/No session sets in this workspace yet/)).toBeVisible({ timeout: 30000 });
+        await (0, test_1.expect)(inner.getByText(/Copy adoption bootstrap prompt/i)).toBeVisible();
     }
     finally {
         await teardown(per);

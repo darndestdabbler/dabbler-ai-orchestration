@@ -14920,6 +14920,20 @@ function formatLocalIsoSeconds(d) {
 function isCancelled(sessionSetDir) {
   return fs2.existsSync(path3.join(sessionSetDir, CANCELLED_FILENAME));
 }
+function readCancellationState(sessionSetDir) {
+  const state = readSessionState(sessionSetDir);
+  if (state === null)
+    return "unknown";
+  if (typeof state.status !== "string" || state.status.length === 0) {
+    return "unknown";
+  }
+  if (state.status === "cancelled")
+    return "cancelled";
+  if (fs2.existsSync(path3.join(sessionSetDir, RESTORED_FILENAME))) {
+    return "restored";
+  }
+  return "active";
+}
 function atomicWriteFile(filePath, content) {
   const directory = path3.dirname(filePath);
   const base = path3.basename(filePath);
@@ -15524,7 +15538,13 @@ function readSessionSets(root) {
     const aiAssignmentPath = path4.join(dir, "ai-assignment.md");
     const uatChecklistPath = path4.join(dir, `${entry.name}-uat-checklist.json`);
     let state;
-    if (isCancelled(dir)) {
+    const cancellation = readCancellationState(dir);
+    if (cancellation === "cancelled") {
+      state = "cancelled";
+    } else if (cancellation === "unknown" && isCancelled(dir)) {
+      console.warn(
+        `[dabblerSessionSets] Cancellation detected via legacy file-presence fallback for ${dir} \u2014 session-state.json is missing or unparseable. Consider running ensure_state_file to repair.`
+      );
       state = "cancelled";
     } else {
       const status = readStatus(dir);
@@ -16051,10 +16071,6 @@ function renderAccordionEmpty(cta) {
   const effectiveCta = cta || DEFAULT_CTA;
   const argsAttr = effectiveCta.args !== void 0 ? ` data-command-args="${escAttr(JSON.stringify(effectiveCta.args))}"` : "";
   return `<div class="acc-empty">
-  <div class="grey-gauges">
-    <div class="gauge-svg-wrap">${renderGaugeSvg("unknown", "current", 0)}</div>
-    <div class="gauge-svg-wrap">${renderGaugeSvg("unknown", "current", 0)}</div>
-  </div>
   <div class="acc-empty-cta">
     <span>No signal \u2014 </span>
     <button class="acc-link" type="button" data-command="${escAttr(effectiveCta.commandId)}"${argsAttr}>${escHtml(effectiveCta.label)}</button>

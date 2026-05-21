@@ -36,8 +36,11 @@ export interface UatSummary {
 }
 export interface OrchestratorInfo {
     engine?: string;
+    provider?: string;
     model?: string;
     effort?: string;
+    checkedOutAt?: string;
+    lastActivityAt?: string;
 }
 export interface LiveSession {
     currentSession: number | null;

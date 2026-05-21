@@ -34,7 +34,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 const assert = __importStar(require("assert"));
-const SessionSetsProvider_1 = require("../../providers/SessionSetsProvider");
+const SessionSetsModel_1 = require("../../providers/SessionSetsModel");
 // Set 9 Session 3 (D-2 hard-scoping of ``--force``): the [FORCED]
 // description badge surfaces sets that closed via ``close_session
 // --force`` / ``mark_session_complete(force=True)``. It reads the
@@ -81,24 +81,24 @@ function fakeSet(liveSession) {
 }
 suite("SessionSetsProvider — forceClosedBadge", () => {
     test("renders [FORCED] when forceClosed is true", () => {
-        assert.strictEqual((0, SessionSetsProvider_1.forceClosedBadge)(fakeSet(fakeLive({ forceClosed: true }))), "[FORCED]");
+        assert.strictEqual((0, SessionSetsModel_1.forceClosedBadge)(fakeSet(fakeLive({ forceClosed: true }))), "[FORCED]");
     });
     test("renders nothing when forceClosed is false", () => {
-        assert.strictEqual((0, SessionSetsProvider_1.forceClosedBadge)(fakeSet(fakeLive({ forceClosed: false }))), "");
+        assert.strictEqual((0, SessionSetsModel_1.forceClosedBadge)(fakeSet(fakeLive({ forceClosed: false }))), "");
     });
     test("renders nothing when forceClosed is null (legacy snapshot)", () => {
         // Sets closed before Set 9 Session 3 don't carry the field at all;
         // fileSystem.ts maps the missing field to null. The badge must
         // remain hidden so retroactively triaging a legacy set does not
         // light up the explorer with false [FORCED] markers.
-        assert.strictEqual((0, SessionSetsProvider_1.forceClosedBadge)(fakeSet(fakeLive({ forceClosed: null }))), "");
+        assert.strictEqual((0, SessionSetsModel_1.forceClosedBadge)(fakeSet(fakeLive({ forceClosed: null }))), "");
     });
     test("renders nothing when liveSession itself is null", () => {
         // not-started / cancelled sets have liveSession=null. The badge
         // is meaningful only on closed sets, so the null guard short-
         // circuits cleanly to the empty string rather than reading
         // through null.
-        assert.strictEqual((0, SessionSetsProvider_1.forceClosedBadge)(fakeSet(null)), "");
+        assert.strictEqual((0, SessionSetsModel_1.forceClosedBadge)(fakeSet(null)), "");
     });
 });
 //# sourceMappingURL=forceClosedBadge.test.js.map

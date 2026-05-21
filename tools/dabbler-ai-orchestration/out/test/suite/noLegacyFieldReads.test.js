@@ -96,6 +96,12 @@ const ACCESS_PATTERNS = [
 const ALLOWLIST = new Set([
     "utils/progress.ts",
     "utils/sessionState.ts",
+    // utils/migrateSessionState.ts — the v2 → v3 disk migrator (in-extension
+    // TS port of ai_router/migrate_session_state.py). The entire file's
+    // purpose is to read v2 legacy fields and rewrite them into the v3
+    // sessions[] shape; gating each read on a per-line noqa would just be
+    // noise. Same shape carve-out as utils/progress.ts's synthesizer.
+    "utils/migrateSessionState.ts",
     "types.ts",
     "providers/SessionSetsProvider.ts",
 ]);

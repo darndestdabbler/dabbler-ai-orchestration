@@ -38,7 +38,7 @@ exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-const SessionSetsProvider_1 = require("./providers/SessionSetsProvider");
+const CustomSessionSetsView_1 = require("./providers/CustomSessionSetsView");
 const scanState_1 = require("./providers/scanState");
 const migrateSet_1 = require("./commands/migrateSet");
 const fileSystem_1 = require("./utils/fileSystem");
@@ -54,10 +54,14 @@ const CostDashboard_1 = require("./dashboard/CostDashboard");
 const ConfigEditorPanel_1 = require("./configEditor/ConfigEditorPanel");
 const flagDecisionForReview_1 = require("./commands/flagDecisionForReview");
 const scanAnnotationsForActiveSet_1 = require("./commands/scanAnnotationsForActiveSet");
-const orchestratorIndicatorProvider_1 = require("./providers/orchestratorIndicatorProvider");
 const installOrchestratorHookClaudeCode_1 = require("./commands/installOrchestratorHookClaudeCode");
-const setOrchestratorManualStub_1 = require("./commands/setOrchestratorManualStub");
+const installOrchestratorHookGemini_1 = require("./commands/installOrchestratorHookGemini");
+const installOrchestratorHookCopilot_1 = require("./commands/installOrchestratorHookCopilot");
+const checkOutOrchestrator_1 = require("./commands/checkOutOrchestrator");
+const releaseCheckOut_1 = require("./commands/releaseCheckOut");
 const openOrchestratorWriterLog_1 = require("./commands/openOrchestratorWriterLog");
+const configWatcher_1 = require("./codex/configWatcher");
+const CheckoutPollService_1 = require("./providers/CheckoutPollService");
 const SESSION_SETS_REL = path.join("docs", "session-sets");
 function evaluateSupportContextKeys(allSets) {
     const cfg = vscode.workspace.getConfiguration("dabblerSessionSets");
@@ -83,15 +87,22 @@ function activate(context) {
     const scanState = new scanState_1.ScanState();
     context.subscriptions.push({ dispose: () => scanState.dispose() });
     scanState.setLoading();
-    const provider = new SessionSetsProvider_1.SessionSetsProvider(context.extensionUri, scanState);
-    context.subscriptions.push(vscode.window.registerTreeDataProvider("dabblerSessionSets", provider));
+    // Set 029 Session 4: replaced the native TreeView with a custom
+    // webview tree. CustomSessionSetsView owns rendering, the
+    // accordion-body for the resolved in-progress set's orchestrator
+    // gauges, the typed message protocol with monotonic version, and
+    // the QuickPick-based row-context menu (per S4 audit Q6 = a).
+    //
+    // Set 033 Session 2: MarkerWatchService retired (H2). Each
+    // in-progress row's accordion is computed from the orchestrator
+    // block on its own session-state.json — the workspace-level
+    // file-watcher below (which already watches session-state.json)
+    // covers every signal the view needs.
+    const provider = new CustomSessionSetsView_1.CustomSessionSetsView(context, scanState);
+    context.subscriptions.push({ dispose: () => provider.dispose() });
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(CustomSessionSetsView_1.CustomSessionSetsView.viewType, provider));
     const evaluateContextKeys = () => {
-        evaluateSupportContextKeys(provider._cache ?? (0, fileSystem_1.readAllSessionSets)());
-    };
-    const originalRefresh = provider.refresh.bind(provider);
-    provider.refresh = () => {
-        originalRefresh();
-        setImmediate(evaluateContextKeys);
+        evaluateSupportContextKeys((0, fileSystem_1.readAllSessionSets)());
     };
     // v0.13.2: defensive — `evaluateContextKeys()` calls `readAllSessionSets()`
     // which iterates every session set's session-state.json. A single
@@ -155,6 +166,7 @@ function activate(context) {
     const refreshAll = () => {
         bindWatchers();
         provider.refresh();
+        setImmediate(evaluateContextKeys);
     };
     // Defensive: bindWatchers iterates roots and creates filesystem
     // watchers; a thrown error from createFileSystemWatcher (e.g., a
@@ -208,17 +220,67 @@ function activate(context) {
     safeRegister("registerFlagDecisionForReview", () => (0, flagDecisionForReview_1.registerFlagDecisionForReview)(context));
     safeRegister("registerScanAnnotationsForActiveSet", () => (0, scanAnnotationsForActiveSet_1.registerScanAnnotationsForActiveSet)(context));
     safeRegister("registerMigrateSetCommand", () => (0, migrateSet_1.registerMigrateSetCommand)(context, { refreshView: refreshAll }));
-    // Set 029 Session 2: orchestrator-indicator gauges. The webview view
-    // is registered against `dabblerOrchestratorIndicator` (declared in
-    // package.json as type:"webview" above the session-sets tree). Hook
-    // installer + manual-override stub + writer-log opener are siblings.
-    safeRegister("registerOrchestratorIndicatorView", () => {
-        const indicatorProvider = new orchestratorIndicatorProvider_1.OrchestratorIndicatorProvider(context.extensionUri);
-        context.subscriptions.push(vscode.window.registerWebviewViewProvider(orchestratorIndicatorProvider_1.OrchestratorIndicatorProvider.viewType, indicatorProvider));
-    });
+    // Set 029 Session 4: the dedicated dabblerOrchestratorIndicator view
+    // is retired in v0.16.0. The orchestrator gauges live in the
+    // CustomSessionSetsView accordion-body for the resolved in-progress
+    // set (registered above). Hook installer + manual-override stub +
+    // writer-log opener remain available as standalone commands; the
+    // accordion-body buttons dispatch them via postMessage.
+    //
+    // Set 029 Session 5: full multi-provider surface — Codex auto-detect
+    // via config-watcher (no command), Gemini + Copilot manual-only
+    // shim commands that delegate to the universal manual-override
+    // quickpick. Manual stub from S2 is retired in favor of the real
+    // implementation.
     safeRegister("registerInstallOrchestratorHookClaudeCode", () => (0, installOrchestratorHookClaudeCode_1.registerInstallOrchestratorHookClaudeCodeCommand)(context));
-    safeRegister("registerSetOrchestratorManualStub", () => (0, setOrchestratorManualStub_1.registerSetOrchestratorManualStub)(context));
+    safeRegister("registerInstallOrchestratorHookGemini", () => (0, installOrchestratorHookGemini_1.registerInstallOrchestratorHookGeminiCommand)(context));
+    safeRegister("registerInstallOrchestratorHookCopilot", () => (0, installOrchestratorHookCopilot_1.registerInstallOrchestratorHookCopilotCommand)(context));
+    safeRegister("registerCheckOutOrchestrator", () => (0, checkOutOrchestrator_1.registerCheckOutOrchestrator)(context));
+    safeRegister("registerReleaseCheckOut", () => (0, releaseCheckOut_1.registerReleaseCheckOut)(context));
     safeRegister("registerOpenOrchestratorWriterLog", () => (0, openOrchestratorWriterLog_1.registerOpenOrchestratorWriterLog)(context));
+    safeRegister("activateCodexConfigWatcher", () => {
+        context.subscriptions.push((0, configWatcher_1.activateCodexConfigWatcher)(context));
+    });
+    // Set 033 Session 5: CheckoutPollService watches
+    // ~/.dabbler/checkout-conflicts/ for structured conflict records
+    // emitted by the Claude SessionStart invoker and the Codex config
+    // watcher on EXIT_CHECKOUT_CONFLICT (H3 refusal). For each record,
+    // it surfaces a poll/force/dismiss prompt; "poll" watches the held
+    // set's session-state.json (5s debounce) and auto-retries
+    // start_session when the slot becomes free (H4 identity gate). The
+    // pythonPath resolver mirrors the one in checkOutOrchestrator.ts /
+    // configWatcher.ts so all three paths share the operator's
+    // dabblerSessionSets.pythonPath setting.
+    safeRegister("CheckoutPollService", () => {
+        const pollService = new CheckoutPollService_1.CheckoutPollService({
+            pythonPathResolver: (cwd) => {
+                const cfg = vscode.workspace.getConfiguration("dabblerSessionSets");
+                const inspected = cfg.inspect("pythonPath");
+                const explicit = inspected?.workspaceFolderValue ??
+                    inspected?.workspaceValue ??
+                    inspected?.globalValue;
+                const raw = (explicit ?? "python").trim();
+                if (!raw)
+                    return "python";
+                if (path.isAbsolute(raw))
+                    return raw;
+                if (raw.includes(path.sep) || raw.includes("/")) {
+                    return path.resolve(cwd, raw);
+                }
+                return raw;
+            },
+            timeoutMinutesResolver: () => {
+                const cfg = vscode.workspace.getConfiguration("dabblerSessionSets");
+                const value = cfg.get("checkoutPollTimeoutMinutes", CheckoutPollService_1.DEFAULT_TIMEOUT_MINUTES);
+                if (typeof value !== "number" || !Number.isFinite(value) || value < 1) {
+                    return CheckoutPollService_1.DEFAULT_TIMEOUT_MINUTES;
+                }
+                return Math.min(value, 1440);
+            },
+        });
+        pollService.start();
+        context.subscriptions.push(pollService);
+    });
     // Set 030 Session 5: flip scanState to "ready" once activation
     // finishes. `setImmediate` yields the event loop one tick so the
     // synchronous body of activate() returns first (VS Code measures

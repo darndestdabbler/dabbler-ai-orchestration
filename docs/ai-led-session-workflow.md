@@ -457,35 +457,58 @@ time.
 **How the operator triggers it:**
 
 - **Right-click in the Session Set Explorer.** The `Cancel Session
-  Set` action is visible on in-progress / not-started / done items;
-  `Restore Session Set` is visible on cancelled items. Both prompt
-  for confirmation and offer an optional reason that is prepended to
-  the on-disk history.
-- **Manually create or delete `CANCELLED.md`.** The same on-disk
-  shape works without the extension — drop a `CANCELLED.md` file in
-  the session-set folder and the next reader treats it as cancelled.
-  Removing the file (or renaming it to `RESTORED.md`) restores the
-  set. The TypeScript and Python helpers in
+  Set` action is visible on in-progress / not-started / complete
+  items; `Restore Session Set` is visible on cancelled items. Both
+  prompt for confirmation and offer an optional reason that is
+  prepended to the on-disk history. The canonical writers
+  (`cancelSessionSet` in
   `tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts` and
-  `ai_router/session_lifecycle.py` are the canonical writers; both
-  emit the same byte-for-byte format (LF newlines, UTF-8 no BOM,
-  ISO-8601 local timestamps).
+  `cancel_session_set` in `ai_router/session_lifecycle.py`) flip
+  `session-state.json`'s `status` to `"cancelled"` AND prepend an
+  entry to `CANCELLED.md` in a single atomic boundary.
+- **Edit `session-state.json` by hand.** Flip the top-level `status`
+  to `"cancelled"` and (optionally) capture the prior value into a
+  `preCancelStatus` field so a later restore can flip it back. The
+  Cancelled bucket picks up the change on the next refresh. The
+  matching `CANCELLED.md` audit entry is not strictly required for
+  bucketing (the state file is the canonical signal post-Set-035),
+  but **writing both is the canonical shape**: the markdown file is
+  the durable, operator-readable record of what happened and when.
+  Hand-flipping only the state file leaves the audit trail
+  incomplete; hand-dropping only a `CANCELLED.md` does not flip the
+  bucket (state-file-first wins; see "Detection precedence" below).
 
-**Detection precedence** (highest first): `CANCELLED.md` present →
-`session-state.json` `status` field (`"complete"` → done,
-`"in-progress"` → in-progress, otherwise → not-started).
-`CANCELLED.md` always wins: a partially-completed set that has been
-cancelled shows as cancelled, not done. Do **not** infer state from
-file presence (`activity-log.json`, `change-log.md`) — read
-`session-state.json` directly.
+**Detection precedence** (Set 035, extending the Set 033 Session 2
+H2 single-source-of-truth verdict): `session-state.json`'s `status`
+field is the canonical signal. The extension's reader
+(`readCancellationState` in `cancelLifecycle.ts`, wired through
+`fileSystem.ts:readSessionSets`) resolves the bucket in this order:
+
+1. `state.status === "cancelled"` → **Cancelled**.
+2. `state.status` is a non-cancelled string → fall through to the
+   normal status ladder (`"complete"` → Complete, `"in-progress"`
+   → Active, otherwise → Not Started). A stray `CANCELLED.md`
+   alongside a non-cancelled status is **not** consulted and does
+   **not** flip the bucket — that is an operator-resolvable
+   inconsistency, not a silent override.
+3. No usable state file (missing, unparseable, or no `status`
+   field — legacy v1 snapshots, hand-edited shapes, brand-new
+   folders) AND `CANCELLED.md` is present on disk → **Cancelled**
+   via the legacy file-presence fallback. A `console.warn` fires
+   so a diagnostic trail exists if a state-file write bug ever
+   masks a real cancellation behind an inconsistent status.
+
+Do **not** infer state from file presence (`activity-log.json`,
+`change-log.md`) — read `session-state.json` directly via the
+shared `readSessionSets` / `get_progress` helpers.
 
 **`RESTORED.md` is audit-only.** Once a cancelled set is restored,
 `CANCELLED.md` is renamed to `RESTORED.md` and the file is kept
 indefinitely as the toggle history. `RESTORED.md` is *not* a separate
-state — the set falls back to whichever of done / in-progress /
-not-started its other files indicate. Subsequent re-cancels rename
-`RESTORED.md` back to `CANCELLED.md` and prepend a new entry, so the
-file accumulates the full history across multiple toggles.
+state — the set falls back to whichever of complete / in-progress /
+not-started its `session-state.json` indicates. Subsequent re-cancels
+rename `RESTORED.md` back to `CANCELLED.md` and prepend a new entry,
+so the file accumulates the full history across multiple toggles.
 
 **Out of scope for cancellation:**
 
@@ -984,11 +1007,15 @@ each set's `session-state.json` (see **§ Session-Set Lifecycle and
 State File** above):
 - `status: "in-progress"` = active — pick this set (or the named slug)
 - `status: "not-started"` = use this if no in-progress set exists
-- `status: "complete"` or `CANCELLED.md` present = skip
+- `status: "complete"` or `status: "cancelled"` = skip
 
 Do **not** infer state from file presence. The old heuristic
-(`activity-log.json` present but no `change-log.md` = in-progress)
-is retired — `session-state.json` is the only correct signal.
+(`activity-log.json` present but no `change-log.md` = in-progress;
+`CANCELLED.md` presence flips to skipped) is retired —
+`session-state.json` is the canonical signal. The marker
+fallback (described under "Cancelling and restoring a session
+set" above) fires only when no usable state file exists, and is
+not a routine path.
 
 If the trigger phrase named a specific slug (e.g., "Start the next
 session of `<slug>`"), use that slug directly rather than calling

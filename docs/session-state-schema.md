@@ -594,6 +594,61 @@ prepend-formatted history they accumulate (`Cancelled on <iso>` /
 what happened and when. They are no longer the bucketing signal,
 but they are not retired.
 
+### Canonical reader
+
+The single entry point is
+[`readCancellationState(sessionSetDir)`](../tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts)
+in `tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts`.
+It returns one of four discrete values:
+
+| Return | Meaning |
+|---|---|
+| `"cancelled"` | The state file declares `status: "cancelled"`. Bucket the set as Cancelled. |
+| `"restored"` | The state file declares a non-cancelled status AND `RESTORED.md` is present on disk. History-aware: the set is live, but has been cancelled and restored in the past. |
+| `"active"` | The state file declares a non-cancelled status AND no `RESTORED.md` is on disk. The common case. |
+| `"unknown"` | No state file, unparseable JSON, or a state file with no usable `status` field. The caller must fall back to the legacy file-presence predicates (`isCancelled` / `wasRestored`). |
+
+`readCancellationState` is the only function readers should call
+for bucketing decisions. The legacy predicates remain exported for
+the fallback path and for cross-engine parity comparisons against
+the Python writer in `ai_router/session_lifecycle.py`, but they are
+not the bucketing API. The wired-in call site is
+[`fileSystem.ts:readSessionSets()`](../tools/dabbler-ai-orchestration/src/utils/fileSystem.ts).
+
+### Writer symmetry
+
+The two canonical writers — `cancelLifecycle.ts` (TypeScript) and
+`ai_router/session_lifecycle.py` (Python) — keep both signals in
+lockstep at every cancel/restore boundary:
+
+- A successful `cancelSessionSet` / `cancel_session_set` writes the
+  `CANCELLED.md` audit entry **and** sets `state.status =
+  "cancelled"` with the prior status captured into
+  `preCancelStatus`.
+- A successful `restoreSessionSet` / `restore_session_set` renames
+  `CANCELLED.md` to `RESTORED.md` (preserving history), prepends a
+  new `Restored on <iso>` entry, **and** restores `state.status`
+  from `preCancelStatus` (or, when `preCancelStatus` is missing,
+  infers from file presence — see `inferStatusFromFiles`).
+- **Re-cancel preserves the original `preCancelStatus`.** A
+  cancel-on-an-already-cancelled set prepends a new audit entry
+  but does NOT overwrite `preCancelStatus` with `"cancelled"` —
+  that would lose the original status across the next restore.
+  Both writers gate the `preCancelStatus` capture on
+  `state.status !== "cancelled"`, so a re-cancel is a no-op for
+  the captured prior status.
+
+Set 035 Session 2's writer-parity check confirmed the two writers
+produce byte-equivalent on-disk output (LF newlines, UTF-8 no BOM,
+local-time ISO-8601 with second precision and `±HH:MM` offset).
+A set cancelled on one platform reads identically when the same
+repo is opened on another. Because the writers are symmetric,
+the only way for the state file's `status` and the markdown
+marker's presence to disagree is (a) a legacy state file written
+before Set 035, or (b) a manual edit to one signal without the
+other. Both branches resolve through the legacy-fallback path
+below, never by silently overriding the state file.
+
 ### Legacy-fallback path
 
 The extension's reader keeps one fallback: if `session-state.json`
@@ -603,10 +658,9 @@ v1 snapshot, hand-edited shape, brand-new folder), and a
 Cancelled. The fallback emits a `console.warn` so a diagnostic
 trail exists if a state-file write bug ever masks a real
 cancellation behind an inconsistent status. Modern v3 writes from
-either the Python (`session_lifecycle.py`) or TypeScript
-(`cancelLifecycle.ts`) writer always populate `status` correctly,
-so the fallback branch is exercised only for legacy state and
-manually edited files.
+either writer always populate `status` correctly, so the fallback
+branch is exercised only for legacy state and manually edited
+files.
 
 The state-file-first contract intentionally does NOT consult
 `CANCELLED.md` presence when the state file declares a
@@ -618,6 +672,18 @@ override the state file.
 Per-session cancellation is reserved for a future schema. v3
 readers tolerate `"cancelled"` in `sessions[]` but no v3 writer
 emits it.
+
+### Layer-3 coverage
+
+The state-file-first contract is pinned by a Layer-3 Playwright
+smoke at
+[`tools/dabbler-ai-orchestration/src/test/playwright/cancellation-state-file.spec.ts`](../tools/dabbler-ai-orchestration/src/test/playwright/cancellation-state-file.spec.ts).
+Two scenarios cover the two paths: (1) `status: "cancelled"` with
+no `CANCELLED.md` on disk → Cancelled bucket (the new contract);
+(2) no usable state file + `CANCELLED.md` present → Cancelled
+bucket (the legacy fallback). A third scenario covers the
+write-side asymmetry — `status: "complete"` with a stray
+`CANCELLED.md` is NOT bucketed as Cancelled (the state file wins).
 
 ---
 

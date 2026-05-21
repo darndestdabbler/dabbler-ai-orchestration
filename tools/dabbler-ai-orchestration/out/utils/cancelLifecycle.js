@@ -35,13 +35,19 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isCancelled = isCancelled;
 exports.wasRestored = wasRestored;
+exports.readCancellationState = readCancellationState;
 exports.cancelSessionSet = cancelSessionSet;
 exports.restoreSessionSet = restoreSessionSet;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
-// Filenames for the cancel/restore audit-trail markdown files. The
-// filename signals the *current* lifecycle state; the body is the same
-// accumulated history regardless of which name the file currently uses.
+// Filenames for the cancel/restore audit-trail markdown files. Pre-
+// Set-035 the filename signalled the *current* lifecycle state and
+// drove the Explorer's bucketing read; post-Set-035 the canonical
+// signal is ``session-state.json``'s ``status`` field (H2 verdict
+// from Set 033 Session 2, extended to cancellation by Set 035) and
+// these files are durable audit-history artifacts. The body
+// accumulates the same prepend-formatted entries across cancel /
+// restore toggles regardless of which name the file currently uses.
 const CANCELLED_FILENAME = "CANCELLED.md";
 const RESTORED_FILENAME = "RESTORED.md";
 const SESSION_STATE_FILENAME = "session-state.json";
@@ -51,7 +57,10 @@ const HISTORY_HEADER = "# Cancellation history";
 // byte-for-byte on the on-disk shape so a set cancelled on one platform
 // reads identically when the same repo is opened on another. Pin both
 // writers to LF newlines and UTF-8 (no BOM) — the spec's Risks section
-// calls this out explicitly.
+// calls this out explicitly. Set 035 Session 2 confirmed parity across
+// the 10 rows that matter (filename constants, history header,
+// timestamp shape, atomic write, prepend semantics, state-file flip,
+// restore inference, JSON serialization).
 /**
  * Format a Date as a local-time ISO-8601 string with timezone offset and
  * second precision (e.g., ``2026-05-14T11:23:07-04:00``).
@@ -76,27 +85,92 @@ function formatLocalIsoSeconds(d) {
     return `${yyyy}-${mm}-${dd}T${HH}:${MM}:${SS}${sign}${offH}:${offM}`;
 }
 /**
- * Returns ``true`` iff *sessionSetDir* currently has a ``CANCELLED.md``
- * file. Per the spec's detection rules, this signal takes precedence
- * over every other state indicator (change-log, activity-log,
- * session-state.json status). Session 2 wires this into the explorer's
- * state-detection function ahead of the ``readStatus`` call.
+ * Legacy file-presence predicate. Returns ``true`` iff *sessionSetDir*
+ * currently has a ``CANCELLED.md`` file.
+ *
+ * **Set 035 retired this as the primary bucketing signal** in favor of
+ * :func:`readCancellationState`, which consults ``session-state.json``
+ * first (the H2 single-source-of-truth verdict from Set 033 Session 2,
+ * extended to cancellation by Set 035). This helper remains exported
+ * for two purposes:
+ *
+ * 1. The legacy-fallback path inside :func:`readCancellationState` —
+ *    invoked when the state file is missing/unparseable (legacy v1
+ *    snapshots, hand-edited files, brand-new folders).
+ * 2. Cross-engine parity comparisons against the Python writer in
+ *    ``ai_router/session_lifecycle.py`` and unit-test scaffolding.
+ *
+ * Do not introduce new production call sites that branch on this
+ * predicate alone — route through :func:`readCancellationState`
+ * instead so the state-file-first contract holds uniformly.
  */
 function isCancelled(sessionSetDir) {
     return fs.existsSync(path.join(sessionSetDir, CANCELLED_FILENAME));
 }
 /**
- * Returns ``true`` iff *sessionSetDir* has a ``RESTORED.md`` file AND
- * does not currently have a ``CANCELLED.md`` file. ``RESTORED.md`` is
- * an audit-only artifact: once restored, the set falls back to whatever
- * its other files indicate (done / in-progress / not-started). The
+ * Legacy file-presence predicate. Returns ``true`` iff *sessionSetDir*
+ * has a ``RESTORED.md`` file AND does not currently have a
+ * ``CANCELLED.md`` file. ``RESTORED.md`` is an audit-only artifact:
+ * once restored, the set falls back to whatever its other files
+ * indicate (done / in-progress / not-started). The
  * ``CANCELLED.md``-absent guard means a re-cancelled set (which renames
  * ``RESTORED.md`` back to ``CANCELLED.md``) does not also report
  * "wasRestored".
+ *
+ * As of Set 035 this predicate is no longer consulted by the reader's
+ * bucketing path; the canonical signal is ``state.status``. Kept
+ * exported for test scaffolding and the legacy-fallback branch inside
+ * :func:`readCancellationState`.
  */
 function wasRestored(sessionSetDir) {
     return (fs.existsSync(path.join(sessionSetDir, RESTORED_FILENAME)) &&
         !fs.existsSync(path.join(sessionSetDir, CANCELLED_FILENAME)));
+}
+/**
+ * State-file-first cancellation/restoration reader.
+ *
+ * Set 035 retires the file-presence-first bucketing rule that
+ * :func:`isCancelled` codified. The canonical signal for cancellation
+ * is now ``session-state.json``'s ``status`` field; the markdown
+ * markers (``CANCELLED.md`` / ``RESTORED.md``) remain on disk as
+ * audit-history artifacts and as the legacy-fallback signal when no
+ * usable state file is present.
+ *
+ * Resolution order:
+ *
+ * 1. If ``session-state.json`` exists and parses to an object with a
+ *    string ``status`` field, the field's value selects between
+ *    ``"cancelled"``, ``"restored"`` (status is non-cancelled and
+ *    ``RESTORED.md`` is present on disk), and ``"active"`` (status is
+ *    non-cancelled and ``RESTORED.md`` is absent).
+ * 2. If the state file is missing, malformed, or carries no usable
+ *    ``status``, returns ``"unknown"``. The caller is expected to
+ *    consult :func:`isCancelled` / :func:`wasRestored` for legacy
+ *    bucketing in that branch.
+ *
+ * The state-file-first contract intentionally does NOT consult
+ * ``CANCELLED.md`` presence when the state file declares
+ * ``status: "complete"`` (or any other non-cancelled value): the
+ * writer keeps both signals in lockstep at every cancel/restore
+ * boundary, so a state-file value of ``"complete"`` paired with a
+ * stray ``CANCELLED.md`` represents either (a) a manually edited file
+ * the operator needs to reconcile, or (b) a legacy snapshot — both of
+ * which are handled via the ``"unknown"`` fallback when ``status``
+ * is missing, not by silently letting the markdown file win.
+ */
+function readCancellationState(sessionSetDir) {
+    const state = readSessionState(sessionSetDir);
+    if (state === null)
+        return "unknown";
+    if (typeof state.status !== "string" || state.status.length === 0) {
+        return "unknown";
+    }
+    if (state.status === "cancelled")
+        return "cancelled";
+    if (fs.existsSync(path.join(sessionSetDir, RESTORED_FILENAME))) {
+        return "restored";
+    }
+    return "active";
 }
 /**
  * Atomic write via unique temp file + rename. Mirrors
@@ -131,9 +205,13 @@ function atomicWriteFile(filePath, content) {
 /**
  * Build the file body with *verb*'s new entry prepended above any
  * existing entries. Tolerates malformed prior content (manual edits)
- * by keeping it verbatim below the new entry — the spec's risk section
- * calls out that "filename presence is what matters" and the prepend
- * logic must not break detection.
+ * by keeping it verbatim below the new entry — the original cancel-
+ * lifecycle spec called out that the prepend logic must not break
+ * detection, and post-Set-035 the audit-history file remains the
+ * durable record of *what happened and when* even though
+ * ``session-state.json``'s ``status`` is now the bucketing signal.
+ * Preserving prior content unchanged keeps the operator-readable
+ * history intact across hand-edits.
  *
  * The entry block is self-terminating: each entry ends with the
  * blank-line separator (``\n\n``) that the spec's Session-1 prepend
@@ -220,6 +298,15 @@ function inferStatusFromFiles(sessionSetDir) {
  * ``session-state.json`` so its ``status`` becomes ``"cancelled"`` with
  * the prior status captured into ``preCancelStatus``.
  *
+ * Both writes happen on every cancel: post-Set-035 the state file's
+ * ``status`` is the canonical bucketing signal (consulted by
+ * :func:`readCancellationState`), and ``CANCELLED.md`` is the durable
+ * audit-history artifact. Keeping the two writes paired is the
+ * symmetry that :func:`readCancellationState` relies on — a stray
+ * ``CANCELLED.md`` paired with a non-cancelled ``status`` is the
+ * operator-resolvable inconsistency case, not a routine output of
+ * this writer.
+ *
  * Idempotent for the markdown side in the sense that re-cancelling an
  * already-cancelled set just prepends another entry; it does not
  * rewrite the history. The session-state.json update is a no-op rebind
@@ -264,8 +351,12 @@ async function cancelSessionSet(sessionSetDir, reason = "") {
  * mirroring the Set 7 backfill rules.
  *
  * Throws if ``CANCELLED.md`` does not exist; the caller should check
- * via :func:`isCancelled` first. Restoring a never-cancelled set is
- * an operator error, not a no-op.
+ * via :func:`isCancelled` first. :func:`readCancellationState`'s
+ * ``"cancelled"`` return is the canonical bucketing signal, but the
+ * writer needs the *file* present to rename it into ``RESTORED.md``,
+ * so the file-presence predicate is the right precondition here even
+ * post-Set-035. Restoring a never-cancelled set is an operator
+ * error, not a no-op.
  */
 async function restoreSessionSet(sessionSetDir, reason = "") {
     const cancelledPath = path.join(sessionSetDir, CANCELLED_FILENAME);
@@ -276,13 +367,18 @@ async function restoreSessionSet(sessionSetDir, reason = "") {
     const existing = fs.readFileSync(cancelledPath, "utf8");
     const updated = prependEntry(existing, "Restored", reason, formatLocalIsoSeconds(new Date()));
     // Sequence: write RESTORED.md, then update session-state.json, then
-    // unlink CANCELLED.md. CANCELLED.md is the highest-precedence state
-    // signal, so it stays in place until everything else is consistent —
-    // a crash before the unlink leaves the set looking cancelled (sticky
-    // and correct), and the operator can simply re-run restore. The
-    // alternative (unlink first, then update JSON) would briefly show
-    // the set as restored to the explorer while session-state.json still
-    // reported `status: "cancelled"` to any other reader.
+    // unlink CANCELLED.md. Post-Set-035 the state file's `status` is
+    // the canonical bucketing signal (a `"cancelled"` status wins over
+    // any marker on disk), so the writer's job is just to keep both
+    // signals consistent. The "rename last" ordering means a crash
+    // partway through leaves the set looking *cancelled* to both the
+    // state-file-first reader (`status` still `"cancelled"` until the
+    // JSON write lands) and the legacy-fallback reader (`CANCELLED.md`
+    // still on disk) — sticky and correct. The operator can simply
+    // re-run restore. The alternative (unlink first, then update JSON)
+    // would briefly show the set as restored to the legacy-fallback
+    // reader while the canonical reader still saw `status:
+    // "cancelled"`.
     atomicWriteFile(restoredPath, updated);
     const state = readSessionState(sessionSetDir);
     if (state !== null) {

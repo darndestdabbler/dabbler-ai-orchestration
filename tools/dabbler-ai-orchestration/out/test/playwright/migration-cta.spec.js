@@ -38,20 +38,19 @@ async function teardown(per) {
         console.warn("teardown encountered cleanup errors:", errs);
     }
 }
+// Set 029 Session 4: tree is now a webview FrameLocator, not the
+// native TreeView Locator. Treeitems have no aria-label in the
+// webview impl (the name + description are child spans with their
+// own classes); textContent yields "<name><description>" which is
+// fine for the substring-contains assertions in this suite.
 async function treeitemTexts(tree) {
     const items = tree.locator('[role="treeitem"]');
     const count = await items.count();
     const out = [];
     for (let i = 0; i < count; i++) {
         const item = items.nth(i);
-        const aria = await item.getAttribute("aria-label");
-        if (aria) {
-            out.push(aria);
-        }
-        else {
-            const t = (await item.textContent()) || "";
-            out.push(t.trim());
-        }
+        const t = (await item.textContent()) || "";
+        out.push(t.trim().replace(/\s+/g, " "));
     }
     return out;
 }

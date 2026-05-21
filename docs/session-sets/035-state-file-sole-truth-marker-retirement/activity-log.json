@@ -163,6 +163,63 @@
           "output_path": "verification-output/round-a-session-2-result.json"
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/schema-doc-finalized",
+      "dateTime": "2026-05-21T07:10:00-04:00",
+      "description": "Finalized the docs/session-state-schema.md Cancel / restore section. Session 1 had rewritten the lede (state file canonical, markdown audit-only), the bucketing-list first bullet (state file wins, Set 035), and the status-table footnote. Session 3 added three new subsections under 'Cancel / restore': (1) 'Canonical reader' — names readCancellationState(sessionSetDir) in cancelLifecycle.ts as the single entry point with a 4-row return-value table (cancelled / restored / active / unknown) mirroring the CancellationState type union, and points at fileSystem.ts:readSessionSets as the wired-in caller; (2) 'Writer symmetry' — names the TS + Python writers as the two canonical writers, cites Session 2's verified byte-equivalent on-disk shape (LF newlines, UTF-8 no BOM, local-time ISO-8601 with second precision + ±HH:MM offset), spells out the both-writes contract (cancel emits CANCELLED.md AND state.status=cancelled+preCancelStatus=prior; restore symmetric), bullets the re-cancel preCancelStatus preservation invariant per the Round A nice-to-have; (3) 'Layer-3 coverage' — names the new cancellation-state-file.spec.ts and summarizes its three scenarios (state-file-only cancelled, legacy fallback, state-file wins on stray marker).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/workflow-doc-aligned",
+      "dateTime": "2026-05-21T07:15:00-04:00",
+      "description": "Aligned docs/ai-led-session-workflow.md to the state-file-first contract in two places. (1) 'Cancelling and restoring a session set' section: 'How the operator triggers it' rewritten — right-click bullet now names the canonical writers as flipping state.status='cancelled' AND prepending to CANCELLED.md in a single atomic boundary; the prior 'Manually create or delete CANCELLED.md' bullet replaced with 'Edit session-state.json by hand', which makes the state file the canonical signal and recommends (but does not require) the matching markdown audit entry; explicitly notes that hand-dropping only a CANCELLED.md does NOT flip the bucket. 'Detection precedence' subsection rewritten as a three-tier ladder matching fileSystem.ts:readSessionSets — tier 1 state.status==='cancelled', tier 2 non-cancelled status falls through to the normal status ladder with no marker override, tier 3 legacy fallback fires only on no usable state file + CANCELLED.md present (with console.warn). RESTORED.md is-audit-only paragraph updated to use 'complete' instead of 'done' in the falls-back trio. (2) Step 1 'Identify the Active Session Set' bullet 'status: \"complete\" or CANCELLED.md present = skip' replaced with 'status: \"complete\" or status: \"cancelled\" = skip'; the file-presence retirement explanation tightened to point at the Cancelling/restoring section for the legacy-fallback exception.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/jsdoc-updated",
+      "dateTime": "2026-05-21T07:20:00-04:00",
+      "description": "Polished JSDoc + body comments in tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts. (1) Header comment block (lines 4-11) reframed: the markdown markers are described as durable audit-history artifacts post-Set-035 with the state file as the canonical bucketing signal, citing the Set 033 Session 2 H2 verdict + Set 035 extension to cancellation. (2) Byte-equivalence pin comment (lines 13-22) updated to name Session 2's verified parity table (10 rows). (3) prependEntry JSDoc — removed the 'filename presence is what matters' attribution; rewrote to frame the prepend-logic motivation as preserving the operator-readable audit history across hand-edits, retaining the malformed-content robustness claim. (4) cancelSessionSet JSDoc — added a 'Both writes happen on every cancel' paragraph explaining the writer-symmetry contract that readCancellationState relies on (a stray CANCELLED.md paired with non-cancelled status is the operator-resolvable inconsistency case, not a routine writer output). (5) restoreSessionSet JSDoc — added a clarifying sentence on why isCancelled is still the right file-presence precondition (writer needs the file present to rename into RESTORED.md, even though readCancellationState is the canonical bucketing API). (6) restoreSessionSet body 'Sequence: write RESTORED.md, then update session-state.json, then unlink CANCELLED.md' comment rewritten — the crash-safety argument now explicitly references both readers (state-file-first canonical + legacy-fallback) and uses the 'sticky and correct' framing where a partial failure leaves both signals saying cancelled. Typecheck (npx tsc --noEmit) clean.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/layer3-test-green",
+      "dateTime": "2026-05-21T07:30:00-04:00",
+      "description": "Authored tools/dabbler-ai-orchestration/src/test/playwright/cancellation-state-file.spec.ts. Three scenarios pin the state-file-first contract on rendered output: (1) 'state file says cancelled with no CANCELLED.md → Cancelled bucket (new contract)' — calls cancelSet(h) (which writes both signals via the canonical Python writer) then fs.unlinkSync(cancelledPath); asserts row data-state=cancelled and 'Cancelled  (1)' bucket header visible; exercises the readCancellationState === 'cancelled' branch. (2) 'no state file + CANCELLED.md present → Cancelled bucket (legacy fallback)' — calls cancelSet(h) then fs.unlinkSync(statePath); asserts row data-state=cancelled and 'Cancelled  (1)' bucket header visible; exercises the cancellation === 'unknown' && isCancelled(dir) branch in fileSystem.ts:readSessionSets (with the console.warn diagnostic). (3) 'status: complete + stray CANCELLED.md → Complete bucket (state file wins)' — makeSet(slug, 1) then driveHappyPath(h, 1) to land status=complete + lifecycleState=closed; sanity-checks state.status='complete' before writing a hand-rolled stray CANCELLED.md; asserts row data-state=complete (NOT cancelled), no Cancelled bucket header, 'Complete  (1)' bucket header visible. Discovered during initial test execution that `npm run test:playwright` compiles via esbuild to dist/extension.js (the extension's package.json main), but the per-test re-compile only ran `tsc --outDir out`; needed to rebuild dist/ via `node esbuild.js` to pick up Session 1's fileSystem.ts changes. All 3 new scenarios green after the rebuild. 3 pre-existing Layer-3 failures in session-sets-tree.spec.ts (renders ARIA tree structure / seeded orchestrator block / empty-state CTA) are unrelated to Session 3's cancellation work — they trace back to Session 1's empty-state grey-gauge removal in OrchestratorAccordion.ts. Documented as deferred follow-ups for Set 034 (styling iteration) or a separate hot-fix; Session 4 test sweep will surface them again.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/round-a-verification",
+      "dateTime": "2026-05-21T07:35:00-04:00",
+      "description": "Round A verification via gemini-pro (gemini-2.5-pro tier 2) at $0.0217788 cost (16,671 input tokens + 94 output tokens). Bundle size 48,118 chars covering: schema doc Cancel/restore section + new Canonical reader / Writer symmetry / Layer-3 coverage subsections + bucketing-list first bullet; workflow doc Cancelling/restoring section + Step 1 find_active_session_set bullet; full cancelLifecycle.ts (JSDoc polish); full cancellation-state-file.spec.ts (3 Layer-3 scenarios); fileSystem.ts readSessionSets cancellation branch (ground truth); Session 3 spec contract. Verdict: VERIFIED, no must-fix issues. Nice-to-have: 'subtle but important' re-cancel preCancelStatus preservation worth explicitly documenting in 'Writer symmetry'. Addressed inline post-verification per [[feedback_dont_hide_behind_out_of_scope]] — added a third bullet to the Writer symmetry list spelling out the re-cancel invariant + the writer's gate (state.status !== 'cancelled'). Round B not needed. Cumulative Set 035 routed spend: $0.0612 of $0.50 forecast.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "model_id": "gemini-2.5-pro",
+          "tier": 2,
+          "task_type": "session-verification",
+          "input_tokens": 16671,
+          "output_tokens": 94,
+          "cost_usd": 0.0217788,
+          "verdict": "VERIFIED",
+          "output_path": "verification-output/round-a-session-3-result.json"
+        }
+      ]
     }
   ]
 }

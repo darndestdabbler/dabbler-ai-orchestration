@@ -20,6 +20,15 @@
   "verification_message_ids": [
     "verification-output/round-a-session-1-result.json"
   ],
-  "next_orchestrator": null,
+  "next_orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "medium",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 (writer alignment + glossary harvest) builds directly on Session 1's reader migration; same engine + identity keeps the H2 architectural model + the new readCancellationState contract continuous, and the per-set lifecycle lock invariant from Set 033 H1 is best preserved by a continuous check-out across mid-set boundaries."
+    }
+  },
   "blockers": []
 }

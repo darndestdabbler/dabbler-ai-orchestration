@@ -343,3 +343,174 @@ suite("cancelLifecycle — readCancellationState (Set 035 state-file-first)", ()
     fs.rmSync(dir, { recursive: true });
   });
 });
+
+suite("cancelLifecycle — writer parity (Set 035 Session 2)", () => {
+  // These tests pin the byte-level shape of what cancelLifecycle.ts
+  // writes to disk so the Python mirror in ai_router/session_lifecycle.py
+  // and the TS writer here stay in lockstep. The Python side's parity
+  // is enforced by ai_router/tests/test_session_lifecycle.py; this suite
+  // is the matching TS half.
+
+  test("CANCELLED.md uses LF newlines only (no \\r\\n on Windows)", async () => {
+    const dir = makeTmpDir();
+    await cancelSessionSet(dir, "lf check");
+    const bytes = fs.readFileSync(path.join(dir, "CANCELLED.md"));
+    for (let i = 0; i < bytes.length; i++) {
+      if (bytes[i] === 0x0d) {
+        assert.fail(
+          `CANCELLED.md contains a CR byte at offset ${i}; the writer must emit LF only`
+        );
+      }
+    }
+    // BOM check: must not begin with 0xEF 0xBB 0xBF
+    assert.notStrictEqual(bytes[0], 0xef, "CANCELLED.md must not have a UTF-8 BOM");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("session-state.json serialization matches Python json.dumps(state, indent=2) + '\\n'", () => {
+    const dir = makeTmpDir();
+    const input = {
+      schemaVersion: 3,
+      sessionSetName: "test",
+      sessions: [{ number: 1, title: "s1", status: "not-started" }],
+      currentSession: null,
+      totalSessions: 1,
+      completedSessions: [],
+      status: "not-started",
+    };
+    writeState(dir, input);
+    const raw = fs.readFileSync(path.join(dir, "session-state.json"), "utf8");
+    // 2-space indent (no tabs), no leading whitespace, trailing newline.
+    assert.ok(raw.endsWith("\n"), "state file must end with a trailing newline");
+    assert.strictEqual(raw[raw.length - 2], "}", "trailing char before newline must be }");
+    assert.ok(!raw.includes("\t"), "state file must not contain tab indentation");
+    // 2-space indent: a nested array element should be preceded by 4 spaces
+    // (2 for "completedSessions": [, then the array contents are on their own
+    // lines indented 4 from the root). We check via a simple cue: any
+    // top-level array's first nested line starts with exactly 4 spaces.
+    const sessionsLine = raw.split("\n").find((l) => l.includes('"number": 1'));
+    assert.ok(sessionsLine !== undefined, "could not find sessions[0] line");
+    assert.ok(
+      sessionsLine!.startsWith("      "),
+      `sessions[0] line should be indented 6 spaces (root.sessions[0].keys), got: ${JSON.stringify(sessionsLine)}`
+    );
+  });
+
+  test("cancel writes only status + preCancelStatus, leaving sibling keys untouched", async () => {
+    const dir = makeTmpDir();
+    const baseline = {
+      schemaVersion: 3,
+      sessionSetName: "parity-test",
+      sessions: [{ number: 1, title: "s1", status: "in-progress" }],
+      currentSession: 1,
+      totalSessions: 1,
+      completedSessions: [],
+      status: "in-progress",
+      lifecycleState: "work_in_progress",
+      startedAt: "2026-05-21T06:00:00-04:00",
+      completedAt: null,
+      verificationVerdict: null,
+      orchestrator: {
+        engine: "claude",
+        provider: "anthropic",
+        model: "claude-opus-4-7",
+      },
+    };
+    writeState(dir, baseline);
+    await cancelSessionSet(dir, "writer-parity");
+    const after = readState(dir);
+    // Two deltas only — status + preCancelStatus.
+    assert.strictEqual(after.status, "cancelled");
+    assert.strictEqual(after.preCancelStatus, "in-progress");
+    // Every other key preserved verbatim.
+    for (const key of [
+      "schemaVersion",
+      "sessionSetName",
+      "sessions",
+      "currentSession",
+      "totalSessions",
+      "completedSessions",
+      "lifecycleState",
+      "startedAt",
+      "completedAt",
+      "verificationVerdict",
+      "orchestrator",
+    ] as const) {
+      assert.deepStrictEqual(
+        after[key],
+        (baseline as Record<string, unknown>)[key],
+        `cancel writer must not mutate ${key}`
+      );
+    }
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("round-trip: cancel + restore returns status to the exact prior value", async () => {
+    // Iterates the four canonical status values to confirm the
+    // preCancelStatus capture + restore reads them all symmetrically.
+    for (const original of ["not-started", "in-progress", "complete"] as const) {
+      const dir = makeTmpDir();
+      writeState(dir, {
+        schemaVersion: 3,
+        status: original,
+        sessions: [],
+      });
+      await cancelSessionSet(dir, `cancel-${original}`);
+      assert.strictEqual(readState(dir).status, "cancelled");
+      assert.strictEqual(readState(dir).preCancelStatus, original);
+      await restoreSessionSet(dir, `restore-${original}`);
+      const after = readState(dir);
+      assert.strictEqual(
+        after.status,
+        original,
+        `round-trip from ${original} should restore exactly`
+      );
+      assert.strictEqual(
+        after.preCancelStatus,
+        undefined,
+        "preCancelStatus must be cleared after restore"
+      );
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+
+  test("cancel timestamp is local-time ISO-8601 with second precision and ±HH:MM offset (Python-mirror shape)", async () => {
+    const dir = makeTmpDir();
+    await cancelSessionSet(dir, "tz check");
+    const text = fs.readFileSync(path.join(dir, "CANCELLED.md"), "utf8");
+    // Strict match the format the Python mirror produces:
+    //   datetime.now().astimezone().replace(microsecond=0).isoformat()
+    //   = "2026-05-14T11:23:07-04:00"
+    // No microseconds, no Z suffix; offset always ±HH:MM (Python never
+    // emits a ±HHMM bare form for whole-minute offsets).
+    const match = text.match(
+      /Cancelled on (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2})\n/
+    );
+    assert.ok(
+      match !== null,
+      `expected '<ISO-8601-local-seconds>' timestamp; got: ${JSON.stringify(text)}`
+    );
+    // Negative checks: no millisecond, no UTC Z.
+    assert.ok(!/\d{2}\.\d{3}/.test(text), "must not contain millisecond fractions");
+    assert.ok(!/T\d{2}:\d{2}:\d{2}Z/.test(text), "must not use UTC Z suffix");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("re-cancel after restore preserves the original preCancelStatus across the cycle", async function () {
+    this.timeout(20000);
+    const dir = makeTmpDir();
+    writeState(dir, { schemaVersion: 3, status: "in-progress", sessions: [] });
+    await cancelSessionSet(dir, "C1");
+    await new Promise((r) => setTimeout(r, 1100));
+    await restoreSessionSet(dir, "R1");
+    await new Promise((r) => setTimeout(r, 1100));
+    await cancelSessionSet(dir, "C2");
+    const after = readState(dir);
+    assert.strictEqual(after.status, "cancelled");
+    // The C2 cancel re-captures the post-R1 status (which was the
+    // original "in-progress") as the new preCancelStatus. Symmetry
+    // with the Python mirror confirmed.
+    assert.strictEqual(after.preCancelStatus, "in-progress");
+    fs.rmSync(dir, { recursive: true });
+  });
+});

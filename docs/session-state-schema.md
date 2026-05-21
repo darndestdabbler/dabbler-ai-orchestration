@@ -261,9 +261,12 @@ ledger:
   complete. **Includes the between-sessions state** (one session
   closed, the next not yet started).
 - `"complete"` — every session in `sessions[]` is `"complete"`.
-- `"cancelled"` — set was cancelled mid-flight. Filename
-  (`CANCELLED.md`) is the primary marker; `status: "cancelled"`
-  follows.
+- `"cancelled"` — set was cancelled mid-flight. `status: "cancelled"`
+  in this file is the **canonical signal** (Set 035, extending the
+  H2 single-source-of-truth verdict from Set 033 Session 2). The
+  ``CANCELLED.md`` marker continues to be written alongside as an
+  audit-history artifact, but the bucketing read consults `status`
+  first. See [§ Cancel / restore](#cancel--restore) below.
 
 **Aliases tolerated on read, never written:** the canonicalizer in
 both helpers maps `"completed"` and `"done"` to `"complete"`. The
@@ -575,16 +578,46 @@ set; that's tolerated on read but no new write produces it.
 
 ## Cancel / restore
 
-Cancellation is tracked by **file presence** (`CANCELLED.md` /
-`RESTORED.md`), not by `status: "cancelled"` alone. The extension's
-bucketing rule is filename-first: `CANCELLED.md` present → tree
-state is Cancelled regardless of `status`. The `cancelLifecycle`
-helpers keep `status` in lockstep with the markdown markers so the
-two signals don't diverge; manual edits resolve via the file-presence
-path.
+Cancellation is tracked by the **state file's `status` field**.
+`status: "cancelled"` is the canonical signal; the extension's
+bucketing read consults the state file first and routes the set to
+the **Cancelled** tree group when it finds that value. This is the
+Set 035 extension of the H2 single-source-of-truth verdict that
+Set 033 Session 2 locked for orchestrator state.
 
-Per-session cancellation is reserved for a future schema. v3 readers
-tolerate `"cancelled"` in `sessions[]` but no v3 writer emits it.
+The `cancelLifecycle` helpers (`cancelSessionSet` /
+`restoreSessionSet`) continue to write a companion `CANCELLED.md` or
+`RESTORED.md` audit-history markdown file at every cancel/restore
+boundary. These files are **operator-readable audit artifacts**: the
+prepend-formatted history they accumulate (`Cancelled on <iso>` /
+`Restored on <iso>` entries with reasons) is the durable record of
+what happened and when. They are no longer the bucketing signal,
+but they are not retired.
+
+### Legacy-fallback path
+
+The extension's reader keeps one fallback: if `session-state.json`
+is missing, unparseable, or carries no usable `status` field (legacy
+v1 snapshot, hand-edited shape, brand-new folder), and a
+`CANCELLED.md` is present on disk, the set still buckets as
+Cancelled. The fallback emits a `console.warn` so a diagnostic
+trail exists if a state-file write bug ever masks a real
+cancellation behind an inconsistent status. Modern v3 writes from
+either the Python (`session_lifecycle.py`) or TypeScript
+(`cancelLifecycle.ts`) writer always populate `status` correctly,
+so the fallback branch is exercised only for legacy state and
+manually edited files.
+
+The state-file-first contract intentionally does NOT consult
+`CANCELLED.md` presence when the state file declares a
+non-cancelled `status`. A stray `CANCELLED.md` paired with
+`status: "complete"` represents an operator-resolvable
+inconsistency (likely a manual edit), not a signal to silently
+override the state file.
+
+Per-session cancellation is reserved for a future schema. v3
+readers tolerate `"cancelled"` in `sessions[]` but no v3 writer
+emits it.
 
 ---
 
@@ -713,7 +746,10 @@ v2:
 The extension's tree view buckets each row from `get_progress()` plus
 filename signals:
 
-- `CANCELLED.md` present → **Cancelled** (filename wins).
+- `status === "cancelled"` → **Cancelled** (state file wins,
+  Set 035). Legacy fallback: if no usable state file is present and
+  `CANCELLED.md` exists on disk, the set still buckets as
+  Cancelled — see [§ Cancel / restore](#cancel--restore).
 - Else top-level `status === "complete"` and `isBetweenSessions ===
   false` → **Complete** (the user-visible label that was "Done"
   through v0.13.x).

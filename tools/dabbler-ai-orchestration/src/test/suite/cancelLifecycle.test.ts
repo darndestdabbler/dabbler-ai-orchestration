@@ -5,6 +5,7 @@ import * as path from "path";
 import {
   cancelSessionSet,
   isCancelled,
+  readCancellationState,
   restoreSessionSet,
   wasRestored,
 } from "../../utils/cancelLifecycle";
@@ -243,6 +244,102 @@ suite("cancelLifecycle — session-state.json plumbing", () => {
     restoreSessionSet(dir, "");
     assert.strictEqual(fs.existsSync(path.join(dir, "session-state.json")), false);
     assert.strictEqual(wasRestored(dir), true);
+    fs.rmSync(dir, { recursive: true });
+  });
+});
+
+suite("cancelLifecycle — readCancellationState (Set 035 state-file-first)", () => {
+  test("state says cancelled, no CANCELLED.md → reader reports cancelled (state-file wins)", () => {
+    // The Set 035 contract: a state file declaring status: "cancelled"
+    // is the canonical signal even without the markdown marker on disk.
+    // Pre-035 this would have bucketed as "active" since file-presence
+    // was the first gate.
+    const dir = makeTmpDir();
+    writeState(dir, { schemaVersion: 3, status: "cancelled", sessions: [] });
+    assert.strictEqual(readCancellationState(dir), "cancelled");
+    assert.strictEqual(fs.existsSync(path.join(dir, "CANCELLED.md")), false);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("state says complete, CANCELLED.md present → reader reports active (state-file wins)", () => {
+    // The state-file-first contract intentionally ignores a stray
+    // CANCELLED.md when the state file declares a non-cancelled status.
+    // The legacy `isCancelled()` predicate still reports true (file is
+    // there), but the new reader trusts the state file. The legacy
+    // fallback in fileSystem.ts:276 only activates when the state file
+    // is absent or unparseable — covered by a separate case below.
+    const dir = makeTmpDir();
+    writeState(dir, { schemaVersion: 3, status: "complete", sessions: [] });
+    fs.writeFileSync(path.join(dir, "CANCELLED.md"), "# Cancellation history\n");
+    assert.strictEqual(readCancellationState(dir), "active");
+    assert.strictEqual(isCancelled(dir), true);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("state says complete, RESTORED.md present → reader reports restored (history-aware)", () => {
+    const dir = makeTmpDir();
+    writeState(dir, { schemaVersion: 3, status: "complete", sessions: [] });
+    fs.writeFileSync(path.join(dir, "RESTORED.md"), "# Cancellation history\n");
+    assert.strictEqual(readCancellationState(dir), "restored");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("state says in-progress, no markdown markers → reader reports active", () => {
+    const dir = makeTmpDir();
+    writeState(dir, { schemaVersion: 3, status: "in-progress", sessions: [] });
+    assert.strictEqual(readCancellationState(dir), "active");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("state file missing → reader reports unknown (caller must consult isCancelled fallback)", () => {
+    const dir = makeTmpDir();
+    assert.strictEqual(readCancellationState(dir), "unknown");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("state file unparseable → reader reports unknown", () => {
+    const dir = makeTmpDir();
+    fs.writeFileSync(path.join(dir, "session-state.json"), "{not json");
+    assert.strictEqual(readCancellationState(dir), "unknown");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("state file with missing status field → reader reports unknown", () => {
+    // A legacy v1 / hand-edited file lacking a status field falls
+    // through to the unknown branch so fileSystem.ts:276's legacy
+    // fallback (isCancelled file-presence check) can still apply.
+    const dir = makeTmpDir();
+    writeState(dir, { schemaVersion: 1, currentSession: 1 });
+    assert.strictEqual(readCancellationState(dir), "unknown");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("legacy fallback: state file absent, CANCELLED.md present → caller uses isCancelled", () => {
+    // The new reader returns "unknown" for legacy snapshots; the
+    // fileSystem.ts:276 branch then consults isCancelled() to honor
+    // the file-presence signal. This test documents that contract
+    // here so the two helpers stay in sync.
+    const dir = makeTmpDir();
+    fs.writeFileSync(path.join(dir, "CANCELLED.md"), "# Cancellation history\n");
+    assert.strictEqual(readCancellationState(dir), "unknown");
+    assert.strictEqual(isCancelled(dir), true);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("end-to-end: cancelSessionSet then readCancellationState reports cancelled", () => {
+    const dir = makeTmpDir();
+    writeState(dir, { schemaVersion: 3, status: "in-progress", sessions: [] });
+    cancelSessionSet(dir, "scope rolled into another set");
+    assert.strictEqual(readCancellationState(dir), "cancelled");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("end-to-end: cancel then restore reports restored", () => {
+    const dir = makeTmpDir();
+    writeState(dir, { schemaVersion: 3, status: "in-progress", sessions: [] });
+    cancelSessionSet(dir, "first");
+    restoreSessionSet(dir, "back");
+    assert.strictEqual(readCancellationState(dir), "restored");
     fs.rmSync(dir, { recursive: true });
   });
 });

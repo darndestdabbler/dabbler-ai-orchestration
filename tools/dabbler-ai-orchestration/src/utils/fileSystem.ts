@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { listGitWorktrees } from "./git";
 import { readStatus } from "./sessionState";
-import { isCancelled } from "./cancelLifecycle";
+import { isCancelled, readCancellationState } from "./cancelLifecycle";
 import { readProgress, SessionStateInvariantError } from "./progress";
 import {
   SessionSet,
@@ -258,22 +258,34 @@ export function readSessionSets(root: string): SessionSet[] {
     const aiAssignmentPath = path.join(dir, "ai-assignment.md");
     const uatChecklistPath = path.join(dir, `${entry.name}-uat-checklist.json`);
 
-    // Set 8: CANCELLED.md presence is the canonical (and only) signal
-    // for the cancelled tree state. The spec's detection-rules table in
-    // `docs/session-sets/008-cancelled-session-set-status/spec.md` makes
-    // the file-presence check the first gate so a partially-completed
-    // set that has been cancelled mid-stream renders as Cancelled rather
-    // than Done. Once a set is restored, its `RESTORED.md` is "purely
-    // an audit artifact" (spec § Detection rules) and the set falls
-    // back to whichever of done/in-progress/not-started its other
-    // files indicate. The cancelLifecycle helpers keep
-    // session-state.json's `status` in lockstep with the markdown file,
-    // so we do not consult `status === "cancelled"` as a separate
-    // signal — operator manual edits resolve via the file-presence
-    // path, matching the spec's "filename presence is what matters"
-    // rule.
+    // Set 035: state-file-first cancellation detection. Set 8 originally
+    // made `CANCELLED.md` presence the first gate; Set 033 Session 2
+    // locked the H2 verdict that `session-state.json` is the single
+    // source of truth for session-set state, and Set 035 extends that
+    // verdict to the cancellation lifecycle. `readCancellationState`
+    // consults the state file's `status` field first; the markdown
+    // marker (`CANCELLED.md`) survives as an audit-trail artifact and
+    // as the legacy-fallback signal when no usable state file is
+    // present (the `"unknown"` branch below). The writer
+    // (`cancelLifecycle.ts`) continues to keep both signals in lockstep
+    // at every cancel/restore boundary, so the state file's `status`
+    // is the authoritative read.
     let state: SessionState;
-    if (isCancelled(dir)) {
+    const cancellation = readCancellationState(dir);
+    if (cancellation === "cancelled") {
+      state = "cancelled";
+    } else if (cancellation === "unknown" && isCancelled(dir)) {
+      // Legacy fallback: no usable state file (v1 snapshot, hand-edited
+      // shape, brand-new folder), but `CANCELLED.md` is present. Honor
+      // the file-presence signal so a pre-035 set still buckets
+      // correctly. A `console.warn` documents the fallback so a
+      // diagnostic trail exists if a state-file write bug ever masks
+      // a real cancellation behind a "complete" status.
+      console.warn(
+        `[dabblerSessionSets] Cancellation detected via legacy file-presence ` +
+          `fallback for ${dir} — session-state.json is missing or unparseable. ` +
+          `Consider running ensure_state_file to repair.`
+      );
       state = "cancelled";
     } else {
       const status = readStatus(dir);

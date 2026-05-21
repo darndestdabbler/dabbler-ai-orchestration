@@ -26,7 +26,7 @@
 ## Session Set Configuration
 
 ```yaml
-totalSessions: 6
+totalSessions: 7
 requiresUAT: false
 requiresE2E: true
 uatScope: none
@@ -77,7 +77,7 @@ locked the following pattern (operator-adjudicated, GPT-leaning):
 | **Q6** `requireExplicitTakeover` setting | REJECTED — no persistent off-switch; if real friction surfaces later, ship a one-shot affordance |
 | **Q7** Watcher-scope enforcement | REFINED — allowlisted watcher-inventory unit test |
 
-### What ships across the six sessions
+### What ships across the seven sessions
 
 - **S1** — Writer migration + per-set lifecycle lock. Q5's lock
   is the gating prerequisite for the hybrid-migration safety;
@@ -90,11 +90,19 @@ locked the following pattern (operator-adjudicated, GPT-leaning):
   convention test. Q3 + Q7 user-facing surface.
 - **S5** — Layer-3 Playwright coverage + cross-tier docs +
   cross-repo notice update.
-- **S6** — Final tests + change-log + dual-registry release.
+- **S6** — Orchestrator-agnostic UI audit + empty-state refactor.
+  Sweeps the extension UI for Claude-specific framing now that
+  the writer treats Claude Code, Codex CLI, Gemini Code Assist,
+  and GitHub Copilot as equal first-class orchestrators. Added
+  per operator directive 2026-05-21 on the back of the Set 035
+  Session 1 empty-state polish — gauge geometry was already
+  orchestrator-agnostic, but the empty-state CTA copy still
+  pointed at the Claude Code hook by default.
+- **S7** — Final tests + change-log + dual-registry release.
 
 ---
 
-## Session 1 of 6: Writer migration + per-set lifecycle lock (Q5 prerequisite)
+## Session 1 of 7: Writer migration + per-set lifecycle lock (Q5 prerequisite)
 
 **Goal:** add `chatSessionId` to the orchestrator block + refine
 H4 + add the per-set lifecycle lock that makes the hybrid
@@ -187,7 +195,7 @@ cover all branches.
 
 ---
 
-## Session 2 of 6: `new_chat_id` CLI + Claude Code hook-invoker pass-through
+## Session 2 of 7: `new_chat_id` CLI + Claude Code hook-invoker pass-through
 
 **Goal:** the agent-facing token-source plumbing. Claude Code
 gets its native per-chat ID (from the hook payload's
@@ -257,7 +265,7 @@ fallback CLI; tests cover both paths.
 
 ---
 
-## Session 3 of 6: `signalKind` retirement + Codex config-toml watcher retirement
+## Session 3 of 7: `signalKind` retirement + Codex config-toml watcher retirement
 
 **Goal:** apply the D1 watcher-scope discipline. The Codex
 config-toml watcher is retired entirely (it was the inference
@@ -333,7 +341,7 @@ confidence-level variants. CSS simpler.
 
 ---
 
-## Session 4 of 6: Takeover UX (Q3) + watcher-inventory convention test (Q7)
+## Session 4 of 7: Takeover UX (Q3) + watcher-inventory convention test (Q7)
 
 **Goal:** the user-facing takeover UX (modal in IDE / CLI prompt
 in terminal) and the code-level enforcement of the watcher-scope
@@ -423,7 +431,7 @@ inventory test.
 
 ---
 
-## Session 5 of 6: Layer-3 Playwright coverage + cross-tier docs + cross-repo notice
+## Session 5 of 7: Layer-3 Playwright coverage + cross-tier docs + cross-repo notice
 
 **Goal:** end-to-end test coverage + canonical docs aligned +
 cross-repo notice updated for consumer repos.
@@ -508,7 +516,155 @@ the three consumer repos.
 
 ---
 
-## Session 6 of 6: Tests + change-log + dual-registry release
+## Session 6 of 7: Orchestrator-agnostic UI audit + empty-state refactor
+
+**Goal:** sweep the extension UI for Claude-specific framing and
+replace it with engine-neutral language now that the writer
+contract treats Claude Code, Codex CLI, Gemini Code Assist, and
+GitHub Copilot as equal first-class orchestrators. Decide the
+fate of the accordion empty-state CTA: refactor to neutral copy,
+or retire it if the post-Set-033 + post-Set-036 architecture has
+made it unreachable in practice.
+
+**Background (operator directive 2026-05-21).** Set 035 Session 1
+removed the two grey placeholder gauges from the accordion's
+empty-state per the operator's "we don't need to show gauges
+when there is 'no signal'" call. While reviewing, the operator
+also flagged the CTA copy itself
+([`OrchestratorAccordion.ts:333-336`](../../../tools/dabbler-ai-orchestration/src/providers/OrchestratorAccordion.ts#L333-L336)):
+
+> ```ts
+> const DEFAULT_CTA: EmptyCta = {
+>   commandId: "dabbler.installOrchestratorHook.claudeCode",
+>   label: "install Claude Code hook",
+> };
+> ```
+
+The operator's questions, verbatim:
+
+> "I don't need to install a Claude Code hook. Also, what if I am
+> using Copilot exclusively? The gauges will still work. Correct?
+> There should be no message about signals or Claude Code hooks.
+> Correct?"
+
+This session answers those questions in code. The audit is
+orchestrator-agnostic — there is no single hook that all four
+orchestrators share, so any "install <X> hook" copy hard-codes
+an engine choice that may not be the operator's.
+
+**Steps:**
+
+1. **Audit pass.** Grep the extension source + media + package
+   contributions for engine-specific strings. At minimum:
+   - `Claude Code` / `claude` / `claude-opus` literal occurrences
+     in user-facing copy (excluding internal identifiers and
+     legitimate Claude-Code-installer command names).
+   - `Codex` / `Gemini` / `Copilot` literal occurrences (the
+     other three orchestrators — same audit; the goal is parity,
+     not removal).
+   - `install hook` / `hook installer` framing in user-facing
+     copy — does it still make sense when only Claude Code has
+     an auto-detect hook path?
+   - Catalog findings in
+     `docs/session-sets/036-.../ui-audit-findings.md`. Each
+     finding: file:line, current copy, proposed neutral copy,
+     disposition (fix-in-session vs. follow-on vs. acceptable).
+2. **Empty-state CTA decision.** Three viable dispositions; pick
+   based on what the audit surfaces and the Set-036 architecture
+   landscape:
+   - **(a) Neutral copy + smart-CTA only.** Replace the
+     hard-coded `DEFAULT_CTA` with engine-neutral language
+     (e.g., "No orchestrator checked out. Use *Check Out As…*
+     to start a session.") and keep the smart-CTA mechanism for
+     workspaces that actually have an installable hook target
+     (Claude Code). The CTA button becomes the *Check Out As…*
+     Command Palette action by default — works for every
+     orchestrator, no install step implied.
+   - **(b) Retire the empty-state entirely.** If post-Set-036
+     the accordion is only rendered for `set.state ===
+     "in-progress"` and the writer guarantees the orchestrator
+     block is populated whenever a set is in-progress (Set 033
+     H1 + Set 036 S1 lifecycle lock), the `kind: "empty"` branch
+     is unreachable in normal operation. The branch only fires
+     on edge cases (hand-edited state file with `status:
+     "in-progress"` but `orchestrator: null`). Replace the CTA
+     with a one-line "missing orchestrator block — run
+     *Check Out As…* to repair" diagnostic.
+   - **(c) Status quo + label fix.** Keep the smart-CTA but
+     rephrase to "*configure orchestrator*" (engine-neutral
+     verb) and let the existing detector pick the locally-best
+     install target. Behaviorally unchanged from v0.18.x; copy
+     change only.
+   The session adjudicates between (a) / (b) / (c) per a brief
+   cross-provider consensus check (gemini-pro + gpt-5-4 routed,
+   per [[feedback_prefer_ai_consensus_over_human_prompt]]) and
+   implements the chosen path. Default lean: (b) if Set 036 S1
+   makes the empty-state genuinely unreachable; (a) otherwise.
+3. **Refactor implementation.** Apply the chosen disposition.
+   At minimum:
+   - Update `DEFAULT_CTA` and any caller-passed `EmptyCta`
+     definitions to the neutral copy.
+   - Update
+     [`detectOrchestrators.ts`](../../../tools/dabbler-ai-orchestration/src/providers/detectOrchestrators.ts)'s
+     "right link to surface in the 'No signal' hint" comment +
+     logic to reflect the new copy.
+   - Update the package.json command titles only if they appear
+     in user-facing surfaces (Command Palette titles are
+     user-facing — keep `Install Orchestrator Hook (Claude
+     Code)` etc. for the actual install commands; that's not
+     audit scope).
+4. **Welcome / wizard surfaces.** The `Dabbler: Get Started`
+   wizard and `viewsWelcome` contribution carry their own copy.
+   Audit and fix in the same pass — operator-visible empty
+   workspaces are a high-impact surface for first impressions
+   from non-Claude operators.
+5. **Layer-3 Playwright update.** The existing assertion in
+   `session-sets-tree.spec.ts` checks
+   `expect(cta).toContainText(/No signal/)`. Replace with an
+   assertion matching the new copy. Add a complementary scenario
+   exercising the empty-state's button click (verifies the
+   *Check Out As…* command dispatches, not an installer command).
+6. **CSS sweep.** The orphaned `.grey-gauges` rules in
+   `media/session-sets-tree/tree.css` and
+   `media/orchestrator-indicator/indicator.css` are dead post-
+   Set-035; remove them in this session if they're still around.
+7. **End-of-session verification** (gemini-pro, Round A).
+
+**Creates:**
+- `docs/session-sets/036-chatsessionid-and-watcher-scope-implementation/ui-audit-findings.md`
+
+**Touches:**
+- `tools/dabbler-ai-orchestration/src/providers/OrchestratorAccordion.ts`
+- `tools/dabbler-ai-orchestration/src/providers/detectOrchestrators.ts`
+- `tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts`
+  (caller-passed `emptyCta` plumbing — only if disposition (a)
+  changes the smart-CTA shape)
+- `tools/dabbler-ai-orchestration/src/test/playwright/session-sets-tree.spec.ts`
+- `tools/dabbler-ai-orchestration/package.json` (viewsWelcome
+  contribution, if audited copy lives there)
+- `tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css`
+- `tools/dabbler-ai-orchestration/media/orchestrator-indicator/indicator.css`
+- Any files surfaced by the audit pass needing copy updates.
+
+**Ends with:** No user-facing extension copy assumes a particular
+orchestrator. The empty-state branch either renders neutral
+language or has been retired in favor of a diagnostic-only
+treatment. Layer-3 Playwright pins the new contract.
+
+**Progress keys:** `session-006/ui-audit-completed`,
+`session-006/empty-state-disposition-locked`,
+`session-006/refactor-applied`,
+`session-006/welcome-wizard-updated`,
+`session-006/layer3-test-green`,
+`session-006/css-sweep-completed`,
+`session-006/round-a-verification`
+
+**Estimated cost:** $0.05–$0.15 (audit grep + consensus check +
+implementation + verification).
+
+---
+
+## Session 7 of 7: Tests + change-log + dual-registry release
 
 **Goal:** final test sweep, change-log aggregation, dual release.
 
@@ -520,8 +676,8 @@ the three consumer repos.
      (Layer-2 coverage for the modal, CLI prompt, watcher-
      inventory).
    - `cd tools/dabbler-ai-orchestration && npm run test:playwright`
-     (S5's three new scenarios + the existing Set 033 S4
-     scenarios remain green).
+     (S5's three new scenarios + S6's empty-state scenarios +
+     the existing Set 033 S4 scenarios remain green).
    - `npx tsc --noEmit` clean.
 2. **Set 036 change-log.md** — final-session aggregation per
    [[project_final_session_changelog_pre_close]].
@@ -531,7 +687,7 @@ the three consumer repos.
    - `ai_router/CHANGELOG.md` 0.7.0 entry.
    - `tools/dabbler-ai-orchestration/package.json` 0.18.x →
      **0.19.0** (minor — feature release for the takeover UX
-     + watcher retirement).
+     + watcher retirement + orchestrator-agnostic UI).
    - `tools/dabbler-ai-orchestration/CHANGELOG.md` 0.19.0
      entry.
    - `CLAUDE.md` Extension versioning walk extended.
@@ -545,7 +701,7 @@ the three consumer repos.
    --pat $env:AZURE_VSCODE_MARKETPLACE_TOKEN` per
    [[reference_vsce_pat]]; honor [[feedback_no_env_var_probing]]
    — do NOT probe the env var with shell substitutions).
-7. **`close_session` invocation** for Set 036 Session 6.
+7. **`close_session` invocation** for Set 036 Session 7.
 
 **Creates:**
 - `docs/session-sets/036-chatsessionid-and-watcher-scope-implementation/change-log.md`
@@ -561,13 +717,13 @@ the three consumer repos.
 Cross-repo notice updated for operator to push to the three
 consumer repos.
 
-**Progress keys:** `session-006/test-sweep-green`,
-`session-006/change-log-generated`,
-`session-006/version-bumps-applied`,
-`session-006/round-a-verification`,
-`session-006/pypi-release-pushed`,
-`session-006/marketplace-publish-completed`,
-`session-006/close-session-succeeded`
+**Progress keys:** `session-007/test-sweep-green`,
+`session-007/change-log-generated`,
+`session-007/version-bumps-applied`,
+`session-007/round-a-verification`,
+`session-007/pypi-release-pushed`,
+`session-007/marketplace-publish-completed`,
+`session-007/close-session-succeeded`
 
 **Estimated cost:** $0.05–$0.20 (verification + dual release).
 
@@ -615,12 +771,17 @@ consumer repos.
   notice itself is timestamped + version-stamped, so
   consumer repos can self-audit by comparing their pasted
   version to the canonical.
-- **R7 — Six-session set creep.** The session set is at the
-  upper edge of effort:high. If any session blows its
+- **R7 — Seven-session set creep.** The session set is at the
+  upper edge of effort:high (extended from six to seven sessions
+  per operator directive 2026-05-21 to absorb the
+  orchestrator-agnostic UI audit). If any session blows its
   estimated cost (e.g., S1's lock implementation finds an
-  unexpected concurrency bug), the implementation may need a
-  session-7 carve-out. Mitigation: keep S1's scope tight to
-  writer + lock; defer any deeper investigation to a follow-on.
+  unexpected concurrency bug, or S6's audit surfaces more
+  Claude-specific copy than expected), defer the overflow to a
+  follow-on set rather than bloating any single session.
+  Mitigation: keep each session's scope tight to its stated
+  contract; the dual-registry release (S7) is the natural
+  bundling boundary.
 
 ---
 
@@ -649,14 +810,16 @@ consumer repos.
 - Session 3: $0.05–$0.15
 - Session 4: $0.05–$0.15
 - Session 5: $0.05–$0.15
-- Session 6: $0.05–$0.20
-- **Total Set 036 forecast: $0.28–$0.90.**
+- Session 6: $0.05–$0.15 (UI audit + empty-state refactor +
+  cross-provider consensus check on disposition (a) / (b) / (c))
+- Session 7: $0.05–$0.20
+- **Total Set 036 forecast: $0.33–$1.05.**
 
 For context: Set 033's 6 sessions totaled ~$0.20 of $1.25 NTE.
 Set 036 is similar scope (writer + reader + UI + tests + docs +
-release) but the audit prep was minimal (informal cross-
-provider already done), so per-session verification spend
-should be similar.
+release) plus the orchestrator-agnostic UI sweep (S6); the audit
+prep was minimal (informal cross-provider already done), so
+per-session verification spend should be similar.
 
 ---
 
@@ -675,7 +838,7 @@ should be similar.
   - [[feedback_audit_then_spec_for_substantial_features]] —
     the audit half ran informally; this is the spec half.
   - [[feedback_no_env_var_probing]] — secret-handling
-    discipline (relevant to S6's Marketplace publish step).
+    discipline (relevant to S7's Marketplace publish step).
   - [[reference_vsce_pat]] — Marketplace PAT location.
 - **Queue position:** Set 035
   (`035-state-file-sole-truth-marker-retirement`) and Set 034

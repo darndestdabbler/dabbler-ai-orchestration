@@ -2,7 +2,7 @@
   "schemaVersion": 3,
   "sessionSetName": "036-chatsessionid-and-watcher-scope-implementation",
   "currentSession": null,
-  "totalSessions": 6,
+  "totalSessions": 7,
   "status": "not-started",
   "lifecycleState": null,
   "startedAt": null,
@@ -37,6 +37,11 @@
     },
     {
       "number": 6,
+      "title": "Orchestrator-agnostic UI audit + empty-state refactor",
+      "status": "not-started"
+    },
+    {
+      "number": 7,
       "title": "Tests + change-log + dual-registry release",
       "status": "not-started"
     }

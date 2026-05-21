@@ -314,14 +314,16 @@ export function effortTooltip(marker: OrchestratorMarker): string {
 // ----- Accordion body rendering -----
 
 // Empty state for the accordion: marker not present for the resolved
-// in-progress set. Renders grey gauges + the three indicator-action
-// buttons (install hook / set orchestrator / writer log). Per S4 M8,
-// these three affordances MUST be in the accordion body before the
-// dabblerOrchestratorIndicator view retires.
+// in-progress set. Renders the smart-CTA link only — Set 035 retired
+// the grey gauges that used to sit above the CTA. The gauges were
+// meant to occupy the visual slot future loaded-state gauges would
+// fill, but in practice they read as "data we don't have," which the
+// operator (2026-05-21) called out as more confusing than useful.
 //
-// Buttons fire via `data-command` attributes; the webview client.js
-// captures clicks and posts `{ type: "executeCommand", commandId }` to
-// the host. The host dispatches via vscode.commands.executeCommand.
+// The CTA button fires via a `data-command` attribute; the webview
+// client.js captures the click and posts `{ type: "executeCommand",
+// commandId }` to the host. The host dispatches via
+// vscode.commands.executeCommand.
 //
 // Session 5 (smart CTA): the "install hook" link's target is no longer
 // hardcoded to Claude. The caller passes an optional `cta` based on
@@ -341,17 +343,7 @@ export function renderAccordionEmpty(cta?: EmptyCta | null): string {
     effectiveCta.args !== undefined
       ? ` data-command-args="${escAttr(JSON.stringify(effectiveCta.args))}"`
       : "";
-  // Set 029 Session 6: the Set Orchestrator + Writer Log row-action
-  // buttons relegated out of the accordion body to Command Palette +
-  // right-click context menu (per consensus call 2026-05-19, GPT-5.4
-  // round-2 Q4 must-fix). The empty-state still renders the smart-CTA
-  // link to install/declare orchestrator support, but no longer
-  // duplicates the row-action affordances.
   return `<div class="acc-empty">
-  <div class="grey-gauges">
-    <div class="gauge-svg-wrap">${renderGaugeSvg("unknown", "current", 0)}</div>
-    <div class="gauge-svg-wrap">${renderGaugeSvg("unknown", "current", 0)}</div>
-  </div>
   <div class="acc-empty-cta">
     <span>No signal — </span>
     <button class="acc-link" type="button" data-command="${escAttr(effectiveCta.commandId)}"${argsAttr}>${escHtml(effectiveCta.label)}</button>

@@ -220,6 +220,63 @@
           "output_path": "verification-output/round-a-session-3-result.json"
         }
       ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/test-sweep-green",
+      "dateTime": "2026-05-21T07:55:00-04:00",
+      "description": "Ran the full test sweep against the master tip after Sessions 1-3 close-out. Python pytest: 643 passed, 1 skipped (3:35 wall). Typecheck npx tsc --noEmit: clean (no output). Layer-2 npm run test:unit: 462 passing, 2 pre-existing unrelated failures unchanged (configEditor ViewColumn.One stub gap; notificationsSection 'wired in Set 026 Session 7' assertion). Layer-3 npm run test:playwright: 14 passed, 3 pre-existing failures, 3 skipped (3.8 min). The 3 Playwright failures are in session-sets-tree.spec.ts (renders ARIA tree structure with bucket grouping for an in-progress set; seeded orchestrator block renders provider sublabel in the accordion; empty-state CTA falls back to Claude installer when no orchestrators detected) and are test-scaffolding / locator-specificity issues, NOT production regressions. Verified by inspecting OrchestratorAccordion.ts:340-352: renderAccordionEmpty() still emits <div class='acc-empty-cta'> with 'No signal — ' prefix and the install button. The makeSet helper in electronLaunch.ts:172 produces a not-started set; the first failing test's slug '029-scenario-in-progress' was never driven into in-progress (no startSession() call), so the row data-state='not-started' is correct given the scaffolding. Failure 2 is a strict-mode locator violation (getByText(/anthropic/) matches both .gauge-sublabel and .model-section-text in the seeded-orchestrator scenario; needs .first() or more specific selector). Failure 3 expects .acc-empty-cta visible under an in-progress row, but the scaffolded set is not-started. Decision per spec out-of-scope clause + memory project_034_035_state_file_sole_truth_audit: defer all three to Set 034 (034-session-set-explorer-styling-iteration) styling iteration, which is queued after Set 035 and is the natural home for test-scaffolding fixes alongside its UI work.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-004/change-log-generated",
+      "dateTime": "2026-05-21T08:05:00-04:00",
+      "description": "Authored docs/session-sets/035-state-file-sole-truth-marker-retirement/change-log.md as the final-session aggregation per [[project_final_session_changelog_pre_close]] (must pre-exist before close_session — gate check_change_log_fresh fires before idempotent writes). Structure follows the Set 033 template: header block (status COMPLETE 4 of 4, created 2026-05-21, cost forecast $0.16-$0.50 / NTE $0.50, cumulative through S3 Round A = $0.0612), Context section anchoring the Set 033 S2 H2 verdict extension + audit-into-spec collapse rationale per [[feedback_audit_then_spec_for_substantial_features]], one section per Session 1-4 listing Shipped + Verification, 'What ships across the framework' closing summary, 'Risks closed' walking R1-R5, 'Follow-ups out of scope' enumerating the 3 deferred Layer-3 failures + C1 Python CLI cancellation-reader follow-on + cross-writer golden-file fixtures + explicit SUPERSEDED.md non-introduction. Session 4 section flagged the no-PyPI-release decision and named the 3 Layer-3 deferrals as test-side-not-production.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-004/version-bumps-applied",
+      "dateTime": "2026-05-21T08:15:00-04:00",
+      "description": "Applied extension version bumps. tools/dabbler-ai-orchestration/package.json version 0.18.0 -> 0.18.1. tools/dabbler-ai-orchestration/CHANGELOG.md new [0.18.1] section inserted above [0.18.0] heading, dated 2026-05-21, tagline 'Set 035 — state-file sole truth for cancellation', with Added / Changed / Tests / Tooling / Known issues subsections. The Known issues subsection names the 3 Layer-3 test-side failures and confirms renderAccordionEmpty() still emits .acc-empty-cta and 'No signal —' correctly. CLAUDE.md 'Current: **v0.18.0**' line replaced with 'Current: **v0.18.1**'; Extension versioning walk extended with the 0.18.1 entry naming the H2 extension to cancellation, readCancellationState canonical reader, fileSystem.ts:readSessionSets migration, 10-row writer parity (no PyPI release), 16 new unit tests + 3 new Layer-3 scenarios, bundled empty-state grey-gauge removal + glossary-harvest tool, and the two deferred follow-ups (Set 034 styling + C1 Python CLI patch). pyproject.toml NOT touched (no Python-mirror edits across Sessions 1-3, writer-parity check verified byte-equivalent in Session 2); ai_router/CHANGELOG.md NOT touched (no PyPI release this set).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-004/round-a-verification",
+      "dateTime": "2026-05-21T08:25:00-04:00",
+      "description": "Round A verification via gemini-pro (gemini-2.5-pro tier 2) at $0.01415125 cost (11,249 input tokens + 9 output tokens). Bundle size 28,676 chars covering: full change-log.md (final-session aggregation), CHANGELOG.md [0.18.1] section, CLAUDE.md Extension versioning walk segment, Session 4 spec contract, package.json head (version pin). Verdict: VERIFIED, no must-fix issues. Cumulative routed Set 035 spend: $0.0754 of $0.50 forecast (well under). Driver script docs/session-sets/035-.../verify_session4.py committed alongside.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "model_id": "gemini-2.5-pro",
+          "tier": 2,
+          "task_type": "session-verification",
+          "input_tokens": 11249,
+          "output_tokens": 9,
+          "cost_usd": 0.01415125,
+          "verdict": "VERIFIED",
+          "output_path": "verification-output/round-a-session-4-result.json"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-004/marketplace-publish-completed",
+      "dateTime": "2026-05-21T08:35:00-04:00",
+      "description": "Marketplace publish DarndestDabbler.dabbler-ai-orchestration v0.18.1 LIVE at https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration. Sequence: cd tools/dabbler-ai-orchestration && npx vsce package produced dabbler-ai-orchestration-0.18.1.vsix (27 files, 851.53 KB). First publish attempt with `npx vsce publish --pat $env:AZURE_VSCODE_MARKETPLACE_TOKEN` failed with TF400813 (user 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' is not authorized) — the bash subprocess Claude uses didn't inherit the User-scoped env var. Operator supplied the PAT inline; retry succeeded. PyPI release skipped (per spec — Python mirror unchanged across Sessions 1-3, verified byte-equivalent in S2). Reference memory reference_vsce_pat.md should be updated with the User-env-scope caveat. Packaged .vsix included 28 KB of test-results/ diagnostic outputs from the 3 failed Layer-3 scenarios — minor .vscodeignore gap, not blocking; queue an entry to add `test-results/**` to .vscodeignore in Set 034 or follow-on hot-fix.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

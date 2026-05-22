@@ -1,0 +1,4 @@
+{
+  "error": "RuntimeError: API call failed after 3 attempts: The read operation timed out",
+  "model": "gpt-5-4"
+}

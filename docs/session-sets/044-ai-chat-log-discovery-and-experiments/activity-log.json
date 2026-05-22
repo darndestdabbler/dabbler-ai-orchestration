@@ -124,6 +124,110 @@
           "result": "VERIFIED"
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/narration-design-drafted",
+      "dateTime": "2026-05-22T11:15:00-04:00",
+      "description": "Drafted narration-design.md v1 pre-consensus: 11 sections covering format token (`[DABBLER-NARRATION v1 key=value ...]` bracketed sigil+kvp), placement scheme (session-start mandatory + per-turn conditional + session-end), content discipline (effort field with mixed reasoning+speed axis values, outcome field on session-end), parser contract (single regex + extract dict + emit shape), A3 conditional branch with value-based precedence rules, per-backend application (Copilot system-prompt TBD + scratch CLAUDE.md), comparability checklist, lock criteria, and open empirical questions list. Pre-consensus draft was deliberately longer than the eventual locked version to give consensus reviewers material to push back against. Scope reduction expected during consensus pass.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/sequencing-consulted",
+      "dateTime": "2026-05-22T11:25:00-04:00",
+      "description": "Pre-design sequencing decision routed through operator-driven external GPT consultation per operator answer to S3 entry question. Three options laid out: (1) baseline runs first then design; (2) design first then baseline runs per disposition's planned order; (3) hybrid draft-then-refine. GPT recommendation: Option 2 with refinement — lock the narration contract now, but lock A3 as a rule (predeclared conditional branch), not as a guessed empirical fact. Rationale: only if the live A3 finding would change the parser SHAPE (not just whether an optional A3 field is emitted) should baselines precede design; otherwise redesign-after-baseline is churn that weakens S3/S4 comparability. Adopted Option 2 with the rule-not-guess refinement.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/consensus-routed",
+      "dateTime": "2026-05-22T11:45:00-04:00",
+      "description": "Cross-provider design consensus per spec.md:165 'candidate site for piloting the bias-cautions preamble.' Authored consensus_design_s3.py driver routing the locked-draft + bias-cautions preamble + 9-section FOCUS_PROMPT through ai_router.query to gemini-pro and gpt-5-4. gemini-pro: VERDICT APPROVED with 5 must-fix items (fragile marker format / A3 hybrid-precedence ambiguity / outcome field scope creep / comparability omits token-count confounder / channel-invariance claim too strong) + 1 nice-to-have (LLM-side quoting instruction). Cost $0.020852 (7930 in / 1094 out). gpt-5-4: ai_router call FAILED twice with timeout. Operator pasted the 28954-char self-contained prompt to ChatGPT manually and provided verdict: APPROVED with 5 must-fix items (de-overload effort field — biggest design bug / cut outcome or justify / make marker-emission reliability a lock gate / separate 'where instructions live' from 'how concrete values get injected' / fix comparability claim re token confound + held-constant gaps) + 2 nice-to-haves (parser semantic-domain checks / open-interval missing-session-end semantics). Convergence analysis: 3 must-fixes overlap across both providers (effort de-overload, outcome cut, comparability confounds); 4 single-provider must-fixes also applied. All 10 must-fix items applied to narration-design.md: §2.2/§2.3 parser tolerance, §3.3 open-interval + no session-end, §4.4 placeholder-leakage, §5.5 6-tag semantic validation, §6 axis-based A3 (no value-based precedence), §7.4 compact instruction contingency, §7.5 parameterization mechanism, §8.1+§8.3 confounds acknowledged, §10 pre-lock smoke probe protocol. Both nice-to-haves applied (§5.5 + §3.3). Net effect: v1 narrower (no outcome, no speed-axis narration), more defensive (semantic validation, placeholder detection, parser tolerance), pre-lock-validated.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "messageId": "verification-output/consensus-design-result-gemini-pro.json",
+          "provider": "google",
+          "model": "gemini-pro",
+          "intent": "design-consensus",
+          "inputTokens": 7930,
+          "outputTokens": 1094,
+          "costUsd": 0.020852,
+          "result": "APPROVED-with-5-must-fixes"
+        },
+        {
+          "messageId": "verification-output/consensus-design-result-gpt-5-4-manual.md",
+          "provider": "openai",
+          "model": "gpt-5-4",
+          "intent": "design-consensus",
+          "inputTokens": null,
+          "outputTokens": null,
+          "costUsd": 0.0,
+          "result": "APPROVED-with-5-must-fixes-via-operator-manual-paste-after-router-timeout"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/copilot-channel-resolved",
+      "dateTime": "2026-05-22T12:20:00-04:00",
+      "description": "Resolved §7.1 LOCK GATE Q1: Copilot 1.0.51 custom-instructions channel is `AGENTS.md` files (default search: git root + current working directory), per `copilot help environment` documentation ('COPILOT_CUSTOM_INSTRUCTIONS_DIRS: comma-separated list of additional directories to search for custom instructions files') and the `--no-custom-instructions` CLI flag ('Disable loading of custom instructions from AGENTS.md and related files'). Secondary surface: `.github/copilot-instructions.md` generated by `copilot init`. v1 commits to AGENTS.md at the synthetic-set workspace root for the deferred live runs. Channel-length status confirmed unconstrained (no documented limit; full-form instruction is ~1100 chars, well within any plausible limit).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/smoke-probe-executed",
+      "dateTime": "2026-05-22T12:50:00-04:00",
+      "description": "Pre-lock smoke probe per §10.1: populated synthetic-set with minimal scaffold (001-synthetic-harvest-target spec.md 2-session + session-state.json schema v3); wrote AGENTS.md at c:\\tmp\\dabbler-log-harvest\\synthetic-set\\ with §7.1 full-form instruction substituted (`set=001-synthetic-harvest-target session=1 total=2`, no `effort` key — Branch A simulated). Run 1 driver: `copilot -C ... -p ... --allow-all-tools --allow-all-paths -s`. Run 2 added `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true COPILOT_OTEL_FILE_EXPORTER_PATH=<real-path>` after discovering the inherited environment had OTel exporter pointing to NUL. Findings: marker EMISSION PASSED — emitted verbatim with concrete substituted values, on its own line, as first text output, no code fence, no paraphrase (visible in stdout). SURFACE FINDING: marker ABSENT from `session-store.db turns.assistant_response` (48-byte DB row contains only post-marker text); marker PRESENT in OTel JSONL `gen_ai.output.messages` attribute of the `chat <model>` span (and also in `gen_ai.system_instructions` where the AGENTS.md template gets echoed — parser must skip this surface). Hypothesized cause for DB miss: Copilot 1.0.51 makes two LLM round-trips per turn (process-log shows two 'Sending request to the AI model' events) and persists only the last in the DB. Bonus discovery: `gen_ai.usage.reasoning.output_tokens=270` of 378 total at default effort — qualifies as candidate Branch A reasoning-axis signal for Copilot pending explicit-effort runs, not documented in S1's Copilot inventory. Probe authoritatively recorded in smoke-probe-results.md with §4 design implications and §5 operator decision points.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-003/narration-design-locked",
+      "dateTime": "2026-05-22T13:10:00-04:00",
+      "description": "Applied smoke-probe-driven design updates per operator decision (Option 1: OTel surface + content-capture-ON + A3 deferred to config flag): §5.0 (NEW preconditions block elevated to top of §5 for visibility per Round A verifier guidance); §5.1 Copilot input shape rewritten to read from `attributes.gen_ai.output.messages` of OTel JSONL `chat <model>` spans (replacing the pre-probe assumption of session-store.db turns join); §5.4 parser explicitly skips `gen_ai.system_instructions` (AGENTS.md template echoes there); §6.3 Copilot A3 branch defaults DEFERRED to per-backend config flag pending explicit-effort runs to confirm reasoning.output_tokens value-range bucket distinguishability; §8.1 OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true REQUIRED for both Copilot baseline and narrated runs (was optional in pre-smoke draft); §10.1 probe protocol step 4 updated to read OTel not the DB. Marked LOCKED: §9 + §12 four-checkbox lock criteria all complete (consensus done; channel resolved; smoke probe passed; operator approval recorded); header front-matter flipped from 'post-consensus draft' to 'LOCKED 2026-05-22'. Subsequent S3.5/S4 work measures against this frozen contract; changes after lock force v1→v2 re-version + re-running both baselines.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-003/spec-edits-for-scope-split",
+      "dateTime": "2026-05-22T13:20:00-04:00",
+      "description": "Edited spec.md to document the as-shipped scope split for S3 (design + smoke probe only — live runs absorbed into S4 per operator decision) and the corresponding S4 scope expansion (absorbs four previously-deferred live-run packets plus the cross-backend synthesis). Per Round A verifier guidance: S4a/S4b split is the DEFAULT plan (not just optional), with S4a covering Copilot baseline + Claude baseline + Copilot narrated + Copilot delta and S4b covering Claude narrated + Claude delta + cross-backend synthesis. The deferral pattern is now 'S1-S3 do design/contract work; S4 does live runs' — third consecutive live-run deferral (S1→S2→S3→S4). Rationale recorded: smoke probe surfaced substantive design implication (OTel JSONL is the Copilot harvester surface, not session-store.db); folding the live experiment into the same session as the design lock would have risked the experiment measuring against an unstable contract.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-003/round-a-verification",
+      "dateTime": "2026-05-22T13:35:00-04:00",
+      "description": "Round A verification via ai_router.query (gemini-pro). Bundle: 84012 chars across 5 parts (S3 spec excerpt incl. S4 expansion note, narration-design.md LOCKED, smoke-probe-results.md, baseline-comparison.md from S2, consensus-design-result-gpt-5-4-manual.md). VERDICT: VERIFIED, no must-fix issues. Cost $0.036524 (27355 in / 233 out). Three nice-to-haves applied in-line: (a) §5.0 preconditions block elevated for visibility (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true on Copilot is a critical operational requirement); (b) §2.3 parser-regex curly-quote character class explained with inline comment for long-term maintainability (literal class is U+201C/U+201D/U+2018/U+2019 + ASCII straight quotes); (c) spec.md S4 note: S4a/S4b split made the DEFAULT plan rather than a 'consider' option. Cumulative routed Set 044 spend across S1+S2+S3: $0.17424 of $15.00 NTE. Verification artifact at verification-output/round-a-session-3-result.json.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "messageId": "verification-output/round-a-session-3-result.json",
+          "provider": "google",
+          "model": "gemini-pro",
+          "intent": "session-verification",
+          "inputTokens": 27355,
+          "outputTokens": 233,
+          "costUsd": 0.036524,
+          "result": "VERIFIED"
+        }
+      ]
     }
   ]
 }

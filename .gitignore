@@ -28,3 +28,10 @@ docs/session-sets/*/.dabbler/
 # default-on and explicitly opt-outable via
 # delegation.decision_consensus.journal_full_payloads_dir: null.
 ai_router/consensus-decisions/
+# Set 044 (AI chat-log discovery + experiments). The scratch dir holds
+# raw harvested logs / transcripts / sqlite dumps from the discovery
+# runs. Lives outside the repo at C:\tmp\dabbler-log-harvest\, but the
+# entry below is belt-and-suspenders against an accidental symlink /
+# relocation that lands it under the repo root. See
+# docs/session-sets/044-.../harvest-objectives-and-redaction.md Part 2.
+dabbler-log-harvest/

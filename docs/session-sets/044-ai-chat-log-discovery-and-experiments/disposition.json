@@ -1,0 +1,21 @@
+{
+  "status": "completed",
+  "summary": "Set 044 Session 1 of 6 — Copilot log harvest + scope/redaction framing. Investigation-heavy session, no code shipped. (1) Locked the harvest-objectives matrix at 15 signals across four groupings (A1-A5 identity, B1-B5 action, C1-C5 boundary), with §D naming the minimum-viable conflict-detection triple as timestamp + engine+provider + set/session id. (2) Locked the redaction policy: two-tier storage (scratch outside repo at C:\\tmp\\dabbler-log-harvest\\, synthesis layer inside repo), synthetic test material at C:\\tmp\\dabbler-log-harvest\\synthetic-set\\ (no real Dabbler content harvested), 7 numbered scrub rules covering prompts/responses/file-contents/tokens/operator-paths/non-public-repo-names/third-party-identifiers, reading-side discipline (no `cat`-of-log-files), .gitignore extended to belt-and-suspenders against accidental relocation. (3) Inventoried Copilot CLI 1.0.51's ~/.copilot/ surface: 9 artifact rows in the inventory matrix; full session-store.db schema captured verbatim from sqlite_master (column names only, no row values); OTel JSONL exporter contract documented from `copilot help monitoring`; ide/*.lock files flagged CRITICAL for plaintext headers.Authorization. Key empirical finding: session_files(session_id, file_path, tool_name, turn_index, first_seen_at) is the harvest-objective B1+B2+B3 in storage form — 'which tool touched which file on which turn' is already first-class in Copilot's session store, no opt-in required. (4) Live-run harvest DEFERRED to S2 per operator decision 2026-05-22 ('Structural now + scaffold live runs for S2'). Scaffolding shipped: scratch tree (synthetic-set/, otel/, s1-s4 per-experiment dirs), setup-copilot-env.ps1 wrapper script, S2 harvest-harness recipe inlined in discovery-notes-copilot.md §6 (synthetic-set seed content authored at S2 run time; three representative invocations interactive / prompt-mode --output-format json / prompt-mode with a tool call; explicit non-copy callout for $COPILOT_HOME\\ide\\). (5) Per-objective coverage matrix in §4: 13 of 15 objectives surfaced natively or via documented OTel opt-in (9 unambiguous Yes, 2 Implicit, 1 Probably yes pending S2 confirmation, 1 Yes-via-B4 derivative); only A3 (effort/reasoning-level) and C3 (Dabbler set/session marker) unambiguously require narration. Conclusion: the harvest hypothesis is on firmer ground than the spec assumed — Copilot's native session store + opt-in OTel surface ALREADY contain most of the conflict-detection signal that the launch-adapter approach (Sets 037-041) would have had to synthesize from scratch. (6) Round A via gemini-pro: first call REJECTED with one must-fix (coverage-summary arithmetic inconsistent: claimed '9 of 13' against a 15-row table; rewrote to '13 of 15 ... 9 Yes + 2 Implicit + 1 Probably yes + 1 derivative'); re-run VERIFIED with no must-fix and two non-blocking notes endorsing the now-corrected summary and the §4 'firmer ground' conclusion. Cumulative routed Set 044 spend after S1: $0.0364 of $15.00 NTE (S5 budget).",
+  "files_changed": [
+    "docs/session-sets/044-ai-chat-log-discovery-and-experiments/harvest-objectives-and-redaction.md (new)",
+    "docs/session-sets/044-ai-chat-log-discovery-and-experiments/discovery-notes-copilot.md (new)",
+    "docs/session-sets/044-ai-chat-log-discovery-and-experiments/verify_session1.py (new)",
+    "docs/session-sets/044-ai-chat-log-discovery-and-experiments/verification-output/round-a-session-1-result.json (new)",
+    "docs/session-sets/044-ai-chat-log-discovery-and-experiments/activity-log.json (new)",
+    "docs/session-sets/044-ai-chat-log-discovery-and-experiments/disposition.json (new)",
+    "docs/session-sets/044-ai-chat-log-discovery-and-experiments/session-state.json",
+    "docs/session-sets/044-ai-chat-log-discovery-and-experiments/session-events.jsonl",
+    ".gitignore"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [
+    "verification-output/round-a-session-1-result.json"
+  ],
+  "next_orchestrator": null,
+  "blockers": []
+}

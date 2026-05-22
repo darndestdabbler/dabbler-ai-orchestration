@@ -1,19 +1,11 @@
 {
   "schemaVersion": 3,
   "sessionSetName": "044-ai-chat-log-discovery-and-experiments",
-  "currentSession": null,
-  "totalSessions": 6,
-  "status": "not-started",
-  "lifecycleState": null,
-  "startedAt": null,
-  "completedAt": null,
-  "verificationVerdict": null,
-  "orchestrator": null,
   "sessions": [
     {
       "number": 1,
       "title": "Copilot log harvest + scope/redaction framing",
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "number": 2,
@@ -41,5 +33,20 @@
       "status": "not-started"
     }
   ],
-  "completedSessions": []
+  "currentSession": 1,
+  "totalSessions": 6,
+  "completedSessions": [],
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-22T07:59:38.041576-04:00",
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "checkedOutAt": "2026-05-22T07:59:38.041576-04:00",
+    "lastActivityAt": "2026-05-22T07:59:38.041576-04:00"
+  }
 }

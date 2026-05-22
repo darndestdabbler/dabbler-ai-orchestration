@@ -5,15 +5,19 @@
 > [`baseline-comparison.md`](baseline-comparison.md) §5 (which
 > constrains the narration scope to two signals: C3 mandatory, A3
 > conditional).
-> **Status when written:** post-consensus draft, **narrower than
-> the pre-consensus draft**. Cross-provider consensus 2026-05-22
-> (gemini-pro APPROVED with revisions, gpt-5-4 manual APPROVED with
-> revisions) shrank v1: split overloaded effort axes; cut the
-> `outcome` field; promoted marker-emission reliability from
-> post-lock empirical question to pre-lock smoke gate. See §13 for
-> the consensus journal entry.
-> **Lock status:** see §10 — locked only after Copilot channel
-> TBDs resolve and smoke probe confirms verbatim emission.
+> **Status:** **LOCKED 2026-05-22.** Post-consensus, post-smoke-
+> probe. Cross-provider consensus 2026-05-22 (gemini-pro APPROVED
+> with revisions, gpt-5-4 manual APPROVED with revisions) shrank
+> v1: split overloaded effort axes; cut the `outcome` field;
+> promoted marker-emission reliability from post-lock empirical
+> question to pre-lock smoke gate. Pre-lock smoke probe 2026-05-22
+> against synthetic-set discovered that the Copilot harvester
+> surface is **OTel JSONL `gen_ai.output.messages`** (not
+> `session-store.db turns.assistant_response` as the
+> pre-consensus draft assumed); §5.1 + §5.4 + §6.3 + §8.1 + §10
+> revised accordingly. See §13 for consensus journal,
+> [smoke-probe-results.md](smoke-probe-results.md) for the
+> empirical run.
 
 > **Discipline rule (from GPT call 2026-05-22):** lock the
 > narration *contract* now; lock A3 as a *rule*, not as a guessed
@@ -138,6 +142,14 @@ though canonical emission is strict. The parser MUST accept:
 ```
 \[DABBLER-NARRATION\s+v(?P<ver>\d+)(?P<body>(?:\s+[A-Za-z][A-Za-z0-9_-]*\s*=\s*["'""'']?[A-Za-z0-9_./-]+["'""'']?)*)\s*\]
 ```
+
+> The `["'""'']?` character class matches an optional opening
+> quote: ASCII straight double-quote, ASCII straight single-
+> quote, then the four Unicode curly variants U+201C, U+201D,
+> U+2018, U+2019. Same class appears around the closing-quote
+> position. The visual encoding looks confusing in
+> monospace-rendered diffs; implementations should add an
+> inline comment near the literal.
 
 The `body` capture is split on whitespace into `key=value`
 pairs, each pair is normalized (lowercased key, stripped quotes,
@@ -316,17 +328,64 @@ syntactically valid.
 The harvester parser (S5 design, S6 implementation if scoped in
 this set) MUST implement the following contract.
 
+#### 5.0 Preconditions (operational, per-backend)
+
+These are **non-optional** runtime requirements without which
+the harvester cannot reach the marker. Promoted to a top-level
+preconditions section per Round A verifier guidance 2026-05-22:
+
+- **Copilot:** `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true`
+  MUST be set on the Copilot process at session start. Without
+  this, the marker text is absent from
+  `attributes.gen_ai.output.messages` and the harvester has no
+  way to recover it (the smoke probe confirmed
+  `session-store.db turns.assistant_response` does not contain
+  the marker either).
+- **Copilot:** OTel JSONL exporter MUST be enabled (one of
+  `COPILOT_OTEL_ENABLED=true` + `COPILOT_OTEL_EXPORTER_TYPE=file`
+  + `COPILOT_OTEL_FILE_EXPORTER_PATH=<real path>`, OR the OTel
+  endpoint vars in `copilot help environment` §"OTel"). The
+  parser reads from the file the operator nominated; the
+  harvester needs to know that path.
+- **Claude:** no comparable env var; `~/.claude/projects/<slug>
+  /<conv-uuid>.jsonl` is always-on per S2 §2 and inlines content
+  by default. The Claude harvester reads the JSONL files
+  directly.
+
+Both backends:
+- The narration instruction file (`AGENTS.md` for Copilot,
+  scratch `CLAUDE.md` for Claude) MUST contain concrete
+  substituted values (no `SET-SLUG`, `SESSION-NUMBER`, etc.
+  literal text — §5.5 placeholder-leakage check catches this
+  but at the cost of dropping the entire marker).
+
 #### 5.1 Input shape
 
 Per backend, the parser sees a stream of (turn_text,
 turn_context) tuples, where `turn_context` is the join key set:
 
-- Copilot: `(turn_text, {session_id, turn_index, timestamp,
-  cwd, host_type})` from `session-store.db turns` + `sessions`
-  join.
-- Claude: `(turn_text, {sessionId, message.model, timestamp,
+- **Copilot:** `(turn_text, {gen_ai.conversation.id,
+  github.copilot.turn_id, github.copilot.interaction_id,
+  span.startTime, gen_ai.request.model, gen_ai.provider.name})`
+  from `chat <model>` spans in OTel JSONL output. `turn_text`
+  is parsed from `attributes.gen_ai.output.messages` — a
+  JSON-encoded array of message parts — filtering for
+  `role=assistant, type=text`. **REQUIRES**
+  `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true` on
+  the Copilot side; without that env var the
+  `gen_ai.output.messages` attribute is omitted and the marker
+  is unreachable. (Smoke probe finding 2026-05-22:
+  `session-store.db turns.assistant_response` captures only
+  the LLM's final formatted output text, NOT the marker-bearing
+  first emission — empirically Copilot 1.0.51 makes two LLM
+  round-trips per turn and persists only the last in the DB.
+  See [smoke-probe-results.md](smoke-probe-results.md) §3 for
+  the full trace.)
+- **Claude:** `(turn_text, {sessionId, message.model, timestamp,
   uuid, cwd_from_session-env})` from `~/.claude/projects/<slug>
-  /<conv-uuid>.jsonl` assistant events.
+  /<conv-uuid>.jsonl` assistant events. Marker text is read
+  directly from `assistant.message.content` (the JSONL inlines
+  by default per S2 §2; no opt-in flag needed).
 
 #### 5.2 Output shape (per matched marker)
 
@@ -383,6 +442,16 @@ honest: the regex, normalization, validation, and output-shape
 construction are all backend-agnostic; only the **input adapter
 that builds `(turn_text, turn_context)` tuples from native
 artifacts** is per-backend.
+
+**Parser surface for Copilot specifically:** the parser MUST
+scan `attributes.gen_ai.output.messages` and explicitly **NOT**
+`attributes.gen_ai.system_instructions`, where the AGENTS.md
+template gets echoed into the system prompt and would otherwise
+produce phantom markers on every turn (smoke probe finding
+2026-05-22 — the substituted instruction text in `AGENTS.md`
+appears verbatim in `gen_ai.system_instructions` because
+Copilot inlines custom-instruction files into the system
+prompt).
 
 #### 5.5 Semantic validation (post-syntactic)
 
@@ -473,9 +542,23 @@ native field; ignore the marker's `effort` key if present.
 #### 6.3 Branch B — Narrated reasoning A3 path
 
 **Active when:** native reasoning-axis effort is absent or
-unreliable on this backend. (Default on both Claude and
-Copilot at S3 close — re-evaluate per backend at each S5
-proposal revision.)
+unreliable on this backend.
+
+**Default per backend at S3 close:**
+- **Claude:** Branch B (narrated). S2 empirical confirmed
+  `usage` has 10 fields, none of which is a reasoning-effort
+  enum.
+- **Copilot:** **DEFERRED** to a per-backend config flag pending
+  explicit-effort live runs in the deferred S3.5/S4 phase. The
+  smoke probe discovered
+  `gen_ai.usage.reasoning.output_tokens` as a per-turn native
+  proximate signal (270 tokens out of 378 output at the smoke
+  probe's default effort level — see
+  [smoke-probe-results.md](smoke-probe-results.md) §3.4). The
+  field MAY qualify as Branch A (native) signal if explicit
+  `--effort high|medium|low` runs show the value range
+  reliably distinguishes the three buckets; pending that
+  confirmation, the Copilot default is Branch B.
 
 **Parser behavior:** read reasoning-axis effort from the
 marker's `effort` key on `session-start` and `phase=turn`
@@ -671,8 +754,17 @@ otherwise identical."
 - [ ] Same task battery (the exact same set of prompts /
       operations driven against the synthetic set)
 - [ ] Same `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT`
-      setting (Copilot — default off both runs unless
-      explicitly flipped for both)
+      setting on Copilot: **REQUIRED ON** for both runs (smoke
+      probe finding 2026-05-22 — the marker is unreachable in
+      OTel without this flag; `session-store.db
+      turns.assistant_response` only persists the LLM's final
+      formatted output, not the marker-bearing first emission).
+      Baseline-comparison.md §3.2.1 framed content-capture as
+      optional for a Copilot-first POC; that framing is now
+      empirically refuted by the smoke probe — the harvester
+      surface IS the content-capture-bearing OTel surface, and
+      Copilot's redaction-cost advantage relative to Claude
+      shrinks accordingly.
 - [ ] Same harvest method (which artifacts are read, in what
       order, with what scrub rules)
 - [ ] Same measurement metric ("per-harvest-objective signal
@@ -739,9 +831,22 @@ The design is **locked** when all of the following are true:
       `copilot help environment` + `--no-custom-instructions`
       flag documentation (resolved 2026-05-22 from local
       Copilot 1.0.51 CLI help).
-- [ ] **Smoke probe passes** — see §10.1.
-- [ ] **Operator review** of this post-consensus draft complete;
-      any further changes folded.
+- [x] **Smoke probe passes** — executed 2026-05-22 against
+      synthetic-set; marker emitted verbatim with concrete
+      substituted values on its own line as first text output;
+      marker reachable via OTel JSONL `gen_ai.output.messages`
+      (NOT via `session-store.db turns.assistant_response` —
+      §5.1 updated to reflect empirical surface). See
+      [smoke-probe-results.md](smoke-probe-results.md).
+- [x] **Operator review** of post-consensus draft complete;
+      smoke-probe-driven revisions to §5.1, §5.4, §6.3, §8.1,
+      §10.1 applied 2026-05-22 per operator decision (OTel
+      surface, content-capture-ON required, A3 Copilot branch
+      deferred to config flag).
+
+**The design is LOCKED as of 2026-05-22.** Subsequent S3.5+
+work (deferred live runs and narrated experiment) measures
+against this contract.
 
 Once locked, this document is the contract that S3 (Copilot
 narrated runs) and S4 (Claude narrated runs) measure against.
@@ -772,12 +877,21 @@ matches the emission.
    directory?"). The first text output should contain the
    marker.
 4. **Verify emission:**
-   - Open `~/.copilot/session-store.db`. Read
-     `turns.assistant_response` for the new turn.
-   - Apply the §2.3 parser regex.
+   - Open the OTel JSONL exporter file
+     (`$COPILOT_OTEL_FILE_EXPORTER_PATH`). Locate the `chat
+     <model>` span for the new turn.
+   - Read `attributes.gen_ai.output.messages` — a JSON-encoded
+     array of message parts.
+   - Apply the §2.3 parser regex to assistant-role text parts
+     ONLY; skip `attributes.gen_ai.system_instructions` (the
+     AGENTS.md template echoes there).
    - Check that the matched marker contains the literal
      substituted values (no leakage; no paraphrase; no code
      fence).
+   - **Note (smoke probe 2026-05-22):** `~/.copilot/
+     session-store.db turns.assistant_response` does NOT
+     contain the marker — verifying there will produce a
+     false negative. Always verify against OTel.
 5. **Decision:**
    - **Pass:** all four checks pass. Set 9's "smoke probe
      passes" check; lock the design.
@@ -848,9 +962,13 @@ lock-gate (Q1-Q2).
 - [x] §10 pre-lock smoke probe — protocol drafted
 - [x] §11 open empirical questions — promoted Q1+Q2 to
       lock-gate
-- [ ] Copilot channel TBDs resolved — pending S3 live runs
-- [ ] Smoke probe completed — pending S3 live runs
-- [ ] Final operator approval — pending
+- [x] Copilot channel TBDs resolved — `AGENTS.md` at workspace
+      root
+- [x] Smoke probe completed — PASSED (with §5.1 harvester-
+      surface revision)
+- [x] Final operator approval — recorded 2026-05-22
+
+**Contract status: LOCKED.**
 
 ---
 

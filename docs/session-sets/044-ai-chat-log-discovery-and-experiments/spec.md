@@ -152,6 +152,20 @@ versus which need narration.
 
 ### Session 3 of 6: Narration design + Copilot narration experiment
 
+> **As-shipped (2026-05-22):** S3 ships **design + pre-lock smoke
+> probe only**. The previously-deferred S1+S2 live runs PLUS the
+> Copilot narrated experiment PLUS the cross-backend baseline
+> comparison are all consolidated into S4. This is the third
+> consecutive deferral of live runs (S1→S2→S3→S4); the spec
+> pattern now is "investigation, design, and contract lock in
+> S1-S3; all live runs + narrated experiments in S4." Rationale
+> for THIS deferral: smoke probe surfaced a substantive design
+> implication (OTel JSONL is the Copilot harvester surface, not
+> session-store.db); folding the live runs into the same session
+> as the design lock would have risked the experiment running
+> against an unstable contract. With v1 now LOCKED, S4 can run
+> against a frozen target.
+
 **Steps:**
 1. Design narration discipline before applying it: what should
    orchestrators say at which boundaries (e.g., "starting Set 042
@@ -192,6 +206,28 @@ how much it improves Copilot log signal.
 ---
 
 ### Session 4 of 6: Claude narration experiment + cross-backend synthesis
+
+> **Scope expansion (2026-05-22):** absorbs the previously-
+> deferred S1 Copilot live runs, S2 Claude live runs, and S3
+> Copilot narrated experiment. The cross-backend synthesis
+> (the original S4 deliverable) still anchors the session, but
+> now S4 also executes the four live-run packets (Copilot
+> baseline, Claude baseline, Copilot narrated, Claude narrated)
+> against the synthetic-set at `c:\tmp\dabbler-log-harvest\
+> synthetic-set\`.
+>
+> **Split into S4a / S4b is the DEFAULT plan** (per Round A
+> verifier guidance 2026-05-22 — five distinct work packets
+> in one session is bloated). Suggested boundary:
+> - S4a: Copilot baseline + Claude baseline + Copilot narrated
+>   + Copilot delta in `copilot-narration-results.md`.
+> - S4b: Claude narrated + Claude delta in
+>   `claude-narration-results.md` + cross-backend synthesis in
+>   `cross-backend-synthesis.md`.
+> S4a closes when the Copilot side is fully measured; S4b is a
+> separate orchestrator check-out the next session. If the
+> operator decides at S4 start that the work IS scoped tightly
+> enough for one session, the split can be skipped.
 
 **Steps:**
 1. Apply the S3 narration design to Claude Code via CLAUDE.md

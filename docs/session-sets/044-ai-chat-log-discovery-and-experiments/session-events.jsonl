@@ -3,3 +3,6 @@
 {"timestamp": "2026-05-22T12:26:53.869769Z", "session_number": 1, "event_type": "closeout_failed", "failed_checks": ["next_orchestrator_present"]}
 {"timestamp": "2026-05-22T12:27:38.585215Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
 {"timestamp": "2026-05-22T12:27:39.032082Z", "session_number": 1, "event_type": "closeout_succeeded", "method": "api"}
+{"timestamp": "2026-05-22T13:02:01.564403Z", "session_number": 2, "event_type": "work_started"}
+{"timestamp": "2026-05-22T14:02:06.457245Z", "session_number": 2, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-05-22T14:02:06.893704Z", "session_number": 2, "event_type": "closeout_failed", "failed_checks": ["working_tree_clean"]}

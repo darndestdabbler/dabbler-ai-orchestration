@@ -10,7 +10,7 @@
     {
       "number": 2,
       "title": "Claude Code log harvest + comparative analysis",
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "number": 3,
@@ -33,15 +33,22 @@
       "status": "not-started"
     }
   ],
-  "currentSession": null,
+  "currentSession": 2,
   "totalSessions": 6,
   "completedSessions": [
     1
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-22T07:59:38.041576-04:00",
+  "startedAt": "2026-05-22T09:02:01.565607-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "checkedOutAt": "2026-05-22T09:02:01.565607-04:00",
+    "lastActivityAt": "2026-05-22T09:02:01.565607-04:00"
+  }
 }

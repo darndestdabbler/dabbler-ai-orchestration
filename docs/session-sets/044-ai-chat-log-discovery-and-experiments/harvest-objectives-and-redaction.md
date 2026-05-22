@@ -95,6 +95,26 @@ The scratch path is added to `.gitignore` as a belt-and-suspenders even
 though it's outside the repo, so that any accidental symlink or
 relocation can't leak.
 
+**Cross-backend copy-exclusion zones** (paths the harvester must
+NEVER copy into scratch, regardless of synthetic-vs-production
+posture):
+
+| Path | Why excluded |
+|---|---|
+| `~/.copilot/ide/*.lock` | `headers.Authorization` plaintext bearer token (S1 §5) |
+| `~/.claude/ide/*.lock` | `authToken` plaintext bearer token (S2 §5) |
+| `~/.claude/.credentials.json` | Long-lived OAuth tokens |
+| `~/.claude/file-history/` | Content-addressed pre-edit blob store mirroring every file Claude has edited (S2 §3) |
+| **Copilot OAuth credential store (location TBD)** | **Placeholder — S1's structural-only probe confirmed OAuth tokens are NOT in `session-store.db`, but did not pin down where Copilot CLI persists them on disk. The path is almost certainly under `~/.copilot/` (per the CLI's documented config layout) or in the OS credential vault. S3 to empirically locate during the deferred Copilot live-runs and amend this row.** |
+
+These exclusions are *permanent policy*, not synthetic-test-only
+conveniences — a production harvester running against an
+operator's real `~/.claude/` or `~/.copilot/` would otherwise
+pull dramatically sensitive content. (Per `discovery-notes-claude.md`
+§6 caveat: isolated synthetic-test runs will still populate
+`file-history/` with the synthetic content; the exclusion holds
+either way to prevent generalization drift.)
+
 **Synthetic test material:**
 
 The "representative sessions" used in S1/S3 harvest runs operate
@@ -134,6 +154,32 @@ markdown file:**
    verbatim.
 7. **Email addresses, real names of third parties** — substitute
    placeholders.
+8. **Claude Code `~/.claude/file-history/<conv-uuid>/` content-
+   addressed blob store** — the rollback mechanism powering
+   `/restore-checkpoint` mirrors every file Claude has edited in
+   any conversation, content-addressed (`<hash>@v<N>`). Treat as
+   copy-exclusion in parity with `~/.claude/ide/` and
+   `~/.copilot/ide/`. Discovery characterizations may enumerate
+   index filenames (the `<hash>@v<N>` shape) but must not open
+   blob contents. Per-conversation index metadata is also visible
+   inline at `type: "file-history-snapshot"` events inside the
+   JSONL — characterize from there if needed. *Added 2026-05-22
+   in Set 044 S2.*
+9. **Claude Code `~/.claude/plans/<title-slug>.md` filename
+   leakage** — `/plan`-mode artifact filenames embed sentence-
+   fragment paraphrases of the prompting message (concrete
+   examples observable on the operator's instance with 21 such
+   files, slug-form). Discovery notes describe the *pattern*
+   ("title slug paraphrases prompt") without quoting any slug
+   verbatim. *Added 2026-05-22 in Set 044 S2.*
+10. **Claude Code `type: "last-prompt"` JSONL events** — the
+    `lastPrompt` top-level field on these events is a verbatim
+    copy of the most recent user prompt (kept for `/resume`
+    repopulation). Any harvester querying the JSONL must filter
+    `type == "last-prompt"` out before any structured-summary
+    aggregation, or treat the field with rule-1 discipline
+    (verbatim prompts → never copied). *Added 2026-05-22 in Set
+    044 S2.*
 
 **Reading-side discipline (inside the AI assistant doing the harvest
 work):**
@@ -175,9 +221,19 @@ discovery session.
 
 ### Lock status
 
-- [x] Part 1 (objectives) — locked
-- [x] Part 2 (redaction discipline) — locked
-- [x] Part 3 (inventory methodology) — locked
+- [x] Part 1 (objectives) — locked (S1)
+- [x] Part 2 (redaction discipline) — locked (S1), refined in S2 with
+  cross-backend copy-exclusion table + Claude-specific scrub rules
+  8/9/10 (`file-history/` blob store, `plans/` filename leakage,
+  `last-prompt` JSONL events). **Refinement window remains open
+  through S4** because S3's narration design (and the S3/S4 live
+  runs) will produce new log-surface artifacts — narration-emitted
+  JSON-line markers, the deferred-from-S1 Copilot live captures,
+  and the as-yet-uncharacterized Claude `--print` headless mode —
+  each of which may carry its own redaction risk that must be
+  triaged before S5 ships a proposal.
+- [x] Part 3 (inventory methodology) — locked (S1); methodology
+  unchanged in S2
 
-Refinement window: Session 2 (Claude-specific risks). Past that, new
-harvest objectives require an explicit spec addendum.
+Refinement window: open through Session 4. Past that, new harvest
+objectives require an explicit spec addendum.

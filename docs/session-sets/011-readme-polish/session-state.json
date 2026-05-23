@@ -3,7 +3,7 @@
   "sessionSetName": "011-readme-polish",
   "currentSession": null,
   "totalSessions": 2,
-  "status": "not-started",
+  "status": "cancelled",
   "lifecycleState": null,
   "startedAt": null,
   "completedAt": null,
@@ -21,5 +21,6 @@
       "status": "not-started"
     }
   ],
-  "completedSessions": []
+  "completedSessions": [],
+  "preCancelStatus": "not-started"
 }

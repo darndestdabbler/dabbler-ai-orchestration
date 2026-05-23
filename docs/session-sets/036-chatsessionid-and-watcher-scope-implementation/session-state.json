@@ -20,7 +20,7 @@
     {
       "number": 4,
       "title": "Takeover UX (Q3) + watcher-inventory convention test (Q7)",
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "number": 5,
@@ -38,25 +38,18 @@
       "status": "not-started"
     }
   ],
-  "currentSession": 4,
+  "currentSession": null,
   "totalSessions": 7,
   "completedSessions": [
     1,
     2,
-    3
+    3,
+    4
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
   "startedAt": "2026-05-23T15:14:40.134789-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": {
-    "engine": "claude",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high",
-    "chatSessionId": null,
-    "checkedOutAt": "2026-05-23T15:14:40.134789-04:00",
-    "lastActivityAt": "2026-05-23T15:14:40.134789-04:00"
-  }
+  "orchestrator": null
 }

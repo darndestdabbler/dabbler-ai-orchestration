@@ -5,7 +5,7 @@
     {
       "number": 1,
       "title": "Writer migration + per-set lifecycle lock (Q5 prerequisite)",
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "number": 2,
@@ -38,20 +38,15 @@
       "status": "not-started"
     }
   ],
-  "currentSession": 1,
+  "currentSession": null,
   "totalSessions": 7,
-  "completedSessions": [],
+  "completedSessions": [
+    1
+  ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
   "startedAt": "2026-05-23T10:18:03.437276-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": {
-    "engine": "claude",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high",
-    "checkedOutAt": "2026-05-23T10:18:03.437276-04:00",
-    "lastActivityAt": "2026-05-23T10:18:03.437276-04:00"
-  }
+  "orchestrator": null
 }

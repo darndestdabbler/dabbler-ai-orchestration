@@ -1,10 +1,20 @@
 # Multi-Backend Coding-Assistant Adapter Specification
 
+> **SUPERSEDED 2026-05-23.** This Draft v2 design predates Set 044's
+> empirical pivot to log-harvest observability. The launch-adapter
+> approach this document specifies (Sets 037-041) is retired; both
+> the wrapper-channel and the native-log-parser channel of the
+> replacement architecture are owned by Set 045
+> (`docs/session-sets/045-log-harvest-implementation/spec.md`),
+> behind the cross-provider-consensus locked proposal at
+> `docs/session-sets/044-ai-chat-log-discovery-and-experiments/proposal.md`.
+> This file is retained as audit history; do not implement against it.
+
 **Purpose:** Define a Dabbler-compatible adapter layer that standardizes session
 launch across coding-assistant backends while keeping `python -m ai_router.start_session`
 and `python -m ai_router.close_session` as the canonical ownership writers.
 
-**Status:** Draft v2
+**Status:** Draft v2 (SUPERSEDED — see banner above)
 **Last reviewed:** 2026-05-22
 **Locally characterized CLI:** GitHub Copilot CLI 1.0.51 on Windows
 **Why this revision exists:** Dabbler already has a lifecycle writer and check-out

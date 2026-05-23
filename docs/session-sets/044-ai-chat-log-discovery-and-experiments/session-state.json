@@ -30,10 +30,10 @@
     {
       "number": 6,
       "title": "Conditional implementation + close-out",
-      "status": "not-started"
+      "status": "in-progress"
     }
   ],
-  "currentSession": null,
+  "currentSession": 6,
   "totalSessions": 6,
   "completedSessions": [
     1,
@@ -44,8 +44,15 @@
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-23T04:27:06.701945-04:00",
+  "startedAt": "2026-05-23T06:28:38.886792-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "checkedOutAt": "2026-05-23T06:28:38.886792-04:00",
+    "lastActivityAt": "2026-05-23T06:28:38.886792-04:00"
+  }
 }

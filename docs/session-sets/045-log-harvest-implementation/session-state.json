@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 3,
+  "sessionSetName": "045-log-harvest-implementation",
+  "currentSession": null,
+  "totalSessions": 6,
+  "status": "not-started",
+  "lifecycleState": null,
+  "startedAt": null,
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": null,
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Open-question spike + joiner location decision",
+      "status": "not-started"
+    },
+    {
+      "number": 2,
+      "title": "Joiner design + canonical schema",
+      "status": "not-started"
+    },
+    {
+      "number": 3,
+      "title": "Wrapper + Copilot parser",
+      "status": "not-started"
+    },
+    {
+      "number": 4,
+      "title": "Claude parser + narration v1.1 template",
+      "status": "not-started"
+    },
+    {
+      "number": 5,
+      "title": "Explorer integration + Layer-3 coverage",
+      "status": "not-started"
+    },
+    {
+      "number": 6,
+      "title": "UAT + change-log + cross-tier docs + release",
+      "status": "not-started"
+    }
+  ],
+  "completedSessions": []
+}

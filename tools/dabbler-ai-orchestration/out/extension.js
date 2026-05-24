@@ -60,6 +60,7 @@ const installOrchestratorHookCopilot_1 = require("./commands/installOrchestrator
 const checkOutOrchestrator_1 = require("./commands/checkOutOrchestrator");
 const releaseCheckOut_1 = require("./commands/releaseCheckOut");
 const openOrchestratorWriterLog_1 = require("./commands/openOrchestratorWriterLog");
+const regenerateNarrationTemplates_1 = require("./commands/regenerateNarrationTemplates");
 const CheckoutPollService_1 = require("./providers/CheckoutPollService");
 const ReadOnlyIntentService_1 = require("./providers/ReadOnlyIntentService");
 const SESSION_SETS_REL = path.join("docs", "session-sets");
@@ -241,6 +242,7 @@ function activate(context) {
     safeRegister("registerCheckOutOrchestrator", () => (0, checkOutOrchestrator_1.registerCheckOutOrchestrator)(context));
     safeRegister("registerReleaseCheckOut", () => (0, releaseCheckOut_1.registerReleaseCheckOut)(context));
     safeRegister("registerOpenOrchestratorWriterLog", () => (0, openOrchestratorWriterLog_1.registerOpenOrchestratorWriterLog)(context));
+    safeRegister("registerRegenerateNarrationTemplates", () => (0, regenerateNarrationTemplates_1.registerRegenerateNarrationTemplatesCommand)(context));
     // Set 036 Session 4: ReadOnlyIntentService is the in-memory map of
     // session sets the operator picked "Open in Read-Only Mode" on via
     // the chatSessionMismatchModal. checkOutOrchestrator reads it to

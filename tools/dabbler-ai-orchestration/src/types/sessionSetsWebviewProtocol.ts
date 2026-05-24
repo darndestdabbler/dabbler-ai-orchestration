@@ -28,6 +28,39 @@ export type ScanState = "loading" | "ready";
 // accordion. `accordionUpdatedAt` carries the orchestrator block's
 // `lastActivityAt` (or `checkedOutAt` fallback) and serves as the
 // suppression key per row (replaces the marker file's `updatedAt`).
+// Set 045 / Session 5 — harvested-signal badges + conflict pills on
+// each row. The host queries `python -m ai_router.joiner --coverage`
+// and `--conflicts` via HarvestService and attaches the per-set
+// results to the row payload. The webview client.js renders four
+// badge slots (wrapper / native / narration / bypass) and one
+// conflict pill per detected conflict (severity-colored).
+//
+// When harvest data is unavailable (cold cache, Python missing,
+// joiner CLI failed), `harvestSignals` is null and `conflicts` is
+// empty — the row renders with name + fraction + description only,
+// matching the pre-S5 surface exactly.
+export type ConflictKind =
+  | "engine-mismatch"
+  | "bare-touch"
+  | "stale-checkout-touch"
+  | "writer-bypass";
+
+export type ConflictSeverity = "high" | "medium" | "low";
+
+export interface HarvestSignalsPayload {
+  wrapperLaunched: boolean;
+  narrationPresent: boolean;
+  nativeLogBound: boolean;
+  bypassInferred: boolean;
+  lastSignalTs: string | null;
+}
+
+export interface ConflictPayload {
+  kind: ConflictKind;
+  severity: ConflictSeverity;
+  note: string;
+}
+
 export interface RowPayload {
   slug: string;
   name: string;
@@ -47,6 +80,11 @@ export interface RowPayload {
   // the webview never renders an accordion body.
   accordionHtml: string | null;
   accordionUpdatedAt: string | null;
+  // Set 045 / S5 — harvested signals + conflict warnings. null /
+  // empty when HarvestService has no data yet (cold cache or fetch
+  // failed).
+  harvestSignals: HarvestSignalsPayload | null;
+  conflicts: ConflictPayload[];
 }
 
 export interface BucketPayload {

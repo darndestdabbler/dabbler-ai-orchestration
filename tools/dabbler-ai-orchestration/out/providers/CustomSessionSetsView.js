@@ -72,6 +72,7 @@ Object.defineProperty(exports, "isCurrentSessionInFlight", { enumerable: true, g
 const inProgressSetsService_1 = require("./inProgressSetsService");
 const ActionRegistry_1 = require("./ActionRegistry");
 const suppressionState_1 = require("./suppressionState");
+const HarvestService_1 = require("./HarvestService");
 const SUPPRESSION_KEY = "dabbler.sessionSets.suppressedExpand";
 const RENDER_DEBOUNCE_MS = 50;
 // Allowlist for executeCommand dispatch from the webview. Defense-
@@ -158,6 +159,7 @@ class CustomSessionSetsView {
         this.version = 0;
         this.cache = null;
         this.welcomeHtml = this.loadWelcomeHtmlFromPackageJson();
+        this.harvest = new HarvestService_1.HarvestService(() => this.scheduleRender(), this.context.extensionUri);
         this.context.subscriptions.push(this.scanState.onDidChange(() => this.postScanState()));
     }
     dispose() {
@@ -165,9 +167,11 @@ class CustomSessionSetsView {
             clearTimeout(this.renderTimer);
             this.renderTimer = undefined;
         }
+        this.harvest.dispose();
     }
     refresh() {
         this.cache = null;
+        this.harvest.invalidate();
         this.scheduleRender();
     }
     resolveWebviewView(webviewView, _context, _token) {
@@ -379,6 +383,13 @@ class CustomSessionSetsView {
         return { key, label, count: subset.length, rows };
     }
     buildRow(set) {
+        // Set 045 / S5 — attach harvested signals + conflicts when the
+        // service's cache has data for this slug. Cold cache (first paint
+        // or post-invalidate) returns null/empty here; the service then
+        // schedules a re-render via onUpdate once the joiner CLI returns.
+        const snapshot = this.harvest.getSnapshot();
+        const harvestSignals = snapshot?.signalsBySlug.get(set.name) ?? null;
+        const conflicts = snapshot?.conflictsBySlug.get(set.name) ?? [];
         // Set 034: the per-row accordion is GONE. Operator feedback
         // 2026-05-21 (mid-Set-034 Session 1) — the gauges and the
         // orchestrator-info text below them read as more authoritative
@@ -410,6 +421,20 @@ class CustomSessionSetsView {
             needsMigration: set.needsMigration,
             accordionHtml: null,
             accordionUpdatedAt: null,
+            harvestSignals: harvestSignals
+                ? {
+                    wrapperLaunched: harvestSignals.wrapperLaunched,
+                    narrationPresent: harvestSignals.narrationPresent,
+                    nativeLogBound: harvestSignals.nativeLogBound,
+                    bypassInferred: harvestSignals.bypassInferred,
+                    lastSignalTs: harvestSignals.lastSignalTs,
+                }
+                : null,
+            conflicts: conflicts.map((c) => ({
+                kind: c.kind,
+                severity: c.severity,
+                note: c.note,
+            })),
         };
     }
     // ----- Welcome HTML extraction -----

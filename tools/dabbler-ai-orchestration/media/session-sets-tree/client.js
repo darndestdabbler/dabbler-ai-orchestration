@@ -246,10 +246,19 @@
     // + model description + smart CTA all gone). Rows are never
     // expandable in this view — `accordionHtml` is always null from
     // the host.
+    //
+    // Set 045 / S5: rows can additionally carry harvested-signal
+    // badges (wrapper / native / narration / bypass) and conflict
+    // pills (engine-mismatch / bare-touch / stale-checkout-touch /
+    // writer-bypass). Both attach to the row-text line; the badges
+    // render after the description, the conflicts wrap onto a
+    // second line below.
     const fractionCls = "row-fraction row-fraction-" + escAttr(row.state);
     const descSpan = row.description
       ? '<span class="row-description">' + escHtml(row.description) + '</span>'
       : "";
+    const badges = renderHarvestBadges(row.harvestSignals);
+    const conflictPills = renderConflictPills(row.conflicts);
     return (
       '<div role="treeitem" tabindex="-1" aria-level="2"' +
       ' aria-selected="false" data-slug="' + escAttr(row.slug) + '"' +
@@ -261,10 +270,64 @@
           '<span class="row-text">' +
             '<span class="row-name">' + escHtml(row.name) + '</span>' +
             descSpan +
+            badges +
           '</span>' +
         '</div>' +
+        conflictPills +
       '</div>'
     );
+  }
+
+  // Set 045 / S5 — harvested-signal badges. Each badge is a small
+  // pill with a glyph + label, dimmed when the signal is False so
+  // the row at a glance shows which channels are live. Order is
+  // fixed (wrapper / native / narration / bypass) so the column
+  // positions are visually stable across rows.
+  function renderHarvestBadges(signals) {
+    if (!signals) return "";
+    const slots = [
+      { key: "wrapper",   on: !!signals.wrapperLaunched,  glyph: "W", title: "Dabbler-launch wrapper record present" },
+      { key: "native",    on: !!signals.nativeLogBound,   glyph: "N", title: "Provider-native log present in workspace" },
+      { key: "narration", on: !!signals.narrationPresent, glyph: "M", title: "[DABBLER-NARRATION ...] marker observed" },
+      { key: "bypass",    on: !!signals.bypassInferred,   glyph: "B", title: "Bypass inferred: native log present without wrapper" },
+    ];
+    let html = '<span class="harvest-badges" aria-label="harvested signals">';
+    for (const slot of slots) {
+      const cls = "harvest-badge harvest-badge-" + slot.key + (slot.on ? " is-on" : " is-off");
+      html +=
+        '<span class="' + cls + '"' +
+        ' title="' + escAttr(slot.title) + '"' +
+        ' data-signal="' + slot.key + '"' +
+        ' aria-hidden="' + (slot.on ? "false" : "true") + '">' +
+        escHtml(slot.glyph) +
+        '</span>';
+    }
+    html += '</span>';
+    return html;
+  }
+
+  // Set 045 / S5 — conflict pills (one per detected conflict). They
+  // wrap onto a second line below the row header so the operator can
+  // see the kind + a short note at a glance; high-severity conflicts
+  // get a bolder color via the severity class. Empty array → no
+  // banner row emitted at all.
+  function renderConflictPills(conflicts) {
+    if (!conflicts || conflicts.length === 0) return "";
+    let html = '<div class="conflict-pills" role="status">';
+    for (const c of conflicts) {
+      const cls =
+        "conflict-pill conflict-pill-" + escAttr(c.kind) +
+        " conflict-severity-" + escAttr(c.severity);
+      html +=
+        '<span class="' + cls + '"' +
+        ' data-kind="' + escAttr(c.kind) + '"' +
+        ' data-severity="' + escAttr(c.severity) + '"' +
+        ' title="' + escAttr(c.note) + '">' +
+        escHtml(c.kind) +
+        '</span>';
+    }
+    html += '</div>';
+    return html;
   }
 
   function isSuppressedForRow(row) {

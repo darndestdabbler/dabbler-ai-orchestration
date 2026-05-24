@@ -410,6 +410,154 @@
           "raw_output": "session-reviews/session-004.md"
         }
       ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 1,
+      "stepKey": "session-005/pre-session-decisions-recorded",
+      "dateTime": "2026-05-24T09:45:00-04:00",
+      "description": "Recorded the two F-section follow-on decisions surfaced by S4 verifier: (1) Copilot-side `gen_ai.output.messages` marker scanning — DEFERRED. The structural marker channel on Copilot is the OTel `session_start` event attribute (already parsed in S3); scanning chat output only catches the corner case where Copilot literally typed the marker AND the user enabled content-capture (rare). Bounded value vs. parser+test+verifier-round cost; S5 scope discipline. (2) Q3 phrasing-trigger ablation pre-S6 — DEFERRED post-release. Templates round-trip cleanly through detect_marker in S4 tests; defensive rules are baked in. Marketplace download count = 3 makes a real-world refusal a cheap patch (regenerate template, repush). Both decisions logged in ai-assignment.md S5 block.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 2,
+      "stepKey": "session-005/register-session-start",
+      "dateTime": "2026-05-24T09:47:25-04:00",
+      "description": "Ran python -m ai_router.start_session --session-set-dir docs/session-sets/045-log-harvest-implementation --session-number 5 --engine claude --provider anthropic --model claude-opus-4-7 --effort high. session-state.json flipped to currentSession=5 + in-progress + orchestrator block populated; work_started event appended to session-events.jsonl.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "session-005/ai-assignment-authored",
+      "dateTime": "2026-05-24T09:50:00-04:00",
+      "description": "Authored ai-assignment.md Session 5 block (self-disclaimed Claude orchestrator authorship — workflow Step 3.5 routing remains suppressed by the operator's in-session router restriction). Recorded the pre-S5 operator decisions (Copilot marker DEFER + Q3 ablation DEFER), the plan (8 steps + Layer-1 + Layer-3), carry-forward inputs from S1-S4, and the verification posture (gemini-pro Round A).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 4,
+      "stepKey": "session-005/coverage-narration-wired",
+      "dateTime": "2026-05-24T10:00:00-04:00",
+      "description": "Fixed the S2-era `narration_present=False` hardcode in ai_router/joiner/coverage.py — coverage() now consults a new _any_narration_marker() helper that scans relevant native sessions via parsers.read_claude_session_events() for any event_type='marker' record. Matches on set_slug when bound; falls back to workspace-scoped match for unbound markers. Copilot branch skipped per the deferred decision (no Copilot marker emission in the per-event parser yet). Stale 'S4 will flip this' comment in test_joiner_coverage.py corrected.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "session-005/layer1-narration-tests-authored",
+      "dateTime": "2026-05-24T10:05:00-04:00",
+      "description": "Added 3 new Layer-1 tests to test_joiner_coverage.py: test_coverage_narration_present_when_marker_in_workspace (positive: Claude assistant text block containing the marker flips narration_present True), test_coverage_narration_absent_when_no_marker_text (negative: ordinary assistant text leaves narration_present False — no false-positive), test_coverage_narration_unbound_marker_in_workspace_still_counts (boundary: unbound marker — missing set= field — still counts as evidence in the workspace). Test fixture helper _write_claude_session_with_marker mirrors the on-disk Claude JSONL shape.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "session-005/harvest-service-authored",
+      "dateTime": "2026-05-24T10:15:00-04:00",
+      "description": "Authored tools/dabbler-ai-orchestration/src/providers/HarvestService.ts (281 LOC) — async shell-out to `python -m ai_router.joiner --coverage --json` and `--conflicts --json`, 30s TTL cache with onUpdate callback that triggers a re-render once fresh data lands. Graceful-fail: when both shell-outs fail, an empty snapshot is cached so the service does not hot-spin the subprocess. Dev-mode PYTHONPATH discovery: walks up from extensionUri.fsPath looking for an `ai_router/__init__.py` sibling (present under --extensionDevelopmentPath and Playwright; absent in Marketplace install where `pip install dabbler-ai-router` provides the import path). resolveDevPythonPath cap of 5 ancestor levels keeps the search bounded.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "session-005/row-payload-protocol-extended",
+      "dateTime": "2026-05-24T10:20:00-04:00",
+      "description": "Extended RowPayload in src/types/sessionSetsWebviewProtocol.ts with two new fields: harvestSignals (HarvestSignalsPayload | null) and conflicts (ConflictPayload[]). Added type unions for ConflictKind ('engine-mismatch' | 'bare-touch' | 'stale-checkout-touch' | 'writer-bypass') and ConflictSeverity ('high' | 'medium' | 'low'). Null/empty when the harvest service has no data yet — preserves the pre-S5 single-line row rendering as the cold-cache state.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 8,
+      "stepKey": "session-005/explorer-host-wired",
+      "dateTime": "2026-05-24T10:25:00-04:00",
+      "description": "Wired HarvestService into CustomSessionSetsView (src/providers/CustomSessionSetsView.ts): instantiated in the constructor with `() => this.scheduleRender()` as the onUpdate callback and this.context.extensionUri for the dev-mode PYTHONPATH discovery; disposed in dispose(); invalidated in refresh() so a file-watcher trigger re-fetches. buildRow() reads snapshot.signalsBySlug.get(set.name) and snapshot.conflictsBySlug.get(set.name) synchronously, attaching harvestSignals + conflicts to the row payload (null/empty on cold cache).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 9,
+      "stepKey": "session-005/webview-badges-pills-rendered",
+      "dateTime": "2026-05-24T10:35:00-04:00",
+      "description": "Updated media/session-sets-tree/client.js renderRow() to emit a .harvest-badges span (inside row-text, after description) with four fixed-position badges (wrapper / native / narration / bypass — single-letter glyphs W / N / M / B; is-on / is-off CSS class drives color vs. dim) and a sibling .conflict-pills div (after .row-header) with one .conflict-pill per detected conflict (data-kind / data-severity / hover title carrying the joiner's note). Added the corresponding CSS in media/session-sets-tree/tree.css: IBM colorblind-safe palette (blue/purple/orange/magenta for the four signals, magenta/orange/yellow for the three severities) per the operator's prior gauges-sizing-followup preference; pill border-radius + tabular-nums for badges; conflict-pills indented 60px to clear the fraction column.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 10,
+      "stepKey": "session-005/layer3-playwright-authored",
+      "dateTime": "2026-05-24T10:50:00-04:00",
+      "description": "Authored src/test/playwright/harvest-signals.spec.ts (3 scenarios): (1) harvest badges render in off-state for a fresh session set — asserts the 4 badges render, all carry .is-off class, no conflict-pills DOM; (2) writer-bypass conflict pill renders when state-file mtime drifts from events ledger — uses fs.utimesSync to push the state-file mtime ~60s into the past (well outside the joiner's ±2s tolerance), asserts the conflict pill renders with kind=writer-bypass + severity=high + the hover note matches the expected drift-pattern; (3) conflict pills wrap onto their own line below the row header — asserts .conflict-pills is a DIRECT child of the treeitem div (not nested in .row-header) and .harvest-badges sits INSIDE .row-header (two-tier layout invariant).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 11,
+      "stepKey": "session-005/build-and-test-smoke",
+      "dateTime": "2026-05-24T11:00:00-04:00",
+      "description": "Step 5 build/test: python -m pytest 811 passed, 1 skipped in 151.42s (S4 baseline 808 → +3 new Layer-1 coverage tests). npx tsc --noEmit in tools/dabbler-ai-orchestration/ clean. npm run test:unit 531 passing, 2 pre-existing harness failures (same as S4 baseline; neither touched by S5). npm run compile + npx tsc --outDir out + npx playwright test harvest-signals: 3/3 passed in 59.7s on first post-rebuild run. Full Playwright suite then re-run: 27 passed (+3 new) / 2 skipped in 4.1min — no regressions across the other 8 specs. (Initial run failed because I called `npx playwright test` directly without rebuilding the bundle; the running extension was loading the pre-S5 dist/extension.js. Lesson: `npm run test:playwright` runs `npm run compile && tsc --outDir out && playwright test` — calling playwright directly skips the rebuild.)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 12,
+      "stepKey": "session-005/verification-round-a",
+      "dateTime": "2026-05-24T11:20:00-04:00",
+      "description": "Step 6 end-of-session verification — Round A. Authored verify_session5.py bundling joiner-spec.md + coverage.py + cli.py + test_joiner_coverage.py + HarvestService.ts + CustomSessionSetsView.ts + sessionSetsWebviewProtocol.ts + client.js + tree.css + harvest-signals.spec.ts (122,617 chars across 10 parts). Routed via ai_router.query(model='gemini-pro') per the standing GPT-5.4 429 workaround. Verdict: REJECTED on 2 must-fix issues — (1) .conflict-pills indent was a hard-coded 60px; brittle vs. font-size changes; (2) HarvestService silent-degrades when dabbler-ai-router is not pip-installed, hiding the setup gap from the operator. Plus 4 nice-to-have recommendations. Cost: $0.058361.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "tier": 2,
+          "task_type": "session-verification",
+          "cost_usd": 0.05836125,
+          "input_tokens": 39993,
+          "output_tokens": 837,
+          "verdict": "REJECTED",
+          "raw_output": "session-reviews/session-005.md"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 13,
+      "stepKey": "session-005/must-fix-resolutions-applied",
+      "dateTime": "2026-05-24T11:35:00-04:00",
+      "description": "Applied both Round A must-fix resolutions in-flight per the operator's 'don't hide behind out-of-scope' directive. (1) tree.css: declared --row-fraction-width and --row-fraction-margin-right CSS custom properties on :root; .row-fraction reads via var(); .conflict-pills padding-left uses calc(12px + var(--row-fraction-width) + var(--row-fraction-margin-right)) where 12px is the row-header left padding. The indent now tracks the fraction column above through font-size changes. (2) HarvestService.ts: added SpawnResult.diagnostic field ('missing-ai-router' | 'spawn-failed' | 'non-zero-exit' | 'json-parse'); spawnJson() inspects stderr on non-zero exit and matches /ModuleNotFoundError.*ai_router|No module named ['\"]ai_router['\"]/ to set diagnostic='missing-ai-router'. HarvestService.fetch() fires a one-time vscode.window.showWarningMessage with an 'Open settings' action when this diagnostic appears (sticky per-session via missingDependencyNotified flag). Also applied a small recommendation: spawn-warn now includes cwd in the dev-console line. tsc clean; Playwright re-run 3/3 in 59.3s.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 14,
+      "stepKey": "session-005/verification-round-b",
+      "dateTime": "2026-05-24T11:45:00-04:00",
+      "description": "Step 6 end-of-session verification — Round B. Authored verify_session5_round_b.py with a narrow bundle (tree.css + HarvestService.ts + session-005.md Round A verdict; 28,046 chars across 3 parts) so the verifier could confirm just the two must-fix resolutions without re-litigating the full S5 surface. Routed via gemini-pro. Verdict: VERIFIED no must-fix issues. Cost: $0.012289. Cumulative S5 routed: $0.058361 (Round A) + $0.012289 (Round B) = $0.070650. Cumulative Set 045 entering S6: $0.247 (S1-S4) + $0.070650 (S5) = $0.317650 of $5 NTE.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "tier": 2,
+          "task_type": "session-verification",
+          "cost_usd": 0.01228875,
+          "input_tokens": 9759,
+          "output_tokens": 9,
+          "verdict": "VERIFIED",
+          "raw_output": "session-reviews/session-005-round-b.md"
+        }
+      ]
     }
   ]
 }

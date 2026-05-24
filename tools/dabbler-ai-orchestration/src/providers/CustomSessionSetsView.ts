@@ -63,6 +63,7 @@ import {
   SnapshotPayload,
   WebviewToHost,
 } from "../types/sessionSetsWebviewProtocol";
+import { HarvestService } from "./HarvestService";
 
 const SUPPRESSION_KEY = "dabbler.sessionSets.suppressedExpand";
 const RENDER_DEBOUNCE_MS = 50;
@@ -153,12 +154,21 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   private renderTimer: NodeJS.Timeout | undefined;
   private cache: SessionSet[] | null = null;
   private welcomeHtml: string;
+  // Set 045 / S5 — async harvest CLI shell-out with TTL cache. The
+  // service triggers a re-render via the onUpdate callback when fresh
+  // data lands; postSnapshot reads its cache synchronously and attaches
+  // signals + conflicts to each row.
+  private readonly harvest: HarvestService;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly scanState: ScanState,
   ) {
     this.welcomeHtml = this.loadWelcomeHtmlFromPackageJson();
+    this.harvest = new HarvestService(
+      () => this.scheduleRender(),
+      this.context.extensionUri,
+    );
     this.context.subscriptions.push(
       this.scanState.onDidChange(() => this.postScanState()),
     );
@@ -169,10 +179,12 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       clearTimeout(this.renderTimer);
       this.renderTimer = undefined;
     }
+    this.harvest.dispose();
   }
 
   public refresh(): void {
     this.cache = null;
+    this.harvest.invalidate();
     this.scheduleRender();
   }
 
@@ -405,6 +417,13 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   }
 
   private buildRow(set: SessionSet): RowPayload {
+    // Set 045 / S5 — attach harvested signals + conflicts when the
+    // service's cache has data for this slug. Cold cache (first paint
+    // or post-invalidate) returns null/empty here; the service then
+    // schedules a re-render via onUpdate once the joiner CLI returns.
+    const snapshot = this.harvest.getSnapshot();
+    const harvestSignals = snapshot?.signalsBySlug.get(set.name) ?? null;
+    const conflicts = snapshot?.conflictsBySlug.get(set.name) ?? [];
     // Set 034: the per-row accordion is GONE. Operator feedback
     // 2026-05-21 (mid-Set-034 Session 1) — the gauges and the
     // orchestrator-info text below them read as more authoritative
@@ -436,6 +455,20 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       needsMigration: set.needsMigration,
       accordionHtml: null,
       accordionUpdatedAt: null,
+      harvestSignals: harvestSignals
+        ? {
+            wrapperLaunched: harvestSignals.wrapperLaunched,
+            narrationPresent: harvestSignals.narrationPresent,
+            nativeLogBound: harvestSignals.nativeLogBound,
+            bypassInferred: harvestSignals.bypassInferred,
+            lastSignalTs: harvestSignals.lastSignalTs,
+          }
+        : null,
+      conflicts: conflicts.map((c) => ({
+        kind: c.kind,
+        severity: c.severity,
+        note: c.note,
+      })),
     };
   }
 

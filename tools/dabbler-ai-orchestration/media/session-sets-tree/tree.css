@@ -176,15 +176,23 @@ html, body {
 
 /* Right-aligned fraction list-icon. Fixed-width column so fractions
  * line up across all rows; doesn't shrink under flex pressure (so the
- * row name wraps before the fraction collides with it). */
+ * row name wraps before the fraction collides with it).
+ *
+ * Set 045 / S5: width + margin exposed as CSS variables so the
+ * conflict-pills indent below can stay aligned with the column
+ * even if the operator's font size changes. */
+:root {
+  --row-fraction-width: 3em;
+  --row-fraction-margin-right: 12px;
+}
 .row-fraction {
   flex: 0 0 auto;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   text-align: right;
-  width: 3em;
-  margin-right: 12px;
+  width: var(--row-fraction-width);
+  margin-right: var(--row-fraction-margin-right);
   line-height: 1.2;
 }
 
@@ -227,6 +235,106 @@ body.vscode-light, body.vscode-high-contrast-light {
   opacity: 0.7;
   white-space: normal;
   overflow: visible;
+}
+
+/* ---- Harvested-signal badges + conflict pills (Set 045 / S5) ---- */
+/*
+ * Per-row affordances backed by `python -m ai_router.joiner --coverage`
+ * and `--conflicts`. The four badges sit inline after the row
+ * description; the conflict pills wrap onto a second line below.
+ *
+ * Palette is IBM colorblind-safe (consistent with the Set 029 S2
+ * round-2 follow-up that landed the same palette on the retired
+ * gauges) — blue / orange / yellow / purple for the four signal
+ * slots, and red / orange / yellow for the three conflict severities.
+ */
+:root {
+  --harvest-on-fg:  rgb(255, 255, 255);
+  --harvest-off-fg: var(--vscode-foreground);
+  --harvest-off-bg: rgba(127, 127, 127, 0.12);
+  --harvest-wrapper:   rgb(100, 143, 255);  /* IBM blue */
+  --harvest-native:    rgb(120, 94, 240);   /* IBM purple */
+  --harvest-narration: rgb(254, 97, 0);     /* IBM orange */
+  --harvest-bypass:    rgb(220, 38, 127);   /* IBM magenta — bypass = attention */
+}
+body.vscode-light, body.vscode-high-contrast-light {
+  --harvest-on-fg:  rgb(255, 255, 255);
+  --harvest-off-fg: var(--vscode-foreground);
+  --harvest-off-bg: rgba(127, 127, 127, 0.10);
+}
+
+.harvest-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: baseline;
+}
+.harvest-badge {
+  display: inline-block;
+  min-width: 16px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--vscode-editor-font-family, "Consolas", monospace);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.harvest-badge.is-off {
+  background: var(--harvest-off-bg);
+  color: var(--harvest-off-fg);
+  opacity: 0.35;
+}
+.harvest-badge.is-on { color: var(--harvest-on-fg); }
+.harvest-badge-wrapper.is-on   { background: var(--harvest-wrapper); }
+.harvest-badge-native.is-on    { background: var(--harvest-native); }
+.harvest-badge-narration.is-on { background: var(--harvest-narration); }
+.harvest-badge-bypass.is-on    { background: var(--harvest-bypass); }
+
+/* Conflict pills — one per detected conflict, wrapped onto a second
+ * line below the row header. Severity drives the color; the pill text
+ * is the kind name (short enough to read at a glance). The note rides
+ * along as the title attribute for hover context.
+ */
+.conflict-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  /* Indent past the fraction column on the row above. Derived from
+   * --row-fraction-width + --row-fraction-margin-right + the row-header
+   * left padding (12px) so resizing the font (or rebalancing the
+   * fraction column) keeps the conflict-pills aligned with the row-text
+   * column above them. */
+  padding: 2px 12px 4px
+    calc(12px + var(--row-fraction-width) + var(--row-fraction-margin-right));
+  margin: 0;
+}
+.conflict-pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+  user-select: none;
+  white-space: nowrap;
+}
+.conflict-severity-high {
+  background: rgba(220, 38, 127, 0.85);
+  color: rgb(255, 255, 255);
+}
+.conflict-severity-medium {
+  background: rgba(254, 97, 0, 0.80);
+  color: rgb(255, 255, 255);
+}
+.conflict-severity-low {
+  background: rgba(255, 176, 0, 0.75);
+  color: rgb(40, 40, 40);
 }
 
 /* ---- Cursor-anchored context menu (Set 034) ---- */

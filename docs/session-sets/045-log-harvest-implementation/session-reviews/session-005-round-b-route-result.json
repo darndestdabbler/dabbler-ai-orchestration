@@ -1,0 +1,16 @@
+{
+  "content": "VERIFIED: no must-fix issues.",
+  "model_name": "gemini-pro",
+  "model_id": "gemini-2.5-pro",
+  "tier": 2,
+  "input_tokens": 9759,
+  "output_tokens": 9,
+  "cost_usd": 0.012288750000000001,
+  "total_cost_usd": 0.012288750000000001,
+  "complexity_score": -1,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 22.244535446166992,
+  "truncated": false,
+  "verification": null
+}

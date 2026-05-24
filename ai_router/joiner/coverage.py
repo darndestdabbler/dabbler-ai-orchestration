@@ -47,11 +47,10 @@ def coverage(
 ) -> list[CoverageSummary]:
     """Compute per-session-set coverage summaries.
 
-    S2 ships the structural skeleton; the ``narration_present``
-    field returns False until S4 emits ``marker`` events. The
-    ``wrapper_launched`` field returns False until S3 ships
-    ``dabbler-launch`` and the launch log starts accumulating
-    records.
+    Set 045 / S5 wires the ``narration_present`` field through to the
+    S4 per-event marker detection. The ``wrapper_launched`` field
+    reflects the S3 launch log; ``native_log_bound`` reflects the
+    presence of any provider-native session in the workspace.
     """
     root = workspace_root or Path.cwd()
     natives = list(scan_native_sessions(claude_root=claude_root, copilot_root=copilot_root))
@@ -69,18 +68,63 @@ def coverage(
         )
         native_log_bound = bool(relevant_natives)
         last_signal_ts = _max_ts(relevant_natives)
+        narration_present = _any_narration_marker(
+            relevant_natives, set_slug=state.set_slug,
+        )
         summaries.append(
             CoverageSummary(
                 set_slug=state.set_slug,
                 workspace_cwd_canonical=workspace_canon,
                 wrapper_launched=wrapper_launched,
-                narration_present=False,  # S4 wires this
+                narration_present=narration_present,
                 native_log_bound=native_log_bound,
                 last_signal_ts=last_signal_ts,
                 bypass_inferred=native_log_bound and not wrapper_launched,
             )
         )
     return summaries
+
+
+def _any_narration_marker(
+    natives: list[NativeSession],
+    *,
+    set_slug: str,
+) -> bool:
+    """Return True if any native in the workspace emitted a narration marker.
+
+    Per joiner-spec.md §5.1 the marker event has
+    ``source="narration"`` and ``event_type="marker"``. A marker
+    bound to a launch carries the launch's ``set_slug``; free-running
+    markers carry no ``set_slug``. The workspace filter has already
+    been applied by the caller (``relevant_natives``), so an unbound
+    marker is still strong evidence of narration presence for any
+    set in the same workspace.
+
+    Short-circuits on the first match — cheap on the common case
+    where a workspace's first claude/copilot session yields a marker
+    in its opening turns.
+    """
+    for native in natives:
+        if native.engine == "claude":
+            events = parsers.read_claude_session_events(
+                Path(native.source_file),
+                session_cwd_canonical=native.cwd_canonical,
+                fallback_conv_id=native.conv_id,
+            )
+        elif native.engine == "copilot":
+            # Per pre-S5 operator decision (2026-05-24), Copilot-side
+            # `gen_ai.output.messages` marker scanning is deferred —
+            # the Copilot per-event parser emits no marker events.
+            # Future engines wire here without breaking the predicate.
+            continue
+        else:
+            continue
+        for evt in events:
+            if evt.event_type != "marker":
+                continue
+            if evt.set_slug is None or evt.set_slug == set_slug:
+                return True
+    return False
 
 
 def _max_ts(natives: list[NativeSession]) -> Optional[datetime]:

@@ -388,3 +388,128 @@ a handoff to Codex/Gemini. Rationale: Layer-3 styling iteration
 (per memory `project_029_s6_html_preview_iteration`, operator wants
 ~11 iterations for the visual surface) is best handled in-process
 with the joiner output flowing live.
+
+---
+
+## Session 5: Explorer integration + Layer-3 coverage
+
+### Recommended orchestrator
+
+claude-opus-4-7 @ effort=high (the running orchestrator).
+
+### Self-authored disclaimer (Session 5)
+
+This block was authored by the orchestrator (Claude Opus 4.7)
+directly, not via `route(task_type="analysis")`. The standing
+operator directive ("AI router usage restricted to end-of-session
+verification — cost containment, until further notice") remains in
+force. Read the recommendations below with the
+orchestrator-self-opinion bias caveat in mind; the end-of-session
+verifier provides the independent cross-provider check.
+
+### Rationale
+
+S5 wires the S2 joiner's coverage + conflict outputs into the
+Session Set Explorer webview: per-row signal badges (wrapper /
+native / narration / bypass) and conflict-warning pills
+(engine-mismatch / bare-touch / stale-checkout-touch / writer-
+bypass). The work is module-level TypeScript + webview client.js
+DOM authoring + CSS + Layer-3 Playwright fixtures — best handled
+by Opus in-process with the S4 narration + S2 joiner CLI fresh
+in context. No new API spend in this session (routed verification
+only at end-of-session). Cumulative routed spend coming in:
+**$0.247 of $5 NTE**.
+
+### Estimated routed cost
+
+Low — single routed `session-verification` call via gemini-pro
+(skipping GPT-5.4 per the standing 429-cascade workaround).
+Additional rounds within scope if surfacing must-fix items.
+
+### Pre-S5 operator decisions (recorded 2026-05-24)
+
+1. **Copilot-side marker scanning of `gen_ai.output.messages` —
+   DEFER.** The structural marker channel on Copilot is the OTel
+   `session_start` event attribute (already parsed in S3); scanning
+   chat output for markers only catches the corner case where
+   Copilot literally typed the marker AND the user enabled
+   content-capture. Bounded value vs. parser+test+verifier-round
+   cost; S5 scope discipline matters.
+2. **Q3 phrasing-trigger ablation pre-S6 — DEFER post-release.**
+   Templates round-trip through `detect_marker` cleanly in S4
+   tests; the four defensive rules are baked in. Operator-time
+   is the scarcest resource. Marketplace download count = 3 makes
+   a real-world refusal a cheap patch (regenerate template,
+   repush) — defer ablation to post-release follow-on if a real
+   refusal surfaces.
+
+### Plan
+
+| Step | Action | Routing Decision |
+|------|--------|------------------|
+| 1 | Fix the `narration_present=False` hardcode in `ai_router/joiner/coverage.py` — S2 stub never wired through despite S4 shipping per-event marker detection | No routing |
+| 2 | Author `HarvestService` in extension: shell out to `python -m ai_router.joiner --coverage --json` and `--conflicts --json` from `CustomSessionSetsView.postSnapshot`, cache results, graceful-fail if Python missing | No routing |
+| 3 | Extend `RowPayload` protocol: add `harvestSignals` (wrapper/native/narration/bypass) + `conflicts` (kind + severity + note) | No routing |
+| 4 | Add badge + conflict-pill rendering in `client.js`; CSS for the four signal states + four conflict kinds; IBM colorblind-safe palette per [memory: gauges_sizing_followup](memory/project_gauges_sizing_followup.md) | No routing |
+| 5 | Layer-3 Playwright fixtures: signal-badges-render scenario, conflict-pill-renders scenario, graceful-fail scenario | No routing |
+| 6 | Layer-1 unit tests for `coverage.py` narration-wiring fix (3-4 new tests) | No routing |
+| 7 | `python -m pytest` smoke + `npx tsc --noEmit` + `npm run test:unit` + Layer-3 Playwright smoke | No routing |
+| 8 | End-of-session cross-provider verification (Round A) | `route(model="gemini-pro", task_type="session-verification")` |
+| 9+ | Round B / C if Round A surfaces must-fix items | Same routing |
+
+### Carry-forward inputs from prior sessions (locked, do not relitigate)
+
+- Joiner Python CLI surface at `python -m ai_router.joiner`
+  (Set 045 S1 Q4 lock + S2 cli.py).
+- Canonical CoverageSummary fields (joiner-spec.md §6) and
+  ConflictReport fields (§3.5).
+- Q1 bypass-rate fraction NOT computed in S5 — the
+  observation log only started 2026-05-24; needs 1–2 weeks of
+  data before a meaningful fraction renders. S5 wires the badge
+  infrastructure; the fraction computation lands in S6 if data
+  exists, or as a follow-on if not.
+- The per-row accordion is retired (Set 034); badges + conflict
+  pills attach to the existing single-line row chrome, not to an
+  expandable body.
+
+### Actuals (filled after the session)
+
+- Orchestrator used: claude-opus-4-7 @ effort=high
+- Total routed cost: **$0.0707** across two verification rounds
+  - Round A: gemini-pro session-verification, $0.058, REJECTED on
+    (1) .conflict-pills hard-coded 60px indent (brittle vs. font
+    size), (2) HarvestService silent-degrade when
+    dabbler-ai-router is not pip-installed.
+  - Round B: gemini-pro session-verification, $0.012, VERIFIED.
+- Deviations from recommendation: two verification rounds rather
+  than the projected one — Round A surfaced two real must-fix
+  issues. Both resolved in-flight per the operator's
+  'don't hide behind out-of-scope' directive (CSS custom
+  properties + calc() for the indent; SpawnResult.diagnostic +
+  one-time toast with "Open settings" action for the missing-
+  dependency case). Round B then confirmed the resolutions.
+  Additionally applied one nice-to-have recommendation (spawn
+  warn includes cwd context); deferred three other
+  recommendations: HarvestService → singleton (architectural, no
+  second view in this set), missing-events-ledger ConflictKind
+  (spec-touching, revisit if operator requests),
+  CONTRIBUTING.md note about npm run test:playwright (doc-only,
+  can land separately).
+- Notes for next-session calibration: (1) the rebuild-before-
+  Playwright lesson is worth surfacing more loudly than an
+  activity-log entry — Round A flagged this as a recommended
+  CONTRIBUTING.md improvement and S6 should consider whether to
+  add it as part of the dual-registry release docs.
+  (2) The missing-dependency toast affordance means S6's
+  Marketplace release notes should call out the
+  `pip install dabbler-ai-router` companion install — operators
+  who skip it now get a clear setup gap signal instead of silent
+  degradation.
+  (3) Round A's deferred missing-events-ledger ConflictKind
+  recommendation is worth re-litigating in S6 as part of the
+  cross-tier docs work — it changes spec §3 which would normally
+  be audit-locked, but the change is small and operator-positive
+  (surface inactive bypass detection instead of silent skip).
+- Cumulative routed spend across Set 045 entering S6:
+  $0.024 (S1) + $0.053066 (S2) + $0.107 (S3) + $0.063 (S4) +
+  $0.0707 (S5) = **$0.3177 of $5 NTE**.

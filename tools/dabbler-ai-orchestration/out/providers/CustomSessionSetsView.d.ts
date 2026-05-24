@@ -10,6 +10,7 @@ export declare class CustomSessionSetsView implements vscode.WebviewViewProvider
     private renderTimer;
     private cache;
     private welcomeHtml;
+    private readonly harvest;
     constructor(context: vscode.ExtensionContext, scanState: ScanState);
     dispose(): void;
     refresh(): void;

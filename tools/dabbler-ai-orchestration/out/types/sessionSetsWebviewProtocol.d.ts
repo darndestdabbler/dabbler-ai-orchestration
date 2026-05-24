@@ -1,4 +1,18 @@
 export type ScanState = "loading" | "ready";
+export type ConflictKind = "engine-mismatch" | "bare-touch" | "stale-checkout-touch" | "writer-bypass";
+export type ConflictSeverity = "high" | "medium" | "low";
+export interface HarvestSignalsPayload {
+    wrapperLaunched: boolean;
+    narrationPresent: boolean;
+    nativeLogBound: boolean;
+    bypassInferred: boolean;
+    lastSignalTs: string | null;
+}
+export interface ConflictPayload {
+    kind: ConflictKind;
+    severity: ConflictSeverity;
+    note: string;
+}
 export interface RowPayload {
     slug: string;
     name: string;
@@ -10,6 +24,8 @@ export interface RowPayload {
     needsMigration: boolean;
     accordionHtml: string | null;
     accordionUpdatedAt: string | null;
+    harvestSignals: HarvestSignalsPayload | null;
+    conflicts: ConflictPayload[];
 }
 export interface BucketPayload {
     key: "in-progress" | "not-started" | "complete" | "cancelled";

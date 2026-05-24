@@ -5,6 +5,97 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-05-24 (Set 036 — chatSessionId identity refinement + watcher-scope discipline)
+
+Refines the Set 033 H4 holder-identity composite from
+`engine + provider` to `engine + provider + chatSessionId` so two
+distinct chats on the same engine are recognized as different holders.
+Ships the per-set lifecycle lock (Q5 prerequisite) that serializes
+`start_session` and `close_session` against each other across the
+migration window. Ships the `new_chat_id` CLI as the agent-facing
+token source for orchestrators with no native per-chat metadata
+surface. Adds the `closeout_succeeded` event payload's Q4 audit-trail
+extension. Companion VS Code Marketplace release:
+`DarndestDabbler.dabbler-ai-orchestration 0.20.0`.
+
+### Added
+
+- **`chatSessionId` field on the `orchestrator` block.** New nested
+  field, `string | null`. Strict-on-write (every new write populates
+  the key; `--chat-session-id` arg, `$CHAT_SESSION_ID` env, or
+  None). Tolerant-on-read for legacy state (key absent OR value
+  None is treated as same-holder for engine + provider matches).
+- **`start_session --chat-session-id <value>` CLI argument.**
+  Defaults to `$CHAT_SESSION_ID` env when unset. Refines the H3
+  holder-identity predicate to the H4 triple composite. Refusal
+  stderr names both holders' chatSessionIds (or "no chat session ID
+  recorded" for legacy).
+- **`start_session` TTY-interactive takeover prompt (Q3).** When
+  stdin AND stderr are both TTYs, a chatSessionId-only mismatch
+  surfaces a 3-line menu (Take Over / Open in Read-Only Mode /
+  Cancel) on stderr instead of refusing outright. Engine+provider
+  mismatches stay on the non-interactive refusal path.
+  - New exit code `EXIT_LOCK_CONTENTION = 5` (lifecycle lock
+    contention; 30s default poll).
+  - New exit code `EXIT_READ_ONLY = 6` (operator chose Read-Only
+    Mode at the TTY prompt).
+- **`ai_router.new_chat_id` CLI (Q1 fallback).** Mints a UUID v4
+  per chat for orchestrators with no native session-id surface
+  (Codex CLI, Gemini Code Assist, GitHub Copilot, manual Lightweight
+  tier). Plain mode prints the UUID; `--export` emits a shell-eval-
+  able line; `--shell bash|powershell|fish` selects syntax (default:
+  detect via `$SHELL` first, then platform fallback). Idempotent
+  within a shell session: existing non-empty `$CHAT_SESSION_ID`
+  short-circuits the mint.
+- **Per-set lifecycle lock (Q5).** `close_lock.py` renamed
+  `.close_session.lock` → `.lifecycle.lock`; both `start_session`
+  and `close_session` dual-acquire it (legacy `.close_session.lock`
+  alias survives one release on read). `start_session` polls 30s
+  before exiting `EXIT_LOCK_CONTENTION = 5`; `close_session` keeps
+  its existing immediate exit-3 contract on contention.
+- **`closeout_succeeded` event payload extension (Q4).** Now carries
+  `chatSessionId`, `engine`, `provider`, `model` snapshotted from
+  the orchestrator block BEFORE block-clear. Legacy state files
+  without a block degrade gracefully by omitting the four identity
+  fields rather than emitting empty strings.
+
+### Changed
+
+- **Holder-identity equality** is now the
+  `engine + provider + chatSessionId` triple composite. Two chats
+  with the same engine + provider but different chatSessionIds are
+  now recognized as different holders (they would have silently
+  collapsed onto a single holder under the Set 033 base composite).
+- **`start_session` refusal message** names the existing
+  chatSessionId (or "no chat session ID recorded" for legacy) and
+  the two release paths.
+- **Force-override audit log** carries both holders' chatSessionIds
+  (or sentinels for legacy).
+
+### Migration
+
+- **Pre-0.7.0 state files** (no `chatSessionId` key in the
+  orchestrator block) are tolerated on read. The first new write
+  from any caller populates the field strictly. Legacy data is
+  also tolerated when the field is present but value is `null`
+  (Set 036+ writer's no-ID-at-write-time shape).
+- **Lock-file path migration.** `.lifecycle.lock` is the new name;
+  `.close_session.lock` survives as a read-only alias for one
+  release window (`LEGACY_LOCK_FILENAME` in `close_lock.py`).
+  External scripts that monitored the old lock filename should be
+  updated to consult either name. Schedule for alias retirement
+  TBD in a follow-on patch.
+
+### Release notes
+
+- **No breaking changes** to consumers that don't read the
+  `orchestrator.chatSessionId` field. The field is additive; the
+  tolerant-on-read contract preserves Set 033 behavior for state
+  files written before 0.7.0.
+- **Schema version unchanged** (still v3). The `chatSessionId`
+  nests under the existing `orchestrator` block; no top-level
+  structural change.
+
 ## [0.6.0] — 2026-05-21 (Set 033 — orchestrator check-out / check-in)
 
 Ships the writer side of the check-out / check-in coordination

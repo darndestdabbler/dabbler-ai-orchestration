@@ -39,14 +39,31 @@ is a required duplicate — `vsce package` expects the file alongside
 
 ## Extension versioning
 
-- Current: **v0.19.0** (Set 034 — Session Set Explorer honesty pass;
-  per-row orchestrator-tracking accordion + ActionRegistry
-  orchestrator group RETIRED from the UI surface, replaced by a
-  bold color-coded progress-fraction list-icon and a cursor-anchored
-  popup right-click menu; bucket-level collapse remains as the sole
-  expand/collapse affordance; the cascading-checkout preview is
-  saved as an artifact for Set 036+ reactivation). No companion
-  PyPI release this set. The version walk:
+- Current: **v0.20.0** (Set 036 — chatSessionId identity refinement
+  + MVVM watcher-scope discipline; H4 holder-identity composite
+  refined from `engine + provider` to
+  `engine + provider + chatSessionId` so two distinct chats on the
+  same engine are recognized as different holders; new
+  `new_chat_id` CLI workflow for orchestrators without native
+  per-chat metadata; takeover modal in IDE / TTY prompt in
+  terminal for chatSessionId-only mismatches; per-set lifecycle
+  lock (`.lifecycle.lock`) serializes start/close; Codex config-
+  toml watcher RETIRED entirely (D1 watcher-scope discipline);
+  `signalKind` enum + clock-overlay + multi-branch tooltip
+  variants RETIRED; orphan source from Set 034's per-row accordion
+  retirement DELETED (`OrchestratorAccordion.ts` +
+  `detectOrchestrators.ts` + media/orchestrator-indicator/);
+  watcher-inventory convention test enforces D1 at code-review
+  time). Companion PyPI release: `dabbler-ai-router` 0.7.0. The
+  version walk:
+  - **0.19.0** (Set 034) — Session Set Explorer honesty pass;
+    per-row orchestrator-tracking accordion + ActionRegistry
+    orchestrator group RETIRED from the UI surface, replaced by a
+    bold color-coded progress-fraction list-icon and a cursor-
+    anchored popup right-click menu; bucket-level collapse remains
+    as the sole expand/collapse affordance; the cascading-checkout
+    preview is saved as an artifact for Set 036+ reactivation. No
+    companion PyPI release this set.
   - **0.18.1** (Set 035) — state-file sole truth for cancellation /
     restoration extended from the Set 033 H2 verdict (orchestrator
     block) to the cancellation lifecycle. See below for the prior

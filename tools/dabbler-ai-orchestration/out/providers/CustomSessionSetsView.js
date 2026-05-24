@@ -137,14 +137,19 @@ function descriptionFor(set) {
 // Set 034: right-aligned bold colored progress fraction now lives in
 // its own list-icon column. Compute once here instead of embedding in
 // the description string.
+//
+// Set 036: a session set without a known totalSessions count (spec.md
+// hasn't been written yet, or has been written but doesn't enumerate
+// sessions — see session-set 046 for the canonical example) gets a
+// "?" denominator instead of an empty fraction. The operator's
+// directive was that every row in the Session Set Explorer must carry
+// a fraction so a not-yet-spec'd set doesn't render visually identical
+// to a malformed row.
 function fractionFor(set) {
     if (set.totalSessions && set.totalSessions > 0) {
         return `${set.sessionsCompleted}/${set.totalSessions}`;
     }
-    if (set.sessionsCompleted > 0) {
-        return `${set.sessionsCompleted}`;
-    }
-    return "";
+    return `${set.sessionsCompleted}/?`;
 }
 class CustomSessionSetsView {
     constructor(context, scanState) {

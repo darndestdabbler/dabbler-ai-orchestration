@@ -1,0 +1,16 @@
+{
+  "content": "Issue \u00e2\u2020\u2019 Minor\n- **Location**: `docs/session-sets/036-.../change-log.md`, Session 7 release process.\n- **Fix**: The Session 7 summary correctly identifies that the extension version is `0.20.0`, correcting the original plan. However, the release process does not explicitly confirm that documents updated in prior sessions, like `docs/cross-repo-checkout-notice.md` from Session 5, were re-validated against this final version number. Add a step to the release session checklist to verify all documents that cite version numbers reflect the final versions being shipped. Confirm `docs/cross-repo-checkout-notice.md` references extension version `0.20.0`.\n\n---\n\nThe artifacts are otherwise exemplary and meet all specified criteria. With the above process refinement, the work is VERIFIED.",
+  "model_name": "gemini-pro",
+  "model_id": "gemini-2.5-pro",
+  "tier": 2,
+  "input_tokens": 15579,
+  "output_tokens": 183,
+  "cost_usd": 0.021303750000000003,
+  "total_cost_usd": 0.021303750000000003,
+  "complexity_score": 61,
+  "escalated": false,
+  "escalation_history": [],
+  "elapsed_seconds": 31.048110246658325,
+  "truncated": false,
+  "verification": null
+}

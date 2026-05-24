@@ -35,10 +35,10 @@
     {
       "number": 7,
       "title": "Tests + change-log + dual-registry release",
-      "status": "not-started"
+      "status": "in-progress"
     }
   ],
-  "currentSession": null,
+  "currentSession": 7,
   "totalSessions": 7,
   "completedSessions": [
     1,
@@ -50,8 +50,16 @@
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-23T20:06:40.674841-04:00",
+  "startedAt": "2026-05-24T04:43:45.627129-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "unknown",
+    "chatSessionId": null,
+    "checkedOutAt": "2026-05-24T04:43:45.627129-04:00",
+    "lastActivityAt": "2026-05-24T04:43:45.627129-04:00"
+  }
 }

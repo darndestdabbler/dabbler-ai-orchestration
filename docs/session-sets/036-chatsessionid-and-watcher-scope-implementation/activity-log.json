@@ -533,6 +533,68 @@
           "round": "A"
         }
       ]
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 1,
+      "stepKey": "session-007/test-sweep-green",
+      "dateTime": "2026-05-24T04:50:00-04:00",
+      "description": "Full test sweep: (a) python -m pytest 693 passed + 1 skipped (no regression vs Session 4 baseline). (b) tools/dabbler-ai-orchestration npx tsc --noEmit clean. (c) tools/dabbler-ai-orchestration npm run test:unit 531 passing + same 2 pre-existing failures unchanged through the set (configEditor-foundation panel lifecycle + notificationsSection rendering scaffolding gaps, both predate Set 036). (d) tools/dabbler-ai-orchestration npm run test:playwright 24 passed + 2 skipped (same pre-existing test.skip notes on dabbler.releaseCheckOut + CheckoutPollService second-orchestrator-polls scenarios). Layer-3 includes all 9 new Set 036 scenarios (3 chatSessionId-takeover + 3 chatSessionId-missing-tolerance + 3 new-chat-id-cli-flow) plus Set 035 cancellation-state-file 3 scenarios. All four test layers green.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 2,
+      "stepKey": "session-007/change-log-generated",
+      "dateTime": "2026-05-24T05:00:00-04:00",
+      "description": "Aggregated docs/session-sets/036-.../change-log.md from all 7 sessions. Format mirrors Set 033's change-log.md: header (status, created, cost, NTE, forecast vs actual), Context, per-session sections (Shipped + Verification), What ships across the framework, Risks closed, Follow-ups out of scope. Cumulative cost line cites $3.4106 through S6 Round A. Notable: cost materially over forecast band ($0.33-$1.05) — $3.41 actual through S6 — due to (a) the verifier surfacing real Major-class defects across S1/S2/S4 (each demanding a Round B), (b) the gpt-5-4 rate-limit cascade on S5 forcing a $1.25 opus fallback. NTE ceiling held ($5).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 3,
+      "stepKey": "session-007/version-bumps-applied",
+      "dateTime": "2026-05-24T05:10:00-04:00",
+      "description": "Version bumps applied. (a) pyproject.toml 0.6.0 -> 0.7.0 (minor — feature release for chatSessionId field + new_chat_id CLI + per-set lifecycle lock + Q4 closeout payload extension). (b) ai_router/CHANGELOG.md 0.7.0 entry added with Added/Changed/Migration/Release-notes sections per Keep-a-Changelog format. (c) tools/dabbler-ai-orchestration/package.json 0.19.0 -> 0.20.0 (NOT 0.19.0 as spec said — Set 034 already shipped 0.19.0, documented in CHANGELOG.md + change-log.md). (d) tools/dabbler-ai-orchestration/CHANGELOG.md 0.20.0 entry added with Added/Changed/Removed/Migration/Internal sections. (e) CLAUDE.md Extension versioning walk extended: Current bumped to v0.20.0 with full Set 036 summary; 0.19.0 (Set 034) and 0.18.1 (Set 035) preserved in the walk. No LICENSE sync needed (no license-text changes).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 5,
+      "stepKey": "session-007/in-flight-fraction-column-fix",
+      "dateTime": "2026-05-24T05:35:00-04:00",
+      "description": "In-flight fix per [[feedback_dont_hide_behind_out_of_scope]] — operator directive surfaced during the release-gate AskUserQuestion exchange. CustomSessionSetsView.fractionFor() now returns `${set.sessionsCompleted}/?` when totalSessions is null/0 (previously returned the bare count or an empty string). Triggered by the operator noticing Set 046 (which has totalSessions: null in its session-state.json because the spec.md exists but doesn't yet enumerate sessions) rendering with no fraction in the Session Set Explorer, making it visually identical to a malformed row. Two-line code change in src/providers/CustomSessionSetsView.ts (the middle 'sessionsCompleted > 0 → bare count' branch dropped in favor of a unified always-show-denominator policy). Comment added explaining the rationale + linking to Set 046 as the canonical example. Rebuild via npm run compile (esbuild → dist/extension.js) + npx tsc --outDir out (TypeScript → out/) + npx tsc --noEmit (type-check clean). Layer-2 Mocha sweep re-run: 531 passing + same 2 pre-existing failures unchanged. CHANGELOG.md 0.20.0 Changed section updated to document the fix. change-log.md S7 section updated with a 'Shipped (in-flight UI fix)' bullet. No new tests added (fractionFor is not exported; Layer-3 rendering is already pinned by the session-sets-tree.spec.ts scenarios that pass through after the rebuild).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 4,
+      "stepKey": "session-007/round-a-verification",
+      "dateTime": "2026-05-24T05:20:00-04:00",
+      "description": "Round A verification routed via task_type='verification' (tier-routed, NOT session-verification's gpt-5-4 pin) per the S5+S6 precedent. Router selected gemini-pro (complexity_hint=55, tier 2). Verdict: VERIFIED with one Minor (real). Bundle: change-log.md (new, 305 lines) + diffs of pyproject.toml + ai_router/CHANGELOG.md + tools/.../package.json + tools/.../CHANGELOG.md + CLAUDE.md. Minor: docs/cross-repo-checkout-notice.md (updated in S5) cited the extension version as 0.19.0 in two places (line 49 prose + line 63 H3 header); S7's package.json bump landed on 0.20.0 (Set 034 already shipped 0.19.0), so the notice's pre-release cite was stale. Fixed in-flight per [[feedback_dont_hide_behind_out_of_scope]]: replace_all on the two occurrences of '0.19.0' with '0.20.0'. Cost: $0.041637 ($0.020334 first call + $0.021304 successful call — first call hit a Windows cp1252 UnicodeDecodeError on the git diff subprocess for the CHANGELOGs containing the → arrow + the dump_path's colon-in-label collision; script fixes applied: explicit encoding='utf-8' + errors='replace' on _git_diff, ASCII-safe stdout encoding for verifier prose, round-letter-only filename instead of label-as-filename). The first call's verdict was a bogus 'Blocker — extension CHANGELOG diff is None' (caused by the corrupted bundle, not by missing content). Round B not warranted (Minor addressed in-flight; no Major or Blocker after script fixes).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "taskType": "verification",
+          "model": "gemini-pro",
+          "cost_usd": 0.020334,
+          "input_tokens": 13595,
+          "output_tokens": 334,
+          "round": "A-bogus-from-script-bug"
+        },
+        {
+          "taskType": "verification",
+          "model": "gemini-pro",
+          "cost_usd": 0.021304,
+          "input_tokens": 15579,
+          "output_tokens": 183,
+          "round": "A"
+        }
+      ]
     }
   ]
 }

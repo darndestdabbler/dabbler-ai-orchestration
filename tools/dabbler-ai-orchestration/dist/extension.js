@@ -15894,10 +15894,7 @@ function fractionFor(set) {
   if (set.totalSessions && set.totalSessions > 0) {
     return `${set.sessionsCompleted}/${set.totalSessions}`;
   }
-  if (set.sessionsCompleted > 0) {
-    return `${set.sessionsCompleted}`;
-  }
-  return "";
+  return `${set.sessionsCompleted}/?`;
 }
 var CustomSessionSetsView = class _CustomSessionSetsView {
   constructor(context, scanState) {

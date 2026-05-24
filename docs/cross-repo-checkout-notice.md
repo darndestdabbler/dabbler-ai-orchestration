@@ -46,7 +46,7 @@ with both holders' full composites.
 
 Ships in `dabbler-ai-router` `0.7.0` (PyPI) and the
 `DarndestDabbler.dabbler-ai-orchestration` VS Code Marketplace
-extension `0.19.0` (Set 036).
+extension `0.20.0` (Set 036).
 
 ---
 
@@ -60,7 +60,7 @@ extension `0.19.0` (Set 036).
 ---
 
 ### Orchestrator check-out / check-in (dabbler-ai-router 0.7.0 +
-### dabbler-ai-orchestration 0.19.0)
+### dabbler-ai-orchestration 0.20.0)
 
 The orchestration framework treats `session-state.json`'s
 `orchestrator` block as a check-out record. Two invariants apply:

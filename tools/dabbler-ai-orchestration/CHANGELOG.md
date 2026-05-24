@@ -5,6 +5,133 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-05-24 (Set 036 — chatSessionId identity refinement + watcher-scope discipline)
+
+Ships the user-facing surface for the chatSessionId-refined
+holder-identity composite (`engine + provider + chatSessionId`).
+Adds a three-button takeover modal (Take Over / Open in Read-Only
+Mode / Cancel) for chatSessionId-only mismatches that fire from the
+manual `Check Out As…` quickpick or from the auto-conflict-record
+polling service. Retires the Codex config-toml watcher and the
+`signalKind`-driven gauge variants per the D1 watcher-scope
+discipline locked in the cross-provider audit. Adds a watcher-
+inventory convention test (Q7) that enforces D1 at code-review
+time. Cleans up the orphan source from Set 034's render-surface
+retirement (per-row accordion + empty-state CTA +
+detectOrchestrators). Companion `dabbler-ai-router` PyPI release:
+`0.7.0`.
+
+### Added
+
+- **chatSessionId takeover modal** (`chatSessionMismatchModal.ts`)
+  — three buttons (Take Over / Open in Read-Only Mode / Cancel)
+  via `showInformationMessage({modal: true})`. Surfaces from
+  CheckoutPollService when a conflict record's chatSessionIds
+  differ on the same engine+provider, and from the manual
+  `Check Out As…` command via
+  `maybeShowChatSessionMismatchOnManualCheckout()`. Engine+provider
+  mismatches stay on the legacy non-modal flow.
+- **ReadOnlyIntentService** (`ReadOnlyIntentService.ts`) — in-memory
+  map of session-set paths the operator picked Read-Only on. Shared
+  across modal + checkOutOrchestrator + future surfaces. Transient
+  by design (clears on extension-host restart); no persistence per
+  the audit's Q6 REJECTED verdict. EventEmitter fires on add/clear
+  so future UI subscribers can observe state.
+- **new_chat_id workflow toast** (`newChatIdWorkflowToast.ts`) —
+  one-time-per-(workspace, orchestrator) info toast surfaced by
+  the Gemini + Copilot install-shim commands. Three clipboard-copy
+  actions (bash / PowerShell / fish) with current-shell-eval
+  patterns that persist `$CHAT_SESSION_ID` in the operator's
+  active shell. 'Don't show again' suppression via workspaceState.
+- **Watcher-inventory convention test** (`watcherInventory.test.ts`)
+  — Q7 enforcement of D1 watcher-scope discipline. Hand-maintained
+  `WATCHER_ALLOWLIST` of `{file, line, target, purpose}` tuples.
+  Fails new `fs.watch` / `createFileSystemWatcher` callsites
+  without an allowlist entry.
+
+### Changed
+
+- **`CheckoutPollService` extended** with chatSessionId-aware
+  routing. `ConflictRecord` schema (still v1, additive) gains
+  optional `heldByChatSessionId` + `wouldBeHolderChatSessionId`;
+  new `isChatSessionMismatch` predicate; new
+  `handleChatSessionMismatch` branch surfacing the modal in place
+  of the legacy poll/force/dismiss prompt. `pollKey()` includes
+  the chatSessionId (with sentinel for null) so two distinct
+  chats produce distinct keys. `isSlotFreeForHolder()` accepts an
+  optional `wouldBeChatSessionId` and applies the H3 tolerant-on-
+  read rule.
+- **`dabbler.checkOutOrchestrator` (manual command)** routes
+  chatSessionId mismatches to the same modal helper before reaching
+  the existing force-override confirmation. Take Over → force
+  dispatch; Read-Only → set intent + abort; Cancel → abort.
+  Read-only intent commit is gated on a successful exit-0 dispatch
+  (no silent loss of protection on cancelled prompts).
+- **Claude Code SessionStart invoker**
+  (`claude-session-start-invoker.js`) extracts `session_id` from
+  the hook payload and forwards as `--chat-session-id` to
+  `start_session`. `preserveExistingClaude()` gates model/effort
+  preservation on the full H4 triple (engine + provider +
+  chatSessionId).
+- **Session Set Explorer fraction column always populated**
+  (`CustomSessionSetsView.fractionFor`). A session set without a
+  known `totalSessions` count (spec.md hasn't been written yet, or
+  is written but doesn't enumerate sessions) now renders as
+  `N/?` instead of an empty fraction. The `?` denominator signals
+  "not yet spec'd" without leaving the row visually identical to a
+  malformed entry. Operator directive shipped in-flight during the
+  S7 release pass.
+
+### Removed
+
+- **Codex config-toml watcher** (`src/codex/configWatcher.ts` and
+  the entire `src/codex/` directory) — the most prominent D1
+  violator. Codex CLI joins Gemini Code Assist and GitHub Copilot
+  as manual-only orchestrators; operators claim via the universal
+  `Check Out As…` quickpick.
+- **`signalKind` enum + UI variants** — the top-level + nested
+  `effort.signalKind` + `effort.observedAt` fields on
+  `OrchestratorMarker`; the clock-overlay span (`⏱`) for
+  `last-observed`; the `(configured default)` qualifier on the
+  model line; the multi-branch `modelTooltip` / `effortTooltip`
+  switches; the `.signal-current` / `.signal-manual` /
+  `.signal-last-observed` / `.signal-configured-default` /
+  `.clock-overlay` CSS rules; the `data-signal=` SVG attribute.
+- **Orphan source from Set 034's runtime retirement** —
+  `src/providers/OrchestratorAccordion.ts` (496 LOC),
+  `src/providers/detectOrchestrators.ts` (137 LOC), and
+  `src/test/suite/detectOrchestrators.test.ts` (8 tests) DELETED.
+  Set 034 already shipped `accordionHtml: null` on every row at
+  the render surface; the source survived as "possible future
+  re-enable" deadweight. The H2 writer invariant + Q5 lifecycle
+  lock together make the empty-state's predicate
+  (in-progress + orchestrator block null) unreachable in any
+  properly-operated workspace; a future re-enable fetches the
+  implementation from git history at v0.18.x. Same YAGNI pattern
+  as the Codex config-toml watcher retirement.
+- **`media/orchestrator-indicator/`** directory DELETED.
+  indicator.css was orphan since Set 029 S4 retired
+  `orchestratorIndicatorProvider`.
+- **`media/session-sets-tree/tree.css`** trimmed 458 → 282 lines
+  (full accordion-body section, gauge SVG rules, tier/effort
+  classes, stale-stripe overlay, model-section styles).
+
+### Migration
+
+- **No operator-visible breaking changes** to the Session Set
+  Explorer UI. The retired surfaces were already non-functional in
+  v0.19.0 (Set 034).
+- **No breaking changes** to consumers of the orchestrator-writer
+  protocol. The Set 033 H4 base composite is preserved on
+  tolerant-on-read; the chatSessionId field is additive.
+
+### Internal
+
+- Reorganized `Recommendation` interface from OrchestratorAccordion.ts
+  to `inProgressSetsService.ts` (its only non-test consumer).
+- Layer-3 Playwright suite: 4 pre-existing failures all addressed
+  (21/2/4 baseline → 24/2/0 post-cleanup).
+
 ## [0.19.0] — 2026-05-21 (Set 034 — Session Set Explorer honesty pass)
 
 Retires the per-row orchestrator-tracking accordion (gauges + model

@@ -241,6 +241,11 @@
         "command": "dabbler.openOrchestratorWriterLog",
         "title": "Open Orchestrator Writer Log",
         "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.regenerateNarrationTemplates",
+        "title": "Regenerate Narration Templates",
+        "category": "Dabbler"
       }
     ],
     "menus": {

@@ -23,8 +23,20 @@ def _write_claude_jsonl(claude_root: Path, slug: str, conv_id: str, ts: datetime
     workspace = claude_root / slug
     workspace.mkdir(parents=True, exist_ok=True)
     jsonl = workspace / f"{conv_id}.jsonl"
+    # Set 045 Session 4: ``read_claude_session_events`` only emits per-
+    # event ``HarvestRecord`` instances for records carrying
+    # ``type ∈ {user, assistant}``. The S3 fixture's minimal shape (no
+    # ``type`` field) survived the old fallback path but is now correctly
+    # treated as noise. Write a realistic ``type=user`` first record so
+    # the bound-native session_start surfaces in the harvest stream.
     jsonl.write_text(
-        json.dumps({"timestamp": ts.isoformat(), "cwd": cwd}) + "\n",
+        json.dumps({
+            "type": "user",
+            "timestamp": ts.isoformat(),
+            "cwd": cwd,
+            "sessionId": conv_id,
+            "message": {"role": "user", "content": [{"type": "text", "text": "test"}]},
+        }) + "\n",
         encoding="utf-8",
     )
 

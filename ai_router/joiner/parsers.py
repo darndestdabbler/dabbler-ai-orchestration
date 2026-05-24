@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from ai_router.joiner.schema import HarvestRecord, canonicalize_cwd, parse_iso
+from ai_router.narration import detect_marker
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +132,281 @@ def _read_claude_jsonl(jsonl_path: Path, slug_cwd: str) -> Optional[NativeSessio
         source_file=str(jsonl_path),
         cwd_source=cwd_source,
     )
+
+
+_CLAUDE_NOISE_TYPES = frozenset(
+    {
+        "queue-operation",
+        "ai-title",
+        "last-prompt",
+        "file-history-snapshot",
+        "attachment",
+    }
+)
+
+
+def _summarize_claude_tool_args(args: object) -> Optional[dict]:
+    """Reduce a Claude ``tool_use.input`` payload to a redacted summary.
+
+    Mirrors the ``_summarize_tool_args`` posture for Copilot
+    (joiner-spec.md §7): keep file paths + arity, drop content.
+    Returns ``None`` when ``args`` is not a dict.
+    """
+    if not isinstance(args, dict):
+        return None
+    summary: dict[str, object] = {}
+    for key in ("file_path", "path", "file", "filename"):
+        if key in args and isinstance(args[key], str):
+            summary["file"] = args[key]
+            break
+    for key in ("line_count", "lines", "count", "limit"):
+        if key in args and isinstance(args[key], (int, float)):
+            summary["lines"] = int(args[key])
+            break
+    if "command" in args and isinstance(args["command"], str):
+        # Preserve command verb only; argv body is potentially sensitive.
+        first_word = args["command"].strip().split(None, 1)[0] if args["command"].strip() else ""
+        if first_word:
+            summary["command_head"] = first_word
+    if "args" in args and isinstance(args["args"], (list, tuple)):
+        summary["arg_count"] = len(args["args"])
+    if summary:
+        return summary
+    return {"arg_keys": sorted(k for k in args.keys() if isinstance(k, str))}
+
+
+def _claude_usage_tokens(usage: object) -> tuple[Optional[int], Optional[int]]:
+    """Return (tokens_in, tokens_out) from a Claude assistant ``usage`` block.
+
+    Claude reports cache reads + cache creation + uncached input as
+    separate counters; consumers comparing against Copilot's flat
+    ``inputTokens`` get the closest analog by summing all three.
+    """
+    if not isinstance(usage, dict):
+        return None, None
+    input_total = 0
+    seen_in = False
+    for key in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"):
+        v = usage.get(key)
+        if isinstance(v, int):
+            input_total += v
+            seen_in = True
+    out = usage.get("output_tokens")
+    tokens_out = int(out) if isinstance(out, int) else None
+    return (input_total if seen_in else None, tokens_out)
+
+
+def read_claude_session_events(
+    jsonl_path: Path,
+    *,
+    session_cwd_canonical: Optional[str] = None,
+    fallback_conv_id: Optional[str] = None,
+) -> Iterable[HarvestRecord]:
+    """Yield canonical ``HarvestRecord`` objects per Claude JSONL event.
+
+    Set 045 / Session 4 deliverable. Replaces the placeholder
+    ``session_start``-only projection from S3's
+    ``_native_events_for`` Claude fallback. Maps Claude JSONL
+    record ``type`` values to the canonical ``event_type`` enum
+    (joiner-spec.md §5.1):
+
+    - First ``user`` or ``assistant`` record → one ``session_start``.
+    - Each ``assistant`` record → one ``turn`` (timestamped from the
+      record's ``timestamp`` field).
+    - Each ``tool_use`` block in an assistant's ``message.content``
+      → one ``tool_call`` (redacted via
+      :func:`_summarize_claude_tool_args`, joiner-spec.md §7).
+    - An assistant record carrying ``message.usage`` → one
+      ``usage`` (tokens_in summed across uncached input + cache
+      creation + cache read; tokens_out from ``output_tokens``).
+    - Any ``text`` content block matching the
+      ``[DABBLER-NARRATION v1 ...]`` regex
+      (:func:`ai_router.narration.detect_marker`) → one ``marker``.
+      Marker records carry ``source="narration"`` and back-pointer
+      to the JSONL line for audit.
+
+    Noise types (``queue-operation``, ``ai-title``, ``last-prompt``,
+    ``file-history-snapshot``, ``attachment``) are skipped.
+
+    Sticky context (cwd, conv_id, model, provider) is established
+    from the first record carrying each field and threaded onto
+    subsequent events. Provider defaults to ``"anthropic"`` once a
+    Claude assistant record with a ``message.model`` is seen.
+
+    Tolerant of malformed lines: a bad JSONL line is skipped, never
+    aborts the iterator. Missing files yield nothing.
+    """
+    if not jsonl_path.exists():
+        return
+    conv_id_from_file = jsonl_path.stem
+    sticky_conv_id: Optional[str] = fallback_conv_id or conv_id_from_file
+    sticky_cwd: Optional[str] = session_cwd_canonical
+    sticky_model: Optional[str] = None
+    sticky_provider: Optional[str] = None
+    emitted_session_start = False
+    try:
+        with open(jsonl_path, "r", encoding="utf-8", errors="replace") as f:
+            for line_idx, line in enumerate(f, 1):
+                if not line.strip():
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                rec_type = rec.get("type")
+                if rec_type in _CLAUDE_NOISE_TYPES:
+                    continue
+                if rec_type not in ("user", "assistant"):
+                    continue
+                ts_str = rec.get("timestamp")
+                if not ts_str:
+                    continue
+                try:
+                    ts = parse_iso(ts_str)
+                except ValueError:
+                    continue
+                # Sticky-context updates.
+                cwd_field = rec.get("cwd")
+                if cwd_field and not sticky_cwd:
+                    sticky_cwd = canonicalize_cwd(cwd_field)
+                conv_field = rec.get("sessionId")
+                if conv_field:
+                    sticky_conv_id = conv_field
+                message = rec.get("message") if isinstance(rec.get("message"), dict) else {}
+                model_field = message.get("model") if message else None
+                if model_field and not sticky_model:
+                    sticky_model = model_field
+                    if not sticky_provider:
+                        sticky_provider = "anthropic"
+                cwd_for_record = sticky_cwd or ""
+
+                if not emitted_session_start:
+                    yield HarvestRecord(
+                        ts=ts,
+                        event_type="session_start",
+                        source="claude-native",
+                        engine="claude",
+                        workspace_cwd=cwd_for_record,
+                        workspace_cwd_canonical=cwd_for_record,
+                        raw_ref={
+                            "file": str(jsonl_path),
+                            "line": line_idx,
+                            "type": rec_type,
+                        },
+                        provider=sticky_provider,
+                        model=sticky_model,
+                        conv_id=sticky_conv_id,
+                    )
+                    emitted_session_start = True
+
+                if rec_type != "assistant":
+                    # Marker detection on user-side content is out of
+                    # scope: per Set 044 narration-design.md §3.1 the
+                    # marker is emitted by the assistant, not the user.
+                    continue
+
+                content = message.get("content") if message else None
+                content_blocks = content if isinstance(content, list) else []
+
+                # 1) Marker events (scan text blocks first so a turn
+                #    that opens with the marker shows the marker
+                #    record before the turn record at the same ts).
+                for block_idx, block in enumerate(content_blocks):
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") != "text":
+                        continue
+                    text = block.get("text")
+                    if not isinstance(text, str):
+                        continue
+                    parsed = detect_marker(text)
+                    if parsed is None:
+                        continue
+                    yield HarvestRecord(
+                        ts=ts,
+                        event_type="marker",
+                        source="narration",
+                        engine="claude",
+                        workspace_cwd=cwd_for_record,
+                        workspace_cwd_canonical=cwd_for_record,
+                        raw_ref={
+                            "file": str(jsonl_path),
+                            "line": line_idx,
+                            "block": block_idx,
+                            "marker_raw": parsed.raw,
+                            "semantic_error": parsed.semantic_error,
+                            "incomplete": parsed.incomplete,
+                            "skipped": parsed.skipped,
+                        },
+                        provider=sticky_provider,
+                        model=sticky_model,
+                        conv_id=sticky_conv_id,
+                        set_slug=parsed.set_slug,
+                        session_number=parsed.session,
+                        effort=parsed.effort,
+                    )
+
+                # 2) Turn event (one per assistant record).
+                yield HarvestRecord(
+                    ts=ts,
+                    event_type="turn",
+                    source="claude-native",
+                    engine="claude",
+                    workspace_cwd=cwd_for_record,
+                    workspace_cwd_canonical=cwd_for_record,
+                    raw_ref={"file": str(jsonl_path), "line": line_idx, "type": "assistant"},
+                    provider=sticky_provider,
+                    model=sticky_model,
+                    conv_id=sticky_conv_id,
+                )
+
+                # 3) Tool-call events.
+                for block_idx, block in enumerate(content_blocks):
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") != "tool_use":
+                        continue
+                    yield HarvestRecord(
+                        ts=ts,
+                        event_type="tool_call",
+                        source="claude-native",
+                        engine="claude",
+                        workspace_cwd=cwd_for_record,
+                        workspace_cwd_canonical=cwd_for_record,
+                        raw_ref={
+                            "file": str(jsonl_path),
+                            "line": line_idx,
+                            "block": block_idx,
+                            "tool_use_id": block.get("id"),
+                        },
+                        provider=sticky_provider,
+                        model=sticky_model,
+                        conv_id=sticky_conv_id,
+                        tool=block.get("name"),
+                        tool_args_summary=_summarize_claude_tool_args(block.get("input")),
+                    )
+
+                # 4) Usage event.
+                usage = message.get("usage") if message else None
+                if usage is not None:
+                    tokens_in, tokens_out = _claude_usage_tokens(usage)
+                    if tokens_in is not None or tokens_out is not None:
+                        yield HarvestRecord(
+                            ts=ts,
+                            event_type="usage",
+                            source="claude-native",
+                            engine="claude",
+                            workspace_cwd=cwd_for_record,
+                            workspace_cwd_canonical=cwd_for_record,
+                            raw_ref={"file": str(jsonl_path), "line": line_idx, "type": "usage"},
+                            provider=sticky_provider,
+                            model=sticky_model,
+                            conv_id=sticky_conv_id,
+                            tokens_in=tokens_in,
+                            tokens_out=tokens_out,
+                        )
+    except OSError:
+        return
 
 
 # ---------------------------------------------------------------------------

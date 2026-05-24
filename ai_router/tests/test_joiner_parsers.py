@@ -12,6 +12,7 @@ import pytest
 
 from ai_router.joiner.parsers import (
     claude_slug_to_cwd,
+    read_claude_session_events,
     read_copilot_session_events,
     read_session_state,
     scan_claude_logs,
@@ -102,6 +103,220 @@ def test_scan_claude_logs_slug_fallback_when_no_cwd_field(tmp_path: Path):
     assert len(sessions) == 1
     assert sessions[0].cwd_source == "slug-fallback"
     assert sessions[0].cwd_canonical == "c:/users/foo"
+
+
+# ---------------------------------------------------------------------------
+# Claude per-event parser (Set 045 / Session 4).
+# ---------------------------------------------------------------------------
+
+
+def _claude_jsonl(records: list[dict]) -> str:
+    return "\n".join(json.dumps(r) for r in records) + "\n"
+
+
+def test_read_claude_session_events_emits_canonical_event_stream(tmp_path: Path):
+    """Claude per-event parser yields session_start / turn / tool_call / usage / marker."""
+    p = tmp_path / "claude.jsonl"
+    p.write_text(
+        _claude_jsonl([
+            # Noise — skipped.
+            {"type": "queue-operation", "timestamp": "2026-05-24T08:00:00.000Z", "sessionId": "conv-xyz"},
+            {"type": "ai-title", "aiTitle": "x", "sessionId": "conv-xyz"},
+            # First user record → session_start.
+            {
+                "type": "user",
+                "timestamp": "2026-05-24T08:00:01Z",
+                "cwd": "C:/Users/foo/project",
+                "sessionId": "conv-xyz",
+                "message": {"role": "user", "content": [{"type": "text", "text": "go"}]},
+            },
+            # Assistant turn with marker + tool_use + usage.
+            {
+                "type": "assistant",
+                "timestamp": "2026-05-24T08:00:05Z",
+                "cwd": "C:/Users/foo/project",
+                "sessionId": "conv-xyz",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-7",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "[DABBLER-NARRATION v1 phase=session-start set=045-log-harvest-implementation session=4 total=6 effort=high]\nStarting.",
+                        },
+                        {
+                            "type": "tool_use",
+                            "id": "toolu_1",
+                            "name": "Edit",
+                            "input": {
+                                "file_path": "src/foo.py",
+                                "old_string": "x",
+                                "new_string": "y",
+                            },
+                        },
+                    ],
+                    "usage": {
+                        "input_tokens": 100,
+                        "cache_creation_input_tokens": 500,
+                        "cache_read_input_tokens": 2000,
+                        "output_tokens": 200,
+                    },
+                },
+            },
+            # Second assistant turn — no marker, no tool, no usage block.
+            {
+                "type": "assistant",
+                "timestamp": "2026-05-24T08:00:10Z",
+                "cwd": "C:/Users/foo/project",
+                "sessionId": "conv-xyz",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-7",
+                    "content": [{"type": "thinking", "thinking": "deliberating"}],
+                },
+            },
+        ]),
+        encoding="utf-8",
+    )
+    records = list(read_claude_session_events(p))
+    types = [r.event_type for r in records]
+    # First record is session_start; then for assistant#1 the order is
+    # marker → turn → tool_call → usage; then assistant#2 yields a turn.
+    assert types == ["session_start", "marker", "turn", "tool_call", "usage", "turn"]
+    assert all(r.engine == "claude" for r in records)
+    # session_start carries claude-native; marker carries narration.
+    assert records[0].source == "claude-native"
+    assert records[1].source == "narration"
+    assert records[2].source == "claude-native"
+    # Sticky context.
+    assert all(r.workspace_cwd_canonical == "c:/users/foo/project" for r in records)
+    assert all(r.conv_id == "conv-xyz" for r in records)
+    # Provider defaults to anthropic once the model is seen.
+    assert records[1].model == "claude-opus-4-7"
+    assert records[1].provider == "anthropic"
+    # Marker fields parsed off the regex.
+    marker = records[1]
+    assert marker.set_slug == "045-log-harvest-implementation"
+    assert marker.session_number == 4
+    assert marker.effort == "high"
+    assert marker.raw_ref["marker_raw"].startswith("[DABBLER-NARRATION v1")
+    # Tool-call redaction: file path preserved, secrets dropped.
+    tool = records[3]
+    assert tool.tool == "Edit"
+    assert tool.tool_args_summary is not None
+    assert tool.tool_args_summary["file"] == "src/foo.py"
+    assert "old_string" not in (tool.tool_args_summary or {})
+    assert "new_string" not in (tool.tool_args_summary or {})
+    # Usage tokens sum input + cache reads + cache creation.
+    usage = records[4]
+    assert usage.tokens_in == 100 + 500 + 2000
+    assert usage.tokens_out == 200
+
+
+def test_read_claude_session_events_missing_file_returns_empty(tmp_path: Path):
+    assert list(read_claude_session_events(tmp_path / "nope.jsonl")) == []
+
+
+def test_read_claude_session_events_tolerates_malformed_lines(tmp_path: Path):
+    p = tmp_path / "claude.jsonl"
+    p.write_text(
+        "garbage\n"
+        + json.dumps({
+            "type": "assistant",
+            "timestamp": "2026-05-24T08:00:00Z",
+            "cwd": "C:/foo",
+            "sessionId": "abc",
+            "message": {"role": "assistant", "model": "claude-opus-4-7", "content": []},
+        }) + "\n"
+        + "more-garbage\n",
+        encoding="utf-8",
+    )
+    records = list(read_claude_session_events(p))
+    assert [r.event_type for r in records] == ["session_start", "turn"]
+    assert records[0].conv_id == "abc"
+
+
+def test_read_claude_session_events_skips_noise_only_file_with_no_user_or_assistant(tmp_path: Path):
+    p = tmp_path / "claude.jsonl"
+    p.write_text(
+        _claude_jsonl([
+            {"type": "queue-operation", "sessionId": "x", "timestamp": "2026-05-24T08:00:00Z"},
+            {"type": "file-history-snapshot"},
+            {"type": "ai-title", "aiTitle": "x", "sessionId": "x"},
+        ]),
+        encoding="utf-8",
+    )
+    assert list(read_claude_session_events(p)) == []
+
+
+def test_read_claude_session_events_emits_session_start_once(tmp_path: Path):
+    """Even when many assistant records precede other user records, session_start fires once."""
+    p = tmp_path / "claude.jsonl"
+    p.write_text(
+        _claude_jsonl([
+            {
+                "type": "assistant",
+                "timestamp": "2026-05-24T08:00:00Z",
+                "cwd": "C:/foo",
+                "sessionId": "s1",
+                "message": {"role": "assistant", "model": "m", "content": []},
+            },
+            {
+                "type": "user",
+                "timestamp": "2026-05-24T08:00:01Z",
+                "cwd": "C:/foo",
+                "sessionId": "s1",
+                "message": {"role": "user", "content": [{"type": "text", "text": "next"}]},
+            },
+            {
+                "type": "assistant",
+                "timestamp": "2026-05-24T08:00:02Z",
+                "cwd": "C:/foo",
+                "sessionId": "s1",
+                "message": {"role": "assistant", "model": "m", "content": []},
+            },
+        ]),
+        encoding="utf-8",
+    )
+    records = list(read_claude_session_events(p))
+    assert [r.event_type for r in records].count("session_start") == 1
+
+
+def test_read_claude_session_events_redaction_drops_bash_argv_body(tmp_path: Path):
+    """The Bash tool's command body MUST NOT leak; only the leading verb is kept."""
+    p = tmp_path / "claude.jsonl"
+    p.write_text(
+        _claude_jsonl([
+            {
+                "type": "assistant",
+                "timestamp": "2026-05-24T08:00:00Z",
+                "cwd": "C:/foo",
+                "sessionId": "s",
+                "message": {
+                    "role": "assistant",
+                    "model": "claude-opus-4-7",
+                    "content": [{
+                        "type": "tool_use",
+                        "id": "t1",
+                        "name": "Bash",
+                        "input": {
+                            "command": "curl -s https://secret.example/api?key=DO_NOT_LEAK",
+                            "description": "fetch",
+                        },
+                    }],
+                },
+            },
+        ]),
+        encoding="utf-8",
+    )
+    records = list(read_claude_session_events(p))
+    tool = next(r for r in records if r.event_type == "tool_call")
+    assert tool.tool == "Bash"
+    summary = tool.tool_args_summary or {}
+    assert summary.get("command_head") == "curl"
+    serialized = json.dumps(summary)
+    assert "DO_NOT_LEAK" not in serialized
+    assert "secret.example" not in serialized
 
 
 # ---------------------------------------------------------------------------

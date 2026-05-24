@@ -132,10 +132,10 @@ def _native_events_for(native) -> list["HarvestRecord"]:
 
     - **Copilot**: ``read_copilot_session_events`` (S3 hardened
       per-event parser) yields the canonical event stream.
-    - **Claude**: per-event parser is the S4 deliverable per
-      joiner-spec.md §8.1. Until S4 ships, emit a single
-      ``session_start`` projection derived from the
-      session-level scrape.
+    - **Claude**: ``read_claude_session_events`` (S4 hardened
+      per-event parser) yields the canonical event stream,
+      including any ``[DABBLER-NARRATION v1 ...]`` marker events
+      that match the narration-design.md §2.3 regex.
     - **Other engines**: emit only ``session_start`` (engine
       handler not yet implemented).
 
@@ -152,8 +152,16 @@ def _native_events_for(native) -> list["HarvestRecord"]:
                 fallback_conv_id=native.conv_id,
             )
         )
-    # Claude (and any future engine without a per-event parser yet)
-    # falls back to a single session_start projection.
+    if native.engine == "claude":
+        return list(
+            parsers.read_claude_session_events(
+                Path(native.source_file),
+                session_cwd_canonical=native.cwd_canonical,
+                fallback_conv_id=native.conv_id,
+            )
+        )
+    # Future engines without a per-event parser yet fall back to a
+    # single session_start projection.
     return [
         HarvestRecord(
             ts=native.first_event_ts,
@@ -224,14 +232,13 @@ def harvest(
     result is emitted as a ``launch`` record with ``binding_state
     ∈ {"bound", "unbound", "ambiguous"}``.
 
-    When ``binding_state == "bound"`` and a per-event parser is
-    available for the bound engine (Copilot in S3), the full
-    native event stream is emitted with the launch's
-    ``set_slug`` / ``session_number`` merged in — this is §4's
-    ``HarvestRecord.from_native(launch, native_evt)``. For
-    backends whose per-event parser has not shipped yet (Claude
-    in S3 — S4 deliverable), a single ``session_start`` record is
-    emitted with the launch context merged.
+    When ``binding_state == "bound"``, the bound engine's
+    per-event parser (Copilot in S3, Claude in S4) yields the full
+    native event stream and each event is emitted with the
+    launch's ``set_slug`` / ``session_number`` merged in — this is
+    §4's ``HarvestRecord.from_native(launch, native_evt)``.
+    Engines without a per-event parser yet fall back to a single
+    ``session_start`` record with the launch context merged.
 
     Native sessions that no launch claimed (free-running) are
     emitted as their own ``session_start`` records with no

@@ -57,6 +57,8 @@ export declare function attemptStartSession(h: FixtureHandle, sessionNumber: num
 }, opts?: {
     force?: boolean;
     homeOverride?: string;
+    chatSessionId?: string | null;
+    env?: Record<string, string>;
 }): StartSessionAttemptResult;
 /**
  * Set 033 Session 2 — seed the `orchestrator` block on a fixture's
@@ -78,6 +80,7 @@ export declare function seedOrchestratorBlock(h: FixtureHandle, overrides?: Part
     effort: string;
     checkedOutAt: string;
     lastActivityAt: string;
+    chatSessionId: string | null;
 }>): void;
 export declare function makeAdditionalSet(base: FixtureHandle, newSlug: string, newTotalSessions: number): FixtureHandle;
 /**

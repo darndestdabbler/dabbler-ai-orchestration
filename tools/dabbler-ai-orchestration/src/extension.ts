@@ -62,16 +62,15 @@ export function activate(context: vscode.ExtensionContext): void {
   scanState.setLoading();
 
   // Set 029 Session 4: replaced the native TreeView with a custom
-  // webview tree. CustomSessionSetsView owns rendering, the
-  // accordion-body for the resolved in-progress set's orchestrator
-  // gauges, the typed message protocol with monotonic version, and
-  // the QuickPick-based row-context menu (per S4 audit Q6 = a).
+  // webview tree. CustomSessionSetsView owns rendering, the typed
+  // message protocol with monotonic version, and the QuickPick-based
+  // row-context menu (per S4 audit Q6 = a). The per-row accordion-body
+  // was retired in Set 034 (accordionHtml ships as null on every row)
+  // and the source modules deleted in Set 036 Session 6.
   //
-  // Set 033 Session 2: MarkerWatchService retired (H2). Each
-  // in-progress row's accordion is computed from the orchestrator
-  // block on its own session-state.json — the workspace-level
-  // file-watcher below (which already watches session-state.json)
-  // covers every signal the view needs.
+  // Set 033 Session 2: MarkerWatchService retired (H2). The
+  // workspace-level file-watcher below (which already watches
+  // session-state.json) covers every signal the view needs.
   const provider = new CustomSessionSetsView(context, scanState);
   context.subscriptions.push({ dispose: () => provider.dispose() });
   context.subscriptions.push(
@@ -237,11 +236,10 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   // Set 029 Session 4: the dedicated dabblerOrchestratorIndicator view
-  // is retired in v0.16.0. The orchestrator gauges live in the
-  // CustomSessionSetsView accordion-body for the resolved in-progress
-  // set (registered above). Hook installer + manual-override stub +
-  // writer-log opener remain available as standalone commands; the
-  // accordion-body buttons dispatch them via postMessage.
+  // is retired in v0.16.0. Set 034 then retired the per-row gauges in
+  // CustomSessionSetsView; Set 036 Session 6 deleted the source.
+  // Hook installer + manual-override stub + writer-log opener remain
+  // as standalone Command Palette / right-click context-menu actions.
   //
   // Set 029 Session 5: full multi-provider surface — Gemini + Copilot
   // manual-only shim commands that delegate to the universal

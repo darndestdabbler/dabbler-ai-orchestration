@@ -23,7 +23,21 @@ import * as fs from "fs";
 import * as path from "path";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { SessionSet } from "../types";
-import { Recommendation } from "./OrchestratorAccordion";
+
+// Recommendation shape parsed from ai-assignment.md. Set 036 Session 6:
+// moved here from the retired OrchestratorAccordion.ts (whose gauge /
+// accordion / mismatch renderers all became orphan code when Set 034
+// retired the per-row accordion). The Suggested-row mismatch logic
+// went with the accordion; the parser stays because the data is still
+// surfaced through the start-command copy + future plan-import flows.
+export interface Recommendation {
+  rawText: string;
+  providerName: string;
+  modelName: string;
+  effort: string;
+  sessionLabel: string;
+  setName: string;
+}
 
 // Return the array of session sets currently in the in-progress
 // bucket, sorted by `startedAt` ascending (the older the in-flight

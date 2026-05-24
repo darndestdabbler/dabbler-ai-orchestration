@@ -1,11 +1,15 @@
 "use strict";
 // Set 033 Session 5 — check-out conflict polling service.
 //
-// When the Claude SessionStart invoker or the Codex config-toml watcher
-// invokes `python -m ai_router.start_session` and gets EXIT_CHECKOUT_CONFLICT
+// When the Claude SessionStart invoker invokes
+// `python -m ai_router.start_session` and gets EXIT_CHECKOUT_CONFLICT
 // (4 — H3 hard-coordination refusal because a different engine+provider
-// already holds the slot), they write a structured conflict record to
-// `~/.dabbler/checkout-conflicts/<timestamp>.json`. This service:
+// already holds the slot), it writes a structured conflict record to
+// `~/.dabbler/checkout-conflicts/<timestamp>.json`. (Set 036 Session 3
+// retired the Codex config-toml watcher — formerly a second producer
+// of these records — under the D1 watcher-scope discipline; the
+// service still parses `source: "codex-watcher"` on read for any
+// pre-Set-036 record an operator may have on disk.) This service:
 //
 //   1. Consumes those records via `fs.watch` on the directory (plus an
 //      initial scan at activation so records written while the extension
@@ -65,6 +69,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CheckoutPollService = exports.POLL_PROMPT_DISMISS = exports.POLL_PROMPT_FORCE = exports.POLL_PROMPT_POLL = exports.DEFAULT_TIMEOUT_MINUTES = exports.POLL_DEBOUNCE_MS = exports.WRITER_LOG_REL = exports.CONFLICT_DIR_REL = void 0;
 exports.conflictDirPath = conflictDirPath;
 exports.parseConflictRecord = parseConflictRecord;
+exports.isChatSessionMismatch = isChatSessionMismatch;
 exports.isSlotFreeForHolder = isSlotFreeForHolder;
 exports.pollKey = pollKey;
 const vscode = __importStar(require("vscode"));
@@ -72,6 +77,8 @@ const cp = __importStar(require("child_process"));
 const fs = __importStar(require("fs"));
 const os = __importStar(require("os"));
 const path = __importStar(require("path"));
+const chatSessionMismatchModal_1 = require("./chatSessionMismatchModal");
+const ReadOnlyIntentService_1 = require("./ReadOnlyIntentService");
 exports.CONFLICT_DIR_REL = path.join(".dabbler", "checkout-conflicts");
 exports.WRITER_LOG_REL = path.join(".dabbler", "orchestrator-writer.log");
 exports.POLL_DEBOUNCE_MS = 5000;
@@ -123,31 +130,93 @@ function parseConflictRecord(raw) {
         heldByEngine: p.heldByEngine,
         heldByProvider: p.heldByProvider,
         heldByModel: typeof p.heldByModel === "string" ? p.heldByModel : null,
+        heldByChatSessionId: typeof p.heldByChatSessionId === "string" ? p.heldByChatSessionId : null,
         checkedOutAt: typeof p.checkedOutAt === "string" ? p.checkedOutAt : null,
         wouldBeHolderEngine: p.wouldBeHolderEngine,
         wouldBeHolderProvider: p.wouldBeHolderProvider,
         wouldBeHolderModel: typeof p.wouldBeHolderModel === "string" ? p.wouldBeHolderModel : null,
         wouldBeHolderEffort: typeof p.wouldBeHolderEffort === "string" ? p.wouldBeHolderEffort : null,
+        wouldBeHolderChatSessionId: typeof p.wouldBeHolderChatSessionId === "string" ? p.wouldBeHolderChatSessionId : null,
     };
 }
+// Set 036 Session 4 (Q3): a chatSessionId mismatch is a different
+// flavor of H3 refusal — same engine+provider held the slot, but the
+// would-be holder reports a different per-chat session_id. The
+// existing poll/force/dismiss prompt assumes a different-engine
+// holder may release naturally; for the chatSessionId case, that
+// assumption is wrong (the same agent stays put), so the UX layer
+// shows the takeover modal instead.
+//
+// Returns true only when BOTH sides report a chatSessionId AND they
+// differ. The null/null and pre-Set-036-no-field cases collapse to
+// the tolerant-on-read branch (start_session treats them as same
+// holder), so the conflict that surfaced was an engine+provider
+// mismatch, not a chatSessionId mismatch.
+function isChatSessionMismatch(record) {
+    if (record.heldByEngine !== record.wouldBeHolderEngine)
+        return false;
+    if (record.heldByProvider !== record.wouldBeHolderProvider)
+        return false;
+    const held = record.heldByChatSessionId;
+    const want = record.wouldBeHolderChatSessionId;
+    if (held === null || want === null)
+        return false;
+    return held !== want;
+}
 // H4 identity check: "would-be holder can claim" iff the orchestrator
-// block is null OR its (engine, provider) composite matches the
-// would-be holder's. A third orchestrator joining mid-poll does NOT
-// yield — that's a different (engine, provider) than the would-be
-// holder, so this returns false and the poll keeps waiting.
-function isSlotFreeForHolder(orchestrator, wouldBeEngine, wouldBeProvider) {
+// block is null OR its full H4 composite (engine + provider +
+// chatSessionId) matches the would-be holder's. A third orchestrator
+// joining mid-poll does NOT yield — that's a different composite
+// than the would-be holder, so this returns false and the poll
+// keeps waiting.
+//
+// Set 036 Session 4 (Round A Major fix): the predicate now includes
+// chatSessionId with the same tolerant-on-read rule as
+// start_session.py's H3 predicate — a prior block with chatSessionId
+// missing (pre-Set-036 writer) or value null (Set 036+ writer that
+// had no ID at the time of write) is treated as "matches the
+// caller's chatSessionId" for engine+provider equality. Without
+// this, a third chat (different chatSessionId, same engine+provider)
+// claiming the slot mid-poll would be misclassified as "free for
+// holder" and the poll would fire blind retries.
+//
+// `wouldBeChatSessionId === undefined` is the caller-side
+// backward-compat path: pre-Set-036 callers (no chatSessionId
+// awareness) get the engine+provider-only check exactly as before.
+// Set 036+ callers pass an explicit string-or-null.
+function isSlotFreeForHolder(orchestrator, wouldBeEngine, wouldBeProvider, wouldBeChatSessionId) {
     if (!orchestrator)
         return true;
-    return (orchestrator.engine === wouldBeEngine &&
-        orchestrator.provider === wouldBeProvider);
+    if (orchestrator.engine !== wouldBeEngine)
+        return false;
+    if (orchestrator.provider !== wouldBeProvider)
+        return false;
+    if (wouldBeChatSessionId === undefined)
+        return true;
+    const priorHasKey = Object.prototype.hasOwnProperty.call(orchestrator, "chatSessionId");
+    const priorCid = priorHasKey ? orchestrator.chatSessionId : null;
+    if (!priorHasKey || priorCid === null)
+        return true;
+    return priorCid === wouldBeChatSessionId;
 }
 // Poll-key derivation. The (slug, would-be holder identity) pair is the
 // natural primary key — two would-be holders racing for the same slot
 // poll independently; the same would-be holder firing multiple
 // SessionStart hooks for the same set short-circuits via in-flight
 // de-dup.
+//
+// Set 036 Session 4 (Round A Major fix): the would-be holder identity
+// must include chatSessionId so two different chats on the same
+// engine+provider don't collapse into a single in-flight entry —
+// without the chatSessionId in the key, chat B's takeover modal
+// would be dropped while chat A's prompt was still resolving. `null`
+// chatSessionIds normalize to a sentinel string so pre-Set-036
+// records keep producing stable keys (and two pre-Set-036 records
+// from the same engine+provider continue to collapse, matching the
+// Set-033 dedup behavior).
 function pollKey(record) {
-    return `${record.sessionSetSlug}::${record.wouldBeHolderEngine}+${record.wouldBeHolderProvider}`;
+    const cid = record.wouldBeHolderChatSessionId ?? "<no-chat-id>";
+    return (`${record.sessionSetSlug}::${record.wouldBeHolderEngine}+${record.wouldBeHolderProvider}+${cid}`);
 }
 exports.POLL_PROMPT_POLL = "Poll for release";
 exports.POLL_PROMPT_FORCE = "Force override";
@@ -235,6 +304,15 @@ class CheckoutPollService {
             return;
         this.inFlight.add(key);
         try {
+            // Set 036 Session 4 (Q3): when the conflict is specifically a
+            // chatSessionId mismatch (same engine+provider, different chat),
+            // route to the takeover modal instead of the poll/force/dismiss
+            // prompt. Polling would never resolve — the same agent isn't
+            // going to release its slot.
+            if (isChatSessionMismatch(record)) {
+                await this.handleChatSessionMismatch(record);
+                return;
+            }
             const holderLabel = `${record.heldByEngine} + ${record.heldByProvider}`;
             const wouldBeLabel = `${record.wouldBeHolderEngine} + ${record.wouldBeHolderProvider}`;
             const message = `Check-out on "${record.sessionSetSlug}" is held by ${holderLabel}. ` +
@@ -259,6 +337,35 @@ class CheckoutPollService {
                 this.inFlight.delete(pollKey(record));
             }
         }
+    }
+    // Set 036 Session 4 (Q3 locked): chatSessionId-mismatch takeover
+    // path. Three operator-visible actions per the audit-locked verdict:
+    //   - Take Over → forces start_session (audit-logged) for the new
+    //     chat. The existing holder's claim is overwritten.
+    //   - Open in Read-Only Mode → sets a transient flag on the in-
+    //     memory ReadOnlyIntentService; extension-side write commands
+    //     (currently dabbler.checkOutOrchestrator) prompt to clear the
+    //     intent before proceeding.
+    //   - Cancel → no-op; the would-be holder remains uncliamed.
+    async handleChatSessionMismatch(record) {
+        const copy = {
+            sessionSetSlug: record.sessionSetSlug,
+            heldByLabel: (0, chatSessionMismatchModal_1.formatHolderLabel)(record.heldByEngine, record.heldByProvider, record.heldByChatSessionId),
+            wouldBeLabel: (0, chatSessionMismatchModal_1.formatHolderLabel)(record.wouldBeHolderEngine, record.wouldBeHolderProvider, record.wouldBeHolderChatSessionId),
+        };
+        const choice = await (0, chatSessionMismatchModal_1.chatSessionMismatchModal)(copy, this.opts.showMismatchModal);
+        if (choice === "take-over") {
+            await this.forceOverride(record);
+            return;
+        }
+        if (choice === "read-only") {
+            const intents = this.opts.readOnlyIntentService ?? (0, ReadOnlyIntentService_1.getReadOnlyIntentService)();
+            intents.setReadOnly(record.sessionSetPath);
+            void vscode.window.showInformationMessage(`"${record.sessionSetSlug}" opened in read-only mode for this window. ` +
+                `Extension write commands will prompt before claiming the check-out.`);
+            return;
+        }
+        // cancel — explicit no-op
     }
     beginPolling(record) {
         if (this.disposed)
@@ -293,7 +400,13 @@ class CheckoutPollService {
             catch {
                 return;
             }
-            if (!isSlotFreeForHolder(state.orchestrator, record.wouldBeHolderEngine, record.wouldBeHolderProvider)) {
+            // Set 036 Session 4 (Round A Major fix): forward the would-be
+            // holder's chatSessionId so the H4 composite check fires. A
+            // third chat (different chatSessionId, same engine+provider)
+            // claiming the slot mid-poll must NOT misclassify as "free
+            // for holder" — that would fire blind retries against a slot
+            // we don't actually own.
+            if (!isSlotFreeForHolder(state.orchestrator, record.wouldBeHolderEngine, record.wouldBeHolderProvider, record.wouldBeHolderChatSessionId)) {
                 return; // still held by a different orchestrator; keep waiting
             }
             poll.retryInFlight = true;
@@ -378,6 +491,14 @@ class CheckoutPollService {
         ];
         if (record.sessionNumber !== null) {
             args.push("--session-number", String(record.sessionNumber));
+        }
+        // Set 036 Session 4: forward the per-chat ID so a take-over write
+        // populates the H4 composite for the new holder rather than
+        // leaving the chatSessionId field null (which would invite a
+        // benign-but-confusing tolerant-on-read fallback on the next
+        // SessionStart).
+        if (record.wouldBeHolderChatSessionId !== null) {
+            args.push("--chat-session-id", record.wouldBeHolderChatSessionId);
         }
         if (force)
             args.push("--force");

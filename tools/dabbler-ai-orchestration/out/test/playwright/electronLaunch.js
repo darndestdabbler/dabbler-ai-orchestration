@@ -264,12 +264,19 @@ function attemptStartSession(h, sessionNumber, identity, opts = {}) {
     ];
     if (opts.force)
         args.push("--force");
+    if (typeof opts.chatSessionId === "string") {
+        args.push("--chat-session-id", opts.chatSessionId);
+    }
     const env = _filteredEnv();
     if (opts.homeOverride) {
         // os.path.expanduser checks USERPROFILE on Windows and HOME on
         // POSIX; setting both keeps the redirect cross-platform.
         env.HOME = opts.homeOverride;
         env.USERPROFILE = opts.homeOverride;
+    }
+    if (opts.env) {
+        for (const [k, v] of Object.entries(opts.env))
+            env[k] = v;
     }
     const proc = cp.spawnSync(PYTHON, args, {
         encoding: "utf8",
@@ -304,7 +311,7 @@ function seedOrchestratorBlock(h, overrides = {}) {
     const raw = fs.readFileSync(statePath, "utf8");
     const state = JSON.parse(raw);
     const now = new Date().toISOString();
-    state.orchestrator = {
+    const block = {
         engine: "claude",
         provider: "anthropic",
         model: "claude-opus-4-7",
@@ -313,6 +320,15 @@ function seedOrchestratorBlock(h, overrides = {}) {
         lastActivityAt: now,
         ...overrides,
     };
+    // The spread above copies chatSessionId only when explicitly in
+    // overrides — Partial's optional key is included via "in" if the
+    // caller wrote it, and excluded if they didn't. We keep that
+    // shape verbatim so the omitted-key vs. null-value distinction
+    // survives to the writer's predicate.
+    if (!("chatSessionId" in overrides)) {
+        delete block.chatSessionId;
+    }
+    state.orchestrator = block;
     fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + "\n", "utf8");
 }
 function makeAdditionalSet(base, newSlug, newTotalSessions) {

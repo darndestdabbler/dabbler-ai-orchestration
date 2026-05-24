@@ -3,7 +3,6 @@
 // Session 4 ship — replaces the v0.15.0 native TreeView. Consumes:
 //   - SessionSetsModel (pure scan/bucket/sort/text helpers)
 //   - inProgressSetsService (listInProgressSets + ai-assignment recommendation)
-//   - OrchestratorAccordion (pure render helpers + orchestrator-block adapter)
 //   - ActionRegistry (typed action-applicability predicates per row)
 //   - suppressionState (manual-collapse persistence reducer)
 //   - ScanState (loading/ready phase from extension.ts)
@@ -11,19 +10,22 @@
 //
 // Per S4 audit GPT-5.4 M4: this file owns lifecycle + message
 // protocol + snapshot serialization. It does NOT own kbd nav (that's
-// in media/session-sets-tree/client.js). It does NOT own gauge
-// rendering (that's in OrchestratorAccordion).
+// in media/session-sets-tree/client.js). Gauge rendering historically
+// lived in OrchestratorAccordion — Set 034 retired the per-row
+// accordion at the render surface (`accordionHtml` ships as `null` on
+// every row); Set 036 Session 6 deleted the OrchestratorAccordion +
+// detectOrchestrators source modules entirely.
 //
 // Per S4 audit GPT-5.4 M3: every render message carries a monotonic
 // version. Out-of-order messages are dropped by the webview client.
 //
 // Set 033 Session 2: per H2, the `.dabbler/orchestrator.json` per-set
-// marker is retired. Each in-progress row's accordion body is now
-// computed from that set's `orchestrator` block on session-state.json
-// (Set 033 Session 1 schema) plus its ai-assignment.md recommendation.
-// The single-active-set ambiguity banner is gone — multi-in-progress
-// is the supported case and every in-progress row gets its own
-// accordion.
+// marker is retired. The `orchestrator` block on session-state.json
+// (Set 033 Session 1 schema) is the canonical record. The single-
+// active-set ambiguity banner is gone — multi-in-progress is the
+// supported case. Set 034 then retired the on-screen accordion that
+// would have rendered the block; each in-progress row now ships
+// name / fraction / description only.
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -63,17 +65,22 @@ const vscode = __importStar(require("vscode"));
 const fileSystem_1 = require("../utils/fileSystem");
 const SessionSetsModel_1 = require("./SessionSetsModel");
 Object.defineProperty(exports, "isCurrentSessionInFlight", { enumerable: true, get: function () { return SessionSetsModel_1.isCurrentSessionInFlight; } });
+// Set 034: the per-row orchestrator-tracking accordion (gauges + model
+// description) is retired from the UI. Set 036 Session 6 deleted the
+// OrchestratorAccordion + detectOrchestrators source modules. The
+// in-progress ordering helper survives in inProgressSetsService.
 const inProgressSetsService_1 = require("./inProgressSetsService");
-const OrchestratorAccordion_1 = require("./OrchestratorAccordion");
-const detectOrchestrators_1 = require("./detectOrchestrators");
 const ActionRegistry_1 = require("./ActionRegistry");
 const suppressionState_1 = require("./suppressionState");
 const SUPPRESSION_KEY = "dabbler.sessionSets.suppressedExpand";
 const RENDER_DEBOUNCE_MS = 50;
 // Allowlist for executeCommand dispatch from the webview. Defense-
 // in-depth: even if a malicious string slipped through the protocol
-// type check, only these commands fire. Includes all 14 row-context
-// actions + 3 indicator-action buttons.
+// type check, only these commands fire. Holds the 14 row-context
+// actions; the orchestrator-control buttons that used to live in the
+// per-row accordion body were retired in Set 034 and no longer
+// dispatch from this surface (they remain accessible via the Command
+// Palette and the right-click menu).
 const COMMAND_ALLOWLIST = new Set([
     // 14 row-context actions
     "dabblerSessionSets.openSpec",
@@ -90,13 +97,12 @@ const COMMAND_ALLOWLIST = new Set([
     "dabblerSessionSets.migrate",
     "dabblerSessionSets.cancel",
     "dabblerSessionSets.restore",
-    // Indicator-action buttons (Session 4 + Session 5 multi-provider)
-    "dabbler.installOrchestratorHook.claudeCode",
-    "dabbler.installOrchestratorHook.gemini",
-    "dabbler.installOrchestratorHook.copilot",
-    "dabbler.checkOutOrchestrator",
-    "dabbler.releaseCheckOut",
-    "dabbler.openOrchestratorWriterLog",
+    // Set 034: the orchestrator-control commands (checkOutOrchestrator /
+    // releaseCheckOut / openOrchestratorWriterLog / installOrchestratorHook.*)
+    // are no longer dispatched from the webview — they're removed from
+    // both ActionRegistry (right-click menu) and the empty-state CTA
+    // (which itself is gone). The commands remain registered in
+    // extension.ts and are still accessible via the Command Palette.
 ]);
 function contextValueFor(set) {
     const parts = [`sessionSet:${set.state}`];
@@ -108,15 +114,37 @@ function contextValueFor(set) {
         parts.push("needs-migration");
     return parts.join(":");
 }
+// Set 034: row description drops the fraction prefix (which now lives
+// in the right-aligned fraction list-icon column) and the trailing
+// "Complete" word. For in-progress rows: just "session N in flight".
+// For not-started / complete / cancelled rows: empty (the fraction
+// IS the signal). UAT / force-closed / needs-migration / touched-date
+// badges still tack on if present.
 function descriptionFor(set) {
-    const bits = [
-        (0, SessionSetsModel_1.progressText)(set),
+    const bits = [];
+    if (set.state === "in-progress" && set.liveSession?.currentSession != null) {
+        bits.push(`session ${set.liveSession.currentSession} in flight`);
+    }
+    const extras = [
         (0, SessionSetsModel_1.touchedDate)(set),
         (0, SessionSetsModel_1.uatBadge)(set),
         (0, SessionSetsModel_1.forceClosedBadge)(set),
         (0, SessionSetsModel_1.needsMigrationBadge)(set),
     ].filter(Boolean);
+    bits.push(...extras);
     return bits.join("  ·  ");
+}
+// Set 034: right-aligned bold colored progress fraction now lives in
+// its own list-icon column. Compute once here instead of embedding in
+// the description string.
+function fractionFor(set) {
+    if (set.totalSessions && set.totalSessions > 0) {
+        return `${set.sessionsCompleted}/${set.totalSessions}`;
+    }
+    if (set.sessionsCompleted > 0) {
+        return `${set.sessionsCompleted}`;
+    }
+    return "";
 }
 class CustomSessionSetsView {
     constructor(context, scanState) {
@@ -165,6 +193,15 @@ class CustomSessionSetsView {
             case "executeCommand":
                 this.dispatchCommand(msg.commandId, msg.args);
                 return;
+            case "executeRowCommand": {
+                // Set 034: cursor-anchored context-menu item selection. Look
+                // up the set by slug and dispatch the command with [{ set }].
+                const set = this.findSetBySlug(msg.slug);
+                if (!set)
+                    return;
+                this.dispatchCommand(msg.commandId, [{ set }]);
+                return;
+            }
             case "showRowContextMenu":
                 void this.showContextMenu(msg.slug);
                 return;
@@ -184,7 +221,14 @@ class CustomSessionSetsView {
         }
         void vscode.commands.executeCommand(commandId, ...(args ?? []));
     }
+    // Set 034: replaced the v0.18.1 showQuickPick-at-top-of-window flow
+    // with a cursor-anchored popup rendered by the webview. The host
+    // computes applicable actions and posts them back as a flat
+    // `renderContextMenu` message; the webview paints the popup at the
+    // cursor position it captured on the contextmenu event.
     async showContextMenu(slug) {
+        if (!this.view)
+            return;
         const set = this.findSetBySlug(slug);
         if (!set)
             return;
@@ -192,13 +236,12 @@ class CustomSessionSetsView {
         const actions = (0, ActionRegistry_1.applicableActions)(set, supports);
         if (actions.length === 0)
             return;
-        const picked = await vscode.window.showQuickPick(actions.map((a) => ({ label: a.label, id: a.id })), {
-            placeHolder: `${set.name} — choose an action`,
-            matchOnDescription: false,
-        });
-        if (!picked)
-            return;
-        this.dispatchCommand(picked.id, [{ set }]);
+        const msg = {
+            type: "renderContextMenu",
+            slug,
+            items: actions.map((a) => ({ label: a.label, commandId: a.id })),
+        };
+        this.view.webview.postMessage(msg);
     }
     async readSupports() {
         // Context keys live in vscode's contextKeyService which is not
@@ -270,9 +313,8 @@ class CustomSessionSetsView {
         // state CTA is shared across in-progress rows that have no
         // orchestrator block yet (e.g., a pre-Set-033 in-flight set, or
         // a freshly-started set that hasn't run start_session yet).
-        const emptyCta = (0, detectOrchestrators_1.pickEmptyStateCta)();
         const payload = {
-            buckets: this.buildBuckets(all, emptyCta),
+            buckets: this.buildBuckets(all),
             hasAnySets: all.length > 0,
             welcomeHtml: this.welcomeHtml,
         };
@@ -313,59 +355,56 @@ class CustomSessionSetsView {
     toProtocolScanState() {
         return this.scanState.phase === "loading" ? "loading" : "ready";
     }
-    buildBuckets(all, emptyCta) {
+    buildBuckets(all) {
         const buckets = (0, SessionSetsModel_1.bucketSets)(all);
-        // Set 033 Session 2: order in-progress sets by `startedAt` ascending
-        // (the older the in-flight set, the higher it ranks) — same order
-        // as `listInProgressSets()`. SessionSetsModel.sortBucket still
-        // sorts by `lastTouched` desc for the visual rows; we apply the
-        // in-progress-specific ordering here.
         const inProgressOrdered = (0, inProgressSetsService_1.listInProgressSets)(buckets.inProgress);
         const groups = [
-            this.buildBucket("in-progress", "In Progress", inProgressOrdered, emptyCta),
-            this.buildBucket("not-started", "Not Started", buckets.notStarted, emptyCta),
-            this.buildBucket("complete", "Complete", buckets.complete, emptyCta),
+            this.buildBucket("in-progress", "In Progress", inProgressOrdered),
+            this.buildBucket("not-started", "Not Started", buckets.notStarted),
+            this.buildBucket("complete", "Complete", buckets.complete),
         ];
         if (buckets.cancelled.length > 0) {
-            groups.push(this.buildBucket("cancelled", "Cancelled", buckets.cancelled, emptyCta));
+            groups.push(this.buildBucket("cancelled", "Cancelled", buckets.cancelled));
         }
         return groups;
     }
-    buildBucket(key, label, subset, emptyCta) {
+    buildBucket(key, label, subset) {
         const sorted = key === "in-progress" ? subset : (0, SessionSetsModel_1.sortBucket)(subset, key);
-        const rows = sorted.map((set) => this.buildRow(set, emptyCta));
+        const rows = sorted.map((set) => this.buildRow(set));
         return { key, label, count: subset.length, rows };
     }
-    buildRow(set, emptyCta) {
-        // Set 033 Session 2: every in-progress row gets an accordion body
-        // (multi-in-progress is the supported case). The body is computed
-        // from this set's `orchestrator` block on session-state.json + its
-        // ai-assignment.md recommendation. Non-in-progress rows still
-        // skip the accordion entirely per S4 Q3 = a.
-        let accordionHtml = null;
-        let accordionUpdatedAt = null;
-        if (set.state === "in-progress") {
-            const block = set.liveSession?.orchestrator ?? null;
-            const recommendation = (0, inProgressSetsService_1.recommendationFor)(set);
-            let state = (0, OrchestratorAccordion_1.accordionStateFromOrchestratorBlock)(block, recommendation);
-            if (state.kind === "empty") {
-                state = { kind: "empty", cta: emptyCta };
-            }
-            else {
-                accordionUpdatedAt = state.marker.updatedAt;
-            }
-            accordionHtml = (0, OrchestratorAccordion_1.renderAccordionBody)(state);
-        }
+    buildRow(set) {
+        // Set 034: the per-row accordion is GONE. Operator feedback
+        // 2026-05-21 (mid-Set-034 Session 1) — the gauges and the
+        // orchestrator-info text below them read as more authoritative
+        // than the underlying signal warrants: the adapter rendered
+        // every check-out as a live high-confidence signal regardless of
+        // how stale it actually was, effort tracking via /think_* slash
+        // commands was retired in Set 033 H2 (no longer observed), and
+        // for orchestrators without a hook path (Copilot, Gemini, Codex
+        // post-Set-036-S3) the gauge area was either empty or whatever
+        // the last manual checkout claimed. Rather than try to honestly
+        // caveat all of that visually, retire the entire
+        // orchestrator-tracking display surface until a future set
+        // delivers a real signal. Rows now show just name + fraction +
+        // description.
+        //
+        // Net effect: accordionHtml is null on every row; client.js no
+        // longer renders any accordion body. The `orchestrator` block on
+        // session-state.json continues to be written by start_session /
+        // close_session (the check-out semantics still serve coordination
+        // and audit-log purposes); only the UI surface retires.
         return {
             slug: set.name,
             name: set.name,
             state: set.state,
+            fraction: fractionFor(set),
             description: descriptionFor(set),
             contextValue: contextValueFor(set),
             iconSlug: SessionSetsModel_1.ICON_FILES[set.state] ?? "",
             needsMigration: set.needsMigration,
-            accordionHtml,
-            accordionUpdatedAt,
+            accordionHtml: null,
+            accordionUpdatedAt: null,
         };
     }
     // ----- Welcome HTML extraction -----
@@ -421,10 +460,11 @@ class CustomSessionSetsView {
         const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "tree.css"));
         const jsUri = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "client.js"));
         const nonce = String(Math.floor(Math.random() * 1e16));
-        // The accordion includes inline SVG generated by
-        // OrchestratorAccordion.ts; per the existing indicator CSP, the
-        // SVG fragments are part of innerHTML (not separate script), so
-        // they're covered by style-src + the webview's own document.
+        // Set 034 + Set 036 S6: the per-row accordion that injected inline
+        // SVG via innerHTML is gone. Only the tree shell (rows + bucket
+        // headers + context menu) renders now, but the CSP keeps
+        // `'unsafe-inline'` for style-src in case future shell content
+        // re-introduces inline styles before the next CSP review.
         const csp = `default-src 'none'; ` +
             `style-src ${webview.cspSource} 'unsafe-inline'; ` +
             `script-src 'nonce-${nonce}';`;

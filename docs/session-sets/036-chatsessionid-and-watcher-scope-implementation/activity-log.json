@@ -452,6 +452,87 @@
           "round": "A"
         }
       ]
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 1,
+      "stepKey": "session-006/ui-audit-completed",
+      "dateTime": "2026-05-23T20:30:00-04:00",
+      "description": "Audit pass over tools/dabbler-ai-orchestration/src + media + package contributions for engine-specific UI copy. Findings catalog at docs/session-sets/036-.../ui-audit-findings.md. Headline finding reframes the spec's (a)/(b)/(c) dispositions: Set 034 had already retired the per-row accordion at the render surface (CustomSessionSetsView.buildRow ships accordionHtml: null on every row; client.js:renderRow emits only name/fraction/description), making the empty-state CTA + the entire OrchestratorAccordion.ts + detectOrchestrators.ts modules orphan source preserved for 'possible future re-enable.' The operator's stated concerns ('I don't need to install a Claude Code hook' / 'what if I am using Copilot exclusively') are already true at runtime — the CTA, gauges, and 'No signal' text are all unreachable. F3 + F4 catalog findings (package.json command titles for Install Orchestrator Hook (X) per orchestrator, viewsWelcome contribution naming all three orchestrators, copyAdoptionBootstrapPrompt toast, wizard.html API key list, installer-shim file headers) classified as KEEP — parity copy or correctly-engine-specific-by-scope.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 2,
+      "stepKey": "session-006/empty-state-disposition-locked",
+      "dateTime": "2026-05-23T20:35:00-04:00",
+      "description": "Operator-locked disposition after audit surfaced the post-Set-034 reframe: DELETE the orphan source (YAGNI cleanup). Selected over (a)/(b)/(c) because all three spec dispositions assumed a live empty-state that doesn't exist post-Set-034. Mitigation for re-implementation cost: git history at v0.18.x preserves the full implementation; future re-enable fetches from history rather than from a frozen-and-rotting source tree (same pattern as Set 036 Session 3's codex config-toml watcher retirement). Cross-provider consensus deferred per [[feedback_ai_router_usage]] mid-session restriction; the disposition is mechanical rather than judgment-laden once the headline finding surfaced. Operator confirmed via AskUserQuestion: 'Delete orphan source (Recommended)'.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 3,
+      "stepKey": "session-006/refactor-applied",
+      "dateTime": "2026-05-23T20:50:00-04:00",
+      "description": "Orphan source cleanup. (a) Moved Recommendation interface from OrchestratorAccordion.ts to inProgressSetsService.ts (its only non-test consumer). (b) Deleted src/providers/OrchestratorAccordion.ts (496 LOC; all gauge / accordion-body / mismatch / tooltip / classifyRecommendationTier / providerHasExtraCapacity / SVG / tier-rank helpers). (c) Deleted src/providers/detectOrchestrators.ts (137 LOC; CLAUDE_CTA / CODEX_CTA / GEMINI_CTA / COPILOT_CTA + claudeCodeInstalled() / codexInstalled() / geminiInstalled() / copilotInstalled() + pickEmptyStateCta()). (d) Deleted src/test/suite/detectOrchestrators.test.ts (8 tests covering the deleted picker). tsc --noEmit clean post-cleanup; Layer-2 test count went 539 → 531 matching the deleted test file's count.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 4,
+      "stepKey": "session-006/css-sweep-completed",
+      "dateTime": "2026-05-23T20:55:00-04:00",
+      "description": "CSS cleanup beyond the spec's stated .grey-gauges scope (justified by the orphan-source-deletion disposition). (a) Deleted media/session-sets-tree/tree.css lines 283-459 (full accordion-body section: .accordion-body, .acc-link, .acc-empty + .acc-empty-cta + .acc-empty .grey-gauges, .gauges + container query, .gauge-cell + .gauge-svg + .gauge-svg-wrap + arc/needle/pivot/sublabel rules, .tier-low/mid/flagship/unknown, .effort-low/medium/high/extra-high/max/unknown, .stale ::after diagonal stripes, .last-updated, .model-sections + .model-section + header + text + suggested-italic). File went 458 → 282 lines. (b) Rewrote tree.css header to reflect single-layer (tree shell only) post-retirement. (c) Replaced the --indicator-stripe-color / --indicator-band-bg / --indicator-band-fg :root custom-properties block with a single retirement note since the only consumers were the deleted accordion-body rules. (d) Deleted media/orchestrator-indicator/ directory entirely (indicator.css; the only file; orchestratorIndicatorProvider was retired in Set 029 S4 and no code path loads the CSS).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 5,
+      "stepKey": "session-006/layer3-test-green",
+      "dateTime": "2026-05-23T21:00:00-04:00",
+      "description": "Layer-3 Playwright sweep — 4 pre-existing failures all addressed (baseline was 21 passed / 2 skipped / 4 failed; post-cleanup is 24 passed / 2 skipped / 0 failed). (a) Deleted session-sets-tree.spec.ts 'empty-state CTA falls back to Claude installer when no orchestrators detected' (asserted .acc-empty-cta which no longer renders). (b) Deleted 'seeded orchestrator block renders provider sublabel in the accordion' (asserted gauge sublabel from the retired accordion). (c) Replaced 'two in-progress sets each render their own accordion body' with a focused 'multi-in-progress workspaces render two rows (no ambiguity banner)' scenario — the data-expandable attribute assertion was orphan; the ambiguity-banner-absence assertion remains a real regression check. (d) Deleted multi-in-progress.spec.ts test.skip'd 'each in-progress row paints its own gauge SVG' (the FIXME from Set 033 S4 is resolved by deletion not un-skipping). (e) In-flight fix per [[feedback_dont_hide_behind_out_of_scope]]: the 'In Progress bucket header shows the multi-in-progress count' test was failing because Set 034 prepended a chevron glyph (▾/▸) to the bucket header inside the group's textContent, breaking the `/^In Progress\\s*\\(2\\)/` regex anchor. Dropped the `^` anchor; comment + activity-log entry document the surfaced-not-introduced provenance. Also: dropped the now-orphan aria-expanded attribute assertion in the 'renders ARIA tree structure' scenario (rows are no longer expandable per Set 034).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 6,
+      "stepKey": "session-006/welcome-wizard-updated",
+      "dateTime": "2026-05-23T21:05:00-04:00",
+      "description": "Welcome / wizard surfaces audit — no code changes needed. webview/wizard.html is orchestrator-agnostic (parity API-key list mentions ANTHROPIC_API_KEY + OPENAI_API_KEY + GEMINI_API_KEY); the single Anthropic-pricing link is acceptable variance per the audit findings F3 (filed as follow-on if a parity-list emerges). package.json viewsWelcome contribution lists all three orchestrators by name with parity copy. dashboard.html / cost dashboard / config editor / troubleshoot all already orchestrator-agnostic. The 'install Claude Code hook' framing the spec called out at OrchestratorAccordion.ts:333-336 was deleted with the rest of the orphan source in step 3.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 7,
+      "stepKey": "session-006/comment-freshness-updated",
+      "dateTime": "2026-05-23T21:10:00-04:00",
+      "description": "Stale-comment sweep across the files that referenced the deleted modules. (a) CustomSessionSetsView.ts header comment + import-section comment + renderShell CSP comment all rewritten to note Set 036 S6 deleted the OrchestratorAccordion + detectOrchestrators source. (b) extension.ts CustomSessionSetsView-registration comment + orchestratorIndicator-retirement comment both rewritten to reflect the deletion. (c) tree.css file header + theme-derived-properties comment both rewritten. (d) watcherInventory.test.ts WATCHER_ALLOWLIST entry for extension.ts updated from line 147 to line 146 (the comment-deletion in extension.ts shifted the watcher createFileSystemWatcher callsite up by one line) — caught by the convention test itself when the post-cleanup Layer-2 suite ran.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 8,
+      "stepKey": "session-006/round-a-verification",
+      "dateTime": "2026-05-23T21:30:00-04:00",
+      "description": "Round A verification routed via task_type='verification' (tier-routed, NOT session-verification which is pinned to gpt-5-4) per [[feedback_split_large_verification_bundles]] precedent + the Set 036 S5 429-cascade fallback that landed on opus at $1.25 — the cleanup is documentation-heavy and the cheaper tiers should suffice. Router selected gemini-pro (complexity_score=57, tier 2); 22.4s elapsed; $0.03835 (27576 input + 388 output tokens). Bundle: ui-audit-findings.md + full git diff excluding generated artifacts (90,351 chars total). All six verification asks returned PASS: (1) audit completeness — the audit was thorough, correctly identified the Claude-specific UI as already non-functional, and remaining engine-specific copy is correctly scoped; (2) Recommendation interface move — clean, tsc --noEmit confirms no broken callers; (3) orphan-CSS deletion bounds — self-contained block; tree shell styles unaffected; (4) broken-test sweep completeness — 4-to-0 failure reduction confirms the sweep landed cleanly; (5) comment freshness — all affected files diligently updated; (6) out-of-scope check — orphan cleanup correctly scoped; the bucket-count regex fix is an acceptable opportunistic correction within a file being modified, properly documented. Round B not warranted (no Major / Blocker / Minor findings).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "taskType": "verification",
+          "model": "gemini-pro",
+          "cost_usd": 0.03835,
+          "input_tokens": 27576,
+          "output_tokens": 388,
+          "round": "A"
+        }
+      ]
     }
   ]
 }

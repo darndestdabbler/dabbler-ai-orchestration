@@ -14,13 +14,14 @@
 //
 // The previous installer also installed a `UserPromptSubmit` hook that
 // piped through the retired `write-orchestrator-marker.js` helper to
-// update `effort.signalKind`. With the marker file retired (H2) and
-// the `orchestrator` block having no `signalKind` field, that hook
-// no longer has a meaningful behavior. The installer drops the
-// `UserPromptSubmit` entry — and ALSO removes any previously-installed
-// dabbler `UserPromptSubmit` entry that still points at the deleted
-// helper, so re-running the installer cleans up the stale reference
-// in operators' settings.
+// update an `effort.signalKind` field on the per-set marker. With the
+// marker file retired (H2), the `orchestrator` block carrying no
+// signalKind field, and the signalKind enum itself retired entirely
+// in Set 036 Session 3, that hook has no meaningful behavior. The
+// installer drops the `UserPromptSubmit` entry — and ALSO removes any
+// previously-installed dabbler `UserPromptSubmit` entry that still
+// points at the deleted helper, so re-running the installer cleans up
+// the stale reference in operators' settings.
 //
 // The command is idempotent. It locates an existing dabbler entry by
 // matcher AND command-path-substring; re-running upgrades the command
@@ -211,8 +212,9 @@ async function installClaudeCodeOrchestratorHook(extensionUri) {
         settings.hooks.SessionStart = ensureMatcherEntry(settings.hooks.SessionStart, matcher, sessionStartCmd);
     }
     // UserPromptSubmit: prune any dabbler-managed entries left over from
-    // the pre-Set-033 helper. The new check-out model doesn't carry
-    // signalKind, so there's nothing for a per-prompt hook to do.
+    // the pre-Set-033 helper. The new check-out model carries no field
+    // a per-prompt hook would maintain (signalKind itself was retired
+    // in Set 036 S3), so there's nothing for the hook to do.
     settings.hooks.UserPromptSubmit = pruneDabblerHooks(settings.hooks.UserPromptSubmit);
     if (Array.isArray(settings.hooks.UserPromptSubmit) && settings.hooks.UserPromptSubmit.length === 0) {
         delete settings.hooks.UserPromptSubmit;

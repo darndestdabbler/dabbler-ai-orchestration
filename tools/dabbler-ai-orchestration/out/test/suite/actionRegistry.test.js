@@ -70,7 +70,13 @@ function ids(set, supports) {
     return (0, ActionRegistry_1.applicableActions)(set, supports).map((a) => a.id);
 }
 suite("ActionRegistry", () => {
-    test("ROW_ACTIONS exposes the 14 S3 actions plus the 3 orchestrator actions (S6 relegation + S033 S3 release-check-out)", () => {
+    test("ROW_ACTIONS exposes the 14 non-orchestrator actions (Set 034 retired the orchestrator group)", () => {
+        // Set 034: orchestrator group (dabbler.checkOutOrchestrator,
+        // dabbler.releaseCheckOut, dabbler.openOrchestratorWriterLog)
+        // removed from the right-click menu in lockstep with the per-row
+        // orchestrator-tracking accordion retiring. The commands stay
+        // registered in extension.ts (Command Palette access preserved)
+        // but no longer appear in this typed registry.
         const expected = new Set([
             "dabblerSessionSets.openSpec",
             "dabblerSessionSets.openActivityLog",
@@ -83,33 +89,22 @@ suite("ActionRegistry", () => {
             "dabblerSessionSets.copyStartCommand.default",
             "dabblerSessionSets.copyStartCommand.parallel",
             "dabblerSessionSets.copySlug",
-            // Set 029 Session 6 — relegated from accordion body to right-click + Command Palette.
-            // Set 033 Session 3 renamed `dabbler.setOrchestrator` → `dabbler.checkOutOrchestrator`
-            // and added `dabbler.releaseCheckOut` as H3's named release path.
-            "dabbler.checkOutOrchestrator",
-            "dabbler.releaseCheckOut",
-            "dabbler.openOrchestratorWriterLog",
             "dabblerSessionSets.migrate",
             "dabblerSessionSets.cancel",
             "dabblerSessionSets.restore",
         ]);
         const got = new Set(ActionRegistry_1.ROW_ACTIONS.map((a) => a.id));
         assert.deepStrictEqual(got, expected);
-        assert.strictEqual(ActionRegistry_1.ROW_ACTIONS.length, 17);
+        assert.strictEqual(ActionRegistry_1.ROW_ACTIONS.length, 14);
     });
-    test("checkOutOrchestrator + releaseCheckOut appear only on in-progress rows; openOrchestratorWriterLog always available", () => {
-        for (const st of ["in-progress"]) {
-            const got = ids(fakeSet(st), ALL_SUPPORTED);
-            assert.ok(got.includes("dabbler.checkOutOrchestrator"), `checkOutOrchestrator missing for ${st}`);
-            assert.ok(got.includes("dabbler.releaseCheckOut"), `releaseCheckOut missing for ${st}`);
-        }
-        for (const st of ["not-started", "complete", "cancelled"]) {
-            const got = ids(fakeSet(st), ALL_SUPPORTED);
-            assert.ok(!got.includes("dabbler.checkOutOrchestrator"), `checkOutOrchestrator leaked onto ${st}`);
-            assert.ok(!got.includes("dabbler.releaseCheckOut"), `releaseCheckOut leaked onto ${st}`);
-        }
-        for (const st of ["in-progress", "not-started", "complete", "cancelled"]) {
-            assert.ok(ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.openOrchestratorWriterLog"), `openOrchestratorWriterLog missing for ${st}`);
+    test("orchestrator group is NOT exposed by the registry (Set 034 retirement)", () => {
+        const ids14 = ActionRegistry_1.ROW_ACTIONS.map((a) => a.id);
+        for (const id of [
+            "dabbler.checkOutOrchestrator",
+            "dabbler.releaseCheckOut",
+            "dabbler.openOrchestratorWriterLog",
+        ]) {
+            assert.ok(!ids14.includes(id), `${id} should NOT appear in ROW_ACTIONS — Set 034 retired the orchestrator group`);
         }
     });
     test("always-available actions appear for any state when supports are full", () => {

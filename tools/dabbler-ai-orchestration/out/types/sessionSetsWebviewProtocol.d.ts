@@ -3,6 +3,7 @@ export interface RowPayload {
     slug: string;
     name: string;
     state: "in-progress" | "not-started" | "complete" | "cancelled";
+    fraction: string;
     description: string;
     contextValue: string;
     iconSlug: string;
@@ -37,7 +38,16 @@ export interface SuppressionEchoMsg {
     version: number;
     suppressed: Record<string, string>;
 }
-export type HostToWebview = RowsSnapshotMsg | ScanStateChangedMsg | SuppressionEchoMsg;
+export interface ContextMenuItem {
+    label: string;
+    commandId: string;
+}
+export interface RenderContextMenuMsg {
+    type: "renderContextMenu";
+    slug: string;
+    items: ContextMenuItem[];
+}
+export type HostToWebview = RowsSnapshotMsg | ScanStateChangedMsg | SuppressionEchoMsg | RenderContextMenuMsg;
 export interface ExecuteCommandMsg {
     type: "executeCommand";
     commandId: string;
@@ -60,4 +70,9 @@ export interface ActivateRowMsg {
 export interface ReadyMsg {
     type: "ready";
 }
-export type WebviewToHost = ExecuteCommandMsg | ShowRowContextMenuMsg | ToggleRowMsg | ActivateRowMsg | ReadyMsg;
+export interface ExecuteRowCommandMsg {
+    type: "executeRowCommand";
+    slug: string;
+    commandId: string;
+}
+export type WebviewToHost = ExecuteCommandMsg | ExecuteRowCommandMsg | ShowRowContextMenuMsg | ToggleRowMsg | ActivateRowMsg | ReadyMsg;

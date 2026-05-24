@@ -30,7 +30,7 @@
     {
       "number": 6,
       "title": "Orchestrator-agnostic UI audit + empty-state refactor",
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "number": 7,
@@ -38,7 +38,7 @@
       "status": "not-started"
     }
   ],
-  "currentSession": null,
+  "currentSession": 6,
   "totalSessions": 7,
   "completedSessions": [
     1,
@@ -49,8 +49,16 @@
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-23T17:24:58.785469-04:00",
+  "startedAt": "2026-05-23T20:06:40.674841-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "unknown",
+    "chatSessionId": "d0d2d88e-adbb-4d17-8255-43fa654ec5cb",
+    "checkedOutAt": "2026-05-23T20:06:40.674841-04:00",
+    "lastActivityAt": "2026-05-23T20:06:40.674841-04:00"
+  }
 }

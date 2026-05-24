@@ -110,10 +110,12 @@ async function teardown(per) {
             effort: "high",
         });
         // Drop a sentinel file in the home-override's conflicts dir,
-        // simulating what the Claude SessionStart invoker or the Codex
-        // configWatcher would have written. The CheckoutPollService's
-        // start() method scans this directory at activation, so we can
-        // assert end-to-end on consumption without driving the toast.
+        // simulating what the Claude SessionStart invoker writes when
+        // start_session refuses with EXIT_CHECKOUT_CONFLICT. The
+        // CheckoutPollService's start() method scans this directory at
+        // activation, so we can assert end-to-end on consumption without
+        // driving the toast. (The Codex config.toml watcher used to be a
+        // second producer of these records; retired in Set 036 S3.)
         const conflictsDir = path.join(homeOverride, ".dabbler", "checkout-conflicts");
         fs.mkdirSync(conflictsDir, { recursive: true });
         const sentinelPath = path.join(conflictsDir, "test-sentinel.json");

@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { ShowModal } from "../providers/chatSessionMismatchModal";
 export type EffortLevel = "low" | "medium" | "high" | "max";
 export type Provider = "anthropic" | "google" | "openai" | "github";
 export interface OrchestratorTuple {
@@ -30,6 +31,7 @@ export interface InProgressSet {
             provider?: string;
             model?: string;
             effort?: string;
+            chatSessionId?: string | null;
         } | null;
     };
 }
@@ -44,5 +46,22 @@ export interface DispatchResult {
     stderr: string;
 }
 export declare function dispatchCheckOut(tuple: OrchestratorTuple, set: InProgressSet, ctx: WriteContext, force: boolean): Promise<DispatchResult>;
+export declare function confirmRevertReadOnlyIntent(set: InProgressSet): Promise<boolean>;
+export declare function commitClearReadOnlyIntent(set: InProgressSet): void;
+export type ManualChatMismatchResult = {
+    kind: "no-mismatch";
+} | {
+    kind: "take-over";
+} | {
+    kind: "read-only";
+} | {
+    kind: "cancel";
+};
+export declare function maybeShowChatSessionMismatchOnManualCheckout(tuple: OrchestratorTuple, set: InProgressSet, opts?: {
+    showModal?: ShowModal;
+    intentService?: {
+        setReadOnly: (path: string) => void;
+    };
+}): Promise<ManualChatMismatchResult>;
 export declare function registerCheckOutOrchestrator(context: vscode.ExtensionContext): void;
 export {};

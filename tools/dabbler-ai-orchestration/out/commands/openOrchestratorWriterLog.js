@@ -1,11 +1,11 @@
 "use strict";
 // Opens ~/.dabbler/orchestrator-writer.log for operator diagnostics.
 //
-// The marker writer (scripts/write-orchestrator-marker.js) appends one
-// JSON-lines entry per skipped write so the operator can see why a
-// configured-default Codex signal didn't make it through (or why a
-// manual quickpick was overridden by a live SessionStart). The log is
-// best-effort — losing it doesn't change behavior, just visibility.
+// The canonical writer (`python -m ai_router.start_session` —
+// Set 033 H1) appends one JSON-lines entry per check-out, refusal,
+// and force-override so the operator can see why a claim was
+// refused or how a conflict was resolved. The log is best-effort —
+// losing it doesn't change behavior, just visibility.
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -50,8 +50,8 @@ function registerOpenOrchestratorWriterLog(context) {
         const logPath = path.join(os.homedir(), ".dabbler", "orchestrator-writer.log");
         if (!fs.existsSync(logPath)) {
             vscode.window.showInformationMessage(`No writer log yet — ${logPath} hasn't been touched. ` +
-                `Logged entries appear when a marker write is skipped (e.g., ` +
-                `a configured-default Codex signal blocked by a fresh Claude SessionStart).`);
+                `Logged entries appear on every start_session call: successful ` +
+                `check-outs, H3 hard-coordination refusals, and --force overrides.`);
             return;
         }
         const doc = await vscode.workspace.openTextDocument(logPath);

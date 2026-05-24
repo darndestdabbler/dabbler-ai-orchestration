@@ -60,8 +60,8 @@ const installOrchestratorHookCopilot_1 = require("./commands/installOrchestrator
 const checkOutOrchestrator_1 = require("./commands/checkOutOrchestrator");
 const releaseCheckOut_1 = require("./commands/releaseCheckOut");
 const openOrchestratorWriterLog_1 = require("./commands/openOrchestratorWriterLog");
-const configWatcher_1 = require("./codex/configWatcher");
 const CheckoutPollService_1 = require("./providers/CheckoutPollService");
+const ReadOnlyIntentService_1 = require("./providers/ReadOnlyIntentService");
 const SESSION_SETS_REL = path.join("docs", "session-sets");
 function evaluateSupportContextKeys(allSets) {
     const cfg = vscode.workspace.getConfiguration("dabblerSessionSets");
@@ -88,16 +88,15 @@ function activate(context) {
     context.subscriptions.push({ dispose: () => scanState.dispose() });
     scanState.setLoading();
     // Set 029 Session 4: replaced the native TreeView with a custom
-    // webview tree. CustomSessionSetsView owns rendering, the
-    // accordion-body for the resolved in-progress set's orchestrator
-    // gauges, the typed message protocol with monotonic version, and
-    // the QuickPick-based row-context menu (per S4 audit Q6 = a).
+    // webview tree. CustomSessionSetsView owns rendering, the typed
+    // message protocol with monotonic version, and the QuickPick-based
+    // row-context menu (per S4 audit Q6 = a). The per-row accordion-body
+    // was retired in Set 034 (accordionHtml ships as null on every row)
+    // and the source modules deleted in Set 036 Session 6.
     //
-    // Set 033 Session 2: MarkerWatchService retired (H2). Each
-    // in-progress row's accordion is computed from the orchestrator
-    // block on its own session-state.json — the workspace-level
-    // file-watcher below (which already watches session-state.json)
-    // covers every signal the view needs.
+    // Set 033 Session 2: MarkerWatchService retired (H2). The
+    // workspace-level file-watcher below (which already watches
+    // session-state.json) covers every signal the view needs.
     const provider = new CustomSessionSetsView_1.CustomSessionSetsView(context, scanState);
     context.subscriptions.push({ dispose: () => provider.dispose() });
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(CustomSessionSetsView_1.CustomSessionSetsView.viewType, provider));
@@ -221,36 +220,42 @@ function activate(context) {
     safeRegister("registerScanAnnotationsForActiveSet", () => (0, scanAnnotationsForActiveSet_1.registerScanAnnotationsForActiveSet)(context));
     safeRegister("registerMigrateSetCommand", () => (0, migrateSet_1.registerMigrateSetCommand)(context, { refreshView: refreshAll }));
     // Set 029 Session 4: the dedicated dabblerOrchestratorIndicator view
-    // is retired in v0.16.0. The orchestrator gauges live in the
-    // CustomSessionSetsView accordion-body for the resolved in-progress
-    // set (registered above). Hook installer + manual-override stub +
-    // writer-log opener remain available as standalone commands; the
-    // accordion-body buttons dispatch them via postMessage.
+    // is retired in v0.16.0. Set 034 then retired the per-row gauges in
+    // CustomSessionSetsView; Set 036 Session 6 deleted the source.
+    // Hook installer + manual-override stub + writer-log opener remain
+    // as standalone Command Palette / right-click context-menu actions.
     //
-    // Set 029 Session 5: full multi-provider surface — Codex auto-detect
-    // via config-watcher (no command), Gemini + Copilot manual-only
-    // shim commands that delegate to the universal manual-override
-    // quickpick. Manual stub from S2 is retired in favor of the real
-    // implementation.
+    // Set 029 Session 5: full multi-provider surface — Gemini + Copilot
+    // manual-only shim commands that delegate to the universal
+    // manual-override quickpick. Manual stub from S2 is retired in favor
+    // of the real implementation.
+    //
+    // Set 036 Session 3 (D1 watcher-scope discipline): the Codex
+    // config.toml auto-detect watcher is retired. Codex joins Gemini
+    // and Copilot as a manual-only orchestrator; operators claim a
+    // Codex check-out via "Check Out As…" (the canonical writer path)
+    // instead of via filesystem inference.
     safeRegister("registerInstallOrchestratorHookClaudeCode", () => (0, installOrchestratorHookClaudeCode_1.registerInstallOrchestratorHookClaudeCodeCommand)(context));
     safeRegister("registerInstallOrchestratorHookGemini", () => (0, installOrchestratorHookGemini_1.registerInstallOrchestratorHookGeminiCommand)(context));
     safeRegister("registerInstallOrchestratorHookCopilot", () => (0, installOrchestratorHookCopilot_1.registerInstallOrchestratorHookCopilotCommand)(context));
     safeRegister("registerCheckOutOrchestrator", () => (0, checkOutOrchestrator_1.registerCheckOutOrchestrator)(context));
     safeRegister("registerReleaseCheckOut", () => (0, releaseCheckOut_1.registerReleaseCheckOut)(context));
     safeRegister("registerOpenOrchestratorWriterLog", () => (0, openOrchestratorWriterLog_1.registerOpenOrchestratorWriterLog)(context));
-    safeRegister("activateCodexConfigWatcher", () => {
-        context.subscriptions.push((0, configWatcher_1.activateCodexConfigWatcher)(context));
-    });
+    // Set 036 Session 4: ReadOnlyIntentService is the in-memory map of
+    // session sets the operator picked "Open in Read-Only Mode" on via
+    // the chatSessionMismatchModal. checkOutOrchestrator reads it to
+    // prompt-before-write; lifetime ends when the extension host
+    // deactivates.
+    context.subscriptions.push({ dispose: () => (0, ReadOnlyIntentService_1.getReadOnlyIntentService)().dispose() });
     // Set 033 Session 5: CheckoutPollService watches
     // ~/.dabbler/checkout-conflicts/ for structured conflict records
-    // emitted by the Claude SessionStart invoker and the Codex config
-    // watcher on EXIT_CHECKOUT_CONFLICT (H3 refusal). For each record,
-    // it surfaces a poll/force/dismiss prompt; "poll" watches the held
-    // set's session-state.json (5s debounce) and auto-retries
-    // start_session when the slot becomes free (H4 identity gate). The
-    // pythonPath resolver mirrors the one in checkOutOrchestrator.ts /
-    // configWatcher.ts so all three paths share the operator's
-    // dabblerSessionSets.pythonPath setting.
+    // emitted by the Claude SessionStart invoker on
+    // EXIT_CHECKOUT_CONFLICT (H3 refusal). For each record, it surfaces
+    // a poll/force/dismiss prompt; "poll" watches the held set's
+    // session-state.json (5s debounce) and auto-retries start_session
+    // when the slot becomes free (H4 identity gate). The pythonPath
+    // resolver mirrors the one in checkOutOrchestrator.ts so both paths
+    // share the operator's dabblerSessionSets.pythonPath setting.
     safeRegister("CheckoutPollService", () => {
         const pollService = new CheckoutPollService_1.CheckoutPollService({
             pythonPathResolver: (cwd) => {

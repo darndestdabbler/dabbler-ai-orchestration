@@ -100,10 +100,11 @@ async function teardown(per) {
         const row = inner.locator('[role="treeitem"][data-slug="029-scenario-in-progress"]');
         await (0, test_1.expect)(row).toBeVisible();
         await (0, test_1.expect)(row).toHaveAttribute("aria-level", "2");
-        // In-progress + resolved row should default to expanded
-        // (accordion shows). Since this is the only in-progress set in
-        // the workspace, the walk-up resolver returns it cleanly.
-        await (0, test_1.expect)(row).toHaveAttribute("aria-expanded", /true|false/);
+        // Set 036 Session 6: dropped the aria-expanded assertion. Set 034
+        // retired the per-row accordion (rows are no longer expandable);
+        // the renderRow helper in client.js stopped emitting aria-expanded
+        // entirely. The pre-Set-034 assertion was a stale orphan that
+        // never caught a regression — the orphan-test sweep removes it.
     }
     finally {
         await teardown(per);
@@ -172,47 +173,29 @@ async function teardown(per) {
 // `.dabbler/orchestrator.json` marker is retired (H2) and the
 // accordion now reads from session-state.json's `orchestrator` block.
 // The Set 029 S5 signal-class scenarios (configured-default / manual)
-// covered the retired signalKind affordance; the new block-fed render
-// emits only signal-current, so those scenarios are no longer
-// meaningful and have been removed. Set 033 Session 4 will add the
-// dedicated check-out conflict + force-override + release-checkout
-// Playwright scenarios.
+// covered the retired signalKind affordance; with Set 036 S3 also
+// retiring the enum on the renderer side, no signalKind class is
+// emitted at all and the original scenarios are gone for good. Set
+// 033 Session 4 added the dedicated check-out conflict +
+// force-override + release-checkout Playwright scenarios.
 // ---------------------------------------------------------------------
-(0, test_1.test)("seeded orchestrator block renders provider sublabel in the accordion", async () => {
-    const per = {};
-    try {
-        per.tmpPath = (0, electronLaunch_1.makeTmpDir)("dabbler-pw-orch-block");
-        const h = (0, electronLaunch_1.makeSet)(per.tmpPath, "033-orch-block", 2);
-        (0, electronLaunch_1.startSession)(h, 1);
-        (0, electronLaunch_1.seedOrchestratorBlock)(h, {
-            engine: "claude",
-            provider: "anthropic",
-            model: "claude-opus-4-7",
-            effort: "high",
-        });
-        per.launch = await (0, electronLaunch_1.launchVSCode)(h.repo_root);
-        const inner = await (0, electronLaunch_1.openSessionSetsView)(per.launch.page);
-        await (0, electronLaunch_1.triggerRefresh)(per.launch.page);
-        const row = inner.locator('[role="treeitem"][data-slug="033-orch-block"]');
-        await (0, test_1.expect)(row).toBeVisible({ timeout: 30000 });
-        // Provider sublabel renders verbatim. The synthesizer uses the
-        // bare provider string ("anthropic") as the display name — Set 029
-        // S5's rich providerDisplayName mapping was tied to the retired
-        // marker schema.
-        await (0, test_1.expect)(row.getByText(/anthropic/)).toBeVisible();
-    }
-    finally {
-        await teardown(per);
-    }
-});
-(0, test_1.test)("two in-progress sets each render their own accordion body", async () => {
+// Set 036 Session 6: the "seeded orchestrator block renders provider
+// sublabel" and "two in-progress sets each render their own accordion
+// body" scenarios were deleted alongside the source modules they
+// asserted against (OrchestratorAccordion.renderAccordionLoaded +
+// the data-expandable attribute on rows). Set 034 retired the per-row
+// accordion entirely; both scenarios had been failing silently on the
+// post-Set-034 build but were never caught by CI because no one ran
+// the full Layer-3 suite between Set 034 close and Set 036 Session 6.
+//
+// The non-orphan invariant ("the ambiguity banner is gone post-Set-033")
+// is captured below as a focused replacement scenario.
+(0, test_1.test)("multi-in-progress workspaces render two rows (no ambiguity banner)", async () => {
     const per = {};
     try {
         per.tmpPath = (0, electronLaunch_1.makeTmpDir)("dabbler-pw-multi-inflight");
         const a = (0, electronLaunch_1.makeSet)(per.tmpPath, "033-set-a", 2);
         const b = (0, electronLaunch_1.makeAdditionalSet)(a, "033-set-b", 2);
-        // Both sets in-progress with distinct orchestrator identities.
-        // The new tree provider must paint two accordions, one per row.
         (0, electronLaunch_1.startSession)(a, 1);
         (0, electronLaunch_1.seedOrchestratorBlock)(a, {
             engine: "claude",
@@ -234,10 +217,6 @@ async function teardown(per) {
         const rowB = inner.locator('[role="treeitem"][data-slug="033-set-b"]');
         await (0, test_1.expect)(rowA).toBeVisible({ timeout: 30000 });
         await (0, test_1.expect)(rowB).toBeVisible();
-        // Both rows must carry an accordion body (data-expandable="1").
-        // Pre-Set-033 only the resolver's single "active" row had one.
-        await (0, test_1.expect)(rowA).toHaveAttribute("data-expandable", "1");
-        await (0, test_1.expect)(rowB).toHaveAttribute("data-expandable", "1");
         // Pre-Set-033 the ambiguity banner appeared at "multiple
         // in-progress sets". It must NOT appear anymore — the new
         // protocol drops the field entirely.
@@ -247,34 +226,14 @@ async function teardown(per) {
         await teardown(per);
     }
 });
-(0, test_1.test)("empty-state CTA falls back to Claude installer when no orchestrators detected", async () => {
-    const per = {};
-    try {
-        per.tmpPath = (0, electronLaunch_1.makeTmpDir)("dabbler-pw-empty-cta");
-        const h = (0, electronLaunch_1.makeSet)(per.tmpPath, "029-empty-cta", 2);
-        // Intentionally do NOT seed a marker — the resolved in-progress
-        // row should render the empty-state accordion body. The smart
-        // CTA's detection runs against the test host's user dir, which
-        // typically has ~/.claude/ if any Claude tooling was ever used.
-        // The assertion checks the *fallback* label form so the test is
-        // robust against the host's actual install footprint.
-        per.launch = await (0, electronLaunch_1.launchVSCode)(h.repo_root);
-        const inner = await (0, electronLaunch_1.openSessionSetsView)(per.launch.page);
-        await (0, electronLaunch_1.triggerRefresh)(per.launch.page);
-        const row = inner.locator('[role="treeitem"][data-slug="029-empty-cta"]');
-        await (0, test_1.expect)(row).toBeVisible({ timeout: 30000 });
-        // Empty-state CTA always renders a link button with data-command.
-        // The label varies by detection; we just assert *some* install/
-        // preset link exists and the "No signal —" prefix is present.
-        const cta = row.locator(".acc-empty-cta");
-        await (0, test_1.expect)(cta).toBeVisible();
-        await (0, test_1.expect)(cta).toContainText(/No signal/);
-        await (0, test_1.expect)(cta.locator("button.acc-link")).toBeVisible();
-    }
-    finally {
-        await teardown(per);
-    }
-});
+// Set 036 Session 6: the "empty-state CTA falls back to Claude
+// installer" scenario was deleted alongside the source modules it
+// asserted against (OrchestratorAccordion.renderAccordionEmpty +
+// detectOrchestrators.pickEmptyStateCta). Per-row accordions stopped
+// rendering in Set 034 (CustomSessionSetsView.buildRow ships
+// accordionHtml: null); the empty-state DOM element never made it to
+// the webview. The scenario had no live surface to pin and is
+// replaced by the next test's positive-rendering coverage.
 (0, test_1.test)("loading-state sentinel is replaced by row list when scan completes", async () => {
     const per = {};
     try {

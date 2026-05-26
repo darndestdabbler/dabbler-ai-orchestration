@@ -1,0 +1,26 @@
+{
+  "session_set": "047-state-file-schema-v4-audit",
+  "session_number": 1,
+  "passes": [
+    {
+      "label": "PASS A",
+      "primary_model": "gemini-pro",
+      "primary_provider": "gemini-2.5-pro",
+      "primary_cost": 0.023,
+      "verify_model": "gpt-5-4-mini",
+      "verify_provider": "openai",
+      "verify_cost": 0.03151875,
+      "verify_verdict": "ISSUES_FOUND"
+    },
+    {
+      "label": "PASS B (devil's-advocate)",
+      "primary_model": "gemini-pro",
+      "primary_provider": "gemini-2.5-pro",
+      "primary_cost": 0.026309999999999997,
+      "verify_model": "gpt-5-4-mini",
+      "verify_provider": "openai",
+      "verify_cost": 0.027682500000000002,
+      "verify_verdict": "ISSUES_FOUND"
+    }
+  ]
+}

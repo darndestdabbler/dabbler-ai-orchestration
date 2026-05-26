@@ -234,11 +234,19 @@ def synthesize_v3_from_v2(state: dict, spec_md_path: Path) -> dict:
 
     # Figure out the session count: prefer the explicit totalSessions,
     # else the largest known number from spec/legacy ledger, else 0.
+    #
+    # Set 046 Session 2: ``legacy_current`` is intentionally excluded
+    # from the candidate set. Including it inflated the synthesized
+    # total to 1 for the plan-less in-progress shape the Set 046 writer
+    # produces (``totalSessions: null``, ``currentSession: 1``,
+    # ``completedSessions: []``, no ``sessions[]``) — which made the
+    # Explorer render ``0/1`` instead of the intended ``0/?``. The
+    # remaining candidates (explicit ``totalSessions``, spec.md
+    # headings, closed-session numbers) are all evidence the operator
+    # has committed to a plan; ``currentSession`` alone is not.
     candidates = [legacy_total]
     candidates.extend(titles_by_number.keys())
     candidates.extend(legacy_completed)
-    if legacy_current is not None:
-        candidates.append(legacy_current)
     total = max(candidates) if candidates else 0
 
     sessions: List[dict] = []

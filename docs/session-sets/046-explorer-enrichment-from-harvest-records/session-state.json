@@ -9,44 +9,27 @@
     },
     {
       "number": 2,
-      "title": "Writer-side totalSessions:null + Explorer pre-flight",
-      "status": "not-started"
-    },
-    {
-      "number": 3,
-      "title": "Second-line orchestrator badge + state-divergence pill",
-      "status": "not-started"
-    },
-    {
-      "number": 4,
-      "title": "Live cost surfacing per row",
-      "status": "not-started"
-    },
-    {
-      "number": 5,
-      "title": "Time-since-last-activity per row",
-      "status": "not-started"
-    },
-    {
-      "number": 6,
-      "title": "(needs migration) expansion: migrator + triage + click action",
-      "status": "not-started"
-    },
-    {
-      "number": 7,
-      "title": "README screenshot + cross-tier docs + verification + dual release",
-      "status": "not-started"
+      "title": "Writer-side totalSessions:null + Explorer pre-flight + close-out (reduced scope)",
+      "status": "in-progress"
     }
   ],
-  "currentSession": null,
-  "totalSessions": 7,
+  "currentSession": 2,
+  "totalSessions": 2,
   "completedSessions": [
     1
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-26T03:15:02.342241-04:00",
+  "startedAt": "2026-05-26T05:19:52.342166-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "chatSessionId": "ecdc00b8-6830-4aa6-8679-f2eab9f154ee",
+    "checkedOutAt": "2026-05-26T05:19:40.871816-04:00",
+    "lastActivityAt": "2026-05-26T05:19:52.342166-04:00"
+  }
 }

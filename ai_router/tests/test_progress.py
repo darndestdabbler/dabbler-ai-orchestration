@@ -576,6 +576,40 @@ class TestSynthesizeV3FromV2:
         # Neither True nor 1.0 should escalate session 1 to complete.
         assert out["sessions"][0]["status"] == SESSION_STATUS_NOT_STARTED
 
+    def test_planless_state_does_not_inflate_total_from_currentSession(
+        self, spec_missing
+    ):
+        """Set 046 Session 2: the synthesizer must NOT promote the
+        total to ``currentSession`` alone when no other signal (explicit
+        totalSessions, spec.md headings, closed sessions) supports it.
+
+        This is the read-side half of the ``0/?`` deliverable: the Set
+        046 writer emits ``totalSessions: null`` + no ``sessions[]``
+        for a plan-less Session 1 in flight, and the synthesizer would
+        previously inflate total to 1 (from ``legacyCurrent``),
+        producing ``0/1`` instead of the intended ``0/?``. Mirror
+        check on the TS side lives in the Layer-2 progress.test.ts
+        suite.
+        """
+        v2 = {
+            "schemaVersion": 2,
+            "sessionSetName": "planless",
+            "currentSession": 1,
+            "totalSessions": None,
+            "status": "in-progress",
+            "lifecycleState": "work_in_progress",
+            "completedSessions": [],
+        }
+        out = synthesize_v3_from_v2(v2, spec_missing)
+        # No candidates → sessions[] empty → rule 1 fires through
+        # get_progress. The Explorer's fileSystem.ts catches that and
+        # falls through with totalSessions stayed-null, which makes
+        # fractionFor() render ``0/?``.
+        assert out["sessions"] == []
+        with pytest.raises(SessionStateInvariantError) as exc:
+            get_progress(out)
+        assert exc.value.rule == 1
+
     def test_v2_pure_no_mutation(self, spec_with_headings):
         v2 = {
             "schemaVersion": 2,

@@ -328,7 +328,19 @@ function main() {
     // hook-log debugger. Any other non-zero (boundary violations,
     // usage errors) only surfaces to stderr; the writer is the
     // source of truth for state, the hook is best-effort notification.
-    if (result.status === EXIT_CHECKOUT_CONFLICT) {
+    //
+    // Set 046 mid-Session-2 hotfix: with hard-coordination
+    // enforcement opt-in (default off), start_session almost never
+    // returns EXIT_CHECKOUT_CONFLICT in practice. Belt-and-suspenders
+    // we still only emit a conflict record when enforcement is on,
+    // so a future code path that incidentally routes through exit-4
+    // doesn't resurrect the operator-blocking toast.
+    const enforcementOn = (() => {
+      const v = process.env.DABBLER_ENFORCE_CHECKOUT_COORDINATION;
+      if (typeof v !== "string") return false;
+      return ["1", "true", "yes", "on"].includes(v.trim().toLowerCase());
+    })();
+    if (result.status === EXIT_CHECKOUT_CONFLICT && enforcementOn) {
       emitConflictRecord(resolution, model, effort, chatSessionId);
     }
     if (result.stderr) {

@@ -16,13 +16,29 @@ CLI shape::
     python -m ai_router.start_session --session-set-dir <path> \\
         --engine claude --model claude-opus-4-7 [--session-number N] \\
         [--effort medium] [--provider anthropic] \\
-        [--chat-session-id <uuid>] [--force]
+        [--chat-session-id <uuid>] [--total-sessions N] [--force]
 
 Behavior:
 
 - ``--session-number`` is optional. When absent, the CLI infers the
   next session via ``compute_effective_completed_sessions(dir)``:
   ``max(closed) + 1``, or ``1`` for a not-started set.
+- **``--total-sessions`` is optional (Set 046 Session 2).** When
+  absent, the writer resolves the session plan size from the
+  existing ``session-state.json``'s ``totalSessions`` field (if any),
+  falling back to the spec.md Session Set Configuration block's
+  ``totalSessions`` field, and finally to ``null``. A ``null``
+  result writes a **plan-less in-progress** snapshot — no
+  ``sessions[]`` ledger, ``totalSessions: null``,
+  ``currentSession`` set, ``completedSessions: []`` — so the
+  Session Set Explorer renders ``0/?`` per Set 046's deliverable
+  (a). Pre-Set-046 writers fell back to
+  ``max(spec_headings, completedSessions, session_number)``; that
+  derivation has been removed because just-having-``### Session N``-
+  headings is not a strong-enough signal of operator intent to
+  lock a total. Pass ``--total-sessions N`` to lock the count
+  explicitly, or declare ``totalSessions: N`` in spec.md's
+  configuration block.
 - **Idempotent.** Re-running for the same session N when N is already
   the in-flight session (``currentSession == N`` and N not in
   ``completedSessions[]``) is a no-op. The underlying
@@ -141,6 +157,42 @@ EXIT_READ_ONLY = 6  # Set 036 Session 4: operator chose Read-Only at TTY prompt
 # Session 2).
 CHAT_SESSION_ID_ENV_VAR = "CHAT_SESSION_ID"
 
+# Set 046 mid-Session-2 hotfix: hard-coordination enforcement (Set 033
+# H3 + Set 036 H4) is opt-in. The mechanics — orchestrator block,
+# checkedOutAt, lastActivityAt, chatSessionId composite identity — are
+# still tracked on every write; only the REFUSAL (and the
+# chatSessionId-mismatch interactive prompt that lives behind it) is
+# gated.
+#
+# Why off by default: in real multi-orchestrator workflows (the
+# operator running claude on one machine and codex on another, both
+# pointed at the same workspace), the H3 refusal surfaced a
+# poll/force-override/dismiss toast that blocked the second
+# orchestrator's session-start hook. The friction outweighed the
+# state-corruption protection the refusal was designed to provide.
+# The audit trail in ``session-state.json``'s ``orchestrator`` block
+# history remains the operator's diagnostic surface.
+#
+# Why an env var rather than a permanent rip-out: the Set 033 / Set
+# 036 test suites continue to exercise the refusal logic when this
+# env var is set, so a future audit-then-spec rollback of the
+# coordination layer (or a future re-enable) doesn't have to
+# resurrect deleted code.
+ENFORCE_COORDINATION_ENV_VAR = "DABBLER_ENFORCE_CHECKOUT_COORDINATION"
+
+
+def _coordination_enforced() -> bool:
+    """True iff the operator opted in to H3 + chatSessionId refusal.
+
+    The check is "env var is a truthy string". ``1``, ``true``,
+    ``yes``, ``on`` (case-insensitive) all turn enforcement back on;
+    unset, empty, ``0``, ``false`` are the (default) off state.
+    """
+    raw = os.environ.get(ENFORCE_COORDINATION_ENV_VAR, "")
+    if not isinstance(raw, str):
+        return False
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
 # Set 033 Session 1 (H3): the force-override audit trail. Append-only,
 # best-effort — a log-write failure does not block the override (the
 # state file is the source of truth; the log is observability).
@@ -219,6 +271,22 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "SessionStart payload's ``session_id`` field; other "
             "orchestrators source it via ``python -m "
             "ai_router.new_chat_id`` (Set 036 Session 2)."
+        ),
+    )
+    p.add_argument(
+        "--total-sessions",
+        type=int,
+        default=None,
+        help=(
+            "Total number of sessions in this set (Set 046 Session "
+            "2). When omitted, the writer resolves the total from "
+            "the existing state file, then spec.md's configuration "
+            "block, and writes a plan-less in-progress snapshot "
+            "(``totalSessions: null``, no ``sessions[]`` ledger) if "
+            "neither yields a value. Plan-less snapshots render as "
+            "``0/?`` in the Session Set Explorer per Set 046 "
+            "deliverable (a). Pass this flag to lock the count "
+            "explicitly without editing spec.md."
         ),
     )
     p.add_argument(
@@ -595,11 +663,16 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     # coordination check. If the existing orchestrator block on disk
     # names a different ``engine + provider + chatSessionId``
     # composite than the caller, refuse the write unless ``--force``
-    # is set. The check runs AFTER the existing boundary checks so
-    # the more-specific "session N is still in flight" / "session N
-    # is already closed" / "skip-ahead" errors surface first when
-    # applicable — H3 is the holder-conflict layer, not a replacement
-    # for the lifecycle boundary.
+    # is set.
+    #
+    # Set 046 mid-Session-2 hotfix: the refusal (and the
+    # chatSessionId-mismatch interactive prompt) only fires when
+    # ``DABBLER_ENFORCE_CHECKOUT_COORDINATION`` is set. The default-
+    # off behavior treats every conflicting check-out as an authority
+    # handoff: the new holder claims the slot, the writer log
+    # captures the handoff (best-effort audit trail), and execution
+    # falls through to ``register_session_start`` to rewrite the
+    # orchestrator block.
     #
     # Tolerant-on-read for chatSessionId: a prior block missing the
     # ``chatSessionId`` field entirely (pre-Set-036 writer) or with
@@ -607,11 +680,6 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     # to record) treats the caller's chatSessionId as a match for
     # engine + provider equality. The first new write populates the
     # field strictly via :func:`register_session_start`.
-    #
-    # Force-override is an authority handoff, not a state-machine
-    # transition: it bypasses ONLY this H3 check, not the other
-    # boundary refusals above. Logged best-effort to the writer log
-    # so the holder change is auditable.
     new_chat_session_id = _resolve_chat_session_id(args)
     prior_orch = state.get("orchestrator") if isinstance(state, dict) else None
     # The H3 + H4 check only fires when there is a prior orchestrator
@@ -636,6 +704,7 @@ def _run_under_lock(args: argparse.Namespace) -> int:
         same_holder = engine_provider_match and chat_session_id_matches
         if not same_holder:
             forced = bool(getattr(args, "force", False))
+            enforcement_on = _coordination_enforced()
             prior_label = _identity_label(
                 prior_engine,
                 prior_provider,
@@ -647,42 +716,51 @@ def _run_under_lock(args: argparse.Namespace) -> int:
                 args.provider,
                 new_chat_session_id,
             )
-            # Set 036 Session 4 (Q3 CLI side): only prompt when the
-            # mismatch is specifically a chatSessionId one (same
-            # engine+provider, different chat). The engine+provider
-            # case stays on the non-interactive refusal path — the
-            # operator routes that flow through the extension's
-            # poll/force/dismiss prompt or invokes --force directly.
-            chat_session_id_mismatch = (
-                engine_provider_match and not chat_session_id_matches
-            )
-            if not forced and chat_session_id_mismatch and _is_interactive_tty():
-                choice = _prompt_takeover_choice(prior_label, new_label)
-                if choice == "take-over":
-                    forced = True
-                elif choice == "read-only":
-                    sys.stderr.write(
-                        f"start_session: read-only mode chosen; no "
-                        f"claim written for {new_label} on this "
-                        f"session set.\n"
-                    )
-                    return EXIT_READ_ONLY
-                # 'cancel' falls through to the standard refusal below.
-            if not forced:
-                print(
-                    f"start_session: refused -- session set is checked "
-                    f"out by a different orchestrator "
-                    f"({prior_label}); caller is {new_label}. Release "
-                    f"the check-out before starting: re-run with "
-                    f"--force to override, or invoke the "
-                    f"\"Release Check-Out\" Command Palette action.",
-                    file=sys.stderr,
+            # Set 046 mid-Session-2 hotfix: when enforcement is off
+            # (the default), the chatSessionId-mismatch interactive
+            # prompt is suppressed entirely. We still log the handoff
+            # to the writer log so the orchestrator change is
+            # observable in the audit trail, then fall through to
+            # register_session_start.
+            if enforcement_on:
+                # Set 036 Session 4 (Q3 CLI side): only prompt when the
+                # mismatch is specifically a chatSessionId one (same
+                # engine+provider, different chat). The engine+provider
+                # case stays on the non-interactive refusal path — the
+                # operator routes that flow through the extension's
+                # poll/force/dismiss prompt or invokes --force directly.
+                chat_session_id_mismatch = (
+                    engine_provider_match and not chat_session_id_matches
                 )
-                return EXIT_CHECKOUT_CONFLICT
-            # Force-override: log the handoff (best-effort) then
-            # proceed. register_session_start handles the timestamps
-            # — checkedOutAt rewrites to now because the H4 identity
-            # changed.
+                if not forced and chat_session_id_mismatch and _is_interactive_tty():
+                    choice = _prompt_takeover_choice(prior_label, new_label)
+                    if choice == "take-over":
+                        forced = True
+                    elif choice == "read-only":
+                        sys.stderr.write(
+                            f"start_session: read-only mode chosen; no "
+                            f"claim written for {new_label} on this "
+                            f"session set.\n"
+                        )
+                        return EXIT_READ_ONLY
+                    # 'cancel' falls through to the standard refusal below.
+                if not forced:
+                    print(
+                        f"start_session: refused -- session set is checked "
+                        f"out by a different orchestrator "
+                        f"({prior_label}); caller is {new_label}. Release "
+                        f"the check-out before starting: re-run with "
+                        f"--force to override, or invoke the "
+                        f"\"Release Check-Out\" Command Palette action.",
+                        file=sys.stderr,
+                    )
+                    return EXIT_CHECKOUT_CONFLICT
+            # Handoff: log to the writer log (best-effort) then proceed.
+            # When enforcement was on, this branch fires only after
+            # ``--force`` (or the interactive take-over choice). When
+            # enforcement is off (the default), every handoff lands here
+            # so the orchestrator-writer.log captures the holder change
+            # as the canonical audit signal.
             _log_force_override(
                 session_set_dir=session_set_dir,
                 session_number=requested,
@@ -705,7 +783,21 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     # Set 030 Session 3: derive total via the v3 view when available;
     # ``register_session_start`` tolerates None and falls back to its
     # own resolution chain (caller-supplied -> existing state -> spec).
-    total_sessions = view.total_sessions if view is not None and view.total_sessions > 0 else None
+    #
+    # Set 046 Session 2: ``--total-sessions`` on the CLI is the
+    # caller-supplied value when present. The v3-view fallback
+    # protects the common "re-start an in-flight session" case
+    # (totalSessions already populated from a prior write) and is
+    # the path that lets the writer's existing-state fallback do
+    # the right thing without changing register_session_start's
+    # resolution chain.
+    cli_total = getattr(args, "total_sessions", None)
+    if isinstance(cli_total, int) and cli_total > 0:
+        total_sessions = cli_total
+    else:
+        total_sessions = (
+            view.total_sessions if view is not None and view.total_sessions > 0 else None
+        )
 
     register_session_start(
         session_set=session_set_dir,

@@ -469,12 +469,28 @@ def register_session_start(
     # Set 030 Session 2: build the v3 sessions[] ledger first; the
     # legacy triple is derived from it. The session count is the
     # caller's ``total_sessions``, falling back to the existing state's
-    # value, then to the largest known number across prior_completed +
-    # session_number + spec.md headings. The order matters: writer
-    # callers (the start_session CLI) always pass the spec-known
-    # ``totalSessions`` so the first branch wins on every legitimate
-    # invocation; the fallbacks protect the very rare case where a
-    # caller doesn't have the total at hand.
+    # value, then to the spec.md configuration block's
+    # ``totalSessions`` field. The order matters: writer callers (the
+    # start_session CLI) always pass the spec-known ``totalSessions``
+    # so the first branch wins on every legitimate invocation; the
+    # fallbacks protect the very rare case where a caller doesn't have
+    # the total at hand.
+    #
+    # Set 046 Session 2 (deliverable (a)): the writer no longer falls
+    # back to ``session_number`` (or its companion ``max(completed,
+    # session_number)``) when nothing else yields a total. The
+    # operator-observed bug — "as soon as you run start_session on an
+    # unscoped stub, the fraction becomes 0/1 and stays that way until
+    # close_session writes the real count" — was driven by the
+    # session_number fallback writing total=1 on a fresh Session 1.
+    # We keep the spec.md heading fallback (``### Session N`` headings
+    # are an explicit "here is the plan" signal the operator authored
+    # by hand) and drop only the session_number fallback. When none of
+    # the four sources yield a value, the writer falls through to the
+    # **plan-less in-progress** shape below: no ``sessions[]`` ledger,
+    # ``totalSessions: null``, ``currentSession`` set,
+    # ``completedSessions: []``. The Session Set Explorer renders this
+    # as ``0/?`` per the existing ``fractionFor()`` carve-out.
     effective_total = total_sessions
     if not (isinstance(effective_total, int) and effective_total > 0):
         if isinstance(existing, dict):
@@ -482,61 +498,99 @@ def register_session_start(
             if isinstance(prior_total, int) and prior_total > 0:
                 effective_total = prior_total
     if not (isinstance(effective_total, int) and effective_total > 0):
+        spec_total = _read_total_sessions_from_spec(session_set)
+        if isinstance(spec_total, int) and spec_total > 0:
+            effective_total = spec_total
+    if not (isinstance(effective_total, int) and effective_total > 0):
         spec_titles = _spec_titles_for_set(session_set)
-        max_spec_number = max(spec_titles.keys()) if spec_titles else 0
-        max_completed = max(prior_completed) if prior_completed else 0
-        effective_total = max(max_spec_number, max_completed, session_number)
-    # Spec D6 fail-loud: if the caller-supplied (or
-    # backfilled-from-existing) total is smaller than the session
-    # number being started or any prior-closed session, the input
-    # is incoherent — the CLI's boundary checks should have caught
-    # it upstream, and silently stretching the total here would
-    # mask the upstream bug. Surface it instead. The
-    # _build_sessions_array call below would also raise on the
-    # same condition (in_progress_number > total), but this earlier
-    # check produces a clearer error message that names both
-    # values.
-    if session_number > effective_total:
-        raise SessionStateInvariantError(
-            2,
-            f"session_number {session_number} exceeds total_sessions "
-            f"{effective_total}; the CLI's boundary check should have "
-            "refused this. If you are calling the Python helper "
-            "directly, pass a total_sessions that covers your "
-            "session_number, or update the spec.md totalSessions "
-            "field first.",
-        )
-    if prior_completed and max(prior_completed) > effective_total:
-        raise SessionStateInvariantError(
-            2,
-            f"prior completedSessions contains {max(prior_completed)} "
-            f"which exceeds total_sessions {effective_total}; "
-            "totalSessions on disk is inconsistent with the closed-set "
-            "history. Run close_session --repair or update the spec.md "
-            "totalSessions field.",
+        if spec_titles:
+            max_spec_number = max(spec_titles.keys())
+            if max_spec_number > 0:
+                effective_total = max_spec_number
+    plan_known = isinstance(effective_total, int) and effective_total > 0
+    if plan_known:
+        # Spec D6 fail-loud: if the caller-supplied (or
+        # backfilled-from-existing) total is smaller than the session
+        # number being started or any prior-closed session, the input
+        # is incoherent — the CLI's boundary checks should have caught
+        # it upstream, and silently stretching the total here would
+        # mask the upstream bug. Surface it instead. The
+        # _build_sessions_array call below would also raise on the
+        # same condition (in_progress_number > total), but this earlier
+        # check produces a clearer error message that names both
+        # values.
+        if session_number > effective_total:
+            raise SessionStateInvariantError(
+                2,
+                f"session_number {session_number} exceeds total_sessions "
+                f"{effective_total}; the CLI's boundary check should have "
+                "refused this. If you are calling the Python helper "
+                "directly, pass a total_sessions that covers your "
+                "session_number, or update the spec.md totalSessions "
+                "field first.",
+            )
+        if prior_completed and max(prior_completed) > effective_total:
+            raise SessionStateInvariantError(
+                2,
+                f"prior completedSessions contains {max(prior_completed)} "
+                f"which exceeds total_sessions {effective_total}; "
+                "totalSessions on disk is inconsistent with the closed-set "
+                "history. Run close_session --repair or update the spec.md "
+                "totalSessions field.",
+            )
+
+        # in_progress is session_number unless it's already in
+        # prior_completed (which would violate rule 4 — the writer must
+        # refuse, since the start_session CLI's boundary gate should have
+        # caught this earlier).
+        sessions = _build_sessions_array(
+            session_set,
+            total=effective_total,
+            completed_numbers=prior_completed,
+            in_progress_number=session_number,
+            prior_state=existing,
         )
 
-    # in_progress is session_number unless it's already in
-    # prior_completed (which would violate rule 4 — the writer must
-    # refuse, since the start_session CLI's boundary gate should have
-    # caught this earlier).
-    sessions = _build_sessions_array(
-        session_set,
-        total=effective_total,
-        completed_numbers=prior_completed,
-        in_progress_number=session_number,
-        prior_state=existing,
-    )
-
-    # Writer-side invariant enforcement (spec D6, fail loud).
-    # Validation happens BEFORE any file is written or any event is
-    # appended, so a violation leaves both the on-disk snapshot and
-    # the events ledger in their previous (consistent) state.
-    _validate_sessions_or_raise(
-        sessions,
-        top_status=SESSION_STATUS_IN_PROGRESS,
-        lifecycle_state=SessionLifecycleState.WORK_IN_PROGRESS.value,
-    )
+        # Writer-side invariant enforcement (spec D6, fail loud).
+        # Validation happens BEFORE any file is written or any event is
+        # appended, so a violation leaves both the on-disk snapshot and
+        # the events ledger in their previous (consistent) state.
+        _validate_sessions_or_raise(
+            sessions,
+            top_status=SESSION_STATUS_IN_PROGRESS,
+            lifecycle_state=SessionLifecycleState.WORK_IN_PROGRESS.value,
+        )
+    else:
+        # Set 046 Session 2: plan-less in-progress write. The state
+        # file carries ``totalSessions: null`` and omits the
+        # ``sessions[]`` ledger entirely so the Explorer's
+        # ``fractionFor()`` renders ``0/?`` and the v3 reader's
+        # tolerant catch leaves the count derivation to the events
+        # ledger (zero closed sessions on a fresh Session 1 in flight).
+        # ``prior_completed`` must be empty here — a set with closed
+        # sessions has, by definition, a known plan; the writer
+        # boundary check below confirms that and refuses incoherent
+        # input. The session number must also be 1 (no skip-ahead is
+        # possible without a plan to skip across).
+        if prior_completed:
+            raise SessionStateInvariantError(
+                2,
+                "plan-less in-progress write refused: session set has "
+                f"{len(prior_completed)} closed session(s) "
+                f"({sorted(set(prior_completed))!r}) but no "
+                "``totalSessions`` is resolvable. Pass --total-sessions "
+                "on the CLI or declare ``totalSessions`` in spec.md's "
+                "configuration block.",
+            )
+        if session_number != 1:
+            raise SessionStateInvariantError(
+                2,
+                f"plan-less in-progress write refused: session_number "
+                f"{session_number} requested but no ``totalSessions`` is "
+                "resolvable. Only session 1 may start without a known "
+                "plan; pass --total-sessions or declare it in spec.md.",
+            )
+        sessions = None
 
     # Validation passed — now append the work_started event (the
     # audit trail) and write the snapshot (the consumer-readable
@@ -563,7 +617,21 @@ def register_session_start(
         if not already_emitted:
             append_event(session_set, "work_started", session_number)
 
-    derived_current, derived_total, derived_completed = _derive_legacy_fields(sessions)
+    if sessions is None:
+        # Set 046 Session 2 plan-less write: ``sessions[]`` is omitted,
+        # so the derivation fallback uses the boundary inputs directly.
+        # ``currentSession`` is the in-flight number, ``totalSessions``
+        # stays ``None`` (the Explorer signal the operator sees as
+        # ``?``), and ``completedSessions`` is empty by construction
+        # (the plan-less branch above refuses input with any closed
+        # sessions).
+        derived_current, derived_total, derived_completed = (
+            session_number,
+            None,
+            [],
+        )
+    else:
+        derived_current, derived_total, derived_completed = _derive_legacy_fields(sessions)
 
     # Set 033 Session 1 (H3 + H4 + OQ1) + Set 036 Session 1 (Q5):
     # compute checkedOutAt and lastActivityAt from the existing
@@ -628,30 +696,41 @@ def register_session_start(
     # was Set 036+ aware but had no chatSessionId to record" apart
     # from "this writer pre-dated Set 036" (the latter omits the key
     # entirely).
-    state = {
+    state: dict = {
         "schemaVersion": SCHEMA_VERSION,
         "sessionSetName": os.path.basename(session_set.rstrip("/\\")),
-        "sessions": sessions,
-        # Dual-write legacy triple per spec D5. Always derived from
-        # ``sessions[]`` by :func:`_derive_legacy_fields`; never
-        # independently maintained.
-        "currentSession": derived_current,
-        "totalSessions": derived_total,
-        "completedSessions": derived_completed,
-        "status": SESSION_STATUS_IN_PROGRESS,
-        "lifecycleState": SessionLifecycleState.WORK_IN_PROGRESS.value,
-        "startedAt": now,
-        "completedAt": None,
-        "verificationVerdict": None,
-        "orchestrator": {
-            "engine": orchestrator_engine,
-            "provider": orchestrator_provider,
-            "model": orchestrator_model,
-            "effort": orchestrator_effort,
-            "chatSessionId": orchestrator_chat_session_id,
-            "checkedOutAt": checked_out_at,
-            "lastActivityAt": now,
-        },
+    }
+    # Set 046 Session 2: the plan-less branch omits ``sessions`` entirely
+    # rather than writing ``"sessions": null``. The v3 reader's tolerant
+    # path (``read_progress`` checks ``state.get("sessions") is not
+    # None``) routes a missing-vs-present-null distinction through the
+    # v2 synthesis path, which would re-derive from the legacy triple
+    # and could produce a ``sessions: []`` that violates rule 1. The
+    # absent-key form is the documented carve-out for "no plan known"
+    # — same shape ``_not_started_payload`` already produces when
+    # spec.md has no configuration block.
+    if sessions is not None:
+        state["sessions"] = sessions
+    # Dual-write legacy triple per spec D5. Always derived from
+    # ``sessions[]`` by :func:`_derive_legacy_fields`; never
+    # independently maintained. The plan-less write writes
+    # ``totalSessions: None`` here so the Explorer renders ``0/?``.
+    state["currentSession"] = derived_current
+    state["totalSessions"] = derived_total
+    state["completedSessions"] = derived_completed
+    state["status"] = SESSION_STATUS_IN_PROGRESS
+    state["lifecycleState"] = SessionLifecycleState.WORK_IN_PROGRESS.value
+    state["startedAt"] = now
+    state["completedAt"] = None
+    state["verificationVerdict"] = None
+    state["orchestrator"] = {
+        "engine": orchestrator_engine,
+        "provider": orchestrator_provider,
+        "model": orchestrator_model,
+        "effort": orchestrator_effort,
+        "chatSessionId": orchestrator_chat_session_id,
+        "checkedOutAt": checked_out_at,
+        "lastActivityAt": now,
     }
     path = _state_path(session_set)
     with open(path, "w", encoding="utf-8") as f:

@@ -245,11 +245,16 @@ def test_same_composite_reattach_is_benign(tmp_path: Path):
 # (c) Different chatSessionId (same engine + provider) is refused
 # ---------------------------------------------------------------------------
 
-def test_different_chat_session_id_refuses(tmp_path: Path, capsys):
+def test_different_chat_session_id_refuses(
+    tmp_path: Path, capsys, monkeypatch
+):
     """A caller with the same engine+provider but a different
     chatSessionId is refused with EXIT_CHECKOUT_CONFLICT, and the
     error message names the existing chatSessionId so the operator
-    can identify the conflicting chat."""
+    can identify the conflicting chat.
+
+    Set 046 mid-Session-2 hotfix: enforcement is opt-in."""
+    monkeypatch.setenv("DABBLER_ENFORCE_CHECKOUT_COORDINATION", "1")
     set_dir = _fresh_set(tmp_path)
     _seed_in_flight(
         set_dir,
@@ -285,14 +290,17 @@ def test_different_chat_session_id_refuses(tmp_path: Path, capsys):
 
 
 def test_refusal_message_for_legacy_state_calls_out_no_chat_id(
-    tmp_path: Path, capsys,
+    tmp_path: Path, capsys, monkeypatch,
 ):
     """When the prior state has no chatSessionId field (pre-Set-036
     legacy shape), the tolerant-on-read path treats engine+provider
     match as same-holder. But when engine+provider ALSO differ, the
     H3 refusal must call out "no chat session ID recorded" so the
     operator sees the legacy state explicitly rather than being
-    confused by an empty composite."""
+    confused by an empty composite.
+
+    Set 046 mid-Session-2 hotfix: enforcement is opt-in."""
+    monkeypatch.setenv("DABBLER_ENFORCE_CHECKOUT_COORDINATION", "1")
     set_dir = _fresh_set(tmp_path)
     _seed_in_flight(
         set_dir,

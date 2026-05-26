@@ -158,15 +158,20 @@ export function synthesizeV3FromV2(state: any, specMdPath: string): any {
   }
 
   // Figure out total: prefer explicit, else largest known number, else 0.
+  //
+  // Set 046 Session 2: ``legacyCurrent`` is intentionally excluded
+  // from the candidate set. Including it inflated the synthesized
+  // total to 1 for the plan-less in-progress shape the Set 046 writer
+  // produces (``totalSessions: null``, ``currentSession: 1``,
+  // ``completedSessions: []``, no ``sessions[]``) — which made the
+  // Explorer render ``0/1`` instead of the intended ``0/?``. Mirrors
+  // the same change in ai_router/progress.py.
   let total = legacyTotal;
   for (const n of titlesByNumber.keys()) {
     if (n > total) total = n;
   }
   for (const n of legacyCompleted) {
     if (n > total) total = n;
-  }
-  if (legacyCurrent !== null && legacyCurrent > total) {
-    total = legacyCurrent;
   }
 
   const completedSet = new Set(legacyCompleted);

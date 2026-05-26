@@ -1,22 +1,24 @@
 {
   "status": "completed",
-  "summary": "Session 1 audit pass scope-locked the Set 046 stub into a 7-session arc. Two-pass devil's-advocate cross-provider consensus over the audit proposal (gemini-2.5-pro primary + gpt-5-4-mini verify, $0.183/$5 NTE) resolved five bias flags (3 stand-by, 1 flip — migrator gets its own session, 1 partial) and four open questions; added a state-divergence pill as a new leverage point from Pass A primary. Operator-locked deliverables (a) 0/? fraction, (b) second-line engine-model-effort badge, (c) README screenshot are mapped onto S2/S3/S7 with the canonical-primary / harvested-fallback data-source rule applied across S3/S4/S5. The v4 schema migration and blocked-on-prereqs lifecycle question are deferred to a new stub at 047-state-file-schema-v4-audit per the audit-then-spec discipline for substantial schema changes.",
+  "summary": "Set 046 Session 2 shipped deliverable (a) — the writer-side totalSessions:null change — and absorbed an operator incident mid-session: the Set 033/036 hard-coordination toast blocked staff onboarding when a Codex hook on a second machine fired the H3 refusal path. The H3 + chatSessionId-mismatch enforcement is now opt-in (DABBLER_ENFORCE_CHECKOUT_COORDINATION=1); mechanics are preserved. The original 7-session arc collapsed to 2 sessions; deliverables (b), (c), live cost, idle time, state-divergence pill, and needs-migration expansion are all CANCELLED. Future work in this area routes through Set 048+ per feedback_audit_then_spec_for_substantial_features. Cumulative Set 046 routed cost: $0.183 of $5 NTE (~3.7%). Set 046's writer change rides Set 047's release; no version bump for this set.",
   "verification_method": "manual",
   "files_changed": [
-    "docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/proposal.md",
-    "docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/run_consensus.py",
-    "docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/pass_a_primary.md",
-    "docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/pass_a_verify.md",
-    "docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/pass_b_primary.md",
-    "docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/pass_b_verify.md",
-    "docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/cost_summary.json",
-    "docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/verdict.md",
+    "ai_router/start_session.py",
+    "ai_router/session_state.py",
+    "ai_router/progress.py",
+    "ai_router/tests/test_start_session.py",
+    "ai_router/tests/test_progress.py",
+    "ai_router/tests/test_checkout_writer.py",
+    "ai_router/tests/test_chatsessionid_writer.py",
+    "ai_router/tests/test_start_session_takeover_prompt.py",
+    "tools/dabbler-ai-orchestration/src/utils/progress.ts",
+    "tools/dabbler-ai-orchestration/scripts/claude-session-start-invoker.js",
+    "CLAUDE.md",
     "docs/session-sets/046-explorer-enrichment-from-harvest-records/spec.md",
     "docs/session-sets/046-explorer-enrichment-from-harvest-records/session-state.json",
-    "docs/session-sets/046-explorer-enrichment-from-harvest-records/.close-reason-s1.md",
-    "docs/session-sets/046-explorer-enrichment-from-harvest-records/disposition.json",
-    "docs/session-sets/047-state-file-schema-v4-audit/spec.md",
-    "docs/session-sets/047-state-file-schema-v4-audit/session-state.json"
+    "docs/session-sets/046-explorer-enrichment-from-harvest-records/activity-log.json",
+    "docs/session-sets/046-explorer-enrichment-from-harvest-records/change-log.md",
+    "docs/session-sets/046-explorer-enrichment-from-harvest-records/disposition.json"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -25,8 +27,8 @@
     "model": "claude-opus-4-7",
     "effort": "high",
     "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 2 implements the writer-side totalSessions:null change designed in Session 1's audit, plus Explorer pre-flight verification of deliverable (a). Same orchestrator preserves continuity of the canonical-primary / harvested-fallback architectural framing established by the audit."
+      "code": "new-session-set",
+      "specifics": "Set 047 (per-session orchestrator + Set 033/036 rollback + watcher-scope removal) is the next active set. Session 1 of 047 is the cross-provider devil's-advocate audit of the new design."
     }
   },
   "blockers": []

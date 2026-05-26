@@ -31,6 +31,42 @@ Your role in this repo is **canonical source and release gatekeeper**:
 > `requiresE2E: false` are permanent defaults. UI/UAT/E2E-specific behavior
 > must be gated on spec-level flags.
 
+## Hard-coordination enforcement (Sets 033 / 036) is OFF by default
+
+The Set 033 H3 + Set 036 H4 hard-coordination check — `start_session`
+refusing with `EXIT_CHECKOUT_CONFLICT` (and the extension's
+poll/force/dismiss toast) when a different `engine + provider +
+chatSessionId` composite holds the check-out — was disabled mid-Set-046
+after a production incident: a Codex hook on a second machine triggered
+the refusal toast while an operator was trying to onboard staff,
+blocking real work for a coordination scenario that didn't need it.
+
+What's still tracked:
+- The `orchestrator` block in `session-state.json` (engine, provider,
+  model, effort, chatSessionId, checkedOutAt, lastActivityAt) is still
+  written on every `start_session`.
+- The orchestrator-writer audit log at
+  `~/.dabbler/orchestrator-writer.log` still appends a line on every
+  handoff so the holder change is observable post-hoc.
+- The `CheckoutPollService` in the extension still exists and is wired
+  up; it just has no records to consume (the
+  `claude-session-start-invoker.js` write site is gated on the same
+  flag) and the start_session writer never emits the conflict exit
+  code that would write one.
+
+How to re-enable (single-machine workflows, audit-driven enforcement,
+test runs):
+
+- Set `DABBLER_ENFORCE_CHECKOUT_COORDINATION=1` in the environment
+  start_session runs under. The flag accepts `1`/`true`/`yes`/`on`
+  (case-insensitive); anything else (including unset) is "off".
+- The Set 033 / Set 036 refusal tests set this env var explicitly via
+  `monkeypatch.setenv`, so their coverage is preserved.
+
+The longer-term decision (full rollback or formal re-design) is parked
+as Set 048+ behind the standard `feedback_audit_then_spec_for_substantial_features`
+discipline — do not touch the coordination layer outside an audit set.
+
 ## License
 
 `LICENSE` at the repo root is canonical. `tools/dabbler-ai-orchestration/LICENSE`

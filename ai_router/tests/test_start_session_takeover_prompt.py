@@ -32,6 +32,16 @@ from session_state import (
 )
 
 
+# Set 046 mid-Session-2 hotfix: hard-coordination enforcement is opt-in
+# (default off). Every test in this module exercises the enforcement
+# code path (TTY take-over prompt + EXIT_CHECKOUT_CONFLICT refusal), so
+# we enable it via the autouse fixture below. The same env var is
+# honored by start_session's runtime check.
+@pytest.fixture(autouse=True)
+def _enforce_coordination(monkeypatch):
+    monkeypatch.setenv("DABBLER_ENFORCE_CHECKOUT_COORDINATION", "1")
+
+
 def _fresh_set(tmp_path: Path) -> Path:
     set_dir = tmp_path / "test-set-takeover-prompt"
     set_dir.mkdir()

@@ -1,7 +1,7 @@
 {
   "sessionSetName": "046-explorer-enrichment-from-harvest-records",
   "createdDate": "2026-05-23",
-  "totalSessions": 7,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -114,6 +114,78 @@
       "stepKey": "session-001/close-out-artifacts-authored",
       "dateTime": "2026-05-26T05:25:00-04:00",
       "description": "Authored close-out artifacts: disposition.json (status=completed, verification_method=manual, next_orchestrator=claude continue-current-trajectory for S2), .close-reason-s1.md (attestation that the two-pass cross-provider audit IS the verification for this session — re-routing through close_session's verifier queue would duplicate the work at additional router cost with no marginal signal), this activity-log.json. Operator opted for --manual-verify based on the audit-session character.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/register-session-start",
+      "dateTime": "2026-05-26T05:19:52-04:00",
+      "description": "Invoked python -m ai_router.start_session for session 2 with engine=claude, model=claude-opus-4-7, effort=high, provider=anthropic, chat-session-id=ecdc00b8-6830-4aa6-8679-f2eab9f154ee. State file flipped to session 2 in-progress.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/writer-side-totalsessions-null",
+      "dateTime": "2026-05-26T05:25:00-04:00",
+      "description": "Implemented deliverable (a) — writer-side totalSessions:null for plan-less Not-Started session sets. Changes: (i) ai_router/start_session.py — added --total-sessions CLI arg; (ii) ai_router/session_state.py — register_session_start's resolution chain reduced to caller -> existing state -> spec.md config block -> spec.md ### Session N headings -> null; the pre-Set-046 max(spec_titles, completed, session_number) fallback removed because the session_number branch was the bug; plan-less branch emits state with no sessions[] key and totalSessions:null; refusal with SessionStateInvariantError on incoherent input (closed sessions but no resolvable total).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/read-side-synthesizer-fix",
+      "dateTime": "2026-05-26T05:35:00-04:00",
+      "description": "Mirror change on the read side so plan-less state round-trips correctly: ai_router/progress.py + tools/dabbler-ai-orchestration/src/utils/progress.ts both drop legacy_current/legacyCurrent from the v2->v3 synthesizer's total-candidate set. Without this change, a plan-less in-progress state would synthesize as total=1 from currentSession=1 alone, defeating the writer's null intent. The Explorer's existing fractionFor() carve-out renders the resulting totalSessions:null as 0/?.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/new-test-coverage",
+      "dateTime": "2026-05-26T05:45:00-04:00",
+      "description": "Added 6 new tests: 5 in ai_router/tests/test_start_session.py (plan-less session 1 writes null, --total-sessions CLI arg locks count, plan-less refuses session_number > 1, writer refuses state with prior completed when total unresolvable, plan-less state round-trips through read_progress with rule 1) plus 1 in ai_router/tests/test_progress.py (synthesizer does not inflate total from currentSession). Updated existing test fixture _fresh_set to use the canonical ## Session Set Configuration heading (the fixture had been silently relying on the removed session_number fallback).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/operator-incident-coordination-disabled",
+      "dateTime": "2026-05-26T05:55:00-04:00",
+      "description": "Mid-session operator incident: a Codex hook on a second machine triggered the Set 033 H3 + Set 036 H4 poll/force/dismiss toast against the in-progress 046 set just as staff was about to be onboarded. Operator directed: keep checkin/checkout mechanics, disable enforcement. Out-of-scope for original Set 046 plan, shipped this session in response. Changes: (i) ai_router/start_session.py adds _coordination_enforced() predicate gating the H3 refusal AND the chatSessionId-mismatch TTY prompt — default off, opt back in via DABBLER_ENFORCE_CHECKOUT_COORDINATION=1; (ii) tools/dabbler-ai-orchestration/scripts/claude-session-start-invoker.js conflict-record emission gated on the same env var (belt and suspenders); (iii) ai_router/tests refusal-path tests now set the env var via monkeypatch so coverage stays intact; (iv) new test test_different_holder_default_off_writes_through_without_refusal locks the default-off production behavior; (v) CLAUDE.md documents the flip and how to re-enable.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/scope-reduction",
+      "dateTime": "2026-05-26T06:00:00-04:00",
+      "description": "Operator directed scope reduction in light of the incident: only deliverable (a) ships in Set 046. Deliverables (b), (c) and the four follow-on enrichments (live cost, idle time, state-divergence pill, needs-migration expansion) are CANCELLED — future work in this area routes through Set 048+ via feedback_audit_then_spec_for_substantial_features. Rewrote spec.md to a 2-session arc, updated session-state.json to a 2-session plan with claude+anthropic as holder (reclaiming the slot from codex+openai that wrote in after the enforcement disable per default-off semantics). The audit artifacts in docs/proposals/2026-05-26-explorer-enrichment-from-harvest-records/ are preserved for any future revival.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/memory-and-changelog",
+      "dateTime": "2026-05-26T06:05:00-04:00",
+      "description": "Wrote new memory project_set_033_enforcement_disabled with the flip + how-to-re-enable + open follow-up (extension's CheckoutPollService and chatSessionMismatchModal not yet deleted — deferred to Set 047 per the operator's redesign). Authored change-log.md for Set 046 covering Session 1 + Session 2 + the cancelled scope.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/test-suite-passing",
+      "dateTime": "2026-05-26T06:10:00-04:00",
+      "description": "Full Python test suite passes: 818 passed, 1 skipped in ~157s. No release this set — Set 046's writer change rides Set 047's release. Session 2 routed cost: $0 (self-review only, no cross-provider verification given the reduced scope).",
       "status": "complete",
       "routedApiCalls": []
     }

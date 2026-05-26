@@ -40,13 +40,23 @@ def _fresh_set(tmp_path: Path, total_sessions: int = 3) -> Path:
 
     The minimal shape ``start_session`` expects: a directory with a
     ``spec.md`` (so the not-started synthesizer can read
-    ``totalSessions`` from the config block) and a synthesized
-    ``session-state.json`` carrying ``status: "not-started"``.
+    ``totalSessions`` from the ``## Session Set Configuration``
+    block) and a synthesized ``session-state.json`` carrying
+    ``status: "not-started"``.
+
+    Set 046 Session 2: the fixture now includes the canonical
+    ``## Session Set Configuration`` heading so
+    ``_read_total_sessions_from_spec`` picks up ``totalSessions``.
+    Pre-Set-046 the fixture omitted the heading and the writer fell
+    through to a ``max(spec_titles, completed, session_number)``
+    fallback that has since been removed (the session_number branch
+    was the operator-observed ``0/1`` bug Set 046 fixes).
     """
     set_dir = tmp_path / "test-set"
     set_dir.mkdir()
     (set_dir / "spec.md").write_text(
         "# spec\n\n"
+        "## Session Set Configuration\n\n"
         "```yaml\n"
         f"totalSessions: {total_sessions}\n"
         "requiresUAT: false\n"
@@ -71,10 +81,31 @@ def _args(set_dir: Path, **overrides) -> "start_session.argparse.Namespace":
     ]
     if "session_number" in overrides:
         base.extend(["--session-number", str(overrides.pop("session_number"))])
+    if "total_sessions" in overrides:
+        base.extend(["--total-sessions", str(overrides.pop("total_sessions"))])
     args = parser.parse_args(base)
     for k, v in overrides.items():
         setattr(args, k, v)
     return args
+
+
+def _planless_set(tmp_path: Path) -> Path:
+    """Create a fresh "plan-less" session set: spec.md exists but has
+    no ``## Session Set Configuration`` block and no ``### Session N``
+    headings.
+
+    Used by the Set 046 Session 2 coverage to exercise the
+    ``totalSessions: null`` writer path Explorer renders as ``0/?``.
+    """
+    set_dir = tmp_path / "planless-set"
+    set_dir.mkdir()
+    (set_dir / "spec.md").write_text(
+        "# Plan-less stub\n\n"
+        "The operator has not committed to a session breakdown yet.\n",
+        encoding="utf-8",
+    )
+    synthesize_not_started_state(str(set_dir))
+    return set_dir
 
 
 # ---------------------------------------------------------------------------
@@ -371,3 +402,137 @@ def test_main_returns_boundary_exit_on_violation(tmp_path: Path):
         "--session-number", "2",
     ])
     assert rc == start_session.EXIT_BOUNDARY
+
+
+# ---------------------------------------------------------------------------
+# Group 6: Set 046 Session 2 — plan-less in-progress + --total-sessions CLI
+# ---------------------------------------------------------------------------
+
+def test_planless_session_1_writes_totalsessions_null(tmp_path: Path):
+    """A fresh stub (no ``## Session Set Configuration`` block, no
+    ``### Session N`` headings) writes a plan-less in-progress shape:
+    ``totalSessions: null``, ``currentSession: 1``,
+    ``completedSessions: []``, no ``sessions[]``.
+
+    This is Set 046 deliverable (a): the Explorer's ``fractionFor()``
+    sees ``totalSessions == null`` and renders ``0/?`` instead of the
+    pre-Set-046 ``0/1`` (which was driven by the now-removed
+    ``max(spec_titles, completed, session_number)`` writer fallback
+    inflating to ``session_number`` on a fresh Session 1).
+    """
+    set_dir = _planless_set(tmp_path)
+
+    rc = start_session.run(_args(set_dir))
+    assert rc == start_session.EXIT_OK
+
+    state = read_session_state(str(set_dir)) or {}
+    assert state.get("currentSession") == 1
+    assert state.get("totalSessions") is None, (
+        "plan-less write must keep totalSessions: null so the "
+        "Explorer renders 0/? per Set 046 deliverable (a)"
+    )
+    assert state.get("completedSessions") == []
+    assert "sessions" not in state, (
+        "plan-less write must omit sessions[] entirely; the v3 reader's "
+        "carve-out for 'no plan known' is the absent-key form, not "
+        "present-with-null or present-with-empty-array"
+    )
+    assert state.get("status") == "in-progress"
+    assert state.get("lifecycleState") == "work_in_progress"
+
+
+def test_total_sessions_cli_arg_locks_count_without_spec(tmp_path: Path):
+    """``--total-sessions N`` lets the operator lock the count on a
+    plan-less stub without editing spec.md. The writer materializes a
+    full ``sessions[]`` ledger of length N with session 1 in-progress
+    and the rest not-started.
+    """
+    set_dir = _planless_set(tmp_path)
+
+    rc = start_session.run(_args(set_dir, total_sessions=5))
+    assert rc == start_session.EXIT_OK
+
+    state = read_session_state(str(set_dir)) or {}
+    assert state.get("totalSessions") == 5
+    assert state.get("currentSession") == 1
+    sessions = state.get("sessions")
+    assert isinstance(sessions, list) and len(sessions) == 5
+    assert sessions[0]["number"] == 1
+    assert sessions[0]["status"] == "in-progress"
+    assert all(s["status"] == "not-started" for s in sessions[1:])
+
+
+def test_planless_refuses_session_number_above_1(tmp_path: Path):
+    """The plan-less branch only accepts session 1 — without a known
+    plan, there is no way to coherently start session 2 (no
+    contiguous-from-1 invariant to satisfy).
+    """
+    set_dir = _planless_set(tmp_path)
+    args = _args(set_dir, session_number=2)
+    # The CLI's skip-ahead boundary refuses session 2 with no closed
+    # sessions before it ever reaches the plan-less branch in the
+    # writer, so we expect EXIT_BOUNDARY rather than the writer's
+    # invariant-error path. The behavioral contract — "plan-less
+    # Session 2 is refused" — holds either way.
+    rc = start_session.run(args)
+    assert rc == start_session.EXIT_BOUNDARY
+
+
+def test_planless_writer_refuses_state_with_prior_completed(tmp_path: Path):
+    """If a state file claims closed sessions but no
+    ``totalSessions`` is resolvable, the writer refuses with a
+    SessionStateInvariantError — that combination is incoherent and
+    silently writing a plan-less snapshot would lose the closed-
+    session history.
+    """
+    from progress import SessionStateInvariantError
+
+    set_dir = _planless_set(tmp_path)
+    # Hand-construct an inconsistent state: completedSessions=[1] but
+    # totalSessions=null and no spec.md signal.
+    state_path = set_dir / "session-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["completedSessions"] = [1]
+    state["currentSession"] = None
+    state["status"] = "in-progress"
+    state["lifecycleState"] = "work_in_progress"
+    state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    with pytest.raises(SessionStateInvariantError) as excinfo:
+        register_session_start(
+            session_set=str(set_dir),
+            session_number=2,
+            total_sessions=None,
+            orchestrator_engine="claude",
+            orchestrator_model="claude-opus-4-7",
+            orchestrator_effort="medium",
+            orchestrator_provider="anthropic",
+        )
+    assert "plan-less" in str(excinfo.value)
+
+
+def test_planless_state_round_trips_through_read_progress(tmp_path: Path):
+    """The v3 reader's tolerant path (``read_progress`` raises rule 1
+    for missing ``sessions[]``) is what makes the Explorer's
+    ``fractionFor()`` see ``totalSessions: null`` and render ``0/?``.
+    Lock down both the writer-produced shape and the read-side
+    behavior so a regression in either layer shows up here.
+    """
+    from pathlib import Path as _Path
+    from progress import SessionStateInvariantError, read_progress
+
+    set_dir = _planless_set(tmp_path)
+    start_session.run(_args(set_dir))
+
+    state = read_session_state(str(set_dir)) or {}
+    assert state.get("totalSessions") is None
+    assert "sessions" not in state
+
+    # Read side: the v3 synthesizer should NOT inflate total to 1
+    # from currentSession alone (Set 046 Session 2 progress.py
+    # change). With no sessions[], no headings, no closed sessions,
+    # and totalSessions=null, the candidates set is empty and the
+    # synthesized sessions[] is also empty — which trips rule 1.
+    with pytest.raises(SessionStateInvariantError) as excinfo:
+        read_progress(state, _Path(set_dir) / "spec.md")
+    assert excinfo.value.rule == 1

@@ -231,10 +231,66 @@ def test_same_holder_reattach_updates_model_and_effort_in_place(
 # (c) Different-holder refusal: non-zero exit, no mutation
 # ---------------------------------------------------------------------------
 
-def test_different_holder_refuses_with_exit_4(tmp_path: Path, capsys):
+def test_different_holder_default_off_writes_through_without_refusal(
+    tmp_path: Path, capsys, monkeypatch
+):
+    """Set 046 mid-Session-2 hotfix: with ``DABBLER_ENFORCE_CHECKOUT_
+    COORDINATION`` UNSET (the default), a different-holder claim
+    proceeds and rewrites the orchestrator block. The writer log
+    records the handoff so the change is auditable, but the operator
+    is not blocked by a refusal toast.
+
+    This is the contract Set 033's enforcement layer used to violate:
+    the operator running claude on machine A and codex on machine B
+    against the same workspace would get a poll/force/dismiss toast
+    on B that blocked normal work. The default-off behavior treats
+    every handoff as authority transfer and lets the user manage
+    coordination through observation (the orchestrator block + writer
+    log) rather than enforcement."""
+    # Explicitly clear the env var in case the test environment has
+    # it set globally.
+    monkeypatch.delenv(
+        "DABBLER_ENFORCE_CHECKOUT_COORDINATION", raising=False
+    )
+    set_dir = _fresh_set(tmp_path)
+    _seed_in_flight(
+        set_dir, engine="claude", provider="anthropic",
+    )
+
+    rc = start_session.run(_args(
+        set_dir,
+        session_number=1,
+        engine="gpt-5-4",
+        provider="openai",
+    ))
+    assert rc == start_session.EXIT_OK, (
+        f"default-off coordination must let the handoff through; "
+        f"got {rc}"
+    )
+
+    state = read_session_state(str(set_dir)) or {}
+    orch = state.get("orchestrator") or {}
+    assert orch.get("engine") == "gpt-5-4", (
+        "new holder's engine must be recorded after handoff"
+    )
+    assert orch.get("provider") == "openai", (
+        "new holder's provider must be recorded after handoff"
+    )
+    capsys.readouterr()  # drain
+
+
+def test_different_holder_refuses_with_exit_4(
+    tmp_path: Path, capsys, monkeypatch
+):
     """An existing in-flight session held by Claude/Anthropic + a
     caller of GPT-5-4/OpenAI without --force exits with the new
-    EXIT_CHECKOUT_CONFLICT (4) code and does NOT mutate state."""
+    EXIT_CHECKOUT_CONFLICT (4) code and does NOT mutate state.
+
+    Set 046 mid-Session-2 hotfix: enforcement is opt-in. The test
+    explicitly enables it via the env var so the refusal path stays
+    under test; production callers see the default-off "always
+    succeed (with writer-log audit)" behavior."""
+    monkeypatch.setenv("DABBLER_ENFORCE_CHECKOUT_COORDINATION", "1")
     set_dir = _fresh_set(tmp_path)
     seeded = _seed_in_flight(
         set_dir, engine="claude", provider="anthropic",
@@ -269,13 +325,17 @@ def test_different_holder_refuses_with_exit_4(tmp_path: Path, capsys):
 # ---------------------------------------------------------------------------
 
 def test_refusal_message_names_holder_and_both_release_paths(
-    tmp_path: Path, capsys
+    tmp_path: Path, capsys, monkeypatch
 ):
     """The H3 refusal error must name (a) the current holder's
     ``engine + provider`` identity and (b) BOTH release paths —
     ``--force`` and the ``Release Check-Out`` Command Palette
     action. The Set 033 verdict makes this contract operator-facing,
-    so the error wording matters."""
+    so the error wording matters.
+
+    Set 046 mid-Session-2 hotfix: refusal-message coverage runs
+    under explicit enforcement-on."""
+    monkeypatch.setenv("DABBLER_ENFORCE_CHECKOUT_COORDINATION", "1")
     set_dir = _fresh_set(tmp_path)
     _seed_in_flight(set_dir, engine="claude", provider="anthropic")
 

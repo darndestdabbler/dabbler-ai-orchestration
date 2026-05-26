@@ -1,28 +1,22 @@
 {
   "schemaVersion": 3,
   "sessionSetName": "047-state-file-schema-v4-audit",
-  "currentSession": 1,
+  "currentSession": null,
   "totalSessions": 6,
-  "completedSessions": [],
+  "completedSessions": [
+    1
+  ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
   "startedAt": "2026-05-26T07:27:06.095672-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": {
-    "engine": "claude",
-    "provider": "anthropic",
-    "model": "claude-opus-4-7",
-    "effort": "high",
-    "chatSessionId": null,
-    "checkedOutAt": "2026-05-26T07:27:06.095672-04:00",
-    "lastActivityAt": "2026-05-26T07:27:06.095672-04:00"
-  },
+  "orchestrator": null,
   "sessions": [
     {
       "number": 1,
       "title": "Audit pass + scope-lock",
-      "status": "in-progress"
+      "status": "complete"
     },
     {
       "number": 2,

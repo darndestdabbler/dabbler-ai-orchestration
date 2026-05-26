@@ -218,6 +218,64 @@ class RouteResult:
     verification: Optional[VerificationResult] = None  # populated if verified
 
 
+# Set 048 Session 2: --no-router mode stub model identifier. Surfaced
+# in RouteResult.model_name and VerificationResult.verifier_model so
+# downstream observers (metrics, audit logs) can tell at a glance that
+# no actual LLM call happened.
+_NO_ROUTER_MODEL = "no-router-mode"
+_NO_ROUTER_VERDICT = "no_router_skipped"
+
+
+def _build_no_router_route_stub() -> "RouteResult":
+    """Return a zero-cost RouteResult stub for --no-router-mode invocations.
+
+    Set 048 §3.1 A3: callers SHOULD check ``runtime_mode.is_no_router_mode()``
+    before invoking ``route()`` and short-circuit at the call site. This
+    stub exists as a defensive safety net so a stray invocation under
+    Lightweight tier never hits an LLM API or requires credentials in env.
+    """
+    return RouteResult(
+        content="",
+        model_name=_NO_ROUTER_MODEL,
+        model_id=_NO_ROUTER_MODEL,
+        tier=0,
+        input_tokens=0,
+        output_tokens=0,
+        cost_usd=0.0,
+        total_cost_usd=0.0,
+        complexity_score=0,
+        escalated=False,
+        escalation_history=[],
+        elapsed_seconds=0.0,
+        truncated=False,
+        verification=None,
+    )
+
+
+def _build_no_router_verification_stub(generator_model: str) -> "VerificationResult":
+    """Return a zero-cost VerificationResult stub for --no-router-mode invocations.
+
+    Set 048 §3.1 A3: returned when ``verify()`` is called while
+    ``runtime_mode.is_no_router_mode()`` is True. The verdict
+    ``no_router_skipped`` is explicit so downstream metrics + audit
+    code don't mistake the stub for a real ``VERIFIED`` / ``ISSUES_FOUND``
+    outcome.
+    """
+    return VerificationResult(
+        verdict=_NO_ROUTER_VERDICT,
+        verified=False,
+        issues=[],
+        verifier_model=_NO_ROUTER_MODEL,
+        verifier_provider=_NO_ROUTER_MODEL,
+        generator_model=generator_model,
+        generator_provider=_NO_ROUTER_MODEL,
+        verifier_input_tokens=0,
+        verifier_output_tokens=0,
+        verifier_cost_usd=0.0,
+        raw_response="[skipped: --no-router mode active]",
+    )
+
+
 def route(
     content: str,
     task_type: str = "general",
@@ -247,6 +305,19 @@ def route(
         RouteResult with the AI response and metadata.
         The caller is responsible for logging via SessionLog.log_step().
     """
+    # Set 048 Session 2: --no-router short-circuit. Defensive safety net
+    # for callers that didn't check is_no_router_mode() first. Returns a
+    # zero-cost stub WITHOUT calling _init() (no config load, no
+    # credential check, no LLM SDK touch).
+    try:
+        from runtime_mode import is_no_router_mode
+
+        if is_no_router_mode():
+            return _build_no_router_route_stub()
+    except Exception:  # noqa: BLE001
+        # Runtime-mode lookup must never block route(); proceed normally.
+        pass
+
     _init()
 
     # 1. Estimate complexity
@@ -538,6 +609,18 @@ def verify(
     Returns:
         VerificationResult with verdict, issues, and cost.
     """
+    # Set 048 Session 2: --no-router short-circuit. Same safety-net
+    # contract as route() above.
+    try:
+        from runtime_mode import is_no_router_mode
+
+        if is_no_router_mode():
+            return _build_no_router_verification_stub(
+                generator_model=route_result.model_name
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
     _init()
 
     result = _run_verification(

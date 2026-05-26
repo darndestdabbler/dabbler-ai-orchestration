@@ -1344,7 +1344,23 @@ def run(
     # neither-source case, so reaching this branch with both empty
     # means the operator aborted the prompt mid-way.
     manual_attestation: Optional[str] = None
-    if args.manual_verify:
+    # Set 048 Session 2: --no-router treats the close-out as manual-
+    # attestation by construction (Lightweight tier skips routed
+    # verification per §3.1 A3). The attestation comes from
+    # --reason-file when provided; absent that, a stock attestation
+    # documents that Lightweight mode is active so the audit trail
+    # still records what happened.
+    if getattr(args, "no_router", False) and not args.manual_verify:
+        if reason_text is not None:
+            manual_attestation = reason_text
+        else:
+            manual_attestation = (
+                "Set 048 Lightweight tier (--no-router mode): "
+                "routed verification skipped per §3.1 A3. "
+                "Operator runs external verification via copyable-"
+                "prompt commands."
+            )
+    elif args.manual_verify:
         if reason_text is not None:
             manual_attestation = reason_text
         else:
@@ -1437,6 +1453,13 @@ def run(
             method = "skipped"
         elif args.manual_verify:
             method = "manual"
+        elif getattr(args, "no_router", False):
+            # Set 048 Session 2 §3.1 A3: Lightweight tier skips routed
+            # verification. Method records as "manual" so the events
+            # ledger + state file converge with the existing manual
+            # attestation path; the attestation text (set above)
+            # documents the --no-router invocation explicitly.
+            method = "manual"
         elif disposition is not None and disposition.verification_method:
             method = disposition.verification_method
         else:
@@ -1485,6 +1508,66 @@ def run(
                 failed_checks=[g.check for g in failed],
             )
             return outcome
+
+        # Set 048 Session 2 §3.5: external-verification.md soft gate.
+        # Fires only under --no-router mode (full-tier sessions don't
+        # use this artifact). When the file is missing, branch on
+        # TTY/non-TTY/accept-suggestions:
+        #   * --accept-suggestions OR no TTY: emit stderr warning,
+        #     append to outcome.messages, proceed.
+        #   * Interactive TTY: prompt "[y/N]". A "y" answer proceeds
+        #     with a recorded message; anything else aborts the
+        #     close-out with result="aborted_at_soft_gate".
+        # Set 048 keeps this OUT of the gate_checks framework because
+        # gate_checks contract is deterministic / non-interactive; the
+        # soft gate is by-design interactive.
+        if getattr(args, "no_router", False):
+            ext_verify_path = os.path.join(
+                session_set_dir, "external-verification.md"
+            )
+            if not os.path.exists(ext_verify_path):
+                non_interactive = bool(
+                    getattr(args, "accept_suggestions", False)
+                ) or not sys.stdin.isatty()
+                warning_msg = (
+                    f"external-verification.md missing at "
+                    f"{ext_verify_path} (--no-router mode); the "
+                    f"copyable-prompt commands document the expected "
+                    f"format. Per Set 048 §3.5 this is a soft gate, "
+                    f"not a hard failure."
+                )
+                if non_interactive:
+                    print(f"WARNING: {warning_msg}", file=sys.stderr)
+                    outcome.messages.append(warning_msg)
+                else:
+                    prompt = (
+                        f"external-verification.md missing at "
+                        f"{ext_verify_path}. Continue closing session "
+                        f"without it? [y/N]: "
+                    )
+                    answer = (prompt_fn(prompt) or "").strip().lower()
+                    if answer not in ("y", "yes"):
+                        outcome.result = "aborted_at_soft_gate"
+                        outcome.messages.append(
+                            "close-out aborted by operator at the "
+                            "external-verification.md soft gate "
+                            "(Set 048 §3.5); create the artifact and "
+                            "re-run, or pass --accept-suggestions to "
+                            "bypass non-interactively."
+                        )
+                        _emit_event(
+                            session_set_dir,
+                            "closeout_failed",
+                            outcome.session_number,
+                            outcome,
+                            failed_checks=["external_verification_soft_gate"],
+                        )
+                        return outcome
+                    outcome.messages.append(
+                        "operator confirmed close-out without "
+                        "external-verification.md at the soft gate "
+                        "(Set 048 §3.5)"
+                    )
 
         outcome.result = "succeeded"
         # Set 036 Session 1 (Q4): include the orchestrator-identity

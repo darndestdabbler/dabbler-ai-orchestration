@@ -15,7 +15,7 @@
     {
       "number": 3,
       "title": "Migrator phase: migrate_v3_to_v4 CLI + MigrateV3ToV4 TS command + rollback procedure",
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "number": 4,
@@ -33,7 +33,7 @@
       "status": "not-started"
     }
   ],
-  "currentSession": null,
+  "currentSession": 3,
   "totalSessions": 6,
   "completedSessions": [
     1,
@@ -41,8 +41,16 @@
   ],
   "status": "in-progress",
   "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-26T08:34:33.093655-04:00",
+  "startedAt": "2026-05-26T09:40:26.099045-04:00",
   "completedAt": null,
   "verificationVerdict": null,
-  "orchestrator": null
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "chatSessionId": null,
+    "checkedOutAt": "2026-05-26T09:40:26.099045-04:00",
+    "lastActivityAt": "2026-05-26T09:40:26.099045-04:00"
+  }
 }

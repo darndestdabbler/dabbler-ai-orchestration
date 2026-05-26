@@ -4,7 +4,7 @@ import * as path from "path";
 import { listGitWorktrees } from "./git";
 import { readStatus } from "./sessionState";
 import { isCancelled, readCancellationState } from "./cancelLifecycle";
-import { readProgress, SessionStateInvariantError } from "./progress";
+import { readProgress, SessionStateInvariantError, normalizeToV4Shape } from "./progress";
 import {
   SessionSet,
   SessionState,
@@ -60,6 +60,11 @@ export function discoverRoots(): string[] {
 // `completedSessions[]` synthesizes to a sessions[] that fails rule 7,
 // flagging the same drift cases (count mismatch, final-session signal
 // gap) without the explicit predicate ladder.
+//
+// Set 047 Session 2: `readProgress` itself runs through
+// `normalizeToV4Shape` now, so this probe is robust to both v3 and v4
+// state-file shapes. The v2-compat ledger-merge below stays unchanged
+// — it operates on the raw parsed dict before any normalization.
 //
 // V2-compat: pre-Set-022 snapshots without `completedSessions[]` get
 // their array pre-populated from the events ledger before synthesis,
@@ -341,7 +346,49 @@ export function readSessionSets(root: string): SessionSet[] {
 
     if (fs.existsSync(statePath)) {
       try {
-        const sd = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+        // Set 047 Session 2 (reader-first phase): pipe the raw parsed
+        // state through `normalizeToV4Shape` so a v4-shaped file (whose
+        // writers — Sessions 4-5 — drop `orchestrator`, `startedAt`,
+        // `completedAt`, `verificationVerdict` from the top level in
+        // favor of per-session metadata) reads identically to a v3 file.
+        // The shim re-derives the top-level fields from `sessions[]` on
+        // v4 inputs and is a no-op on pure v3 inputs that already carry
+        // them. `needsMigration` detection below reads the RAW parsed
+        // object (`rawSd`) because the v3/v4 distinction is precisely
+        // the signal we're checking for there.
+        const rawSd = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+          schemaVersion?: number;
+          sessions?: unknown;
+          completedSessions?: unknown;
+        };
+
+        // Set 030 Session 3 v2-compat pre-processing: if the snapshot
+        // is v2-shape (no sessions[]) and lacks a non-empty
+        // completedSessions[], pre-populate it from the events ledger
+        // BEFORE handing the dict to the normalize shim. This keeps
+        // the ledger as a count signal for pre-Set-022 snapshots that
+        // haven't been healed by their next boundary write yet.
+        // Pure-v3 / v4 snapshots skip this entirely — sessions[] is
+        // authoritative for them. Set 047 Session 2 moved this branch
+        // ahead of the normalize call because normalize guarantees
+        // sessions[] on the output, which would mask the v2-compat
+        // signal if checked post-normalize.
+        let preNormalizeSd: any = rawSd;
+        if (
+          rawSd &&
+          typeof rawSd === "object" &&
+          !Array.isArray(rawSd) &&
+          rawSd.sessions === undefined &&
+          (!Array.isArray(rawSd.completedSessions) ||  // noqa: D13 - v2-compat ledger-merge for synthesizer input
+            (rawSd.completedSessions as unknown[]).length === 0)  // noqa: D13 - v2-compat ledger-merge for synthesizer input
+        ) {
+          const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
+          if (ledgerSessions.length > 0) {
+            preNormalizeSd = { ...rawSd, completedSessions: ledgerSessions };
+          }
+        }
+
+        const sd = normalizeToV4Shape(preNormalizeSd, specPath) as {
           completedAt?: string;
           startedAt?: string;
           status?: string;
@@ -370,10 +417,26 @@ export function readSessionSets(root: string): SessionSet[] {
         // Files with schemaVersion > 3 are future-schema and treated
         // as already-current (the migrator refuses to downgrade them
         // for the same reason).
-        if (sd && typeof sd === "object" && !Array.isArray(sd)) {
-          const sv = sd.schemaVersion;
+        //
+        // Set 047 Session 2: read `rawSd` (NOT the normalized `sd`)
+        // because the shim unconditionally bumps `schemaVersion` to 4
+        // — that bump would mask the v3-needs-migration signal here.
+        // The detection rule itself is unchanged; the read source
+        // shifts to the pre-normalize parse so the signal stays honest.
+        //
+        // DEFERRED to Set 047 Session 3 (migrator phase): extend the
+        // detector to also flag raw v3 files as needing v4 migration
+        // once `python -m ai_router.migrate_v3_to_v4` ships. Adding
+        // the v3 flag in Session 2 (this session) would light up the
+        // badge on 47+ historical sets with no remediation action
+        // available — pure UI noise. The badge gains an actionable
+        // meaning the moment the migrator lands. (Cross-provider
+        // verifier flagged this in the S2 review; ack with the
+        // sequencing rationale above.)
+        if (rawSd && typeof rawSd === "object" && !Array.isArray(rawSd)) {
+          const sv = rawSd.schemaVersion;
           if (sv === 3) {
-            if (!Array.isArray(sd.sessions)) {
+            if (!Array.isArray(rawSd.sessions)) {
               needsMigration = true;
             }
           } else if (typeof sv !== "number" || sv < 3) {
@@ -381,36 +444,24 @@ export function readSessionSets(root: string): SessionSet[] {
           }
         }
 
-        // Set 030 Session 3: route progress reads through the v3
-        // helper. `readProgress` branches v2/v3 internally; on a v3
-        // file it reads sessions[] directly, and on a v2 file it
-        // synthesizes from the legacy triple first. We trap invariant
-        // violations and fall through to the v2-compat events-ledger
-        // fallback below so a pre-Set-022 snapshot lacking
-        // completedSessions[] still derives a sensible count.
+        // Set 030 Session 3: route progress reads through the v3/v4
+        // helper. `readProgress` itself runs through `normalizeToV4Shape`
+        // so a v4 file (per-session metadata) and a v3 file (top-level
+        // metadata) both produce the same `ProgressView`. We trap
+        // invariant violations and fall through to the v2-compat
+        // events-ledger fallback below so a pre-Set-022 snapshot
+        // lacking completedSessions[] still derives a sensible count.
         //
-        // V2-compat pre-processing: if the snapshot is v2 (no sessions[])
-        // and lacks a non-empty completedSessions[], pre-populate it
-        // from the events ledger BEFORE synthesizing. This keeps the
-        // ledger as a count signal for pre-Set-022 sets that have not
-        // yet been healed by the next boundary write. Pure-v3 snapshots
-        // skip this entirely — sessions[] is authoritative.
+        // Set 047 Session 2: the v2-compat ledger-merge pre-step that
+        // used to sit here is hoisted above the normalize call (see
+        // `preNormalizeSd` above) — `sd` is already normalized to v4
+        // with sessions[] guaranteed, so the historical ledger-merge
+        // check (`sd.sessions === undefined`) would no longer fire.
         let progressTotal: number | null = null;
         let progressCompleted: number[] | null = null;
         let progressCurrent: number | null = null;
-        let stateForProgress: any = sd;
-        if (
-          (sd as { sessions?: unknown }).sessions === undefined &&
-          (!Array.isArray((sd as { completedSessions?: unknown }).completedSessions) ||  // noqa: D13 - v2-compat ledger-merge for synthesizer input
-            ((sd as { completedSessions?: unknown[] }).completedSessions?.length ?? 0) === 0)  // noqa: D13 - v2-compat ledger-merge for synthesizer input
-        ) {
-          const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
-          if (ledgerSessions.length > 0) {
-            stateForProgress = { ...sd, completedSessions: ledgerSessions };
-          }
-        }
         try {
-          const view = readProgress(stateForProgress, specPath);
+          const view = readProgress(sd, specPath);
           progressTotal = view.totalSessions;
           progressCompleted = [...view.completedSessions];
           progressCurrent = view.currentSession;

@@ -1,0 +1,17 @@
+{
+  "elapsed_sec": 186.70322918891907,
+  "payload_chars": 139183,
+  "result": {
+    "model_name": "gpt-5-4",
+    "model_id": "gpt-5.4",
+    "tier": 3,
+    "input_tokens": 33165,
+    "output_tokens": 9508,
+    "cost_usd": 0.22553250000000002,
+    "total_cost_usd": 0.22553250000000002,
+    "complexity_score": 65,
+    "escalated": false,
+    "elapsed_seconds": 186.67798686027527,
+    "truncated": false
+  }
+}

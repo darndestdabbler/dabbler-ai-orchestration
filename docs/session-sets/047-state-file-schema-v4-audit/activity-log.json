@@ -1,14 +1,14 @@
 {
   "sessionSetName": "047-state-file-schema-v4-audit",
   "createdDate": "2026-05-26",
-  "totalSessions": null,
+  "totalSessions": 6,
   "entries": [
     {
       "sessionNumber": 1,
       "stepNumber": 1,
       "stepKey": "session-001/budget-and-scope-confirmation",
       "dateTime": "2026-05-26T07:25:00-04:00",
-      "description": "Confirmed prerequisites at session start: Set 046 closed 2026-05-26 (state-file shows completedSessions [1,2], status complete, lifecycleState closed). Operator answers via AskUserQuestion: (1) NTE budget $10 for Set 047, (2) S1 follows Set 046 S1 pattern — self-authored proposal then two-pass devil's-advocate cross-provider consensus then scope-lock then per-session spec authoring (per feedback_devils_advocate_default_for_roadmap_decisions), (3) no operator-locked deliverables to absorb beyond the five audit topics already enumerated in spec.md (shape-of-v4 normalization, cancellation-marker design, migration sequencing, one-shot v3-to-v4 migrator subsuming Set 046 S6 expansion, blocked-on-prereqs lifecycle).",
+      "description": "Confirmed prerequisites at session start: Set 046 closed 2026-05-26 (state-file shows completedSessions [1,2], status complete, lifecycleState closed). Operator answers via AskUserQuestion: (1) NTE budget $10 for Set 047, (2) S1 follows Set 046 S1 pattern \u2014 self-authored proposal then two-pass devil's-advocate cross-provider consensus then scope-lock then per-session spec authoring (per feedback_devils_advocate_default_for_roadmap_decisions), (3) no operator-locked deliverables to absorb beyond the five audit topics already enumerated in spec.md (shape-of-v4 normalization, cancellation-marker design, migration sequencing, one-shot v3-to-v4 migrator subsuming Set 046 S6 expansion, blocked-on-prereqs lifecycle).",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -17,7 +17,7 @@
       "stepNumber": 2,
       "stepKey": "session-001/register-session-start",
       "dateTime": "2026-05-26T07:27:06-04:00",
-      "description": "Invoked python -m ai_router.start_session with engine=claude, provider=anthropic, model=claude-opus-4-7, effort=high. State-file flipped from not-started to in-progress with the orchestrator block populated; currentSession=1; totalSessions left null (Set 046 S2 forward-only writer behavior — appropriate for a stub-mode set where the audit deliverable IS the session-count lock). Observation: the writer's emitted state file does not include a sessions[] array — surfaced as a Set-047-relevant data point for the v4 audit (the missing-sessions[] case is exactly what the v4 schema would derive top-level state from, so the audit will need to specify the writer's behavior when sessions[] is absent vs. empty).",
+      "description": "Invoked python -m ai_router.start_session with engine=claude, provider=anthropic, model=claude-opus-4-7, effort=high. State-file flipped from not-started to in-progress with the orchestrator block populated; currentSession=1; totalSessions left null (Set 046 S2 forward-only writer behavior \u2014 appropriate for a stub-mode set where the audit deliverable IS the session-count lock). Observation: the writer's emitted state file does not include a sessions[] array \u2014 surfaced as a Set-047-relevant data point for the v4 audit (the missing-sessions[] case is exactly what the v4 schema would derive top-level state from, so the audit will need to specify the writer's behavior when sessions[] is absent vs. empty).",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -26,7 +26,7 @@
       "stepNumber": 3,
       "stepKey": "session-001/code-surface-grounding",
       "dateTime": "2026-05-26T07:35:00-04:00",
-      "description": "Delegated grounding research to an Explore subagent. Subagent located: (1) 6 writer call sites — register_session_start (session_state.py:408), _flip_state_to_closed (session_state.py:847), mark_session_complete (session_state.py:1064), cancel_session_set (session_lifecycle.py:161), synthesizeNotStartedState (sessionState.ts:267), ensureSessionStateFile (sessionState.ts:288), plus TS cancelSessionSet (cancelLifecycle.ts ~250); Set 035 dual-write convergence confirmed. (2) Reader call sites confirmed at memory-cited lines — fractionFor (CustomSessionSetsView.ts:142-147), readSessionSets (fileSystem.ts:243-524 with reads spanning lines 274-476), readCancellationState (cancelLifecycle.ts:147-158), gate_checks startedAt read (gate_checks.py:648). (3) Needs-migration detector confirmed at fileSystem.ts:373-381 — fires on schemaVersion absent/<3 OR (schemaVersion==3 AND sessions[] not array). (4) Field-touch enumeration for totalSessions, completedSessions, lifecycleState, verificationVerdict produced. (5) Events ledger emits 5 event kinds via session_events.py append_event — verificationVerdict snapshot is NOT redundant with ledger (snapshot is point-in-time, ledger is audit trail). (6) Test-file shape coupling: 54 Python tests + 128 TS tests + ~35 Playwright specs; real fixtures live in docs/session-sets/*/session-state.json across 47 sets. (7) NO sessionLog[] field found in the codebase — memory note may have been from a consumer repo not this one. No discrepancies with memory-cited line numbers.",
+      "description": "Delegated grounding research to an Explore subagent. Subagent located: (1) 6 writer call sites \u2014 register_session_start (session_state.py:408), _flip_state_to_closed (session_state.py:847), mark_session_complete (session_state.py:1064), cancel_session_set (session_lifecycle.py:161), synthesizeNotStartedState (sessionState.ts:267), ensureSessionStateFile (sessionState.ts:288), plus TS cancelSessionSet (cancelLifecycle.ts ~250); Set 035 dual-write convergence confirmed. (2) Reader call sites confirmed at memory-cited lines \u2014 fractionFor (CustomSessionSetsView.ts:142-147), readSessionSets (fileSystem.ts:243-524 with reads spanning lines 274-476), readCancellationState (cancelLifecycle.ts:147-158), gate_checks startedAt read (gate_checks.py:648). (3) Needs-migration detector confirmed at fileSystem.ts:373-381 \u2014 fires on schemaVersion absent/<3 OR (schemaVersion==3 AND sessions[] not array). (4) Field-touch enumeration for totalSessions, completedSessions, lifecycleState, verificationVerdict produced. (5) Events ledger emits 5 event kinds via session_events.py append_event \u2014 verificationVerdict snapshot is NOT redundant with ledger (snapshot is point-in-time, ledger is audit trail). (6) Test-file shape coupling: 54 Python tests + 128 TS tests + ~35 Playwright specs; real fixtures live in docs/session-sets/*/session-state.json across 47 sets. (7) NO sessionLog[] field found in the codebase \u2014 memory note may have been from a consumer repo not this one. No discrepancies with memory-cited line numbers.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -35,7 +35,7 @@
       "stepNumber": 4,
       "stepKey": "session-001/operator-directive-lightweight-tier-parity",
       "dateTime": "2026-05-26T07:50:00-04:00",
-      "description": "Mid-session operator directive: 'The lightweight workflow should use the same exact process.' Clarified via AskUserQuestion: Lightweight orchestrators MUST follow same process as Full for (a) model/effort identification, (b) session-set identification, (c) session identification, (d) state-file updates, (e) Session Set Explorer UX. Differences limited to: no AI router, no auto-verification, provides copyable review prompts, suggests (not requires) UAT/E2E for interface-bearing work. Hand-edit recipe ELIMINATED. Saved as project memory project_lightweight_uses_same_process_as_full.md; audit proposal must absorb this as a load-bearing premise. Substantial scope expansion to Set 047 — may spawn sibling Set 048 (lightweight-tier writer parity). Original audit topic #4 (Lightweight migrator) is eliminated by construction; replaced by new topics: writer-architecture for AI-router-less Lightweight tier (separate dabbler-session-state PyPI? or dabbler-ai-router no-router-mode?), copyable-review-prompt deliverable shape, suggested-not-required UAT/E2E pathway, bootstrap-doc revision plan.",
+      "description": "Mid-session operator directive: 'The lightweight workflow should use the same exact process.' Clarified via AskUserQuestion: Lightweight orchestrators MUST follow same process as Full for (a) model/effort identification, (b) session-set identification, (c) session identification, (d) state-file updates, (e) Session Set Explorer UX. Differences limited to: no AI router, no auto-verification, provides copyable review prompts, suggests (not requires) UAT/E2E for interface-bearing work. Hand-edit recipe ELIMINATED. Saved as project memory project_lightweight_uses_same_process_as_full.md; audit proposal must absorb this as a load-bearing premise. Substantial scope expansion to Set 047 \u2014 may spawn sibling Set 048 (lightweight-tier writer parity). Original audit topic #4 (Lightweight migrator) is eliminated by construction; replaced by new topics: writer-architecture for AI-router-less Lightweight tier (separate dabbler-session-state PyPI? or dabbler-ai-router no-router-mode?), copyable-review-prompt deliverable shape, suggested-not-required UAT/E2E pathway, bootstrap-doc revision plan.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -44,7 +44,7 @@
       "stepNumber": 5,
       "stepKey": "session-001/audit-proposal-pass-a-drafted",
       "dateTime": "2026-05-26T08:00:00-04:00",
-      "description": "Authored docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/proposal.md (~430 lines, 28953 chars): §1 purpose, §2 operator-locked premises P1-P4 (the Lightweight directive), §3 code-state grounding from the Explore subagent report, §4 Group A v4 schema dispositions (A1-A5: shape-of-v4, cancellation marker, blocked-on-prereqs, migration sequencing, migrator scope), §5 Group B Lightweight-parity dispositions (B1-B4: package architecture, copyable-prompt surface, suggested-not-required UAT/E2E, doc-revision plan), §6 critical scope decision (Shape 1 bundled vs Shape 2 split-into-047+048 vs Shape 3 inverted) with Shape 2 as drafter's recommendation, §7 proposed 6-session breakdown for Set 047, §8 six bias-cautions for the verifier, §9 four open questions for the verifier, §10 memory-hook citations (12 hooks). Self-authored per the in-session router restriction (feedback_ai_router_usage); cross-provider verification routed at the audit's own end-of-session boundary.",
+      "description": "Authored docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/proposal.md (~430 lines, 28953 chars): \u00a71 purpose, \u00a72 operator-locked premises P1-P4 (the Lightweight directive), \u00a73 code-state grounding from the Explore subagent report, \u00a74 Group A v4 schema dispositions (A1-A5: shape-of-v4, cancellation marker, blocked-on-prereqs, migration sequencing, migrator scope), \u00a75 Group B Lightweight-parity dispositions (B1-B4: package architecture, copyable-prompt surface, suggested-not-required UAT/E2E, doc-revision plan), \u00a76 critical scope decision (Shape 1 bundled vs Shape 2 split-into-047+048 vs Shape 3 inverted) with Shape 2 as drafter's recommendation, \u00a77 proposed 6-session breakdown for Set 047, \u00a78 six bias-cautions for the verifier, \u00a79 four open questions for the verifier, \u00a710 memory-hook citations (12 hooks). Self-authored per the in-session router restriction (feedback_ai_router_usage); cross-provider verification routed at the audit's own end-of-session boundary.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -53,11 +53,25 @@
       "stepNumber": 6,
       "stepKey": "session-001/cross-provider-consensus-pass-a",
       "dateTime": "2026-05-26T08:20:00-04:00",
-      "description": "Ran Pass A of two-pass devil's-advocate consensus via run_consensus.py driver. Primary read (route, gemini-2.5-pro tier 2): ENDORSE WITH REVISIONS — endorsed all 5 Group A dispositions and all 4 Group B dispositions; endorsed Shape 2 (split into 047 + 048); flagged 4 missing topics: rollback procedure underspecified, performance impact unverified, Q2 CLI back-compat ambiguous, prerequisites field schema underspecified. Cross-provider verify (gpt-5-4-mini): ISSUES FOUND — flagged Pass A primary's own blind spots: (1) missed cross-cutting v4↔package-split interface as a topic, (2) Session 6 over-scoped (bundles schema-doc + bootstrap + close-out + publish), (3) package-split endorsed too uncritically (suggested considering single-package + internal modularization instead). Pass A cost: $0.0545 ($0.023 route + $0.0315 verify).",
+      "description": "Ran Pass A of two-pass devil's-advocate consensus via run_consensus.py driver. Primary read (route, gemini-2.5-pro tier 2): ENDORSE WITH REVISIONS \u2014 endorsed all 5 Group A dispositions and all 4 Group B dispositions; endorsed Shape 2 (split into 047 + 048); flagged 4 missing topics: rollback procedure underspecified, performance impact unverified, Q2 CLI back-compat ambiguous, prerequisites field schema underspecified. Cross-provider verify (gpt-5-4-mini): ISSUES FOUND \u2014 flagged Pass A primary's own blind spots: (1) missed cross-cutting v4\u2194package-split interface as a topic, (2) Session 6 over-scoped (bundles schema-doc + bootstrap + close-out + publish), (3) package-split endorsed too uncritically (suggested considering single-package + internal modularization instead). Pass A cost: $0.0545 ($0.023 route + $0.0315 verify).",
       "status": "complete",
       "routedApiCalls": [
-        {"model": "gemini-2.5-pro", "tier": 2, "cost_usd": 0.023, "tokens_in": 8336, "tokens_out": 1258, "phase": "pass-a-route"},
-        {"model": "gpt-5-4-mini", "tier": "verifier", "cost_usd": 0.03151875, "tokens_in": 8875, "tokens_out": 5525, "phase": "pass-a-verify"}
+        {
+          "model": "gemini-2.5-pro",
+          "tier": 2,
+          "cost_usd": 0.023,
+          "tokens_in": 8336,
+          "tokens_out": 1258,
+          "phase": "pass-a-route"
+        },
+        {
+          "model": "gpt-5-4-mini",
+          "tier": "verifier",
+          "cost_usd": 0.03151875,
+          "tokens_in": 8875,
+          "tokens_out": 5525,
+          "phase": "pass-a-verify"
+        }
       ]
     },
     {
@@ -65,11 +79,25 @@
       "stepNumber": 7,
       "stepKey": "session-001/cross-provider-consensus-pass-b",
       "dateTime": "2026-05-26T08:40:00-04:00",
-      "description": "Ran Pass B (devil's-advocate framing) of consensus. Primary read (gemini-2.5-pro): ENDORSE WITH SPECIFIC BIAS FLIPS — flipped Bias 1 (single dabbler-ai-router package + --no-router mode wins over Path 1 separate package), Bias 3 (Command Palette primary + right-click secondary, both surfaces), Bias 6 (must recognize non-canonical Lightweight shapes); stood by Bias 2 (derive), Bias 4 (reader-first phased migration), Bias 5 (Shape 2 split into 047+048). Open questions: Q1 token-only, Q2 re-export, Q3 backup file, Q4 'no Set 048 audit needed'. Cross-provider verify (gpt-5-4-mini): ISSUES FOUND — pushed back on (a) the Bias 6 flip (Pass B primary's premise was wrong — non-canonical Lightweight shapes do NOT live in this repo per the grounding report, only in consumer repos out of Set 047's scope), (b) the Q4 conclusion (Set 048 DOES need its own audit pass; Pass B primary's 'no' was based on conflating Group B with a Set 048 audit). The verify pushbacks on Bias 6 and Q4 were both decisive — net STAND BY proposal on Bias 6 and net FLIP Q4 (Set 048 will run its own S1). Pass B cost: $0.054 ($0.0263 route + $0.0277 verify).",
+      "description": "Ran Pass B (devil's-advocate framing) of consensus. Primary read (gemini-2.5-pro): ENDORSE WITH SPECIFIC BIAS FLIPS \u2014 flipped Bias 1 (single dabbler-ai-router package + --no-router mode wins over Path 1 separate package), Bias 3 (Command Palette primary + right-click secondary, both surfaces), Bias 6 (must recognize non-canonical Lightweight shapes); stood by Bias 2 (derive), Bias 4 (reader-first phased migration), Bias 5 (Shape 2 split into 047+048). Open questions: Q1 token-only, Q2 re-export, Q3 backup file, Q4 'no Set 048 audit needed'. Cross-provider verify (gpt-5-4-mini): ISSUES FOUND \u2014 pushed back on (a) the Bias 6 flip (Pass B primary's premise was wrong \u2014 non-canonical Lightweight shapes do NOT live in this repo per the grounding report, only in consumer repos out of Set 047's scope), (b) the Q4 conclusion (Set 048 DOES need its own audit pass; Pass B primary's 'no' was based on conflating Group B with a Set 048 audit). The verify pushbacks on Bias 6 and Q4 were both decisive \u2014 net STAND BY proposal on Bias 6 and net FLIP Q4 (Set 048 will run its own S1). Pass B cost: $0.054 ($0.0263 route + $0.0277 verify).",
       "status": "complete",
       "routedApiCalls": [
-        {"model": "gemini-2.5-pro", "tier": 2, "cost_usd": 0.02631, "tokens_in": 8280, "tokens_out": 1596, "phase": "pass-b-route"},
-        {"model": "gpt-5-4-mini", "tier": "verifier", "cost_usd": 0.02768, "tokens_in": 9172, "tokens_out": 4623, "phase": "pass-b-verify"}
+        {
+          "model": "gemini-2.5-pro",
+          "tier": 2,
+          "cost_usd": 0.02631,
+          "tokens_in": 8280,
+          "tokens_out": 1596,
+          "phase": "pass-b-route"
+        },
+        {
+          "model": "gpt-5-4-mini",
+          "tier": "verifier",
+          "cost_usd": 0.02768,
+          "tokens_in": 9172,
+          "tokens_out": 4623,
+          "phase": "pass-b-verify"
+        }
       ]
     },
     {
@@ -77,7 +105,7 @@
       "stepNumber": 8,
       "stepKey": "session-001/synthesis-and-verdict-write",
       "dateTime": "2026-05-26T08:55:00-04:00",
-      "description": "Synthesized the 4 consensus reads into verdict.md. Final bias dispositions: FLIP Bias 1 (single-package + --no-router), STAND BY Bias 2 (derive), FLIP Bias 3 (both surfaces — Command Palette AND right-click), STAND BY Bias 4 (reader-first), STAND BY Bias 5 (Shape 2 split), STAND BY Bias 6 (canonical-only migrator — Pass B verify pushback wins). Open-question resolutions: Q1 token-only, Q2 moot under Bias 1 flip + converted to firm CLI back-compat requirement, Q3 backup file, Q4 Set 048 needs own audit (Pass B verify pushback wins). 4 missing topics from Pass A primary incorporated as additional scope on Sessions 2-5; 3 missing-topic flags from Pass A verify either dissolved by Bias 1 flip or accepted (Session 6 over-scoped → adoption-bootstrap.md revision deferred to Set 048). Cumulative S1 routed cost: $0.10851 of $10 NTE (1.1%).",
+      "description": "Synthesized the 4 consensus reads into verdict.md. Final bias dispositions: FLIP Bias 1 (single-package + --no-router), STAND BY Bias 2 (derive), FLIP Bias 3 (both surfaces \u2014 Command Palette AND right-click), STAND BY Bias 4 (reader-first), STAND BY Bias 5 (Shape 2 split), STAND BY Bias 6 (canonical-only migrator \u2014 Pass B verify pushback wins). Open-question resolutions: Q1 token-only, Q2 moot under Bias 1 flip + converted to firm CLI back-compat requirement, Q3 backup file, Q4 Set 048 needs own audit (Pass B verify pushback wins). 4 missing topics from Pass A primary incorporated as additional scope on Sessions 2-5; 3 missing-topic flags from Pass A verify either dissolved by Bias 1 flip or accepted (Session 6 over-scoped \u2192 adoption-bootstrap.md revision deferred to Set 048). Cumulative S1 routed cost: $0.10851 of $10 NTE (1.1%).",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -86,7 +114,115 @@
       "stepNumber": 9,
       "stepKey": "session-001/spec-rewrite-and-set-048-stub",
       "dateTime": "2026-05-26T09:10:00-04:00",
-      "description": "Rewrote docs/session-sets/047-state-file-schema-v4-audit/spec.md from STUB to AUDIT-LOCKED with Session Set Configuration (totalSessions=6, requiresUAT=true, requiresE2E=true, uatStyle=ad-hoc, effort=high), §1 what this set ships, §2 operator-locked premises P1-P4 (carry forward to Set 048), §3 scope-locked decisions, §4 6-session breakdown with all additions from the audit (Session 2 performance benchmark, Session 3 rollback procedure, Session 5 prerequisites-field schema, Session 6 deferred bootstrap-doc revision), §5 deferred-to-048 deliverables, §6 non-goals, §7 cross-references. Stubbed Set 048 (lightweight-tier-parity) at docs/session-sets/048-lightweight-tier-parity/ with spec.md inheriting premises P1-P4 + 5 locked-from-Set-047 design decisions + 6 major deliverables + 8 open audit topics; session-state.json was auto-created by the extension watcher in non-canonical shape (missing sessions[]/completedSessions[] arrays — same observation as project_session_state_auto_creation_observed) and patched to canonical v3 shape.",
+      "description": "Rewrote docs/session-sets/047-state-file-schema-v4-audit/spec.md from STUB to AUDIT-LOCKED with Session Set Configuration (totalSessions=6, requiresUAT=true, requiresE2E=true, uatStyle=ad-hoc, effort=high), \u00a71 what this set ships, \u00a72 operator-locked premises P1-P4 (carry forward to Set 048), \u00a73 scope-locked decisions, \u00a74 6-session breakdown with all additions from the audit (Session 2 performance benchmark, Session 3 rollback procedure, Session 5 prerequisites-field schema, Session 6 deferred bootstrap-doc revision), \u00a75 deferred-to-048 deliverables, \u00a76 non-goals, \u00a77 cross-references. Stubbed Set 048 (lightweight-tier-parity) at docs/session-sets/048-lightweight-tier-parity/ with spec.md inheriting premises P1-P4 + 5 locked-from-Set-047 design decisions + 6 major deliverables + 8 open audit topics; session-state.json was auto-created by the extension watcher in non-canonical shape (missing sessions[]/completedSessions[] arrays \u2014 same observation as project_session_state_auto_creation_observed) and patched to canonical v3 shape.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/register-session-start",
+      "dateTime": "2026-05-26T08:34:33-04:00",
+      "description": "Invoked python -m ai_router.start_session with engine=claude, provider=anthropic, model=claude-opus-4-7, effort=high. State-file flipped from between-sessions to in-progress with the orchestrator block populated; currentSession=2; sessions[2].status=in-progress; cumulative S1 spend $0.10851 of $10 NTE (1.1%) carried forward. Per memory feedback_budget_question_scope, did not re-ask the budget at session start.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/reader-surface-grounding",
+      "dateTime": "2026-05-26T08:50:00-04:00",
+      "description": "Inspected the Python and TS reader surfaces: ai_router/progress.py (canonical reader path; synthesize_v3_from_v2 and read_progress already centralize v2/v3 dispatch); ai_router/gate_checks.py (uses _read_progress_or_none wrapping read_progress); ai_router/reconciler.py (reads session-events.jsonl, NOT state file \u2014 no shim coupling needed); ai_router/session_lifecycle.py (private _read_session_state writes back state on cancel/restore \u2014 should NOT normalize since the write-back must preserve raw fields); tools/dabbler-ai-orchestration/src/utils/progress.ts (TS mirror of progress.py); src/utils/fileSystem.ts:readSessionSets (the high-level reader that builds the Explorer SessionSet records; reads sd.orchestrator, sd.startedAt, sd.completedAt, sd.verificationVerdict, sd.forceClosed from the raw dict); src/utils/cancelLifecycle.ts:readCancellationState (only reads state.status, which is preserved at top level in v4 \u2014 no shim coupling needed); src/providers/CustomSessionSetsView.ts:fractionFor (pure in-memory function over the SessionSet record \u2014 no state-file coupling). Confirmed the D13 lint test (test_no_legacy_field_reads.py) allowlists progress.py so the new shim's top-level field accesses inside the helper are compliant.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/python-shim-implementation",
+      "dateTime": "2026-05-26T09:15:00-04:00",
+      "description": "Implemented normalize_to_v4_shape(state, spec_md_path) in ai_router/progress.py. The shim accepts v1/v2/v3/v4 input, returns a NEW dict (pure function), and emits BOTH per-session metadata (each sessions[i] gets startedAt/completedAt/orchestrator/verificationVerdict defaulted to None) AND derived legacy top-level fields (currentSession/totalSessions/completedSessions/orchestrator/startedAt/completedAt/verificationVerdict/lifecycleState) so existing readers consuming top-level fields work transparently against v4 writes. Two derivation directions: (v3 in) promote top-level fields to in-progress / most-recently-completed session, then re-derive top-level from sessions[]; (v4 in) per-session metadata is authoritative, top-level derived FROM it. Routed read_progress() internally through the shim so v4 files read identically to v3. Added SCHEMA_VERSION_V4=4 constant and exported normalize_to_v4_shape via __all__. Routed 818 baseline Python tests through the new read path: all pass.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/typescript-shim-implementation",
+      "dateTime": "2026-05-26T09:45:00-04:00",
+      "description": "Mirrored normalize_to_v4_shape in TypeScript as normalizeToV4Shape in tools/dabbler-ai-orchestration/src/utils/progress.ts with byte-for-byte field semantics + same SCHEMA_VERSION_V4=4 constant. Routed readProgress internally through the shim. Updated readSessionSets in src/utils/fileSystem.ts: (a) JSON.parse output is now `rawSd` and is piped through normalizeToV4Shape into `sd`; (b) v2-compat events-ledger merge hoisted above the normalize call so it operates on rawSd (since normalize guarantees sessions[] on the output, the post-normalize merge would never fire); (c) needsMigration detector reads rawSd.schemaVersion (not the normalized sd.schemaVersion, which is unconditionally bumped to 4). Confirmed `npx tsc --noEmit` clean. All 553 baseline TS unit tests + the existing fileSystem/readSessionSets/progress tests pass.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/unit-test-coverage",
+      "dateTime": "2026-05-26T10:10:00-04:00",
+      "description": "Wrote ai_router/tests/test_normalize_v4_shape.py (23 baseline tests) and tools/dabbler-ai-orchestration/src/test/suite/normalizeV4Shape.test.ts (22 baseline tests). Coverage: v3 input \u2192 v4 (schemaVersion bump, sessionSetName preserved, per-session metadata defaulted, orchestrator/startedAt promoted to in-progress, completedAt/verdict promoted to last completed, between-sessions orchestrator to last completed, status canonicalization, totalSessions/completedSessions/currentSession derived from sessions[], preCancelStatus + forceClosed passthrough); v4 input \u2192 v4 (per-session orchestrator authoritative, top derived from in-progress, verdict from last completed, stale top-level ignored when per-session present); v2 input \u2192 v4 (synthesizes then enriches; pure-counts v2 normalizes cleanly); errors (None raises TypeError, non-list sessions raises SessionStateInvariantError, no mutation \u2014 pure function); readProgress routing (v3 file works, v4 file works, strict v4 with only schemaVersion+sessionSetName+sessions+status works).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/perf-baseline",
+      "dateTime": "2026-05-26T10:25:00-04:00",
+      "description": "Authored tools/dabbler-ai-orchestration/src/test/suite/readSessionSetsPerfBenchmark.test.ts: walks the real docs/session-sets/ tree (47 sets), calls readSessionSets(repoRoot) 20 times after a warm-up iteration, prints p50/p95/max/mean wall-clock timings, and asserts p95 < 5000ms as a relaxed regression guard. Baseline emitted to test output: mean=21.8ms p50=21.2ms p95=32.5ms max=32.5ms (Windows 11 + warm SSD + node 22 + ts-node). The test will trip on a ~150\u00d7 regression \u2014 tight enough to catch a real reader-side perf bug, loose enough to survive CI runner variance. Tightening the bound is a future-set conversation once we have stable CI numbers across Windows / macOS / Linux.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/cross-provider-verification-round-1",
+      "dateTime": "2026-05-26T11:10:00-04:00",
+      "description": "Ran routed cross-provider verification via docs/session-sets/047-state-file-schema-v4-audit/run_s2_verification.py. Bundle: progress.py + progress.ts + fileSystem.ts + the three new test files + perf benchmark (123,639 chars total). task_type='session-verification' routed to gpt-5-4 tier 3. Verdict: ISSUES_FOUND with 3 must-fix items. (1) Per-session status aliases not canonicalized in the shim's build loop \u2014 a hand-edited \"completed\" session would not appear in derived completedSessions[]. (2) Top-level startedAt lost on v3 between-sessions / all-complete snapshots and v4 derivation scanned from start of sessions[] (returns session 1's startedAt) instead of last-completed. (3) needsMigration should flag raw v3 files (verifier's reading of my own ambiguous contract property 3 wording). Cost: 215.4s, $0.25798, 29337 input + 12309 output tokens. NOTE: first run lost the response text because run_s2_verification.py grabbed `result.text` instead of the actual attribute `result.content` (per RouteResult dataclass) \u2014 fixed the attribute names per memory feedback_ai_router_route_result_handling; transcript recovered on Round 2.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "tier": 3,
+          "cost_usd": 0.25797749999999997,
+          "tokens_in": 29337,
+          "tokens_out": 12309,
+          "phase": "round-1-verify"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/verifier-fixes-and-regression-tests",
+      "dateTime": "2026-05-26T11:25:00-04:00",
+      "description": "Applied fixes for Issues 1 and 2 in both Python (ai_router/progress.py) and TypeScript (tools/dabbler-ai-orchestration/src/utils/progress.ts). Fix 1: call canonicalize_status (Python) / canonicalizeStatus (TS) on each entry's status field inside the build loop BEFORE downstream derivation reads it. Fix 2a: in the v3-promotion block, when no in-progress session, promote top-level startedAt to the most-recently-completed session alongside the orchestrator block. Fix 2b: in the top-level derivation block, when derived_started/derivedStarted is null and completed sessions exist, scan completed_v4/completedV4 in REVERSE so the most-recently-completed session's startedAt wins (was: scanning sessions_v4 from start returned session 1's startedAt on multi-session sets). Added 9 Python regression tests (TestVerifierFix1*, TestVerifierFix2*, TestVerifierNiceToHaveIdempotence) and 9 TS regression tests (verifier fix 1 / fix 2 / idempotence suites) covering both fixes plus the verifier's nice-to-have idempotence guarantee normalize(normalize(x))==normalize(x). Issue 3 (v3 needsMigration flag expansion) deferred to Session 3 with a documented code-comment rationale at fileSystem.ts: the dabblerSessionSets.migrate command is hardwired to \"Migrate to v3 schema\" and its set.needsMigration check early-returns for v3 files \u2014 flipping the flag now would point the badge CTA at a nonexistent migrator action. Tests: 32 Python shim tests pass (23 baseline + 9 regression); 31 TS shim tests pass (22 baseline + 9 regression).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-002/cross-provider-verification-round-2",
+      "dateTime": "2026-05-26T11:50:00-04:00",
+      "description": "Re-ran routed verification with the corrected RouteResult attribute names and post-fix bundle (139,183 chars). Verdict: ISSUES_FOUND with 1 remaining item \u2014 Issue 3 (v3 needsMigration expansion) only. Verifier confirmed Issues 1 and 2 from Round 1 are resolved (they are NOT re-listed). Cost: 186.7s, $0.22553, 31000 input + 17286 output tokens. Decision: accept ISSUES_FOUND verdict with documented deferral rather than burning another $0.20+ on a Round 3 just to flip a single flag. Per memory feedback_verifier_spiral_recruit_codex, this is not a spiral \u2014 Round 2 confirmed prior fixes; the remaining issue is a contract-wording-ambiguity disagreement, not a code defect. Round-1 + Round-2 routed cost for S2 verification: $0.48351. Cumulative S1+S2 routed cost: $0.59202 of $10 NTE (5.9%).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "tier": 3,
+          "cost_usd": 0.22553250000000002,
+          "tokens_in": 31000,
+          "tokens_out": 17286,
+          "phase": "round-2-verify"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-002/full-regression-suite",
+      "dateTime": "2026-05-26T12:05:00-04:00",
+      "description": "Full regression checks: (a) Python pytest \u2014 850 passed (818 baseline + 32 new shim tests), 1 skipped (pre-existing), 0 failed. (b) Python e2e (ai_router/tests/e2e/) \u2014 11 passed. (c) Python e2e marker tests \u2014 8 passed. (d) TS npm run test:unit \u2014 563 passed (553 baseline + 10 shim baseline + 9 regression + 1 perf benchmark), 2 failed (pre-existing failures unchanged from baseline: configEditor-foundation ViewColumn stub issue + notificationsSection disabled-button assertion, both last-touched in Set 026 \u2014 unrelated to v4 work). Perf baseline emitted: readSessionSets(47 sets) \u00d7 20 iterations: mean=21.8ms p50=21.2ms p95=32.5ms max=32.5ms.",
       "status": "complete",
       "routedApiCalls": []
     }

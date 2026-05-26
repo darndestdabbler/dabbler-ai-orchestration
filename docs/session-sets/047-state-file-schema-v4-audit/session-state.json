@@ -1,17 +1,6 @@
 {
   "schemaVersion": 3,
   "sessionSetName": "047-state-file-schema-v4-audit",
-  "currentSession": null,
-  "totalSessions": 6,
-  "completedSessions": [
-    1
-  ],
-  "status": "in-progress",
-  "lifecycleState": "work_in_progress",
-  "startedAt": "2026-05-26T07:27:06.095672-04:00",
-  "completedAt": null,
-  "verificationVerdict": null,
-  "orchestrator": null,
   "sessions": [
     {
       "number": 1,
@@ -21,7 +10,7 @@
     {
       "number": 2,
       "title": "Reader-first phase: normalize-to-v4 shim + reader updates + perf benchmark",
-      "status": "not-started"
+      "status": "in-progress"
     },
     {
       "number": 3,
@@ -43,5 +32,24 @@
       "title": "Schema-doc + authoring-guide revision + close-out + publish",
       "status": "not-started"
     }
-  ]
+  ],
+  "currentSession": 2,
+  "totalSessions": 6,
+  "completedSessions": [
+    1
+  ],
+  "status": "in-progress",
+  "lifecycleState": "work_in_progress",
+  "startedAt": "2026-05-26T08:34:33.093655-04:00",
+  "completedAt": null,
+  "verificationVerdict": null,
+  "orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "high",
+    "chatSessionId": null,
+    "checkedOutAt": "2026-05-26T08:34:33.093655-04:00",
+    "lastActivityAt": "2026-05-26T08:34:33.093655-04:00"
+  }
 }

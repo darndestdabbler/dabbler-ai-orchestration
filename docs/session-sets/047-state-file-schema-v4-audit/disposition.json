@@ -1,24 +1,24 @@
 {
   "status": "completed",
-  "summary": "Set 047 Session 1 ran a two-pass devil's-advocate cross-provider audit of the v4 state-file schema migration. A mid-session operator directive substantially expanded scope: the Lightweight tier must use the same exact process as Full (premises P1-P4) — same writers, same Explorer UX, no hand-edit; differs only in no AI router, no auto-verification, copyable review prompts, and suggested-not-required UAT/E2E. The audit absorbed P1-P4 as load-bearing premises, carved the Lightweight implementation work out to a sibling Set 048 (stubbed in this commit), and rewrote the original audit-pending stub spec into a scope-locked 6-session implementation arc. Notable bias FLIPS from the proposal after consensus: single dabbler-ai-router package + --no-router mode (no PyPI package split), copyable-prompt commands ship on BOTH Command Palette AND right-click context menu. Notable bias STAND-BYs after pushback weighing: split into 047 (v4 schema) + 048 (Lightweight parity) was the right shape; migrator stays canonical-only for this repo (Pass B verify's pushback on Pass B primary's flip won). Cumulative S1 routed cost: $0.10851 of $10 NTE (1.1%).",
+  "summary": "Set 047 Session 2 shipped the reader-first phase of the v4 schema migration: the normalize_to_v4_shape / normalizeToV4Shape shim in Python and TypeScript, reader routing in fileSystem.ts (readSessionSets pipes raw JSON through the shim; v2-compat ledger merge hoisted above the normalize call; needsMigration reads rawSd not normalized sd), 32 Python + 31 TS unit tests covering v3-in / v4-in / v2-in / errors / pure-function guarantee / routing / verifier-flagged regressions / idempotence, and a readSessionSets() perf benchmark with baseline mean=21.8ms p50=21.2ms p95=32.5ms max=32.5ms over 47 sets × 20 iterations. Cross-provider verification ran two rounds against gpt-5-4 tier 3 ($0.484 total): Round 1 flagged 3 must-fix items, Round 2 confirmed Issues 1 and 2 resolved. Issue 3 (expanding the needsMigration detector to flag raw v3 files) was deferred to Session 3 with a documented code-comment rationale — the dabblerSessionSets.migrate command is hardwired to \"Migrate to v3 schema\" and flipping the flag now would point the badge CTA at a nonexistent v3→v4 migrator (which ships in Session 3). All 850 Python tests pass + 11 e2e + 8 e2e-marker; 563 TS unit tests pass (2 pre-existing failures unchanged). Cumulative S1+S2 routed cost: $0.59202 of $10 NTE (5.9%).",
   "verification_method": "manual",
   "files_changed": [
-    "docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/proposal.md",
-    "docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/run_consensus.py",
-    "docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/pass_a_primary.md",
-    "docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/pass_a_verify.md",
-    "docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/pass_b_primary.md",
-    "docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/pass_b_verify.md",
-    "docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/cost_summary.json",
-    "docs/proposals/2026-05-26-state-file-schema-v4-and-lightweight-parity/verdict.md",
+    "ai_router/progress.py",
+    "ai_router/tests/test_normalize_v4_shape.py",
+    "tools/dabbler-ai-orchestration/src/utils/progress.ts",
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/normalizeV4Shape.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/readSessionSetsPerfBenchmark.test.ts",
     "docs/session-sets/047-state-file-schema-v4-audit/spec.md",
     "docs/session-sets/047-state-file-schema-v4-audit/activity-log.json",
     "docs/session-sets/047-state-file-schema-v4-audit/session-events.jsonl",
     "docs/session-sets/047-state-file-schema-v4-audit/session-state.json",
-    "docs/session-sets/047-state-file-schema-v4-audit/s1-close-reason.md",
-    "docs/session-sets/047-state-file-schema-v4-audit/disposition.json",
-    "docs/session-sets/048-lightweight-tier-parity/spec.md",
-    "docs/session-sets/048-lightweight-tier-parity/session-state.json"
+    "docs/session-sets/047-state-file-schema-v4-audit/s2-close-reason.md",
+    "docs/session-sets/047-state-file-schema-v4-audit/s2-verification-prompt.md",
+    "docs/session-sets/047-state-file-schema-v4-audit/s2-verification-result.json",
+    "docs/session-sets/047-state-file-schema-v4-audit/s2-verification-transcript.md",
+    "docs/session-sets/047-state-file-schema-v4-audit/run_s2_verification.py",
+    "docs/session-sets/047-state-file-schema-v4-audit/disposition.json"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -28,7 +28,7 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Set 047 Session 2 is the reader-first phase of the v4 schema migration per the scope-locked spec.md §4. It adds the _normalize_to_v4_shape(state) shim to Python and TypeScript readers, routes every existing reader (readSessionSets, readCancellationState, fractionFor, gate_checks, reconciler) through it, and establishes a performance benchmark for readSessionSets() against all historical state files. Claude Opus 4.7 high-effort is the same orchestrator that closed S1 and is appropriate for the cross-language shim authoring and the establish-baseline benchmark work."
+      "specifics": "Set 047 Session 3 is the migrator phase per the scope-locked spec.md §4: ships `python -m ai_router.migrate_v3_to_v4` CLI subcommand (walks docs/session-sets/*/session-state.json, idempotent re-runs, dry-run + apply modes, writes session-state.v3.bak.json alongside on apply), the TypeScript Explorer right-click 'Migrate to v4 schema' command, the formal rollback procedure doc deliverable, a new Layer-3 Playwright spec for the right-click migrate path, AND the deferred-from-S2 needsMigration detector expansion (raw v3 files now flag as needing v4 migration, with the badge CTA pointing at the new v4 migrator). Claude Opus 4.7 high-effort is the same orchestrator that closed S1 and S2 and is appropriate for the cross-language migrator authoring (Python CLI + TS command) plus the Playwright spec authoring."
     }
   },
   "blockers": []

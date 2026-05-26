@@ -29,6 +29,17 @@ from typing import Iterable, List, Optional, Tuple
 
 
 SCHEMA_VERSION_V3 = 3
+# Set 047 Session 2: v4 schema constant. v4 derives top-level state
+# (currentSession, totalSessions, completedSessions, orchestrator,
+# startedAt, completedAt, verificationVerdict, lifecycleState) from a
+# per-session sessions[] ledger where each entry gains its own
+# startedAt / completedAt / orchestrator / verificationVerdict fields.
+# The Session-2 reader-first shim (:func:`normalize_to_v4_shape`)
+# accepts v1/v2/v3/v4 input and returns a normalized v4 read-view dict
+# with BOTH per-session metadata AND derived top-level fields so
+# existing readers (which still consume top-level fields) work
+# transparently against v4 writes from Sessions 4-5.
+SCHEMA_VERSION_V4 = 4
 
 SESSION_STATUS_NOT_STARTED = "not-started"
 SESSION_STATUS_IN_PROGRESS = "in-progress"
@@ -283,6 +294,234 @@ def synthesize_v3_from_v2(state: dict, spec_md_path: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# v3/v4 -> v4 read-time normalization (Set 047 Session 2)
+# ---------------------------------------------------------------------------
+
+
+# v4 per-session metadata keys promoted/derived by the normalize shim.
+# Centralized so the Python and TypeScript implementations stay in
+# lockstep on which fields move from top-level to per-session in v4.
+_V4_PER_SESSION_KEYS = (
+    "startedAt",
+    "completedAt",
+    "orchestrator",
+    "verificationVerdict",
+)
+
+
+def normalize_to_v4_shape(state: dict, spec_md_path: Path) -> dict:
+    """Return *state* in canonical v4 read-view shape.
+
+    Accepts v1/v2/v3/v4 input. Returns a NEW dict; does NOT mutate the
+    input. The returned dict carries:
+
+    - ``schemaVersion: 4``
+    - ``sessionSetName`` (preserved)
+    - ``sessions[]`` with v4 per-session metadata (each entry gains
+      ``startedAt`` / ``completedAt`` / ``orchestrator`` /
+      ``verificationVerdict`` defaulted to ``None`` when absent)
+    - ``status`` (canonicalized)
+    - **Derived legacy top-level fields** (``currentSession``,
+      ``totalSessions``, ``completedSessions``, ``orchestrator``,
+      ``startedAt``, ``completedAt``, ``verificationVerdict``,
+      ``lifecycleState``) so existing readers that still consume the
+      top-level fields work transparently against v4 writes.
+
+    The TWO directions of derivation:
+
+    - **v3 input → v4**: top-level ``orchestrator`` / ``startedAt`` /
+      ``completedAt`` / ``verificationVerdict`` are promoted to the
+      in-progress session (or, if none, the most-recently-completed
+      session) so per-session metadata is populated. The top-level
+      fields are then re-derived from the per-session ones (no-op on
+      pure v3 input; gives the same observable shape).
+    - **v4 input → v4**: per-session metadata is preserved; top-level
+      fields are derived FROM the per-session metadata (in-progress
+      session's orchestrator/startedAt wins; most-recently-completed
+      session's completedAt/verificationVerdict wins). This is what
+      lets a v3-era reader consume a v4 file unchanged.
+
+    This is the canonical reader path for Sessions 4-5 (writer flip)
+    forward: every reader (gate_checks, the Explorer's readSessionSets,
+    cancellation reader, reconciler) goes through this shim so the
+    write side and the read side can evolve independently.
+
+    Per the Session-1 audit verdict (Group A1): the shim is the
+    reader-first phase; the migrator (Session 3) and the writer flip
+    (Sessions 4-5) both depend on this contract.
+    """
+    if state is None:
+        raise TypeError("normalize_to_v4_shape: state is None")
+
+    # Step 1: ensure sessions[] is present (synthesize from v2 if missing).
+    # synthesize_v3_from_v2 returns a NEW dict; for v3/v4 inputs we make
+    # our own shallow copy so we can mutate without touching the caller's
+    # dict.
+    if state.get("sessions") is None:
+        v3_state = synthesize_v3_from_v2(state, spec_md_path)
+    else:
+        v3_state = dict(state)
+
+    raw_sessions = v3_state.get("sessions") or []
+    if not isinstance(raw_sessions, list):
+        raise SessionStateInvariantError(
+            1,
+            f"sessions[] must be a list, got {type(raw_sessions).__name__}",
+        )
+
+    # Step 2: build v4 per-session records. Each entry gets the v4
+    # metadata fields defaulted to None when absent so downstream code
+    # can rely on key presence. We copy each entry rather than
+    # mutating in-place.
+    sessions_v4: List[dict] = []
+    for entry in raw_sessions:
+        if not isinstance(entry, dict):
+            # Defer to validator's SessionStateInvariantError; this
+            # branch shouldn't normally fire because get_progress would
+            # have rejected earlier. Be permissive here so callers can
+            # validate at their own layer.
+            sessions_v4.append({"number": None, "title": None, "status": None})
+            continue
+        sv4 = dict(entry)
+        # Canonicalize per-session status BEFORE downstream derivation
+        # reads it. Aliased values (``"completed"`` / ``"done"``) must
+        # collapse to ``"complete"`` here so the promotion and the
+        # legacy-top-level derivation below match those entries
+        # against ``SESSION_STATUS_COMPLETE``. Without this, a v3/v4
+        # file authored with the alias form would bypass the
+        # derivation entirely (a hand-edited "completed" session would
+        # not appear in derived ``completedSessions[]``).
+        sv4["status"] = canonicalize_status(sv4.get("status"))
+        for k in _V4_PER_SESSION_KEYS:
+            sv4.setdefault(k, None)
+        sessions_v4.append(sv4)
+
+    schema_version_in = state.get("schemaVersion")
+    is_v4_input = (
+        isinstance(schema_version_in, int) and schema_version_in >= SCHEMA_VERSION_V4
+    )
+
+    # Step 3: on non-v4 input, promote top-level fields to per-session
+    # records that don't already carry the metadata. v4 inputs skip
+    # promotion because their per-session fields are authoritative.
+    if not is_v4_input:
+        top_orchestrator = state.get("orchestrator")
+        top_started = state.get("startedAt")
+        top_completed = state.get("completedAt")
+        top_verdict = state.get("verificationVerdict")
+
+        in_progress = [
+            s for s in sessions_v4 if s.get("status") == SESSION_STATUS_IN_PROGRESS
+        ]
+        completed = [
+            s for s in sessions_v4 if s.get("status") == SESSION_STATUS_COMPLETE
+        ]
+
+        if in_progress:
+            tgt = in_progress[0]
+            if tgt.get("orchestrator") is None and top_orchestrator is not None:
+                tgt["orchestrator"] = top_orchestrator
+            if tgt.get("startedAt") is None and top_started is not None:
+                tgt["startedAt"] = top_started
+
+        if completed:
+            last_completed = completed[-1]
+            if last_completed.get("completedAt") is None and top_completed is not None:
+                last_completed["completedAt"] = top_completed
+            if (
+                last_completed.get("verificationVerdict") is None
+                and top_verdict is not None
+            ):
+                last_completed["verificationVerdict"] = top_verdict
+            # When no in-progress session, the orchestrator block on a
+            # v3 close-out snapshot belongs with the most recent
+            # completed session (the orchestrator that closed it).
+            # Same goes for ``startedAt`` — without this branch, a
+            # between-sessions or all-complete snapshot would lose the
+            # top-level ``startedAt`` entirely (no in-progress session
+            # to receive it, and the v4 derivation step has nowhere to
+            # re-discover it).
+            if not in_progress:
+                if last_completed.get("orchestrator") is None and top_orchestrator is not None:
+                    last_completed["orchestrator"] = top_orchestrator
+                if last_completed.get("startedAt") is None and top_started is not None:
+                    last_completed["startedAt"] = top_started
+
+    # Step 4: derive legacy top-level fields from the per-session
+    # ledger. This is the v4 reader contract — top-level fields are
+    # DERIVED, never independently maintained.
+    completed_numbers = [
+        s["number"]
+        for s in sessions_v4
+        if s.get("status") == SESSION_STATUS_COMPLETE and isinstance(s.get("number"), int)
+    ]
+    in_progress_list = [
+        s for s in sessions_v4 if s.get("status") == SESSION_STATUS_IN_PROGRESS
+    ]
+    current_session = (
+        in_progress_list[0]["number"]
+        if in_progress_list and isinstance(in_progress_list[0].get("number"), int)
+        else None
+    )
+
+    derived_orchestrator = None
+    derived_started = None
+    derived_completed = None
+    derived_verdict = None
+
+    if in_progress_list:
+        derived_orchestrator = in_progress_list[0].get("orchestrator")
+        derived_started = in_progress_list[0].get("startedAt")
+
+    completed_v4 = [
+        s for s in sessions_v4 if s.get("status") == SESSION_STATUS_COMPLETE
+    ]
+    if completed_v4:
+        last_completed = completed_v4[-1]
+        derived_completed = last_completed.get("completedAt")
+        derived_verdict = last_completed.get("verificationVerdict")
+        if derived_orchestrator is None:
+            derived_orchestrator = last_completed.get("orchestrator")
+        if derived_started is None:
+            # Prefer the most-recently-completed session's startedAt
+            # over the earliest session's. Earlier draft scanned
+            # `sessions_v4` from the start, which on a v4 between-
+            # sessions snapshot would return session 1's startedAt
+            # (typically the set's open time, not the active session
+            # boundary). Scanning completed sessions in reverse gives
+            # the most current boundary timestamp.
+            for s in reversed(completed_v4):
+                if s.get("startedAt"):
+                    derived_started = s["startedAt"]
+                    break
+
+    canonical_top_status = canonicalize_status(state.get("status"))
+
+    out: dict = {
+        "schemaVersion": SCHEMA_VERSION_V4,
+        "sessionSetName": state.get("sessionSetName"),
+        "sessions": sessions_v4,
+        "status": canonical_top_status,
+        "currentSession": current_session,
+        "totalSessions": len(sessions_v4),
+        "completedSessions": completed_numbers,
+        "orchestrator": derived_orchestrator,
+        "startedAt": derived_started,
+        "completedAt": derived_completed,
+        "verificationVerdict": derived_verdict,
+        "lifecycleState": state.get("lifecycleState"),
+    }
+    # Preserve passthrough fields that callers (cancellation reader,
+    # forceClosed display, Set 035 preCancelStatus) still consume from
+    # the top level. These are NOT derived from sessions[]; they ride
+    # along as opaque values until a future schema folds them in too.
+    for passthrough_key in ("preCancelStatus", "forceClosed"):
+        if passthrough_key in state:
+            out[passthrough_key] = state[passthrough_key]
+    return out
+
+
+# ---------------------------------------------------------------------------
 # get_progress: the one reader path
 # ---------------------------------------------------------------------------
 
@@ -305,12 +544,18 @@ def read_progress(state: dict, spec_md_path: Path) -> ProgressView:
     Raises :class:`SessionStateInvariantError` on invariant violation.
     Application readers that want defensive fallback (e.g. degrade to
     in-progress rather than throw) should wrap the call in try/except.
+
+    Set 047 Session 2: routed through :func:`normalize_to_v4_shape` so
+    a v4-shaped file (sessions[] entries carrying per-session
+    startedAt / completedAt / orchestrator / verificationVerdict)
+    reads identically to a v3 file. The normalize shim is invoked
+    even for v3 inputs so the v4 per-session enrichment is available
+    to any consumer that fetches the normalized dict directly.
     """
     if state is None:
         raise TypeError("read_progress: state is None")
-    if state.get("sessions") is not None:
-        return get_progress(state)
-    return get_progress(synthesize_v3_from_v2(state, spec_md_path))
+    normalized = normalize_to_v4_shape(state, spec_md_path)
+    return get_progress(normalized)
 
 
 def get_progress(state: dict) -> ProgressView:
@@ -567,6 +812,7 @@ def _parse_sessions(raw: Iterable) -> List[SessionRecord]:
 
 __all__ = [
     "SCHEMA_VERSION_V3",
+    "SCHEMA_VERSION_V4",
     "SESSION_STATUS_NOT_STARTED",
     "SESSION_STATUS_IN_PROGRESS",
     "SESSION_STATUS_COMPLETE",
@@ -581,6 +827,7 @@ __all__ = [
     "canonicalize_status",
     "extract_session_titles_from_spec",
     "synthesize_v3_from_v2",
+    "normalize_to_v4_shape",
     "read_progress",
     "get_progress",
     "validate_invariants",

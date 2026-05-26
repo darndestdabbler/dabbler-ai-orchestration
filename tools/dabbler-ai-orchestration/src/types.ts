@@ -44,10 +44,26 @@ export interface SessionStateV3 {
   sessions: SessionRecord[];
 }
 
+// Set 048 Session 2: tri-state UAT/E2E enum per audit decision D4.
+// `true` blocks close-out until checklist evidence present; `false`
+// skips; `"suggested"` triggers an upfront positive-confirmation prompt
+// from the AI orchestrator at session start when the session has UX
+// scope (per operator override of audit Bias 4), with the choice
+// recorded in activity-log as a `suggestion_disposition` entry.
+export type TriStateFlag = boolean | "suggested";
+
+// Set 048 Session 2: tier field per audit §3.6. Lightweight tier
+// follows the same writer/Explorer/state-file process as Full but
+// suppresses AI router runtime calls and auto-verification (per
+// operator-locked premises P1-P4). Pre-Set-048 specs default to
+// `"full"` when the field is absent.
+export type SessionSetTier = "full" | "lightweight";
+
 export interface SessionSetConfig {
-  requiresUAT: boolean;
-  requiresE2E: boolean;
+  requiresUAT: TriStateFlag;
+  requiresE2E: TriStateFlag;
   uatScope: string;
+  tier: SessionSetTier;
 }
 
 // Set 047 Session 5: prerequisites field schema landed by spec §3.3.

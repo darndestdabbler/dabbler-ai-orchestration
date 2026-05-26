@@ -72,6 +72,100 @@ suite("fileSystem — parseSessionSetConfig", () => {
     assert.strictEqual(cfg.requiresE2E, false);
     fs.rmSync(dir, { recursive: true });
   });
+
+  // Set 048 Session 2: tier field + tri-state requiresUAT/E2E. Defaults
+  // are full-tier-conservative for backwards compatibility with the 47
+  // pre-Set-048 specs that have no `tier:` field.
+
+  test("Set 048: defaults tier to 'full' when field absent (pre-Set-048 specs)", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\nrequiresUAT: true\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.tier, "full");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: parses tier=lightweight", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\ntier: lightweight\nrequiresUAT: false\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.tier, "lightweight");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: parses tier=full explicitly", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\ntier: full\nrequiresUAT: false\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.tier, "full");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: unknown tier value falls back to 'full' (validator surfaces typos, not parser)", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\ntier: kitchen-sink\nrequiresUAT: false\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.tier, "full");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: tri-state requiresUAT='suggested' (unquoted)", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\nrequiresUAT: suggested\nrequiresE2E: false\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.requiresUAT, "suggested");
+    assert.strictEqual(cfg.requiresE2E, false);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: tri-state requiresUAT='suggested' (quoted)", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\nrequiresUAT: \"suggested\"\nrequiresE2E: false\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.requiresUAT, "suggested");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: tri-state requiresE2E='suggested'", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\nrequiresUAT: false\nrequiresE2E: suggested\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.requiresE2E, "suggested");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: inline YAML comments tolerated", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\ntier: lightweight  # operator-locked\nrequiresUAT: \"suggested\"  # Set 048 D4\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.tier, "lightweight");
+    assert.strictEqual(cfg.requiresUAT, "suggested");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: mixed tri-state + lightweight tier", () => {
+    const dir = makeTmpDir();
+    const specPath = path.join(dir, "spec.md");
+    fs.writeFileSync(specPath, "## Session Set Configuration\n```yaml\ntier: lightweight\nrequiresUAT: true\nrequiresE2E: suggested\n```");
+    const cfg = parseSessionSetConfig(specPath);
+    assert.strictEqual(cfg.tier, "lightweight");
+    assert.strictEqual(cfg.requiresUAT, true);
+    assert.strictEqual(cfg.requiresE2E, "suggested");
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  test("Set 048: missing spec returns tier='full' default", () => {
+    const cfg = parseSessionSetConfig("/nonexistent/spec.md");
+    assert.strictEqual(cfg.tier, "full");
+  });
 });
 
 suite("fileSystem — parseUatChecklist", () => {

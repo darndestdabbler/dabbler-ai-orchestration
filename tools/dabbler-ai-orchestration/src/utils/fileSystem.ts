@@ -10,6 +10,7 @@ import {
   SessionState,
   SessionSetConfig,
   SessionSetPrerequisite,
+  TriStateFlag,
   UatSummary,
   LiveSession,
 } from "../types";
@@ -185,10 +186,15 @@ export function countDistinctCloseoutSessions(eventsPath: string): number {
 }
 
 export function parseSessionSetConfig(specPath: string): SessionSetConfig {
+  // Set 048 Session 2: defaults are full-tier-conservative — `tier: "full"`,
+  // `requiresUAT: false`, `requiresE2E: false`. Pre-Set-048 specs without
+  // explicit `tier:` resolve to `"full"` so existing 47 sets continue to
+  // run under canonical Full-tier discipline.
   const config: SessionSetConfig = {
     requiresUAT: false,
     requiresE2E: false,
     uatScope: "none",
+    tier: "full",
   };
   if (!fs.existsSync(specPath)) return config;
   let text: string;
@@ -201,17 +207,37 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
     /##\s*Session Set Configuration[\s\S]*?```ya?ml\s*([\s\S]*?)```/i
   );
   const block = headingMatch ? headingMatch[1] : text;
-  const flagRe = (key: string) =>
-    new RegExp(`^\\s*${key}\\s*:\\s*(true|false)\\s*$`, "im");
+  // Set 048 Session 2: triStateRe accepts `true | false | suggested` (with
+  // optional surrounding quotes on `suggested` since YAML allows either).
+  const triStateRe = (key: string) =>
+    new RegExp(
+      `^\\s*${key}\\s*:\\s*(?:"(suggested)"|(true|false|suggested))\\s*(?:#.*)?$`,
+      "im",
+    );
   const stringRe = (key: string) =>
-    new RegExp(`^\\s*${key}\\s*:\\s*([\\w-]+)\\s*$`, "im");
+    new RegExp(`^\\s*${key}\\s*:\\s*([\\w-]+)\\s*(?:#.*)?$`, "im");
+  const parseTriState = (m: RegExpMatchArray | null): TriStateFlag | null => {
+    if (!m) return null;
+    const raw = (m[1] ?? m[2] ?? "").toLowerCase();
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    if (raw === "suggested") return "suggested";
+    return null;
+  };
 
-  const uat = block.match(flagRe("requiresUAT"));
-  if (uat) config.requiresUAT = uat[1].toLowerCase() === "true";
-  const e2e = block.match(flagRe("requiresE2E"));
-  if (e2e) config.requiresE2E = e2e[1].toLowerCase() === "true";
+  const uat = parseTriState(block.match(triStateRe("requiresUAT")));
+  if (uat !== null) config.requiresUAT = uat;
+  const e2e = parseTriState(block.match(triStateRe("requiresE2E")));
+  if (e2e !== null) config.requiresE2E = e2e;
   const scope = block.match(stringRe("uatScope"));
   if (scope) config.uatScope = scope[1];
+  const tier = block.match(stringRe("tier"));
+  if (tier) {
+    const v = tier[1].toLowerCase();
+    if (v === "full" || v === "lightweight") config.tier = v;
+    // Unknown tier values silently fall back to "full" — schema validator
+    // (separate from this parser) is responsible for surfacing the typo.
+  }
   return config;
 }
 

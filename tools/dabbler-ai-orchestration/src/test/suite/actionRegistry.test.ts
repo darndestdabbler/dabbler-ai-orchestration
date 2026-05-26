@@ -28,7 +28,7 @@ function fakeSet(
     sessionsCompleted: 0,
     lastTouched: null,
     liveSession: null,
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none" },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full" },
     uatSummary: null,
     root: "/x",
     needsMigration: false,
@@ -115,7 +115,7 @@ suite("ActionRegistry", () => {
   });
 
   test("UAT entry gated on both supports.uat AND set.config.requiresUAT", () => {
-    const uatSet = fakeSet("in-progress", { config: { requiresUAT: true, requiresE2E: false, uatScope: "" } });
+    const uatSet = fakeSet("in-progress", { config: { requiresUAT: true, requiresE2E: false, uatScope: "", tier: "full" } });
     const nonUatSet = fakeSet("in-progress");
     assert.ok(ids(uatSet, ALL_SUPPORTED).includes("dabblerSessionSets.openUatChecklist"));
     assert.ok(!ids(uatSet, NEITHER_SUPPORTED).includes("dabblerSessionSets.openUatChecklist"),
@@ -125,7 +125,7 @@ suite("ActionRegistry", () => {
   });
 
   test("E2E entry gated on both supports.e2e AND set.config.requiresE2E", () => {
-    const e2eSet = fakeSet("in-progress", { config: { requiresUAT: false, requiresE2E: true, uatScope: "none" } });
+    const e2eSet = fakeSet("in-progress", { config: { requiresUAT: false, requiresE2E: true, uatScope: "none", tier: "full" } });
     assert.ok(ids(e2eSet, ALL_SUPPORTED).includes("dabblerSessionSets.revealPlaywrightTests"));
     assert.ok(!ids(e2eSet, NEITHER_SUPPORTED).includes("dabblerSessionSets.revealPlaywrightTests"));
     assert.ok(!ids(fakeSet("in-progress"), ALL_SUPPORTED).includes("dabblerSessionSets.revealPlaywrightTests"));
@@ -213,7 +213,7 @@ suite("ActionRegistry", () => {
   test("result is sorted by group ascending so menu order is deterministic", () => {
     const got = applicableActions(
       fakeSet("in-progress", {
-        config: { requiresUAT: true, requiresE2E: true, uatScope: "" },
+        config: { requiresUAT: true, requiresE2E: true, uatScope: "", tier: "full" },
         needsMigration: true,
         migrationTargetSchemaVersion: 4,
       }),

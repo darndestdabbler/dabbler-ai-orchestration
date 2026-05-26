@@ -23,10 +23,18 @@
     {
       "number": 2,
       "title": "--no-router mode + tri-state schema/runtime + soft gate",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-05-26T17:44:48.561045-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-4-7",
+        "effort": "max",
+        "chatSessionId": null,
+        "checkedOutAt": "2026-05-26T17:44:48.561045-04:00",
+        "lastActivityAt": "2026-05-26T17:44:48.561045-04:00"
+      },
       "verificationVerdict": null
     },
     {

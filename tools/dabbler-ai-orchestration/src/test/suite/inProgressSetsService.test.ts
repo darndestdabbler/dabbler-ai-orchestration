@@ -123,7 +123,7 @@ function fakeSet(
       forceClosed: null,
       completedSessions: [],
     },
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none" },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full" },
     uatSummary: null,
     root: "/tmp",
     needsMigration: false,

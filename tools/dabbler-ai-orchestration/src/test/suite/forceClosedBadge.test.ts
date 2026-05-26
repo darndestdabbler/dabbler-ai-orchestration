@@ -42,6 +42,7 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
       requiresUAT: false,
       requiresE2E: false,
       uatScope: "none",
+      tier: "full",
     },
     uatSummary: null,
     root: "/x",

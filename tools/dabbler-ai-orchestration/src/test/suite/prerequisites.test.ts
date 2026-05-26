@@ -378,7 +378,7 @@ suite("Set 047 / S5 — blockedByPrereqsBadge", () => {
       sessionsCompleted: 0,
       lastTouched: null,
       liveSession: null,
-      config: { requiresUAT: false, requiresE2E: false, uatScope: "none" },
+      config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full" },
       uatSummary: null,
       root: "/x",
       needsMigration: false,

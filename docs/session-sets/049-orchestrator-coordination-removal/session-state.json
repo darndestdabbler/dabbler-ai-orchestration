@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "049-orchestrator-coordination-removal",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -65,9 +65,9 @@
     {
       "number": 5,
       "title": "Docs + version bumps + close-out",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-05-27T18:08:40.681132-04:00",
-      "completedAt": null,
+      "completedAt": "2026-05-27T18:31:52.612161-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",

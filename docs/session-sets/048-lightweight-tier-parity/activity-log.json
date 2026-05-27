@@ -305,6 +305,85 @@
       "description": "All 6 actionable Round-A findings addressed in-flight per memory feedback_dont_hide_behind_out_of_scope: (#1 documentation) tightened header comment in copyPromptCommands.ts explaining the §3.9 review-criteria carve-out is intentional (operator-authored meta-instructions, not artifact content); (#2 documentation) expanded interface comment on TopLevelPickItem.dabblerKind explaining why VS Code's QuickPickItem.kind collision matters; (#3 sanitization) new sanitizeSlugForPrompt helper replaces backticks with single-quotes; applied in both buildStartNextSessionPrompt and planLeftClickActivation; (#4 fail-CLOSED) planLeftClickActivation flipped from negative 'state !== complete && state !== cancelled' to positive 'state === in-progress || state === not-started' check so unknown future states skip the clipboard shortcut; (#5 cleanup) removed redundant .slice() in applicableActions; (#6 error handling) copyToClipboard wraps writeText in try/catch with showWarningMessage on rejection; (#7 comment) added intentional-omission comment in buildSetAccomplishmentsPrompt referencing spec §3.2 set-vs-session evidence distinction; (#8 comment) expanded COMMAND_ALLOWLIST comment explaining the narrowed purpose and that any new webview→host dispatch path must add allowed ids explicitly. 3 new regression tests (sanitize-backticks for both prompt + clipboard paths + unknown-state fail-CLOSED). 665 TS pass + 0 net regressions; 2 pre-existing failures unchanged from S2 close-out.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/register-session-start",
+      "dateTime": "2026-05-26T21:08:10-04:00",
+      "description": "Invoked python -m ai_router.start_session --session-set-dir docs/session-sets/048-lightweight-tier-parity --session-number 4 --engine claude-code --provider anthropic --model claude-opus-4-7 --effort max. Writer flipped sessions[3].status from not-started to in-progress; orchestrator block populated; cumulative routed S3-close spend $0.411 of $10 NTE (4.1%) carried forward per memory feedback_budget_question_scope.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-004/commit-A-lightweight-migrator-cli",
+      "dateTime": "2026-05-26T21:15:00-04:00",
+      "description": "Commit A (5fbfbb9): per-consumer Lightweight migrator CLI per §3.7. New ai_router/migrate_lightweight_to_canonical_v4.py (~500 LOC) handles three non-canonical Lightweight shapes via _normalize_to_v3_intermediate (sessionLog[] -> sessions[] rename from great-psalms-scroll-font; per-session + top-level status alias canonicalization; missing-schemaVersion stamping). Routes through existing progress.normalize_to_v4_shape shim. Idempotent (canonical v4 input skips). Refuses pre-v3 (pointer to v2->v3 migrator) and future-schema. Apply mode writes session-state.lwbak.json (distinct from .v3.bak.json so operator can tell which migrator ran) before the new file; one-cycle rollback = one rename. 16 unit tests at ai_router/tests/test_migrate_lightweight_to_canonical_v4.py covering all four shape recognizers, idempotent skip, refusal cases, backup contract, and CLI/JSON output. 998 Python pass, 0 regressions.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-004/commit-B-external-verification-command",
+      "dateTime": "2026-05-26T21:30:00-04:00",
+      "description": "Commit B (53aa8cb): dabbler.openExternalVerificationDoc command per §3.8. New tools/dabbler-ai-orchestration/src/commands/externalVerification.ts (~80 LOC). Command Palette only; opens or creates <set>/external-verification.md in an editor tab. Free-form per §3.8 (no templated header). EEXIST treated as benign race; falls through to open. Single-set workspaces skip the picker; multi-set workspaces show a QuickPick. Registered in extension.ts via safeRegister. New command entry in package.json. Watcher-inventory pinned line bumped 149 -> 150 (new import shifted createFileSystemWatcher line). tsc clean; 665 TS pass + 2 pre-existing failures unchanged.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-004/commit-C-review-criteria-templates",
+      "dateTime": "2026-05-26T21:42:00-04:00",
+      "description": "Commit C (1ae5d80): review-criteria template files per §3.9. Three files at docs/review-criteria/{spec,session,set}.md with comment-headers explaining how to edit and delete-to-default semantics. Sample bullets cover repo-specific concerns: audit-lock discipline, scope realism, in-flight Round-A fixes, version-bump correctness, cross-repo notices, cumulative budget reporting, memory carry-forward. Picked up automatically by S3's copyPromptCommands default readReviewCriteria reader (no code change required).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-004/commit-D-wizard-tier-branch",
+      "dateTime": "2026-05-26T21:50:00-04:00",
+      "description": "Commit D (50db03e): wizard tier-branch (E8). tools/dabbler-ai-orchestration/webview/wizard.html gains a <h2>Choose adoption tier</h2> radio group above <h2>Prerequisites</h2>; default is Full to preserve existing behavior. data-tier=\"full\" / data-tier=\"lightweight\" attributes tag prerequisites, callouts, and buttons; applyTierVisibility(tier) toggles .hidden class on all [data-tier] elements on radio change. New Lightweight prerequisite (path-aware review agent) and no-API-spend callout surface only under Lightweight selection. The Configure AI Router + Show Cost Dashboard buttons hide under Lightweight; Troubleshoot stays for both. pricingLink click handler now guarded with if (pricing) since the link lives inside a hideable callout.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-004/commit-E-doc-revisions-and-cross-repo-notice",
+      "dateTime": "2026-05-26T22:05:00-04:00",
+      "description": "Commit E (fd82944): doc revisions + cross-repo notice. (1) docs/session-state-schema.md § Tier expectations rewritten to describe actual Set 048 model: router writers DO operate under --no-router; lazy LLM-SDK imports keep credentials out; verification short-circuits to manual attestation; external-verification.md soft gate; hand-maintained Lightweight migration path. (2) docs/ai-led-session-workflow.md Step 6 gains 'Lightweight tier — copyable review prompts replace routed verification' subsection: 5-step copy / paste / paste-back / soft-gate flow with the path-aware-agent requirement. (3) docs/planning/session-set-authoring-guide.md gains tier: full / lightweight semantics + tri-state requiresUAT/E2E semantics with the upfront-positive-confirmation prompt that replaces the audit's originally-proposed triple-redundancy. (4) docs/adoption-bootstrap.md Lightweight closing pointers rewritten to describe actual Set 048 deliverables. (5) NEW docs/cross-repo-lightweight-notice.md following the established cross-repo-*.md pattern: one-time copy source for consumer-repo CLAUDE.md authors covering activation, copy-prompt + paste-back, agent-capability requirement, review-criteria files, migrator recipe, and tier-branch wizard.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-004/cross-provider-verification-round-A",
+      "dateTime": "2026-05-26T22:25:00-04:00",
+      "description": "Ran docs/session-sets/048-lightweight-tier-parity/run_s4_verification.py. Route (gpt-5-4, tier 3, $0.175) returned needs-attention with 1 Medium finding: apply-mode backup re-read race in migrate_one_set's _atomic_copy_json (concurrent edit between initial parse and backup re-read would have raised JSONDecodeError out of the migrator, breaking the 'never raises on normal failure' contract). The two partial-pass checks (#2 refusal correctness + #8 spec compliance) shared the same root cause. The verify-of-verify step was attempted but the cross-provider verifier path was unavailable for gpt-5-4; the route() call already used task_type=session-verification cross-provider routing so the route response IS the Round-A verdict. S4 verification cost: $0.175 of $10 NTE; cumulative Set 048 routed spend ~$0.76 (counting an earlier first-pass route that crashed on a RouteResult attribute access bug in the script, the actual paid spend is closer to $0.76, ~7.6% of NTE).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "tier": 3,
+          "cost_usd": 0.174735,
+          "phase": "route"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-004/round-A-medium-fix-in-flight",
+      "dateTime": "2026-05-26T22:32:00-04:00",
+      "description": "Medium #1 fix addressed in-flight per memory feedback_dont_hide_behind_out_of_scope: migrate_one_set apply path now writes the already-parsed `state` dict directly via _atomic_write_json(backup_path, state) instead of re-reading the source file. No re-read, no race. New regression test test_backup_uses_parsed_state_not_reread_from_disk monkey-patches the writer to confirm the backup content reflects the parsed dict, not whatever ends up on disk after concurrent edits. 17 Lightweight-migrator tests pass (was 16); 0 regressions elsewhere.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

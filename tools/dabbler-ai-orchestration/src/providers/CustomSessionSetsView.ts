@@ -273,7 +273,8 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   //
   //   Level 1 → top-level items:
   //     - "Open File ▸"   (if any openFile entries are applicable)
-  //     - "Copy Eval ▸"   (if any copyEval entries are applicable)
+  //     - "Copy Prompt ▸" (if any copyEval entries are applicable; was
+  //       "Copy Eval ▸" through Set 048; relabeled Set 049 S1)
   //     - each flat action as its own item
   //
   //   Level 2 → submenu items for the chosen "▸" branch. Escape /
@@ -305,7 +306,7 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     const submenu = topLevelChoice.kind === "openFile" ? categorized.openFile : categorized.copyEval;
     const placeHolder = topLevelChoice.kind === "openFile"
       ? `Open File — ${set.name}`
-      : `Copy Eval — ${set.name}`;
+      : `Copy Prompt — ${set.name}`;
     const submenuChoice = await this.pickSubmenu(submenu, placeHolder, showQuickPick);
     if (!submenuChoice) return;
     this.executeRowAction(submenuChoice, set);

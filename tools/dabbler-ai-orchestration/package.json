@@ -145,6 +145,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.copyStartNextParallelSessionPrompt",
+        "title": "Copy: Start the next parallel session",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.openExternalVerificationDoc",
         "title": "Open External Verification Document",
         "category": "Dabbler"

@@ -28,7 +28,12 @@ export interface SubmenuPickItem extends vscode.QuickPickItem {
 
 // Build the top-level QuickPick item list:
 //   - "Open File ▸" when the openFile category is non-empty
-//   - "Copy Eval ▸" when the copyEval category is non-empty
+//   - "Copy Prompt ▸" when the copyEval category is non-empty (label
+//     was "Copy Eval ▸" in Set 048 S3; renamed Set 049 S1 because the
+//     submenu contains non-evaluation entries like "Start Next Session"
+//     and "Start New Parallel Session". The internal `dabblerKind` /
+//     ActionCategory identifier stays `copyEval` so this rename is
+//     user-visible only.)
 //   - one item per flat action (already sorted by `applicableActions`)
 export function buildTopLevelItems(categorized: CategorizedActions): TopLevelPickItem[] {
   const items: TopLevelPickItem[] = [];
@@ -36,7 +41,7 @@ export function buildTopLevelItems(categorized: CategorizedActions): TopLevelPic
     items.push({ label: "Open File ▸", dabblerKind: "openFile" });
   }
   if (categorized.copyEval.length > 0) {
-    items.push({ label: "Copy Eval ▸", dabblerKind: "copyEval" });
+    items.push({ label: "Copy Prompt ▸", dabblerKind: "copyEval" });
   }
   for (const action of categorized.flat) {
     items.push({ label: action.label, dabblerKind: "action", action });

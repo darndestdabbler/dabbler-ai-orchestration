@@ -46,11 +46,11 @@ suite("rowMenuHelpers — buildTopLevelItems", () => {
     assert.ok(!withoutOpen.some((i) => i.dabblerKind === "openFile"));
   });
 
-  test("includes 'Copy Eval ▸' only when copyEval category has entries", () => {
+  test("includes 'Copy Prompt ▸' only when copyEval category has entries", () => {
     const withCopy = buildTopLevelItems(
       cat({ copyEval: [action({ id: "x", label: "Eval", category: "copyEval" })] }),
     );
-    assert.ok(withCopy.some((i) => i.label === "Copy Eval ▸" && i.dabblerKind === "copyEval"));
+    assert.ok(withCopy.some((i) => i.label === "Copy Prompt ▸" && i.dabblerKind === "copyEval"));
   });
 
   test("appends flat actions verbatim after the submenu chips", () => {
@@ -66,7 +66,7 @@ suite("rowMenuHelpers — buildTopLevelItems", () => {
     );
     assert.deepStrictEqual(
       items.map((i) => i.label),
-      ["Open File ▸", "Copy Eval ▸", "Set Orchestrator…", "Cancel Session Set"],
+      ["Open File ▸", "Copy Prompt ▸", "Set Orchestrator…", "Cancel Session Set"],
     );
     assert.strictEqual(items[2].dabblerKind, "action");
     assert.strictEqual(items[2].action?.id, "dabbler.checkOutOrchestrator");
@@ -82,7 +82,7 @@ suite("rowMenuHelpers — buildTopLevelItems", () => {
     );
     assert.deepStrictEqual(
       items.map((i) => i.label),
-      ["Open File ▸", "Copy Eval ▸", "Cancel"],
+      ["Open File ▸", "Copy Prompt ▸", "Cancel"],
     );
   });
 });

@@ -5,6 +5,7 @@ import {
   buildSessionAccomplishmentsPrompt,
   buildSetAccomplishmentsPrompt,
   buildStartNextSessionPrompt,
+  buildStartNextParallelSessionPrompt,
   sanitizeSlugForPrompt,
 } from "../../commands/copyPromptCommands";
 import { SessionSet, SessionState } from "../../types";
@@ -159,5 +160,21 @@ suite("copyPromptCommands — start-next-session prompt (L5 + §3.3 mirror)", ()
     const out = buildStartNextSessionPrompt(fakeSet("evil`-name"));
     assert.strictEqual(out, "Start the next session of `evil'-name`.");
     assert.ok(!out.includes("``"), "double-backtick is unsafe in markdown");
+  });
+});
+
+suite("copyPromptCommands — start-next-parallel-session prompt (Set 049 S1 hygiene)", () => {
+  test("returns the parallel-variant text matching copyCommand.ts's parallel preset", () => {
+    const out = buildStartNextParallelSessionPrompt(fakeSet("049-orchestrator-coordination-removal"));
+    assert.strictEqual(
+      out,
+      "Start the next parallel session of `049-orchestrator-coordination-removal`.",
+    );
+  });
+
+  test("sanitizes backticks consistent with the non-parallel variant", () => {
+    const out = buildStartNextParallelSessionPrompt(fakeSet("evil`-name"));
+    assert.strictEqual(out, "Start the next parallel session of `evil'-name`.");
+    assert.ok(!out.includes("``"));
   });
 });

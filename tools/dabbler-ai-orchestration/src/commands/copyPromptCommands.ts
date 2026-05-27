@@ -174,6 +174,16 @@ export function buildStartNextSessionPrompt(set: SessionSet): string {
   return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
 
+// Set 049 S1 hygiene: parallel-session variant. The
+// `dabblerSessionSets.copyStartCommand.parallel` command in
+// copyCommand.ts already builds this text but is not surfaced in the
+// right-click submenu. This helper + its registration below give the
+// context menu a "Start New Parallel Session" entry that uses the
+// same path-reference convention as the non-parallel variant.
+export function buildStartNextParallelSessionPrompt(set: SessionSet): string {
+  return `Start the next parallel session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
+}
+
 async function copyToClipboard(text: string, statusMessage: string): Promise<void> {
   try {
     await vscode.env.clipboard.writeText(text);
@@ -216,6 +226,14 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
         if (!item?.set) return;
         const prompt = buildStartNextSessionPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Start the next session of ${item.set.name}`);
+      },
+    ),
+    vscode.commands.registerCommand(
+      "dabbler.copyStartNextParallelSessionPrompt",
+      async (item: SetItem) => {
+        if (!item?.set) return;
+        const prompt = buildStartNextParallelSessionPrompt(item.set);
+        await copyToClipboard(prompt, `Copied: Start the next parallel session of ${item.set.name}`);
       },
     ),
   );

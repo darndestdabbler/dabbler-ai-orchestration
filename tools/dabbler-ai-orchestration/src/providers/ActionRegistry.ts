@@ -1,7 +1,8 @@
 // Typed action registry for the Set 029 Session 4 custom-tree view.
 //
 // Set 048 Session 3 reshape (spec §3.3 + L3): the menu structure
-// gained two top-level submenus (`Open File ▸`, `Copy Eval ▸`) plus a
+// gained two top-level submenus (`Open File ▸`, `Copy Prompt ▸` —
+// labelled `Copy Eval ▸` through Set 048, renamed Set 049 S1) plus a
 // row of flat actions. Each registry entry now carries a `category`
 // discriminator so the runtime can group submenu items without having
 // to infer from the command id. The cursor-anchored HTML popup that
@@ -32,7 +33,9 @@ export interface ActionSupports {
 // Set 048 S3: category discriminator drives the two-step QuickPick
 // grouping in `CustomSessionSetsView.showContextMenu`.
 //   "openFile" → top-level "Open File ▸" submenu
-//   "copyEval" → top-level "Copy Eval ▸" submenu
+//   "copyEval" → top-level "Copy Prompt ▸" submenu (internal id stays
+//                "copyEval" to avoid a type-system rename; user-visible
+//                label rename only)
 //   "flat"     → rendered inline on the top-level QuickPick
 export type ActionCategory = "openFile" | "copyEval" | "flat";
 
@@ -65,7 +68,7 @@ const needsMigrationToV4 = (s: SessionSet): boolean =>
 // `category` controls which top-level item or submenu the entry lands
 // under. The numeric bands:
 //   1xx — Open File submenu
-//   3xx — Copy Eval submenu
+//   3xx — Copy Prompt submenu
 //   5xx — flat actions (orchestrator-related quick-access)
 //   8xx — flat migrate actions
 //   9xx — flat lifecycle actions (cancel / restore)
@@ -80,13 +83,21 @@ export const ROW_ACTIONS: RowAction[] = [
   { id: "dabblerSessionSets.openChangeLog",     label: "Change Log",              group: 103, category: "openFile", when: () => true },
   { id: "dabblerSessionSets.openSessionState",  label: "Session State",           group: 104, category: "openFile", when: () => true },
 
-  // Copy Eval ▸ submenu — L2 labels match the spec §3.3 table.
+  // Copy Prompt ▸ submenu — L2 labels match the spec §3.3 table (the
+  // submenu was renamed Set 049 S1 to better reflect its contents,
+  // which include action prompts like "Start Next Session" not just
+  // evaluation prompts).
   { id: "dabbler.copySpecReviewPrompt",         label: "Evaluate Specification",       group: 301, category: "copyEval", when: () => true },
   { id: "dabbler.copySessionAccomplishmentsPrompt", label: "Evaluate Most Recent Session", group: 302, category: "copyEval",
     when: (s) => hasCompletedSession(s) },
   { id: "dabbler.copySetAccomplishmentsPrompt", label: "Evaluate Session Set",         group: 303, category: "copyEval",
     when: (s) => isCompleteState(s) },
   { id: "dabbler.copyStartNextSessionPrompt",   label: "Start Next Session",           group: 304, category: "copyEval",
+    when: (s) => inFlightLike(s) },
+  // Set 049 S1 hygiene: surface the parallel-session command in the
+  // submenu. Gated identically to "Start Next Session" — the parallel
+  // pattern is only meaningful on non-terminal rows.
+  { id: "dabbler.copyStartNextParallelSessionPrompt", label: "Start New Parallel Session", group: 305, category: "copyEval",
     when: (s) => inFlightLike(s) },
 
   // Flat actions — appear at the top level of the QuickPick. The

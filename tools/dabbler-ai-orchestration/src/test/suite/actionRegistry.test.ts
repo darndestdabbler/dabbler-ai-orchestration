@@ -58,7 +58,7 @@ function ids(set: SessionSet, supports: ActionSupports): string[] {
 }
 
 suite("ActionRegistry", () => {
-  test("ROW_ACTIONS exposes the 13 menu-surface actions (Set 048 S3 reshape)", () => {
+  test("ROW_ACTIONS exposes the 14 menu-surface actions (Set 048 S3 reshape + Set 049 S1 hygiene)", () => {
     // Set 048 S3 reshape:
     //   - L3 removed `dabblerSessionSets.openAiAssignment`.
     //   - L2 narrowed the Open File submenu to exactly 4 entries
@@ -75,6 +75,12 @@ suite("ActionRegistry", () => {
     //   - Two flat orchestrator entries promoted into the menu
     //     surface: dabbler.checkOutOrchestrator (gated to in-progress)
     //     and dabbler.openOrchestratorWriterLog.
+    // Set 049 S1 hygiene addition:
+    //   - dabbler.copyStartNextParallelSessionPrompt — the parallel-
+    //     session variant surfaces in the submenu under the same
+    //     non-terminal gating as "Start Next Session". Pre-049 the
+    //     copyStartCommand.parallel command existed in copyCommand.ts
+    //     but had no menu entry.
     const expected = new Set([
       "dabblerSessionSets.openSpec",
       "dabblerSessionSets.openActivityLog",
@@ -84,6 +90,7 @@ suite("ActionRegistry", () => {
       "dabbler.copySessionAccomplishmentsPrompt",
       "dabbler.copySetAccomplishmentsPrompt",
       "dabbler.copyStartNextSessionPrompt",
+      "dabbler.copyStartNextParallelSessionPrompt",
       "dabbler.checkOutOrchestrator",
       "dabbler.openOrchestratorWriterLog",
       "dabblerSessionSets.migrate",
@@ -93,7 +100,7 @@ suite("ActionRegistry", () => {
     ]);
     const got = new Set(ROW_ACTIONS.map((a) => a.id));
     assert.deepStrictEqual(got, expected);
-    assert.strictEqual(ROW_ACTIONS.length, 14);
+    assert.strictEqual(ROW_ACTIONS.length, 15);
   });
 
   test("openAiAssignment fully removed (L3)", () => {
@@ -193,6 +200,21 @@ suite("ActionRegistry", () => {
       assert.ok(
         !ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.copyStartNextSessionPrompt"),
         `start-next-session leaked onto terminal state=${st}`,
+      );
+    }
+  });
+
+  test("copyEval submenu — start-next-parallel-session gated on non-terminal rows (Set 049 S1)", () => {
+    for (const st of ["in-progress", "not-started"] as SessionState[]) {
+      assert.ok(
+        ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.copyStartNextParallelSessionPrompt"),
+        `start-next-parallel-session missing for state=${st}`,
+      );
+    }
+    for (const st of ["complete", "cancelled"] as SessionState[]) {
+      assert.ok(
+        !ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.copyStartNextParallelSessionPrompt"),
+        `start-next-parallel-session leaked onto terminal state=${st}`,
       );
     }
   });
@@ -315,5 +337,7 @@ suite("ActionRegistry", () => {
     assert.ok(ids.includes("dabbler.copySetAccomplishmentsPrompt"));
     assert.ok(!ids.includes("dabbler.copyStartNextSessionPrompt"),
       "start-next-session must not surface on complete (terminal) state");
+    assert.ok(!ids.includes("dabbler.copyStartNextParallelSessionPrompt"),
+      "start-next-parallel-session must not surface on complete (terminal) state");
   });
 });

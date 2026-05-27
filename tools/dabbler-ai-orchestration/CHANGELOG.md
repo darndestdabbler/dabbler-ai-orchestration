@@ -5,6 +5,111 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-05-27 (Set 049 — Orchestrator coordination removal)
+
+Rips out the extension-side surfaces that paired with the
+hard-coordination layer in ai_router. The Session Set Explorer
+returns to its pre-Set-045 shape (no orchestrator info, no
+harvest-record badges, no coordination-conflict pills). Set 049
+implements operator-locked premise P4 (no orchestrator info in
+Explorer rendering) end-to-end. Companion PyPI release:
+`dabbler-ai-router 0.11.0`.
+
+### Breaking
+
+- **`dabbler.checkOutOrchestrator` command removed.** ("Set
+  Orchestrator…" / "Check Out As…" right-click action.) Keybindings
+  bound to it via `commandId` will produce a "command not found"
+  toast on invocation.
+- **`dabbler.releaseCheckOut` command removed.** ("Release
+  Check-Out" Command Palette action.) Same caveat.
+- **`dabbler.installOrchestratorHook.gemini` and
+  `dabbler.installOrchestratorHook.copilot` commands removed.**
+  Both depended entirely on the retired check-out quickpick and
+  `new_chat_id` toast — broken by construction post-rip.
+  `dabbler.installOrchestratorHook.claudeCode` survives.
+- **`dabbler.newChatIdWorkflowToast` removed.** Internal command
+  consumed by the retired Gemini/Copilot installers; no
+  user-facing keybindings expected.
+- **Configuration setting `dabblerSessionSets.checkoutPollTimeoutMinutes`
+  removed.** Sole consumer (`CheckoutPollService`) was retired.
+- **Webview row payload shape narrowed.**
+  `RowPayload.harvestSignals` and `RowPayload.conflicts` fields
+  removed. Custom consumers of the webview message protocol that
+  pinned the old shape will need to update.
+
+### Changed
+
+- **`claude-session-start-invoker.js` simplified.** Drops
+  `--chat-session-id` forwarding, `EXIT_CHECKOUT_CONFLICT` handling,
+  `emitConflictRecord`, and `~/.dabbler/checkout-conflicts/` directory
+  writes. The hook now walks up to resolve the in-progress set and
+  spawns `start_session --engine claude --provider anthropic
+  [--model X --effort Y]` where model/effort come from prior block
+  recovery (no `"unknown"` fallback under T3). On non-zero exit, the
+  hook logs stderr and exits 0.
+- **Session Set Explorer rows reverted to pre-Set-045 layout.**
+  Each row renders: name + fraction + description only. No harvest
+  badges, no conflict pills.
+- **`CustomSessionSetsView.ts` decoupled from `HarvestService`.**
+  Import + instance + cache invalidation calls removed; `buildRow`
+  no longer attaches `harvestSignals` / `conflicts`; `dispose()`
+  no longer calls `harvest.dispose()`; `refresh()` no longer calls
+  `harvest.invalidate()`.
+- **`docs/cross-repo-checkout-notice.md` rewritten as deprecation
+  instruction.** "Remove this content from your CLAUDE.md" with
+  step-by-step remediation for consumer repos that paste-in'd the
+  Set 033 or Set 036 snippet, plus a survives / retired summary.
+
+### Removed
+
+- **Source files deleted:**
+  - `src/commands/checkOutOrchestrator.ts`
+  - `src/commands/releaseCheckOut.ts`
+  - `src/commands/newChatIdWorkflowToast.ts`
+  - `src/commands/installOrchestratorHookGemini.ts`
+  - `src/commands/installOrchestratorHookCopilot.ts`
+  - `src/providers/CheckoutPollService.ts`
+  - `src/providers/chatSessionMismatchModal.ts`
+  - `src/providers/ReadOnlyIntentService.ts` (orphaned by the
+    `checkOutOrchestrator` + `CheckoutPollService` deletes)
+  - `src/providers/HarvestService.ts` (sole caller disconnected
+    by P4 revert; load-bearing scaffolding lives in `ai_router/joiner/`)
+- **Webview protocol types deleted** from
+  `src/types/sessionSetsWebviewProtocol.ts`: `ConflictKind`,
+  `ConflictSeverity`, `HarvestSignalsPayload`, `ConflictPayload`.
+- **Webview client code deleted** from `media/session-sets-tree/`:
+  `renderHarvestBadges()` + `renderConflictPills()` functions
+  (~50 lines), `.harvest-badges` + `.harvest-badge*` +
+  `.conflict-pills` + `.conflict-pill` + `.conflict-severity-*`
+  CSS rules (~95 lines).
+- **ActionRegistry entry** `dabbler.checkOutOrchestrator`
+  ("Set Orchestrator…") — 14 entries now, was 15.
+- **Tests retired (whole-file):**
+  `checkOutOrchestrator.test.ts`,
+  `checkOutOrchestratorChatSessionMismatch.test.ts`,
+  `releaseCheckOut.test.ts`, `chatSessionMismatchModal.test.ts`,
+  `checkoutPollService.test.ts`, `readOnlyIntentService.test.ts`,
+  `readOnlyIntentTiming.test.ts`,
+  `playwright/new-chat-id-cli-flow.spec.ts`,
+  `playwright/chatsessionid-takeover.spec.ts`,
+  `playwright/chatsessionid-missing-tolerance.spec.ts`,
+  `playwright/checkout-polling.spec.ts`,
+  `playwright/checkout-conflict.spec.ts`,
+  `playwright/harvest-signals.spec.ts`.
+
+### Kept
+
+- **`dabbler.openOrchestratorWriterLog`** — survives. The
+  underlying `~/.dabbler/orchestrator-writer.log` is retained as a
+  generic "start_session ran" audit appender per Set 049 T5.
+- **`dabbler.installOrchestratorHook.claudeCode`** — survives.
+  Installs the simplified `SessionStart` hook.
+- **`writer-bypass` detector (D3) in `ai_router/joiner/conflicts.py`** —
+  survives as a general writer-discipline check, decoupled from
+  coordination context (Python-side; the TS-side rendering surface
+  is gone).
+
 ## [0.23.0] — 2026-05-27 (Set 048 — Lightweight-tier parity)
 
 Ships end-to-end parity between the Full and Lightweight tiers per the

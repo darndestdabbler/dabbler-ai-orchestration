@@ -385,6 +385,69 @@
       "description": "Ran npm run compile + npm run test:unit + npm run test:playwright. Layer-1: 553 passing, 2 failing (both pre-existing \u2014 configEditor-foundation vscode-stub ViewColumn.One gap + notificationsSection s5-test-notification disabled-attribute regex; verified by git-stash comparison against master HEAD before S4 edits). Layer-3: 14 passing, 4 failing (all pre-existing \u2014 3 blocked-by-prereqs.spec.ts FileExistsError races on Windows temp-dir + 1 migration-cta-v4.spec.ts needs-migration badge missing; same stash-comparison evidence). S4 added no regressions; net Layer-1 test-count drop (\u224880 tests) matches the test-file deletion footprint.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 1,
+      "stepKey": "session-005/version-bump-confirmation",
+      "dateTime": "2026-05-27T18:10:00-04:00",
+      "description": "Operator confirmed S5 version-bump targets via AskUserQuestion: ai_router minor (0.10.0 \u2192 0.11.0), Marketplace minor (0.23.0 \u2192 0.24.0), and YES backfill the ai_router CHANGELOG gap for 0.8.0/0.9.0/0.10.0 entries that were missed during their respective sets. Spec recommendation tracked operator pick on bump magnitude; backfill is a modest scope expansion that restores CHANGELOG integrity before the 049 release.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 2,
+      "stepKey": "session-005/claude-md-rewrite",
+      "dateTime": "2026-05-27T18:15:00-04:00",
+      "description": "CLAUDE.md rewrite: 'Hard-coordination enforcement (Sets 033 / 036) is OFF by default' section retired entirely; new 'Orchestrator-block contract (post-Set-049)' section documents the 4-field omit-null shape (engine/provider/model/effort), the historical-record-not-check-out framing, D3 writer-bypass detector survival decoupled from coordination context, P4 Explorer revert, and pointers to docs/session-state-schema.md \u00a7 Writer Contract + docs/cross-repo-checkout-notice.md. Extension versioning section: v0.24.0 description added (full feature manifest, Set 049 \u2014 Orchestrator coordination removal), v0.23.0 demoted to Previous, v0.22.0 to Pre-Previous, v0.21.0 to Pre-Pre-Previous, v0.18.1 to Pre-Pre-Pre-Previous with no content loss in the version walk.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "session-005/workflow-doc-rewrite",
+      "dateTime": "2026-05-27T18:20:00-04:00",
+      "description": "docs/ai-led-session-workflow.md: 'Orchestrator check-out / check-in (Set 033)' section (114 lines) replaced with 'Orchestrator identity and concurrency (post-Set-049)' describing the 4-field record, T3 declaration contract, T2 accept-with-warning behavior with the exact stderr line, ~/.dabbler/orchestrator-writer.log retained as generic audit appender, tier symmetry, D3 writer-bypass detector survival, and P4 Explorer revert. Step-8-area cross-reference at ~line 1770 rewritten to point at the new section. Step 6 itself did not cite the coordination layer; spec \u00a75 S5 directive fully satisfied.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 4,
+      "stepKey": "session-005/pypi-version-bump",
+      "dateTime": "2026-05-27T18:25:00-04:00",
+      "description": "PyPI dabbler-ai-router bumped 0.10.0 \u2192 0.11.0 in pyproject.toml. ai_router/__init__.py __version__ bumped 0.9.0 \u2192 0.11.0 (caught a pre-existing skip from Set 048's 0.10.0 release where the module-level constant was never incremented). ai_router/CHANGELOG.md [0.11.0] entry added with full Breaking / Changed / Removed / Kept sections detailing every retired surface and the T2 accept-with-warning compatibility guarantee. Retroactive CHANGELOG backfill: [0.8.0] (Set 045 \u2014 log-harvest), [0.9.0] (Set 047 \u2014 v4 schema), [0.10.0] (Set 048 \u2014 Lightweight parity) entries added from memory + extension CHANGELOG mirrors so the ai_router CHANGELOG matches the live PyPI version history.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "session-005/marketplace-version-bump",
+      "dateTime": "2026-05-27T18:30:00-04:00",
+      "description": "Marketplace dabbler-ai-orchestration bumped 0.23.0 \u2192 0.24.0 in tools/dabbler-ai-orchestration/package.json. tools/dabbler-ai-orchestration/CHANGELOG.md [0.24.0] entry added with the same Breaking / Changed / Removed / Kept structure. .vsix packaged clean at 927.58 KB / 22 files after a .vscodeignore hygiene tweak (added test-results/** + playwright-report/** entries so Playwright run artifacts no longer bloat the published package; ~5 files / 13 KB shaved off the 0.23.0 baseline's 940.42 KB).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "session-005/change-log-and-uat",
+      "dateTime": "2026-05-27T18:35:00-04:00",
+      "description": "Set 049 change-log.md authored with per-session narrative (S1-S5), commit references for every session, deletion counts, test results, and the cumulative routed cost table ($0.0475 / $10 NTE = 0.48% through S4; S2-S5 ran without invoking the router mid-session). 049-orchestrator-coordination-removal-uat-checklist.json authored with 17 items spanning orchestrator block shape (Full + Lightweight), CLI backward compatibility (--chat-session-id accept-with-warning + consumer-repo hook), new_chat_id retirement, migrator sweep+normalize (v3\u2192v4 + v4\u2192v4 cleanup + idempotency + .bak rollback), Explorer surface revert (no badges + no orchestrator info in rendering), Command Palette retirement, writer-bypass detector (synthetic bypass + ConflictKind narrowing), cancel/restore lifecycle, and consumer-repo notice rewrite. 11 items verified programmatically in S5 with named test references; 6 items flagged as manual operator UAT post-publish (live VS Code interaction required).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "session-005/test-suite-verification",
+      "dateTime": "2026-05-27T18:40:00-04:00",
+      "description": "Ran python -m pytest: 967 passing + 1 skipped + 0 regressions in 207.73s. Ran npm run test:unit: 553 passing + 2 pre-existing failures (configEditor-foundation vscode-stub ViewColumn.One gap + notificationsSection s5-test-notification disabled regex \u2014 both surveyed in S4 close-reason via git-stash baseline). Layer-3 Playwright not re-run \u2014 S5 made no changes to surfaces exercised by Layer-3 tests; the S4 baseline of 14 passing + 4 pre-existing failing holds.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

@@ -5,6 +5,154 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-05-27 (Set 049 — Orchestrator coordination removal)
+
+Rips out the hard-coordination layer shipped in Set 033 (0.6.0) and
+refined in Set 036 (0.7.0). The `orchestrator` block on the per-session
+ledger reshapes from 7 fields to 4 (`engine`, `provider`, `model`,
+`effort`) with an omit-null writer pattern. The `new_chat_id` CLI is
+retired; vestigial flags survive as accept-with-warning for backward
+compatibility. Companion VS Code Marketplace release:
+`DarndestDabbler.dabbler-ai-orchestration 0.24.0`.
+
+### Breaking
+
+- **`python -m ai_router.new_chat_id` CLI removed.** The module is
+  gone; consumers calling it directly will get `ModuleNotFoundError`.
+  No replacement — the chatSessionId concept it served is retired.
+- **Orchestrator block fields `chatSessionId`, `checkedOutAt`,
+  `lastActivityAt` no longer written.** The on-disk shape drops these
+  3 fields. Readers ignore them on legacy files; the
+  `migrate_v3_to_v4` migrator strips them from historical files on
+  invocation.
+- **Exit code `EXIT_CHECKOUT_CONFLICT` retired.** `start_session` no
+  longer emits this code. The two-different-holders case that it
+  guarded against is no longer a refusal scenario.
+- **Holder-identity / takeover-prompt / Read-Only-Mode contracts
+  retired.** `start_session` no longer interrogates the prior
+  orchestrator block; any caller can claim a not-in-flight session
+  regardless of who ran the previous one. Within-set sequential
+  (one in-progress session per set) is still enforced.
+
+### Changed
+
+- **`start_session` writer reduced.** Removed
+  `EXIT_CHECKOUT_CONFLICT`, `prior_engine_provider` matching, takeover
+  modal / TTY prompt, `_coordination_enforced()` gate, and the
+  `orchestrator_chat_session_id` writer parameter. The orchestrator
+  block emitter applies omit-null on the 4-field result.
+- **CLI backward compatibility — accept-with-warning (T2).**
+  `start_session --chat-session-id <id>` (and any other vestigial
+  flag) is accepted by argparse and ignored by the writer with a
+  single stderr line per invocation:
+
+  ```
+  start_session: --chat-session-id is no longer used (Set 049); ignoring
+  ```
+
+  Consumer-repo hooks that still pass the flag keep working without
+  modification. The flag will be removed in a future major release.
+- **`close_session` simplified.** Check-in branch removed. The
+  per-session orchestrator block stays attached to its `sessions[i]`
+  entry as a historical record (no top-level clearing).
+- **`migrate_v3_to_v4` extended with T4 sweep+normalize.** Strips
+  `chatSessionId`, `checkedOutAt`, `lastActivityAt` from all
+  orchestrator blocks (top-level legacy + per-session ledger) during
+  the migration pass. Idempotent on already-clean v4 files. `.bak`
+  rollback preserved.
+- **`writer-bypass` detector (D3) kept, decoupled.** Survives in
+  `ai_router/joiner/conflicts.py` as a general writer-discipline
+  check, documented as engine-independent. Its sibling detectors
+  (`bare-touch` / `engine-mismatch` / `stale-checkout-touch`) are
+  retired — see Removed below.
+
+### Removed
+
+- **`ai_router/new_chat_id.py`** — whole CLI retired.
+- **`ai_router/joiner/conflicts.py` D1/D2 detectors** —
+  `bare-touch` (incompatible with omit-null engine field),
+  `engine-mismatch` and `stale-checkout-touch` (both depended on
+  `lastActivityAt`). `ConflictKind` Literal narrowed to
+  `"writer-bypass"` only.
+- **`session_events.py` holder_change + checkout_conflict
+  emission** — event-type-emission calls deleted; existing JSONL
+  entries in legacy ledgers are left intact (audit history).
+- **Tests retired (whole-file):**
+  `test_chatsessionid_writer.py`, `test_checkout_writer.py`,
+  `test_start_session_takeover_prompt.py`, `test_new_chat_id.py`.
+  `test_joiner_conflicts.py` reduced to writer-bypass coverage only.
+
+### Kept
+
+- `~/.dabbler/orchestrator-writer.log` — retained as a generic
+  "start_session ran" audit appender. May be retired in a future
+  stability set if it proves dead.
+
+## [0.10.0] — 2026-05-27 (Set 048 — Lightweight-tier parity)
+
+End-to-end Lightweight parity with Full shipped across 5 sessions.
+Adds `--no-router` mode with three-knob precedence (CLI flag >
+`DABBLER_NO_ROUTER` env > spec.md `tier: lightweight` > default Full).
+`route()` / `verify()` prologues short-circuit to zero-cost stubs
+without `_init()` (no config load, no credentials needed).
+`close_session` gains a manual-attestation block + soft gate for
+`external-verification.md` with TTY/non-TTY branching and
+`--accept-suggestions` non-interactive flag. Tri-state `requiresUAT` /
+`requiresE2E` schema (`true | false | "suggested"`) on both Full and
+Lightweight. `spec.md` `tier: full | lightweight` field with
+backwards-compat default to `full`. New
+`python -m ai_router.migrate_lightweight_to_canonical_v4` CLI handles
+three Lightweight non-canonical shapes (`sessionLog[]` → `sessions[]`,
+`done`/`completed` status aliases, missing schemaVersion) with
+`.lwbak.json` backup. S5 UAT discovered and fixed a Critical
+bare-import bug: production-code bare imports of `runtime_mode` /
+`spec_config` (left over from S2's test-conftest convention) raised
+`ModuleNotFoundError` under pip-install consumers, silently no-op'ing
+`--no-router` across the entire CLI surface; the fix uses relative
+imports and the bug is locked out by a new static-analysis test.
+Companion VS Code Marketplace release:
+`DarndestDabbler.dabbler-ai-orchestration 0.23.0`.
+
+## [0.9.0] — 2026-05-26 (Set 047 — state-file schema v4 audit)
+
+v4 evolution of `session-state.json` shipped end-to-end across 6
+sessions. Derives every legacy top-level lifecycle field
+(`currentSession` / `totalSessions` / `completedSessions` /
+`lifecycleState` / `startedAt` / `completedAt` / `orchestrator` /
+`verificationVerdict`) from a per-session `sessions[]` ledger where
+each entry carries its own `startedAt` / `completedAt` /
+`orchestrator` / `verificationVerdict`. Reader-first migration via
+`normalize_to_v4_shape(state, spec_md_path)` shim that accepts
+v1/v2/v3/v4 input transparently. New `python -m ai_router.migrate_v3_to_v4`
+CLI with `.bak` rollback contract and documented rollback procedure
+at `docs/v3-to-v4-rollback-procedure.md`. All Python writers
+(`register_session_start` / `_flip_state_to_closed` /
+`cancel_session_set` / `restore_session_set`) emit canonical v4
+on-disk shape. New `spec.md` `prerequisites:` field surfaced via the
+extension's `[BLOCKED BY PREREQS]` badge. Companion VS Code
+Marketplace release:
+`DarndestDabbler.dabbler-ai-orchestration 0.22.0`.
+
+## [0.8.0] — 2026-05-25 (Set 045 — log-harvest implementation)
+
+Dual-primary observability surface per Set 044's consensus-locked
+proposal v1 shipped end-to-end across 6 sessions. New
+`python -m ai_router.joiner` CLI is the async-shell-out the
+extension calls to populate Session Set Explorer harvested-signal
+badges (W / N / M / B for wrapper-launched / native-log /
+narration-marker / writer-bypass) plus coordination-conflict pills
+(engine-mismatch / bare-touch / stale-checkout-touch / writer-bypass).
+Wrapper-launched detection and native-log parsing serve as co-equal
+channels (Pass B framing-bias correction). Joiner output schema
+documented for cross-tier consumer-repo paste-in. Companion VS Code
+Marketplace release:
+`DarndestDabbler.dabbler-ai-orchestration 0.21.0`.
+
+> Note: The Set 045 Explorer surface (harvest badges + conflict pills)
+> was reverted in Set 049 per operator-locked P4. The joiner CLI and
+> its `writer-bypass` detector survive; the badge/pill rendering does
+> not.
+
 ## [0.7.0] — 2026-05-24 (Set 036 — chatSessionId identity refinement + watcher-scope discipline)
 
 Refines the Set 033 H4 holder-identity composite from

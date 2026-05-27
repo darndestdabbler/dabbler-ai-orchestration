@@ -65,10 +65,15 @@
     {
       "number": 5,
       "title": "Docs + version bumps + close-out",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-05-27T18:08:40.681132-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-4-7",
+        "effort": "high"
+      },
       "verificationVerdict": null
     }
   ]

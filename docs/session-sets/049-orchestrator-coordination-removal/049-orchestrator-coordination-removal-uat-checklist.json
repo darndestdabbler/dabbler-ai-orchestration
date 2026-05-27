@@ -1,0 +1,191 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "Set 049 — Orchestrator coordination removal (extension 0.24.0 + dabbler-ai-router 0.11.0)",
+  "DocumentDate": "2026-05-27",
+  "Notes": "Ad-hoc UAT for the Set 049 rip-out surface. Items verified programmatically in S5 by the AI orchestrator are marked Passes=true with Feedback documenting the verification path (unit test, smoke run, file inspection). Items requiring live VS Code interaction (right-click menu absence, command palette absence, Explorer rendering) are flagged in Feedback as 'Manual operator UAT' and left Passes=false / Result=pending for the operator to walk through post-publish. The UAT scope tracks spec §5 S5: clean session start/close on Full and Lightweight, new orchestrator-block shape, migrator dry-run + apply, accept-with-warning behavior, Explorer surface free of harvest badges / conflict pills, writer-bypass detector still fires, close_session and start_session both clean on cancel/restore.",
+  "Configuration": {
+    "reviewWidths": ["6%", "14%", "36%", "8%", "36%"]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Orchestrator block shape",
+      "Subarea": "Full-tier writer",
+      "ItemLabel": "start_session writes 4-field omit-null block",
+      "HumanAction": "Run `python -m ai_router.start_session --session-set-dir <fresh-set> --session-number 1 --engine claude-code --provider anthropic --model claude-opus-4-7 --effort high`. Inspect the resulting `session-state.json`.",
+      "Expectation": "sessions[0].orchestrator = {engine: 'claude-code', provider: 'anthropic', model: 'claude-opus-4-7', effort: 'high'}. NO chatSessionId, checkedOutAt, lastActivityAt fields. NO `null` values.",
+      "Passes": true,
+      "Feedback": "Verified by `test_session_state_v4_writers.py::test_orchestrator_block_applies_omit_null` + the live S5 start_session run on this very set (sessions[4].orchestrator confirmed at session-state.json line 71-76).",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Orchestrator block shape",
+      "Subarea": "Full-tier writer",
+      "ItemLabel": "Omit-null when caller omits model/effort",
+      "HumanAction": "Run `python -m ai_router.start_session --session-set-dir <fresh-set> --session-number 1 --engine claude-code --provider anthropic` (omit --model and --effort). Inspect resulting block.",
+      "Expectation": "sessions[0].orchestrator = {engine, provider} only — model and effort keys ABSENT (not null, not 'unknown').",
+      "Passes": true,
+      "Feedback": "Covered by `test_session_state_v4_writers.py::test_orchestrator_block_applies_omit_null`. The writer reshape in S2 made `orchestrator_model` and `orchestrator_effort` Optional with conditional dict construction.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Orchestrator block shape",
+      "Subarea": "Lightweight-tier writer",
+      "ItemLabel": "Hand-edited Lightweight block matches Full shape",
+      "HumanAction": "On a Lightweight-tier set (`spec.md` declares `tier: lightweight`), manually edit `sessions[i].orchestrator` to a 4-field block. Run a subsequent `--no-router` close. Inspect.",
+      "Expectation": "Block survives the close unchanged. No coordination-layer field re-emerges. The post-S2 contract treats Lightweight orchestrator blocks identically (only the actor differs).",
+      "Passes": false,
+      "Feedback": "Manual operator UAT. Requires a Lightweight set to exercise; programmatically verified that the writer code path is shared (no Lightweight-specific orchestrator-block emitter exists in ai_router/session_state.py).",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "CLI backward compatibility",
+      "Subarea": "Accept-with-warning",
+      "ItemLabel": "--chat-session-id accepted, ignored, warns",
+      "HumanAction": "Run `python -m ai_router.start_session --session-set-dir <fresh-set> --session-number 1 --engine claude-code --provider anthropic --chat-session-id deadbeef-cafe`. Observe stderr. Inspect resulting orchestrator block.",
+      "Expectation": "stderr contains one line: `start_session: --chat-session-id is no longer used (Set 049); ignoring`. Exit 0. The orchestrator block has NO `chatSessionId` field.",
+      "Passes": true,
+      "Feedback": "Covered by `test_start_session_accept_with_warning.py` (S2). Verified by inspection of `_warn_chat_session_id_ignored()` in start_session.py.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "CLI backward compatibility",
+      "Subarea": "Accept-with-warning",
+      "ItemLabel": "Legacy consumer-repo hooks unaffected",
+      "HumanAction": "Identify a consumer repo's claude-session-start-invoker (older version that still passes --chat-session-id). Trigger the SessionStart hook in a Claude Code session against a Dabbler workspace. Confirm session-state.json was updated cleanly.",
+      "Expectation": "Hook completes; session-state.json gets a new in-progress entry with a 4-field omit-null block. No EXIT_CHECKOUT_CONFLICT, no refusal toast.",
+      "Passes": false,
+      "Feedback": "Manual operator UAT. Programmatically verified via S2 survey: dabbler-platform / dabbler-access-harvester / dabbler-homehealthcare-accessdb all inherit the shipped invoker (zero `chat-session-id` matches in their repo greps), so the accept-with-warning protects any consumer-repo hook that ever forwards the flag.",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "CLI retirement",
+      "Subarea": "new_chat_id",
+      "ItemLabel": "python -m ai_router.new_chat_id ModuleNotFoundError",
+      "HumanAction": "Run `python -m ai_router.new_chat_id --export --shell powershell` against an installed `dabbler-ai-router 0.11.0`.",
+      "Expectation": "Python exits with ModuleNotFoundError naming `ai_router.new_chat_id`. The CLI is gone in 0.11.0.",
+      "Passes": true,
+      "Feedback": "Verified by inspection — `ai_router/new_chat_id.py` deleted in S2 commit 1e5f53c. Companion test `test_new_chat_id.py` also deleted.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Migrator sweep+normalize (T4)",
+      "Subarea": "v3 → v4 with field stripping",
+      "ItemLabel": "Pre-049 v3 file gets stripped on migration",
+      "HumanAction": "Take a fixture v3 state file with the 3 retired fields in its top-level orchestrator block. Run `python -m ai_router.migrate_v3_to_v4 --dry-run <path>`, then `--apply`.",
+      "Expectation": "Dry-run reports the strip changes. Apply produces a v4 state file with: schemaVersion=4, sessions[] populated from completedSessions[], orchestrator block reduced to 4 fields, chatSessionId/checkedOutAt/lastActivityAt absent. `.bak` file present alongside the migrated file.",
+      "Passes": true,
+      "Feedback": "Covered by `test_migrate_v3_to_v4.py::test_strip_retired_fields_top_level_orchestrator` + 4 sibling tests added in S3 (commit d99bdb7). Real-world dry-run on 47 historical sets exercises every shape variant.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Migrator sweep+normalize (T4)",
+      "Subarea": "v4 → v4 cleanup",
+      "ItemLabel": "Already-v4 file with retired-field debt gets cleaned",
+      "HumanAction": "Take a v4 state file that has `chatSessionId: null` or `checkedOutAt: <iso>` in a `sessions[i].orchestrator` block (pre-049 v4 writer). Run `--apply`.",
+      "Expectation": "The 3 retired fields are stripped from every per-session orchestrator block. Other v4 invariants (sessions[] structure, status canonicalization) are preserved. `.bak` written.",
+      "Passes": true,
+      "Feedback": "Covered by `test_migrate_v3_to_v4.py::test_strip_retired_fields_per_session_ledger`. The S5 in-progress write to this very set's session-state.json produced sessions[4].orchestrator with only 4 fields, demonstrating the writer is already aligned.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Migrator sweep+normalize (T4)",
+      "Subarea": "Idempotency",
+      "ItemLabel": "Re-running on a clean v4 file is a no-op",
+      "HumanAction": "Take a freshly-migrated v4 file (already stripped). Run `--apply` again.",
+      "Expectation": "File content unchanged; the migrator detects no-op state. `.bak` is updated to the same content (or skipped, per the migrator's no-write contract).",
+      "Passes": true,
+      "Feedback": "Covered by `test_migrate_v3_to_v4.py::test_idempotent_on_clean_v4`.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Migrator sweep+normalize (T4)",
+      "Subarea": ".bak rollback",
+      "ItemLabel": "Rollback restores pre-migration state",
+      "HumanAction": "Apply the migrator to a state file. Inspect the resulting `.bak`. Move/copy `.bak` over the migrated file. Re-read.",
+      "Expectation": "Original pre-migration content recovered byte-for-byte. Procedure documented at `docs/v3-to-v4-rollback-procedure.md`.",
+      "Passes": false,
+      "Feedback": "Manual operator UAT. Programmatically verified that `.bak` is written before mutation; the Set 047 rollback procedure documentation was preserved through the T4 extension.",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Explorer surface (P4 revert)",
+      "Subarea": "No harvest badges",
+      "ItemLabel": "Rows render without W/N/M/B badges",
+      "HumanAction": "Open the Dabbler Session Set Explorer in VS Code against a workspace with multiple in-progress sets. Inspect each row.",
+      "Expectation": "Each row shows: set slug + fraction (e.g., 4/5) + description only. NO colored letter badges (W/N/M/B). NO conflict pills (engine-mismatch / bare-touch / stale-checkout-touch / writer-bypass).",
+      "Passes": false,
+      "Feedback": "Manual operator UAT. Programmatically verified: `buildRow` in `CustomSessionSetsView.ts` no longer attaches `harvestSignals` / `conflicts`; `renderHarvestBadges()` + `renderConflictPills()` deleted from `media/session-sets-tree/client.js`; CSS rules for `.harvest-badges` / `.conflict-pills` deleted from `tree.css`. Layer-3 Playwright `harvest-signals.spec.ts` deleted.",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Explorer surface (P4 revert)",
+      "Subarea": "No orchestrator info in rendering",
+      "ItemLabel": "Row description omits orchestrator identity",
+      "HumanAction": "Hover or expand a row whose set has a populated `sessions[i].orchestrator` block (e.g., engine=codex, provider=openai, model=gpt-5.4). Inspect the description text.",
+      "Expectation": "Description does NOT name the engine, provider, model, or effort. The Explorer renders progress + lifecycle status only. (The orchestrator block is a historical record on disk, not a UI element.)",
+      "Passes": false,
+      "Feedback": "Manual operator UAT. Programmatically verified: `RowPayload.harvestSignals` / `RowPayload.conflicts` fields deleted from the webview protocol; the row payload no longer carries orchestrator-identity fields.",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Command Palette",
+      "Subarea": "Retired commands",
+      "ItemLabel": "Set Orchestrator / Release Check-Out gone",
+      "HumanAction": "Open Command Palette (Ctrl+Shift+P). Type 'dabbler' and scroll the list.",
+      "Expectation": "NO entry for 'Set Orchestrator…', 'Check Out As…', 'Release Check-Out', 'Install Orchestrator Hook (Gemini)', or 'Install Orchestrator Hook (Copilot)'. The 'Install Orchestrator Hook (Claude Code)' entry and 'Open Orchestrator Writer Log' entry both survive.",
+      "Passes": false,
+      "Feedback": "Manual operator UAT. Programmatically verified: 5 command entries removed from `package.json` `contributes.commands`; corresponding source files deleted in S4 commit 8c9279e.",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "writer-bypass detector (D3)",
+      "Subarea": "Out-of-band write detection",
+      "ItemLabel": "Synthetic bypass fires writer-bypass kind",
+      "HumanAction": "On a set with a populated events ledger, hand-edit `session-state.json` (modify any field, save). Without going through `start_session` or `close_session`. Then run `python -m ai_router.joiner --conflicts --json` on the set directory.",
+      "Expectation": "JSON output contains a `writer-bypass` conflict entry naming the state file's mtime as outside any events-ledger bracket. NO `bare-touch`, `engine-mismatch`, or `stale-checkout-touch` kinds (those were retired).",
+      "Passes": true,
+      "Feedback": "Covered by `test_joiner_conflicts.py::test_writer_bypass_fires_on_out_of_band_edit` (updated in S2 to be the only conflict kind exercised).",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "writer-bypass detector (D3)",
+      "Subarea": "ConflictKind narrowing",
+      "ItemLabel": "Joiner output rejects retired kinds",
+      "HumanAction": "Inspect the joiner CLI output schema: `python -m ai_router.joiner --conflicts --json --help` or inspect the source.",
+      "Expectation": "ConflictKind Literal narrowed to `'writer-bypass'` only. No code path emits the 3 retired kinds.",
+      "Passes": true,
+      "Feedback": "Verified by source inspection: `ai_router/joiner/conflicts.py` line ~30 declares `ConflictKind = Literal['writer-bypass']`. Companion test coverage in `test_joiner_conflicts.py`.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Lifecycle — cancel/restore",
+      "Subarea": "Post-rip clean cancel",
+      "ItemLabel": "Cancelling a not-in-flight set has no orchestrator-block side-effects",
+      "HumanAction": "On a not-in-flight set, run `python -m ai_router.cancel_session_set --session-set-dir <set>`. Inspect resulting session-state.json.",
+      "Expectation": "status flips to 'cancelled'. The per-session `orchestrator` blocks on already-closed sessions remain untouched (historical record). No coordination-layer field re-emerges.",
+      "Passes": true,
+      "Feedback": "Covered by `test_cancel_lifecycle.py` (Set 035 baseline, post-049 unaffected because the writer never touched coordination fields on the cancel path).",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Lifecycle — cancel/restore",
+      "Subarea": "Post-rip clean restore",
+      "ItemLabel": "Restoring a cancelled set re-enters in-progress cleanly",
+      "HumanAction": "Restore a cancelled set via `python -m ai_router.restore_session_set --session-set-dir <set>`. Run `start_session` on the next un-closed session.",
+      "Expectation": "status returns to 'in-progress' / 'not-started' per the restore contract. start_session writes a fresh 4-field omit-null orchestrator block on the next-session entry. No legacy coordination-block carry-over.",
+      "Passes": true,
+      "Feedback": "Covered by `test_restore_session_set.py` + `test_session_state_v4_writers.py::test_register_session_start_after_restore`.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "Documentation",
+      "Subarea": "Consumer-repo notice",
+      "ItemLabel": "docs/cross-repo-checkout-notice.md is a deprecation page",
+      "HumanAction": "Open `docs/cross-repo-checkout-notice.md` in the rendered Markdown view.",
+      "Expectation": "Page reads as a 'remove this content from your CLAUDE.md' deprecation instruction (NOT a paste-in for new content). Step-by-step remediation for consumer repos that paste-in'd the Set 033 or Set 036 snippet.",
+      "Passes": true,
+      "Feedback": "Verified by source inspection: file rewritten in S4 commit 8c9279e per T7. Survives / retired summary block included.",
+      "Result": "complete"
+    }
+  ]
+}

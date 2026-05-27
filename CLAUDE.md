@@ -31,43 +31,38 @@ Your role in this repo is **canonical source and release gatekeeper**:
 > `requiresE2E: false` are permanent defaults. UI/UAT/E2E-specific behavior
 > must be gated on spec-level flags.
 
-## Hard-coordination enforcement (Sets 033 / 036) is OFF by default
+## Orchestrator-block contract (post-Set-049)
 
-The Set 033 H3 + Set 036 H4 hard-coordination check — `start_session`
-refusing with `EXIT_CHECKOUT_CONFLICT` (and the extension's
-poll/force/dismiss toast) when a different `engine + provider +
-chatSessionId` composite holds the check-out — was disabled mid-Set-046
-after a production incident: a Codex hook on a second machine triggered
-the refusal toast while an operator was trying to onboard staff,
-blocking real work for a coordination scenario that didn't need it.
+The `orchestrator` block in each `sessions[i]` entry of
+`session-state.json` carries exactly four fields:
 
-What's still tracked:
-- The `orchestrator` block in `session-state.json` (engine, provider,
-  model, effort, chatSessionId, checkedOutAt, lastActivityAt) is still
-  written on every `start_session`.
-- The orchestrator-writer audit log at
-  `~/.dabbler/orchestrator-writer.log` still appends a line on every
-  handoff so the holder change is observable post-hoc.
-- The `CheckoutPollService` in the extension still exists and is wired
-  up; it just has no records to consume (the
-  `claude-session-start-invoker.js` write site is gated on the same
-  flag) and the start_session writer never emits the conflict exit
-  code that would write one.
+- `engine` — `claude` / `codex` / `gemini` / `copilot` / …
+- `provider` — `anthropic` / `openai` / `google` / `github` / …
+- `model` — model id when the hook can declare it authoritatively
+- `effort` — effort tier when the hook can declare it authoritatively
 
-How to re-enable (single-machine workflows, audit-driven enforcement,
-test runs):
+Writers use **omit-null**: a field the caller cannot declare
+authoritatively is simply absent from the on-disk block. No `null`
+values, no `"unknown"` placeholder strings. Readers tolerate missing
+keys.
 
-- Set `DABBLER_ENFORCE_CHECKOUT_COORDINATION=1` in the environment
-  start_session runs under. The flag accepts `1`/`true`/`yes`/`on`
-  (case-insensitive); anything else (including unset) is "off".
-- The Set 033 / Set 036 refusal tests set this env var explicitly via
-  `monkeypatch.setenv`, so their coverage is preserved.
+The Set 033 H3 + Set 036 H4 hard-coordination check (refusal toast,
+poll/force/dismiss flow, `EXIT_CHECKOUT_CONFLICT`,
+`chatSessionId` / `checkedOutAt` / `lastActivityAt` fields) was fully
+ripped out in Set 049. The shim that disabled it by default
+(`DABBLER_ENFORCE_CHECKOUT_COORDINATION`) is gone. The
+`~/.dabbler/orchestrator-writer.log` audit appender is retained as a
+generic "start_session ran" record (no holder-change semantics).
 
-The longer-term decision (full rollback or formal re-design) is
-parked as Set 049 (`049-orchestrator-coordination-removal`) behind
-the standard `feedback_audit_then_spec_for_substantial_features`
-discipline — do not touch the coordination layer outside that
-audit set.
+The orchestrator block is not surfaced in the Session Set Explorer
+rendering (P4: no orchestrator info in the UI, no harvest-record
+badges, no coordination-conflict pills). The `writer-bypass` detector
+(D3) survives in `ai_router/joiner/conflicts.py` as a general
+writer-discipline check, decoupled from coordination context.
+
+See `docs/session-state-schema.md § Writer Contract` for the
+per-orchestrator declaration pattern and `docs/cross-repo-checkout-notice.md`
+for the consumer-repo deprecation instruction.
 
 ## License
 
@@ -77,9 +72,57 @@ is a required duplicate — `vsce package` expects the file alongside
 
 ## Extension versioning
 
-- Current: **v0.23.0** (Set 048 — Lightweight-tier parity;
-  end-to-end Lightweight parity with Full shipped across 5
-  sessions; `--no-router` mode with three-knob precedence
+- Current: **v0.24.0** (Set 049 — Orchestrator coordination
+  removal; full rip-out of the Set 033 H3 + Set 036 H4
+  hard-coordination check shipped end-to-end across 5 sessions;
+  `session-state.json` orchestrator block reshaped from 7 fields
+  to 4 (`engine`, `provider`, `model`, `effort`) with omit-null
+  writer pattern — `chatSessionId`, `checkedOutAt`,
+  `lastActivityAt` dropped from on-disk shape AND writer code
+  paths; `start_session --chat-session-id <id>` and other
+  vestigial flags accepted by argparse and ignored by the writer
+  with a single stderr deprecation line per invocation
+  (T2 accept-with-warning); `python -m ai_router.new_chat_id`
+  CLI retired entirely; `EXIT_CHECKOUT_CONFLICT` /
+  `prior_engine_provider` matching / takeover modal / TTY prompt
+  / `_coordination_enforced()` gate / `chatSessionMismatchModal`
+  / `CheckoutPollService` / `dabbler.checkOutOrchestrator` /
+  `dabbler.releaseCheckOut` / `dabbler.newChatIdWorkflowToast`
+  / Gemini + Copilot installer shims all deleted; `bare-touch`
+  / `engine-mismatch` / `stale-checkout-touch` joiner detectors
+  retired (D1/D2 loss-of-signal accepted per audit); D3
+  `writer-bypass` detector kept, decoupled from coordination
+  context as a general writer-discipline check; Set 045
+  Explorer surface reverted per P4 — `RowPayload.harvestSignals`
+  / `RowPayload.conflicts` fields removed,
+  `renderHarvestBadges()` / `renderConflictPills()` deleted,
+  `.harvest-badges` / `.conflict-pills` CSS rules removed
+  (~145 lines CSS+JS); `HarvestService.ts` deleted (sole-caller
+  disconnect made the stub pointless; load-bearing scaffolding
+  lives in `ai_router/joiner/`); `holder_change` /
+  `checkout_conflict` event-type emission retired in
+  `session_events.py` (existing JSONL entries intact);
+  `~/.dabbler/orchestrator-writer.log` audit appender retained
+  as a generic "start_session ran" record (no holder-change
+  semantics); `migrate_v3_to_v4` migrator extended with T4
+  sweep+normalize that strips the 3 retired fields from
+  historical orchestrator blocks (top-level legacy + per-session
+  ledger; `.bak` rollback preserved; idempotent on clean v4
+  files); `claude-session-start-invoker.js` simplified to walk-up
+  resolve + spawn `start_session --engine claude --provider
+  anthropic [--model X --effort Y]` with model/effort from prior
+  block recovery (no `"unknown"` fallback under T3);
+  `docs/cross-repo-checkout-notice.md` rewritten as one-page
+  deprecation instruction for consumer-repo CLAUDE.md
+  remediation (T7); `docs/session-state-schema.md` § Writer
+  Contract documents the T3 per-orchestrator declaration
+  pattern; `CLAUDE.md` "Hard-coordination enforcement is OFF
+  by default" section retired entirely (rip-out makes it
+  obsolete). Companion PyPI release: `dabbler-ai-router 0.11.0`.
+  The version walk:
+  - **0.23.0** (Set 048) — Lightweight-tier parity;
+    end-to-end Lightweight parity with Full shipped across 5
+    sessions; `--no-router` mode with three-knob precedence
   (CLI flag > env var `DABBLER_NO_ROUTER` > `spec.md` `tier:
   lightweight` > default Full); route() / verify() prologues
   short-circuit to zero-cost stubs without `_init()` (no
@@ -221,15 +264,19 @@ is a required duplicate — `vsce package` expects the file alongside
     block) to the cancellation lifecycle. See below for the prior
     Set 035 description.
 
-- Previous: **v0.22.0** (Set 047 — state-file schema v4 audit.
+- Previous: **v0.23.0** (Set 048 — Lightweight-tier parity.
+  Companion PyPI release: `dabbler-ai-router 0.10.0`). Full
+  description preserved in the version walk above.
+
+- Pre-Previous: **v0.22.0** (Set 047 — state-file schema v4 audit.
   Companion PyPI release: `dabbler-ai-router 0.9.0`). Full
   description preserved in the version walk above.
 
-- Pre-Previous: **v0.21.0** (Set 045 — log-harvest implementation.
+- Pre-Pre-Previous: **v0.21.0** (Set 045 — log-harvest implementation.
   Companion PyPI release: `dabbler-ai-router 0.8.0`). Full
   description preserved in the version walk above.
 
-- Pre-Pre-Previous: **v0.18.1** (Set 035 — state-file sole truth for
+- Pre-Pre-Pre-Previous: **v0.18.1** (Set 035 — state-file sole truth for
   cancellation/restoration; Marketplace publish gated on operator
   confirmation). No companion PyPI release this set
   (`ai_router/session_lifecycle.py` verified byte-equivalent with the

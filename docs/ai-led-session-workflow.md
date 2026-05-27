@@ -367,121 +367,84 @@ the wizard prompt assume the file is created up front.
 robustness measure for legacy folders, not a license to skip the file
 on new ones.
 
-### Orchestrator check-out / check-in (Set 033)
+### Orchestrator identity and concurrency (post-Set-049)
 
-The `orchestrator` block on `session-state.json` doubles as the
-authoritative **check-out record** for the set. Two related
-invariants govern how sets are claimed and released:
+Each `sessions[i]` entry in `session-state.json` carries its own
+`orchestrator` block — a per-session record of who ran that session.
+Set 049 ripped out the hard-coordination layer that Sets 033 / 036
+built on top of this block. The current contract is much simpler:
 
-1. **Within-set sequential.** At most one in-progress session per
-   session set at a time. `start_session` enforces this: a request
-   that would create a second in-flight session in the same set is
-   refused at the boundary. The check-out lives exactly as long as
-   the one in-progress session does. `close_session` clears the
-   block (`orchestrator: null`) on every successful close, releasing
-   the set so the next session can be claimed by any holder.
-2. **Across-set parallel.** Two different session sets can each
-   have their own in-progress session at the same time, even with
-   different holders. The Session Set Explorer (`v0.18.x` onward)
-   renders multiple in-progress sets — that is the supported
-   case, not a degenerate one. Per-set accordions, per-set
-   check-out records; no cross-set coupling.
+**The orchestrator block is a record, not a check-out.** Four fields
+(`engine`, `provider`, `model`, `effort`) with omit-null. A field the
+caller cannot declare authoritatively is simply absent from the
+on-disk block — no `null` values, no `"unknown"` placeholders. The
+block stays attached to its `sessions[i]` entry forever; it's part
+of the historical ledger. Nothing reads it to gate behavior.
 
-**Holder identity** is the `engine + provider + chatSessionId`
-composite (H4 from the Set 032 audit, refined by Set 036 Q1 to add
-chatSessionId). Two orchestrators with the same triple but
-different `model` are treated as the same holder; model and
-effort update in place on a same-holder re-attach. Two distinct
-chats (different `chatSessionId`) on the same `engine + provider`
-are treated as **different holders** — that's the discriminator
-the takeover UX keys on.
+**Within-set sequential is still enforced.** At most one in-progress
+session per set at a time. `start_session` refuses a request that
+would create a second in-flight session in the same set. There is
+no holder-identity check on top of that — any caller can claim a
+not-in-flight session, regardless of who ran the previous one.
 
-**`chatSessionId` source** depends on the orchestrator:
+**Across-set parallel is supported.** Two different session sets can
+each have their own in-progress session at the same time, with any
+combination of orchestrators. The Session Set Explorer renders
+multiple in-progress sets natively.
 
-- **Claude Code** — automatic. The SessionStart hook invoker
-  forwards the hook payload's `session_id` as
-  `--chat-session-id` to `start_session`. The operator does
-  nothing.
+**Per-orchestrator declaration contract (T3).** Hooks pass only the
+fields they can declare authoritatively:
+
+- **Claude Code** — the shipped `claude-session-start-invoker.js`
+  hook passes `engine=claude`, `provider=anthropic`, and recovers
+  `model` / `effort` from the prior session's block when available
+  (no `"unknown"` fallback).
 - **Codex CLI / Gemini Code Assist / GitHub Copilot / manual
-  Lightweight** — operator-driven. Run
-  `python -m ai_router.new_chat_id --export --shell <bash|powershell|fish>`
-  once per chat and `eval`/`Invoke-Expression`/`source` the output;
-  `start_session` defaults to the resulting `$CHAT_SESSION_ID` env
-  value. The wizard's "Configure Orchestrator" toast for Gemini /
-  Copilot includes one-click clipboard-copy actions for all three
-  shells. The CLI is idempotent against an existing non-empty
-  `$CHAT_SESSION_ID` so repeated invocations in the same shell
-  re-emit the same identifier.
+  Lightweight** — analogous; pass what you know, omit what you
+  don't.
 
-**Hard coordination** (H3): `start_session` REFUSES to take a set
-that is already held by a different `engine + provider + chatSessionId`
-composite than the caller. The refusal error names both the
-current holder's full composite (including the chatSessionId or
-`<no chat session ID recorded>` for legacy state files) and the
-two release paths. When the only difference is the chatSessionId
-(same engine + provider, different chat) and the caller is on an
-interactive TTY, `start_session` also surfaces an inline three-
-option prompt — Take Over / Open in Read-Only Mode / Cancel —
-before falling through to refusal. The extension surfaces the
-same three options as a modal (Q3 audit-locked) when the
-mismatch fires during a check-out attempt from the VS Code
-surface.
+**CLI backward compatibility (T2).**
+`start_session --chat-session-id <id>` and any other vestigial
+flag from the pre-049 surface is accepted by argparse and ignored
+by the writer with a single stderr deprecation line per invocation:
 
-**Tolerant-on-read.** A prior block missing the `chatSessionId`
-key (pre-Set-036 writer) or with the key present and `null`
-(Set 036 writer that had no ID at write time) is treated as a
-match against any caller-supplied chatSessionId for `engine +
-provider` equality. The first new write populates the field
-strictly. This lets in-flight sets carried across the Set 036
-boundary migrate without forcing the holder through an explicit
-re-attach handshake.
+```
+start_session: --chat-session-id is no longer used (Set 049); ignoring
+```
 
-**Force-override is the one explicit deviation.** When a different
-orchestrator needs to take a set whose check-out belongs to someone
-else — typically because the original holder crashed, abandoned the
-workstation, or is otherwise stranded — there are two operator-
-facing affordances, both audit-preserving:
+Consumer-repo hooks that still pass `--chat-session-id` keep working
+without modification. The flag will be removed in a future major
+release.
 
-- `start_session --force` from the would-be next holder.
-- "Release Check-Out" Command Palette action (extension v0.18.x+),
-  which wraps the same `--force` invocation.
+**`~/.dabbler/orchestrator-writer.log`** is retained as a generic
+"start_session ran" audit appender. It no longer records holder
+changes (there are none in the post-rip model); the log survives
+as a post-hoc diagnosis surface and may be retired in a future
+stability set.
 
-Both paths append a single line to
-`~/.dabbler/orchestrator-writer.log` recording the prior holder,
-the new holder, both holders' chatSessionIds (or `<no chat session
-ID recorded>` for the legacy case), and an ISO timestamp. The
-events ledger (`session-events.jsonl`) is unchanged — force-
-override is an authority handoff, not a state-machine transition
-— but the `closeout_succeeded` event payload does carry the
-released holder's `chatSessionId + engine + provider + model` (Set
-036 Q4 audit trail) so a forensic walk can correlate close events
-to chats.
+**Tier symmetry.** On Full tier, `close_session` writes the
+per-session orchestrator block automatically; the operator never
+edits it directly. On Lightweight tier, the operator (or path-aware
+agent) writes the per-session block by hand on every close,
+following the same 4-field omit-null contract.
 
-**Per-set lifecycle lock (Set 036 Q5).** Both `start_session` and
-`close_session` acquire `<session-set-dir>/.lifecycle.lock` for
-their read/check/write window so a hybrid migration — one
-orchestrator opening a new session while another is mid-close-out
-on the same set — never interleaves writes. `start_session` polls
-for up to 30s on contention (`EXIT_LOCK_CONTENTION=5`);
-`close_session` keeps its immediate-failure contract (exit 3).
-Legacy `.close_session.lock` is honored alongside the canonical
-name for one release window per the R1 alias contract.
+**`writer-bypass` detector (D3) survives** in
+`ai_router/joiner/conflicts.py` as a general writer-discipline check
+— it fires when a state-file write isn't bracketed by an
+events-ledger entry, catching out-of-band writes regardless of
+which orchestrator did them. The Set 045 `bare-touch`,
+`engine-mismatch`, and `stale-checkout-touch` detectors are retired.
 
-**Tier symmetry.** On Full tier, `close_session` clears the
-`orchestrator` block automatically (Set 033 Session 6). On
-Lightweight tier, the human writes `orchestrator: null` by hand at
-the same boundary, alongside the manual `completedSessions[]`
-update. The chatSessionId requirement applies tier-symmetrically:
-a Lightweight operator runs `python -m ai_router.new_chat_id` to
-mint a UUID, pastes it into the orchestrator block by hand under
-the `chatSessionId` key, and clears it (with the rest of the
-block) on close. The rule is identical; only the actor differs.
+**Set 045 Explorer surface is reverted.** The Session Set Explorer
+does not render orchestrator info, harvest-record badges, or
+coordination-conflict pills (operator-locked P4). The log-harvest
+infrastructure in `ai_router/joiner/parsers.py` survives for
+non-conflict uses.
 
-See [`docs/session-state-schema.md`](session-state-schema.md)
-"Check-out / check-in (Set 033)" for the full schema delta and
-field semantics, and
-[`ai_router/docs/close-out.md`](../ai_router/docs/close-out.md)
-Section 4 for the stranded-check-out recovery flow.
+See [`docs/session-state-schema.md § Writer Contract`](session-state-schema.md)
+for the per-orchestrator declaration pattern and
+[`docs/cross-repo-checkout-notice.md`](cross-repo-checkout-notice.md)
+for the consumer-repo CLAUDE.md remediation instruction.
 
 ### Cancelling and restoring a session set
 
@@ -1767,12 +1730,13 @@ The orchestrator:
 3. Checks prerequisites from prior sessions
 4. Executes — regardless of which agent ran previous sessions
 
-Between sessions, the `orchestrator` block on `session-state.json` is
-`null` (the prior `close_session` cleared it on Full tier; the human
-clears it on Lightweight). The new orchestrator's `start_session`
-populates the block fresh — there is no special "handoff" path. See
-"Orchestrator check-out / check-in (Set 033)" above for the full
-invariant set and the stranded-holder recovery affordances.
+Each `sessions[i].orchestrator` block records the orchestrator that
+ran that specific session (engine/provider/model/effort, omit-null).
+The next session's `start_session` populates its own per-session
+block — there is no special "handoff" path and nothing reads the
+prior block to gate behavior. See
+"Orchestrator identity and concurrency (post-Set-049)" above for the
+full contract.
 
 ---
 

@@ -1,5 +1,7 @@
 src/**
 test/**
+test-results/**
+playwright-report/**
 out/**
 .vscode/**
 .github/**

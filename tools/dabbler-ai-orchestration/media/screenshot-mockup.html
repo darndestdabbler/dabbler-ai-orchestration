@@ -1,358 +1,361 @@
 <!doctype html>
 <!--
-  Set 048 (extension v0.23.0) Session Set Explorer screenshot mockup.
+  Session Set Explorer screenshot mockup (extension v0.23.0).
+
+  Visual values pulled directly from
+  tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css:
+    - .row-header   padding 2px 12px, font-size 13px, line-height 1.2
+    - .row-fraction font-weight 700, font-variant tabular-nums,
+                    width 3em, margin-right 12px, line-height 1.2
+    - .row-name     font-weight 500
+    - fraction colors (dark theme):
+        in-progress  rgb(86, 180, 233)
+        not-started  rgb(187, 187, 187)
+        complete     rgb(0, 197, 140)
+    - bucket-header font-size 11px, font-weight 600,
+                    text-transform uppercase, letter-spacing 0.05em,
+                    opacity 0.72, padding 6px 12px 8px 12px
+    - bucket label format: "Label  (N)" (double-space, from
+                    client.js line 122)
+
+  No context menu / QuickPick is drawn — the right-click surface
+  rebuilt on showQuickPick in Set 048 S3 has a different visual
+  shape (top-of-editor search-input style, not a dropdown), and a
+  static mockup is not the right medium for it.
 
   Replace the existing media/session-set-explorer-in-action.png by:
-    1. Open this file in a Chromium-based browser (full window or
-       devtools "Toggle device toolbar" responsive mode).
-    2. Resize the viewport so the framed mockup fits at 751 × 453
-       (the existing PNG size — matches the README's image width).
-    3. Screenshot the framed area only and save as
-       tools/dabbler-ai-orchestration/media/session-set-explorer-in-action.png
-       (overwrite). The tall variant (tall.png) can be produced by
-       toggling the .tall class on .frame.
-
-  This is a static mockup, not a live extension capture — it depicts
-  the 0.23.0 surface (bucket grouping, QuickPick context menu,
-  L5 left-click toast) so Marketplace browsers see what the
-  extension actually looks like today.
+    1. Open in a Chromium-based browser.
+    2. DevTools (F12) → Elements panel → select the
+       <div class="frame"> element → ⋮ menu → Capture node screenshot.
+       This produces a clean 751 × 453 PNG of just the framed area.
+    3. Save over
+       tools/dabbler-ai-orchestration/media/session-set-explorer-in-action.png.
 -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <title>Session Set Explorer — 0.23.0 mockup</title>
 <style>
-  :root {
-    /* VS Code Dark+ palette */
-    --bg: #1e1e1e;
-    --bg-elev: #252526;
-    --bg-tree: #1e1e1e;
-    --bg-hover: #2a2d2e;
-    --bg-quickpick: #252526;
-    --bg-quickpick-active: #094771;
-    --fg: #cccccc;
-    --fg-muted: #969696;
-    --fg-dim: #6a6a6a;
-    --accent: #4ec9b0;
-    --warning: #ce9178;
-    --in-progress: #d7ba7d;
-    --not-started: #9cdcfe;
-    --done: #6a9955;
-    --separator: #303031;
-    --focus: #007fd4;
-  }
   html, body {
     margin: 0; padding: 0;
     background: #000;
     font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
-    color: var(--fg);
+    color: #cccccc;
     display: flex; align-items: center; justify-content: center;
     min-height: 100vh;
   }
+
+  /* Window frame — matches the existing PNG dimensions. */
   .frame {
     width: 751px;
     height: 453px;
-    background: var(--bg-tree);
     display: grid;
-    grid-template-columns: 48px 280px 1fr;
-    overflow: hidden;
+    grid-template-columns: 48px 300px 1fr;
+    grid-template-rows: 1fr 22px;
+    background: #1e1e1e;
     box-shadow: 0 0 0 1px #444;
     position: relative;
+    overflow: hidden;
     font-size: 13px;
   }
-  /* Activity bar (left rail) */
+
+  /* ----- Activity bar (left rail) ----- */
   .activity-bar {
     background: #333333;
-    display: flex;
-    flex-direction: column;
+    border-right: 1px solid #2b2b2b;
+    grid-row: 1 / 2;
+    display: flex; flex-direction: column;
     align-items: center;
     padding-top: 8px;
-    border-right: 1px solid #2b2b2b;
   }
   .ab-icon {
     width: 48px; height: 48px;
     display: flex; align-items: center; justify-content: center;
     color: #858585;
-    position: relative;
   }
   .ab-icon.active {
-    color: var(--fg);
-    border-left: 2px solid var(--fg);
+    color: #ffffff;
+    border-left: 2px solid #ffffff;
     margin-left: -2px;
   }
   .ab-icon svg { width: 22px; height: 22px; fill: currentColor; }
-  /* Side bar (session set explorer) */
+
+  /* ----- Sidebar / Session Set Explorer ----- */
   .sidebar {
-    background: var(--bg-elev);
+    background: #252526;
     border-right: 1px solid #2b2b2b;
+    grid-row: 1 / 2;
     display: flex; flex-direction: column;
   }
   .sb-title {
-    padding: 6px 16px 4px;
+    padding: 8px 16px 6px;
     text-transform: uppercase;
     font-size: 11px;
-    letter-spacing: 0.5px;
-    color: var(--fg-muted);
     font-weight: 600;
-    display: flex; justify-content: space-between; align-items: center;
+    letter-spacing: 0.05em;
+    color: #cccccc;
+    opacity: 0.85;
+    display: flex; align-items: center; justify-content: space-between;
   }
-  .sb-title .actions { color: var(--fg-dim); font-size: 14px; letter-spacing: 0; }
-  .tree { flex: 1; overflow: hidden; padding: 4px 0; }
+  .sb-title .actions { font-size: 16px; opacity: 0.65; letter-spacing: 0; }
+
+  /* Bucket: padding 6px 12px 8px 12px, font 11px / 600 / uppercase /
+   * letter-spacing 0.05em / opacity 0.72.  Matches tree.css. */
   .bucket-header {
-    padding: 3px 8px 3px 4px;
-    display: flex; align-items: center; gap: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px 8px 12px;
     font-size: 11px;
-    color: var(--fg);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
+    opacity: 0.72;
     user-select: none;
   }
-  .bucket-header .chev { color: var(--fg-muted); font-size: 10px; width: 12px; display: inline-block; text-align: center; }
-  .bucket-header .count { color: var(--fg-muted); font-weight: normal; margin-left: 4px; }
-  .row {
-    padding: 2px 8px 2px 22px;
-    display: flex; align-items: center; gap: 8px;
-    color: var(--fg);
-    line-height: 22px;
-    cursor: default;
-    position: relative;
+  .bucket-chevron {
+    display: inline-block;
+    width: 12px; text-align: center;
+    opacity: 0.7;
+    font-size: 9px;
   }
-  .row.hover { background: var(--bg-hover); }
-  .row.focused { background: var(--bg-quickpick-active); }
-  .row .frac {
-    font-size: 10px;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    min-width: 32px;
-    text-align: right;
-    padding: 1px 4px;
-    border-radius: 3px;
-    margin-right: 2px;
-  }
-  .row .label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .row .badge {
-    font-size: 10px;
-    padding: 1px 5px;
-    border-radius: 3px;
-    color: #000;
-    font-weight: 600;
-    margin-left: 4px;
-  }
-  .frac.in-progress { color: var(--in-progress); }
-  .frac.not-started { color: var(--not-started); }
-  .frac.done       { color: var(--done); }
-  .badge.in-flight { background: var(--in-progress); color: #1e1e1e; }
-  .badge.blocked   { background: #d16969; color: #1e1e1e; }
 
-  /* Editor pane (right) */
+  /* Row header: padding 2px 12px, font-size 13px, line-height 1.2.
+   * Matches tree.css line 164-172. */
+  .row-header {
+    display: flex;
+    align-items: baseline;
+    padding: 2px 12px;
+    font-size: 13px;
+    line-height: 1.2;
+    gap: 0;
+    user-select: none;
+  }
+  .row-header.hover {
+    background: rgba(127, 127, 127, 0.10);
+  }
+  .row-header.focused {
+    background: rgba(127, 127, 127, 0.12);
+    border-left: 2px solid #007fd4;
+    margin-left: -2px;
+    padding-left: 10px;
+  }
+
+  /* Fraction: bold 700, tabular-nums, width 3em, line-height 1.2,
+   * right-aligned. */
+  .row-fraction {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    text-align: right;
+    width: 3em;
+    margin-right: 12px;
+    line-height: 1.2;
+  }
+  /* Dark-theme fraction palette per tree.css :root rule. */
+  .row-fraction-in-progress { color: rgb(86, 180, 233); }
+  .row-fraction-not-started { color: rgb(187, 187, 187); }
+  .row-fraction-complete    { color: rgb(0, 197, 140); }
+
+  /* Row name: weight 500, wraps freely. */
+  .row-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ----- Editor pane (right) ----- */
   .editor {
-    background: var(--bg);
+    background: #1e1e1e;
+    grid-row: 1 / 2;
     display: flex; flex-direction: column;
     position: relative;
+    overflow: hidden;
   }
   .tabs {
     background: #2d2d30;
     height: 34px;
     display: flex;
     border-bottom: 1px solid #2b2b2b;
+    flex-shrink: 0;
   }
   .tab {
-    padding: 0 12px;
+    padding: 0 14px;
     display: flex; align-items: center; gap: 6px;
     font-size: 12px;
-    color: var(--fg-muted);
+    color: #969696;
     border-right: 1px solid #2b2b2b;
   }
   .tab.active {
-    background: var(--bg);
-    color: var(--fg);
-    border-top: 1px solid var(--focus);
+    background: #1e1e1e;
+    color: #ffffff;
+    border-top: 1px solid #007fd4;
     margin-top: -1px;
     padding-top: 1px;
   }
   .editor-body {
     flex: 1;
-    padding: 12px 16px;
-    font-family: "Cascadia Code", Consolas, monospace;
+    padding: 12px 18px;
+    font-family: "Cascadia Code", Consolas, "Courier New", monospace;
     font-size: 12px;
     line-height: 1.55;
-    color: var(--fg);
+    color: #d4d4d4;
     overflow: hidden;
-    position: relative;
   }
-  .editor-body .h1 { color: var(--accent); font-weight: 600; }
-  .editor-body .meta { color: var(--fg-dim); }
-  .editor-body .yaml-key { color: var(--not-started); }
-  .editor-body .yaml-val { color: var(--warning); }
-  .editor-body .heading { color: #569cd6; }
-  .editor-body .comment { color: var(--fg-dim); }
+  .md-h1   { color: #569cd6; font-weight: 600; font-size: 13px; }
+  .md-h2   { color: #4ec9b0; font-weight: 600; }
+  .md-quote { color: #6a9955; font-style: italic; }
+  .md-quote b { color: #ce9178; font-style: normal; }
+  .md-blank { height: 0.55em; }
+  .yaml-key { color: #9cdcfe; }
+  .yaml-val { color: #ce9178; }
+  .punct    { color: #d4d4d4; }
+  .fence    { color: #6a9955; opacity: 0.7; }
 
-  /* QuickPick popup */
-  .quickpick {
-    position: absolute;
-    top: 38px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 420px;
-    background: var(--bg-quickpick);
-    border: 1px solid #454545;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-    z-index: 30;
-  }
-  .qp-input {
-    padding: 8px 10px;
-    background: #3c3c3c;
-    border-bottom: 1px solid #454545;
-    color: var(--fg-muted);
-    font-size: 12px;
-    font-style: italic;
-  }
-  .qp-item {
-    padding: 6px 12px;
-    display: flex; align-items: center;
-    gap: 10px;
-    color: var(--fg);
-    font-size: 13px;
-  }
-  .qp-item.active { background: var(--bg-quickpick-active); color: #fff; }
-  .qp-item .arrow { color: var(--fg-muted); }
-  .qp-sep {
-    height: 1px;
-    background: #3a3a3a;
-    margin: 4px 8px;
-  }
-
-  /* Toast notification */
+  /* ----- Toast (L5 left-click confirmation) ----- */
   .toast {
     position: absolute;
     bottom: 14px;
     right: 14px;
-    background: #181818;
-    border: 1px solid #444;
-    color: var(--fg);
-    padding: 10px 14px;
+    background: #252526;
+    border: 1px solid #454545;
+    color: #cccccc;
+    padding: 9px 14px 9px 12px;
     font-size: 12px;
     display: flex; align-items: center; gap: 10px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.45);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     z-index: 20;
-    max-width: 340px;
+    max-width: 360px;
+    border-radius: 2px;
   }
   .toast .ic {
     width: 14px; height: 14px;
-    color: var(--accent);
+    color: rgb(86, 180, 233);
+    flex-shrink: 0;
   }
 
-  /* Status bar */
+  /* ----- Status bar ----- */
   .statusbar {
+    grid-column: 1 / -1;
+    grid-row: 2 / 3;
     height: 22px;
-    background: var(--focus);
+    background: #007acc;
     color: #ffffff;
     font-size: 12px;
     display: flex; align-items: center;
-    grid-column: 1 / -1;
     padding: 0 10px;
+    gap: 14px;
   }
-
-  /* Icon helpers */
-  .icon {
-    width: 14px; height: 14px;
-    display: inline-block;
-    vertical-align: middle;
-    color: var(--fg-muted);
-  }
+  .statusbar .sb-item { display: inline-flex; align-items: center; gap: 4px; }
 </style>
 </head>
 <body>
   <div class="frame">
+
     <!-- Activity bar -->
     <div class="activity-bar">
-      <div class="ab-icon" title="Explorer"><svg viewBox="0 0 16 16"><path d="M14.5 3h-5L8 1.5 7 .5H1.5l-1 1v11l1 1h13l1-1V4l-1-1z"/></svg></div>
-      <div class="ab-icon" title="Search"><svg viewBox="0 0 16 16"><path d="M10.5 7a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM11 11l4 4-1 1-4-4 1-1z" /></svg></div>
-      <div class="ab-icon" title="Source Control"><svg viewBox="0 0 16 16"><circle cx="4" cy="3" r="2"/><circle cx="4" cy="13" r="2"/><circle cx="13" cy="13" r="2"/><path d="M4 5v6M5.5 13H11" stroke="#858585" fill="none" stroke-width="1.5"/></svg></div>
-      <div class="ab-icon active" title="Session Set Explorer"><svg viewBox="0 0 16 16"><path d="M2 3h4l1 1h7v9H2z" fill="currentColor"/></svg></div>
-      <div class="ab-icon" title="Extensions"><svg viewBox="0 0 16 16"><path d="M6 6V2h4v4h4v4h-4v4H6v-4H2V6z"/></svg></div>
+      <div class="ab-icon" title="Explorer">
+        <svg viewBox="0 0 16 16"><path d="M14.5 3h-5L8 1.5 7 .5H1.5l-1 1v11l1 1h13l1-1V4l-1-1z"/></svg>
+      </div>
+      <div class="ab-icon" title="Search">
+        <svg viewBox="0 0 16 16"><path d="M10.5 7a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM11 11l4 4-1 1-4-4 1-1z"/></svg>
+      </div>
+      <div class="ab-icon" title="Source Control">
+        <svg viewBox="0 0 16 16"><circle cx="4" cy="3" r="2"/><circle cx="4" cy="13" r="2"/><circle cx="13" cy="13" r="2"/><path d="M4 5v6M5.5 13H11" stroke="#858585" fill="none" stroke-width="1.5"/></svg>
+      </div>
+      <div class="ab-icon active" title="Session Set Explorer">
+        <svg viewBox="0 0 16 16"><path d="M2 3h4l1 1h7v9H2z" fill="currentColor"/></svg>
+      </div>
+      <div class="ab-icon" title="Extensions">
+        <svg viewBox="0 0 16 16"><path d="M6 6V2h4v4h4v4h-4v4H6v-4H2V6z"/></svg>
+      </div>
     </div>
+
     <!-- Sidebar / Session Set Explorer -->
     <div class="sidebar">
       <div class="sb-title">Session Set Explorer <span class="actions">⋯</span></div>
-      <div class="tree">
-        <div class="bucket-header"><span class="chev">▾</span> In Progress <span class="count">(2)</span></div>
-        <div class="row hover">
-          <span class="frac in-progress">3 / 5</span>
-          <span class="label">048-lightweight-tier-parity</span>
+
+      <div class="bucket">
+        <div class="bucket-header"><span class="bucket-chevron">▾</span>In Progress&nbsp;&nbsp;(1)</div>
+        <div class="row-header focused">
+          <span class="row-fraction row-fraction-in-progress">4&nbsp;/&nbsp;5</span>
+          <span class="row-name">048-lightweight-tier-parity</span>
         </div>
-        <div class="row">
-          <span class="frac in-progress">1 / 4</span>
-          <span class="label">049-orchestrator-coordination-removal</span>
-          <span class="badge blocked">BLOCKED BY PREREQS</span>
+      </div>
+
+      <div class="bucket">
+        <div class="bucket-header"><span class="bucket-chevron">▾</span>Not Started&nbsp;&nbsp;(1)</div>
+        <div class="row-header">
+          <span class="row-fraction row-fraction-not-started">0&nbsp;/&nbsp;3</span>
+          <span class="row-name">049-orchestrator-coordination-removal</span>
         </div>
-        <div class="bucket-header"><span class="chev">▾</span> Not Started <span class="count">(1)</span></div>
-        <div class="row">
-          <span class="frac not-started">0 / 3</span>
-          <span class="label">050-calculator-tirekicker</span>
+      </div>
+
+      <div class="bucket">
+        <div class="bucket-header"><span class="bucket-chevron">▾</span>Done&nbsp;&nbsp;(4)</div>
+        <div class="row-header">
+          <span class="row-fraction row-fraction-complete">6&nbsp;/&nbsp;6</span>
+          <span class="row-name">047-state-file-schema-v4-audit</span>
         </div>
-        <div class="bucket-header"><span class="chev">▾</span> Done <span class="count">(4)</span></div>
-        <div class="row">
-          <span class="frac done">6 / 6</span>
-          <span class="label">047-state-file-schema-v4-audit</span>
+        <div class="row-header">
+          <span class="row-fraction row-fraction-complete">6&nbsp;/&nbsp;6</span>
+          <span class="row-name">045-log-harvest-implementation</span>
         </div>
-        <div class="row">
-          <span class="frac done">6 / 6</span>
-          <span class="label">045-log-harvest-implementation</span>
+        <div class="row-header">
+          <span class="row-fraction row-fraction-complete">7&nbsp;/&nbsp;7</span>
+          <span class="row-name">044-log-discovery</span>
         </div>
-        <div class="row">
-          <span class="frac done">7 / 7</span>
-          <span class="label">044-log-discovery</span>
-        </div>
-        <div class="row">
-          <span class="frac done">5 / 5</span>
-          <span class="label">033-orchestrator-checkout-checkin</span>
+        <div class="row-header">
+          <span class="row-fraction row-fraction-complete">5&nbsp;/&nbsp;5</span>
+          <span class="row-name">033-orchestrator-checkout-checkin</span>
         </div>
       </div>
     </div>
-    <!-- Editor with spec.md open + QuickPick popped + toast -->
+
+    <!-- Editor pane: spec.md + toast -->
     <div class="editor">
       <div class="tabs">
-        <div class="tab active">📄 spec.md</div>
-        <div class="tab">📄 change-log.md</div>
-        <div class="tab">📄 session-state.json</div>
+        <div class="tab active">📄&nbsp;spec.md</div>
+        <div class="tab">📄&nbsp;change-log.md</div>
+        <div class="tab">📄&nbsp;session-state.json</div>
       </div>
       <div class="editor-body">
-        <div class="h1"># Lightweight-Tier Parity — Audit-Locked Spec</div>
-        <div class="meta">&nbsp;</div>
-        <div class="meta">&gt; <span style="color:#dcdcaa">Status:</span> <b>AUDIT-LOCKED 2026-05-26 (S1 closed).</b></div>
-        <div class="meta">&gt; <span style="color:#dcdcaa">Session Set:</span> docs/session-sets/048-lightweight-tier-parity/</div>
-        <div class="meta">&nbsp;</div>
-        <div class="heading">## Session Set Configuration</div>
-        <div>```yaml</div>
-        <div><span class="yaml-key">totalSessions:</span> <span class="yaml-val">5</span></div>
-        <div><span class="yaml-key">prerequisites:</span></div>
-        <div>&nbsp;&nbsp;- 047-state-file-schema-v4-audit</div>
-        <div><span class="yaml-key">requiresUAT:</span> <span class="yaml-val">true</span></div>
-        <div><span class="yaml-key">requiresE2E:</span> <span class="yaml-val">false</span></div>
-        <div><span class="yaml-key">tier:</span> <span class="yaml-val">full</span></div>
-        <div>```</div>
+        <div class="md-h1"># Lightweight-Tier Parity — Audit-Locked Spec</div>
+        <div class="md-blank"></div>
+        <div class="md-quote">&gt; <b>Status:</b> AUDIT-LOCKED 2026-05-26 (S1 closed).</div>
+        <div class="md-quote">&gt; <b>Session Set:</b> docs/session-sets/048-lightweight-tier-parity/</div>
+        <div class="md-quote">&gt; <b>Workflow:</b> Orchestrator → AI Router → Cross-provider verification.</div>
+        <div class="md-blank"></div>
+        <div class="md-h2">## Session Set Configuration</div>
+        <div class="md-blank"></div>
+        <div class="fence">```yaml</div>
+        <div><span class="yaml-key">totalSessions</span><span class="punct">:</span> <span class="yaml-val">5</span></div>
+        <div><span class="yaml-key">prerequisites</span><span class="punct">:</span></div>
+        <div>&nbsp;&nbsp;<span class="punct">-</span> <span class="yaml-val">047-state-file-schema-v4-audit</span></div>
+        <div><span class="yaml-key">requiresUAT</span><span class="punct">:</span> <span class="yaml-val">true</span></div>
+        <div><span class="yaml-key">requiresE2E</span><span class="punct">:</span> <span class="yaml-val">false</span></div>
+        <div><span class="yaml-key">tier</span><span class="punct">:</span> <span class="yaml-val">full</span></div>
+        <div class="fence">```</div>
       </div>
-      <!-- QuickPick popup (right-click context menu) -->
-      <div class="quickpick">
-        <div class="qp-input">Select an action for 048-lightweight-tier-parity</div>
-        <div class="qp-item"><span>📂 Open File</span> <span class="arrow">▸</span></div>
-        <div class="qp-item active"><span>📋 Copy Eval</span> <span class="arrow">▸</span></div>
-        <div class="qp-sep"></div>
-        <div class="qp-item"><span>⚙ Set Orchestrator…</span></div>
-        <div class="qp-item"><span>📜 Open Orchestrator Writer Log</span></div>
-        <div class="qp-item"><span>🔄 Migrate to v4 schema</span></div>
-        <div class="qp-sep"></div>
-        <div class="qp-item"><span>✕ Cancel set</span></div>
-      </div>
-      <!-- Toast: L5 left-click confirmation -->
+
+      <!-- L5 left-click toast -->
       <div class="toast">
-        <svg class="ic" viewBox="0 0 16 16" fill="currentColor"><path d="M14 3.5l-7.5 7.5L3 7.5l-1 1L6.5 13 15 4.5z"/></svg>
+        <svg class="ic" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M14 3.5l-7.5 7.5L3 7.5l-1 1L6.5 13 15 4.5z"/>
+        </svg>
         Copied: Start the next session of 048-lightweight-tier-parity
       </div>
     </div>
-    <div class="statusbar">⎇ master  ●  0.94 / 10.00 USD (9.4%)  ·  Set 048 closed 5/5  ·  Lightweight-tier parity</div>
+
+    <!-- Status bar -->
+    <div class="statusbar">
+      <span class="sb-item">⎇ master</span>
+      <span class="sb-item">●&nbsp;Set 048 · 4/5 · in-progress</span>
+    </div>
   </div>
 </body>
 </html>

@@ -401,9 +401,12 @@ If the human chose **zero-budget mode**, remind them how verification will happe
 
 If the human chose **lightweight tier (L)** in Step 4.5, give them this closing note instead:
 
-- **No budget, no metrics, no automated verification** — by tier choice, not by exception. Cross-provider verification (Rules 1–2 in `docs/ai-led-session-workflow.md`) is a Full-tier feature; lightweight projects opt out of that whole layer when they pick L. If you ever want it, re-run the bootstrap and pick F to upgrade in place.
+- **No budget, no metrics, no auto-verification** — by tier choice, not by exception. The router writers DO still operate via the Set 048 `--no-router` mode, which short-circuits the routed verification step to a manual attestation. Cross-provider verification happens through copyable review prompts (`dabbler.copySpecReviewPrompt`, `dabbler.copySessionAccomplishmentsPrompt`, `dabbler.copySetAccomplishmentsPrompt`) that you paste into a *different* path-aware AI assistant (Claude Code, Codex, Cline, Cursor, or any agent with file-reading tools). Paste the verdict back into `docs/session-sets/<slug>/external-verification.md` (open or create via `dabbler.openExternalVerificationDoc`).
 - **The Session Set Explorer is your dashboard.** Sets render from `docs/session-sets/<set>/spec.md` and graceful-degrade if optional artifacts are missing.
 - **"Start the next session" still works.** The downstream orchestrator reads whichever set is active and runs against your existing protocol per the Step 4.5 coexistence choice (replace / parallel / index).
+- **Repo-specific review criteria are optional.** If you want to teach reviewers what THIS repo cares about, create one or more of `docs/review-criteria/spec.md`, `docs/review-criteria/session.md`, or `docs/review-criteria/set.md`. Their content gets embedded into the matching copyable prompt's "Operator review criteria" slot. Missing files fall back to the extension's default English instructions. Templates ship in `dabbler-ai-orchestration/docs/review-criteria/`.
+- **Hand-maintained state files still work.** If you can't or don't want to install `dabbler-ai-router` in the consumer repo, edit `session-state.json` by hand using the one-field-flip recipe in `docs/session-state-schema.md` § Lightweight tier — one-field-flip worked example. If a Lightweight state file has drifted into a non-canonical shape (e.g., `sessionLog[]` instead of `sessions[]`), run `python -m ai_router.migrate_lightweight_to_canonical_v4 --in-place` from the consumer repo root once.
+- **You can upgrade later.** Re-run this bootstrap and pick `F` to add the router + verification layer in place. Existing session sets keep working under their `tier:` field.
 
 ---
 

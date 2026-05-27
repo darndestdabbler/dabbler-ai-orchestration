@@ -1027,13 +1027,37 @@ write the plan-less carve-out shape (no `sessions[]` key, top-level
     **leaves `sessions[N-1].orchestrator` in place** as historical
     attribution, sets `sessions[N-1].verificationVerdict`, then
     re-derives top-level status (rule 6/7).
-- **Lightweight tier** (`Workflow: Lightweight`): no router writes.
-  The human or AI orchestrator maintains the file by hand on each
-  session boundary using the one-field-flip recipe above. **Always
-  include and maintain `sessions[]`** — it is the canonical
-  authoritative ledger under hand-maintenance. (The longer-term
-  Lightweight parity work — `--no-router` mode, copyable review
-  prompts, suggested-not-required UAT/E2E — is Set 048's scope.)
+- **Lightweight tier** (`tier: "lightweight"` in spec.md's Session
+  Set Configuration block): the AI router writers DO operate, but
+  under Set 048's `--no-router` mode the verification step is
+  short-circuited to a manual attestation rather than a routed call.
+  The Lightweight orchestrator follows the SAME process as Full for
+  model/effort identification, session-set identification, session
+  identification, and `session-state.json` updates at appropriate
+  times — the difference is operational (no metered API calls, no
+  auto-verification, copyable review prompts, suggested-not-required
+  UAT/E2E), not structural (same writer code paths, same on-disk
+  shape).
+  - `start_session` under `--no-router`: identical write path; no
+    LLM credentials needed (lazy imports per Set 048 §3.1 keep
+    `anthropic` / `openai` / `google-generativeai` out of the
+    Lightweight code path entirely).
+  - `close_session` under `--no-router`: skips the routed
+    verification call; records `verificationVerdict: "manual"` (or a
+    free-text reason supplied via `--reason-file`). The
+    `external-verification.md` soft gate (§3.5 of Set 048's spec)
+    fires when the file is absent and the session is in-progress.
+  - **Hand-maintained Lightweight state files** are still supported
+    for consumers who can't or don't want to install
+    `dabbler-ai-router`. For those, the one-field-flip recipe above
+    applies; **always include and maintain `sessions[]`** — it is
+    the canonical authoritative ledger under hand-maintenance. The
+    per-consumer migrator `python -m
+    ai_router.migrate_lightweight_to_canonical_v4` recognizes
+    documented non-canonical Lightweight shapes (`sessionLog[]`
+    alias, missing `schemaVersion`, status aliases) and rewrites
+    them to canonical v4 with a `session-state.lwbak.json`
+    one-cycle-rollback backup.
 
 ---
 

@@ -138,8 +138,9 @@ external tooling) which gates apply to this set.
 ```yaml
 ## Session Set Configuration
 
-requiresUAT: false       # human UAT review required before set closes
-requiresE2E: false       # E2E test coverage required before notifying
+tier: full               # full | lightweight (Set 048+; pre-Set-048 specs default to "full")
+requiresUAT: false       # true | false | "suggested" — human UAT review required before set closes
+requiresE2E: false       # true | false | "suggested" — E2E test coverage required before notifying
 uatStyle: ad-hoc         # dsl | ad-hoc (only meaningful when requiresUAT: true; default ad-hoc)
 uatScope: per-session    # per-session | per-set | none (only meaningful when requiresUAT: true)
 prerequisites:           # optional; sets that must complete before this one is workable
@@ -148,6 +149,20 @@ prerequisites:           # optional; sets that must complete before this one is 
 ```
 
 ### Field semantics
+
+- **`tier: "full"`** — the set runs through the full AI router:
+  cross-provider verification, automated close-out, metrics. Default
+  for any spec authored before Set 048. Backwards-compatible for
+  every existing spec.
+
+- **`tier: "lightweight"`** (Set 048+) — the set runs under
+  `--no-router` mode: no metered API calls, no auto-verification.
+  The orchestrator follows the same write discipline as Full (same
+  state-file shape, same Session Set Explorer UX, same model /
+  effort / session identification), but verification is handled via
+  copyable review prompts (Set 048 §3.2) the operator pastes into a
+  second AI assistant. See `docs/ai-led-session-workflow.md` Step 6
+  → "Lightweight tier — copyable review prompts" for the flow.
 
 - **`requiresUAT: true`** — the set must produce a
   `<slug>-uat-checklist.json` and human-UAT review is a precondition
@@ -161,6 +176,17 @@ prerequisites:           # optional; sets that must complete before this one is 
   workflow gates are skipped silently. The set's quality bar is build
   + tests + cross-provider AI verification.
 
+- **`requiresUAT: "suggested"`** (Set 048+) — UAT is recommended but
+  not required at spec-authoring time. When the session has UX
+  scope, the AI orchestrator asks the operator at session start:
+  *"E2E tests, UAT checklist, both, or neither?"* The choice is
+  recorded once in `activity-log.json` as a `suggestion_disposition`
+  entry and the close-out gate derives from that recorded answer.
+  This replaces the originally-proposed triple-redundancy reminder
+  pattern (toast + log + close-out warning) with a single upfront
+  positive-confirmation prompt. Applies to both Full and Lightweight
+  tiers.
+
 - **`requiresE2E: true`** — every functional checklist item (when UAT
   is also required AND `uatStyle: "dsl"`) must have matching E2E test
   coverage before the human is notified. When `requiresUAT: false`
@@ -171,6 +197,12 @@ prerequisites:           # optional; sets that must complete before this one is 
 - **`requiresE2E: false`** — no E2E coverage gate. Unit + integration
   tests are still expected (those are governed by the testing
   hierarchy, not by this flag).
+
+- **`requiresE2E: "suggested"`** (Set 048+) — the upfront-prompt
+  mechanism applies symmetrically: if the operator answers "E2E" or
+  "both" at session start, the E2E gate is armed for close-out; if
+  they answer "UAT only" or "neither", the gate is skipped. The
+  recorded disposition lives in `activity-log.json`.
 
 - **`uatStyle: "dsl"`** — checklist items compile to Playwright tests
   via `dabbler-uat-dsl`. **Requires `requiresE2E: true`.** The
@@ -222,13 +254,13 @@ prerequisites:           # optional; sets that must complete before this one is 
 ### Defaults
 
 If the configuration block is **omitted entirely**, the spec is
-treated as `requiresUAT: false`, `requiresE2E: false`, `uatStyle:
-ad-hoc`, `uatScope: none`. Same outcome as writing the block with
-all four values spelled out as their defaults.
+treated as `tier: full`, `requiresUAT: false`, `requiresE2E: false`,
+`uatStyle: ad-hoc`, `uatScope: none`. Same outcome as writing the
+block with all five values spelled out as their defaults.
 
 If the block is **present but a field is omitted**, the missing field
-takes its default (`false` for booleans, `"ad-hoc"` for `uatStyle`,
-`none` for `uatScope`).
+takes its default (`"full"` for `tier`, `false` for boolean tri-state
+flags, `"ad-hoc"` for `uatStyle`, `none` for `uatScope`).
 
 **The safe default is no UAT and no E2E gate.** Authors who want UAT
 or E2E coverage must opt in explicitly. This keeps every set's gates

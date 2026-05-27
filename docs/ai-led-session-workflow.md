@@ -1389,6 +1389,49 @@ log a `Major` issue and proceed to commit). Do not skip commit just
 because verification is provider-broken — the work is preserved in
 git for human review and the next session can re-attempt.
 
+#### Lightweight tier — copyable review prompts replace routed verification
+
+When the set's spec.md declares `tier: "lightweight"` (Set 048 §3.6),
+or `--no-router` mode is active via CLI flag / `DABBLER_NO_ROUTER=1`
+env var, Step 6 changes shape:
+
+1. The orchestrator does NOT call `route(task_type="session-verification")`.
+   `close_session --no-router` skips the routed call entirely and
+   accepts a manual attestation in `verificationVerdict` (default
+   `"manual"`).
+2. Instead, the orchestrator triggers one of the copyable-review-prompt
+   commands shipped in the Dabbler extension (Set 048 §3.2):
+   - **`dabbler.copySessionAccomplishmentsPrompt`** — places a
+     path-reference prompt on the clipboard that names the spec,
+     activity log, and (if present) change log. The operator pastes
+     this into a **different** AI assistant (Claude, GPT-based tool,
+     Gemini, Cline, Cursor) and gets back a free-form review verdict.
+   - The reviewing assistant MUST be path-aware (it reads files
+     itself rather than receiving them inline). Path-aware assistants
+     include Claude Code, Codex, Cline, Cursor, and any agent with
+     file-reading tools.
+3. The operator pastes the verdict back into
+   `docs/session-sets/<slug>/external-verification.md` for the audit
+   trail. The Dabbler extension's `dabbler.openExternalVerificationDoc`
+   Command Palette command opens or creates this file. The file is
+   free-form text — no templated header.
+4. `close_session --no-router` runs a soft gate on
+   `external-verification.md`: if the file is absent and the session
+   is in-progress, the close-out prints a warning and (in interactive
+   mode) prompts `Continue closing session without verification
+   artifact? [y/N]`. Non-interactive runs and `--accept-suggestions`
+   force-bypass the prompt. The gate is **soft** — operator can
+   answer "yes" and proceed.
+5. Repo-specific review criteria embedded into the copyable prompt
+   live at `docs/review-criteria/{spec,session,set}.md`. Each is
+   optional; missing files fall back to the extension's default
+   English instructions.
+
+The Lightweight path preserves cross-provider verification at a cost
+of operator time rather than dollars. It's the right tradeoff for
+projects that already have a second AI subscription, for volunteer
+or open-source work, or for repos where API spend is constrained.
+
 ### Step 7: Handle Verification Result
 
 **VERIFIED:** Proceed to commit.

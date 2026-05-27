@@ -37,10 +37,15 @@
     {
       "number": 3,
       "title": "Writer-side cleanup + migration sweep",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-05-27T17:06:54.463528-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "codex",
+        "provider": "openai",
+        "model": "gpt-5.4",
+        "effort": "medium"
+      },
       "verificationVerdict": null
     },
     {

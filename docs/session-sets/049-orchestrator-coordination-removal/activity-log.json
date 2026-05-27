@@ -17,7 +17,7 @@
       "stepNumber": 2,
       "stepKey": "session-001/register-session-start",
       "dateTime": "2026-05-27T13:59:19-04:00",
-      "description": "Invoked python -m ai_router.start_session with engine=claude, provider=anthropic, model=claude-opus-4-7, effort=high. State-file flipped from not-started to in-progress; orchestrator block populated. Note: a Codex hook fired during the session and rewrote the orchestrator block to engine=codex/model=gpt-5.4/effort=medium mid-work — exactly the unreliable-data pattern that triggered Set 049 to begin with. Left as-is per operator-locked premise P3 (Set 049 rip-out will fix this).",
+      "description": "Invoked python -m ai_router.start_session with engine=claude, provider=anthropic, model=claude-opus-4-7, effort=high. State-file flipped from not-started to in-progress; orchestrator block populated. Note: a Codex hook fired during the session and rewrote the orchestrator block to engine=codex/model=gpt-5.4/effort=medium mid-work \u2014 exactly the unreliable-data pattern that triggered Set 049 to begin with. Left as-is per operator-locked premise P3 (Set 049 rip-out will fix this).",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -26,7 +26,7 @@
       "stepNumber": 3,
       "stepKey": "session-001/pre-audit-code-surface-survey",
       "dateTime": "2026-05-27T14:05:00-04:00",
-      "description": "Pre-audit survey grounded the audit in 4 areas: (1) read-sites for the 3 dropped fields — 18 Python files + ~20 TS files reference chatSessionId/checkedOutAt/lastActivityAt; all readers outside the coordination path are themselves retiring. (2) joiner conflict-kinds — surveyed conflicts.py to surface the discovered collisions D1/D2/D3. (3) hook + CLI invocation path — claude-session-start-invoker.js currently passes --chat-session-id from SessionStart payload + hard-codes engine/provider + recovers model/effort from prior block. (4) coordination enforcement gate — DABBLER_ENFORCE_CHECKOUT_COORDINATION env var disables H3 refusal by default since Set 046.",
+      "description": "Pre-audit survey grounded the audit in 4 areas: (1) read-sites for the 3 dropped fields \u2014 18 Python files + ~20 TS files reference chatSessionId/checkedOutAt/lastActivityAt; all readers outside the coordination path are themselves retiring. (2) joiner conflict-kinds \u2014 surveyed conflicts.py to surface the discovered collisions D1/D2/D3. (3) hook + CLI invocation path \u2014 claude-session-start-invoker.js currently passes --chat-session-id from SessionStart payload + hard-codes engine/provider + recovers model/effort from prior block. (4) coordination enforcement gate \u2014 DABBLER_ENFORCE_CHECKOUT_COORDINATION env var disables H3 refusal by default since Set 046.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -38,7 +38,12 @@
       "description": "Pass A authored proposal.md at docs/proposals/2026-05-27-set-049-orchestrator-coordination-removal/ covering operator-locked premises P1-P5, open topics T1-T7, discovered collisions D1-D3, read-site survey, and 5 feature roll-call items. Pass A routed to gemini-pro (primary author framing: agreeing with the operator that rip-out is right, focused on disposing topics). Cost $0.0175. Result at pass-a.md: v4-compatible (T1), accept-and-ignore (T2), retire writer-log (T5), retire emit (T6), retire all 3 conflict detectors with writer-bypass decoupled+kept (D3), all 5 FRs Keep (1 Defer for FR2).",
       "status": "complete",
       "routedApiCalls": [
-        {"model": "gemini-pro", "tier": 2, "task_type": "architecture", "cost_usd": 0.0175}
+        {
+          "model": "gemini-pro",
+          "tier": 2,
+          "task_type": "architecture",
+          "cost_usd": 0.0175
+        }
       ]
     },
     {
@@ -46,10 +51,15 @@
       "stepNumber": 5,
       "stepKey": "session-001/cross-provider-audit-pass-b",
       "dateTime": "2026-05-27T14:50:00-04:00",
-      "description": "Pass B (devil's advocate) initially routed to gpt-5-4 which timed out (read operation timeout after 3 attempts) — matching gpt-5-4-pivot-to-gemini memory pattern. Fallback chain ran gpt-5-4-mini first, which succeeded. Cost $0.0300. Result at pass-b.md: counter-positions on T1 (prefer v5 bump), T2 (accept-with-warning), T4 (don't rely on readers-ignore-extras), T5 (keep writer-log), T6 (compat window), session arc estimate 5-7 not 3-5. Identified survey gap (non-runtime consumers: types files, JSON schemas, consumer-repo hooks).",
+      "description": "Pass B (devil's advocate) initially routed to gpt-5-4 which timed out (read operation timeout after 3 attempts) \u2014 matching gpt-5-4-pivot-to-gemini memory pattern. Fallback chain ran gpt-5-4-mini first, which succeeded. Cost $0.0300. Result at pass-b.md: counter-positions on T1 (prefer v5 bump), T2 (accept-with-warning), T4 (don't rely on readers-ignore-extras), T5 (keep writer-log), T6 (compat window), session arc estimate 5-7 not 3-5. Identified survey gap (non-runtime consumers: types files, JSON schemas, consumer-repo hooks).",
       "status": "complete",
       "routedApiCalls": [
-        {"model": "gpt-5-4-mini", "tier": 2, "task_type": "architecture", "cost_usd": 0.0300}
+        {
+          "model": "gpt-5-4-mini",
+          "tier": 2,
+          "task_type": "architecture",
+          "cost_usd": 0.03
+        }
       ]
     },
     {
@@ -75,7 +85,7 @@
       "stepNumber": 8,
       "stepKey": "session-001/spec-authoring",
       "dateTime": "2026-05-27T15:30:00-04:00",
-      "description": "Authored docs/session-sets/049-orchestrator-coordination-removal/spec.md replacing the STUB. Sections: operator-locked premises (P1-P5), audit-locked dispositions (T1-T7 + D1-D3), feature roll-call (5 Keep), §4 survey gap to close before S2 code-deletion, §5 session arc (5 sessions with per-session theme breakdown), §6 non-goals, §7 cross-references. Added Session Set Configuration YAML block (totalSessions: 5, prerequisites, requiresUAT: true, tier: full). Pre-populated session-state.json sessions[] with 5 entries (S1 in-progress + S2-S5 not-started placeholders matching the locked arc).",
+      "description": "Authored docs/session-sets/049-orchestrator-coordination-removal/spec.md replacing the STUB. Sections: operator-locked premises (P1-P5), audit-locked dispositions (T1-T7 + D1-D3), feature roll-call (5 Keep), \u00a74 survey gap to close before S2 code-deletion, \u00a75 session arc (5 sessions with per-session theme breakdown), \u00a76 non-goals, \u00a77 cross-references. Added Session Set Configuration YAML block (totalSessions: 5, prerequisites, requiresUAT: true, tier: full). Pre-populated session-state.json sessions[] with 5 entries (S1 in-progress + S2-S5 not-started placeholders matching the locked arc).",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -84,7 +94,7 @@
       "stepNumber": 9,
       "stepKey": "session-001/hygiene-patch-context-menu-defects",
       "dateTime": "2026-05-27T15:45:00-04:00",
-      "description": "Operator surfaced two Set-048-era context-menu defects during S1 close-out review: (1) 'Copy Eval ▸' submenu label inaccurate because it contains non-evaluation entries like 'Start Next Session' — renamed user-visible to 'Copy Prompt ▸' (internal copyEval identifier preserved). (2) dabblerSessionSets.copyStartCommand.parallel command existed in copyCommand.ts but had no ActionRegistry entry — added 'Start New Parallel Session' submenu entry with new buildStartNextParallelSessionPrompt helper + dabbler.copyStartNextParallelSessionPrompt registration. Test coverage: ROW_ACTIONS membership bumped 14→15, new gating tests, copyPromptCommands tests for parallel-variant. 668 TS pass + 2 pre-existing failures unrelated.",
+      "description": "Operator surfaced two Set-048-era context-menu defects during S1 close-out review: (1) 'Copy Eval \u25b8' submenu label inaccurate because it contains non-evaluation entries like 'Start Next Session' \u2014 renamed user-visible to 'Copy Prompt \u25b8' (internal copyEval identifier preserved). (2) dabblerSessionSets.copyStartCommand.parallel command existed in copyCommand.ts but had no ActionRegistry entry \u2014 added 'Start New Parallel Session' submenu entry with new buildStartNextParallelSessionPrompt helper + dabbler.copyStartNextParallelSessionPrompt registration. Test coverage: ROW_ACTIONS membership bumped 14\u219215, new gating tests, copyPromptCommands tests for parallel-variant. 668 TS pass + 2 pre-existing failures unrelated.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -102,7 +112,7 @@
       "stepNumber": 1,
       "stepKey": "session-002/register-session-start",
       "dateTime": "2026-05-27T15:43:34-04:00",
-      "description": "Invoked python -m ai_router.start_session with engine=claude, provider=anthropic, model=claude-opus-4-7, effort=high. State-file flipped session 2 to in-progress; orchestrator block populated (still in pre-rip 7-field shape via the legacy writer at this point — rewritten to 4-field omit-null mid-session once the writer reshape landed).",
+      "description": "Invoked python -m ai_router.start_session with engine=claude, provider=anthropic, model=claude-opus-4-7, effort=high. State-file flipped session 2 to in-progress; orchestrator block populated (still in pre-rip 7-field shape via the legacy writer at this point \u2014 rewritten to 4-field omit-null mid-session once the writer reshape landed).",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -111,7 +121,7 @@
       "stepNumber": 2,
       "stepKey": "session-002/preflight-survey-non-runtime-consumers",
       "dateTime": "2026-05-27T15:50:00-04:00",
-      "description": "§4 pre-flight survey closed the Pass B gap across 4 non-runtime areas: (1) sessionSetsWebviewProtocol.ts — ConflictKind Literal + RowPayload.accordionUpdatedAt vestigialities defer to S4 (Extension TS cleanup), not blockers. (2) HarvestService.ts — parseConflicts silently filters unknown kinds, graceful degradation after S2 narrows the joiner CLI output. NOT BLOCKING. (3) Consumer-repo hooks (platform / harvester / homehealthcare-accessdb) — grep for chat-session-id and chatSessionId returns zero matches in all three; T2 accept-with-warning ships as safety blanket. (4) dump_session_state_schema.py — confirmed hit (build_example_state emits the 3 retiring fields; committed reference would drift). Added inline to S2 scope as a trivial addition. Findings written to docs/session-sets/049-orchestrator-coordination-removal/s2-survey-findings.md.",
+      "description": "\u00a74 pre-flight survey closed the Pass B gap across 4 non-runtime areas: (1) sessionSetsWebviewProtocol.ts \u2014 ConflictKind Literal + RowPayload.accordionUpdatedAt vestigialities defer to S4 (Extension TS cleanup), not blockers. (2) HarvestService.ts \u2014 parseConflicts silently filters unknown kinds, graceful degradation after S2 narrows the joiner CLI output. NOT BLOCKING. (3) Consumer-repo hooks (platform / harvester / homehealthcare-accessdb) \u2014 grep for chat-session-id and chatSessionId returns zero matches in all three; T2 accept-with-warning ships as safety blanket. (4) dump_session_state_schema.py \u2014 confirmed hit (build_example_state emits the 3 retiring fields; committed reference would drift). Added inline to S2 scope as a trivial addition. Findings written to docs/session-sets/049-orchestrator-coordination-removal/s2-survey-findings.md.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -129,7 +139,7 @@
       "stepNumber": 4,
       "stepKey": "session-002/start-session-cli-rip",
       "dateTime": "2026-05-27T16:05:00-04:00",
-      "description": "ai_router/start_session.py rewritten end-to-end. Removed: constants EXIT_CHECKOUT_CONFLICT/EXIT_READ_ONLY/CHAT_SESSION_ID_ENV_VAR/ENFORCE_COORDINATION_ENV_VAR; helpers _coordination_enforced/_identity_label/_prompt_takeover_choice/_is_interactive_tty/_log_force_override/_resolve_chat_session_id; the ~100-line H3+H4 refusal branch (prior-block check, engine_provider_match+chat_session_id_matches derivation, take-over/read-only TTY prompt, exit paths, force-override audit log on handoff); --force flag (only consumer was H3 force-override). Added: _warn_chat_session_id_ignored (T2 accept-with-warning — stderr deprecation line per supply); _log_session_start (T5 — generic 'start_session ran' record at ~/.dabbler/orchestrator-writer.log). Retained: --chat-session-id flag (value ignored by writer); --model and --effort flags as optional with no unknown default (T3).",
+      "description": "ai_router/start_session.py rewritten end-to-end. Removed: constants EXIT_CHECKOUT_CONFLICT/EXIT_READ_ONLY/CHAT_SESSION_ID_ENV_VAR/ENFORCE_COORDINATION_ENV_VAR; helpers _coordination_enforced/_identity_label/_prompt_takeover_choice/_is_interactive_tty/_log_force_override/_resolve_chat_session_id; the ~100-line H3+H4 refusal branch (prior-block check, engine_provider_match+chat_session_id_matches derivation, take-over/read-only TTY prompt, exit paths, force-override audit log on handoff); --force flag (only consumer was H3 force-override). Added: _warn_chat_session_id_ignored (T2 accept-with-warning \u2014 stderr deprecation line per supply); _log_session_start (T5 \u2014 generic 'start_session ran' record at ~/.dabbler/orchestrator-writer.log). Retained: --chat-session-id flag (value ignored by writer); --model and --effort flags as optional with no unknown default (T3).",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -138,7 +148,7 @@
       "stepNumber": 5,
       "stepKey": "session-002/new-chat-id-retire",
       "dateTime": "2026-05-27T16:08:00-04:00",
-      "description": "Deleted ai_router/new_chat_id.py whole-file (no preservation flag per spec §5 S2 directive). Companion ai_router/tests/test_new_chat_id.py also deleted. T2 accept-with-warning at start_session is the sole BC surface; consumer-repo invokers that historically sourced $CHAT_SESSION_ID from new_chat_id --export are not affected because grep confirmed zero consumer-repo callers.",
+      "description": "Deleted ai_router/new_chat_id.py whole-file (no preservation flag per spec \u00a75 S2 directive). Companion ai_router/tests/test_new_chat_id.py also deleted. T2 accept-with-warning at start_session is the sole BC surface; consumer-repo invokers that historically sourced $CHAT_SESSION_ID from new_chat_id --export are not affected because grep confirmed zero consumer-repo callers.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -147,7 +157,7 @@
       "stepNumber": 6,
       "stepKey": "session-002/close-session-audit-payload-cleanup",
       "dateTime": "2026-05-27T16:10:00-04:00",
-      "description": "ai_router/close_session.py::_peek_orchestrator_identity drops chatSessionId from its return dict per P3. Docstring + the calling-site comment in _run_close updated: per-session orchestrator block is historical record under v4, not a check-out flag, so the pre-flip read for audit symmetry stays. The closeout_succeeded event payload reduces from {chatSessionId, engine, provider, model} to {engine, provider, model}. Spec §5 S2 'check-in branch removed' was effectively a documentation-only directive — under v4 the writer never nulled the block on close (that was a v3-era behavior), so no code branch needed removal beyond the docstring tightening.",
+      "description": "ai_router/close_session.py::_peek_orchestrator_identity drops chatSessionId from its return dict per P3. Docstring + the calling-site comment in _run_close updated: per-session orchestrator block is historical record under v4, not a check-out flag, so the pre-flip read for audit symmetry stays. The closeout_succeeded event payload reduces from {chatSessionId, engine, provider, model} to {engine, provider, model}. Spec \u00a75 S2 'check-in branch removed' was effectively a documentation-only directive \u2014 under v4 the writer never nulled the block on close (that was a v3-era behavior), so no code branch needed removal beyond the docstring tightening.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -165,7 +175,7 @@
       "stepNumber": 8,
       "stepKey": "session-002/t6-event-emit-no-op-confirm",
       "dateTime": "2026-05-27T16:18:00-04:00",
-      "description": "Surveyed for holder_change / checkout_conflict event-type emit sites across the whole repo. The literal event-type strings appear ONLY in test names (about EXIT_CHECKOUT_CONFLICT, not the event type), in the audit proposal, and in the spec — they were never emitted by any code path. T6 is therefore documentation-only; no code edits needed. The closeout_succeeded event type continues to be emitted with the engine/provider/model audit payload (chatSessionId dropped at step 6).",
+      "description": "Surveyed for holder_change / checkout_conflict event-type emit sites across the whole repo. The literal event-type strings appear ONLY in test names (about EXIT_CHECKOUT_CONFLICT, not the event type), in the audit proposal, and in the spec \u2014 they were never emitted by any code path. T6 is therefore documentation-only; no code edits needed. The closeout_succeeded event type continues to be emitted with the engine/provider/model audit payload (chatSessionId dropped at step 6).",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -183,7 +193,7 @@
       "stepNumber": 10,
       "stepKey": "session-002/python-test-suite-updates",
       "dateTime": "2026-05-27T16:30:00-04:00",
-      "description": "Retired (whole-file delete): test_chatsessionid_writer.py, test_checkout_writer.py, test_start_session_takeover_prompt.py, test_new_chat_id.py. Updated: test_joiner_conflicts.py rewritten to cover only writer-bypass + scan_conflicts walks emitting writer-bypass kinds (removed all engine-mismatch / bare-touch / stale-checkout-touch test classes + synthetic_workspace fixture). test_session_state_v4_writers.py::test_in_progress_session_carries_per_session_metadata loses the orchestrator_chat_session_id kwarg + 3-field assertions; added new test_orchestrator_block_applies_omit_null regression test (engine-only subset call → {engine: 'claude'}). test_no_router_backcompat.py: --force-asserting start_session tests replaced with --chat-session-id accept-with-warning tests. Full ai_router test suite: 952 pass + 1 skip + 0 regressions in 224 seconds.",
+      "description": "Retired (whole-file delete): test_chatsessionid_writer.py, test_checkout_writer.py, test_start_session_takeover_prompt.py, test_new_chat_id.py. Updated: test_joiner_conflicts.py rewritten to cover only writer-bypass + scan_conflicts walks emitting writer-bypass kinds (removed all engine-mismatch / bare-touch / stale-checkout-touch test classes + synthetic_workspace fixture). test_session_state_v4_writers.py::test_in_progress_session_carries_per_session_metadata loses the orchestrator_chat_session_id kwarg + 3-field assertions; added new test_orchestrator_block_applies_omit_null regression test (engine-only subset call \u2192 {engine: 'claude'}). test_no_router_backcompat.py: --force-asserting start_session tests replaced with --chat-session-id accept-with-warning tests. Full ai_router test suite: 952 pass + 1 skip + 0 regressions in 224 seconds.",
       "status": "complete",
       "routedApiCalls": []
     },
@@ -193,6 +203,96 @@
       "stepKey": "session-002/commit-code-deliverable",
       "dateTime": "2026-05-27T16:35:00-04:00",
       "description": "Committed S2 code deliverable (1e5f53c). Net diff: -2916 lines (3266 deletions, 350 insertions) across 14 files. 4 whole-file deletes + 5 modified Python files + 4 test edits + 1 schema example. Survey-findings document (s2-survey-findings.md) committed alongside the close-out artifacts in a separate commit per the S1 pattern.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/register-session-start",
+      "dateTime": "2026-05-27T16:16:29-04:00",
+      "description": "Invoked python -m ai_router.start_session for S3 with engine=claude, provider=anthropic, model=claude-opus-4-7, effort=high. State-file flipped session 3 from not-started to in-progress; orchestrator block populated on the v4 sessions[] entry. The new 4-field omit-null shape (post-S2 writer reshape) is what landed on disk \u2014 no chatSessionId / checkedOutAt / lastActivityAt fields written, confirming S2's writer rewrite is operational.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/consumer-repo-doc-canonicalization",
+      "dateTime": "2026-05-27T16:30:00-04:00",
+      "description": "Operator-flagged mid-session: an in-progress chat in dabbler-platform was about to create a new session set following stale state-file-rule guidance (v3-shape completedSessions[] / currentSession references). Surveyed instruction files across 4 repos. Updated state-file rules to v4 sessions[] shape in: this repo's CLAUDE.md \u00a7 Session state schema; dabbler-platform/CLAUDE.md \u00a7 State-file rules; dabbler-platform/docs/planning/lessons-learned.md (register_session_start lesson marked RESOLVED with historical context preserved); dabbler-homehealthcare-accessdb/CLAUDE.md close-out step. Per operator decision (Canonicalize - recommended option): deleted consumer-repo copies of ai-led-session-workflow.md (812-955 lines behind canonical) and session-set-authoring-guide.md (116-152 lines behind) in dabbler-platform + dabbler-access-harvester; updated 6 consumer instruction files (CLAUDE.md / AGENTS.md / GEMINI.md in both repos) to reference the canonical via GitHub URL matching the established session-state-schema.md pattern. platform-addendum.md kept as legitimate Blazor / MudBlazor / Playwright addendum. Drift detector (extending migrators with known-stale-term warning scan) deferred to a future audit-then-spec follow-on set per operator-locked decision.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/dabbler-platform-state-file-fix",
+      "dateTime": "2026-05-27T17:00:00-04:00",
+      "description": "Operator-flagged mid-session: dabbler-platform/docs/session-sets/template-scaffolding-followup-fixes/session-state.json showed a 'needs migration' label in the Session Set Explorer. File inspection: it was schemaVersion=2 despite being created today (2026-05-27) by a Codex start_session invocation. Hand-migrated to canonical v4 (3-session ledger with session 1 in-progress under Codex orchestrator). Flagged separately: the v2-emission writer-bug is investigation-worthy because per memory all writers should emit v4 since Set 047 S4 \u2014 suggests a stale pip-installed dabbler-ai-router in dabbler-platform's .venv, or a non-router writer code path. Deferred as separate substantive investigation.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/claude-session-start-invoker-cleanup",
+      "dateTime": "2026-05-27T17:20:00-04:00",
+      "description": "tools/dabbler-ai-orchestration/scripts/claude-session-start-invoker.js rewritten per spec \u00a75 S3. Removed: extractSessionId + chatSessionId forwarding (H4 composite identity gone); preserveExistingClaude chatSessionId composite logic; EXIT_CHECKOUT_CONFLICT constant + handling; CONFLICT_DIR + emitConflictRecord function + its call site; DABBLER_ENFORCE_CHECKOUT_COORDINATION env-var gating; Round-B Low payload-schema-drift stderr signal. Replaced preserveExistingClaude with recoverPriorClaudeModelEffort which returns {model, effort} or {undefined, undefined} based on engine+provider match (no chatSessionId composite). New code respects T3 omit-null contract: when no prior model/effort is recoverable, the args are omitted entirely from the spawn \u2014 no 'unknown' fallback. Module exports reduced to {parsePayload, recoverPriorClaudeModelEffort}. Net change: 372 \u2192 226 lines (gross: 314 deletions / 168 insertions).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/migrate-v3-to-v4-t4-sweep",
+      "dateTime": "2026-05-27T17:45:00-04:00",
+      "description": "ai_router/migrate_v3_to_v4.py extended with the T4 sweep+normalize pass per spec \u00a72 T4. New constants: _RETIRED_ORCHESTRATOR_KEYS = (chatSessionId, checkedOutAt, lastActivityAt); SWEEP_BACKUP_FILENAME = session-state.pre-049-sweep.bak.json; ACTION_SWEPT_ORCHESTRATOR = 'swept-orchestrator'. New helpers: _strip_retired_orchestrator_keys (block) returns (new_block, changed) \u2014 strips retired keys regardless of value (omit-null contract); _sweep_orchestrator_blocks(state) returns (new_state, changed) \u2014 sweeps both top-level legacy orchestrator AND per-session ledger entries. migrate_one_set: v4 fast-path branch enhanced to detect retired keys and either sweep+write (with Set-049-specific backup filename) or skip cleanly; v3\u2192v4 path applies sweep on output. CLI _print_result_line + main summary handle the new action. 15 new sweep tests added to test_migrate_v3_to_v4.py (TestStripRetiredOrchestratorKeys, TestSweepOrchestratorBlocks, TestMigrateOneSetSweep classes). 967 Python tests pass + 1 skip + 0 fail.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-003/ts-migrator-parity",
+      "dateTime": "2026-05-27T18:05:00-04:00",
+      "description": "tools/dabbler-ai-orchestration/src/utils/migrateSessionStateV4.ts received parity sweep edits per the Python\u2194TS lockstep contract documented at the module head. Added: SWEEP_BACKUP_FILENAME constant; 'swept-orchestrator' to MigrationActionV4 type; RETIRED_ORCHESTRATOR_KEYS constant; stripRetiredOrchestratorKeys + sweepOrchestratorBlocks helpers mirroring the Python sweep semantics. migrateOneSetV4 v4 fast-path branch + v3\u2192v4 build output both apply the sweep. tsc --noEmit clean. TS tests not added in S3 per spec \u00a75 S4's scope ('drop coordination assertions; keep the invoker shape tests for the simplified path') \u2014 S4 will sweep TS test files alongside the TS command retirements.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-003/schema-doc-reshape",
+      "dateTime": "2026-05-27T18:20:00-04:00",
+      "description": "docs/session-state-schema.md orchestrator-block sections reshaped per spec \u00a75 S3. Per-session orchestrator block table reduced to 4-field omit-null (engine/provider/model/effort) with new 'Omit-null on disk (Set 049 T3)' callout. Check-out / check-in section (~90 lines including H4 holder identity, hard-coordination gate, chatSessionId per-chat sourcing, per-set lifecycle lock, stranded-checkout recovery) replaced with: new \u00a7 Writer Contract (T3) documenting the per-orchestrator declaration pattern (caller passes what it can declare authoritatively; omit-null on disk; no 'unknown' fallback); \u00a7 Block-preserved-on-close (carrying forward the v4 historical-attribution contract); \u00a7 ~/.dabbler/orchestrator-writer.log note (T5 keep-provisionally). All JSON examples in the doc stripped of the 3 retired keys (top JSON template, plan-less carve-out, between-sessions worked example, completed worked example). Historical context paragraph 'Historical: chatSessionId / checkedOutAt / lastActivityAt' preserved to document schema-evolution.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-003/migrator-dry-run-verification",
+      "dateTime": "2026-05-27T18:35:00-04:00",
+      "description": "Ran migrator dry-run across all 49 historical session sets per spec \u00a75 S3 verification step: 46 v3\u2192v4 migrations (sets 001-046) + 3 v4-sweeps (047/048/049) + 0 would-violate + 0 backup-failed. Verbose dry-run on set 047 confirmed before/after diff: orchestrator blocks went from {engine, provider, model, effort, chatSessionId, checkedOutAt, lastActivityAt} \u2192 {engine, provider, model, effort}. Sweep is idempotent: re-running on already-clean state returns SKIPPED_V4. The dabbler-ai-orchestration repo itself has 46 v3 sets still on disk (created pre-Set-047 launch) that the operator can migrate at their discretion via --in-place; not in S3 scope.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-003/save-memory-canonicalization",
+      "dateTime": "2026-05-27T18:50:00-04:00",
+      "description": "Saved project memory entry project_consumer_repo_doc_canonicalization.md capturing the cross-repo state-file-rule corrections + canonicalization decisions (delete consumer copies, GitHub-URL refs) + deferred drift-detector follow-on. MEMORY.md index updated. The memory documents the > **RESOLVED \u2014 v4 schema** convention as the resolve-without-deleting pattern for lessons-learned files going forward.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-003/commit-code-deliverable",
+      "dateTime": "2026-05-27T19:00:00-04:00",
+      "description": "Committed S3 code deliverable (d99bdb7) with 6 files staged: CLAUDE.md, ai_router/migrate_v3_to_v4.py, ai_router/tests/test_migrate_v3_to_v4.py, docs/session-state-schema.md, tools/dabbler-ai-orchestration/scripts/claude-session-start-invoker.js, tools/dabbler-ai-orchestration/src/utils/migrateSessionStateV4.ts. Net diff: +862/-393 lines across 6 files. Pushed to origin/master. start_session pre-close writes (session-state.json + session-events.jsonl) intentionally excluded from this commit per the Set 049 S2 pattern \u2014 they land in a separate close-out commit alongside activity-log + close-out artifacts.",
       "status": "complete",
       "routedApiCalls": []
     }

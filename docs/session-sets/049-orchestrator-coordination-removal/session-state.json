@@ -37,9 +37,9 @@
     {
       "number": 3,
       "title": "Writer-side cleanup + migration sweep",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-05-27T17:06:54.463528-04:00",
-      "completedAt": null,
+      "completedAt": "2026-05-27T17:19:09.256868-04:00",
       "orchestrator": {
         "engine": "codex",
         "provider": "openai",

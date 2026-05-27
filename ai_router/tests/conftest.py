@@ -37,6 +37,13 @@ if str(AI_ROUTER_DIR) not in sys.path:
 # cache in ``sys.modules['runtime_mode']`` but ``ai_router.route()``
 # (which does ``from .runtime_mode import is_no_router_mode``) reads
 # from the distinct ``sys.modules['ai_router.runtime_mode']`` cache.
+#
+# S5 Round-A Minor #2: the alias is import-order sensitive. If any code
+# imports a bare Set 048 module BEFORE conftest runs, ``sys.modules``
+# already holds a distinct module object under that name, and replacing
+# it here leaves any references already taken pointing at the old
+# object. Fail fast in that case rather than silently producing the
+# split-module-identity bug this aliasing is supposed to prevent.
 _SHARED_MODULE_NAMES = (
     "runtime_mode",
     "spec_config",
@@ -45,4 +52,14 @@ _SHARED_MODULE_NAMES = (
 )
 for _name in _SHARED_MODULE_NAMES:
     _pkg = importlib.import_module(f"ai_router.{_name}")
+    _existing = sys.modules.get(_name)
+    if _existing is not None and _existing is not _pkg:
+        raise RuntimeError(
+            f"conftest module-aliasing tripped: sys.modules[{_name!r}] is "
+            f"a different object than ai_router.{_name}. Something imported "
+            "the bare module name before conftest ran; that early import "
+            "would defeat the test convention's shared-state assumption. "
+            "Check pre-conftest imports (pytest plugins, sys.path-shimmed "
+            "package init code, etc.)."
+        )
     sys.modules[_name] = _pkg

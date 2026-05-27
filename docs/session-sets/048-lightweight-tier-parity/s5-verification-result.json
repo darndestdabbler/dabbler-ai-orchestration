@@ -1,0 +1,18 @@
+{
+  "session_set": "048-lightweight-tier-parity",
+  "session_number": 5,
+  "route": {
+    "model": "gpt-5-4",
+    "tier": 3,
+    "cost_usd": 0.1806325,
+    "tokens_in": 4489,
+    "tokens_out": 11294
+  },
+  "verify": {
+    "model": "skipped",
+    "tier": "verifier",
+    "cost_usd": 0.0,
+    "verdict": null
+  },
+  "total_cost_usd": 0.1806325
+}

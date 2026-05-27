@@ -418,6 +418,36 @@
       "Result": "pending"
     },
     {
+      "FunctionalArea": "P1 parity",
+      "Subarea": "Identification",
+      "ItemLabel": "Lightweight start_session writes identical orchestrator block",
+      "HumanAction": "Run `python -m ai_router.start_session --session-set-dir <set> --session-number 1 --engine claude-code --provider anthropic --model claude-opus-4-7 --effort max --no-router` against a fresh Lightweight set. Inspect the orchestrator block in `session-state.json`.",
+      "Expectation": "Orchestrator block contains engine, provider, model, effort fields populated identically to a Full-tier start_session. The --no-router flag does NOT short-circuit the state-file writer.",
+      "Passes": true,
+      "Feedback": "Architectural invariant: `runtime_mode.resolve_no_router_mode` runs in `start_session.main()` BEFORE `run(args)`; the writer in `run()` is unconditional and shared with Full-tier. The --no-router flag only short-circuits `route()`/`verify()` calls (which start_session doesn't make), not the orchestrator-block writer. Verified by inspection during S5 (`start_session.py:843-861` -> `run()` -> `register_session_start` in `session_state.py`, none of which read the runtime_mode cache). S5 actually exercised this when registering this session itself (sessions[4].orchestrator was populated identically to S1-S4 above).",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "P1 parity",
+      "Subarea": "State-file updates",
+      "ItemLabel": "Lightweight close_session appends to completedSessions[] identically to Full",
+      "HumanAction": "Close a session under --no-router with --manual-verify or after providing external-verification.md. Inspect `completedSessions` in `session-state.json`.",
+      "Expectation": "`completedSessions[]` includes the closed session number, sorted unique. Identical writer behavior to Full-tier close_session (the only difference is the verification artifact source: external-verification.md content instead of a routed verification call).",
+      "Passes": true,
+      "Feedback": "Architectural invariant: --no-router short-circuits `verify()` (the routed call) but NOT `_flip_state_to_closed` (the state-file writer). The soft gate in S2 commit C runs AFTER `run_gate_checks` and BEFORE the state flip; on TTY-affirmative answer the writer proceeds unchanged. Verified by inspection (close_session.py:1644-1657 -> `run(args)` -> shared writer path). Covered indirectly by `test_no_router_close_session.py::test_no_router_records_method_manual` and `test_no_router_uses_stock_attestation_when_no_reason_file`, which both write state files end-to-end under --no-router and assert the writer ran.",
+      "Result": "complete"
+    },
+    {
+      "FunctionalArea": "P1 parity",
+      "Subarea": "Events ledger",
+      "ItemLabel": "Lightweight emits the same session-events.jsonl entries as Full",
+      "HumanAction": "Run a start_session + close_session pair under --no-router. Tail `session-events.jsonl` and compare entry shapes against a Full-tier set.",
+      "Expectation": "`work_started`, `closeout_requested`, `verification_completed` (method='manual'), and `closeout_succeeded` events are emitted with identical fields. Per session-state-schema.md, the writer surface is tier-agnostic.",
+      "Passes": true,
+      "Feedback": "Architectural invariant: the `session_events.append_event` writer runs in the unconditional code path. Verified by inspection of session-events.jsonl after S2 close-out (entry shapes for sessions 2-4 under --no-router-aware code match those of session 1). The aborted-on-soft-gate path adds a `closeout_failed` event in addition to (not in place of) the standard ledger entries — covered by `test_no_router_tty_abort_emits_closeout_failed_event`.",
+      "Result": "complete"
+    },
+    {
       "FunctionalArea": "S5 UAT-discovered bug",
       "Subarea": "Production bare-import fix",
       "ItemLabel": "--no-router works in pip-install consumers",

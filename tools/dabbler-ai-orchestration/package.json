@@ -145,6 +145,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.openExternalVerificationDoc",
+        "title": "Open External Verification Document",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.getStarted",
         "title": "Get Started",
         "category": "Dabbler",

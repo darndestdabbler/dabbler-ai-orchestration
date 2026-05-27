@@ -26,6 +26,7 @@ import { registerCheckOutOrchestrator } from "./commands/checkOutOrchestrator";
 import { registerReleaseCheckOut } from "./commands/releaseCheckOut";
 import { registerOpenOrchestratorWriterLog } from "./commands/openOrchestratorWriterLog";
 import { registerRegenerateNarrationTemplatesCommand } from "./commands/regenerateNarrationTemplates";
+import { registerExternalVerificationCommand } from "./commands/externalVerification";
 import {
   CheckoutPollService,
   DEFAULT_TIMEOUT_MINUTES,
@@ -278,6 +279,9 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   safeRegister("registerRegenerateNarrationTemplates", () =>
     registerRegenerateNarrationTemplatesCommand(context),
+  );
+  safeRegister("registerExternalVerificationCommand", () =>
+    registerExternalVerificationCommand(context),
   );
 
   // Set 036 Session 4: ReadOnlyIntentService is the in-memory map of

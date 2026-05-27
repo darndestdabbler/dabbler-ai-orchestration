@@ -57,10 +57,18 @@
     {
       "number": 4,
       "title": "Doc revision + per-consumer migrator + bootstrap tier-branch",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-05-26T21:08:10.796755-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-4-7",
+        "effort": "max",
+        "chatSessionId": null,
+        "checkedOutAt": "2026-05-26T21:08:10.796755-04:00",
+        "lastActivityAt": "2026-05-26T21:08:10.796755-04:00"
+      },
       "verificationVerdict": null
     },
     {

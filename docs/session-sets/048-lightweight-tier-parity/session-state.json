@@ -40,10 +40,18 @@
     {
       "number": 3,
       "title": "Copyable-prompt commands + Context-menu IA refresh (COMBINED per audit Bias 7 flip)",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-05-26T20:02:59.716458-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-4-7",
+        "effort": "max",
+        "chatSessionId": null,
+        "checkedOutAt": "2026-05-26T20:02:59.716458-04:00",
+        "lastActivityAt": "2026-05-26T20:25:00.000000-04:00"
+      },
       "verificationVerdict": null
     },
     {

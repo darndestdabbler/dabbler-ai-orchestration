@@ -220,6 +220,91 @@
       "description": "All 5 actionable Round-A findings addressed in-flight per memory feedback_dont_hide_behind_out_of_scope: (C1) route()/verify() prologues now fail-CLOSED - top-level import of runtime_mode + direct call; if is_no_router_mode raises, it propagates rather than silently promoting to a live LLM call; (M4) resolve_no_router_mode no-ops on re-entry, returns cached value with debug log; (M3) record_suggestion_disposition uses write-temp + atomic-rename pattern eliminating the read-modify-write race; (I5) parse_session_set_config reads tier ONLY from inside the canonical YAML block (no full-file fallback), preserves Set 015 plain-text fallback for requiresUAT/E2E/uatScope; (Minor 6) timestamp emits UTC directly via datetime.now(timezone.utc).isoformat(). M2 (bare imports) acknowledged as false-positive (matches existing package convention via conftest.py sys.path manipulation); S7 (lazy-cache consistency) deferred as low-priority documentation matter. 2 new regression tests for I5 fix (test_tier_from_free_form_prose_is_ignored + test_requiresUAT_in_plain_text_still_parses_set015_compat). 982 Python pass + 0 regressions after fixes.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/orientation-and-takeover",
+      "dateTime": "2026-05-26T20:25:00-04:00",
+      "description": "Operator (in a new Claude Opus Max chat) asked for the next session. Discovered session-state.json + session-events.jsonl had uncommitted edits flipping S3 to in-progress under a Codex/gpt-5.4/medium orchestrator block ~20 minutes earlier with NO implementation commits to follow. Asked the operator via AskUserQuestion how to proceed; operator chose 'Take over as Claude Opus' (preserve original startedAt timestamp from the Codex start, swap orchestrator block to claude-code/anthropic/claude-opus-4-7/max, append work_resumed event to ledger). Set 033/036 hard-coordination enforcement is disabled by default per project_set_033_enforcement_disabled.md so no state-writer refusal fired; the takeover is purely an audit-log update.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/orientation-and-codebase-survey",
+      "dateTime": "2026-05-26T20:35:00-04:00",
+      "description": "Surveyed the existing right-click context-menu surface: ActionRegistry.ts (15 actions, flat list), CustomSessionSetsView.showContextMenu (computed applicableActions and posted renderContextMenu to webview), media/session-sets-tree/client.js (~100 lines of cursor-anchored popup state + DOM management), media/session-sets-tree/tree.css (.context-menu* rules), openFile.ts (registers openAiAssignment among other openFile commands), copyCommand.ts (existing copyStartCommand.default + .parallel + copySlug). Confirmed Open File submenu locked to exactly 4 entries by L2: Spec / Activity Log / Change Log / Session State (no UAT Checklist / Reveal Playwright Tests / Reveal Folder in the §3.3 spec table); decided to leave those commands palette-accessible. Confirmed Migrate to v3 schema stays as a Flat action alongside v4 (mutually-exclusive predicate guarantees only one per row); spec listed v4 as illustrative.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/copy-prompt-commands-shipped",
+      "dateTime": "2026-05-26T20:55:00-04:00",
+      "description": "Created src/commands/copyPromptCommands.ts (~200 lines) with four prompt builders + the BuildContext dependency-injection seam (readReviewCriteria + fileExists) for testability. Path-reference format per L1: prompts list relative-to-root paths (forward-slash normalized) and NEVER embed session-set artifacts. §3.9 carve-out documented in the file header: review-criteria/<kind>.md is the operator-authored meta-instructions slot, intentionally embedded as inline reviewer checklist rather than referenced. Each builder has its own enabled-when predicate fixed via the ActionRegistry: spec-review always; session-accomplishments when sessionsCompleted > 0; set-accomplishments when state === complete; start-next-session non-terminal-only. copyToClipboard wraps writeText in try/catch with showWarningMessage on failure. All four commands registered as dabbler.copySpecReviewPrompt / dabbler.copySessionAccomplishmentsPrompt / dabbler.copySetAccomplishmentsPrompt / dabbler.copyStartNextSessionPrompt.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/action-registry-reshape",
+      "dateTime": "2026-05-26T21:05:00-04:00",
+      "description": "Reshaped src/providers/ActionRegistry.ts: added ActionCategory discriminator type ('openFile' | 'copyEval' | 'flat') + categorizedActions(set, supports) helper that partitions applicableActions by category and pre-sorts within each. ROW_ACTIONS rewritten to 14 entries: 4 openFile (Spec/ActivityLog/ChangeLog/SessionState per L2 lock), 4 copyEval (the new dabbler.copy*Prompt commands with gating predicates from §3.2 table), 6 flat (Set Orchestrator…/Open Orchestrator Writer Log + the two migrate predicates + Cancel/Restore). Old entries removed: dabblerSessionSets.openAiAssignment (L3), dabblerSessionSets.openUatChecklist + dabblerSessionSets.revealPlaywrightTests + dabblerSessionSets.openFolder (L2 narrowed Open File to exactly 4), dabblerSessionSets.copyStartCommand.default/.parallel + dabblerSessionSets.copySlug (replaced by §3.2 copy-prompts; pre-existing commands remain palette-accessible). Set Orchestrator… gated to in-progress rows via dedicated when predicate.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/quickpick-rewrite-and-cursor-anchored-popup-retirement",
+      "dateTime": "2026-05-26T21:20:00-04:00",
+      "description": "Rewrote CustomSessionSetsView.showContextMenu as a two-step vscode.window.showQuickPick flow. The host now computes categorizedActions(set, supports), opens a top-level QuickPick with 'Open File ▸' / 'Copy Eval ▸' chips (when their categories are non-empty) plus flat actions inline; an item selection opens a second-level QuickPick for the chosen submenu. Native QuickPick handles click-outside / Escape / focus-loss (L4 close-on-blur free byproduct). Extracted the pure decision logic to src/providers/rowMenuHelpers.ts (buildTopLevelItems + buildSubmenuItems + planLeftClickActivation) for unit-testability. handleActivateRow wires L5 dual-action: ALWAYS opens spec.md, ALSO copies 'Start the next session of <slug>.' + info toast on non-terminal rows. Deleted the cursor-anchored popup: ~100 lines from media/session-sets-tree/client.js (showCursorContextMenu / ensureContextMenuEl / hideContextMenu / bandForCommandId + click/keydown/resize/scroll handlers + lastContextMenuPos state); the .context-menu* CSS in tree.css; the RenderContextMenuMsg / ContextMenuItem / ExecuteRowCommandMsg from the webview protocol. COMMAND_ALLOWLIST collapsed from 14 entries to just dabblerSessionSets.openSpec (the L5 left-click path is the only webview→host dispatch left).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-003/test-coverage-additions",
+      "dateTime": "2026-05-26T21:35:00-04:00",
+      "description": "Rewrote src/test/suite/actionRegistry.test.ts to assert the 14-entry registry, the L2-locked 4-item Open File submenu, the four copyEval gating predicates, the L3 openAiAssignment absence invariant, and the categorizedActions partition. Added src/test/suite/copyPromptCommands.test.ts (~14 tests) covering path-reference format / forward-slash normalization / review-criteria default vs embedded / session-accomplishments change-log conditional / git-command embed / start-next-session payload / sanitizeSlugForPrompt. Added src/test/suite/rowMenuHelpers.test.ts (~16 tests) covering buildTopLevelItems / buildSubmenuItems / planLeftClickActivation pure functions including the fail-CLOSED behavior on unknown state values. Added src/test/playwright/context-menu-quickpick.spec.ts (~2 scenarios) pinning the negative invariant that .context-menu* DOM never appears and the L3 openAiAssignment data-command attribute is absent. Bumped src/test/suite/watcherInventory.test.ts pinned line 148 → 149 (new import shifted extension.ts by one line). Removed all entries for openAiAssignment from package.json + COMMAND_ALLOWLIST + openFile.ts registration.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-003/cross-provider-verification-round-A",
+      "dateTime": "2026-05-26T21:50:00-04:00",
+      "description": "Ran docs/session-sets/048-lightweight-tier-parity/run_s3_verification.py. Route (sonnet, tier 2, $0.147) returned ISSUES_FOUND with 8 findings: Critical #1 (L1-compliance: review-criteria content embedded into prompt body — operator-authored carve-out per §3.9, documentation clarified); Critical #2 (potential .kind vs .dabblerKind dispatch-key mismatch — false positive on inspection: actual code reads picked.dabblerKind correctly; comment clarified); Important #3 (backtick-injection in L5 clipboard payload if slug contains backtick — defense-in-depth sanitize applied); Important #4 (unknown future state values fall through to clipboard write — flipped to positive in-progress|not-started check to fail CLOSED); Minor #5 (redundant .slice() in applicableActions — removed); Minor #6 (copyToClipboard swallows no error — wrapped in try/catch with showWarningMessage); Minor #7 (set-accomplishments omits activity-log — added comment documenting spec §3.2's intentional set-vs-session evidence-source distinction); Minor #8 (COMMAND_ALLOWLIST narrowed purpose undocumented — expanded comment). Verify (gemini-pro, $0.014) returned VERIFIED for review quality with explicit confirmation that all findings are accurate and proposed fixes correct. S3 verification cost: $0.161 of $10 NTE; cumulative Set 048 spend $0.411 (4.1%).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "tier": 2,
+          "cost_usd": 0.1469835,
+          "phase": "route"
+        },
+        {
+          "model": "gemini-pro",
+          "tier": "verifier",
+          "cost_usd": 0.013655,
+          "phase": "verify"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-003/round-A-fixes-in-flight",
+      "dateTime": "2026-05-26T22:00:00-04:00",
+      "description": "All 6 actionable Round-A findings addressed in-flight per memory feedback_dont_hide_behind_out_of_scope: (#1 documentation) tightened header comment in copyPromptCommands.ts explaining the §3.9 review-criteria carve-out is intentional (operator-authored meta-instructions, not artifact content); (#2 documentation) expanded interface comment on TopLevelPickItem.dabblerKind explaining why VS Code's QuickPickItem.kind collision matters; (#3 sanitization) new sanitizeSlugForPrompt helper replaces backticks with single-quotes; applied in both buildStartNextSessionPrompt and planLeftClickActivation; (#4 fail-CLOSED) planLeftClickActivation flipped from negative 'state !== complete && state !== cancelled' to positive 'state === in-progress || state === not-started' check so unknown future states skip the clipboard shortcut; (#5 cleanup) removed redundant .slice() in applicableActions; (#6 error handling) copyToClipboard wraps writeText in try/catch with showWarningMessage on rejection; (#7 comment) added intentional-omission comment in buildSetAccomplishmentsPrompt referencing spec §3.2 set-vs-session evidence distinction; (#8 comment) expanded COMMAND_ALLOWLIST comment explaining the narrowed purpose and that any new webview→host dispatch path must add allowed ids explicitly. 3 new regression tests (sanitize-backticks for both prompt + clipboard paths + unknown-state fail-CLOSED). 665 TS pass + 0 net regressions; 2 pre-existing failures unchanged from S2 close-out.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

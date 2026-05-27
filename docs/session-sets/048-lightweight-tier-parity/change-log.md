@@ -129,4 +129,151 @@ routed for S2. Verifier confirmed `ISSUES_FOUND` with 7 findings:
   Set 048 routed spend $0.250 of $10 NTE (2.5%).
 - **TypeScript:** 633 passed + 2 pre-existing failures unrelated to S2.
 
-<!-- Sessions 3-5 to be appended on each session close-out -->
+## Session 3 — Copyable-prompt commands + Context-menu IA refresh (COMBINED per Bias 7 flip)
+
+Closed 2026-05-26 with disposition `completed`.
+
+### What ships in S3
+
+S3 implements spec §3.2 (copyable-review-prompt commands), §3.3
+(context-menu IA refresh — Bias 3 FLIP locks QuickPick), and §3.9
+(review-criteria storage). The cursor-anchored HTML popup that
+Set 034 introduced is retired. Operator locks L1-L5 all land in this
+session.
+
+**New files:**
+
+- `tools/dabbler-ai-orchestration/src/commands/copyPromptCommands.ts`
+  registers four commands: `dabbler.copySpecReviewPrompt` (always
+  enabled), `dabbler.copySessionAccomplishmentsPrompt` (≥1 completed
+  session), `dabbler.copySetAccomplishmentsPrompt` (`state ===
+  "complete"`), `dabbler.copyStartNextSessionPrompt` (non-terminal
+  rows only). Each builder is pure with a `BuildContext` dependency-
+  injection seam for unit testing. Path-reference format per L1:
+  prompts list relative-to-root paths (forward-slash normalized) and
+  NEVER embed session-set artifacts. §3.9 carve-out documented in
+  the module header — `docs/review-criteria/<kind>.md` is operator-
+  authored meta-instructions, intentionally embedded as the
+  reviewer's checklist (NOT the artifact under review). The
+  `sanitizeSlugForPrompt` helper replaces backticks with single-
+  quotes so the L5 backtick-delimited clipboard payload stays
+  well-formed even on slugs containing a `` ` ``.
+
+- `tools/dabbler-ai-orchestration/src/providers/rowMenuHelpers.ts`
+  holds the pure decision logic extracted from
+  `CustomSessionSetsView`: `buildTopLevelItems` (produces the top-
+  level QuickPick item list with `Open File ▸` / `Copy Eval ▸`
+  chips and inline flat actions), `buildSubmenuItems` (second-level
+  picker items), and `planLeftClickActivation` (L5 dual-action plan:
+  ALWAYS open spec.md; ALSO copy `Start the next session of
+  \`<slug>\`.` + info toast on non-terminal rows). The state check
+  is a positive `in-progress | not-started` test so unknown future
+  state values FAIL CLOSED — schema drift cannot accidentally fire
+  L5 on a bucket the operator never approved.
+
+- `tools/dabbler-ai-orchestration/src/test/playwright/context-menu-quickpick.spec.ts`
+  pins two negative invariants at Layer 3: the cursor-anchored
+  `.context-menu*` DOM never appears (before or after a right-click)
+  and the L3-removed `openAiAssignment` data-command attribute is
+  absent from the row tree.
+
+**Reshape — `ActionRegistry.ts`:**
+
+- New `ActionCategory` discriminator (`"openFile" | "copyEval" |
+  "flat"`) on each `RowAction` entry; `categorizedActions(set,
+  supports)` partitions the applicable subset by category for the
+  two-step QuickPick.
+- Final entry count: 14 (was 15). Removed: `openAiAssignment` (L3),
+  the `Open File`-adjacent palette actions (`openUatChecklist`,
+  `revealPlaywrightTests`, `openFolder`) which L2 narrows away from
+  the menu surface (commands remain registered for Command Palette
+  use), and the pre-existing `copyStartCommand.default | .parallel`
+  + `copySlug` (replaced by the §3.2 copy-prompts; the old commands
+  stay palette-accessible). Added: 4 copyEval entries + 2 flat
+  orchestrator entries (`dabbler.checkOutOrchestrator` gated to
+  in-progress rows; `dabbler.openOrchestratorWriterLog`).
+- Open File submenu is locked to exactly four entries per L2:
+  Spec / Activity Log / Change Log / Session State. The convention-
+  level invariant is asserted by a new test in
+  `actionRegistry.test.ts`.
+
+**Rewrite — `CustomSessionSetsView.ts`:**
+
+- `showContextMenu` rebuilt on `vscode.window.showQuickPick`. The
+  host opens a top-level pick (submenu chips + flat actions), then
+  on submenu selection opens a second-level pick. Escape from
+  either level dismisses (L4 close-on-blur free byproduct).
+- `handleActivateRow` implements L5: `dispatchCommand(openSpec)` +
+  conditional `vscode.env.clipboard.writeText` + info toast.
+- `COMMAND_ALLOWLIST` collapsed from 14 entries to 1
+  (`dabblerSessionSets.openSpec`) — the QuickPick selections
+  dispatch via `vscode.commands.executeCommand` directly from the
+  host (no webview round-trip), so the allowlist now governs only
+  the L5 left-click `activateRow` path. Comment expanded to make
+  the narrowed purpose explicit for future webview→host dispatch
+  additions.
+
+**Retired — cursor-anchored popup surface:**
+
+- `media/session-sets-tree/client.js`: ~100 lines removed
+  (`showCursorContextMenu` / `ensureContextMenuEl` /
+  `hideContextMenu` / `bandForCommandId` + click/keydown/resize/
+  scroll handlers + `lastContextMenuPos` state + the
+  `renderContextMenu` host→webview case). The `contextmenu`
+  listener on each row survives — it now just posts
+  `showRowContextMenu` to the host, which opens the QuickPick.
+- `media/session-sets-tree/tree.css`: all `.context-menu`,
+  `.context-menu-item`, `.context-menu-separator` rules removed.
+- `src/types/sessionSetsWebviewProtocol.ts`: `RenderContextMenuMsg`,
+  `ContextMenuItem`, `ExecuteRowCommandMsg` removed.
+
+**Removed — `openAiAssignment` (L3):** the command registration in
+`openFile.ts`, the `package.json` command declaration, the
+`COMMAND_ALLOWLIST` entry, and the `ROW_ACTIONS` entry all go.
+The underlying `ai-assignment.md` file on disk is unaffected;
+any future surface that needs to read it should depend on the
+`aiAssignmentPath` field, not on this menu entry.
+
+### Cross-provider verification round
+
+Route (`sonnet`, $0.147) + verify (`gemini-pro`, $0.014) =
+**$0.161** routed for S3. Verifier verdict `VERIFIED` for review
+quality with all 8 findings confirmed accurate:
+
+| # | Severity | Disposition |
+|---|---|---|
+| 1 | Critical — review-criteria content-embed violates L1 | **DOCUMENTED** in-flight (operator-authored §3.9 carve-out; comment expanded; behavior preserved per spec §3.2 + §3.9 explicit "embedded" wording) |
+| 2 | Critical — potential `.kind` vs `.dabblerKind` dispatch-key mismatch | **FALSE POSITIVE** on inspection (actual code reads `picked.dabblerKind` correctly); interface comment expanded to make the QuickPickItem.kind collision explicit |
+| 3 | Important — backtick in slug breaks L5 markdown payload | **FIXED** in-flight (`sanitizeSlugForPrompt` helper + applied in both prompt builder + clipboard write) |
+| 4 | Important — unknown future state values fall through to clipboard | **FIXED** in-flight (positive `in-progress | not-started` check; unknown states fail CLOSED) |
+| 5 | Minor — redundant `.slice()` in `applicableActions` | **FIXED** in-flight |
+| 6 | Minor — `copyToClipboard` swallows no error | **FIXED** in-flight (try/catch + `showWarningMessage` on rejection) |
+| 7 | Minor — `buildSetAccomplishmentsPrompt` omits activity-log silently | **DOCUMENTED** in-flight (comment references spec §3.2's intentional set-vs-session evidence distinction) |
+| 8 | Minor — `COMMAND_ALLOWLIST` narrowed purpose undocumented | **DOCUMENTED** in-flight (comment expanded) |
+
+3 new regression tests lock in the in-flight fixes (sanitize-
+backticks for both prompt + clipboard paths + unknown-state
+fail-CLOSED).
+
+### Test counts at close
+
+- **TypeScript:** 665 passed (29 new tests for S3) + 2 pre-existing
+  failures unrelated to S3 (`configEditor-foundation` panel-
+  lifecycle + `notificationsSection` rendering — both predate
+  Set 048).
+- **Python:** 994 collected (no Python changes in S3; net new
+  Python tests came from elsewhere between S2 close and S3 open).
+- Cumulative Set 048 routed spend: **$0.411 of $10 NTE (4.1%)**
+  (S1 $0.103 + S2 $0.147 + S3 $0.161).
+
+### Next-session prerequisite
+
+S4 starts against S3's QuickPick + copy-prompt surface. The S4 doc-
+revision scope (bootstrap Step 4.5, schema doc § Tier Expectations,
+workflow doc Step 6, authoring guide tri-state docs, agent-
+capability documentation per §3.2, wizard tier-branch, cross-repo
+notice) will cite the now-shipped commands by id and the L5 left-
+click behavior by user-visible effect. The per-consumer migrator
+(§3.7) is also S4 territory. No S3-deferred items roll forward.
+
+<!-- Sessions 4-5 to be appended on each session close-out -->

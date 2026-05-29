@@ -1,30 +1,18 @@
 {
   "status": "completed",
-  "summary": "S4 shipped Feature 2 (number-prefix addressing) AND the operator-reassigned Explorer UX revision. Feature 2 (verdict Q8-Q11): ai_router/resolve_set.py (resolve_slug/resolve_set exact integer-prefix match with leading-zeros normalized, collision names both, no-match lists available numbers + --next, no fuzzy nearest; next_session_set_number returns int + zero-padded string with width=max(3, widest existing prefix); resolve_session_set_dir bare-number->path passthrough; standalone CLI `python -m ai_router.resolve_set <n>`/`--next`/`--json`); start_session --session-set-dir now accepts a bare number resolving within ./docs/session-sets; authoring guide reconciled (NNN- monotonic sequence prefix REQUIRED for new/scaffolded sets, RECOMMENDED + forward-only for consumers, semantic date/phase names still banned, Numbering section added); minimal extension Command-Palette quick-input resolver command (dabblerSessionSets.resolveSetNumber) backed by a pure TS resolver (utils/resolveSetNumber.ts) mirroring the Python contract so router-less Lightweight consumers still get the handle. Explorer UX revision (operator-directed to S4; non-goal 'old schema OK, no per-row nag'): the intrusive '(needs migration)' row description is replaced by an unobtrusive asterisk + 'Ran under schema v<N>' hover tooltip (SessionSetsModel.migrationMarker/migrationTooltip; schemaVersionOnDisk surfaced from fileSystem.ts; rendered in client.js + tree.css); a single title-bar 'Upgrade older session sets' icon (commands/upgradeOlderSets.ts) gated on the dabblerSessionSets.hasSubCurrentSets context key runs the corrected THREE-migrator bulk chain (migrate_session_state -> migrate_lightweight_to_canonical_v4 -> migrate_v3_to_v4, each --in-place via Python subprocess) across all sub-current sets at once -- the S2 empirical correction, NOT the verdict's two. Per-row right-click migrate actions left intact (manual option, not a nag). Verification (manual; cross-provider deferred to S5 per the per-set pattern): Python 1025 passed / 1 skipped (15 new resolver + 2 new start_session integration tests, 0 regressions); TS test:unit 573 passing / 2 failing (BOTH pre-existing Set-026 stub-harness failures in configEditor-foundation + notificationsSection, unrelated to S4); tsc --noEmit clean; esbuild clean. Layer-3 migration-cta Playwright specs updated to assert asterisk+tooltip (not run locally -- CI-fragile launchVSCode); title-bar enabled/disabled gating unit-tested via hasSubCurrentSets (the package.json `when` clause is declarative). No router invoked; $0 added to the $10 set NTE. NOTE for S5 verifier: (a) confirm the THREE-migrator bulk chain order/correctness vs the verdict's two (S2 empirical correction carried forward); (b) the bulk-upgrade title-bar action shells to Python (the per-row v4 migrate stays in-process) -- a deliberate divergence since only v3->v4 has a TS in-process twin and the bulk path genuinely needs all three migrators; (c) cross-provider verification of S2-S4 deferred here is S5's to perform.",
-  "verification_method": "manual",
+  "summary": "S5 (final, 5 of 5) shipped consumer rollout + docs + dual version bumps and performed the cross-provider verification of the S2-S5 deferred work. (1) docs/cross-repo-migration-guard-notice.md: paste-in for consumer CLAUDE.md -- one-time setup (install the SessionStart drift guard via the extension's dabbler.installOrchestratorHook.claudeCode command OR a router-less manual fallback = invoker raw-URL download + minimal settings.json stanza; raise the >=0.10.0 pin; run a one-time check_migrations + bulk-upgrade-on-drift), a self-contained copy-snippet (machine-enforced schema currency, raw GitHub URLs, schemaVersion:4 stamp, omit-null, old-schema-is-OK no-nag posture, NNN- number-prefix addressing with resolve_set/--next), and a 2026-05-29 adoption-status table. (2) Harvester first-adopter confirmed: all 49 sets at v4 (0 needs-migration), pin dabbler-ai-router>=0.10.0, CLAUDE.md stamped + raw-URL guidance -- all done ahead of the set; the remaining hook install is a one-time operator action against the SHARED GLOBAL ~/.claude/settings.json (the invoker walks up from cwd) which covers every repo on the machine at once. (3) Version bumps: dabbler-ai-router 0.11.0 -> 0.12.0 (pyproject.toml + ai_router/__init__.__version__) and extension 0.24.1 -> 0.25.0 (package.json; publishes the held 0.24.1 Copy-Slug fix); ai_router/CHANGELOG.md [0.12.0] release header (S4 resolve_set + S2 check_migrations/manifest), extension CHANGELOG.md [0.25.0] entry, CLAUDE.md Extension-versioning walk (new Current v0.25.0; Previous/Pre-Previous chain cascaded down one level), and a set-level change-log.md. Cross-provider verification: gemini-pro (google) IV&V via providers.call_model with the provider-scoped config (full cfg lacks a top-level 'retry' key; this also sidesteps the RouteResult.provider trap); first call truncated on thinking with max_tokens=4000 -> fixed with max_tokens=16000 + thinking_budget=4096. Verdict VERIFIED: 0 critical; 2 important (both NOTED RISKS not defects: three-step bulk-migration safety relies on each migrator's idempotency = already a documented/test-asserted invariant; Python/TS resolver dual-impl drift = acknowledged, convention-lint a future-set candidate); 1 nice-to-have (the 2 pre-existing Set-026 TS stub-harness failures, out of scope/predate the set). The verifier explicitly confirmed the empirically-corrected THREE-migrator bulk chain (vs the S1 verdict's two) as sound and called release discipline sound. No in-flight fix required; record at s5-verification.md. Tests: full Python suite 1025 passed / 1 skipped / 0 regressions after the bumps; no TS source changed in S5 (version + CHANGELOG only; S4 already confirmed tsc/esbuild clean). Cost $0.0053 -> cumulative routed $0.2882 of $10 NTE (2.9%). Publishes HELD for operator-initiated tag-push (vsix-v0.25.0 via publish-vscode.yml; v0.12.0 via release.yml) -- NOTE: VSCE_PAT was expired 2026-05-28, confirm freshness before the vsix tag. This is the final session; close_session flips the set's top-level status to complete.",
+  "verification_method": "cross-provider",
   "files_changed": [
-    "ai_router/resolve_set.py",
-    "ai_router/tests/test_resolve_set.py",
-    "ai_router/start_session.py",
-    "ai_router/tests/test_start_session.py",
-    "docs/planning/session-set-authoring-guide.md",
-    "tools/dabbler-ai-orchestration/src/utils/resolveSetNumber.ts",
-    "tools/dabbler-ai-orchestration/src/commands/resolveSetNumber.ts",
-    "tools/dabbler-ai-orchestration/src/commands/upgradeOlderSets.ts",
-    "tools/dabbler-ai-orchestration/src/providers/SessionSetsModel.ts",
-    "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
-    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
-    "tools/dabbler-ai-orchestration/src/types.ts",
-    "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
-    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "docs/cross-repo-migration-guard-notice.md",
+    "pyproject.toml",
+    "ai_router/__init__.py",
+    "ai_router/CHANGELOG.md",
     "tools/dabbler-ai-orchestration/package.json",
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
-    "tools/dabbler-ai-orchestration/src/test/suite/resolveSetNumber.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/migrationMarker.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/migration-cta.spec.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/migration-cta-v4.spec.ts",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "CLAUDE.md",
+    "docs/session-sets/050-schema-drift-detection-and-migration-guard/change-log.md",
+    "docs/session-sets/050-schema-drift-detection-and-migration-guard/s5-verification.md",
+    "docs/session-sets/050-schema-drift-detection-and-migration-guard/s5-close-reason.md",
     "docs/session-sets/050-schema-drift-detection-and-migration-guard/activity-log.json",
     "docs/session-sets/050-schema-drift-detection-and-migration-guard/disposition.json"
   ],
@@ -36,7 +24,7 @@
     "effort": "high",
     "reason": {
       "code": "other",
-      "specifics": "S5 is the final session: consumer rollout (docs/cross-repo-migration-guard-notice.md), harvester first-adopter hook install (operator-scoped), publish the held v0.24.1 Copy-Slug fix, dual version bumps (PyPI dabbler-ai-router + Marketplace extension) + CHANGELOG + CLAUDE.md version walk + change-log.md, and the cross-provider verification of the S2-S4 deferred work (including the THREE-migrator bulk-chain correctness and the bulk-action-shells-to-Python divergence flagged above), then close-out with publishes held for operator tag-push. High effort: cross-repo coordination + release mechanics + the accumulated verification pass warrant it."
+      "specifics": "Final session of Set 050 -- no next session. Set complete: close_session flips the top-level status to complete. Operator follow-ups (out of session scope): (1) push the held publish tags vsix-v0.25.0 (Marketplace) and v0.12.0 (PyPI) after confirming VSCE_PAT freshness (expired 2026-05-28); (2) run the one-time SessionStart drift-guard hook install (extension command) which covers all repos via the shared global ~/.claude/settings.json; (3) paste the cross-repo-migration-guard-notice.md snippet into the remaining consumer repos' CLAUDE.md (operator-scoped). Sets 051 + 052 are stubbed (audit-then-spec, not started)."
     }
   }
 }

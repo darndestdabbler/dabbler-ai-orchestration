@@ -5,6 +5,63 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-05-29 (Set 050 — Schema-drift guard + number-prefix addressing)
+
+Ships the extension side of Set 050 and publishes the held 0.24.1
+Copy-Slug fix as part of the same release. Companion PyPI release:
+`dabbler-ai-router 0.12.0`.
+
+### Added
+
+- **Pure-JS schema-drift scan on the SessionStart hot path.**
+  `scripts/claude-session-start-invoker.js` gains a
+  `CURRENT_SCHEMA_VERSION` constant and a `scanSchemaDrift(workspaceRoot)`
+  step chained after `start_session`. It reads
+  `docs/session-sets/*/session-state.json`, compares each `schemaVersion`
+  to the bundled constant, and prints a terse one-line summary into
+  session context when any set is behind (clean = silent). It has **no
+  `ai_router` import and no network**, so it still warns on a repo with
+  an absent or stale router; it is fail-open on unreadable/missing files,
+  and `start_session` errors are logged-not-fatal so the scan always
+  runs. A CI test (`test_invoker_schema_constant.py`) pins the bundled JS
+  constant to `ai_router`'s `SESSION_STATE_SCHEMA_VERSION` so the two
+  sources of truth cannot drift.
+- **`Dabbler: Install Orchestrator Hook (Claude Code)` install path
+  extended.** The success toast now mentions both `start_session` and the
+  drift scan, and offers a **"Copy manual setup"** action that copies the
+  invoker download URL + a minimal `settings.json` stanza for repos
+  without the extension (works with no router installed at all).
+- **`Dabbler: Resolve Set Number`
+  (`dabblerSessionSets.resolveSetNumber`)** — a Command-Palette
+  quick-input command that takes a session-set number and resolves it to
+  the full slug, backed by a pure-TS resolver (`utils/resolveSetNumber.ts`)
+  mirroring the Python `resolve_set` contract so router-less Lightweight
+  consumers still get the handle.
+- **"Upgrade older session sets" Explorer title-bar icon**
+  (`commands/upgradeOlderSets.ts`), gated on the
+  `dabblerSessionSets.hasSubCurrentSets` context key (enabled only when
+  sub-current sets exist). Runs the corrected three-migrator bulk chain
+  (`migrate_session_state` → `migrate_lightweight_to_canonical_v4` →
+  `migrate_v3_to_v4`, each `--in-place` via a Python subprocess) across
+  all sub-current sets at once — never a per-row obligation.
+
+### Changed
+
+- **Explorer no longer nags per row.** The intrusive `(needs migration)`
+  row description is replaced by an unobtrusive asterisk + "Ran under
+  schema v\<N\>" hover tooltip (operator non-goal: old schema is
+  acceptable; the `normalize_to_v4_shape` reader shim consumes v2/v3
+  transparently). The per-row right-click "Migrate to v3/v4 schema"
+  actions are left intact as a manual option.
+
+### Fixed (carried from the held 0.24.1 patch, now published)
+
+- **`dabblerSessionSets.copySlug` appears in the Session Set Explorer
+  right-click menu.** The command existed in `package.json` and
+  `copyCommand.ts` but was never added to `ROW_ACTIONS` in
+  `ActionRegistry.ts`. Added as a `flat` action; copies the raw
+  session-set slug to the clipboard.
+
 ## [0.24.1] — 2026-05-28 (patch — Copy Slug context menu item)
 
 ### Fixed

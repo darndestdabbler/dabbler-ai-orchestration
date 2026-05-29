@@ -72,13 +72,47 @@ is a required duplicate — `vsce package` expects the file alongside
 
 ## Extension versioning
 
-- Current: **v0.24.1** (patch — `Copy Slug` context menu item wired
+- Current: **v0.25.0** (Set 050 — Schema-drift guard + number-prefix
+  addressing; shipped end-to-end across 5 sessions; publishes the held
+  v0.24.1 Copy-Slug fix as part of the release). The guard the incident
+  required is a **pure-JS, no-`ai_router`, no-network drift scan** chained
+  after `start_session` in `scripts/claude-session-start-invoker.js`
+  (`CURRENT_SCHEMA_VERSION` constant + `scanSchemaDrift(workspaceRoot)`):
+  it reads `docs/session-sets/*/session-state.json`, compares each
+  `schemaVersion` to the bundled constant, and prints a terse one-line
+  drift summary into session context (clean = silent; fail-open on
+  unreadable/missing). A CI test (`test_invoker_schema_constant.py`) pins
+  the bundled JS constant to `ai_router`'s `SESSION_STATE_SCHEMA_VERSION`.
+  The `installOrchestratorHook.claudeCode` toast gained a "Copy manual
+  setup" action (invoker download URL + minimal `settings.json` stanza)
+  for repos without the extension / no router. The richer detect-only
+  `python -m ai_router.check_migrations` CLI + declarative advisory
+  `docs/schema-current.json` manifest live off the hot path. Feature 2
+  (number-prefix addressing): `python -m ai_router.resolve_set <n>` /
+  `--next` resolver + `start_session --session-set-dir <n>` bare-number
+  acceptance + a minimal `dabblerSessionSets.resolveSetNumber`
+  Command-Palette quick-input command (pure-TS `utils/resolveSetNumber.ts`
+  twin so router-less consumers get the handle); the authoring guide now
+  permits monotonic `NNN-` prefixes (required for new sets, recommended +
+  forward-only for consumers; semantic date/phase names still banned).
+  Explorer UX revision: the intrusive `(needs migration)` row description
+  is replaced by an unobtrusive asterisk + "Ran under schema v\<N\>"
+  tooltip, plus a single title-bar "Upgrade older session sets" icon
+  (gated on `dabblerSessionSets.hasSubCurrentSets`) running the corrected
+  **three**-migrator bulk chain (`migrate_session_state` →
+  `migrate_lightweight_to_canonical_v4` → `migrate_v3_to_v4`, each
+  `--in-place`) across all sub-current sets at once — the S2 empirical
+  correction, NOT the verdict's two (a genuine v2 file is skipped by both
+  v4 migrators and needs the v2→v3 step first). Companion PyPI release:
+  `dabbler-ai-router 0.12.0`.
+
+- Previous: **v0.24.1** (patch — `Copy Slug` context menu item wired
   into `ROW_ACTIONS`; command existed in `package.json` and
   `copyCommand.ts` since Set 048 S3 but was never added to
   `ActionRegistry.ts`; copies the raw session-set slug to the
   clipboard from the Explorer right-click menu top level).
 
-- Previous: **v0.24.0** (Set 049 — Orchestrator coordination
+- Pre-Previous: **v0.24.0** (Set 049 — Orchestrator coordination
   removal; full rip-out of the Set 033 H3 + Set 036 H4
   hard-coordination check shipped end-to-end across 5 sessions;
   `session-state.json` orchestrator block reshaped from 7 fields
@@ -270,19 +304,19 @@ is a required duplicate — `vsce package` expects the file alongside
     block) to the cancellation lifecycle. See below for the prior
     Set 035 description.
 
-- Pre-Previous: **v0.23.0** (Set 048 — Lightweight-tier parity.
+- Pre-Pre-Previous: **v0.23.0** (Set 048 — Lightweight-tier parity.
   Companion PyPI release: `dabbler-ai-router 0.10.0`). Full
   description preserved in the version walk above.
 
-- Pre-Pre-Previous: **v0.22.0** (Set 047 — state-file schema v4 audit.
+- Pre-Pre-Pre-Previous: **v0.22.0** (Set 047 — state-file schema v4 audit.
   Companion PyPI release: `dabbler-ai-router 0.9.0`). Full
   description preserved in the version walk above.
 
-- Pre-Pre-Pre-Previous: **v0.21.0** (Set 045 — log-harvest implementation.
+- Pre-Pre-Pre-Pre-Previous: **v0.21.0** (Set 045 — log-harvest implementation.
   Companion PyPI release: `dabbler-ai-router 0.8.0`). Full
   description preserved in the version walk above.
 
-- Pre-Pre-Pre-Pre-Previous: **v0.18.1** (Set 035 — state-file sole truth for
+- Pre-Pre-Pre-Pre-Pre-Previous: **v0.18.1** (Set 035 — state-file sole truth for
   cancellation/restoration; Marketplace publish gated on operator
   confirmation). No companion PyPI release this set
   (`ai_router/session_lifecycle.py` verified byte-equivalent with the

@@ -5,6 +5,31 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-05-29 (Set 050 — Schema-drift guard + number-prefix addressing)
+
+Ships the Python side of Set 050: a detect-only schema-drift scanner, a
+declarative advisory manifest, and a number→slug resolver. The pure-JS
+hot-path drift scan (the guard the incident actually required) lives in
+the extension's `claude-session-start-invoker.js`, not this package —
+it deliberately has **no `ai_router` dependency** so it still runs on a
+repo with an ancient pinned router. Companion VS Code Marketplace
+release: `DarndestDabbler.dabbler-ai-orchestration 0.25.0`.
+
+### Added (Set 050 S4 — number→slug resolver, Feature 2)
+
+- **`python -m ai_router.resolve_set`** — resolve a bare session-set
+  number to its full slug within `./docs/session-sets`. Exact
+  integer-prefix match with leading zeros normalized; collision names
+  both candidates; no-match lists the available numbers (no fuzzy
+  "nearest"). `<n>` resolves a number; `--next` prints the next
+  monotonic `NNN-` prefix (`max(existing)+1`, zero-padded to
+  `max(3, widest existing prefix)`, `001` if none); `--json` for
+  machine consumers. Backed by `resolve_slug` / `resolve_set` /
+  `next_session_set_number` / `resolve_session_set_dir` helpers.
+- **`start_session --session-set-dir <n>`** now accepts a bare number
+  (e.g. `50`) that resolves within `./docs/session-sets`; a path
+  argument passes through unchanged.
+
 ### Added (Set 050 S2 — schema-drift detection, detect-only)
 
 - **`python -m ai_router.check_migrations`** — a detect-only schema-drift

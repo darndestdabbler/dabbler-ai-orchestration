@@ -148,6 +148,53 @@
       "status": "complete",
       "routedApiCalls": [],
       "description": "S4 implemented Feature 2 (number-prefix addressing) AND the operator-reassigned Explorer UX revision. Feature 2 (verdict Q8-Q11): new ai_router/resolve_set.py exposes resolve_slug/resolve_set (exact integer-prefix match, leading zeros normalized, collision names both, no-match lists available numbers + --next; no fuzzy nearest), next_session_set_number (max(existing)+1 returned as int + zero-padded string, width=max(3, widest existing prefix)), resolve_session_set_dir (bare-number -> path; path passes through), and a standalone CLI (`python -m ai_router.resolve_set <n>` / `--next` / `--json`). start_session --session-set-dir now accepts a bare number ('50') that resolves within ./docs/session-sets. authoring guide reconciled: monotonic NNN- sequence prefix permitted (REQUIRED for new/scaffolded sets, RECOMMENDED + forward-only for consumer repos), semantic date/phase names still banned, new Numbering section documents max+1 + zero-pad width + no-mass-rename. Extension gained a minimal Command-Palette quick-input resolver command (dabblerSessionSets.resolveSetNumber) backed by a pure TS resolver (utils/resolveSetNumber.ts) mirroring the Python contract so a router-less Lightweight consumer still gets the handle. Explorer UX revision (operator-directed to S4; non-goal 'old schema is OK, no per-row nag'): the intrusive '(needs migration)' row description is replaced by an unobtrusive asterisk + 'Ran under schema v<N>' hover tooltip (SessionSetsModel.migrationMarker/migrationTooltip; schemaVersionOnDisk surfaced from fileSystem.ts; rendered in client.js + tree.css .row-migration-marker). A single title-bar 'Upgrade older session sets' icon (commands/upgradeOlderSets.ts), gated on the dabblerSessionSets.hasSubCurrentSets context key (set during scan from the pure hasSubCurrentSets predicate), runs the corrected THREE-migrator bulk chain (migrate_session_state -> migrate_lightweight_to_canonical_v4 -> migrate_v3_to_v4, each --in-place via Python subprocess) across all sub-current sets at once -- the S2 empirical correction, NOT the verdict's two. The per-row right-click 'Migrate to v3/v4 schema' actions are left intact (a manual option, not a standing nag). Verification (manual; cross-provider deferred to S5 per the per-set pattern S2/S3 followed): Python `python -m pytest` = 1025 passed / 1 skipped (15 new resolver tests + 2 new start_session integration tests, 0 regressions); TS `npm run test:unit` = 573 passing / 2 failing where BOTH failures (configEditor-foundation panel-lifecycle + notificationsSection stale Set-026 assertion) are pre-existing in files last touched in Set 026 commit c2a336f and unrelated to S4; tsc --noEmit clean; esbuild bundle clean; the new resolveSetNumber + migrationMarker suites pass. Layer-3 Playwright migration-cta specs updated to assert the asterisk + tooltip (not run locally -- Layer-3 launchVSCode is CI-fragile/slow on this host; the title-bar enabled/disabled gating is unit-tested via hasSubCurrentSets since the package.json `when` clause is declarative). No router invoked; $0 added to the $10 set NTE."
+    },
+    {
+      "dateTime": "2026-05-29T12:45:00-04:00",
+      "sessionNumber": 5,
+      "stepNumber": 1,
+      "stepKey": "session-005/consumer-rollout-notice",
+      "status": "complete",
+      "routedApiCalls": [],
+      "description": "Wrote docs/cross-repo-migration-guard-notice.md (paste-in for consumer CLAUDE.md): one-time setup (install the SessionStart drift guard via the extension command OR the router-less manual fallback -- invoker download URL + minimal settings.json stanza; raise the >=0.10.0 pin; run a one-time check_migrations + bulk-upgrade-on-drift), a self-contained copy-snippet (machine-enforced schema currency, raw GitHub URLs not blob, schemaVersion:4 stamp, omit-null, old-schema-is-OK no-nag posture, NNN- number-prefix addressing with resolve_set/--next), required-agent caveats, and a 2026-05-29 adoption-status table. Verified the referenced CLIs behave as documented: resolve_set --next -> 053, resolve_set 50 -> full slug, check_migrations exits 1 on older-schema drift (corrected an earlier mis-read: the `exit: 0` I first saw was head's exit code through a pipe, not python's -- real default exit is 1, --exit-zero forces 0)."
+    },
+    {
+      "dateTime": "2026-05-29T12:50:00-04:00",
+      "sessionNumber": 5,
+      "stepNumber": 2,
+      "stepKey": "session-005/harvester-first-adopter",
+      "status": "complete",
+      "routedApiCalls": [],
+      "description": "Confirmed harvester first-adopter status. dabbler-access-harvester: all 49 session sets now at schemaVersion 4 (0 needs-migration), router pin dabbler-ai-router>=0.10.0 in requirements.txt, CLAUDE.md carries the inlined 'Stamp schemaVersion:4 on every write' rule + raw-URL fetch guidance -- all done 2026-05-29 ahead of this set (the immediate incident unblock). The remaining adopter action is the one-time SessionStart hook install; because the hook lives in the SHARED GLOBAL ~/.claude/settings.json (the invoker walks up from cwd to find the in-progress set), installing it once covers the harvester and every other repo on the machine at once -- an operator-run machine-level action, not a per-repo commit. Other consumer repos' CLAUDE.md snippet paste-in remains operator-scoped per established cross-repo pattern."
+    },
+    {
+      "dateTime": "2026-05-29T12:55:00-04:00",
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "session-005/version-bumps-and-changelogs",
+      "status": "complete",
+      "routedApiCalls": [],
+      "description": "Dual version bumps + changelogs. dabbler-ai-router 0.11.0 -> 0.12.0 (pyproject.toml + ai_router/__init__.__version__); extension 0.24.1 -> 0.25.0 (package.json). ai_router/CHANGELOG.md: cut a [0.12.0] release header capturing S4 resolve_set (Feature 2) + the S2 check_migrations/manifest content (moved out of [Unreleased]). tools/.../CHANGELOG.md: new [0.25.0] entry (pure-JS drift scan + install path, resolveSetNumber command, upgradeOlderSets title-bar icon, Explorer asterisk/tooltip no-nag Change, plus the now-published held 0.24.1 Copy-Slug Fixed). CLAUDE.md Extension versioning: new Current v0.25.0 (Set 050) block; cascaded the Previous/Pre-Previous chain down one level each (0.24.1 -> Previous, 0.24.0 -> Pre-Previous, 0.23.0/0.22.0/0.21.0/0.18.1 each +1 'Pre-'). Created set-level change-log.md (per-session summary, commit hashes, costs). Full Python suite re-run after bumps: 1025 passed / 1 skipped / 0 regressions. No TS source changed in S5 (version+CHANGELOG only), so no rebuild needed -- S4 already confirmed tsc/esbuild clean."
+    },
+    {
+      "dateTime": "2026-05-29T13:00:00-04:00",
+      "sessionNumber": 5,
+      "stepNumber": 4,
+      "stepKey": "session-005/cross-provider-verification",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "role": "verifier",
+          "engine": "gemini-pro",
+          "provider": "google",
+          "model_id": "gemini-2.5-pro",
+          "costUsd": 0.0053,
+          "inputTokens": 1501,
+          "outputTokens": 344,
+          "verdict": "VERIFIED"
+        }
+      ],
+      "description": "Cross-provider IV&V of the S2-S5 deferred work (deferred to S5 by S2/S3/S4 per the per-set pattern). Verifier gemini-pro (google) -- different provider from the Claude orchestrator. Called providers.call_model directly with the PROVIDER-SCOPED config (cfg['providers']['google']) -- the full cfg lacks a top-level 'retry' key (it is nested per-provider), and this also sidesteps the recurring RouteResult.provider attribute trap. First call with max_tokens=4000 returned a candidate with no text parts (gemini-2.5-pro dynamic thinking consumed the whole budget -> KeyError 'parts'); fixed by max_tokens=16000 + thinking_budget=4096. Verdict VERIFIED: 0 critical; 2 important (both NOTED RISKS not defects: (a) three-step bulk migration safety relies on each migrator's idempotency -- already a documented/test-asserted invariant; (b) Python/TS resolver dual-impl drift risk -- acknowledged, convention-lint a future-set candidate); 1 nice-to-have (the 2 pre-existing Set-026 TS failures -- out of scope, predate this set). The verifier explicitly confirmed claim 2 (the empirically-corrected THREE-migrator chain vs the verdict's two) as 'a sound and empirically-validated correction' and called release discipline sound. No in-flight fix required. Record at s5-verification.md. Cost $0.0053 -> cumulative routed $0.2882/$10 NTE (2.9%)."
     }
   ]
 }

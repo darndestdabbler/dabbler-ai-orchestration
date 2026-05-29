@@ -18,7 +18,7 @@
     "model": "claude-opus-4-8",
     "effort": "high",
     "reason": {
-      "code": "scope-decision-pending",
+      "code": "other",
       "specifics": "S4 implements Feature 2 (NNN- prefix convention + two-surface number->slug resolver in ai_router and a minimal extension command) AND must absorb the carried scope decision: where the unassigned end-of-set 'Explorer UX revision' deliverable (asterisk/tooltip + bulk-upgrade title-bar icon) lands — S4 (natural fit, S4 already touches the extension) vs. S5. The cross-surface coordination (ai_router resolver + start_session integration + extension command + authoring-guide reconciliation + the corrected three-migrator bulk chain wired into a title-bar action) plus that open scope call warrant high effort."
     }
   }

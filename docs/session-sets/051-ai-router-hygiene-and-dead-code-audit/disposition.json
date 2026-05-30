@@ -1,25 +1,21 @@
 {
   "status": "completed",
-  "summary": "Set 051 Session 3 of 4 - retired the superseded Set 050 Claude SessionStart hook in the VS Code extension (verdict V10; spec S3). Re-verified the premise before deleting: Set 053's summarize_drift IS imported and called in both ai_router/start_session.py and close_session.py, so retiring the Claude-only hook loses no drift coverage -- it removes a redundant, divergence-prone duplicate (its scanSchemaDrift JS duplicated summarize_drift, and its start_session invocation was a non-load-bearing Claude-only convenience under the portability rule). Deleted 4 files: scripts/claude-session-start-invoker.js, src/commands/installOrchestratorHookClaudeCode.ts (installer command + 'Copy manual setup' toast), ai_router/tests/test_invoker_schema_constant.py (dead JS-constant pin), and src/test/suite/claudeSessionStartInvoker.test.ts (Layer-2 suite that dynamic-imports the deleted JS -- spec-implied consequence, flagged for S4 verifier). Removed the package.json command contribution + the extension.ts import/safeRegister wiring (rewrote the stale Set-049 comment); bumped the Q7 watcher-allowlist line 154->153 for the one-line import shift; recompiled the dist bundle. Reconciled docs as historical pointing at the Set 053 lifecycle advisory: CLAUDE.md (v0.25.0 retirement note), ai-led-session-workflow.md, session-state-schema.md, cross-repo-migration-guard-notice.md (superseded banner + neutralized install step). Created docs/cross-repo-hook-retirement-notice.md (consumer/operator remediation; does NOT edit machine settings). Verification MANUAL (spec quality bar = no regressions; cross-provider verification scoped to S4): Python 1028 passed / 1 skipped (-1 = deleted pin test); TS tsc clean + test:unit 554 passing with only the 2 known pre-existing Set-026 scaffolding failures. The close_session gate run itself emitted the Set 053 drift advisory (live-mechanism confirmation). S3 invoked no router -- $0 routed; cumulative $0.0272/$10.",
-  "verification_method": "manual",
+  "summary": "Set 051 Session 4 of 4 (FINAL) -- docs + changelog + dual version bumps + cross-provider verification + set close-out. CHANGELOGs: ai_router/CHANGELOG.md [0.14.0] (joiner/dabbler_launch island removal, D3 salvage to writer_discipline.py, backfill entry-point retirement, stray-test relocation + the 3 latent utility fixes, wheel/entry-point regression guards, MIGRATIONS.md, dependency audit) and extension CHANGELOG.md [0.26.0] (Claude SessionStart hook retirement). Dual version bumps: dabbler-ai-router 0.13.0 -> 0.14.0 (pyproject.toml + ai_router/__init__.__version__); extension 0.25.0 -> 0.26.0 (package.json + package-lock.json both nodes). Version reconciliation recorded in both CHANGELOGs + the CLAUDE.md walk: ai_router 0.13.0 was claimed by Set 053 (lifecycle summarize_drift) and was NEVER tagged/published to PyPI (last published v0.12.0), so the single 0.12.0 -> 0.14.0 PyPI release carries both sets' changes with separate CHANGELOG entries; extension 0.25.0 is Set 050's (vsix-v0.25.0 tag exists) so Set 051's hook retirement takes 0.26.0. CLAUDE.md Extension-versioning walk restructured (new Current v0.26.0 covering both halves; the Current -> Previous -> Pre-...-Previous chain cascaded down one level across 7 labels; companion-PyPI references updated). V8 live-docs reconciliation finished: corrected the remaining present-tense ai_router/joiner/ references S2's island deletion left stale -- CLAUDE.md (post-Set-049 contract section now points D3 at ai_router/writer_discipline.py; historical Set-049 walk entry notes the joiner deletion) and docs/ai-led-session-workflow.md (D3-survives paragraph + Set-045-Explorer paragraph); narration-templates.md + cross-repo-harvest-notice.md already carried Set 051 removed banners from S2. Created set-level change-log.md. CROSS-PROVIDER VERIFICATION: gemini-pro (google/gemini-2.5-pro) via providers.call_model with the provider-scoped config (full cfg lacks top-level 'retry'; also sidesteps the RouteResult.provider trap), thinking_budget=6000, max_tokens=16000, given the ACTUAL code (old joiner/conflicts.py vs new writer_discipline.py + the S2 packaging diff) with each deviation framed neutrally. VERDICT VERIFIED: 0 critical, 0 important -- confirmed the D3 salvage is 'almost perfectly behavior-preserving ... identical core logic', the V3 retire-not-repoint of the backfill entry point is 'correct and justified', the V4 relocate-and-fix of the stray tests is 'correct and justified ... a legitimate exception for code demonstrably not live because it was broken', and both S3 spec-implied actions (deleting claudeSessionStartInvoker.test.ts; bumping the watcher-allowlist line 154->153) are working as designed. 1 nice-to-have (the salvaged report note string changed from unicode +-2s to ASCII) KEPT deliberately -- reverting would reintroduce the documented Windows cp1252 console-crash gotcha (Set 050 S2); detection behavior is unchanged. Record at s4-verification.md. Tests: full Python suite 1028 passed / 1 skipped / 0 regressions; TS tsc --noEmit clean + test:unit 554 passing with only the 2 known pre-existing Set-026 stub-harness failures (no TS source changed in S4); vsce package clean at 0.26.0 (21 files, 930 KB). Cost: S4 routed the single verification call $0.0219 (9242 in / 1031 out); cumulative Set 051 routed $0.0491 of $10 NTE (0.49%) -- $0.0272 S1 + $0.0219 S4 (S2 + S3 invoked no router). This is the final session; close_session flips the set's top-level status to complete. Publishes HELD for operator-initiated tag-push: PyPI v0.14.0 (release.yml) + Marketplace vsix-v0.26.0 (publish-vscode.yml) -- confirm VSCE_PAT freshness first (it expired 2026-05-28).",
+  "verification_method": "cross-provider",
   "files_changed": [
-    "tools/dabbler-ai-orchestration/scripts/claude-session-start-invoker.js",
-    "tools/dabbler-ai-orchestration/src/commands/installOrchestratorHookClaudeCode.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/claudeSessionStartInvoker.test.ts",
-    "ai_router/tests/test_invoker_schema_constant.py",
-    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "ai_router/CHANGELOG.md",
+    "pyproject.toml",
+    "ai_router/__init__.py",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
     "tools/dabbler-ai-orchestration/package.json",
-    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
-    "tools/dabbler-ai-orchestration/dist/extension.js",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/package-lock.json",
     "CLAUDE.md",
     "docs/ai-led-session-workflow.md",
-    "docs/session-state-schema.md",
-    "docs/cross-repo-migration-guard-notice.md",
-    "docs/cross-repo-hook-retirement-notice.md",
-    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/s3-close-reason.md",
-    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/disposition.json",
-    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/activity-log.json"
+    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/change-log.md",
+    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/s4-verification.md",
+    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/s4-close-reason.md",
+    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/activity-log.json",
+    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/disposition.json"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -28,8 +24,8 @@
     "model": "claude-opus-4-8",
     "effort": "high",
     "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "S4 is the final session: reconcile ai_router/CHANGELOG.md + any docs still naming removed surfaces + CLAUDE.md (restructure the version walk for the new bump); dual version bumps -- PyPI dabbler-ai-router (S2 joiner/packaging removals) AND the VS Code Marketplace extension (S3 hook retirement) -- plus change-log.md; run cross-provider verification of the whole set (it must scrutinize the S2 V3/V4 deviations AND the S3 spec-implied deletion of claudeSessionStartInvoker.test.ts + the watcher-allowlist line bump); close-out; both publishes HELD for operator-initiated tag-push (PyPI v<X.Y.Z> + Marketplace vsix-v<X.Y.Z>). Same Claude/Opus orchestrator keeps continuity of the removal-arc context. NOTE: confirm VSCE_PAT freshness before the Marketplace tag-push (it expired during the 0.24.0 publish)."
+      "code": "other",
+      "specifics": "Final session of Set 051 -- no next session. Set complete: close_session flips the top-level status to complete. Operator follow-ups (out of session scope): (1) push the held publish tags v0.14.0 (PyPI, release.yml OIDC) and vsix-v0.26.0 (Marketplace, publish-vscode.yml) after confirming VSCE_PAT freshness (it expired 2026-05-28); (2) consumer repos that installed the Claude SessionStart hook should remove the dabbler SessionStart entry from ~/.claude/settings.json per docs/cross-repo-hook-retirement-notice.md -- schema-drift coverage now rides the router lifecycle (summarize_drift in start_session/close_session) automatically. Sets 052 (cost-metrics icon redesign) + 053 (CI-agnostic drift enforcement -- already shipped S1+S2) remain; 052 is stubbed (audit-then-spec, not started)."
     }
   }
 }

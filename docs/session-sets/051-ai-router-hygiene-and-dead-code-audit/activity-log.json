@@ -38,8 +38,24 @@
       "description": "Cross-provider adversarial consensus on the contested calls (gemini-pro + gpt-5-4, independent, $0.0272). Unanimous-agree: Q1 delete island, Q4 keep migrator split, Q5 add wheel-contents test, delete-not-archive. BOTH providers' #1 objection, independently: do NOT delete the D3 writer-bypass detector as collateral (Set 049 deliberately retained it) -> V2 SALVAGE into a new live ai_router/writer_discipline.py + test before deleting the island (operator-confirmed salvage). Q6 DISPOSITION CHANGED: drop the migrate --from/--to front door (over-engineering) -> docstrings + MIGRATIONS.md + optional migrate_to_latest(). Added V8 live-docs reconciliation + V9 dependency audit from the panel's gap-checks. INCIDENT (corrected same session): consensus artifacts were first drafted in the same batch as the runner with fabricated costs/verdicts; overwritten with verbatim output + integrity notes; feedback banked to memory. Locked verdict.md V1-V10.",
       "status": "complete",
       "routedApiCalls": [
-        {"role": "reviewer", "engine": "gemini-pro", "provider": "google", "model_id": "gemini-2.5-pro", "costUsd": 0.0089, "inputTokens": 1532, "outputTokens": 702},
-        {"role": "reviewer", "engine": "gpt-5-4", "provider": "openai", "model_id": "gpt-5.4", "costUsd": 0.0183, "inputTokens": 1409, "outputTokens": 986}
+        {
+          "role": "reviewer",
+          "engine": "gemini-pro",
+          "provider": "google",
+          "model_id": "gemini-2.5-pro",
+          "costUsd": 0.0089,
+          "inputTokens": 1532,
+          "outputTokens": 702
+        },
+        {
+          "role": "reviewer",
+          "engine": "gpt-5-4",
+          "provider": "openai",
+          "model_id": "gpt-5.4",
+          "costUsd": 0.0183,
+          "inputTokens": 1409,
+          "outputTokens": 986
+        }
       ]
     },
     {
@@ -122,6 +138,34 @@
       "description": "Verification MANUAL (spec quality bar = no extension/Python regressions; cross-provider verification scoped to S4). Python: pytest 1028 passed / 1 skipped (was 1029; -1 = deleted test_invoker_schema_constant.py). TypeScript: tsc --noEmit clean; test:unit 554 passing, 2 failing (the known pre-existing Set-026 scaffolding failures: configEditor panel-lifecycle + notificationsSection rendering -- unrelated to the hook; both watcher tests now pass). package.json re-validated as well-formed JSON. The close_session gate run itself emitted the Set 053 drift advisory (46 sets below v4, advisory-only) -- live-mechanism confirmation. Code committed d533b28 + pushed. S3 invoked no router -- $0 routed; cumulative $0.0272 of $10 NTE.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/docs-changelog-version-bumps",
+      "dateTime": "2026-05-30T06:30:00-04:00",
+      "description": "Docs + dual version bumps. ai_router/CHANGELOG.md [0.14.0] (joiner/dabbler_launch island removal, D3 salvage to writer_discipline.py, backfill entry-point retirement, stray-test relocation + 3 latent fixes, wheel/entry-point guards, MIGRATIONS.md, dependency audit) + bump pyproject.toml + __init__.__version__ 0.13.0->0.14.0. Extension CHANGELOG.md [0.26.0] (Claude SessionStart hook retirement) + package.json/package-lock.json 0.25.0->0.26.0. Version reconciliation: ai_router 0.13.0 was Set 053's (never tagged to PyPI; last published v0.12.0) so the single 0.12.0->0.14.0 release carries both sets; extension 0.25.0 is Set 050's (vsix-v0.25.0 tag exists) so the hook retirement takes 0.26.0. CLAUDE.md version walk restructured (new Current v0.26.0; 7-label Pre-...-Previous cascade). V8 live-docs reconciliation finished: corrected stale present-tense ai_router/joiner/ refs in CLAUDE.md + ai-led-session-workflow.md to point D3 at writer_discipline.py (narration-templates.md + cross-repo-harvest-notice.md already had Set 051 removed banners from S2). Created set-level change-log.md.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-004/cross-provider-verification",
+      "dateTime": "2026-05-30T06:35:00-04:00",
+      "description": "Cross-provider whole-set verification. gemini-pro (google/gemini-2.5-pro) via providers.call_model with provider-scoped config, thinking_budget=6000, max_tokens=16000; given the actual code (old joiner/conflicts.py vs new writer_discipline.py + the S2 packaging diff) with each deviation framed neutrally. VERDICT: VERIFIED -- 0 critical, 0 important. Confirmed: D3 salvage 'almost perfectly behavior-preserving ... identical core logic'; V3 retire-not-repoint backfill entry point 'correct and justified'; V4 relocate-and-fix the stray tests 'correct and justified ... legitimate exception for code demonstrably not live because it was broken'; S3 deletion of claudeSessionStartInvoker.test.ts + the watcher-allowlist line bump both 'working as designed'. 1 nice-to-have (salvaged report note string +-2s ASCII vs original unicode) KEPT deliberately -- reverting would reintroduce the documented Windows cp1252 console-crash gotcha (Set 050 S2); detection behavior unchanged. Record at s4-verification.md. Suite: Python 1028 pass/1 skip/0 regressions; TS tsc clean + test:unit 554 pass/2 known-pre-existing-Set-026 fails; vsce package clean at 0.26.0 (21 files, 930 KB).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "role": "reviewer",
+          "engine": "gemini-pro",
+          "provider": "google",
+          "model_id": "gemini-2.5-pro",
+          "costUsd": 0.0219,
+          "inputTokens": 9242,
+          "outputTokens": 1031
+        }
+      ]
     }
   ]
 }

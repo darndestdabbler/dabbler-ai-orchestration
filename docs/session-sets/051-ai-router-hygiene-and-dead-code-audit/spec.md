@@ -60,6 +60,16 @@ subsystem plus packaging bugs:
   `migrate_lightweight_to_canonical_v4`, `migrate_router_config`) — all
   currently used, each distinct; reviewed here for *consolidation
   opportunity only*, not assumed dead.
+- **Superseded Claude `SessionStart` hook (extension).** Set 053 moved
+  schema-drift detection into the router lifecycle (`start_session` /
+  `close_session` via `summarize_drift`), which fires for every
+  orchestrator on every host. That makes the Set 050 Claude-only hook
+  (`claude-session-start-invoker.js` + its installer) redundant — its
+  `scanSchemaDrift` JS duplicates 053's `summarize_drift` (and the two
+  messages can diverge), and its `start_session` invocation is a
+  non-load-bearing Claude-only convenience under the portability rule.
+  Retired in S3. (Extension change → Marketplace release, distinct from
+  the ai_router PyPI release.)
 
 ### Confirmed-still-used (do NOT touch — recorded so the audit doesn't re-litigate)
 
@@ -71,8 +81,11 @@ subsystem plus packaging bugs:
 
 ### Non-goals
 
-- **No behavior changes** to any live code path. This is deletion +
-  packaging + relocation only.
+- **No behavior changes** to any live *ai_router* code path. This is
+  deletion + packaging + relocation only. (The S3 Claude-hook retirement
+  is the one deliberate behavior change — it removes a superseded,
+  non-load-bearing convenience whose drift role Set 053 already covers;
+  see S3.)
 - **No migrator rewrites.** Consolidation is *evaluated* and, if
   proposed, scoped as a follow-on — not executed here unless the S1
   audit judges it low-risk and bundles it explicitly.
@@ -119,16 +132,21 @@ subsystem plus packaging bugs:
 
 ## Sessions
 
-### Session 1 of 3: Audit & removal plan
+### Session 1 of 4: Audit & removal plan
 
 **Steps:**
 1. Register the set; re-run the usage scan fresh (modules with no live
    caller; entry-point resolution; wheel contents).
 2. Prove or disprove the joiner/dabbler_launch orphan claim across the
    extension, hooks, entry points, and all consumer repos.
-3. Cross-provider consensus on the five open questions (delete vs.
+3. Cross-provider consensus on the open questions (delete vs.
    archive being the load-bearing one). Produce `proposal.md` + verdict.
-4. Lock the exact removal/relocation list for S2.
+4. Confirm + scope the Claude `SessionStart` hook retirement (drift scan
+   superseded by Set 053's lifecycle `summarize_drift`; `start_session`
+   invocation a non-load-bearing Claude-only convenience). Bless the S3
+   removal list.
+5. Lock the exact removal/relocation list for S2 + the hook-retirement
+   list for S3.
 
 **Creates:** `docs/proposals/2026-05-29-ai-router-hygiene/proposal.md` + verdict.
 **Touches:** this `spec.md` (scope-lock).
@@ -136,7 +154,7 @@ subsystem plus packaging bugs:
 zero-live-caller citation per item.
 **Progress keys:** S1 audit verdict committed; removal list locked.
 
-### Session 2 of 3: Execute removals + packaging fixes
+### Session 2 of 4: Execute removals + packaging fixes
 
 **Steps:**
 1. Remove (or archive, per S1) the joiner/dabbler_launch island and its
@@ -154,20 +172,60 @@ zero-live-caller citation per item.
 carries no tests; suite green.
 **Progress keys:** removals done; packaging fixed; suite green.
 
-### Session 3 of 3: Docs, changelog, close-out
+### Session 3 of 4: Retire the superseded Claude SessionStart hook
+
+The Set 050 Claude `SessionStart` hook is now redundant: Set 053 moved
+schema-drift detection into the router lifecycle (`start_session` /
+`close_session` via `summarize_drift`), which fires for every
+orchestrator on every host. The hook's `scanSchemaDrift` JS duplicates
+that (and the two messages can diverge); its `start_session` invocation
+only auto-registers on resume of an already-in-progress set and is a
+Claude-only convenience the universal workflow does not depend on.
+
+**Steps:**
+1. Delete `tools/dabbler-ai-orchestration/scripts/claude-session-start-invoker.js`.
+2. Remove the extension hook-installer surface: the
+   `installOrchestratorHook.claudeCode` command + its "Copy manual
+   setup" toast/action (Set 050), the `package.json` command
+   registration, and any `extension.ts` wiring.
+3. Remove the now-dead `test_invoker_schema_constant.py` (it pins the
+   deleted JS constant — the one ai_router/Python item in the hook
+   surface).
+4. Rewrite the CLAUDE.md / docs passages that describe the hook drift
+   scan + installer as historical, pointing at Set 053's lifecycle
+   advisory as the live mechanism.
+5. Provide a consumer-repo + operator remediation note (remove the
+   `~/.claude/settings.json` `SessionStart` entries; the router
+   lifecycle covers drift now). Do NOT edit the operator's machine
+   settings from here — document the removal.
+6. Run the suite; confirm no extension/Python regressions.
+
+**Creates:** consumer/operator hook-removal note.
+**Touches:** extension JS + installer command + `package.json` + docs +
+`CLAUDE.md`; `ai_router/scripts/test_invoker_schema_constant.py` (delete).
+**Ends with:** the superseded hook gone; drift coverage rides the Set
+053 lifecycle only; no duplicate/divergent drift messaging.
+**Progress keys:** hook + installer removed; dead test removed; docs
+reconciled.
+
+### Session 4 of 4: Docs, changelog, version bumps, close-out
 
 **Steps:**
 1. Update `ai_router/CHANGELOG.md`, any docs that reference the removed
    joiner CLI as live (rewrite as historical), and `CLAUDE.md` if it
    names removed surfaces.
-2. Version bump (PyPI `dabbler-ai-router`); change-log.md.
-3. Cross-provider verification; close-out; publish **held** for
-   operator-initiated tag-push.
+2. Version bumps: PyPI `dabbler-ai-router` (joiner/packaging removals)
+   AND the VS Code Marketplace extension (hook retirement, S3);
+   change-log.md.
+3. Cross-provider verification; close-out; both publishes **held** for
+   operator-initiated tag-push (PyPI `v<X.Y.Z>` + Marketplace
+   `vsix-v<X.Y.Z>`).
 
 **Creates:** `change-log.md`.
-**Touches:** `ai_router/CHANGELOG.md`, docs, `pyproject.toml`, `CLAUDE.md`.
-**Ends with:** docs reconciled; version bumped; publish queued.
-**Progress keys:** docs updated; version bumped; close-out verdict recorded.
+**Touches:** `ai_router/CHANGELOG.md`, docs, `pyproject.toml`,
+`tools/dabbler-ai-orchestration/package.json`, `CLAUDE.md`.
+**Ends with:** docs reconciled; both versions bumped; dual publish queued.
+**Progress keys:** docs updated; versions bumped; close-out verdict recorded.
 
 ---
 
@@ -180,4 +238,9 @@ carries no tests; suite green.
   ships no tests.
 - Wheel-contents regression test guarding against regrowth.
 - Migrator-consolidation recommendation (execute only if S1 bundles it).
-- CHANGELOG + change-log + version bump; publish held for operator.
+- Superseded Claude `SessionStart` hook retired (S3): invoker JS +
+  installer command + dead `test_invoker_schema_constant.py` removed;
+  drift coverage rides Set 053's lifecycle advisory; consumer/operator
+  remediation note provided.
+- CHANGELOG + change-log + version bumps (PyPI `dabbler-ai-router` +
+  Marketplace extension); both publishes held for operator tag-push.

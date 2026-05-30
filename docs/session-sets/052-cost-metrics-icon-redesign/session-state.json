@@ -20,10 +20,15 @@
     {
       "number": 2,
       "title": "Session 2",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-05-30T07:52:04.879276-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-4-8",
+        "effort": "high"
+      },
       "verificationVerdict": null
     },
     {

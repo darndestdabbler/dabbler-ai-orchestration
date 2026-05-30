@@ -7,18 +7,21 @@
     "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/session-state.json",
     "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/s1-close-reason.md",
     "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/disposition.json",
+    "docs/session-sets/051-ai-router-hygiene-and-dead-code-audit/activity-log.json",
     "docs/proposals/2026-05-29-ai-router-hygiene/proposal.md",
     "docs/proposals/2026-05-29-ai-router-hygiene/verdict.md",
     "docs/proposals/2026-05-29-ai-router-hygiene/consensus-output.md",
     "docs/proposals/2026-05-29-ai-router-hygiene/run_consensus.py"
   ],
+  "verification_message_ids": [],
   "next_orchestrator": {
     "engine": "claude",
     "provider": "anthropic",
     "model": "claude-opus-4-8",
-    "effort": "high"
-  },
-  "next_session_number": 2,
-  "reason": "normal-completion",
-  "next_session_focus": "Execute the ai_router removals + packaging fixes per verdict.md V1-V9: salvage D3 into ai_router/writer_discipline.py + test (V2), then delete the joiner island + dabbler_launch.py + 7 dead tests (V1), repoint the backfill entry point + add an entry-point import test (V3), move the 2 stray scripts/ tests to tests/ (V4), keep the 4 migrators (V5), add the wheel-contents regression test (V6), migrator docstrings + MIGRATIONS.md + optional migrate_to_latest() (V7), reconcile live docs that name the removed CLIs (V8), dependency audit (V9). Tag the removal commit pre-joiner-removal. Run the full suite; confirm green minus removed tests."
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "S2 executes the ai_router removals + packaging fixes per verdict.md V1-V9: salvage D3 into ai_router/writer_discipline.py + test (V2), then delete the joiner island + dabbler_launch.py + 7 dead tests (V1, tag the removal commit pre-joiner-removal), repoint the backfill entry point + add an entry-point import test (V3), move the 2 stray scripts/ tests to tests/ (V4), keep the 4 migrators (V5), add the wheel-contents regression test (V6), migrator docstrings + MIGRATIONS.md + optional migrate_to_latest() (V7), reconcile live docs naming the removed CLIs (V8), dependency audit (V9). Same Claude/Opus orchestrator keeps continuity of the audit context."
+    }
+  }
 }

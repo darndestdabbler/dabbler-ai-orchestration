@@ -1,0 +1,55 @@
+{
+  "sessionSetName": "051-ai-router-hygiene-and-dead-code-audit",
+  "createdDate": "2026-05-29",
+  "totalSessions": 4,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/register-and-scope",
+      "dateTime": "2026-05-29T22:27:16-04:00",
+      "description": "Registered S1 via python -m ai_router.start_session (engine=claude, provider=anthropic, model=claude-opus-4-8). Re-read the 051 stub spec + state. Studied Set 053 at operator direction: confirmed its lifecycle-embedded drift advisory (start_session/close_session -> summarize_drift) supersedes the Set 050 Claude SessionStart hook's drift scan, and the hook's start_session invocation is a non-load-bearing Claude-only convenience. Recovered the 051 state file (a transient read had shown it empty) to its committed 752-byte not-started stub.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/add-hook-retirement-session",
+      "dateTime": "2026-05-29T22:35:00-04:00",
+      "description": "Operator directed adding a dedicated session for the hook retirement before proceeding. Expanded the set 3 -> 4 sessions: S1 audit, S2 ai_router removals+packaging, S3 Claude SessionStart hook retirement (extension -> Marketplace release), S4 docs + dual version bump + close-out. Updated spec.md (motivation, non-goals carve-out, session list, end-of-set deliverables) and session-state.json (added session 4).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/audit-and-caller-trace",
+      "dateTime": "2026-05-29T22:42:00-04:00",
+      "description": "Audit + zero-live-caller trace. joiner/ (7 files, ~1610 LOC) + dabbler_launch.py (259 LOC) + 7 dead tests (~1828 LOC) = 15 files / ~3,734 LOC removable. Verified: no ai_router-internal import of joiner/dabbler_launch outside the island + its own tests; no [project.scripts]/toml/yaml entry point; extension src/ has only 2 stale doc-COMMENT mentions (no live import); consumer repos reference them only in .venv site-packages, never in source. Packaging defects confirmed: broken backfill entry point (module under scripts/, has main()); 2 stray scripts/ test_*.py ship in the wheel. Wrote proposal.md.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/cross-provider-consensus",
+      "dateTime": "2026-05-29T22:51:00-04:00",
+      "description": "Cross-provider adversarial consensus on the contested calls (gemini-pro + gpt-5-4, independent, $0.0272). Unanimous-agree: Q1 delete island, Q4 keep migrator split, Q5 add wheel-contents test, delete-not-archive. BOTH providers' #1 objection, independently: do NOT delete the D3 writer-bypass detector as collateral (Set 049 deliberately retained it) -> V2 SALVAGE into a new live ai_router/writer_discipline.py + test before deleting the island (operator-confirmed salvage). Q6 DISPOSITION CHANGED: drop the migrate --from/--to front door (over-engineering) -> docstrings + MIGRATIONS.md + optional migrate_to_latest(). Added V8 live-docs reconciliation + V9 dependency audit from the panel's gap-checks. INCIDENT (corrected same session): consensus artifacts were first drafted in the same batch as the runner with fabricated costs/verdicts; overwritten with verbatim output + integrity notes; feedback banked to memory. Locked verdict.md V1-V10.",
+      "status": "complete",
+      "routedApiCalls": [
+        {"role": "reviewer", "engine": "gemini-pro", "provider": "google", "model_id": "gemini-2.5-pro", "costUsd": 0.0089, "inputTokens": 1532, "outputTokens": 702},
+        {"role": "reviewer", "engine": "gpt-5-4", "provider": "openai", "model_id": "gpt-5.4", "costUsd": 0.0183, "inputTokens": 1409, "outputTokens": 986}
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/close-out",
+      "dateTime": "2026-05-29T23:00:00-04:00",
+      "description": "S1 close-out: wrote s1-close-reason.md, disposition.json (status=completed, verification_method=manual -- audit/design session, consensus served as the design review, operator made the final D3 call), and this activity-log.json. Committed + pushed S1 artifacts. close_session --manual-verify flips session 1 -> complete; set 051 stays in-progress for S2. Routed cost $0.0272 of $10 NTE (0.27%).",
+      "status": "complete",
+      "routedApiCalls": []
+    }
+  ]
+}

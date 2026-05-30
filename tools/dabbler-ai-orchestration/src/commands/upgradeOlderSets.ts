@@ -31,6 +31,11 @@ import * as cp from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { discoverRoots } from "../utils/fileSystem";
+import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
+import {
+  isAiRouterNotInstalled,
+  describeAiRouterImportFailure,
+} from "../utils/aiRouterInstall";
 
 interface CommandDeps {
   refreshView: () => void;
@@ -46,17 +51,6 @@ export const BULK_UPGRADE_MODULES: readonly string[] = [
 ];
 
 const SESSION_SETS_REL = path.join("docs", "session-sets");
-
-function resolvePythonPath(): string {
-  const cfg = vscode.workspace.getConfiguration("dabblerSessionSets");
-  const inspected = cfg.inspect<string>("pythonPath");
-  const raw =
-    inspected?.workspaceFolderValue ??
-    inspected?.workspaceValue ??
-    inspected?.globalValue ??
-    "python";
-  return (raw || "python").trim() || "python";
-}
 
 function runMigrator(
   pythonPath: string,
@@ -90,6 +84,12 @@ function runMigrator(
       if (spawnErrored) return;
       if (code === 0) {
         resolve({ ok: true, module, detail: summarizeJson(stdout) });
+      } else if (isAiRouterNotInstalled(stderr)) {
+        resolve({
+          ok: false,
+          module,
+          detail: describeAiRouterImportFailure(pythonPath),
+        });
       } else {
         resolve({
           ok: false,
@@ -145,7 +145,6 @@ export function registerUpgradeOlderSetsCommand(
         );
         if (confirm !== "Upgrade") return;
 
-        const pythonPath = resolvePythonPath();
         await vscode.window.withProgress(
           {
             location: vscode.ProgressLocation.Notification,
@@ -156,6 +155,9 @@ export function registerUpgradeOlderSetsCommand(
             const failures: string[] = [];
             const summaries: string[] = [];
             for (const root of roots) {
+              // Resolve per-root: each workspace root may carry its own
+              // `.venv`, and venv auto-detection keys off the root.
+              const pythonPath = resolvePythonInterpreter(root);
               for (const module of BULK_UPGRADE_MODULES) {
                 progress.report({ message: `${path.basename(root)}: ${module}` });
                 const res = await runMigrator(pythonPath, module, root);

@@ -16,6 +16,11 @@ import {
   applyPatch,
   emptyLocalOverridesDoc,
 } from "./patch";
+import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
+import {
+  isAiRouterNotInstalled,
+  describeAiRouterImportFailure,
+} from "../utils/aiRouterInstall";
 
 type LoadedFile = "router-config.yaml" | "budget.yaml" | "local-overrides.yaml";
 
@@ -696,12 +701,10 @@ export class ConfigEditorPanel {
       return;
     }
 
-    const pythonPath = (
-      (vscode.workspace.getConfiguration("dabblerSessionSets").inspect<string>("pythonPath")?.workspaceFolderValue ??
-        vscode.workspace.getConfiguration("dabblerSessionSets").inspect<string>("pythonPath")?.workspaceValue ??
-        vscode.workspace.getConfiguration("dabblerSessionSets").inspect<string>("pythonPath")?.globalValue) ||
-      "python"
-    ).trim() || "python";
+    // `path.dirname(aiRouterDir)` is the workspace root; resolve through
+    // the shared helper so an unset pythonPath auto-detects `<root>/.venv`
+    // instead of falling straight to a system `python` without ai_router.
+    const pythonPath = resolvePythonInterpreter(path.dirname(aiRouterDir));
 
     const script = [
       "import json, sys",
@@ -742,6 +745,12 @@ export class ConfigEditorPanel {
           vscode.window.showErrorMessage(`Test notification failed: ${result.error ?? "unknown error"}`);
         }
       } catch {
+        if (isAiRouterNotInstalled(stderr)) {
+          vscode.window.showErrorMessage(
+            `Test notification failed — ${describeAiRouterImportFailure(pythonPath)}`,
+          );
+          return;
+        }
         const detail = stderr.trim() || stdout.trim() || "no output";
         vscode.window.showErrorMessage(`Test notification failed — unexpected Python output: ${detail}`);
       }

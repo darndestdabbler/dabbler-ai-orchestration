@@ -11,6 +11,7 @@ import {
   ProcessSpawner,
   ROUTER_CONFIG_REL,
 } from "../utils/aiRouterInstall";
+import { resolveExplicitPythonPath } from "../utils/pythonInterpreter";
 
 /**
  * VS Code wiring for the ``Dabbler: Install ai-router`` and
@@ -43,7 +44,10 @@ async function runInstallFlow(mode: "install" | "update"): Promise<void> {
     );
     return;
   }
-  const pythonPath = resolvePythonPath(root);
+  // The install command's interpreter is a *bootstrap* that builds the
+  // venv, so it must NOT auto-detect an existing `.venv` (that would defeat
+  // a fresh install). Use the explicit-or-bare resolver.
+  const pythonPath = resolveExplicitPythonPath(root);
   const repoUrl = resolveAiRouterRepoUrl();
 
   const outcome = await vscode.window.withProgress(
@@ -98,44 +102,6 @@ function resolveAiRouterRepoUrl(): string | undefined {
   const cfg = vscode.workspace.getConfiguration("dabblerSessionSets");
   const raw = (cfg.get<string>("aiRouterRepoUrl") ?? "").trim();
   return raw === "" ? undefined : raw;
-}
-
-function resolvePythonPath(workspaceRoot: string): string {
-  // Install command reads ``dabblerSessionSets.pythonPath``, falling
-  // back to bare ``"python"`` on PATH.
-  //
-  // Use ``inspect()`` to distinguish "operator explicitly set it" from
-  // "the contributed default fired" — `getConfiguration().get()` can't
-  // tell the difference, so a naive `?? next` chain would never reach
-  // the fallback. Round-6 verifier catch.
-  const raw = (
-    explicitConfigValue("dabblerSessionSets", "pythonPath") ??
-    "python"
-  ).trim();
-  if (!raw) return "python";
-  if (path.isAbsolute(raw)) return raw;
-  if (raw.includes(path.sep) || raw.includes("/")) {
-    return path.resolve(workspaceRoot, raw);
-  }
-  return raw;
-}
-
-/**
- * Read a configuration value only if the operator has actually set it
- * (workspace-folder, workspace, or global scope). Returns ``undefined``
- * when only the contributed default is in effect, so callers can fall
- * through to the next setting.
- */
-function explicitConfigValue(section: string, key: string): string | undefined {
-  const cfg = vscode.workspace.getConfiguration(section);
-  const inspected = cfg.inspect<string>(key);
-  if (!inspected) return undefined;
-  return (
-    inspected.workspaceFolderValue ??
-    inspected.workspaceValue ??
-    inspected.globalValue ??
-    undefined
-  );
 }
 
 function makeSpawner(): ProcessSpawner {

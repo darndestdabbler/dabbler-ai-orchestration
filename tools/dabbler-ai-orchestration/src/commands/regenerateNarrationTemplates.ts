@@ -22,6 +22,11 @@ import * as path from "path";
 import * as vscode from "vscode";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { SessionSet } from "../types";
+import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
+import {
+  isAiRouterNotInstalled,
+  describeAiRouterImportFailure,
+} from "../utils/aiRouterInstall";
 
 const COMMAND_ID = "dabbler.regenerateNarrationTemplates";
 
@@ -53,7 +58,7 @@ async function runRegenerate(): Promise<void> {
   const set = await pickSet(inProgress);
   if (!set) return;
 
-  const pythonPath = resolvePythonPath(set.root);
+  const pythonPath = resolvePythonInterpreter(set.root);
   const outDir = path.join(set.dir, "narration-templates");
   fs.mkdirSync(outDir, { recursive: true });
   const claudeOut = path.join(outDir, "CLAUDE.md");
@@ -220,6 +225,9 @@ function renderTemplate(
   }
   if (result.status !== 0) {
     const stderr = (result.stderr ?? "").trim() || "(no stderr output)";
+    if (isAiRouterNotInstalled(stderr)) {
+      return { ok: false, message: describeAiRouterImportFailure(pythonPath) };
+    }
     return {
       ok: false,
       message: `python -m ai_router.narration exited ${result.status}: ${stderr}`,
@@ -234,20 +242,3 @@ function renderTemplate(
   return { ok: true, message: args.outputPath };
 }
 
-function resolvePythonPath(workspaceRoot: string): string {
-  // Mirrors the pythonPath resolver used by installAiRouterCommands
-  // (same per-workspace setting, same fallback).
-  const cfg = vscode.workspace.getConfiguration("dabblerSessionSets");
-  const inspected = cfg.inspect<string>("pythonPath");
-  const explicit =
-    inspected?.workspaceFolderValue ??
-    inspected?.workspaceValue ??
-    inspected?.globalValue;
-  const raw = (explicit ?? "python").trim();
-  if (!raw) return "python";
-  if (path.isAbsolute(raw)) return raw;
-  if (raw.includes(path.sep) || raw.includes("/")) {
-    return path.resolve(workspaceRoot, raw);
-  }
-  return raw;
-}

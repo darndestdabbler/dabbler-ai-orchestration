@@ -151,7 +151,46 @@ export function isAiRouterNotInstalled(stderr: string): boolean {
   ) {
     return true;
   }
+  // Namespace-shadow case: when the cwd holds an ``ai_router/`` folder with
+  // no ``__init__.py`` (e.g. the config-only ``ai_router/`` directory in a
+  // consumer repo) and the *interpreter* has no installed ai_router, the
+  // parent resolves as an empty namespace package, so ``python -m
+  // ai_router.close_session`` emits the unquoted, prefix-less runpy form:
+  //   "<exe>: No module named ai_router.close_session"
+  // This is still an "ai_router cannot run in this interpreter" signal, so
+  // treat it like the others. Anchored to a submodule path so it does not
+  // match unrelated modules (e.g. ``ai_router_helpers``).
+  if (/No module named ['"]?ai_router\.[\w.]+['"]?/.test(stderr)) return true;
   return false;
+}
+
+/**
+ * Build the user/orchestrator-facing message for the import-failure case
+ * detected by {@link isAiRouterNotInstalled}.
+ *
+ * The critical job of this message is to break the mis-diagnosis that bit
+ * the consumer repos: a "No module named ai_router…" error is an
+ * *interpreter / installation* problem, NOT a missing-credentials problem.
+ * An orchestrator reading a generic stderr dump tends to pattern-match it
+ * to "keys missing → stop and ask the human". Saying so explicitly stops
+ * that.
+ */
+export function describeAiRouterImportFailure(
+  pythonPath: string,
+  hint?: string,
+): string {
+  const venvHint =
+    process.platform === "win32"
+      ? ".venv\\Scripts\\python.exe"
+      : ".venv/bin/python";
+  return (
+    `ai_router could not be imported by the interpreter '${pythonPath}'. ` +
+    `This is an interpreter / installation problem — NOT missing API keys. ` +
+    `Point the 'dabblerSessionSets.pythonPath' setting at your workspace ` +
+    `venv (e.g. ${venvHint}), or install the router into that interpreter: ` +
+    `${pythonPath} -m pip install dabbler-ai-router.` +
+    (hint ? ` (${hint})` : "")
+  );
 }
 
 // ---------- Public entry points ----------

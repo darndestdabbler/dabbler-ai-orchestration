@@ -86,9 +86,11 @@ schema:
 
 Clean repos produce no output. The advisory is non-blocking and
 fail-open — it never changes the command's exit status, and a scan error
-is swallowed silently. `python -m ai_router.check_migrations --verbose`
-remains the optional, richer detect-only tool, and anyone who wants a
-hard CI gate can wire it in themselves; it is never required.
+is swallowed silently. `.venv/Scripts/python.exe -m
+ai_router.check_migrations --verbose` (run it through your workspace venv
+interpreter, not a bare `python`) remains the optional, richer
+detect-only tool, and anyone who wants a hard CI gate can wire it in
+themselves; it is never required.
 
 ---
 

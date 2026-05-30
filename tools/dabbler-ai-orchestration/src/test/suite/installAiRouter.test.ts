@@ -6,6 +6,7 @@ import {
   installAiRouter,
   updateAiRouter,
   isAiRouterNotInstalled,
+  describeAiRouterImportFailure,
   deriveVenvFromPythonPath,
   resolveLatestReleaseTag,
   venvPython,
@@ -153,6 +154,21 @@ suite("aiRouterInstall — isAiRouterNotInstalled detector", () => {
     assert.strictEqual(isAiRouterNotInstalled(stderr), true);
   });
 
+  test("matches the namespace-shadow runpy form (the consumer-repo bug)", () => {
+    // When a config-only ai_router/ folder (no __init__.py) shadows as an
+    // empty namespace package and the interpreter has no installed router,
+    // `python -m ai_router.close_session` emits this unquoted, prefix-less
+    // line. It must be recognized as an import failure, not a generic error.
+    const stderr =
+      "C:\\Python311\\python.exe: No module named ai_router.close_session";
+    assert.strictEqual(isAiRouterNotInstalled(stderr), true);
+  });
+
+  test("does not match an unrelated submodule-shaped module name", () => {
+    const stderr = "python: No module named ai_router_helpers.foo";
+    assert.strictEqual(isAiRouterNotInstalled(stderr), false);
+  });
+
   test("returns false for unrelated import errors", () => {
     const stderr = "ModuleNotFoundError: No module named 'pyyaml'";
     assert.strictEqual(isAiRouterNotInstalled(stderr), false);
@@ -165,6 +181,23 @@ suite("aiRouterInstall — isAiRouterNotInstalled detector", () => {
 
   test("returns false for empty stderr", () => {
     assert.strictEqual(isAiRouterNotInstalled(""), false);
+  });
+});
+
+// ---------- describeAiRouterImportFailure ----------
+
+suite("aiRouterInstall — describeAiRouterImportFailure message", () => {
+  test("names the interpreter and states it is NOT a credentials problem", () => {
+    const msg = describeAiRouterImportFailure("C:\\Python311\\python.exe");
+    assert.ok(msg.includes("C:\\Python311\\python.exe"), "names the interpreter");
+    assert.ok(/NOT missing API keys/.test(msg), "denies the missing-keys cause");
+    assert.ok(/pip install dabbler-ai-router/.test(msg), "offers the install fix");
+    assert.ok(/dabblerSessionSets\.pythonPath/.test(msg), "points at the setting");
+  });
+
+  test("appends an optional hint when provided", () => {
+    const msg = describeAiRouterImportFailure("python", "exit 1");
+    assert.ok(msg.endsWith("(exit 1)"));
   });
 });
 

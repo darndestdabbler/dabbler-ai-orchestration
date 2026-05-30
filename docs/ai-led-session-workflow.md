@@ -1031,6 +1031,27 @@ Before doing anything else:
 
 If keys are missing, stop and tell the human.
 
+> **"No module named ai_router" is NOT a missing-keys problem.** Before
+> stopping for "missing keys / missing router", confirm you are invoking
+> the **venv interpreter**, not a bare `python`. A bare `python` often
+> resolves to a system interpreter that has no `ai_router` installed; when
+> a config-only `ai_router/` folder is in the cwd it shadows as an empty
+> namespace package, so `python -m ai_router.<x>` fails with
+> `No module named ai_router.<x>`. That is an *interpreter / installation*
+> problem — the keys can be perfectly present. Always run the router CLIs
+> through the workspace venv:
+>
+> ```bash
+> # Windows
+> .venv/Scripts/python.exe -m ai_router.<module> …
+> # POSIX
+> .venv/bin/python -m ai_router.<module> …
+> ```
+>
+> Only stop-and-ask-the-human for missing keys once the **venv
+> interpreter** confirms a key is genuinely absent (e.g. a key-presence
+> check run with `.venv/Scripts/python.exe` reports it missing).
+
 ### Step 1: Identify the Active Session Set and Register Session Start
 
 The `find_active_session_set()` function reads the `status` field in
@@ -1569,8 +1590,12 @@ in its "Verifier findings & adjudication" section.
 
 When session work is verified complete, the orchestrator (or the
 fresh close-out turn agent) **authors `disposition.json`, commits
-and pushes the work, then runs `python -m ai_router.close_session`,
-then fires the session-complete notification** in that order. The
+and pushes the work, then runs the close-out CLI through the workspace
+venv interpreter** (`.venv/Scripts/python.exe -m ai_router.close_session`
+on Windows, `.venv/bin/python -m ai_router.close_session` on POSIX —
+never a bare `python`, which may resolve to a system interpreter without
+`ai_router`), **then fires the session-complete notification** in that
+order. The
 close-out script is the **sole synchronization barrier** between
 session work and the session being marked complete: it runs
 deterministic gate checks (including `check_pushed_to_remote`,

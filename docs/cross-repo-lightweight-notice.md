@@ -143,12 +143,18 @@ from canonical v4 (e.g., the `sessionLog[]` alias from
 an otherwise-v3 shape), run the migrator once from the consumer
 repo root:
 
+Run these through your workspace venv interpreter
+(`.venv/Scripts/python.exe` on Windows, `.venv/bin/python` on POSIX) —
+a bare `python` can resolve to a system interpreter without `ai_router`,
+which fails with `No module named ai_router` (an interpreter problem,
+not missing keys):
+
 ```bash
 # Dry run first to see what would change:
-python -m ai_router.migrate_lightweight_to_canonical_v4
+.venv/Scripts/python.exe -m ai_router.migrate_lightweight_to_canonical_v4
 
 # Apply when the dry-run looks right:
-python -m ai_router.migrate_lightweight_to_canonical_v4 --in-place
+.venv/Scripts/python.exe -m ai_router.migrate_lightweight_to_canonical_v4 --in-place
 ```
 
 The migrator writes `session-state.lwbak.json` alongside each

@@ -96,9 +96,15 @@ reader shim and `--no-router` mode available.) Reinstall:
 
 ### 3. Run a one-time drift check
 
+> **Run every `python -m ai_router.…` command below through your
+> workspace venv interpreter** — `.venv/Scripts/python.exe` on Windows,
+> `.venv/bin/python` on POSIX. A bare `python` can resolve to a system
+> interpreter without `ai_router`, which fails with `No module named
+> ai_router` (an *interpreter / installation* problem, not missing keys).
+
 ```bash
 # Detect-only; exits non-zero if any set is behind. --verbose lists each.
-python -m ai_router.check_migrations --verbose
+.venv/Scripts/python.exe -m ai_router.check_migrations --verbose
 ```
 
 If it reports drift, run the bulk upgrade — either the Explorer's
@@ -106,9 +112,9 @@ If it reports drift, run the bulk upgrade — either the Explorer's
 migrators in sequence (idempotent, `.bak`-backed, reversible):
 
 ```bash
-python -m ai_router.migrate_session_state --in-place              # v2 -> v3
-python -m ai_router.migrate_lightweight_to_canonical_v4 --in-place # lightweight/v2 -> v4
-python -m ai_router.migrate_v3_to_v4 --in-place                    # v3 -> v4
+.venv/Scripts/python.exe -m ai_router.migrate_session_state --in-place              # v2 -> v3
+.venv/Scripts/python.exe -m ai_router.migrate_lightweight_to_canonical_v4 --in-place # lightweight/v2 -> v4
+.venv/Scripts/python.exe -m ai_router.migrate_v3_to_v4 --in-place                    # v3 -> v4
 ```
 
 > **Chain note (Set 050 S2 empirical correction):** a *genuine* v2 file
@@ -138,7 +144,8 @@ compares each `schemaVersion` to the current canonical version, and
 warns when any set is behind — no editor hook to install, fires for every
 orchestrator on every host. You can no longer silently skip the check. If
 you see a `[dabbler] N session-set(s) below the current schema vX` line,
-run `python -m ai_router.check_migrations --verbose`.
+run `.venv/Scripts/python.exe -m ai_router.check_migrations --verbose`
+(use your workspace venv interpreter, not a bare `python`).
 
 **Hand-authoring a state file (still applies):**
 
@@ -171,8 +178,8 @@ mass-rename existing dirs — it breaks `prerequisites:` references,
 widest-existing-prefix + 1 rule, zero-padded to `max(3, widest)`:
 
 ```bash
-python -m ai_router.resolve_set --next        # prints the next NNN- prefix
-python -m ai_router.resolve_set 50            # resolves "50" -> full slug
+.venv/Scripts/python.exe -m ai_router.resolve_set --next  # prints the next NNN- prefix
+.venv/Scripts/python.exe -m ai_router.resolve_set 50       # resolves "50" -> full slug
 ```
 
 `start_session --session-set-dir 50` accepts a bare number that resolves

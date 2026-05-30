@@ -393,6 +393,22 @@ for gate failures). The patterns below are the ones operators have
 hit during Sets 1–5; new patterns should be added here as the failure
 inventory grows.
 
+**`No module named ai_router…` — wrong interpreter, NOT missing keys.**
+This fails *before* any gate runs, so there is no `gate_results` entry —
+just an import error on stderr. It almost always means close-out was
+launched with a bare `python` that resolved to a system interpreter
+without `ai_router` installed. A config-only `ai_router/` folder in the
+cwd makes it worse: it shadows as an empty namespace package, so the
+error names the submodule (`No module named ai_router.close_session`)
+rather than the package. **Do not interpret this as "missing API keys"
+and stop to ask the human** — the keys can be perfectly present.
+Remediation: run close-out through the workspace venv interpreter
+(`.venv/Scripts/python.exe -m ai_router.close_session …` on Windows,
+`.venv/bin/python …` on POSIX), or `pip install dabbler-ai-router` into
+the interpreter you are using. Only after the venv interpreter loads the
+router will a genuine missing-key error (`Missing environment variable
+ANTHROPIC_API_KEY …`) be trustworthy.
+
 **Uncommitted files in working tree** — `check_working_tree_clean`
 fails with the list of dirty paths. The agent typically forgot to
 `git add` a generated file, or a tool wrote to a temp file inside the

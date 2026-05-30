@@ -54,17 +54,21 @@ updated and prompt a refresh if they're stale.
 ### What this set delivers
 
 1. **Tier-gated visibility.** The cost icon/command is contributed only
-   when the active repo is Full tier; hidden entirely on Lightweight.
-2. **Metrics on by default for Full.** `METRICS_ENABLED` effectively
-   defaults true for Full-tier repos (exact mechanism — config default
-   flip vs. derived-from-tier — decided at S1), so a fresh Full adopter
-   sees real data without discovering a hidden flag through a dead panel.
-3. **Cost-estimate staleness check.** On open, compare when the
-   per-provider rate estimates were last updated against a staleness
-   threshold; if stale, surface a non-blocking prompt with a one-click
-   path to update them.
-4. **Graceful empty state.** When Full + metrics-on but no spend logged
-   yet, show an honest "no spend recorded yet" state, not an error.
+   when the workspace actually routes (router-capability gate — see S1
+   verdict D3); hidden entirely on Lightweight.
+2. **Read-path fix (root cause — S1 discovery).** Point the dashboard
+   reader at the file the router actually writes
+   (`router-metrics.jsonl` via `metrics.log_filename`), not the hardcoded
+   `metrics.jsonl` it reads today. This — not a flag — is why the icon
+   looks dead. (Metrics already default ON; "metrics-on-by-default" was
+   dropped as a no-op at S1.)
+3. **Cost-estimate staleness check.** On open, reuse the existing
+   `metadata.pricing_reviewed` + `review_frequency_days` (default 30) to
+   compute staleness in-extension; if stale, surface a non-blocking
+   prompt with a one-click path to update them.
+4. **Three honest states.** Disabled (`metrics.enabled == false`) /
+   on-but-empty / on-with-data — never naming the fictional
+   `config.py METRICS_ENABLED` flag.
 
 ### Non-goals
 
@@ -76,22 +80,39 @@ updated and prompt a refresh if they're stale.
 
 ---
 
-## Open design questions (S1 audit)
+## Open design questions (S1 audit) — RESOLVED 2026-05-30
 
-1. **Where do rate estimates live and how is "last updated" known?**
-   `router-config.yaml` / `cost_report.py` / a dedicated pricing table?
-   Is there an existing timestamp or must one be introduced?
-2. **Staleness threshold.** Fixed age (e.g., 90 days), a "rates as of
-   \<date\>" stamp the operator maintains, or a version compared against
-   a canonical published rate sheet?
-3. **Metrics-on-by-default mechanism.** Flip the `METRICS_ENABLED`
-   default, derive it from `tier: full`, or auto-enable on first Full
-   session with a one-time notice? Privacy/footprint implications.
-4. **Tier detection in the extension.** How the extension knows a repo
-   is Full vs. Lightweight to gate the icon (reads `spec.md tier:` /
-   router presence / a setting?).
-5. **Update-rates UX.** What "update cost estimates" actually opens —
-   the config editor at the rates section, a guided prompt, or a doc?
+S1 audit + cross-provider consensus (gemini-2.5-pro + gpt-5.4) resolved
+all five. Full design in
+`docs/proposals/2026-05-29-cost-metrics-icon/proposal.md`; locked
+decisions in `verdict.md`. Summary:
+
+> **Audit re-diagnosis:** the dead icon is a **read/write path
+> mismatch**, not a disabled flag. The router *writes*
+> `ai_router/router-metrics.jsonl` (`metrics.log_filename`, default);
+> the dashboard *reads* hardcoded `ai_router/metrics.jsonl`
+> (`utils/metrics.ts:5`) → always empty. Metrics already default ON; the
+> placeholder's `config.py METRICS_ENABLED` flag is fictional.
+
+1. **Where rate estimates live / "last updated":** RESOLVED — rates in
+   `router-config.yaml` (`input_cost_per_1m`/`output_cost_per_1m`);
+   "last updated" = `metadata.pricing_reviewed` (already exists).
+2. **Staleness threshold:** RESOLVED — reuse existing
+   `metadata.pricing_reviewed` + `review_frequency_days` (default 30).
+   Compute in-extension from YAML (not stderr). Single source shared with
+   `config.py:_check_pricing_staleness`.
+3. **Metrics-on-by-default mechanism:** RESOLVED — DROPPED as a no-op
+   (metrics already default ON). Replaced by the read-path fix + honest
+   states.
+4. **Tier detection:** RESOLVED — gate on **router capability**
+   (resolvable `router-config.yaml`/metrics path → context key →
+   `when`-clause), NOT per-set `tier:`, NOT bare folder existence.
+   Consensus split here (gemini = derive-from-sets; gpt-5.4 =
+   router-capability + warned derive-from-sets re-creates the dead icon);
+   resolved to router-capability.
+5. **Update-rates UX:** RESOLVED — primary = open `router-config.yaml` at
+   the `metadata` block (Config Editor has no pricing section today);
+   Config Editor pricing section only if cheaply added in S2.
 
 ---
 
@@ -113,32 +134,56 @@ updated and prompt a refresh if they're stale.
 staleness model.
 **Progress keys:** S1 verdict committed; design locked.
 
-### Session 2 of 3: Implementation
+### Session 2 of 3: Implementation (per S1 verdict D1–D7)
 
 **Steps:**
-1. Tier-gate the icon/command contribution (hidden on Lightweight).
-2. Implement metrics-on-by-default for Full per S1.
-3. Implement the staleness check + non-blocking update prompt on open;
-   wire the "update rates" path.
-4. Implement the honest empty state.
-5. Tests: unit (tier gating, staleness logic) + Layer-3 Playwright
-   (icon present/absent by tier, stale-prompt renders, empty state).
+1. **D1 (root-cause fix, #1):** point the dashboard reader at the file the
+   router writes. Resolve the metrics filename from `router-config.yaml`
+   → `metrics.log_filename` (default `router-metrics.jsonl`) via one
+   shared path-resolution helper used by both the reader (`utils/metrics.ts`)
+   and the CSV export. Do **not** swap one hardcoded name for another.
+2. **D3 tier gate:** contribute the icon/command only when a real router
+   signal resolves for the workspace (resolvable `router-config.yaml` /
+   metrics path) — `setContext` a new key (e.g.
+   `dabblerSessionSets.routesCost`) + gate the menu `when`-clause. Absent
+   on Lightweight. Folder existence alone is insufficient.
+3. **D4 staleness banner:** on open, compute staleness in-extension from
+   `metadata.pricing_reviewed` vs `review_frequency_days` (default 30;
+   missing/invalid metadata → stale). Non-blocking banner with an
+   "Update cost estimates" action.
+4. **D6 update-rates action:** primary = open `router-config.yaml` at the
+   `metadata` block. Config Editor pricing section only if cheaply added.
+5. **D5 three honest states:** disabled (`metrics.enabled == false` —
+   name the *real* knob, never `config.py METRICS_ENABLED`) /
+   on-but-empty / on-with-data.
+6. **D2:** no `metrics.enabled` default change (already on; dropped).
+7. **D7 tests:** unit (read-path resolution / tier-gate predicate /
+   staleness predicate / state selection) + Layer-3 Playwright (icon
+   present-Full / absent-Lightweight, stale banner, empty state, disabled
+   state).
 
 **Creates:** tests.
-**Touches:** `CostDashboard.ts`, `extension.ts`, `package.json` (menus /
-when-clauses), config/`cost_report` as needed.
-**Ends with:** icon shows for Full + real data, hidden for Lightweight;
-stale estimates prompt an update; tests green.
-**Progress keys:** gating + default + staleness shipped + tested.
+**Touches:** `utils/metrics.ts`, `dashboard/CostDashboard.ts`,
+`webview/dashboard.html`, `extension.ts`, `package.json` (menus /
+when-clauses); read-only on `router-config.yaml`/`metrics.py` (path +
+`log_filename` contract).
+**Ends with:** icon shows for routing (Full) workspaces with **real data
+from the correct file**, hidden for Lightweight; stale estimates prompt an
+update; three honest states; tests green.
+**Progress keys:** read-path fix + gate + staleness + 3 states shipped +
+tested.
 
 ### Session 3 of 3: Docs, UAT (if elected), close-out
 
 **Steps:**
 1. Update wizard / docs referencing the cost dashboard + the
-   `user-facing cost messaging` honesty requirements.
-2. If UAT was elected at session start, compile the checklist.
-3. Version bump (Marketplace extension; PyPI only if cost_report
-   changed), CHANGELOG, CLAUDE.md walk, change-log.md.
+   `user-facing cost messaging` honesty requirements (incl. removing any
+   reference to the fictional `config.py METRICS_ENABLED` flag).
+2. UAT was **elected** at session start (`suggestion_disposition: uat`,
+   session 1) — compile the checklist.
+3. Version bump (Marketplace extension; PyPI only if a Python module
+   changed — S2 is expected to be TS-only, so likely Marketplace-only),
+   CHANGELOG, CLAUDE.md walk, change-log.md.
 4. Cross-provider verification; close-out; publishes **held** for
    operator-initiated tag-push.
 
@@ -151,9 +196,11 @@ stale estimates prompt an update; tests green.
 
 ## End-of-set deliverables
 
-- Tier-gated cost icon (Full only; absent on Lightweight).
-- Metrics on by default for Full tier.
-- Cost-estimate staleness check + non-blocking update prompt on open.
-- Honest empty state for Full + metrics-on + no-spend.
-- Tests (unit + Layer-3); UAT checklist if elected.
+- Tier-gated cost icon (router-capability gate; absent on Lightweight).
+- Dashboard read-path fix (reads the file the router writes) — the
+  root-cause dead-icon fix.
+- Cost-estimate staleness check + non-blocking update prompt on open
+  (reusing existing `pricing_reviewed`/`review_frequency_days`).
+- Three honest dashboard states (disabled / empty / data).
+- Tests (unit + Layer-3); UAT checklist (**elected** at S1).
 - Version bumps + CHANGELOG + change-log; publishes held for operator.

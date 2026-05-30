@@ -1,15 +1,20 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "052-cost-metrics-icon-redesign",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-05-30T07:35:27.793193-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-4-8",
+        "effort": "high"
+      },
       "verificationVerdict": null
     },
     {

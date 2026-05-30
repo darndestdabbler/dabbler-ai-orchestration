@@ -50,6 +50,25 @@
       "description": "S2 implementation (verdict D1-D7). D1 root-cause read-path fix: new shared utils/routerConfig.ts resolves the metrics filename from router-config.yaml metrics.log_filename (default router-metrics.jsonl); utils/metrics.ts reader + CSV export both route through it (no second hardcoded name); reconciled MetricsEntry to the on-disk schema (session_number not session_num; call_type; drop adjudication rows). D3 router-capability tier gate: dabblerSessionSets.routesCost context key set in extension.ts from a resolvable ai_router/router-config.yaml; package.json gates the view/title icon AND command-palette entry. D4 staleness banner reuses metadata.pricing_reviewed + review_frequency_days (default 30; missing/invalid = stale), computed in-extension. D5 three honest states (disabled names real metrics.enabled knob / empty / data) + no-router defensive state via pure dashboard/dashboardHtml.ts builders; CostDashboard is now a selectCostState state machine. D6 update-rates opens router-config.yaml at metadata/metrics anchor; CSP-safe button wiring. D7 tests: routerConfig.test.ts + dashboardHtml.test.ts + costDashboardGate.test.ts + metrics.test.ts schema update. Layer-3 icon spec PIVOTED to deterministic gate-wiring guard (VS Code view/title actions duplicate-render + overflow -> not reliably Playwright-assertable; flagged for S3 verifier). 584 unit pass / 2 pre-existing Set-026 fails; session-sets-tree Layer-3 5/5 green; tsc clean. Watcher allowlist line bumped 153->172 (line-shift gotcha). $0 routed.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/docs-uat-version-verification-closeout",
+      "dateTime": "2026-05-30T09:32:22.000000-04:00",
+      "description": "S3 (final) close-out of the cost-metrics icon redesign. Docs reconciled: repository-reference.md (CostDashboard.ts row) + extension README.md describe the new router-capability gating (absent on Lightweight) / on-open staleness prompt / three honest states; confirmed no live human-facing doc referenced the fictional config.py METRICS_ENABLED flag (S2 removed it from webview/dashboard.html) and the read path was already documented as router-metrics.jsonl. UAT checklist (elected at S1): 052-cost-metrics-icon-redesign-uat-checklist.json, 16 items - programmatic items marked complete with covering tests, live-VS-Code items (icon present/absent, painted banner, editor reveal) left pending for manual operator UAT. Version bump: extension 0.26.1 -> 0.27.0 (package.json + package-lock.json both nodes, CHANGELOG 0.27.0 entry, CLAUDE.md version-walk cascade); TS-only, no PyPI release. Cross-provider verification of the S2 implementation by gemini-2.5-pro (different provider), fed the actual code + neutral framing of the two flagged deviations: VERIFIED_WITH_NOTES, 0 critical / 0 blocking, BOTH deviations APPROVED (D7 Playwright->manifest-guard pivot judged superior; schema reconciliation judged a necessary part of a complete fix, not scope creep). One nice-to-have (YYYY-MM-DD date-format comment in computeStaleness) applied in-flight - the sole S3 edit to S2's implementation (comment-only, behavior-preserving). change-log.md + s3-close-reason.md + s3-verification.md authored. tsc clean; test:unit 584 pass / 2 pre-existing Set-026 fails (untouched files). Marketplace vsix-v0.27.0 publish HELD for operator tag-push (confirm VSCE_PAT freshness first). Routed verification cost $0.017121; cumulative Set 052 $0.065548 of $10 NTE.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "engine": "gemini-pro",
+          "provider": "google",
+          "model": "gemini-2.5-pro",
+          "costUsd": 0.017121,
+          "inputTokens": 7505,
+          "outputTokens": 774,
+          "purpose": "verification"
+        }
+      ]
     }
   ]
 }

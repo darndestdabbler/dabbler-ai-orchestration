@@ -52,6 +52,13 @@ the router's `summarize_drift` message). Companion PyPI release:
   lifecycle automatically. (Documents the removal only — does not edit
   any machine settings.)
 
+### Changed (UI)
+
+- **New Activity Bar (sidebar) icon** — the `dabblerSessionSetsContainer`
+  view container now uses `media/dabbler-ai-orchestration-icon.svg`
+  (single-path, `fill:currentColor`, themes/states automatically) in
+  place of the previous `media/icon.svg`.
+
 ## [0.25.0] — 2026-05-29 (Set 050 — Schema-drift guard + number-prefix addressing)
 
 Ships the extension side of Set 050 and publishes the held 0.24.1

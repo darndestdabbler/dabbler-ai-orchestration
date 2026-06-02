@@ -39,6 +39,45 @@ Start; the depth above is one click away rather than buried in a
 
 ---
 
+## Documentation authority and release status
+
+This section is the canonical home for shared repo facts a future
+orchestrator, reviewer, or release operator may need. The root engine
+instruction files are bootstrap entrypoints, not the sole archive for
+shared operational history.
+
+**Guiding principle.** If a fact matters to more than one orchestrator,
+store it in an engine-agnostic doc or canonical package metadata. Do not
+make one engine-specific instruction file the only place a future session
+can learn it.
+
+### Current consumer repos
+
+| Repo | `ai_router` | Extension |
+|---|---|---|
+| `dabbler-access-harvester` | `pip install dabbler-ai-router` | VS Code Marketplace |
+| `dabbler-platform` | `pip install dabbler-ai-router` | VS Code Marketplace |
+| `dabbler-homehealthcare-accessdb` | not used (Lightweight tier) | VS Code Marketplace |
+
+### Current release status
+
+| Surface | Current version | State | Canonical details |
+|---|---|---|---|
+| `dabbler-ai-router` | `0.15.0` | Set 054 shipped; PyPI publish held for operator tag-push `v0.15.0`. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.27.0` | Set 052 shipped; Marketplace publish held for operator tag-push `vsix-v0.27.0`. | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+
+### Recent version walk
+
+- **`dabbler-ai-router 0.15.0`** — Set 054, verificationVerdict persistence. PyPI-only. Publish held for `v0.15.0`.
+- **Extension `0.27.0`** — Set 052, cost-metrics icon redesign. Marketplace-only. Publish held for `vsix-v0.27.0`.
+- **`dabbler-ai-router 0.14.0` + extension `0.26.0`** — Set 051 plus Set 053, ai_router hygiene / hook retirement / lifecycle schema-drift coverage.
+- **`dabbler-ai-router 0.12.0` + extension `0.25.0`** — Set 050, schema-drift guard and numeric session-set addressing.
+- **Extension `0.24.1`** — patch release wiring `Copy Slug` into the row action registry.
+- **`dabbler-ai-router 0.11.0` + extension `0.24.0`** — Set 049, orchestrator coordination removal.
+- Older release history lives in the package CHANGELOGs and the closed session-set change-logs. Do not rebuild a second version walk inside an engine-specific root instruction file.
+
+---
+
 ## Highlighted features (deep dive)
 
 ### 1. Work is organized into session sets and sessions
@@ -94,8 +133,10 @@ orchestrator agents are supported, each reading its own instruction
 file at the repo root: Claude Code reads [CLAUDE.md](../CLAUDE.md),
 Codex (OpenAI) and GitHub Copilot read [AGENTS.md](../AGENTS.md), and
 Gemini Code Assistant reads [GEMINI.md](../GEMINI.md). All three files
-describe the same role and rules — only the agent-specific bootstrap
-(API key export syntax, etc.) differs. The router (`ai_router/`) owns
+point back to the same shared rules; agent-specific bootstrap (API key
+export syntax, etc.) is the only reason they differ. Shared repo facts
+such as current consumers and release/version status live in this doc,
+not in one engine-specific file. The router (`ai_router/`) owns
 reasoning: code review, security review, analysis, architecture,
 documentation, test generation, and the mandatory end-of-session
 verification all go to `route()`, which estimates complexity, picks the
@@ -431,9 +472,9 @@ covered elsewhere in this doc.
 |---|---|
 | [README.md](../README.md) | The lean inviting on-ramp. Hero, 3-paragraph elevator pitch, 4–6 feature bullets each linking into this reference doc, 3-step Quick Start, prerequisites, license. |
 | [docs/repository-reference.md](repository-reference.md) | This file. Deep feature descriptions, UAT/E2E flag matrix, worked end-of-session output, file map. |
-| [CLAUDE.md](../CLAUDE.md) | Project instructions **Claude Code** reads automatically. Defines the curator-and-normalizer role this repo plays for downstream consumers, the portability rule, and the extension version baseline. |
-| [AGENTS.md](../AGENTS.md) | Same content as `CLAUDE.md`, addressed to **Codex (OpenAI)** and **GitHub Copilot** — the two agents that look for `AGENTS.md` at the repo root. Agent-specific bootstrap (API key export, router import) is included so a session can be started without consulting either of the other two files. |
-| [GEMINI.md](../GEMINI.md) | Same content as `CLAUDE.md`, addressed to **Gemini Code Assistant**. Carries the same agent-specific bootstrap. |
+| [CLAUDE.md](../CLAUDE.md) | Bootstrap instructions **Claude Code** reads automatically. Shared repo facts, consumer tables, and release/version status live in this doc; workflow/rules live in `docs/ai-led-session-workflow.md` and `docs/planning/project-guidance.md`. |
+| [AGENTS.md](../AGENTS.md) | Same bootstrap role for **Codex (OpenAI)** and **GitHub Copilot**. Shared repo facts live here in `docs/repository-reference.md`; agent-specific bootstrap is included so a session can start without consulting the other engine files. |
+| [GEMINI.md](../GEMINI.md) | Same bootstrap role for **Gemini Code Assistant**. Shared repo facts live here in `docs/repository-reference.md`; only Gemini-specific bootstrap should differ. |
 
 ### `ai_router/` — multi-provider routing module
 

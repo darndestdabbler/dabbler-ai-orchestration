@@ -20,7 +20,10 @@ This document is the single source of truth for the session-set workflow
 itself — procedure, rules, router usage, verification, UAT handling, and
 session-set close. `CLAUDE.md`, `AGENTS.md`, and `GEMINI.md` provide only
 agent-specific bootstrap (API key export, router import snippet) and point
-here for everything else.
+here for everything else. If a shared operational fact matters to future
+orchestrators or humans, store it in an engine-agnostic doc like this one,
+`docs/repository-reference.md`, `docs/planning/project-guidance.md`, or the
+package changelogs — not only in one engine-specific bootstrap file.
 
 The deterministic close-out path, gate checks, and reconciler hand-off
 live in `ai_router/docs/close-out.md`.

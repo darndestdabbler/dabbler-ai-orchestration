@@ -30,5 +30,6 @@ When reviewing a session-set spec, weight the following:
   audit doc exactly. Cite the verdict path.
 - **Backwards compatibility surfaces.** Any change to shared schemas,
   CLIs, or extension command IDs must spell out the back-compat plan.
-- **Repo conventions.** Defer to `CLAUDE.md` at the repo root for any
-  rule the spec doesn't explicitly override.
+- **Repo conventions.** Defer to `docs/planning/project-guidance.md`,
+  `docs/ai-led-session-workflow.md`, and `docs/repository-reference.md`
+  for any shared rule the spec doesn't explicitly override.

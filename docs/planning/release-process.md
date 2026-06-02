@@ -275,10 +275,10 @@ nothing goes wrong.
 
 10. **Update consumer repos.** Bump `dabbler-ai-router` in any repo
     that pins it. `dabbler-access-harvester` and `dabbler-platform` are
-    the current consumers (per `CLAUDE.md`). After Session 3 of set 010
-    lands, the consumer-side install path is also `Dabbler: Install
-    ai-router` from inside the VS Code extension; that flow ends up
-    calling `pip install dabbler-ai-router` under the hood.
+  the current consumers (per `docs/repository-reference.md`). After
+  Session 3 of set 010 lands, the consumer-side install path is also
+  `Dabbler: Install ai-router` from inside the VS Code extension; that
+  flow ends up calling `pip install dabbler-ai-router` under the hood.
 
 ---
 

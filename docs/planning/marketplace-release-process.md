@@ -385,9 +385,10 @@ publish run and the post-publish Marketplace listing.
 
 11. **Update consumer repos.** Bump any consumer repo that pins a
     specific VSIX version — `dabbler-access-harvester` and
-    `dabbler-platform` are the current consumers (per `CLAUDE.md`).
-    With the Marketplace path live, consumers should switch to
-    Marketplace-installed instead of vendoring the VSIX.
+  `dabbler-platform` are the current consumers (per
+  `docs/repository-reference.md`). With the Marketplace path live,
+  consumers should switch to Marketplace-installed instead of
+  vendoring the VSIX.
 
 ---
 

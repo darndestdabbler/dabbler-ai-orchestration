@@ -34,6 +34,16 @@ The file has two top-level sections:
 
 > **TODO:** Add security and auth principles if applicable.
 
+### Documentation authority
+
+Shared operational facts that future orchestrators, reviewers, or release
+operators may need must live in engine-agnostic docs or canonical package
+metadata, not only in `CLAUDE.md`, `AGENTS.md`, or `GEMINI.md`. The root
+instruction files are bootstrap entrypoints; if they repeat a shared fact,
+the canonical source must still live under `docs/` or in package metadata.
+This prevents one engine-specific file from drifting stale while another
+continues to be updated.
+
 ---
 
 ## Conventions
@@ -60,8 +70,10 @@ The file has two top-level sections:
   is the source of truth for *spec* authoring (slug naming, sizing, the
   Session Set Configuration block); `docs/ai-led-session-workflow.md`
   remains the source of truth for *execution* mechanics.
-- Save verifier output raw and never edit session-review files after they are
-  written.
+- Save verifier output raw and never edit saved verification artifacts after
+  they are written. On the current path this means root-level
+  `sN-verification*.md`; legacy `session-reviews/` files remain read-only if
+  encountered.
 - Log every AI-led session step in the active session set.
 - AI instruction documents (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) reference
   this file and `docs/ai-led-session-workflow.md` so future agent runs inherit

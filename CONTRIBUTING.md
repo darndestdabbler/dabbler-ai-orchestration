@@ -6,8 +6,10 @@ package published to PyPI as `dabbler-ai-router`, and the VS Code
 extension at `tools/dabbler-ai-orchestration/` published to the
 Marketplace as `DarndestDabbler.dabbler-ai-orchestration`.
 
-See [`CLAUDE.md`](CLAUDE.md) for the repo's role-and-release
-overview, the consumer-repo map, and the portability rule.
+See [`CLAUDE.md`](CLAUDE.md) for the repo's role and the portability
+rule, and [`docs/repository-reference.md`](docs/repository-reference.md)
+→ *Documentation authority and release status* for the canonical
+consumer-repo map and current release status.
 
 ## Test layers
 

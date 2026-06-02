@@ -97,6 +97,83 @@
       "description": "Authored disposition.json (status completed, verification_method api, verification_verdict VERIFIED_WITH_NOTES, next_orchestrator -> claude/anthropic/claude-opus-4-8 for the Session 3 complete-centralization pass) and s2-close-reason.md; committed and pushed the Session 2 validation bundle; ran close_session --manual-verify (API path, verification ran out-of-band) to pass the gates and flip Session 2 to complete. Set stays in-progress for Session 3.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/register-start",
+      "dateTime": "2026-06-02T13:08:33.118456-04:00",
+      "description": "Registered Session 3 start via ai_router.start_session with orchestrator metadata (claude / anthropic / claude-opus-4-8, effort high). Verified the on-disk orchestrator block matches the actual orchestrator.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/enumerate-and-locate-homes",
+      "dateTime": "2026-06-02T13:20:00-04:00",
+      "description": "Enumerated every shared operational fact CLAUDE.md carried inline (richer than AGENTS.md/GEMINI.md) and located its engine-agnostic canonical home: orchestrator-block contract -> session-state-schema.md (s Per-session orchestrator block, s Writer Contract) + ai-led-session-workflow.md (D3 writer_discipline, P4 no-Explorer, orchestrator-writer.log) -- all verified present; Building & testing + Orchestrator e2e harness Layer 1/2/3 + CI -> CONTRIBUTING.md (s Test layers richer with the Set-045 rebuild trap, s CI, s Building); session-state schema summary -> session-state-schema.md (already named authoritative). Found the router-config-editor walkthrough was the ONLY genuinely sole-sourced fact with no engine-agnostic home (repository-reference.md's extension file map had no src/configEditor/ row).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/consumer-table-consensus",
+      "dateTime": "2026-06-02T13:30:00-04:00",
+      "description": "Routed the punch-list item-3 consumer-table keep-vs-remove decision through decision-time cross-provider consensus (gemini-2.5-pro, google, independent of this claude/anthropic orchestrator, via direct providers.call_model; run_s3_consensus.py). Result: Option B (pointer-only), HIGH confidence -- drop the ## Consumer repos table from all three engine files in favor of the existing ## Shared repo facts pointer. Converges with the operator 'complete centralization, period' directive and the S2 verifier; the table had already drifted, demonstrating the duplication-for-convenience model fails for this fact. Decision LOCKED to B; makes punch-list item 4 (header drift) moot. Full trail: s3-consensus.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "task": "decision-consensus",
+          "model": "gemini-2.5-pro",
+          "provider": "google",
+          "cost_usd": 0.003793
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/centralize-and-symmetrize",
+      "dateTime": "2026-06-02T13:55:00-04:00",
+      "description": "Executed the punch-list. Relocated the router-config-editor walkthrough into a new src/configEditor/ row in repository-reference.md's extension file map (command + 3 YAML files + key source files). Fixed Finding A (repository-reference.md:475 CLAUDE.md file-map row now says shared facts live in docs/repository-reference.md, aligned with sibling rows) and Finding B (CONTRIBUTING.md:9 cites CLAUDE.md only for role+portability and repository-reference.md for the canonical consumer map / release status). Rewrote CLAUDE.md/AGENTS.md/GEMINI.md to a byte-identical shared body (## Quick start -> ## Decision-time consensus) differing only in the H1+audience header and a single final ## Engine-specific bootstrap section; dropped the consumer table (decision B); thinned CLAUDE.md's inline shared content to pointers; added the missing When-curator-work / Delegation-Discipline / Session-state-schema / Running-the-router sections to all three; upgraded the Shared repo facts pointers to clickable anchor links (item 6). CLAUDE.md 231->160 lines.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/validate",
+      "dateTime": "2026-06-02T14:05:00-04:00",
+      "description": "Validation (punch-list item 7). Structural diff: extracted ## Quick start .. ## Engine-specific bootstrap slice from each engine file -> sha256 identical (37242fe0...), 144 lines each, diff reports IDENTICAL across all three. No leftover ## Consumer repos / ## Orchestrator-block / Extension versioning / ai_router copy in any engine file. Straggler re-grep over live docs (excluding session-sets/proposals/cross-repo-notices/CHANGELOGs/this-set): zero live engine-file-as-canonical references; every remaining hit is a mechanism description, the correct post-migration principle, or consumer/new-project bootstrap. The lone implementation-summary-023-027.md CLAUDE.md mention is a historical Documentation-Updates summary (non-goal protects historical artifacts; S2-dispositioned out-of-scope) and was deliberately left untouched. Anchor #documentation-authority-and-release-status target exists (line 42) and all three files link it; code fences balanced; table rows well-formed. Authored s3-validation.md.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/cross-provider-verification",
+      "dateTime": "2026-06-02T14:20:00-04:00",
+      "description": "Ran end-of-session cross-provider verification. Verifier: gemini-2.5-pro (google) via direct providers.call_model (run_s3_verification.py), fed the actual post-rewrite engine files + full CONTRIBUTING.md + repository-reference.md AND the locked S1 contract s1-audit-record.md (supplied this time to close the S2 context gap that produced its false-positive critical) + the S3 consensus/validation records. Verdict: VERIFIED. All five claim checks held (symmetry; no leftover sole-sourced sections; Finding A fixed; Finding B fixed; relocation landed); verifier independently returned sole_sourced_facts [], lost_facts [], new_stragglers [] all empty, and endorsed the consumer-table removal as 'a sound tightening of the original contract.' No critical/important/nice-to-have findings; nothing to disposition. First run crashed on cp1252 stdout (the known ASCII-only-terminal gotcha) AFTER the paid call returned; fixed the script to write raw output to a UTF-8 file (s3-verification-raw.md) and re-ran. Records: s3-verification.md (formatted) + s3-verification-raw.md (raw JSON).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "task": "session-verification",
+          "model": "gemini-2.5-pro",
+          "provider": "google",
+          "cost_usd": 0.041726
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-3/close-out",
+      "dateTime": "2026-06-02T14:30:00-04:00",
+      "description": "Authored disposition.json (status completed, verification_method api, verification_verdict VERIFIED, next_orchestrator reason.code 'other' = final session / set complete) and s3-close-reason.md; committed and pushed the Session 3 complete-centralization bundle; ran close_session --manual-verify (API path, verification ran out-of-band) to pass the gates, flip Session 3 to complete, and flip the SET to complete (final session). No code, no release.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

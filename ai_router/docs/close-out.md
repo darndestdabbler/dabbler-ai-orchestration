@@ -76,7 +76,7 @@ have to recover, never prevent.
 | `status`               | `"in-progress"`                              | `"complete"`                                 |
 | `lifecycleState`       | `"work_in_progress"`                         | `"closed"`                                   |
 | `completedAt`          | unchanged (null)                             | now                                          |
-| `verificationVerdict`  | from `disposition.verification_verdict` via `resolve_close_verdict()` (null if absent/non-api) | same |
+| `verificationVerdict`  | `resolve_close_verdict()`: explicit `disposition.verification_verdict` first; else api-status-derived fallback for `api` method; else `null` | same |
 | `orchestrator`         | preserved (Set 049 — historical attribution; no longer cleared at close) | preserved |
 | Events ledger          | `closeout_requested` + `closeout_succeeded`  | `closeout_requested` + `closeout_succeeded`  |
 
@@ -347,13 +347,16 @@ returns the corresponding exit code without touching downstream state.
 9. **Idempotent writes.** Each of these is safe to retry:
    - `_flip_state_to_closed(session_set_dir, verification_verdict=verdict)` —
      flips `session-state.json` from `in-progress` to `complete`,
-     records `completedAt` ISO timestamp and the resolved verdict
-     (sourced from `disposition.verification_verdict` via
-     `resolve_close_verdict()`; null when absent/non-api). The
-     `orchestrator` block is **preserved** on the per-session
-     record as historical attribution (Set 049 — the check-in
-     clear was retired when the hard-coordination layer was
-     removed; the block is no longer cleared at session close).
+     records `completedAt` ISO timestamp and the resolved verdict.
+     The verdict is resolved by `resolve_close_verdict()`: explicit
+     `disposition.verification_verdict` wins first; for `api`-method
+     dispositions without an explicit field, status derives the fallback
+     (`completed`→`"VERIFIED"`, `failed`/`requires_review`→`"ISSUES_FOUND"`);
+     otherwise `null` (manual / skipped / `--no-router` / missing
+     disposition). The `orchestrator` block is **preserved** on the
+     per-session record as historical attribution (Set 049 — the check-in
+     clear was retired when the hard-coordination layer was removed; the
+     block is no longer cleared at session close).
    - Append the next-orchestrator recommendation to `ai-assignment.md`
      (every session except the last).
    - Last session only: write `change-log.md` and append the

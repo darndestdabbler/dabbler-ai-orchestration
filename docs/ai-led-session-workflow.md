@@ -1423,13 +1423,16 @@ sessions on the next orchestrator startup and re-runs close-out.
    save each follow-up pass as a sibling root file such as
    `sN-verification-round-2.md`, not under `session-reviews/`.
 5. Log the verification step.
-6. **Record the verdict in `disposition.json`.** Set the
-   `verification_verdict` field to the verifier's `"VERIFIED"` or
+6. **Record the verdict in `disposition.json`.** Set
+   `verification_verdict` to the verifier's `"VERIFIED"` or
    `"ISSUES_FOUND"` value before authoring the rest of the
-   disposition. `close_session` reads this field via
-   `resolve_close_verdict()` and writes it to `session-state.json`'s
-   per-session `verificationVerdict`. Without this step, the state
-   file retains its `null` value.
+   disposition. `close_session` reads this via `resolve_close_verdict()`
+   and writes it to `session-state.json`'s per-session
+   `verificationVerdict`. On the `api` path, `close_session` also has
+   a backward-compat status-derived fallback for older dispositions
+   that omit this field (`completed`→`"VERIFIED"`, `failed`→`"ISSUES_FOUND"`),
+   but setting the field explicitly is the recommended practice and the
+   only path that preserves the exact verifier token.
 
 **Two-attempt verifier fallback.** If the first-choice verifier fails
 at the HTTPS layer (provider outage, timeout, garbled response), the

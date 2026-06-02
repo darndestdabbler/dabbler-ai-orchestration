@@ -54,6 +54,49 @@
       "description": "Authored disposition.json (status completed, verification_method api, verification_verdict VERIFIED_WITH_NOTES, next_orchestrator -> claude/anthropic/claude-opus-4-8 low for the S2 validation pass) and s1-close-reason.md; committed and pushed the Session 1 audit bundle; ran close_session on the API path to pass the five gates and flip Session 1 to complete.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register-start",
+      "dateTime": "2026-06-02T11:46:19.660582-04:00",
+      "description": "Registered Session 2 start via ai_router.start_session with orchestrator metadata (claude / anthropic / claude-opus-4-8, effort high). Verified the on-disk orchestrator block matches the actual orchestrator.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/validate-migration",
+      "dateTime": "2026-06-02T11:55:00-04:00",
+      "description": "Ran the three validation steps. (1) Confirmed the canonical docs/repository-reference.md -> 'Documentation authority and release status' section is present and well-formed (principle + consumer table + release-status table + recent walk) and cross-checked the release-status table against package metadata (pyproject 0.15.0, __init__ 0.15.0, package.json 0.27.0 all match). (2) Markdown render check clean: tables well-formed, heading nesting correct, engine-file Shared repo facts pointers reference the canonical section by prose title; a repo-wide grep for the #documentation-authority-and-release-status anchor returned zero live link uses so there is no broken-anchor risk. (3) Straggler grep sweep over LIVE docs (excluding historical session-sets, consumer-paste cross-repo notices, proposals, vscode-test fixtures, CHANGELOGs, this spec): found TWO live stragglers S1's narrower grep missed -- Finding A (HARD) docs/repository-reference.md:475 CLAUDE.md file-map row says shared facts 'live in this doc' contradicting the migration and inconsistent with sibling AGENTS.md/GEMINI.md rows; Finding B (SOFT) CONTRIBUTING.md:9 cites CLAUDE.md for 'the consumer-repo map'. S2 is validation-only and edits no document: both recorded with prescribed fixes and handed to Session 3. Authored s2-validation.md.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/cross-provider-verification",
+      "dateTime": "2026-06-02T12:05:00-04:00",
+      "description": "Ran an independent cross-provider verification focused on straggler-completeness (the crux of a validation session). Verifier: gemini-2.5-pro (Google) via direct providers.call_model. Raw verdict ISSUES_FOUND with one critical claiming the validation missed the consumer-table straggler (the ## Consumer repos table duplicated in all three engine files). Dispositioned in-flight as a context-gap FALSE POSITIVE against the locked S1 contract: s1-audit-record.md 3.3 explicitly permits a duplicated consumer table ('A short consumer table may be duplicated in the engine files for convenience'), the table's canonical copy verifiably exists in repository-reference.md so it is NOT sole-sourced, and the verifier was not fed s1-audit-record.md. Rather than dismiss it, re-cast the underlying 4-copies-of-the-table tension as an explicit keep-vs-remove DECISION for Session 3 (s2-validation.md 5 item 3, 6). Both claim checks that matter held true (canonical section well-formed; render clean); both S2 stragglers independently confirmed real; verifier endorsed S2's deferral discipline as 'sound'. Net S2 verdict VERIFIED_WITH_NOTES. Raw output saved to s2-verification.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "task": "session-verification",
+          "model": "gemini-2.5-pro",
+          "provider": "google",
+          "cost_usd": 0.040935
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/close-out",
+      "dateTime": "2026-06-02T12:12:00-04:00",
+      "description": "Authored disposition.json (status completed, verification_method api, verification_verdict VERIFIED_WITH_NOTES, next_orchestrator -> claude/anthropic/claude-opus-4-8 for the Session 3 complete-centralization pass) and s2-close-reason.md; committed and pushed the Session 2 validation bundle; ran close_session --manual-verify (API path, verification ran out-of-band) to pass the gates and flip Session 2 to complete. Set stays in-progress for Session 3.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

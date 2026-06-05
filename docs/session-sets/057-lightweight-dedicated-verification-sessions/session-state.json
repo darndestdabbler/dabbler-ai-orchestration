@@ -20,16 +20,16 @@
     {
       "number": 2,
       "title": "Schema + forced writer",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-06-05T08:36:22.483099-04:00",
-      "completedAt": null,
+      "completedAt": "2026-06-05T09:43:56.256862-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-4-8",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

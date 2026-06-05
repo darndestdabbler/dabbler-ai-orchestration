@@ -67,6 +67,10 @@ try:
         SESSION_STATUS_COMPLETE,
         SESSION_STATUS_IN_PROGRESS,
         SESSION_STATUS_NOT_STARTED,
+        SESSION_TYPE_REMEDIATION,
+        SESSION_TYPE_VERIFICATION,
+        SESSION_TYPE_WORK,
+        SESSION_TYPES,
         SessionRecord,
         SessionStateInvariantError,
         canonicalize_status,
@@ -81,6 +85,10 @@ except ImportError:
         SESSION_STATUS_COMPLETE,
         SESSION_STATUS_IN_PROGRESS,
         SESSION_STATUS_NOT_STARTED,
+        SESSION_TYPE_REMEDIATION,
+        SESSION_TYPE_VERIFICATION,
+        SESSION_TYPE_WORK,
+        SESSION_TYPES,
         SessionRecord,
         SessionStateInvariantError,
         canonicalize_status,
@@ -293,6 +301,32 @@ def _existing_sessions_records(state: Optional[dict]) -> List[SessionRecord]:
     return out
 
 
+def _existing_session_types(state: Optional[dict]) -> dict:
+    """Return ``{number: type}`` for entries on disk carrying a known ``type``.
+
+    Set 057 helper. Only entries whose ``type`` is a recognized session
+    type (``work`` / ``verification`` / ``remediation``) are returned;
+    unknown / malformed values are dropped so a stray field never leaks
+    into a rebuilt ledger. Used by :func:`_build_sessions_array` to carry
+    the field across boundary-write rebuilds. The reader normalizer
+    (``progress.normalize_to_v4_shape``) already preserves the field on
+    read — this helper closes the write-side gap.
+    """
+    out: dict = {}
+    if not isinstance(state, dict):
+        return out
+    for entry in state.get("sessions") or []:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("number")
+        if type(number) is not int or number <= 0:
+            continue
+        t = entry.get("type")
+        if isinstance(t, str) and t in SESSION_TYPES:
+            out[number] = t
+    return out
+
+
 def _spec_titles_for_set(session_set_dir: str) -> dict:
     """Return ``{number: title}`` parsed from the set's ``spec.md``.
 
@@ -448,6 +482,14 @@ def _build_sessions_array(
 
     existing = {r.number: r for r in _existing_sessions_records(prior_state)}
     spec_titles = _spec_titles_for_set(session_set_dir)
+    # Set 057: carry forward any non-``work`` ``type`` from the prior
+    # on-disk ledger so a verification / remediation session appended by
+    # the blessed writer is not silently demoted to ``work`` when a later
+    # boundary write (register_session_start / _flip_state_to_closed)
+    # rebuilds sessions[]. Only non-``work`` types are emitted — absent
+    # ``type`` means ``work`` everywhere, so historical and Full-tier
+    # entries stay byte-identical.
+    existing_types = _existing_session_types(prior_state)
 
     out: List[dict] = []
     for k in range(1, total + 1):
@@ -464,7 +506,11 @@ def _build_sessions_array(
             status = SESSION_STATUS_COMPLETE
         else:
             status = SESSION_STATUS_NOT_STARTED
-        out.append({"number": k, "title": title, "status": status})
+        entry: dict = {"number": k, "title": title, "status": status}
+        prior_type = existing_types.get(k)
+        if prior_type is not None and prior_type != SESSION_TYPE_WORK:
+            entry["type"] = prior_type
+        out.append(entry)
 
     return out
 
@@ -874,6 +920,185 @@ def register_session_start(
         _propagate_total_sessions(session_set, total_sessions)
 
     return path
+
+
+def register_typed_session_start(
+    session_set: str,
+    session_type: str,
+    orchestrator_engine: str,
+    orchestrator_model: Optional[str] = None,
+    orchestrator_effort: Optional[str] = None,
+    orchestrator_provider: Optional[str] = None,
+    *,
+    title: Optional[str] = None,
+) -> Tuple[str, int]:
+    """Append a typed verification/remediation session and mark it in-progress.
+
+    Set 057 blessed writer for dedicated verification / remediation
+    sessions (Q1: structured files only — **never** mutates ``spec.md``).
+    It GROWS the runtime session count: the new entry's number is
+    ``len(sessions[]) + 1`` and ``totalSessions`` (derived under v4 from
+    ``len(sessions[])``) increments by exactly one. The authored spec
+    session count is untouched. ``register_session_start`` remains the
+    writer for ``work`` sessions; this is the **only** sanctioned creator
+    of typed sessions (the close-time validator backstops freehand
+    creation — see :mod:`ai_router.dedicated_verification`).
+
+    Contract / refusals (fail loud, before any write — spec D6):
+
+    * ``session_type`` must be ``verification`` or ``remediation``.
+    * The set must already carry a known plan (a ``sessions[]`` ledger on
+      disk). A plan-less stub has no authored sessions to append after.
+    * No session may already be in flight (invariant rule 3: one
+      in-progress at a time). Verification runs after the implementation
+      sessions close; remediation runs after its verification session
+      closes.
+
+    Returns ``(state_file_path, new_session_number)``.
+    """
+    if session_type not in (SESSION_TYPE_VERIFICATION, SESSION_TYPE_REMEDIATION):
+        raise ValueError(
+            f"register_typed_session_start: session_type must be "
+            f"{SESSION_TYPE_VERIFICATION!r} or {SESSION_TYPE_REMEDIATION!r}, "
+            f"got {session_type!r}. Work sessions use register_session_start."
+        )
+
+    existing = read_raw_session_state(session_set)
+    if (
+        not isinstance(existing, dict)
+        or not isinstance(existing.get("sessions"), list)
+        or not existing.get("sessions")
+    ):
+        raise SessionStateInvariantError(
+            1,
+            "register_typed_session_start refused: no sessions[] ledger on "
+            f"disk for {session_set!r}. A typed verification/remediation "
+            "session can only be appended to a set with a known plan; run "
+            "the implementation sessions first (or declare totalSessions).",
+        )
+
+    spec_md_path = Path(session_set) / "spec.md"
+    normalized = normalize_to_v4_shape(existing, spec_md_path)
+    prior_sessions = normalized.get("sessions") or []
+
+    # Refuse if a session is in flight (rule 3 would also catch it, but a
+    # named refusal is clearer to the operator than a generic invariant
+    # error).
+    in_flight = [
+        s
+        for s in prior_sessions
+        if isinstance(s, dict) and s.get("status") == SESSION_STATUS_IN_PROGRESS
+    ]
+    if in_flight:
+        nums = ", ".join(str(s.get("number")) for s in in_flight)
+        raise SessionStateInvariantError(
+            3,
+            f"register_typed_session_start refused: session {nums} is still "
+            f"in flight. Close it before appending a typed {session_type} "
+            "session.",
+        )
+
+    new_number = len(prior_sessions) + 1
+
+    orchestrator_block: dict = {"engine": orchestrator_engine}
+    if orchestrator_provider is not None:
+        orchestrator_block["provider"] = orchestrator_provider
+    if orchestrator_model is not None:
+        orchestrator_block["model"] = orchestrator_model
+    if orchestrator_effort is not None:
+        orchestrator_block["effort"] = orchestrator_effort
+
+    if title is None:
+        # Round = count of prior same-typed sessions + 1, giving a stable,
+        # human-readable label (e.g. "Verification round 1").
+        prior_same = sum(
+            1
+            for s in prior_sessions
+            if isinstance(s, dict) and s.get("type") == session_type
+        )
+        title = f"{session_type.capitalize()} round {prior_same + 1}"
+
+    # Rebuild the ledger: prior entries preserved (number / title / status
+    # / type / per-session metadata) plus the new typed in-progress entry.
+    # We copy only the canonical v4 per-session keys so a stray derived
+    # field from the normalizer never lands on disk.
+    rebuilt: List[dict] = []
+    for s in prior_sessions:
+        entry: dict = {
+            "number": s.get("number"),
+            "title": s.get("title"),
+            "status": s.get("status"),
+        }
+        s_type = s.get("type")
+        if (
+            isinstance(s_type, str)
+            and s_type in SESSION_TYPES
+            and s_type != SESSION_TYPE_WORK
+        ):
+            entry["type"] = s_type
+        for key in _V4_PER_SESSION_METADATA_KEYS:
+            entry[key] = s.get(key)
+        rebuilt.append(entry)
+
+    now = _now_iso()
+    rebuilt.append(
+        {
+            "number": new_number,
+            "title": title,
+            "status": SESSION_STATUS_IN_PROGRESS,
+            "type": session_type,
+            "startedAt": now,
+            "completedAt": None,
+            "orchestrator": orchestrator_block,
+            "verificationVerdict": None,
+        }
+    )
+
+    # Fail-loud invariant check BEFORE any write (spec D6). The new
+    # in-progress entry at the tail keeps the completed-prefix invariant
+    # intact when the implementation sessions are already complete.
+    _validate_sessions_or_raise(
+        rebuilt,
+        top_status=SESSION_STATUS_IN_PROGRESS,
+        lifecycle_state=SessionLifecycleState.WORK_IN_PROGRESS.value,
+    )
+
+    # Append the work_started event (audit trail) before the snapshot
+    # write; idempotent on re-entry (matches register_session_start).
+    if os.path.isdir(session_set):
+        try:
+            from session_events import (  # type: ignore[import-not-found]
+                append_event,
+                read_events,
+            )
+        except ImportError:
+            from .session_events import (  # type: ignore[no-redef]
+                append_event,
+                read_events,
+            )
+        prior_events = read_events(session_set)
+        already = any(
+            ev.event_type == "work_started" and ev.session_number == new_number
+            for ev in prior_events
+        )
+        if not already:
+            append_event(session_set, "work_started", new_number)
+
+    state: dict = {
+        "schemaVersion": SCHEMA_VERSION,
+        "sessionSetName": os.path.basename(session_set.rstrip("/\\")),
+        "status": SESSION_STATUS_IN_PROGRESS,
+        "sessions": rebuilt,
+    }
+    for passthrough_key in ("forceClosed", "preCancelStatus"):
+        if passthrough_key in existing:
+            state[passthrough_key] = existing[passthrough_key]
+
+    path = _state_path(session_set)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2)
+        f.write("\n")
+    return path, new_number
 
 
 def _propagate_total_sessions(session_set: str, total: int) -> None:

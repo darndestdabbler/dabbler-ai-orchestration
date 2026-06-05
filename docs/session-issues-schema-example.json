@@ -1,21 +1,23 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "sessionNumber": 2,
   "verificationRound": 1,
   "verificationVerdict": "ISSUES_FOUND",
   "issues": [
     {
-      "description": "The Step 6 instructions describe writing sN-verification.md but never mention persisting the structured issue list, so the machine-readable findings are dropped after the round completes.",
-      "category": "completeness",
+      "description": "register_typed_session_start appends the verification entry but does not increment the runtime totalSessions, so _build_sessions_array truncates the appended session on the next boundary write.",
+      "category": "correctness",
       "severity": "Major",
+      "issueId": "S057-V1-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Ran the writer against a 2-session fixture, then re-read via normalize_to_v4_shape and observed the appended entry dropped.",
+      "suggestedTestOrCheck": "test_typed_session_grows_total_sessions: assert len(sessions[]) increases by one and survives a subsequent close.",
       "resolution_status": "fixed",
-      "resolution_notes": "Added the sN-issues.json write step to the Step 7 ISSUES_FOUND flow and the artifact table.",
+      "resolution_notes": "Writer now derives the new count from len(sessions[]) and validates before writing.",
       "resolved_in_round": 2
     },
     {
-      "description": "The example fixture should prove that a minimal envelope without any resolution_* fields is still valid; the second issue below carries only the verifier-emitted fields.",
-      "category": "documentation",
-      "severity": "Minor"
+      "description": "The example fixture should prove a minimal envelope with bare verifier issues (no promoted or resolution_* fields) is still valid; this issue carries only the verifier-emitted fields."
     }
   ]
 }

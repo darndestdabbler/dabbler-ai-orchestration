@@ -140,6 +140,103 @@
           "costUsd": 0.0389
         }
       ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/type-field",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Added session.type (work|verification|remediation, default work) to progress.py + preserved across writer rebuilds (_build_sessions_array); documented in session-state-schema.md",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/issues-schema-v2",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Extended sN-issues.json to schemaVersion 2: promoted optional finding fields (issueId/issueType/verificationMethod/suggestedTestOrCheck) + enum-enforced resolution_status/issueType when present; v1 stays valid; updated schema JSON, doc, example fixture",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/blessed-writer",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Implemented register_typed_session_start (appends typed sessions[] entry, grows totalSessions, fail-loud refusals) + start_session --type CLI branch with type-announcement banner pointing typed sessions at the workflow doc",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/close-time-validator",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Added dedicated_verification.py: content-aware close-time validator (different-engine verification before terminal close); D3 left unchanged; non-blocking advisory wired into close_session (gate strength deferred to S3)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/derivation-helper",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Added 7-state derive_workflow_state per Q3 ladder (sessions[]+verdicts+latest sN-issues+verificationMode record) + verificationMode reader/writer + seed_issues_envelope",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/tests",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Added test_dedicated_verification.py + test_typed_session_writer.py + extended schema tests; full Python suite green",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/verify-round-1",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Cross-provider session verification (gpt-5-4): ISSUES_FOUND, 3 Major correctness findings; persisted s2-verification.md + s2-issues.json",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5.4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.2319
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/fixes",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Fixed all 3 Major in-flight: validator empty-baseline fail-closed; advisory-disagreement reclassified as human-stop dispute; seed_issues_envelope rejects VERIFIED verdict; added regression tests",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/verify-round-2",
+      "dateTime": "2026-06-05T09:36:10.458398-04:00",
+      "description": "Re-verification (gpt-5-4): VERIFIED, all 3 resolved, no regressions",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5.4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.0522
+        }
+      ]
     }
   ]
 }

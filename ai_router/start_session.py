@@ -98,6 +98,7 @@ try:
         compute_effective_completed_sessions,
         read_session_state,
         register_session_start,
+        register_typed_session_start,
     )
     from close_lock import (  # type: ignore[import-not-found]
         DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
@@ -119,6 +120,7 @@ except ImportError:
         compute_effective_completed_sessions,
         read_session_state,
         register_session_start,
+        register_typed_session_start,
     )
     from .close_lock import (  # type: ignore[no-redef]
         DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
@@ -228,6 +230,32 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "code can keep passing it without erroring. A one-line "
             "deprecation note is written to stderr on each invocation "
             "that supplies the flag."
+        ),
+    )
+    p.add_argument(
+        "--type",
+        dest="session_type",
+        default="work",
+        choices=["work", "verification", "remediation"],
+        help=(
+            "Set 057: session type. ``work`` (default) starts the next "
+            "authored session normally. ``verification`` or "
+            "``remediation`` invoke the blessed typed-session writer: it "
+            "APPENDS a new typed entry to session-state.json sessions[] "
+            "(growing the runtime totalSessions by one) and never mutates "
+            "spec.md. Typed sessions take their step list from "
+            "docs/ai-led-session-workflow.md (the Lightweight dedicated-"
+            "verification procedure), NOT from a spec.md heading."
+        ),
+    )
+    p.add_argument(
+        "--title",
+        dest="session_title",
+        default=None,
+        help=(
+            "Optional title for a typed (--type verification|remediation) "
+            "session. Defaults to e.g. 'Verification round 1'. Ignored for "
+            "--type work."
         ),
     )
     p.add_argument(
@@ -426,6 +454,20 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     inner flow directly.
     """
     session_set_dir = args.session_set_dir
+
+    # Set 057: typed verification/remediation sessions take a separate
+    # writer path. They are NOT authored in spec.md and do NOT obey the
+    # work-session boundary math (skip-ahead / next-sequential refusals);
+    # instead they APPEND a new typed entry beyond the authored plan and
+    # grow the runtime totalSessions. The blessed writer enforces its own
+    # fail-loud contract (known plan required, no session in flight). The
+    # announcement banner tells the operator AND the orchestrator what
+    # kind of session this is and where its step list lives, so a pasted
+    # "Start the next session" prompt is self-describing.
+    session_type = getattr(args, "session_type", "work") or "work"
+    if session_type in ("verification", "remediation"):
+        return _run_typed_session(args, session_set_dir, session_type)
+
     state = read_session_state(session_set_dir) or {}
     closed = compute_effective_completed_sessions(session_set_dir)
     closed_set = set(closed)
@@ -577,6 +619,79 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     # start_session's exit status.
     try:
         drift_line = summarize_drift(os.path.dirname(os.path.abspath(session_set_dir)))
+        if drift_line:
+            print(drift_line, file=sys.stderr)
+    except Exception:
+        pass
+
+    return EXIT_OK
+
+
+def _run_typed_session(
+    args: argparse.Namespace,
+    session_set_dir: str,
+    session_type: str,
+) -> int:
+    """Set 057: append a typed verification/remediation session.
+
+    Delegates to :func:`session_state.register_typed_session_start`, then
+    prints an ASCII-only announcement banner naming the session type and
+    pointing at the canonical procedure (typed sessions take their step
+    list from ``docs/ai-led-session-workflow.md``, NOT from spec.md).
+    The drift advisory and writer-log appender mirror the work-session
+    path so a typed session is observationally identical otherwise.
+
+    Returns ``EXIT_OK`` on success, ``EXIT_BOUNDARY`` when the writer's
+    fail-loud contract refuses (no plan, session in flight), or
+    ``EXIT_USAGE`` for a bad session_type.
+    """
+    try:
+        _path, new_number = register_typed_session_start(
+            session_set=session_set_dir,
+            session_type=session_type,
+            orchestrator_engine=args.engine,
+            orchestrator_model=args.model,
+            orchestrator_effort=args.effort,
+            orchestrator_provider=args.provider,
+            title=getattr(args, "session_title", None),
+        )
+    except ValueError as exc:
+        # SessionStateInvariantError is a ValueError subclass; both land
+        # here. Contract refusals (no plan / in-flight) are boundary
+        # violations; a bad session_type is a usage error, but argparse
+        # ``choices`` already rejects that upstream, so treat all of these
+        # as boundary violations for a clear, consistent exit code.
+        print(f"start_session: {exc}", file=sys.stderr)
+        return EXIT_BOUNDARY
+
+    # Announcement banner (ASCII-only per the cp1252 convention). Printed
+    # to stderr so it never pollutes any machine-readable stdout consumer,
+    # matching the drift advisory's stream.
+    print(
+        f"[dabbler] Session {new_number} is a {session_type.upper()} session "
+        f"(type={session_type}).",
+        file=sys.stderr,
+    )
+    print(
+        "[dabbler] Typed sessions take their step list from "
+        "docs/ai-led-session-workflow.md -> Lightweight dedicated "
+        "verification (NOT a spec.md heading).",
+        file=sys.stderr,
+    )
+
+    _log_session_start(
+        session_set_dir=session_set_dir,
+        session_number=new_number,
+        engine=args.engine,
+        provider=args.provider,
+    )
+
+    # Set 053 schema-drift advisory, identical to the work-session path:
+    # non-blocking, fail-open, stderr only, never changes exit status.
+    try:
+        drift_line = summarize_drift(
+            os.path.dirname(os.path.abspath(session_set_dir))
+        )
         if drift_line:
             print(drift_line, file=sys.stderr)
     except Exception:

@@ -1,29 +1,36 @@
 {
   "status": "completed",
-  "summary": "Session 1 (Audit & design-lock): de-duplicated the design-input proposal (kept the cleaner second draft as proposal of record), ran cross-provider consensus on Q1-Q7 (gpt-5-4 + gemini-pro, orchestrator excluded) with L1-L4 fed as decided context, and locked the design. Q1-Q5 and Q7 converged; Q6 (close-out gate strength) split materially and was operator-decided to hard-TTY/soft-non-TTY. Both engines flagged the same concrete defect in L3's spec mechanism (the S2 'extend the D3 check' plan is unsound: D3 is content-blind and inert on Lightweight) -- corrected to a new content-aware close-time validator; D3 left unchanged. Wrote the S1 Audit Lock block into spec.md plus verdict.md and s1-audit-record.md. Cross-provider session verification (gpt-5-4): round 1 ISSUES_FOUND (two Major doc-consistency findings), both fixed in-flight, round 2 VERIFIED.",
+  "summary": "Session 2 (Schema + forced writer): shipped the Set 057 implementation against the locked S1 contract. (1) Added the per-session `type` field (work|verification|remediation, default work; absent==work) to progress.py, preserved across writer rebuilds in session_state.py (_build_sessions_array + _existing_session_types), and documented in session-state-schema.md. (2) Extended sN-issues.json to schemaVersion 2: promoted four optional finding fields (issueId/issueType/verificationMethod/suggestedTestOrCheck) and enum-enforced resolution_status + issueType when present, gated so v1 files stay valid; updated schema JSON, doc, and example fixture. (3) Implemented the blessed writer register_typed_session_start (appends a typed sessions[] entry, grows the runtime totalSessions, fail-loud refusals) plus the `start_session --type` CLI branch with a type-announcement banner that points typed sessions at the workflow doc (closes an operator-raised discoverability gap: typed sessions are not in spec.md). (4) Added ai_router/dedicated_verification.py: the content-aware close-time validator (different-engine verification before terminal close; D3 left unchanged) wired into close_session as a non-blocking advisory (gate STRENGTH deferred to S3), the verificationMode record reader/writer, the sN-issues seeder, and the seven-state derivation helper per the Q3 ladder. (5) Tests for all of it; full Python suite green. Cross-provider session verification (gpt-5-4): round 1 ISSUES_FOUND with three Major correctness findings (validator empty-baseline false positive; advisory-disagreement mis-classified as terminal; seeder accepted a VERIFIED verdict) -- all three real, fixed in-flight with regression tests; round 2 VERIFIED. No packaged ai_router surface released (held for S3 version bump per spec). Carried to S3: the verification->remediation hand-off close transition (a non-terminal verification close yields an all-complete sessions[] that invariant rule 6 rejects), the gate strength (Q6 hard-TTY/soft-non-TTY), the workflow-doc generic procedure for typed sessions, and the copy-prompt wiring.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "docs/proposals/2026-06-05-lightweight-dedicated-verification-sessions.md",
-    "docs/proposals/2026-06-05-lightweight-dedicated-verification-sessions/consensus-gpt-5-4.md",
-    "docs/proposals/2026-06-05-lightweight-dedicated-verification-sessions/consensus-gemini-pro.md",
-    "docs/proposals/2026-06-05-lightweight-dedicated-verification-sessions/verdict.md",
-    "docs/session-sets/057-lightweight-dedicated-verification-sessions/spec.md",
+    "ai_router/progress.py",
+    "ai_router/session_state.py",
+    "ai_router/start_session.py",
+    "ai_router/close_session.py",
+    "ai_router/dedicated_verification.py",
+    "ai_router/tests/test_session_issues_schema.py",
+    "ai_router/tests/test_dedicated_verification.py",
+    "ai_router/tests/test_typed_session_writer.py",
+    "docs/session-issues.schema.json",
+    "docs/session-issues-schema.md",
+    "docs/session-issues-schema-example.json",
+    "docs/session-state-schema.md",
     "docs/session-sets/057-lightweight-dedicated-verification-sessions/ai-assignment.md",
-    "docs/session-sets/057-lightweight-dedicated-verification-sessions/s1-audit-record.md",
-    "docs/session-sets/057-lightweight-dedicated-verification-sessions/s1-verification.md",
-    "docs/session-sets/057-lightweight-dedicated-verification-sessions/s1-verification-round-2.md",
-    "docs/session-sets/057-lightweight-dedicated-verification-sessions/s1-issues.json"
+    "docs/session-sets/057-lightweight-dedicated-verification-sessions/activity-log.json",
+    "docs/session-sets/057-lightweight-dedicated-verification-sessions/s2-verification.md",
+    "docs/session-sets/057-lightweight-dedicated-verification-sessions/s2-verification-round-2.md",
+    "docs/session-sets/057-lightweight-dedicated-verification-sessions/s2-issues.json"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
     "engine": "claude-code",
     "provider": "anthropic",
-    "model": "claude-sonnet-4-6",
-    "effort": "high",
+    "model": "claude-opus-4-8",
+    "effort": "medium",
     "reason": {
-      "code": "switch-due-to-cost",
-      "specifics": "Session 2 is well-scoped Python implementation against a locked design (session type field, sN-issues.json enum + promoted fields, blessed start_session --type writer, the new content-aware close-time validator, state-derivation helper, tests). The routed ai-assignment analysis recommends Sonnet at high effort -- a cheaper, fully-capable coding model -- since no fresh architectural reasoning remains."
+      "code": "continue",
+      "specifics": "S3 stays on opus-4-8 (the active engine). It is a consistency-critical rewrite of docs/ai-led-session-workflow.md + the authoring guide (per-set verification made consistent, bounded rounds, the second-opinion tie-breaker, AND the generic procedure typed sessions follow in lieu of a spec.md step list), plus wiring the operator-choice capture and the Q6 close-out gate strength, plus the held PyPI version bump. The S2 verifier flagged that the derivation's disposition partition and the validator's fail-closed edges are subtle -- keep adversarial cross-provider verification on the S3 changes."
     }
   },
   "blockers": []

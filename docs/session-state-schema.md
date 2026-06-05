@@ -213,10 +213,48 @@ Each entry is an object with these fields:
 | `number` | positive int | 1-indexed session number. Unique within the array, sorted ascending. |
 | `title` | string | Display title, copied from `spec.md`'s `### Session K of N: <title>` heading. Cosmetic — drift between `spec.md` and the state file is benign. |
 | `status` | enum (see below) | Per-session lifecycle state. |
+| `type` | enum or absent | Session type: `work` (default) \| `verification` \| `remediation` (Set 057). **Absent means `work`** — every existing and Full-tier entry omits it, and only non-`work` values are written to disk. See **Per-session `type`** below. |
 | `startedAt` | ISO 8601 or null | Set on `start_session`. Null until the session begins. |
 | `completedAt` | ISO 8601 or null | Set on `close_session`. Null until the session closes. |
 | `orchestrator` | object or null | Engine / provider / model / effort for the holder of THIS session, omit-null on disk. Null when this session has not yet started; populated by `start_session`; **preserved across `close_session`** as historical attribution on closed sessions. See **Per-session orchestrator block** below. |
 | `verificationVerdict` | string \| null | Set by `close_session` after gate checks via `resolve_close_verdict()`. Three-level precedence: (1) `disposition.verification_verdict` verbatim (wins even under `--force`); (2) for `verification_method == "api"` only, a status-derived fallback (`completed`→`"VERIFIED"`, `failed`/`requires_review`→`"ISSUES_FOUND"`) when no explicit field is set (backward compat for pre-Set-054 dispositions); (3) `null` for manual / skipped / `--no-router` / missing disposition when neither source applies. The two canonical tokens are `"VERIFIED"` and `"ISSUES_FOUND"`; the writer does not enforce an enum and operators have shipped extension tokens like `"ISSUES_FOUND_RESOLVED_IN_FLIGHT"` to capture mid-session disposition. Readers should treat the field as a string and match on prefix when bucketing. |
+
+### Per-session `type` (Set 057)
+
+A `sessions[N].type` field classifies the session for the Lightweight
+**dedicated-verification** workflow:
+
+| Value | Meaning | Authored where |
+|---|---|---|
+| `work` (default / absent) | A normal implementation session from `spec.md`. | `spec.md` `### Session K` headings; written by `start_session` (work path). |
+| `verification` | A dedicated cross-provider verification session, appended at runtime. | **Not in `spec.md`.** Appended by the blessed writer `start_session --type verification`. |
+| `remediation` | A remediation session that fixes findings from a verification round. | **Not in `spec.md`.** Appended by `start_session --type remediation`. |
+
+Key rules:
+
+- **Absent ⇒ `work`.** The field is additive and backward-compatible.
+  Only non-`work` values are persisted, so historical and Full-tier
+  ledgers are byte-identical to before Set 057. Readers MUST treat a
+  missing `type` as `work`.
+- **Typed sessions are appended at runtime, never authored in `spec.md`**
+  (Set 057 Q1 — the writer never mutates `spec.md`). The blessed writer
+  grows the runtime session count: a typed entry's `number` is
+  `len(sessions[]) + 1`, so the derived `totalSessions` increments by
+  one per appended typed session. The authored spec count stays fixed.
+- **Typed sessions take their step list from
+  [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md)**
+  (the generic, bounded dedicated-verification procedure), **not** from
+  a `spec.md` heading. `start_session --type …` prints a banner saying
+  so, so a pasted "Start the next session" prompt is self-describing.
+- The field is **preserved across boundary writes** — `start_session`
+  (work path) and `close_session` both carry an existing non-`work`
+  `type` forward when they rebuild `sessions[]`.
+- Only the blessed writer (`register_typed_session_start`) creates typed
+  sessions. Freehand creation is backstopped at close time by the
+  content-aware validator in `ai_router/dedicated_verification.py`
+  (`validate_dedicated_verification`); the seven workflow states are
+  derived from `type` + verdicts + the latest `sN-issues.json` by
+  `derive_workflow_state` (Set 057 Q3 — derived, never persisted).
 
 The migration from v3 reorganized the lifecycle so that **per-session
 attribution survives the set's full lifetime**: who ran each session

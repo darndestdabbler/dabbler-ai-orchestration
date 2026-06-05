@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "validate_dedicated_verification can return a false positive when implementation sessions are missing engine metadata: it discards None work-session engines, then accepts any completed verification session whose engine is not in the remaining set, so Q6 can be reported satisfied even though cross-provider cannot be confirmed.",
+      "category": "Correctness",
+      "severity": "Major",
+      "issueId": "S057-S2-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Reasoned through validate_dedicated_verification with an empty work-engine baseline; 'v_engine not in work_engines' is vacuously true when work_engines is empty.",
+      "suggestedTestOrCheck": "Validator test with a work session carrying orchestrator=None and a cross-provider-looking verification session asserts ok is False.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Added an empty-baseline guard: when work_engines is empty after discarding None, the validator returns ok=False (unconfirmable) with a corrective. New test test_fails_when_no_work_engine_baseline.",
+      "resolved_in_round": 2
+    },
+    {
+      "description": "derive_state classified advisory-disagreement as a terminal disposition, letting a disputed finding collapse to closed-dispositioned / closed-verified instead of escalating; the locked Q3 ladder routes a remediation dispute to awaiting-human.",
+      "category": "Correctness",
+      "severity": "Major",
+      "issueId": "S057-S2-002",
+      "issueType": "standards-departure",
+      "verificationMethod": "Compared _TERMINAL_DISPOSITIONS membership against the Q3 ladder's 'open/dispute => awaiting-human' rule.",
+      "suggestedTestOrCheck": "Derivation tests assert advisory-disagreement yields awaiting-human in both the verification and remediation branches.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Moved advisory-disagreement from _TERMINAL_DISPOSITIONS to _HUMAN_STOP_DISPOSITIONS. New tests test_remediation_advisory_disagreement_awaits_human and test_verification_advisory_disagreement_awaits_human.",
+      "resolved_in_round": 2
+    },
+    {
+      "description": "seed_issues_envelope only enforced non-empty issues; it did not reject a clean/VERIFIED verdict for an sN-issues file, violating the locked Set-055 presence-means-issues invariant and potentially mis-driving derive_state into closed-verified.",
+      "category": "Correctness",
+      "severity": "Major",
+      "issueId": "S057-S2-003",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Inspected seed_issues_envelope guards against the Set-055 invariant 'presence of an sN-issues file means issues were found'.",
+      "suggestedTestOrCheck": "Seeder test asserts a VERIFIED / empty / blank verdict raises ValueError.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Added a guard raising ValueError when verification_verdict is empty/blank or equals VERIFIED (case-insensitive). New test test_seed_rejects_verified_verdict.",
+      "resolved_in_round": 2
+    }
+  ]
+}

@@ -72,6 +72,23 @@ TOP_LEVEL_STATUSES = (
 LIFECYCLE_STATE_WORK_IN_PROGRESS = "work_in_progress"
 LIFECYCLE_STATE_CLOSED = "closed"
 
+# Set 057: per-session ``type`` field. Default ``work``; absent/``work``
+# for every existing and Full-tier entry. ``verification`` and
+# ``remediation`` entries are appended at runtime by the blessed writer
+# (``register_typed_session_start``) for the Lightweight dedicated-
+# verification flow — they are NOT authored in spec.md. The field is
+# additive and backward-compatible: a missing ``type`` is interpreted as
+# ``work`` everywhere. Only non-``work`` types are persisted on disk so
+# historical and Full-tier ledgers are untouched.
+SESSION_TYPE_WORK = "work"
+SESSION_TYPE_VERIFICATION = "verification"
+SESSION_TYPE_REMEDIATION = "remediation"
+SESSION_TYPES = (
+    SESSION_TYPE_WORK,
+    SESSION_TYPE_VERIFICATION,
+    SESSION_TYPE_REMEDIATION,
+)
+
 # Tolerated on read, canonicalized to ``complete``. Mirrors the v2
 # alias map in ``session_state.py`` and the extension's
 # ``STATUS_ALIASES`` so a hand-written file with a past-participle
@@ -904,6 +921,10 @@ __all__ = [
     "TOP_LEVEL_STATUSES",
     "LIFECYCLE_STATE_WORK_IN_PROGRESS",
     "LIFECYCLE_STATE_CLOSED",
+    "SESSION_TYPE_WORK",
+    "SESSION_TYPE_VERIFICATION",
+    "SESSION_TYPE_REMEDIATION",
+    "SESSION_TYPES",
     "SessionStateInvariantError",
     "SessionRecord",
     "ProgressView",

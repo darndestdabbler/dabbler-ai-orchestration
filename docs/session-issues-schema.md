@@ -18,6 +18,15 @@
 > (`docs/session-sets/055-structured-verification-issue-artifacts/`).
 > The authoritative design record is
 > [`docs/proposals/2026-06-02-structured-verification-issue-artifacts/verdict.md`](proposals/2026-06-02-structured-verification-issue-artifacts/verdict.md).
+>
+> **Extended by** Set 057
+> (`docs/session-sets/057-lightweight-dedicated-verification-sessions/`):
+> `schemaVersion: 2` promotes four optional finding fields and tightens
+> `resolution_status` (and the new `issueType`) into validator-enforced
+> enums **when present**. v1 files stay valid unchanged. The Set 057
+> design record is
+> [`docs/proposals/2026-06-05-lightweight-dedicated-verification-sessions/verdict.md`](proposals/2026-06-05-lightweight-dedicated-verification-sessions/verdict.md)
+> → Q2.
 
 ---
 
@@ -98,7 +107,7 @@ top-level contract:
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| `schemaVersion` | integer | yes | `1` for the v1 contract. |
+| `schemaVersion` | integer | yes | `1` (Set 055 v1 contract) or `2` (Set 057 v2 contract). v1 keeps loose advisory strings; v2 enum-enforces `resolution_status` / `issueType` and recognizes the promoted finding fields. |
 | `sessionNumber` | integer ≥ 1 | yes | The session this round belongs to. |
 | `verificationRound` | integer ≥ 1 | yes | Round 1 → `sN-issues.json`; round M → `sN-issues-round-<M>.json`. |
 | `verificationVerdict` | string | yes | The verifier verdict, preserved verbatim (e.g. `"ISSUES_FOUND"`). Makes the artifact self-describing. |
@@ -116,9 +125,36 @@ are tolerated (`additionalProperties` is open on the issue object).
 | `description` | string | yes | verifier |
 | `category` | string | no | verifier (loose) |
 | `severity` | string | no | verifier (loose) |
-| `resolution_status` | string | no | orchestrator annotation (advisory) |
+| `resolution_status` | string | no | orchestrator annotation (advisory). v1: loose. v2: enum-enforced **when present** (see below). |
 | `resolution_notes` | string | no | orchestrator annotation (advisory) |
 | `resolved_in_round` | integer ≥ 1 | no | orchestrator annotation (advisory) |
+
+### v2 promoted finding fields (Set 057)
+
+Under `schemaVersion: 2`, four additional **optional** fields are
+recognized on the issue object. They are additive and Full-tier-safe —
+a v2 file may carry none of them and stay valid. When present, the two
+enum fields are validated (spelling-drift guard only; the semantics
+remain advisory, no runtime gate reads them).
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `issueId` | string | no | Stable identifier the verifier assigns so re-verification rounds and remediation sessions can reference the finding unambiguously. |
+| `issueType` | string (enum) | no | One of `deterministic-defect` \| `contingent-risk` \| `standards-departure` \| `missing-context`. Enum-enforced when present. |
+| `verificationMethod` | string | no | One line on how the verifier reached (or would confirm) the finding. |
+| `suggestedTestOrCheck` | string | no | A concrete test/check that would confirm a fix. Often redundant with `verificationMethod`. |
+
+**`resolution_status` enum (v2, enforced when present):** `fixed` \|
+`not-reproducible` \| `accepted-risk` \| `accepted-consequence` \|
+`advisory-disagreement` \| `needs-more-context` \| `escalate-human`.
+
+> **Flow-layer requirement (NOT in the shared schema).** The Lightweight
+> dedicated-verification flow additionally requires a verifier-created
+> **open** issue to carry `issueId` + `issueType` + `verificationMethod`
+> (`description` is already required by the base envelope;
+> `suggestedTestOrCheck` stays optional). That stricter rule is enforced
+> by the flow / writer, not by `session-issues.schema.json`, so the
+> shared schema stays additive for Full tier and for existing fixtures.
 
 ### Resolution fields are advisory only
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dabbler.ai/schemas/session-issues.schema.json",
   "title": "SessionIssues",
-  "description": "Root-level structured verifier-findings artifact for one findings-bearing verification round. Written beside sN-verification.md as sN-issues.json (round 1) or sN-issues-round-<M>.json (later findings-bearing retries). This artifact has no runtime reader in the orchestration layer; it is durable, machine-readable persistence of the verifier's structured issue list. The presence of an sN-issues*.json file means that verification round found issues — VERIFIED rounds get no file. See docs/session-issues-schema.md.",
+  "description": "Root-level structured verifier-findings artifact for one findings-bearing verification round. Written beside sN-verification.md as sN-issues.json (round 1) or sN-issues-round-<M>.json (later findings-bearing retries). This artifact has no runtime reader in the orchestration layer; it is durable, machine-readable persistence of the verifier's structured issue list. The presence of an sN-issues*.json file means that verification round found issues — VERIFIED rounds get no file. schemaVersion 1 (Set 055) keeps category/severity/resolution_status as loose strings. schemaVersion 2 (Set 057) promotes four optional finding fields (issueId, issueType, verificationMethod, suggestedTestOrCheck) and enum-enforces resolution_status + issueType when present; the fields stay advisory in semantics (no runtime gate reads them) — the enum is a spelling-drift guard. v1 files remain valid unchanged. See docs/session-issues-schema.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,9 +14,9 @@
   ],
   "properties": {
     "schemaVersion": {
-      "description": "Envelope schema version. 1 for the v1 contract locked in Set 055.",
+      "description": "Envelope schema version. 1 = the v1 contract locked in Set 055 (loose advisory strings). 2 = the v2 contract locked in Set 057 (promoted optional finding fields + enum-enforced resolution_status / issueType).",
       "type": "integer",
-      "const": 1
+      "enum": [1, 2]
     },
     "sessionNumber": {
       "description": "1-based session number within the set that this findings round belongs to.",
@@ -34,16 +34,31 @@
       "minLength": 1
     },
     "issues": {
-      "description": "The verifier's structured issue list for this round. At least one issue is present (the file would not exist otherwise).",
+      "description": "The verifier's structured issue list for this round. At least one issue is present (the file would not exist otherwise). Under schemaVersion 2 each item additionally validates against IssueV2 (enum-enforced resolution_status / issueType, plus the optional promoted finding fields).",
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/Issue" }
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["schemaVersion"],
+        "properties": { "schemaVersion": { "const": 2 } }
+      },
+      "then": {
+        "properties": {
+          "issues": {
+            "items": { "$ref": "#/$defs/IssueV2" }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "Issue": {
       "type": "object",
-      "description": "One verifier finding. The verifier-emitted fields are preserved verbatim; description is the only reliable required field. category and severity are loose optional strings (the parser may emit 'unknown'). The resolution_* fields are optional, append-only, orchestrator-side annotations and are advisory only — they are NOT authoritative workflow state and no runtime gate consults them.",
+      "description": "One verifier finding (base / v1 contract). The verifier-emitted fields are preserved verbatim; description is the only reliable required field. category and severity are loose optional strings (the parser may emit 'unknown'). The resolution_* fields are optional, append-only, orchestrator-side annotations and are advisory only — they are NOT authoritative workflow state and no runtime gate consults them.",
       "additionalProperties": true,
       "required": ["description"],
       "properties": {
@@ -58,7 +73,7 @@
           "type": "string"
         },
         "resolution_status": {
-          "description": "Advisory annotation: what the orchestrator did with this finding (e.g. 'fixed', 'deferred', 'wont-fix', 'false-positive').",
+          "description": "Advisory annotation: what the orchestrator did with this finding. Loose string under schemaVersion 1; enum-enforced under schemaVersion 2 (see IssueV2).",
           "type": "string"
         },
         "resolution_notes": {
@@ -69,6 +84,50 @@
           "description": "Advisory annotation: the verification round in which this finding was resolved.",
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "IssueV2": {
+      "description": "One verifier finding under the Set 057 v2 contract. Inherits the v1 base (description required, additionalProperties open) and adds: enum-enforced resolution_status / issueType WHEN PRESENT, plus four optional promoted finding fields (issueId, issueType, verificationMethod, suggestedTestOrCheck). All promoted fields stay OPTIONAL in the shared schema (additive / Full-tier-safe). The Lightweight dedicated-verification flow imposes a stricter requirement on a verifier-created open issue (issueId + issueType + verificationMethod) at the flow layer, NOT in this shared schema.",
+      "allOf": [ { "$ref": "#/$defs/Issue" } ],
+      "properties": {
+        "resolution_status": {
+          "description": "Advisory annotation, enum-enforced under schemaVersion 2 (semantics stay advisory; the enum is a spelling-drift guard). No runtime gate reads it.",
+          "type": "string",
+          "enum": [
+            "fixed",
+            "not-reproducible",
+            "accepted-risk",
+            "accepted-consequence",
+            "advisory-disagreement",
+            "needs-more-context",
+            "escalate-human"
+          ]
+        },
+        "issueId": {
+          "description": "Optional stable identifier the verifier assigns a finding so re-verification rounds and remediation sessions can reference it unambiguously.",
+          "type": "string",
+          "minLength": 1
+        },
+        "issueType": {
+          "description": "Optional promoted classification of the finding, enum-enforced when present. deterministic-defect = a reproducible defect; contingent-risk = a conditional/latent risk; standards-departure = a convention/standards violation; missing-context = the verifier lacked context to judge.",
+          "type": "string",
+          "enum": [
+            "deterministic-defect",
+            "contingent-risk",
+            "standards-departure",
+            "missing-context"
+          ]
+        },
+        "verificationMethod": {
+          "description": "Optional one-line description of how the verifier reached this finding (the check it ran / would run). Required on a verifier-created open issue at the Lightweight dedicated-verification flow layer.",
+          "type": "string",
+          "minLength": 1
+        },
+        "suggestedTestOrCheck": {
+          "description": "Optional concrete test or check that would confirm the finding is fixed. Stays optional even in the dedicated-verification flow (often redundant with verificationMethod).",
+          "type": "string",
+          "minLength": 1
         }
       }
     }

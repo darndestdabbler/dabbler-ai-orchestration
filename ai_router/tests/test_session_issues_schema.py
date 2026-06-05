@@ -57,6 +57,14 @@ def _minimal_envelope() -> dict:
     }
 
 
+def _minimal_v2_envelope() -> dict:
+    """The smallest valid v2 findings artifact: schemaVersion 2 plus a
+    single bare verifier issue (the promoted fields are all optional)."""
+    env = _minimal_envelope()
+    env["schemaVersion"] = 2
+    return env
+
+
 class TestArtifactFilesExist:
     def test_schema_file_exists(self):
         assert SCHEMA_PATH.is_file()
@@ -130,11 +138,99 @@ class TestEnvelopeContract:
         with pytest.raises(jsonschema.ValidationError):
             validator.validate(env)
 
-    def test_schema_version_must_be_one(self, validator):
+    def test_schema_version_accepts_one_and_two(self, validator):
+        for version in (1, 2):
+            env = _minimal_envelope()
+            env["schemaVersion"] = version
+            validator.validate(env)
+
+    def test_schema_version_three_rejected(self, validator):
         env = _minimal_envelope()
-        env["schemaVersion"] = 2
+        env["schemaVersion"] = 3
         with pytest.raises(jsonschema.ValidationError):
             validator.validate(env)
+
+
+class TestV1BackwardCompat:
+    """A Set 055 v1 envelope keeps loose advisory strings — the v2 enum
+    tightening must not retroactively reject existing v1 artifacts."""
+
+    def test_v1_loose_resolution_status_still_valid(self, validator):
+        env = _minimal_envelope()  # schemaVersion 1
+        env["issues"][0]["resolution_status"] = "wont-fix"  # not in the v2 enum
+        validator.validate(env)
+
+    def test_v1_loose_category_severity_still_valid(self, validator):
+        env = _minimal_envelope()
+        env["issues"][0].update({"category": "whatever", "severity": "Cosmetic"})
+        validator.validate(env)
+
+
+class TestV2Contract:
+    def test_minimal_v2_envelope_passes(self, validator):
+        """All four promoted fields are optional — a bare v2 issue is valid."""
+        validator.validate(_minimal_v2_envelope())
+
+    def test_v2_resolution_status_enum_enforced(self, validator):
+        env = _minimal_v2_envelope()
+        env["issues"][0]["resolution_status"] = "not-a-real-status"
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)
+
+    def test_v2_resolution_status_enum_accepts_locked_values(self, validator):
+        for status in (
+            "fixed",
+            "not-reproducible",
+            "accepted-risk",
+            "accepted-consequence",
+            "advisory-disagreement",
+            "needs-more-context",
+            "escalate-human",
+        ):
+            env = _minimal_v2_envelope()
+            env["issues"][0]["resolution_status"] = status
+            validator.validate(env)
+
+    def test_v2_issue_type_enum_enforced(self, validator):
+        env = _minimal_v2_envelope()
+        env["issues"][0]["issueType"] = "not-a-real-type"
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)
+
+    def test_v2_issue_type_enum_accepts_locked_values(self, validator):
+        for issue_type in (
+            "deterministic-defect",
+            "contingent-risk",
+            "standards-departure",
+            "missing-context",
+        ):
+            env = _minimal_v2_envelope()
+            env["issues"][0]["issueType"] = issue_type
+            validator.validate(env)
+
+    def test_v2_promoted_fields_accepted(self, validator):
+        env = _minimal_v2_envelope()
+        env["issues"][0].update(
+            {
+                "issueId": "S057-V1-001",
+                "issueType": "deterministic-defect",
+                "verificationMethod": "Ran the writer against a 2-session fixture.",
+                "suggestedTestOrCheck": "assert len(sessions[]) grew by one.",
+                "resolution_status": "fixed",
+            }
+        )
+        validator.validate(env)
+
+    def test_v2_still_requires_description(self, validator):
+        env = _minimal_v2_envelope()
+        env["issues"][0] = {"issueType": "deterministic-defect"}
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)
+
+    def test_v2_tolerates_extra_verifier_keys(self, validator):
+        env = _minimal_v2_envelope()
+        env["issues"][0]["evidence"] = "line 42 in foo.py"
+        validator.validate(env)
 
 
 class TestIssueObjectContract:

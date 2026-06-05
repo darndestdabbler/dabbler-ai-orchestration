@@ -1627,6 +1627,39 @@ def run(
                         "(Set 048 §3.5)"
                     )
 
+        # Set 057 Q6 (validator landed in S2; gate STRENGTH wired in S3).
+        # When verificationMode=dedicated-sessions, run the content-aware
+        # close-time validator and surface its verdict as an ADVISORY
+        # message only — close-out semantics are unchanged in S2 (this
+        # mirrors how suggestion_disposition deferred its runtime gate to
+        # Set 048 S3). Session 3 upgrades this to the hard-TTY/soft-non-TTY
+        # gate. Fail-open: any error here never blocks close-out. Gated on
+        # verificationMode so Full-tier / non-opted-in sets are untouched.
+        try:
+            from dedicated_verification import (  # type: ignore[import-not-found]
+                VERIFICATION_MODE_DEDICATED,
+                read_verification_mode,
+                validate_dedicated_verification,
+            )
+        except ImportError:
+            from .dedicated_verification import (  # type: ignore[no-redef]
+                VERIFICATION_MODE_DEDICATED,
+                read_verification_mode,
+                validate_dedicated_verification,
+            )
+        try:
+            if read_verification_mode(session_set_dir) == VERIFICATION_MODE_DEDICATED:
+                dv = validate_dedicated_verification(session_set_dir)
+                if dv.applicable and not dv.ok:
+                    outcome.messages.append(
+                        "ADVISORY (Set 057, dedicated-sessions): "
+                        f"{dv.reason} {dv.corrective} "
+                        "(Session 3 turns this into a hard-TTY / soft-non-TTY "
+                        "close-out gate; close-out is NOT blocked in S2.)"
+                    )
+        except Exception:
+            pass
+
         outcome.result = "succeeded"
         # Include the orchestrator-identity snapshot in the
         # closeout_succeeded payload so the audit trail records

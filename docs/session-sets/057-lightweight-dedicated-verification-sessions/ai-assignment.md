@@ -68,10 +68,29 @@ high effort is sufficient; no fresh architectural reasoning required.
 Low–Medium (test-generation + one cross-provider session verification).
 
 ### Actuals (filled after the session)
-- Orchestrator used: <tbd>
-- Total routed cost: <tbd>
-- Deviations from recommendation: <tbd>
-- Notes for next-session calibration: <tbd>
+- Orchestrator used: claude-code claude-opus-4-8 @ effort=high
+- Total routed cost: $0.2842 (session-verification R1 $0.2319 gpt-5-4 +
+  R2 $0.0522 gpt-5-4). No ai-assignment route this session — S1's routed
+  analysis already authored the S3 recommendation below.
+- Deviations from recommendation: ran on **opus-4-8** (operator's active
+  engine) rather than the recommended sonnet-4-6. The locked design made
+  the implementation mechanical; opus was not required but was the live
+  engine. Cost impact is on the orchestrator side only (routed verification
+  is identical).
+- Notes for next-session calibration: the cross-provider verifier (gpt-5-4)
+  caught **three Major correctness issues** in round 1 — (1) the close-time
+  validator false-positived with an empty work-engine baseline, (2) the
+  derivation treated `advisory-disagreement` as terminal instead of a
+  human-stop dispute, (3) `seed_issues_envelope` didn't reject a VERIFIED
+  verdict. All three were real and fixed in-flight; round 2 VERIFIED. Lesson
+  for S3: the derivation's disposition partition and the validator's
+  fail-closed edges are subtle — keep adversarial verification on them.
+  S3 also inherits an explicit open item: the verification→remediation
+  hand-off close transition (a non-terminal verification close leaves an
+  all-complete `sessions[]` that invariant rule 6 rejects), plus the
+  operator-raised clarification that **typed sessions take their step list
+  from the workflow doc, not spec.md** (S2 added the announcement banner;
+  S3 must write the generic procedure + wire the copy-prompt).
 
 **Next-session orchestrator recommendation (Session 3):**
 claude-code claude-opus-4-8 @ effort=medium

@@ -128,33 +128,38 @@
   </div>
 
   <h2>Choose adoption tier</h2>
-  <p style="margin-top:0;">The tier you pick changes what prerequisites you need and which actions
-    apply. You can switch later by re-running the bootstrap.</p>
+  <p style="margin-top:0;">The tier changes <strong>one thing only</strong> — whether the AI router makes
+    metered API calls. <strong>Lightweight is router-off, not Python-off:</strong> both tiers use a
+    <code>.venv</code> + <code>dabbler-ai-router</code> and share the same lifecycle. Full model:
+    <a href="https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md">tier-model.md</a>.
+    You can switch a set later by flipping its <code>tier:</code> field.</p>
   <div class="tier-toggle" role="radiogroup" aria-label="Adoption tier">
     <label>
       <input type="radio" name="tier" value="full" checked>
       <span class="tier-label">
-        <span class="tier-label-title">Full — explorer + router + verification</span>
-        <span class="tier-label-detail">Budgeted cross-provider verification, metrics, automated close-out.
-          Best for projects where AI-led work is the primary mode of development.</span>
+        <span class="tier-label-title">Full — automatic cross-provider verification</span>
+        <span class="tier-label-detail">Router on: cost-minded routing, metered cross-provider verification at
+          each session's end, metrics, automated close-out. Best for projects where you want each session
+          automatically verified by a different provider.</span>
       </span>
     </label>
     <label>
       <input type="radio" name="tier" value="lightweight">
       <span class="tier-label">
-        <span class="tier-label-title">Lightweight — explorer + session-set organization only</span>
-        <span class="tier-label-detail">No AI router runtime, no API keys, no metered calls. Copyable
-          review prompts in lieu of routed verification. Best for repos that already have their own session
-          protocol or where the value is in <em>organizing</em> the work.</span>
+        <span class="tier-label-title">Lightweight — zero metered API calls</span>
+        <span class="tier-label-detail">Router off (<code>tier: lightweight</code>): no per-call API spend, no
+          keys required to run. Same Python lifecycle, state file, and close-out gate as Full; verification is
+          per-set (a copyable review prompt pasted into a different assistant, a dedicated different-engine
+          verification session, or opt out). Best for projects you'd rather verify out-of-band than pay per call.</span>
       </span>
     </label>
   </div>
 
   <h2>Prerequisites</h2>
   <div class="prereq"><span class="prereq-icon">✓</span><span>VS Code 1.85 or later (you're here, so ✓)</span></div>
-  <div class="prereq" data-tier="full"><span class="prereq-icon">○</span><span>Python ≥ 3.10 with the <code>ai_router</code> module installed in your project</span></div>
-  <div class="prereq" data-tier="full"><span class="prereq-icon">○</span><span>At least one API key exported: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, or <code>GEMINI_API_KEY</code></span></div>
-  <div class="prereq" data-tier="lightweight"><span class="prereq-icon">○</span><span>A path-aware review agent for copyable prompts (Claude Code, Codex, Cline, Cursor, or any AI assistant with file-reading tools)</span></div>
+  <div class="prereq"><span class="prereq-icon">○</span><span>Python ≥ 3.10 with <code>dabbler-ai-router</code> installed in a workspace <code>.venv</code> (<strong>both tiers</strong>)</span></div>
+  <div class="prereq" data-tier="full"><span class="prereq-icon">○</span><span>At least one API key exported: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, or <code>GEMINI_API_KEY</code> (Full only — Lightweight makes no metered calls)</span></div>
+  <div class="prereq" data-tier="lightweight"><span class="prereq-icon">○</span><span>For out-of-band verification: a path-aware review agent for copyable prompts (Claude Code, Codex, Cline, Cursor, or any AI assistant with file-reading tools)</span></div>
   <div class="prereq"><span class="prereq-icon">○</span><span>Git installed and on your PATH</span></div>
 
   <div class="callout" data-tier="full">
@@ -168,9 +173,11 @@
   </div>
 
   <div class="callout" data-tier="lightweight" style="border-left-color: var(--vscode-textLink-foreground); background: var(--vscode-textBlockQuote-background);">
-    <strong>Lightweight tier — no API spend.</strong> Lightweight projects don't make metered API calls. You
-    pay only for time spent in your AI chat tool. Cross-provider verification is replaced by copyable review
-    prompts you paste into a second AI assistant (free if you already have a subscription elsewhere).
+    <strong>Lightweight tier — no metered API spend.</strong> Lightweight projects make zero router API calls, so
+    there's no per-call cost. You still install <code>dabbler-ai-router</code> and run the same
+    <code>start_session</code> / <code>close_session</code> lifecycle as Full — the router is simply off.
+    Verification happens per-set: paste a copyable review prompt into a second AI assistant (free if you already
+    have a subscription elsewhere), run a dedicated different-engine verification session, or opt out.
   </div>
 
   <h2>What do you want to do?</h2>

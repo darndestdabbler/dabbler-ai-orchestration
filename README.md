@@ -84,13 +84,17 @@ deeper feature descriptions live at
   test, verify, commit) with no UAT/E2E surface area.
   [Deep dive](docs/repository-reference.md#uat-and-e2e-support-when-to-opt-in).
 - **Full and Lightweight tiers.** Specs declare `tier: full` (default)
-  or `tier: lightweight`. Full uses the AI router for cost-minded
-  routing and automatic cross-provider verification. Lightweight
-  skips the router (no API spend on verification) and uses copyable
-  review prompts that reference your session-set files by path,
-  pasted into any path-aware AI chat for manual review. Same
-  Session Set Explorer, same `session-state.json` lifecycle, same
-  close-out gates — only the verification mechanism differs.
+  or `tier: lightweight`. The tier changes **one thing only** — whether
+  the AI router makes metered API calls. **Lightweight is router-off,
+  not Python-off:** both tiers use a `.venv` + `dabbler-ai-router`, the
+  same `session-state.json` lifecycle, the same close-out gate, and the
+  same Session Set Explorer. Full adds cost-minded routing and automatic
+  cross-provider verification; Lightweight makes zero metered calls and
+  verifies per-set (copyable review prompts pasted into a different
+  assistant, a dedicated different-engine verification session, or opt
+  out). The single source of truth is
+  [docs/concepts/tier-model.md](docs/concepts/tier-model.md).
+  [Deep dive](docs/concepts/tier-model.md).
 
 ---
 

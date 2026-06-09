@@ -149,20 +149,45 @@ Don't overdo this. The human can read the canonical workflow doc when they want 
 
 ## Step 4.5 — Adoption tier
 
-Adoption tier is a different dimension from budget tier. Some projects benefit from the **organizational layer** (Session Set Explorer + the `docs/session-sets/<set>/spec.md` convention) without taking on the **router and verification machinery** (`ai_router/`, budgeted cross-provider verification, automated close-out, metrics, cost reports). The bootstrap supports both shapes as first-class choices.
+The tier changes **exactly one thing**: whether this project's AI router
+makes external, metered LLM API calls. **Lightweight is router-off, not
+Python-off** — both tiers install Python and `dabbler-ai-router`, run the
+same `start_session` / `close_session` lifecycle, write the same
+`session-state.json`, and pass the same close-out gate. The single source of
+truth for this model is
+[`docs/concepts/tier-model.md`](concepts/tier-model.md) — read it if any of
+what follows surprises you, and never paraphrase the model elsewhere.
 
 Ask the human:
 
 > **Which adoption tier fits this project?**
 >
-> **(L) Lightweight — Explorer + session-set organization only.** You get session sets visible in the VS Code Session Set Explorer, organized as `docs/session-sets/<set>/spec.md` files. No `ai_router/`, no Python venv, no budget config, no close-out machinery, no cross-provider verification. **Best for:** working test fixtures, repos that already have their own established session protocol (BATON files, custom ledgers, etc.), side projects, or any repo where the value is in *organizing* the work rather than running it through the full router. You can upgrade to Full later by re-running this bootstrap.
+> **(L) Lightweight — zero metered API calls.** Same full Python lifecycle as
+> Full (a `.venv`, `pip install dabbler-ai-router`, `start_session` /
+> `close_session`, the same state file and close-out gate, all three engine
+> files, the Session Set Explorer). The **only** difference: no AI router
+> calls, so no per-call API spend and no router config. Verification is
+> handled **per set** — either by pasting a copyable review prompt into a
+> *different* AI assistant and recording the verdict, or via a dedicated
+> different-engine verification session, or opted out for explicit reasons.
+> **Best for:** projects where you'd rather verify out-of-band (or not at all)
+> than pay per call. You can move a set to Full later by flipping `tier:` and
+> adding router config.
 >
-> **(F) Full — Explorer + `ai_router/` + close-out + cross-provider verification.** The complete framework: budgeted verification, metrics, cost reports, automated close-out, the works. **Best for:** projects where AI-led work is the primary mode of development, where reviewable cost tracking matters, or where you want orchestration support beyond just session-set organization.
+> **(F) Full — automatic cross-provider verification.** Everything in
+> Lightweight, plus the AI router on: cost-minded routing of reasoning tasks,
+> automatic cross-provider verification at the end of each session, metrics,
+> and cost reports. **Best for:** projects where you want each session
+> automatically verified by a metered call to a different provider.
 
 Wait for a clear pick — `L` / `lightweight` or `F` / `full`. Branch from here:
 
-- **If (L):** **Skip Step 5 entirely.** Lightweight projects don't have a budget threshold to set — there's no router doing metered calls. Go directly to Step 6.
-- **If (F):** Continue to Step 5 (budget-threshold dialog). The budget tiers ($0 / limited / middle / ample) only apply within Full adoption.
+- **If (L):** **Skip Step 5 entirely.** Lightweight makes no metered calls, so
+  there is no verification budget to set and no router config to write. Go
+  directly to Step 6. (Everything else in the scaffold — `.venv`, package,
+  engine files, `start-here.md`, templated spec — is identical to Full.)
+- **If (F):** Continue to Step 5 (budget-threshold dialog). The budget tiers
+  ($0 / limited / middle / ample) only apply within Full adoption.
 
 ### Coexistence with existing session protocols
 
@@ -230,7 +255,7 @@ Once the human picks a tier (and a sub-option, for $0), confirm the recommendati
 
 ## Step 6 — Plan alignment dialog
 
-Walk the human through what's done and what's remaining, then propose a session-set decomposition. **Reminder for lightweight-tier projects:** the action checklist at Step 7 will only contain `docs/session-sets/<set>/spec.md` files plus (if needed) a small `CLAUDE.md` amendment naming the new tree. No `ai_router/`, no `budget.yaml`, no `router-config.yaml` — adapt your spec drafts accordingly so they don't reference router-only mechanics.
+Walk the human through what's done and what's remaining, then propose a session-set decomposition. **Reminder for lightweight-tier projects:** the action checklist at Step 7 scaffolds the *same* uniform setup as Full — a `.venv`, `pip install dabbler-ai-router`, all three engine files, `docs/dabbler/start-here.md`, and a templated `spec.md` per chosen set — and differs from Full in only one way: **it omits the router config (`router-config.yaml` / `budget.yaml`)** and sets `tier: lightweight` in each spec. Draft the specs with `tier: lightweight` and `verificationMode: out-of-band-or-none` (the default); do **not** strip the Python lifecycle or omit the engine files — Lightweight uses them too.
 
 ### How to derive a decomposition
 
@@ -291,17 +316,34 @@ The human steers throughout. You propose; they approve, edit, or reject. **Don't
 
 This is the gate. Aggregate every concrete write / config update / scaffolding action you propose to do, in order, into a numbered list. For non-trivial files (`docs/planning/project-plan.md`, each session set's `spec.md`), show inline drafts so the human can read what you're about to write.
 
-> **Lightweight-tier checklists are a strict subset.** If the human picked Lightweight (L) in Step 4.5, your checklist must omit `ai_router/budget.yaml`, `ai_router/router-config.yaml`, the `ai_router/` directory itself, and any pip-install steps. A typical lightweight checklist contains only `docs/session-sets/<set>/spec.md` files (one per chosen set), optionally a `docs/planning/project-plan.md` if it doesn't exist yet, and a small `CLAUDE.md` amendment naming the new tree's relationship to any existing protocol per the Step 4.5 coexistence choice. **The example below is a Full-tier checklist** — adapt it down for lightweight; don't pad lightweight checklists with router items the human explicitly opted out of.
+> **Lightweight-tier checklists differ from Full by exactly one omission.** If
+> the human picked Lightweight (L) in Step 4.5, your checklist is the **same
+> uniform scaffold** as Full — create the `.venv`, `pip install
+> dabbler-ai-router`, write all three engine files (`CLAUDE.md` + `AGENTS.md`
+> + `GEMINI.md`), write `docs/dabbler/start-here.md`, and write a templated
+> `spec.md` (+ `session-state.json`) per chosen set — **minus** the router
+> config: omit `ai_router/router-config.yaml` and `ai_router/budget.yaml`, and
+> set `tier: lightweight` in each spec. **Do not** drop the pip-install, the
+> `.venv`, or the engine files — those are not router config; they are the
+> shared lifecycle both tiers use. **The example below is a Full-tier
+> checklist;** the only lines a Lightweight checklist removes are the
+> `budget.yaml` / `router-config.yaml` writes (items 2 and any router-tuning
+> step). See [`docs/concepts/tier-model.md`](concepts/tier-model.md) and the
+> canonical templates at
+> [`docs/templates/consumer-bootstrap/`](templates/consumer-bootstrap/).
 
 ### Example
 
 ```
-Recommended actions for your project:
+Recommended actions for your project (Full tier):
 
 1. Write docs/planning/project-plan.md (~ 40 lines, draft below)
    <inline draft>
 
-2. Save outsourcing budget ($25) to ai_router/budget.yaml (full content below)
+2. Create .venv and run: .venv/Scripts/pip install dabbler-ai-router
+   (BOTH tiers — Lightweight needs the package too; it just runs --no-router)
+
+3. [FULL ONLY] Save verification budget ($25) to ai_router/budget.yaml
    threshold_usd: 25
    threshold_scope: "project-lifetime"
    mode: "middle-tier"
@@ -310,21 +352,21 @@ Recommended actions for your project:
    set_by: "adoption-bootstrap-flow"
    notes: |
      Mid-sized side project.
+   (Lightweight checklists OMIT this item and any router-config.yaml write.)
 
-3. Scaffold docs/session-sets/ folder structure (empty, ready for sets below)
+4. Write all three engine files at the project root — CLAUDE.md, AGENTS.md,
+   GEMINI.md — from the canonical template bundle (shared body + engine tail).
+   (BOTH tiers — the next session's orchestrator may be a different engine.)
 
-4. Create session-set 001-user-auth (3 sessions, spec.md draft below)
+5. Write docs/dabbler/start-here.md (the generated cold-start operative doc)
+   (BOTH tiers.)
+
+6. Create session-set 001-user-auth (3 sessions) — templated spec.md
+   (tier: full | lightweight) + session-state.json. Drafts below.
    <inline draft>
 
-5. Create session-set 002-product-catalog (4 sessions, spec.md draft below)
+7. Create session-set 002-product-catalog (4 sessions) — same shape.
    <inline draft>
-
-6. Create session-set 003-checkout-flow (3 sessions, spec.md draft below)
-   <inline draft>
-
-7. Add CLAUDE.md (project root, copied from canonical Dabbler repo with
-   project-specific tweaks; full content below)
-   <inline content>
 
 Approve all? Or tell me which items to skip / edit / reorder.
 ```
@@ -349,8 +391,10 @@ Once approved, walk through items in order. Write files. Update configs. Scaffol
 
 ```
 ✓ 1. Wrote docs/planning/project-plan.md (42 lines)
-✓ 2. Saved ai_router/budget.yaml ($25 threshold, middle-tier mode)
-✓ 3. Scaffolded docs/session-sets/ folder structure
+✓ 2. Created .venv and installed dabbler-ai-router
+✓ 3. Saved ai_router/budget.yaml ($25 threshold, middle-tier mode) [Full only]
+✓ 4. Wrote CLAUDE.md, AGENTS.md, GEMINI.md
+✓ 5. Wrote docs/dabbler/start-here.md
 ...
 ```
 
@@ -399,23 +443,31 @@ If the human chose **zero-budget mode**, remind them how verification will happe
 - **Option (a) — manual via different engine:** they open a *different* AI assistant, hand it the verification template + the work, and copy the verdict back. They do this at the end of every session. Their `ai_router/budget.yaml` records `verification_method: "manual-via-other-engine"`.
 - **Option (b) — skipped:** every session's `change-log.md` records that verification was explicitly skipped. Their `ai_router/budget.yaml` records `verification_method: "skipped"`.
 
-If the human chose **lightweight tier (L)** in Step 4.5, give them this closing note instead:
+If the human chose **lightweight tier (L)** in Step 4.5, give them this closing note instead. (The tier model: **router-off, not Python-off** — [`docs/concepts/tier-model.md`](concepts/tier-model.md).)
 
-- **No budget, no metrics, no auto-verification** — by tier choice, not by exception. The router writers DO still operate via the Set 048 `--no-router` mode, which short-circuits the routed verification step to a manual attestation. Cross-provider verification happens through copyable review prompts (`dabbler.copySpecReviewPrompt`, `dabbler.copySessionAccomplishmentsPrompt`, `dabbler.copySetAccomplishmentsPrompt`) that you paste into a *different* path-aware AI assistant (Claude Code, Codex, Cline, Cursor, or any agent with file-reading tools). Paste the verdict back into `docs/session-sets/<slug>/external-verification.md` (open or create via `dabbler.openExternalVerificationDoc`).
+- **Same lifecycle as Full — the router is just off.** You installed `dabbler-ai-router` into a `.venv` like any Full project, so `start_session` / `close_session` maintain `session-state.json` and run the close-out gate for you. The only difference is that `tier: lightweight` in each spec flips `--no-router`: no metered API calls, no budget, no metrics, no automatic verification.
+- **Start sessions from `docs/dabbler/start-here.md`.** That generated cold-start doc resolves the active set, registers the session, and walks any engine through to close. Typing **"start the next session"** points your orchestrator there.
+- **Verification is per set, your choice (Set 057):**
+  - **`out-of-band-or-none` (default)** — paste a copyable review prompt (`dabbler.copySpecReviewPrompt`, `dabbler.copySessionAccomplishmentsPrompt`, `dabbler.copySetAccomplishmentsPrompt`) into a *different* path-aware AI assistant (Claude Code, Codex, Cline, Cursor, or any agent with file-reading tools), then record the verdict in `docs/session-sets/<slug>/external-verification.md` (open or create via `dabbler.openExternalVerificationDoc`) — or opt out for explicit reasons.
+  - **`dedicated-sessions`** — run a structured different-engine verification session (and optional remediation) with a content-aware close-out gate. See [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md) → Lightweight verification.
 - **The Session Set Explorer is your dashboard.** Sets render from `docs/session-sets/<set>/spec.md` and graceful-degrade if optional artifacts are missing.
-- **"Start the next session" still works.** The downstream orchestrator reads whichever set is active and runs against your existing protocol per the Step 4.5 coexistence choice (replace / parallel / index).
 - **Repo-specific review criteria are optional.** If you want to teach reviewers what THIS repo cares about, create one or more of `docs/review-criteria/spec.md`, `docs/review-criteria/session.md`, or `docs/review-criteria/set.md`. Their content gets embedded into the matching copyable prompt's "Operator review criteria" slot. Missing files fall back to the extension's default English instructions. Templates ship in `dabbler-ai-orchestration/docs/review-criteria/`.
-- **Hand-maintained state files still work.** If you can't or don't want to install `dabbler-ai-router` in the consumer repo, edit `session-state.json` by hand using the one-field-flip recipe in `docs/session-state-schema.md` § Lightweight tier — one-field-flip worked example. If a Lightweight state file has drifted into a non-canonical shape (e.g., `sessionLog[]` instead of `sessions[]`), run `python -m ai_router.migrate_lightweight_to_canonical_v4 --in-place` from the consumer repo root once.
-- **You can upgrade later.** Re-run this bootstrap and pick `F` to add the router + verification layer in place. Existing session sets keep working under their `tier:` field.
+- **You can upgrade a set to Full later.** Flip `tier:` in its `spec.md` and add router config (re-running this bootstrap and picking `F` does this for you). Existing session sets keep working under their `tier:` field; nothing else has to change.
 
 ---
 
 ## Reference: canonical schemas
 
-Two schema docs apply to every session set you generate during this
+These docs apply to every session set you generate during this
 bootstrap. Read them when drafting `spec.md` content (Step 7) and any
 state files you write or update during sessions:
 
+- **[`docs/concepts/tier-model.md`](concepts/tier-model.md)** — the single
+  source of truth for the Full vs. Lightweight tier model. Read this before
+  explaining the tiers to the human; do not paraphrase it.
+- **[`docs/templates/consumer-bootstrap/`](templates/consumer-bootstrap/)** —
+  the canonical template bundle every artifact you scaffold should match
+  (spec, session-state, engine files, `start-here.md`).
 - **[`docs/spec-md-schema.md`](spec-md-schema.md)** — the strict surface
   of every `docs/session-sets/<slug>/spec.md`: title, frontmatter
   blockquote, `## Session Set Configuration` yaml block, `## Sessions`

@@ -1,0 +1,123 @@
+<!--
+  GENERATED FILE — do not hand-edit.
+  Rendered by the Dabbler shared template writer from
+  docs/templates/consumer-bootstrap/start-here.md.template in the
+  dabbler-ai-orchestration repo. Edits here are overwritten on the next
+  scaffold and will fail the CI snapshot check. Change the template instead.
+-->
+# Start here — running sessions in `{{REPO_NAME}}`
+
+This is the **cold-start operative doc**. If you are an AI orchestrator (any
+engine) and you were told only *"start the next session"*, this file tells you
+exactly what to do, in order, with no guessing. The procedure is the same on
+both tiers; the **only** branch is one flag at `start_session`.
+
+> **Tier is a property of the set, not the repo** — read it from the active
+> set's `spec.md` (Step 2), since one repo may hold both Full and Lightweight
+> sets. Tier model SSoT:
+> <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
+
+---
+
+## The cold-start chain
+
+Follow these links in order; each step hands you the input for the next:
+
+1. **Engine file** — you arrived from `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`,
+   which pointed you here.
+2. **This file** (`docs/dabbler/start-here.md`) — the procedure below.
+3. **The active `spec.md`** — resolve it with the one rule in the next
+   section. Do not guess among sets.
+4. **Read `tier` + `verificationMode`** from that spec's *Session Set
+   Configuration* block.
+5. **Run `start_session`** (routed for Full, `--no-router` for Lightweight —
+   the resolver does this for you from `tier:`).
+6. **Do the session's work**, then **close via the shared gate**
+   (`close_session`).
+
+---
+
+## Step 1 — Resolve THE active session set (one machine-checkable rule)
+
+> **Rule (verbatim — CI enforces "exactly one active set"):**
+> The active session set is the single directory `docs/session-sets/<NNN-slug>/`
+> whose `session-state.json` has `status: "in-progress"`. **There must be at
+> most one.** If none is `in-progress`, the next set to start is the
+> `not-started` set with the **lowest** `NNN-` prefix. Sets whose status is
+> `"complete"` or `"cancelled"` are skipped.
+
+This is exactly what `ai_router.find_active_session_set()` computes — you can
+let the CLI resolve it, or apply the rule by reading each set's
+`session-state.json`. Never infer state from file presence; read the `status`
+field.
+
+If two sets are `in-progress` at once, that is a drift error, not a choice to
+make — stop and surface it to the operator (and the CI "exactly one active
+set" check will already be red).
+
+## Step 2 — Read the tier and verification mode
+
+Open the active set's `spec.md` and read its *Session Set Configuration*
+block:
+
+- **`tier: full`** → the session runs through the AI router; verification is
+  the automatic cross-provider step at session end.
+- **`tier: lightweight`** → the session makes **zero metered API calls**;
+  verification is **per-set** per `verificationMode`
+  (`out-of-band-or-none` default, or `dedicated-sessions`). See the workflow
+  doc's Lightweight verification section.
+
+## Step 3 — Register the session start (state first, work second)
+
+Run the lifecycle CLI as the **first action** of the session. The
+`--no-router` mode is resolved automatically from `tier: lightweight` in the
+spec, so the *same command* is correct on both tiers:
+
+```bash
+# Windows
+.venv/Scripts/python.exe -m ai_router.start_session \
+    --session-set-dir docs/session-sets/<active-slug> \
+    --engine <claude-code|codex|gemini|copilot> \
+    --provider <anthropic|openai|google>
+# POSIX: .venv/bin/python -m ai_router.start_session ...
+```
+
+> **"No module named ai_router" is not a missing-keys problem** — it almost
+> always means you ran a bare `python` instead of the **venv** interpreter.
+> Always invoke `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python`
+> (POSIX). Both tiers have a `.venv` and `dabbler-ai-router` installed.
+
+This writes `session-state.json` (`status: "in-progress"`), appends a
+`work_started` event, and is idempotent (safe to re-run after a context
+reset).
+
+## Step 4 — Do the work
+
+Follow the active spec's step list for the current session. Log progress;
+make file edits, run tests, commit at the end.
+
+## Step 5 — Close via the shared gate
+
+```bash
+.venv/Scripts/python.exe -m ai_router.close_session \
+    --session-set-dir docs/session-sets/<active-slug>
+```
+
+The gate is the same on both tiers: it requires a disposition, requires
+`change-log.md` on the **final** session, writes idempotently, and emits the
+schema-drift advisory as a soft note. On Full, the cross-provider
+verification verdict is recorded before close; on Lightweight, the per-set
+`verificationMode` flow governs how verification is attested.
+
+---
+
+## The canonical references (read when you need depth)
+
+- **Tier model (SSoT):**
+  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>
+- **Full execution mechanics (the 10-step procedure, rules, verification):**
+  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/ai-led-session-workflow.md>
+- **Spec schema (`tier`, `verificationMode`, the config block):**
+  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/spec-md-schema.md>
+
+You're ready. Resolve the active set (Step 1) and start the next session.

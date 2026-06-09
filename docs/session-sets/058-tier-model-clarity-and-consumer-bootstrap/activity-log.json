@@ -1,0 +1,74 @@
+{
+  "sessionSetName": "058-tier-model-clarity-and-consumer-bootstrap",
+  "createdDate": "2026-06-09T09:38:12-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/read-guidance",
+      "dateTime": "2026-06-09T09:38:00-04:00",
+      "description": "Read project-guidance.md, lessons-learned.md, session-set-authoring-guide.md, ai-led-session-workflow.md, spec.md, verdict.md; confirmed runtime_mode.py ground truth (tier precedence; Lightweight = --no-router not Python-off).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/register-start",
+      "dateTime": "2026-06-09T09:38:12-04:00",
+      "description": "Ran ai_router.start_session; session-state.json -> session 1 in-progress (schemaVersion 4).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/ssot-written",
+      "dateTime": "2026-06-09T09:55:00-04:00",
+      "description": "Wrote docs/concepts/tier-model.md (D1 SSoT): one-differentiator model, same/differs tables, runtime_mode precedence, banned-vs-correct framing, choose-a-tier question. README/adoption-bootstrap/wizard/spec-schema all point here.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/templates-authored",
+      "dateTime": "2026-06-09T10:10:00-04:00",
+      "description": "Authored docs/templates/consumer-bootstrap/ bundle (D4/D5/D6/D8): README contract + spec.md.template (schemaVersion-4 companion state, NNN- slug, required tier+verificationMode) + session-state.json.template (v4) + start-here.md.template (cold-start chain + verbatim active-set rule) + engine-file shared body + claude/agents/gemini tails.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/spec-schema-tier-documented",
+      "dateTime": "2026-06-09T10:20:00-04:00",
+      "description": "Documented tier + verificationMode in docs/spec-md-schema.md config block (overview skeleton, field reference, worked example); fixed the stale 'runs without ai_router (no PyPI dependency)' framing to point to the SSoT.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/docs-pointerized",
+      "dateTime": "2026-06-09T10:40:00-04:00",
+      "description": "Reconciled adoption-bootstrap.md (Steps 4.5/6/7/8/9 + references) and quick-start.md to the D3 uniform scaffold; pointerized README tier highlight + wizard.html copy (both-tier Python prereq, SSoT pointer, accurate Lightweight framing). Scrubbed banned framing.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/verified",
+      "dateTime": "2026-06-09T11:20:00-04:00",
+      "description": "Cross-provider verification (session-verification -> gpt-5-4, cross-provider from Claude). R1 ISSUES_FOUND: 1 Critical (FALSE POSITIVE, empirically dismissed -- spec config block has no schemaVersion field; schemaVersion 4 lives in companion session-state.json.template) + 3 Major + 1 Minor fixed in-flight. R2 confirmed fixes + surfaced 1 Major (repo-scoped tier wording in agents/gemini tails) + 1 Minor (raw vs blob URL) -- both fixed. R3 VERIFIED, no residual stale framing.",
+      "status": "complete",
+      "routedApiCalls": [
+        {"taskType": "session-verification", "model": "gpt-5-4", "round": 1, "verdict": "ISSUES_FOUND", "costUsd": 0.2553},
+        {"taskType": "session-verification", "model": "gpt-5-4", "round": 2, "verdict": "ISSUES_FOUND", "costUsd": 0.1146},
+        {"taskType": "session-verification", "model": "gpt-5-4", "round": 3, "verdict": "VERIFIED", "costUsd": 0.1206}
+      ]
+    }
+  ]
+}

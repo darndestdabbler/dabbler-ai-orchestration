@@ -34,6 +34,7 @@ A conforming `spec.md` has this skeleton:
 ## Session Set Configuration
 
 ```yaml
+tier: full|lightweight
 requiresUAT: true|false
 requiresE2E: true|false
 …
@@ -84,10 +85,16 @@ are required, two more are optional but recommended:
 > **Prerequisite:** <optional — anything the human must do before session 1>
 ```
 
-`Workflow: Lightweight` declares a tier that runs without `ai_router`
-(no PyPI dependency); per-session BATONs + UAT checklists drive
-close-out. `Workflow: Full` declares the standard tier with router
-metrics and provider routing.
+The `Workflow:` line is a human-readable echo of the machine-parsed
+`tier:` field in the configuration block below. **Full** runs the AI
+router (cost-minded routing + automatic cross-provider verification);
+**Lightweight** is **router-off, not Python-off** — it makes zero
+metered API calls but uses the *same* Python lifecycle (`.venv`,
+`start_session` / `close_session`, the blessed state-file writer, the
+close-out gate). Verification on Lightweight is per-set, governed by
+`verificationMode`. Do not restate the tier model in a spec — the
+single source of truth is
+[`docs/concepts/tier-model.md`](concepts/tier-model.md).
 
 ### 3. Session Set Configuration (L2)
 
@@ -95,19 +102,44 @@ Exactly one `## Session Set Configuration` heading, immediately
 followed by a fenced ```yaml block. Field reference:
 
 ```yaml
+tier: full | lightweight       # required for new specs; default "full" if omitted (back-compat)
 requiresUAT: true|false        # required
 requiresE2E: true|false        # required
-uatScope: none | per-session | full    # required when requiresUAT: true
+uatScope: none | per-session | per-set  # required when requiresUAT: true
 uatStyle: ad-hoc | dsl                  # optional; default ad-hoc
+verificationMode: out-of-band-or-none | dedicated-sessions  # Lightweight only; default out-of-band-or-none; inert on Full
 effort: low | medium | high             # optional; orchestrator hint
 totalSessions: <int>                    # optional; canonical session count
 ```
 
-Lightweight-tier specs typically declare only `requiresUAT` /
-`requiresE2E` / `uatScope` and omit router-coupled fields. Full-tier
-specs add the rest. The yaml block is parsed by
-`fileSystem.ts:parseSessionSetConfig` and by `ai_router`'s spec
-reader; field names must match exactly.
+**`tier`** is the single declarative switch between the two tiers
+(Set 048+). `tier: lightweight` is what `ai_router/runtime_mode.py`
+reads to enter `--no-router` mode; `tier: full` (or an omitted field,
+for back-compat with pre-Set-048 specs) keeps the router on. The tier
+changes **only** whether metered API calls are made — see
+[`docs/concepts/tier-model.md`](concepts/tier-model.md) for the full
+model. The canonical spec template
+([`docs/templates/consumer-bootstrap/spec.md.template`](templates/consumer-bootstrap/spec.md.template))
+always emits `tier` explicitly; never emit a spec without it.
+
+**`verificationMode`** (Set 057; **Lightweight only**) selects how the
+set's per-set verification runs. `out-of-band-or-none` (**default**)
+uses the copyable-review-prompt flow (paste into a different
+path-aware assistant, record the verdict in `external-verification.md`)
+or opts out entirely. `dedicated-sessions` opts in to structured typed
+verification/remediation sessions on a different engine with a
+content-aware close-out gate. The field is **inert on Full tier**
+(which always runs automatic, rule-based cross-provider verification);
+it is written for shape uniformity but the router ignores it there.
+The field only *seeds* the choice — the durable record is an
+`activity-log.json` entry written once at set start. See
+[`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md)
+→ *Field semantics* for the seeding/recording contract.
+
+Both tiers declare the same field set; only `tier` (and, on
+Lightweight, `verificationMode`) drives a behavior difference. The yaml
+block is parsed by `fileSystem.ts:parseSessionSetConfig` and by
+`ai_router`'s spec reader; field names must match exactly.
 
 ### 4. Sessions parent (L2, named exactly `## Sessions`)
 
@@ -223,9 +255,11 @@ accessdb`'s global-counter specs — the migration is mechanical:
 ## Session Set Configuration
 
 ```yaml
+tier: lightweight
 requiresUAT: true
 requiresE2E: false
 uatScope: per-session
+verificationMode: out-of-band-or-none
 ```
 
 ## Project Overview

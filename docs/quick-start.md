@@ -9,26 +9,38 @@ gets you oriented in five minutes.
 
 ---
 
-## Two adoption paths
+## Two adoption tiers
 
-**Lightweight** — VS Code Session Set Explorer + `docs/session-sets/*/spec.md`
-files only. No Python, no router, no close-out script. Useful for organizing
-AI-led work without taking on verification infrastructure.
+The tier changes **one thing only**: whether the AI router makes external,
+metered LLM API calls. **Lightweight is router-off, not Python-off** — both
+tiers install Python + `dabbler-ai-router`, run `start_session` /
+`close_session`, and share the same state file, close-out gate, and Session
+Set Explorer.
 
-**Full** — Everything in Lightweight plus the `ai_router` Python package:
-cost-tracked routing, cross-provider verification at session end, automated
-close-out gates, and metrics. Two active consumer repos use Full:
-`dabbler-platform` and `dabbler-access-harvester`.
+**Full** — the AI router is on: cost-minded routing of reasoning tasks and
+automatic cross-provider verification at each session's end, plus metrics and
+cost reports. Two active consumer repos use Full: `dabbler-platform` and
+`dabbler-access-harvester`.
+
+**Lightweight** — zero metered API calls (`tier: lightweight` flips
+`--no-router`). Same Python lifecycle as Full; the only setup difference is no
+router config. Verification is handled **per set** — out-of-band via a
+copyable review prompt pasted into a different assistant, a dedicated
+different-engine verification session, or opted out.
+
+> **The full model — read this, don't paraphrase it:**
+> [`docs/concepts/tier-model.md`](concepts/tier-model.md).
 
 The [adoption bootstrap](adoption-bootstrap.md) walks you through the setup
-interactively. The quick version:
+interactively. The quick version (**both tiers**):
 
 ```bash
-# Full tier — install the router
-pip install dabbler-ai-router          # or: pip install -e . from repo root
+python -m venv .venv
+.venv/Scripts/pip install dabbler-ai-router   # POSIX: .venv/bin/pip install ...
 ```
 
-No install is needed for Lightweight.
+Full additionally writes `ai_router/router-config.yaml` (and `budget.yaml`);
+Lightweight sets `tier: lightweight` in each spec instead.
 
 ---
 

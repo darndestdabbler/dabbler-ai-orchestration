@@ -1,0 +1,38 @@
+{
+  "status": "completed",
+  "summary": "Session 1 of 3: established docs/concepts/tier-model.md as the single source of truth for the Full vs Lightweight tier model (router-off, not Python-off; tier: is the single switch; both tiers share the Python lifecycle), grounded in ai_router/runtime_mode.py. Authored the docs/templates/consumer-bootstrap/ bundle (bundle README contract + spec.md.template + schemaVersion-4 session-state.json.template + start-here.md.template with the verbatim machine-checkable active-set rule + engine-file shared body + claude/agents/gemini tails). Documented tier + verificationMode in docs/spec-md-schema.md and fixed its stale 'runs without ai_router' framing. Reconciled adoption-bootstrap.md and quick-start.md to the D3 uniform scaffold (both tiers scaffold .venv + dabbler-ai-router + three engine files + start-here.md + templated spec; only divergence is Full-only router config). Pointerized the README tier highlight and the Get Started wizard copy (both-tier Python prerequisite, accurate Lightweight framing, SSoT pointer). No extension code changed and no release, per the spec. Cross-provider verification (gpt-5-4) reached VERIFIED after a 3-round fix loop; 1 Critical was an empirically-confirmed false positive (spec config blocks carry no schemaVersion field).",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "docs/concepts/tier-model.md",
+    "docs/templates/consumer-bootstrap/README.md",
+    "docs/templates/consumer-bootstrap/spec.md.template",
+    "docs/templates/consumer-bootstrap/session-state.json.template",
+    "docs/templates/consumer-bootstrap/start-here.md.template",
+    "docs/templates/consumer-bootstrap/engine-file.shared-body.md",
+    "docs/templates/consumer-bootstrap/engine-file.claude-tail.md",
+    "docs/templates/consumer-bootstrap/engine-file.agents-tail.md",
+    "docs/templates/consumer-bootstrap/engine-file.gemini-tail.md",
+    "docs/spec-md-schema.md",
+    "docs/adoption-bootstrap.md",
+    "docs/quick-start.md",
+    "README.md",
+    "tools/dabbler-ai-orchestration/webview/wizard.html",
+    "docs/session-sets/058-tier-model-clarity-and-consumer-bootstrap/activity-log.json",
+    "docs/session-sets/058-tier-model-clarity-and-consumer-bootstrap/s1-verification.md",
+    "docs/session-sets/058-tier-model-clarity-and-consumer-bootstrap/s1-verification-round-2.md",
+    "docs/session-sets/058-tier-model-clarity-and-consumer-bootstrap/s1-verification-round-3.md"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-8",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 implements the TS shared template writer + fixes gitScaffold/sessionGenPrompt/wizard to render the Session-1 template bundle; same orchestrator keeps full architectural context of the SSoT, the placeholder-token contract, and the TOTAL_SESSIONS repetition rule just authored."
+    }
+  },
+  "blockers": []
+}

@@ -54,6 +54,9 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
     plusFraction: false,
+    externalVerificationNoteExists: false,
+    completedVerification: null,
+    verificationMarker: "",
     ...over,
   };
 }

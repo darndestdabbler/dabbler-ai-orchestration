@@ -1,0 +1,44 @@
+{
+  "status": "completed",
+  "summary": "Session 1: D1 verification-posture marker shipped. Derived inputs in fileSystem.ts readSessionSets (externalVerificationNoteExists existence probe; completedVerification = latest completed type:verification ledger entry's verdict + session number; derived verificationMarker glyph) carried on the in-memory SessionSet (new types.ts VerificationMarkerGlyph + CompletedVerificationInfo) - never persisted. Pure predicates in tierLegibility.ts beside shouldRenderPlusFraction: verificationMarkerFor (v? on complete Mode-A rows w/o note or typed session; v+ on Mode-B rows with all type:work sessions complete and verification owed-or-in-flight; suppression on Full/cancelled/terminal/note-present/completed-verification rows), allWorkSessionsComplete (conservative on malformed input), completedVerificationInfo (latest completed typed entry; malformed metadata degrades to null fields without disqualifying), verificationMarkerTooltipFor with locked D1 copy (never says 'unverified'). Rendering via the lw pattern: SessionSetsModel helpers, RowPayload verificationMarker/verificationTooltip, client.js quiet span (role=button) whose click/Enter/Space posts the EXISTING showRowContextMenu message (no new mutation path), tree.css quiet style, fraction tooltip's non-plus slot gains 'Verification: <verdict> (session N)' on verified rows. Tests: new verificationMarker.test.ts (predicate matrix, ledger helpers, locked tooltip copy, model helpers, readSessionSets e2e disk fixtures, payload/rendering source scans); 7 SessionSet fixture builders gained the 3 new fields. TS 788 passing + 2 pre-existing Set-026 failures (baseline 752); Python 1185 passed/1 skipped; drift_guard OK; dist rebuilt in-sync. Verification: R1 VERIFIED 0 issues by gemini-2.5-pro via direct call_model fallback (router's gpt-5-4 pick 429-rate-limited all session; ~$0.0213 estimated, bypasses router metrics). Session boundary notes: 062's stale never-committed session-state.json (4 generic sessions vs the spec's 5) was removed pre-start so start_session reseeded the ledger from spec headings; prerequisite 061 was closed complete via its S4 deferral close in this same conversation.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "tools/dabbler-ai-orchestration/src/types.ts",
+    "tools/dabbler-ai-orchestration/src/utils/tierLegibility.ts",
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/providers/SessionSetsModel.ts",
+    "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
+    "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
+    "tools/dabbler-ai-orchestration/src/test/suite/verificationMarker.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/copyPromptCommands.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/flagDecisionForReview.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/forceClosedBadge.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/inProgressSetsService.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/prerequisites.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionSetsProvider.test.ts",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "docs/session-sets/062-lightweight-verification-affordance/session-state.json",
+    "docs/session-sets/062-lightweight-verification-affordance/activity-log.json",
+    "docs/session-sets/062-lightweight-verification-affordance/session-events.jsonl",
+    "docs/session-sets/062-lightweight-verification-affordance/ai-assignment.md",
+    "docs/session-sets/062-lightweight-verification-affordance/s1-verification.md",
+    "docs/session-sets/062-lightweight-verification-affordance/disposition.json"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-8",
+    "effort": "medium",
+    "reason": {
+      "code": "switch-due-to-cost",
+      "specifics": "Per the routed ai-assignment analysis (gemini-pro), Session 2 is standard TypeScript extension development - the verificationModeRewrite helper mirroring tierRewrite.ts, two commands, and ActionRegistry wiring - well-served by a mid-tier Claude at medium effort rather than the Fable-5/high holder of Session 1."
+    }
+  },
+  "blockers": []
+}

@@ -284,6 +284,20 @@
           escAttr(row.blockedTooltip || "") + '">' +
           escHtml(row.blockedMarker) + '</span>'
       : "";
+    // Set 062 S1 (D1): quiet verification-posture marker ("v?" / "v+")
+    // — same quiet treatment as the markers above, but clickable: a
+    // click posts the existing showRowContextMenu message (see
+    // wireInteraction), opening the same QuickPick the row's
+    // right-click opens. role=button + tabindex so the affordance is
+    // keyboard-reachable; the click never mutates state. Empty marker
+    // → no span (Full / terminal / note-bearing / verified rows stay
+    // quiet — absence is the signal).
+    const verificationSpan = row.verificationMarker
+      ? '<span class="row-verification-marker" role="button" tabindex="0" title="' +
+          escAttr(row.verificationTooltip || "") + '" aria-label="' +
+          escAttr(row.verificationTooltip || "") + '">' +
+          escHtml(row.verificationMarker) + '</span>'
+      : "";
     // Set 061 S1 (D1): when the fraction carries the `+` suffix, the
     // host ships a tooltip explaining why the denominator can grow.
     // It rides the fraction span's title attribute; the marker stays
@@ -304,6 +318,7 @@
             tierSpan +
             migrationSpan +
             blockedSpan +
+            verificationSpan +
             descSpan +
           '</span>' +
         '</div>' +
@@ -416,6 +431,30 @@
         if (slug) {
           vscode.postMessage({ type: "activateRow", slug: slug });
         }
+      });
+    });
+
+    // Set 062 S1 (D1): the verification-posture marker is an action
+    // surface — click (or Enter/Space, via the keydown handler below)
+    // opens the SAME row QuickPick the right-click opens. It posts the
+    // existing showRowContextMenu message; no new mutation path.
+    // stopPropagation keeps the row-header activation (openSpec) from
+    // also firing.
+    Array.from(root.querySelectorAll(".row-verification-marker")).forEach(function (marker) {
+      function openMenu(ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        const item = marker.closest('[role="treeitem"]');
+        if (!item) return;
+        focusItem(item);
+        const slug = item.getAttribute("data-slug");
+        if (slug) {
+          vscode.postMessage({ type: "showRowContextMenu", slug: slug });
+        }
+      }
+      marker.addEventListener("click", openMenu);
+      marker.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") openMenu(ev);
       });
     });
 

@@ -15542,6 +15542,78 @@ function tierMarkerFor(tier) {
 function tierTooltipFor(tier) {
   return tier === "lightweight" ? TIER_MARKER_TOOLTIP : "";
 }
+var VERIFICATION_MARKER_OUT_OF_BAND = "v?";
+var VERIFICATION_MARKER_DEDICATED = "v+";
+var VERIFICATION_OUT_OF_BAND_TOOLTIP = "Lightweight \u2014 verification is out-of-band or none. The Explorer cannot tell whether this set was reviewed out of band. Click for verification options.";
+var VERIFICATION_DEDICATED_TOOLTIP = "Dedicated verification enabled \u2014 a verification/remediation session is still owed or in flight. Click for the next step.";
+function hasCompletedVerificationSession(sessions) {
+  return completedVerificationInfo(sessions) !== null;
+}
+function completedVerificationInfo(sessions) {
+  if (!Array.isArray(sessions))
+    return null;
+  let found = null;
+  for (const s of sessions) {
+    if (s === null || typeof s !== "object")
+      continue;
+    const entry = s;
+    if (entry.type !== "verification")
+      continue;
+    if (entry.status !== "complete")
+      continue;
+    found = {
+      sessionNumber: typeof entry.number === "number" && Number.isInteger(entry.number) && entry.number > 0 ? entry.number : null,
+      verdict: typeof entry.verificationVerdict === "string" && entry.verificationVerdict.length > 0 ? entry.verificationVerdict : null
+    };
+  }
+  return found;
+}
+function allWorkSessionsComplete(sessions) {
+  if (!Array.isArray(sessions))
+    return false;
+  let workCount = 0;
+  for (const s of sessions) {
+    if (s === null || typeof s !== "object")
+      return false;
+    const entry = s;
+    const isWork = entry.type === void 0 || entry.type === "work";
+    if (!isWork)
+      continue;
+    workCount += 1;
+    if (entry.status !== "complete")
+      return false;
+  }
+  return workCount > 0;
+}
+function verificationMarkerFor(tier, verificationMode, sessions, externalVerificationNoteExists, rowState) {
+  if (tier !== "lightweight")
+    return "";
+  if (rowState === "cancelled")
+    return "";
+  if (verificationMode === "out-of-band-or-none") {
+    if (rowState !== "complete")
+      return "";
+    if (externalVerificationNoteExists)
+      return "";
+    if (hasTypedVerificationSession(sessions))
+      return "";
+    return VERIFICATION_MARKER_OUT_OF_BAND;
+  }
+  if (rowState === "complete")
+    return "";
+  if (hasCompletedVerificationSession(sessions))
+    return "";
+  if (!allWorkSessionsComplete(sessions))
+    return "";
+  return VERIFICATION_MARKER_DEDICATED;
+}
+function verificationMarkerTooltipFor(glyph) {
+  if (glyph === VERIFICATION_MARKER_OUT_OF_BAND)
+    return VERIFICATION_OUT_OF_BAND_TOOLTIP;
+  if (glyph === VERIFICATION_MARKER_DEDICATED)
+    return VERIFICATION_DEDICATED_TOOLTIP;
+  return "";
+}
 
 // src/utils/fileSystem.ts
 var SESSION_SETS_REL = path4.join("docs", "session-sets");
@@ -15958,6 +16030,19 @@ function readSessionSets(root) {
       config.verificationMode,
       ledgerSessions
     );
+    const externalVerificationNoteExists = fs4.existsSync(
+      path4.join(dir, "external-verification.md")
+    );
+    const completedVerification = completedVerificationInfo(
+      ledgerSessions
+    );
+    const verificationMarker2 = verificationMarkerFor(
+      config.tier,
+      config.verificationMode,
+      ledgerSessions,
+      externalVerificationNoteExists,
+      state
+    );
     sets.push({
       name: entry.name,
       dir,
@@ -15985,7 +16070,10 @@ function readSessionSets(root) {
       // prerequisites stay at false in both passes.
       blockedByPrereqs: false,
       unsatisfiedPrereqs: [],
-      plusFraction
+      plusFraction,
+      externalVerificationNoteExists,
+      completedVerification,
+      verificationMarker: verificationMarker2
     });
   }
   deriveBlockedByPrereqs(sets);
@@ -16082,6 +16170,18 @@ function tierTooltip(set) {
 }
 function fractionTooltip(set) {
   return set.plusFraction ? PLUS_FRACTION_TOOLTIP : "";
+}
+function verificationMarker(set) {
+  return set.verificationMarker ?? "";
+}
+function verificationTooltip(set) {
+  return verificationMarkerTooltipFor(set.verificationMarker ?? "");
+}
+function verdictFractionTooltip(set) {
+  const cv = set.completedVerification;
+  if (!cv || !cv.verdict)
+    return "";
+  return cv.sessionNumber != null ? `Verification: ${cv.verdict} (session ${cv.sessionNumber})` : `Verification: ${cv.verdict}`;
 }
 var ICON_FILES = {
   complete: "done.svg",
@@ -23097,7 +23197,7 @@ var CustomSessionSetsView = class _CustomSessionSetsView {
       name: set.name,
       state: set.state,
       fraction,
-      fractionTooltip: fraction.endsWith("+") ? fractionTooltip(set) : "",
+      fractionTooltip: fraction.endsWith("+") ? fractionTooltip(set) : verdictFractionTooltip(set),
       description: descriptionFor(set),
       contextValue: contextValueFor(set),
       iconSlug: ICON_FILES[set.state] ?? "",
@@ -23113,6 +23213,10 @@ var CustomSessionSetsView = class _CustomSessionSetsView {
       // unsatisfied prerequisite; replaces the description badge.
       blockedMarker: blockedMarker(set),
       blockedTooltip: blockedTooltip(set),
+      // Set 062 S1 (D1): quiet verification-posture marker (`v?` /
+      // `v+`) + state-specific tooltip; click opens the row QuickPick.
+      verificationMarker: verificationMarker(set),
+      verificationTooltip: verificationTooltip(set),
       accordionHtml: null,
       accordionUpdatedAt: null
     };

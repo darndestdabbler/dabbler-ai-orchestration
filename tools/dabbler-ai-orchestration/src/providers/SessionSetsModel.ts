@@ -4,6 +4,7 @@ import {
   PLUS_FRACTION_TOOLTIP,
   tierMarkerFor,
   tierTooltipFor,
+  verificationMarkerTooltipFor,
 } from "../utils/tierLegibility";
 
 // Set 029 Session 3: data-layer extraction from SessionSetsProvider so
@@ -62,6 +63,33 @@ export function tierTooltip(set: SessionSet): string {
 // Non-empty only when the row's fraction carries the `+` suffix.
 export function fractionTooltip(set: SessionSet): string {
   return set.plusFraction ? PLUS_FRACTION_TOOLTIP : "";
+}
+
+// Set 062 Session 1 (spec D1): the quiet verification-posture marker
+// (`v?` / `v+`) + tooltip. Same shape as migrationMarker/tierMarker —
+// pure functions of the SessionSet so the renderer and tests share one
+// source. The glyph itself is derived at scan time in fileSystem.ts
+// (it needs the ledger, which the SessionSet record does not carry).
+export function verificationMarker(set: SessionSet): string {
+  return set.verificationMarker ?? "";
+}
+
+export function verificationTooltip(set: SessionSet): string {
+  return verificationMarkerTooltipFor(set.verificationMarker ?? "");
+}
+
+// Set 062 Session 1 (spec D1): fraction-tooltip enrichment on verified
+// rows. A completed `type: "verification"` session suppresses the
+// marker (quiet is success); the persisted verdict surfaces here
+// instead, on the fraction the typed session grew. Empty when no
+// completed verification session exists or its verdict was never
+// persisted.
+export function verdictFractionTooltip(set: SessionSet): string {
+  const cv = set.completedVerification;
+  if (!cv || !cv.verdict) return "";
+  return cv.sessionNumber != null
+    ? `Verification: ${cv.verdict} (session ${cv.sessionNumber})`
+    : `Verification: ${cv.verdict}`;
 }
 
 export const ICON_FILES: Record<SessionState, string> = {

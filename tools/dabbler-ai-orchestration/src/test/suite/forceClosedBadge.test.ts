@@ -54,6 +54,9 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
     plusFraction: false,
+    externalVerificationNoteExists: false,
+    completedVerification: null,
+    verificationMarker: "",
   };
 }
 

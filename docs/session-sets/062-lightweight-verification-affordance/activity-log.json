@@ -1,0 +1,69 @@
+{
+  "sessionSetName": "062-lightweight-verification-affordance",
+  "createdDate": "2026-06-11T16:31:34.905812-04:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/ai-assignment",
+      "dateTime": "2026-06-11T16:31:34.917697-04:00",
+      "description": "Step 3.5: authored ai-assignment.md for all 5 sessions via route(analysis) -> gemini-pro. Also at session start: removed a stale never-committed session-state.json (4 generic untitled sessions vs the spec 5) so start_session reseeded the ledger from spec.md headings; Session 1 registered to claude-code/claude-fable-5/high.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 5110,
+          "outputTokens": 1128,
+          "costUsd": 0.0176675
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/derived-inputs",
+      "dateTime": "2026-06-11T16:47:55.053723-04:00",
+      "description": "Extended the set scan (fileSystem.ts readSessionSets) with the two D1 derived inputs: externalVerificationNoteExists (existence probe for the Set 057 external-verification.md out-of-band record) and completedVerification (latest completed type:verification ledger entry's verdict + session number, lifted from the same normalized ledger the Set 061 plus-fraction reads). Plus the derived verificationMarker glyph. All three carried on the in-memory SessionSet record (types.ts: VerificationMarkerGlyph, CompletedVerificationInfo); never persisted.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/marker-predicates",
+      "dateTime": "2026-06-11T16:47:55.053723-04:00",
+      "description": "Pure D1 predicates in tierLegibility.ts beside shouldRenderPlusFraction: verificationMarkerFor(tier, mode, ledger, noteExists, rowState) -> 'v?'|'v+'|'' with the locked suppression rules (Full rows, cancelled, Mode-A note present, completed verification session, Mode-B terminal); helpers allWorkSessionsComplete (>=1 work session, all complete; malformed reads work-open - conservative), completedVerificationInfo / hasCompletedVerificationSession (latest completed typed entry; malformed metadata degrades to null fields without disqualifying the entry); verificationMarkerTooltipFor with the locked D1 tooltip copy. LedgerSessionLike widened with optional status/number/verificationVerdict.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/marker-rendering",
+      "dateTime": "2026-06-11T16:47:55.053723-04:00",
+      "description": "Rendering via the lw-marker pattern: SessionSetsModel verificationMarker/verificationTooltip/verdictFractionTooltip pure helpers; RowPayload gains verificationMarker + verificationTooltip (sessionSetsWebviewProtocol.ts); toRowPayload ships them and the fraction tooltip's non-plus slot now carries the verified-row enrichment 'Verification: <verdict> (session N)'; client.js renders the quiet span (role=button, tabindex=0) and wires click/Enter/Space to the EXISTING showRowContextMenu message (stopPropagation so row activation doesn't also fire; no new mutation path); tree.css quiet style (help cursor, hover/focus brighten). Tests: new verificationMarker.test.ts (predicate matrix, ledger helpers, tooltip copy, model helpers, readSessionSets e2e disk fixtures incl. note present/absent + typed in-flight/completed, payload+rendering source scans); 7 SessionSet fixture builders gained the 3 new fields. Suites: TS 788 passing + 2 pre-existing Set-026 failures (baseline 752 before this session); Python 1185 passed / 1 skipped; drift_guard OK; dist rebuilt in-sync via esbuild.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/verified",
+      "dateTime": "2026-06-11T16:49:23.482335-04:00",
+      "description": "Cross-provider verification: VERIFIED, 0 issues (s1-verification.md). Verifier gemini-2.5-pro via direct call_model fallback after the router first-choice gpt-5-4 hit OpenAI 429 rate limits (3 retries) - same ladder fallback as the 061 S4 close earlier today. Tokens 16079 in / 121 out; cost ~$0.0213 ESTIMATED from token counts (direct call bypasses router metrics).",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gemini-2.5-pro",
+          "taskType": "session-verification",
+          "inputTokens": 16079,
+          "outputTokens": 121,
+          "costUsd": 0.0213,
+          "costEstimated": true
+        }
+      ]
+    }
+  ]
+}

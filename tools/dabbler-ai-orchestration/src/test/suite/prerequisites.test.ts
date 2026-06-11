@@ -463,6 +463,9 @@ suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
       blockedByPrereqs: false,
       unsatisfiedPrereqs: [],
       plusFraction: false,
+      externalVerificationNoteExists: false,
+      completedVerification: null,
+      verificationMarker: "",
       ...over,
     };
   }

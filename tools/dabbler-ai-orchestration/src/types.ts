@@ -70,6 +70,27 @@ export type SessionSetTier = "full" | "lightweight";
 // declarative signal. Inert on Full tier.
 export type VerificationMode = "out-of-band-or-none" | "dedicated-sessions";
 
+// Set 062 Session 1 (spec D1): the quiet verification-posture marker on
+// Lightweight rows. "v?" = completed Mode-A set the Explorer cannot
+// vouch for (no external-verification.md, no typed session); "v+" =
+// Mode-B set whose work sessions are done but whose dedicated
+// verification is still owed or in flight; "" = no marker (Full rows,
+// terminal rows, note-bearing rows, verified rows — quiet is success).
+export type VerificationMarkerGlyph = "v?" | "v+" | "";
+
+// Set 062 Session 1 (spec D1): the persisted outcome of a completed
+// `type: "verification"` session, lifted off the sessions[] ledger so
+// the fraction tooltip can surface it ("Verification: VERIFIED
+// (session 4)") without the renderer re-walking the ledger. `verdict`
+// is the per-session verificationVerdict string ("VERIFIED" /
+// "ISSUES_FOUND" / operator extensions); `sessionNumber` is the typed
+// session's 1-indexed ledger number (null when the entry carries a
+// malformed number).
+export interface CompletedVerificationInfo {
+  sessionNumber: number | null;
+  verdict: string | null;
+}
+
 export interface SessionSetConfig {
   requiresUAT: TriStateFlag;
   requiresE2E: TriStateFlag;
@@ -222,6 +243,27 @@ export interface SessionSet {
   // denominator will grow when typed verification/remediation sessions
   // are appended. Never persisted (spec non-goal: no new state fields).
   plusFraction: boolean;
+  // Set 062 Session 1 (spec D1): true iff `external-verification.md`
+  // exists in the set directory — the Set 057 sanctioned out-of-band
+  // verification record. Suppresses the `v?` marker on completed
+  // Mode-A rows (the record exists; quiet is success). Derived at scan
+  // time, never persisted. Session 2 also consults it for the
+  // `Open external verification note` row action.
+  externalVerificationNoteExists: boolean;
+  // Set 062 Session 1 (spec D1): the completed `type: "verification"`
+  // session's persisted verdict + ledger number (latest completed typed
+  // session when more than one exists), or null when no completed
+  // verification session is in the ledger. Drives the fraction
+  // tooltip's "Verification: <verdict> (session N)" enrichment on
+  // verified Mode-B rows. Derived from the normalized ledger, never
+  // persisted.
+  completedVerification: CompletedVerificationInfo | null;
+  // Set 062 Session 1 (spec D1): the derived verification-posture
+  // marker glyph for this row ("v?" / "v+" / ""). Computed by
+  // `verificationMarkerFor` in utils/tierLegibility.ts at scan time
+  // from (tier, verificationMode, ledger, note presence, row state).
+  // Never persisted.
+  verificationMarker: VerificationMarkerGlyph;
 }
 
 // Set 052 S2: reconciled with the on-disk schema the router actually

@@ -45,6 +45,9 @@ import {
   tierTooltip,
   touchedDate,
   uatBadge,
+  verdictFractionTooltip,
+  verificationMarker,
+  verificationTooltip,
 } from "./SessionSetsModel";
 // Set 034: the per-row orchestrator-tracking accordion (gauges + model
 // description) is retired from the UI. Set 036 Session 6 deleted the
@@ -608,16 +611,24 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     // session-state.json continues to be written by start_session /
     // close_session (the check-out semantics still serve coordination
     // and audit-log purposes); only the UI surface retires.
-    // Set 061 S1 (D1): the tooltip ships only when the rendered
+    // Set 061 S1 (D1): the `+` tooltip ships only when the rendered
     // fraction actually carries the `+` suffix (the "?"-denominator
     // branch suppresses the suffix even when plusFraction is true).
+    // Set 062 S1 (D1): on rows without the suffix, the slot instead
+    // carries the verified-row enrichment ("Verification: <verdict>
+    // (session N)") — non-empty only when a completed typed
+    // verification session persisted a verdict. At most one of the two
+    // applies: the `+` requires no typed verification session, the
+    // verdict requires a completed one.
     const fraction = fractionFor(set);
     return {
       slug: set.name,
       name: set.name,
       state: set.state,
       fraction,
-      fractionTooltip: fraction.endsWith("+") ? fractionTooltip(set) : "",
+      fractionTooltip: fraction.endsWith("+")
+        ? fractionTooltip(set)
+        : verdictFractionTooltip(set),
       description: descriptionFor(set),
       contextValue: contextValueFor(set),
       iconSlug: ICON_FILES[set.state] ?? "",
@@ -633,6 +644,10 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // unsatisfied prerequisite; replaces the description badge.
       blockedMarker: blockedMarker(set),
       blockedTooltip: blockedTooltip(set),
+      // Set 062 S1 (D1): quiet verification-posture marker (`v?` /
+      // `v+`) + state-specific tooltip; click opens the row QuickPick.
+      verificationMarker: verificationMarker(set),
+      verificationTooltip: verificationTooltip(set),
       accordionHtml: null,
       accordionUpdatedAt: null,
     };

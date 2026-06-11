@@ -73,6 +73,17 @@ export interface RowPayload {
   // the migration / tier markers above.
   blockedMarker: string;
   blockedTooltip: string;
+  // Set 062 Session 1 (spec D1): the quiet verification-posture marker
+  // (`v?` on completed Mode-A Lightweight rows with no out-of-band
+  // note; `v+` on Mode-B rows whose work is done but whose dedicated
+  // verification is owed or in flight) + its state-specific tooltip.
+  // Empty on every other row (no positive "verified" badge — absence
+  // is the signal). Unlike the markers above, the webview wires a
+  // click on this marker to the existing `showRowContextMenu` message
+  // (the same QuickPick the row's right-click opens) — the marker is
+  // an action surface, never a mutation path.
+  verificationMarker: string;
+  verificationTooltip: string;
   // Set 034: the per-row orchestrator-tracking accordion is retired.
   // These fields remain on the protocol so older host/webview pairings
   // stay structurally compatible, but the host always emits null and

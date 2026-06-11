@@ -5,7 +5,12 @@ import { listGitWorktrees } from "./git";
 import { readStatus } from "./sessionState";
 import { isCancelled, readCancellationState } from "./cancelLifecycle";
 import { readProgress, SessionStateInvariantError, normalizeToV4Shape } from "./progress";
-import { LedgerSessionLike, shouldRenderPlusFraction } from "./tierLegibility";
+import {
+  LedgerSessionLike,
+  completedVerificationInfo,
+  shouldRenderPlusFraction,
+  verificationMarkerFor,
+} from "./tierLegibility";
 import {
   SessionSet,
   SessionState,
@@ -741,6 +746,24 @@ export function readSessionSets(root: string): SessionSet[] {
       config.verificationMode,
       ledgerSessions as LedgerSessionLike[] | null,
     );
+    // Set 062 Session 1 (spec D1): the verification-posture inputs +
+    // marker — all derived at scan time, never persisted. The note
+    // presence is a plain existence probe (the Set 057 out-of-band
+    // record); the completed-verification info and the marker glyph
+    // come from the same normalized ledger the plus-fraction reads.
+    const externalVerificationNoteExists = fs.existsSync(
+      path.join(dir, "external-verification.md"),
+    );
+    const completedVerification = completedVerificationInfo(
+      ledgerSessions as LedgerSessionLike[] | null,
+    );
+    const verificationMarker = verificationMarkerFor(
+      config.tier,
+      config.verificationMode,
+      ledgerSessions as LedgerSessionLike[] | null,
+      externalVerificationNoteExists,
+      state,
+    );
 
     sets.push({
       name: entry.name,
@@ -770,6 +793,9 @@ export function readSessionSets(root: string): SessionSet[] {
       blockedByPrereqs: false,
       unsatisfiedPrereqs: [],
       plusFraction,
+      externalVerificationNoteExists,
+      completedVerification,
+      verificationMarker,
     });
   }
 

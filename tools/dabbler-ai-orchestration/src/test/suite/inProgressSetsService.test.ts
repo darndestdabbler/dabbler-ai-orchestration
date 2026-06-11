@@ -133,6 +133,9 @@ function fakeSet(
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
     plusFraction: false,
+    externalVerificationNoteExists: false,
+    completedVerification: null,
+    verificationMarker: "",
   };
 }
 

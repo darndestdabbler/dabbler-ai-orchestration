@@ -287,6 +287,30 @@ body.vscode-light, body.vscode-high-contrast-light {
 }
 
 /*
+ * Set 062 S1 (spec D1): the quiet verification-posture marker ("v?" /
+ * "v+") on Lightweight rows — the same deliberately-quiet treatment as
+ * the tier marker above (de-emphasized foreground, help cursor, the
+ * tooltip does the work). Unlike its siblings it is clickable (opens
+ * the row's QuickPick), so hover/focus brighten it slightly — but the
+ * cursor stays `help` per the locked D1 treatment: the tooltip is the
+ * primary signal, the click is the shortcut it teaches.
+ */
+.row-verification-marker {
+  display: inline;
+  margin-left: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+  cursor: help;
+}
+.row-verification-marker:hover,
+.row-verification-marker:focus {
+  color: var(--vscode-foreground, #cccccc);
+  outline: none;
+  text-decoration: underline;
+}
+
+/*
  * Set 049 S4 (rip-out): the Set 045 harvest-record badges
  * (`.harvest-badges` / `.harvest-badge*`) and coordination-conflict
  * pills (`.conflict-pills` / `.conflict-pill` / `.conflict-severity-*`)

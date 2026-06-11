@@ -19,6 +19,90 @@ sessions.
 
 Format as a clean Markdown document I can save as docs/planning/project-plan.md.`;
 
+// Set 060 S2: the two halves of the old QuickPick command are exported
+// individually so the Getting Started form's two step-2 buttons
+// ("Import project-plan.md…" / "Copy prompt for planning") drive each
+// path directly without the intermediate picker. The `dabbler.importPlan`
+// command keeps the QuickPick and delegates to the same functions.
+//
+// `ui` is the injectable VS Code surface (the showQuickPick-injection
+// pattern from CustomSessionSetsView.showContextMenu) so the handlers
+// are unit-testable under the vscode stub.
+
+export interface PlanImportUi {
+  showOpenDialog: typeof vscode.window.showOpenDialog;
+  showWarningMessage: typeof vscode.window.showWarningMessage;
+  showInformationMessage: typeof vscode.window.showInformationMessage;
+  showErrorMessage: typeof vscode.window.showErrorMessage;
+  writeClipboard: (text: string) => Thenable<void>;
+  executeCommand: (command: string, ...args: unknown[]) => Thenable<unknown>;
+  workspaceRoot: () => string | undefined;
+}
+
+function defaultUi(): PlanImportUi {
+  return {
+    showOpenDialog: vscode.window.showOpenDialog,
+    showWarningMessage: vscode.window.showWarningMessage,
+    showInformationMessage: vscode.window.showInformationMessage,
+    showErrorMessage: vscode.window.showErrorMessage,
+    writeClipboard: (text) => vscode.env.clipboard.writeText(text),
+    executeCommand: (command, ...args) => vscode.commands.executeCommand(command, ...args),
+    workspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+  };
+}
+
+/** Copy the plan-authoring prompt to the clipboard (step-2 "OR" path). */
+export async function copyPlanningPrompt(ui: PlanImportUi = defaultUi()): Promise<void> {
+  await ui.writeClipboard(PLAN_AUTHORING_PROMPT);
+  void ui.showInformationMessage(
+    "Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, " +
+    "then save the result as docs/planning/project-plan.md — or import it with " +
+    "'Import project-plan.md'."
+  );
+}
+
+/**
+ * File-picker import into ``docs/planning/project-plan.md``. Returns true
+ * when a plan was written (so callers can refresh live state), false on
+ * cancel / error.
+ */
+export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promise<boolean> {
+  const picked = await ui.showOpenDialog({
+    canSelectFiles: true,
+    canSelectFolders: false,
+    canSelectMany: false,
+    filters: { "Markdown": ["md"] },
+    openLabel: "Import Plan",
+  });
+  if (!picked?.[0]) return false;
+
+  const root = ui.workspaceRoot();
+  if (!root) {
+    void ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+
+  const destPath = path.join(root, PLAN_DEST);
+  const destDir = path.dirname(destPath);
+  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+
+  if (fs.existsSync(destPath)) {
+    const overwrite = await ui.showWarningMessage(
+      `${PLAN_DEST} already exists. Overwrite it?`,
+      { modal: true },
+      "Overwrite"
+    );
+    if (overwrite !== "Overwrite") return false;
+  }
+
+  fs.copyFileSync(picked[0].fsPath, destPath);
+  void ui.executeCommand("vscode.open", vscode.Uri.file(destPath));
+  void ui.showInformationMessage(
+    `Plan imported to ${PLAN_DEST}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
+  );
+  return true;
+}
+
 export function registerPlanImportCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("dabbler.importPlan", async () => {
@@ -32,49 +116,10 @@ export function registerPlanImportCommand(context: vscode.ExtensionContext): voi
       if (!action) return;
 
       if (action.value === "prompt") {
-        await vscode.env.clipboard.writeText(PLAN_AUTHORING_PROMPT);
-        vscode.window.showInformationMessage(
-          "Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, " +
-          "then save the result as docs/planning/project-plan.md and run " +
-          "'Dabbler: Import Project Plan' again to import it."
-        );
+        await copyPlanningPrompt();
         return;
       }
-
-      // File import
-      const picked = await vscode.window.showOpenDialog({
-        canSelectFiles: true,
-        canSelectFolders: false,
-        canSelectMany: false,
-        filters: { "Markdown": ["md"] },
-        openLabel: "Import Plan",
-      });
-      if (!picked?.[0]) return;
-
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) {
-        vscode.window.showErrorMessage("No workspace folder is open.");
-        return;
-      }
-
-      const destPath = path.join(root, PLAN_DEST);
-      const destDir = path.dirname(destPath);
-      if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
-
-      if (fs.existsSync(destPath)) {
-        const overwrite = await vscode.window.showWarningMessage(
-          `${PLAN_DEST} already exists. Overwrite it?`,
-          { modal: true },
-          "Overwrite"
-        );
-        if (overwrite !== "Overwrite") return;
-      }
-
-      fs.copyFileSync(picked[0].fsPath, destPath);
-      vscode.commands.executeCommand("vscode.open", vscode.Uri.file(destPath));
-      vscode.window.showInformationMessage(
-        `Plan imported to ${PLAN_DEST}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
-      );
+      await importPlanFromFile();
     })
   );
 }

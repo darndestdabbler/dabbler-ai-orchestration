@@ -340,6 +340,62 @@ export function renderConsumerBootstrap(
   return { files };
 }
 
+/**
+ * Render ONLY the project-structure artifacts — the three engine files +
+ * the cold-start ``docs/dabbler/start-here.md`` — with NO starter session
+ * set (Set 060 S2, spec D5). The Getting Started form's "Build project
+ * structure" step must not seed a ``docs/session-sets/...`` set: there is
+ * no title prompt to name one, and materializing a set would flip the
+ * dual-mode Explorer to "list" mid-form, hiding steps 2 and 3. Session
+ * sets are created by step 3's decomposition prompt instead.
+ *
+ * These templates only consume ``{{REPO_NAME}}``, so the context's
+ * set-specific fields (title, slug, sessions) are irrelevant here —
+ * callers pass a plain repo-shaped context via
+ * {@link structureOnlyContext}. Token validation still applies.
+ */
+export function renderStructureBootstrap(
+  bundle: TemplateBundle,
+  ctx: BootstrapContext,
+): RenderedArtifacts {
+  const files: Record<string, string> = {
+    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
+    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
+    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
+    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
+  };
+
+  const leftovers = new Set<string>();
+  for (const content of Object.values(files)) {
+    for (const t of findUnsubstitutedTokens(content)) leftovers.add(t);
+  }
+  if (leftovers.size > 0) {
+    throw new Error(
+      `structure-only bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`,
+    );
+  }
+  return { files };
+}
+
+/**
+ * A {@link BootstrapContext} for the structure-only scaffold path. The
+ * set-specific fields are deterministic placeholders — they feed no
+ * rendered output (the structure templates consume ``{{REPO_NAME}}``
+ * only) but keep the context type honest for the shared writer.
+ */
+export function structureOnlyContext(repoName: string, tier: Tier, created: string): BootstrapContext {
+  return {
+    repoName,
+    setTitle: "(no starter set — created via the Getting Started decomposition prompt)",
+    purpose: "(no starter set)",
+    slug: "000-placeholder-unused",
+    created,
+    tier,
+    verificationMode: DEFAULT_VERIFICATION_MODE,
+    totalSessions: 1,
+  };
+}
+
 // ---------- slug helpers ----------
 
 const NNN_SLUG_RE = /^\d{3,}-[a-z0-9]+(?:-[a-z0-9]+)*$/;

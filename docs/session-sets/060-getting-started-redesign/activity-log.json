@@ -38,6 +38,57 @@
       "description": "Cross-provider verification routed to gpt-5-4 (session-verification); see s1-verification.md.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/build-structure",
+      "dateTime": "2026-06-10T20:02:03.024497-04:00",
+      "description": "Build project structure wired: structure-only no-prompt scaffold (renderStructureBootstrap + structureOnlyContext in consumerBootstrap.ts; ScaffoldDeps.structureOnly; buildProjectStructureNoPrompt in gitScaffold.ts) - engine files + start-here.md + tier-aware venv/router install, NO starter session set (D5: no title prompt; seeding a set would flip the dual-mode Explorer to list mid-form). Silent git init; folder-picker fallback when no folder open.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/plan-import",
+      "dateTime": "2026-06-10T20:02:03.024497-04:00",
+      "description": "Plan import wired: planImport.ts split into importPlanFromFile + copyPlanningPrompt (injectable PlanImportUi for tests); dabbler.importPlan QuickPick now delegates to the same functions; form buttons drive each path directly.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/build-session-sets",
+      "dateTime": "2026-06-10T20:02:03.024497-04:00",
+      "description": "Build session sets wired: buildSessionGenPrompt gains SessionGenPromptOptions.parallel (D4/D7 worktree + prerequisites decomposition guidance appended to authoring guidance); copySessionSetGenPrompt shared by command + form. Form-host protocol: GettingStartedActionMsg (5 actions, tier/parallel riders) routed via routeGettingStartedAction (pure, narrowing) + makeGettingStartedHandlers; CustomSessionSetsView refreshes after every handled action; client.js wires data-gs-action buttons w/ persistent gsState (tier/parallel survive re-renders) + disabled double-click guard. 16 new unit tests (676 passing).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/verified",
+      "dateTime": "2026-06-10T20:06:56.567812-04:00",
+      "description": "Cross-provider verification routed to gpt-5-4 (session-verification), 2 rounds: R1 ISSUES_FOUND (1 Major - D7 worktree info note missing) DISPUTED as Session-3 scope per spec; R2 fed Session 3 spec text -> VERIFIED. Raw outputs: s2-verification.md / s2-verification-round-2.md; structured findings: s2-issues.json (resolution advisory-disagreement, resolved_in_round 2).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 14954,
+          "outputTokens": 5947,
+          "costUsd": 0.12659
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 1379,
+          "outputTokens": 318,
+          "costUsd": 0.008217
+        }
+      ]
     }
   ]
 }

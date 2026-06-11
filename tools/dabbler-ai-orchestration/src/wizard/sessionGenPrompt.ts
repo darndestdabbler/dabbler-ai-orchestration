@@ -48,12 +48,35 @@ const SAMPLE_CONTEXT: BootstrapContext = {
  * Pure so the test suite can assert the prompt carries the canonical,
  * expanded shape (and never the retired schemaVersion-2 / bare-slug form).
  */
+export interface SessionGenPromptOptions {
+  /**
+   * Set 060 S2 (spec D4/D7): when the operator checks "Create parallel
+   * session sets where possible", the copied prompt instructs the AI to
+   * decompose for concurrency — independent sets, explicit ordering via
+   * the existing ``prerequisites:`` spec field (no new schema), so any
+   * set without prerequisites can run in parallel in its own git
+   * worktree.
+   */
+  parallel?: boolean;
+}
+
+const PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator asked for parallel session sets
+  where possible: the orchestration runs independent session sets concurrently in
+  separate git worktrees, merged back to the main branch when the sets complete.
+  Minimize cross-set dependencies; when one set genuinely must follow another,
+  declare that explicitly with a \`prerequisites:\` entry in the dependent set's
+  Session Set Configuration block (slug + \`condition: complete\`). Any set with no
+  \`prerequisites:\` is treated as safe to start in parallel.
+`;
+
 export function buildSessionGenPrompt(
   planText: string,
   bundle: TemplateBundle,
+  options: SessionGenPromptOptions = {},
 ): string {
   const exampleSpec = renderSpec(bundle, SAMPLE_CONTEXT);
   const exampleState = renderSessionState(bundle, SAMPLE_CONTEXT);
+  const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
 
   return `You are a session-set architect for an AI-led software development workflow (the Dabbler session-set workflow).
 
@@ -106,7 +129,7 @@ ${exampleState}
 - Both tiers run the same Python lifecycle (\`start_session\` / \`close_session\`), state
   handling, and close-out. Lightweight is router-off, not Python-off — pick \`tier:
   lightweight\` when the project opts out of metered API calls.
-
+${parallelGuidance}
 ---
 
 Project plan:
@@ -114,47 +137,62 @@ Project plan:
 ${planText}`;
 }
 
+/**
+ * Read the project plan, build the decomposition prompt, and copy it to
+ * the clipboard. Shared by the `dabbler.generateSessionSetPrompt`
+ * command (no options) and the Getting Started form's "Build session
+ * sets" action (which forwards the parallel checkbox, Set 060 S2).
+ * Returns true when a prompt was copied.
+ */
+export async function copySessionSetGenPrompt(
+  context: vscode.ExtensionContext,
+  options: SessionGenPromptOptions = {},
+): Promise<boolean> {
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!root) {
+    vscode.window.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+
+  const planPath = path.join(root, PLAN_PATH);
+  if (!fs.existsSync(planPath)) {
+    const action = await vscode.window.showWarningMessage(
+      `No project plan found at ${PLAN_PATH}. Import one first?`,
+      "Import Plan"
+    );
+    if (action === "Import Plan") void vscode.commands.executeCommand("dabbler.importPlan");
+    return false;
+  }
+
+  let bundle: TemplateBundle;
+  try {
+    bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return false;
+  }
+
+  const planText = fs.readFileSync(planPath, "utf8");
+  const prompt = buildSessionGenPrompt(planText, bundle, options);
+
+  await vscode.env.clipboard.writeText(prompt);
+  vscode.window.showInformationMessage(
+    "Session-set generation prompt copied to clipboard. " +
+    "Paste it into your AI assistant. When you receive the specs, save each one to " +
+    "docs/session-sets/<NNN-slug>/spec.md (alongside its session-state.json).\n\n" +
+    "Cost reminder: each session set typically costs $0.10–$2.00 depending on model and effort. " +
+    "Review the generated specs before running all sessions.",
+    { modal: false }
+  );
+  return true;
+}
+
 export function registerSessionGenPromptCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) {
-        vscode.window.showErrorMessage("No workspace folder is open.");
-        return;
-      }
-
-      const planPath = path.join(root, PLAN_PATH);
-      if (!fs.existsSync(planPath)) {
-        const action = await vscode.window.showWarningMessage(
-          `No project plan found at ${PLAN_PATH}. Import one first?`,
-          "Import Plan"
-        );
-        if (action === "Import Plan") vscode.commands.executeCommand("dabbler.importPlan");
-        return;
-      }
-
-      let bundle: TemplateBundle;
-      try {
-        bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
-      } catch (err) {
-        vscode.window.showErrorMessage(
-          `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        return;
-      }
-
-      const planText = fs.readFileSync(planPath, "utf8");
-      const prompt = buildSessionGenPrompt(planText, bundle);
-
-      await vscode.env.clipboard.writeText(prompt);
-      vscode.window.showInformationMessage(
-        "Session-set generation prompt copied to clipboard. " +
-        "Paste it into your AI assistant. When you receive the specs, save each one to " +
-        "docs/session-sets/<NNN-slug>/spec.md (alongside its session-state.json).\n\n" +
-        "Cost reminder: each session set typically costs $0.10–$2.00 depending on model and effort. " +
-        "Review the generated specs before running all sessions.",
-        { modal: false }
-      );
+      await copySessionSetGenPrompt(context);
     })
   );
 }

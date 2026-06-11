@@ -36,6 +36,11 @@
   // re-renders for the session so a watcher tick doesn't snap a
   // user-collapsed bucket back open.
   const bucketCollapsed = {};
+  // Set 060 Session 2: the Getting Started form's control state. Kept
+  // here (like bucketCollapsed) so a snapshot re-render — which happens
+  // after every action and on every watcher tick — doesn't snap the
+  // tier radio back to Full or untick the parallel checkbox.
+  const gsState = { tier: "full", parallel: false };
 
   // ----- Escape helpers (defense-in-depth) -----
   function escHtml(s) {
@@ -97,15 +102,15 @@
     // Set 060 Session 1 (spec D1/D5): dual-mode surface. The host ships
     // a `gettingStarted` block with a `mode`. "no-folder" and
     // "getting-started" replace the old viewsWelcome empty state; "list"
-    // falls through to the bucket tree below. The buttons rendered here
-    // are INERT this session (no listeners wired) — Session 2 wires the
-    // three actions onto the `data-gs-action` hooks.
+    // falls through to the bucket tree below. Session 2 wires the form
+    // actions onto the `data-gs-action` hooks (wireGettingStarted).
     var gs = lastSnapshot.gettingStarted;
     if (gs && gs.mode !== "list") {
       root.innerHTML =
         gs.mode === "no-folder"
           ? renderNoFolder()
           : renderGettingStarted(gs);
+      wireGettingStarted();
       return;
     }
     if (!gs && !lastSnapshot.hasAnySets) {
@@ -134,8 +139,7 @@
   // ----- Set 060 dual-mode Getting Started surfaces -----
 
   // No workspace folder open (D5). A single CTA to open / create a
-  // project folder. Inert this session; Session 2 wires the
-  // `open-folder` action (showOpenDialog -> vscode.openFolder).
+  // project folder (showOpenDialog -> vscode.openFolder host-side).
   function renderNoFolder() {
     return (
       '<div class="getting-started">' +
@@ -157,8 +161,7 @@
   // Folder open, no session sets yet (D1). The three-step setup form.
   // Each step greys out + shows a green check when its D3 completion
   // flag is set (gs.structureBuilt / gs.planPresent /
-  // gs.sessionSetsPresent). Live state lives ONLY here (D2). Buttons
-  // are inert this session.
+  // gs.sessionSetsPresent). Live state lives ONLY here (D2).
   function gsStep(num, title, complete, bodyHtml) {
     var cls = complete ? "gs-step gs-step-complete" : "gs-step";
     var check = complete ? "✓" : "";
@@ -174,13 +177,18 @@
   }
 
   function renderGettingStarted(gs) {
+    // Control state (tier radio / parallel checkbox) comes from gsState
+    // so re-renders keep the operator's picks (Set 060 S2).
+    var fullChecked = gsState.tier === "lightweight" ? "" : " checked";
+    var lightChecked = gsState.tier === "lightweight" ? " checked" : "";
+    var parallelChecked = gsState.parallel ? " checked" : "";
     var step1 = gsStep(
       1,
       "Build project structure",
       gs.structureBuilt,
       '<div class="gs-radio-group" role="radiogroup" aria-label="Project tier">' +
-        '<label class="gs-radio"><input type="radio" name="gs-tier" value="full" checked> Full</label>' +
-        '<label class="gs-radio"><input type="radio" name="gs-tier" value="lightweight"> Lightweight</label>' +
+        '<label class="gs-radio"><input type="radio" name="gs-tier" value="full"' + fullChecked + '> Full</label>' +
+        '<label class="gs-radio"><input type="radio" name="gs-tier" value="lightweight"' + lightChecked + '> Lightweight</label>' +
       '</div>' +
       '<button class="gs-button" type="button" data-gs-action="build-structure">' +
         'Build project structure' +
@@ -205,7 +213,7 @@
         'Copy prompt to build session sets' +
       '</button>' +
       '<label class="gs-checkbox">' +
-        '<input type="checkbox" name="gs-parallel"> Create parallel session sets where possible' +
+        '<input type="checkbox" name="gs-parallel"' + parallelChecked + '> Create parallel session sets where possible' +
       '</label>',
     );
     return (
@@ -217,6 +225,37 @@
         step1 + step2 + step3 +
       '</div>'
     );
+  }
+
+  // Set 060 Session 2: wire the Getting Started surfaces. Buttons post a
+  // typed `gettingStartedAction` message carrying the relevant form
+  // state (tier for build-structure, parallel for build-session-sets);
+  // the clicked button disables until the host's post-action snapshot
+  // re-renders the surface (double-click guard). Radio / checkbox
+  // changes only update gsState — no host round-trip.
+  function wireGettingStarted() {
+    Array.from(root.querySelectorAll('input[name="gs-tier"]')).forEach(function (input) {
+      input.addEventListener("change", function () {
+        if (input.checked) gsState.tier = input.value === "lightweight" ? "lightweight" : "full";
+      });
+    });
+    Array.from(root.querySelectorAll('input[name="gs-parallel"]')).forEach(function (input) {
+      input.addEventListener("change", function () {
+        gsState.parallel = !!input.checked;
+      });
+    });
+    Array.from(root.querySelectorAll("[data-gs-action]")).forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var action = btn.getAttribute("data-gs-action");
+        if (!action) return;
+        var msg = { type: "gettingStartedAction", action: action };
+        if (action === "build-structure") msg.tier = gsState.tier;
+        if (action === "build-session-sets") msg.parallel = gsState.parallel;
+        btn.disabled = true;
+        vscode.postMessage(msg);
+      });
+    });
   }
 
   function renderBucket(bucket) {

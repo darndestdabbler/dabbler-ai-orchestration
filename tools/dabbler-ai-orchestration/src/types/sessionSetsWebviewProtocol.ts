@@ -187,9 +187,36 @@ export interface ReadyMsg {
   type: "ready";
 }
 
+// Set 060 Session 2: the five Getting Started form actions. The webview
+// posts one of these when the operator clicks a `data-gs-action` button;
+// the host validates the action id against this closed set, runs the
+// handler (see commands/gettingStartedActions.ts), and refreshes the
+// snapshot so the form's live completion state repaints. This channel is
+// separate from `executeCommand` on purpose — the actions carry typed
+// form state (tier / parallel) rather than a command id, so the
+// COMMAND_ALLOWLIST defense-in-depth contract is untouched.
+export type GettingStartedActionId =
+  | "open-folder"          // no-folder surface: showOpenDialog -> vscode.openFolder
+  | "build-structure"      // step 1: no-prompt structure-only scaffold (D5)
+  | "import-plan"          // step 2: file picker -> docs/planning/project-plan.md
+  | "copy-plan-prompt"     // step 2 alt: copy the plan-authoring prompt
+  | "build-session-sets";  // step 3: copy the decomposition prompt (D4)
+
+export interface GettingStartedActionMsg {
+  type: "gettingStartedAction";
+  action: GettingStartedActionId;
+  // Form state riders. `tier` rides build-structure (the Full/Lightweight
+  // radio); `parallel` rides build-session-sets (the "create parallel
+  // session sets where possible" checkbox, D7). Both are untrusted
+  // webview input — the host narrows them before use.
+  tier?: "full" | "lightweight";
+  parallel?: boolean;
+}
+
 export type WebviewToHost =
   | ExecuteCommandMsg
   | ShowRowContextMenuMsg
   | ToggleRowMsg
   | ActivateRowMsg
-  | ReadyMsg;
+  | ReadyMsg
+  | GettingStartedActionMsg;

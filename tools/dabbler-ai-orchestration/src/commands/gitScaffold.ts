@@ -18,7 +18,9 @@ import {
   buildSlug,
   loadTemplateBundle,
   renderConsumerBootstrap,
+  renderStructureBootstrap,
   resolveBundledTemplateDir,
+  structureOnlyContext,
   DEFAULT_VERIFICATION_MODE,
 } from "../utils/consumerBootstrap";
 
@@ -38,6 +40,13 @@ export interface ScaffoldDeps {
    */
   installRouter: () => Promise<{ ok: boolean; message: string }>;
   reportProgress?: (msg: string) => void;
+  /**
+   * Set 060 S2 (spec D5): render the structure artifacts only — engine
+   * files + start-here.md, NO starter session set. The Getting Started
+   * form path sets this; the legacy QuickPick flow (which prompts for a
+   * starter set's title) leaves it unset.
+   */
+  structureOnly?: boolean;
 }
 
 export interface ScaffoldResult {
@@ -65,7 +74,9 @@ export async function scaffoldConsumerRepo(
   deps: ScaffoldDeps,
 ): Promise<ScaffoldResult> {
   const report = deps.reportProgress ?? (() => {});
-  const { files } = renderConsumerBootstrap(deps.bundle, deps.ctx);
+  const { files } = deps.structureOnly
+    ? renderStructureBootstrap(deps.bundle, deps.ctx)
+    : renderConsumerBootstrap(deps.bundle, deps.ctx);
 
   const written: string[] = [];
   const skipped: string[] = [];
@@ -340,4 +351,92 @@ function makeScaffoldInstallPrompts() {
     confirmCreateVenv: async (): Promise<boolean> => true,
     promptGitHubRef: async (): Promise<string> => "",
   };
+}
+
+// ---------- Set 060 S2: no-prompt Getting Started entry (spec D5) ----------
+
+/**
+ * Build the project structure into ``projectDir`` with NO interactive
+ * prompts (Set 060 S2, spec D5): no folder picker (the caller resolves
+ * the open workspace folder, or runs the folder fallback first), no
+ * git-init confirmation modal (clicking "Build project structure" IS the
+ * consent — the scaffold's whole job is to set the folder up), no
+ * session-set title / purpose / count prompts (no starter set is seeded;
+ * step 3's decomposition prompt creates the real sets), and no worktree
+ * opt-in modal (the parallel checkbox + the S3 worktree note cover that
+ * concept on the new surface).
+ *
+ * Tier comes from the form's Full/Lightweight radio. Both tiers get the
+ * venv + ``dabbler-ai-router`` install; Lightweight removes the seeded
+ * router config (the Set 058 sole divergence) via the shared
+ * {@link scaffoldConsumerRepo} path.
+ */
+export async function buildProjectStructureNoPrompt(
+  context: vscode.ExtensionContext,
+  projectDir: string,
+  tier: Tier,
+): Promise<ScaffoldResult | undefined> {
+  // git init, silently when needed. The folder is the operator's chosen
+  // project folder and the repo-layout standard expects a git repo;
+  // surfacing a modal here would re-create the dead-end flow UAT
+  // rejected on 0.28.0. checkIsRepo failures fall through to init.
+  try {
+    const git = simpleGit(projectDir);
+    const isRepo = await git.checkIsRepo().catch(() => false);
+    if (!isRepo) await git.init();
+  } catch (err) {
+    // Non-fatal: the durable deliverable is the rendered artifacts.
+    console.warn("[gettingStarted] git init failed — continuing scaffold", err);
+  }
+
+  let bundle: TemplateBundle;
+  try {
+    bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
+  } catch (err) {
+    vscode.window.showErrorMessage(
+      `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return undefined;
+  }
+
+  const ctx = structureOnlyContext(path.basename(projectDir), tier, isoDate());
+  const pythonPath = resolveExplicitPythonPath(projectDir);
+  const result = await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: "Building project structure…",
+      cancellable: false,
+    },
+    async (progress) =>
+      scaffoldConsumerRepo({
+        projectDir,
+        ctx,
+        bundle,
+        fileOps: makeFileOps(),
+        structureOnly: true,
+        reportProgress: (m) => progress.report({ message: m }),
+        installRouter: () =>
+          installAiRouter({
+            workspaceRoot: projectDir,
+            pythonPath,
+            spawner: makeSpawner(),
+            fileOps: makeFileOps(),
+            prompts: makeScaffoldInstallPrompts(),
+            reportProgress: (m) => progress.report({ message: m }),
+          }),
+      }),
+  );
+
+  const summary =
+    `Project structure built (${tier} tier): ${result.written.length} file(s) written` +
+    (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") +
+    `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}`;
+  if (result.installOk) {
+    vscode.window.showInformationMessage(summary);
+  } else {
+    vscode.window.showWarningMessage(
+      `${summary} You can finish the install later with "Dabbler: Install ai-router".`,
+    );
+  }
+  return result;
 }

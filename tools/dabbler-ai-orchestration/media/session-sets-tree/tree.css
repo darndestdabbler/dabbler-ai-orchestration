@@ -331,4 +331,11 @@ body.vscode-light, body.vscode-high-contrast-light {
   background: var(--vscode-button-secondaryBackground);
 }
 .gs-button-secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+/* Set 060 S2: double-click guard — a clicked button disables until the
+   post-action snapshot re-renders the surface. */
+.gs-button[disabled] {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
+}
 

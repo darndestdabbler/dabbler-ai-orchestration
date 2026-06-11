@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "D7 parallel-worktree info note is not rendered in the Getting Started form: the checkbox state is preserved and forwarded into the copied decomposition prompt, but the webview never shows the explanatory note (git worktrees, merged back to main when sets complete) when the box is checked.",
+      "category": "completeness",
+      "severity": "Major",
+      "issueId": "S060-S2-V1-001",
+      "issueType": "missing-context",
+      "verificationMethod": "Static review of client.js renderGettingStarted/wireGettingStarted in the session diff; the round-1 prompt's spec excerpt ended at the Session 2 plan, so the verifier could not see Session 3's plan.",
+      "suggestedTestOrCheck": "UI/webview test covering checked vs unchecked rendering of the worktree note (ships with the note in Session 3).",
+      "resolution_status": "advisory-disagreement",
+      "resolution_notes": "Disputed as out-of-session-scope, not missing work: the spec explicitly assigns the D7 in-form note to Session 3 step 2 ('Parallel worktree info (D7): checking the box surfaces the worktree note'); Session 2's plan scopes the checkbox to 'honoring the parallel checkbox in the copied prompt text' only. Round 2, fed the Session 3 spec text, accepted the disposition and returned VERIFIED. The note (and its test) ships in Session 3.",
+      "resolved_in_round": 2
+    }
+  ]
+}

@@ -77,6 +77,12 @@ import {
   computeGettingStarted,
   nodeDetectionFs,
 } from "../utils/gettingStartedDetection";
+// Set 060 Session 2: the form's action handlers (D4/D5/D7).
+import {
+  GettingStartedHandlers,
+  makeGettingStartedHandlers,
+  routeGettingStartedAction,
+} from "../commands/gettingStartedActions";
 
 const SUPPRESSION_KEY = "dabbler.sessionSets.suppressedExpand";
 const RENDER_DEBOUNCE_MS = 50;
@@ -169,12 +175,17 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   private renderTimer: NodeJS.Timeout | undefined;
   private cache: SessionSet[] | null = null;
   private welcomeHtml: string;
+  // Set 060 Session 2: bound once at construction; injectable for tests.
+  private readonly gettingStartedHandlers: GettingStartedHandlers;
 
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly scanState: ScanState,
+    gettingStartedHandlers?: GettingStartedHandlers,
   ) {
     this.welcomeHtml = this.loadWelcomeHtmlFromPackageJson();
+    this.gettingStartedHandlers =
+      gettingStartedHandlers ?? makeGettingStartedHandlers(context);
     this.context.subscriptions.push(
       this.scanState.onDidChange(() => this.postScanState()),
     );
@@ -240,6 +251,21 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
         // affordance. Terminal-state rows (complete/cancelled) skip
         // the clipboard write and toast — spec.md opens only.
         void this.handleActivateRow(msg.slug);
+        return;
+      case "gettingStartedAction":
+        // Set 060 Session 2: the Getting Started form's buttons. The
+        // router narrows the untrusted action/tier/parallel riders;
+        // after a handler runs, refresh the snapshot so the form's live
+        // completion state repaints immediately (the D3-inputs watcher
+        // remains the backstop for out-of-form work).
+        void routeGettingStartedAction(msg, this.gettingStartedHandlers)
+          .then((handled) => {
+            if (handled) this.refresh();
+          })
+          .catch((err) => {
+            console.warn("[CustomSessionSetsView] Getting Started action failed", err);
+            this.refresh();
+          });
         return;
     }
   }

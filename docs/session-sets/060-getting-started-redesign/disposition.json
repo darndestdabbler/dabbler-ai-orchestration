@@ -1,29 +1,33 @@
 {
   "status": "completed",
-  "summary": "Session 1 of 4: completion-detection model + dual-mode Explorer shell. Shipped (1) a pure, VS Code-free, fs-injected completion-detection module (src/utils/gettingStartedDetection.ts) implementing D3 — detectCompletion {structureBuilt, planPresent, sessionSetsPresent}, selectExplorerMode (D1/D5), and the host-composition helper computeGettingStarted — plus a nodeDetectionFs adapter; (2) dual-mode wiring in CustomSessionSetsView (buildGettingStarted -> SnapshotPayload.gettingStarted) and the ExplorerMode/GettingStartedPayload protocol additions; (3) the webview client.js dual-mode surfaces — a no-folder CTA and the 3-step Getting Started form shell (Full/Lightweight radio + parallel checkbox) greyed/checked per live D3 state, with buttons INERT this session (data-gs-action, not data-command); tree.css form styles; (4) a Getting Started live-progress file watcher in extension.ts covering all D3 inputs (engine files, .venv ai_router package, project-plan.md, numbered set dirs) so the form's steps grey/check live. 16 new unit tests; full unit suite 660 passing / 2 pre-existing stub-harness failures (configEditor ViewColumn + notifications, both unrelated to this diff — ViewColumn is undefined in the vscode-stub). esbuild compile clean. No release this session (0.29.0 bump is Session 4).",
+  "summary": "Session 2 of 4: wired the Getting Started form's three actions end to end, reusing the existing engines. (1) Build project structure: structure-only no-prompt scaffold (spec D5) - new renderStructureBootstrap + structureOnlyContext in consumerBootstrap.ts render ONLY the three engine files + docs/dabbler/start-here.md (NO starter session set: there is no title prompt, and materializing a set would flip the dual-mode Explorer to list mid-form); ScaffoldDeps.structureOnly switches the shared Set 058 writer; buildProjectStructureNoPrompt scaffolds the OPEN workspace folder (folder-picker fallback when none), silent git init, tier from the form radio, tier-aware venv+router install with the Lightweight router-config divergence preserved. (2) Import plan: planImport.ts split into importPlanFromFile + copyPlanningPrompt with an injectable PlanImportUi; the dabbler.importPlan QuickPick delegates to the same functions. (3) Build session sets: buildSessionGenPrompt gains a parallel option (D4/D7 - worktree + prerequisites: decomposition guidance in the copied prompt text); copySessionSetGenPrompt shared by the command and the form. Form-host protocol: GettingStartedActionMsg (5 action ids + tier/parallel riders, separate channel from the executeCommand allowlist) routed through pure routeGettingStartedAction (unknown actions ignored, tier narrowed via asTier defaulting full, parallel === true) with makeGettingStartedHandlers binding the real implementations; CustomSessionSetsView refreshes its snapshot after every handled action. client.js wires the data-gs-action buttons with persistent gsState (tier/parallel survive re-renders) and a disabled-until-repaint double-click guard; no-folder CTA wired to showOpenDialog -> vscode.openFolder. 16 new unit tests (gettingStartedActions.test.ts); full suite 676 passing / 2 pre-existing stub failures; esbuild + tsc clean. No release this session (0.29.0 bump is Session 4).",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
-  "verification_notes": "Cross-provider verification routed to gpt-5-4 (OpenAI) over 4 rounds, cumulative $0.514. R1 found 3 issues: (Issue 2, Major) exists() accepted a DIRECTORY named like CLAUDE.md/project-plan.md -> FIXED with fileExists = exists && !isDirectory + regression tests; (Issue 3, Minor) protocol said gettingStarted always-present-or-null while client handles undefined -> FIXED to optional; (Issue 1) mode flip keyed on hasAnySets not the bare NNN- dir probe -> DISPOSITIONED as intentional (D1 = a renderable set requires spec.md; flipping on a bare dir would render an empty list) with a code comment; R2 confirmed all three resolved/acceptable but raised a completeness gap (form live-progress inputs not watched) -> FIXED by adding a getting-started watcher; R3 wanted the .venv router probe and bare numbered-dir also watched -> FIXED by broadening the single watcher to cover ALL D3 inputs (rides VS Code's existing recursive workspace watcher, no new OS watch); R4 returned VERIFIED. watcherInventory convention test updated (new callsite allowlisted with D1 rationale; baseline 1 -> 2).",
+  "verification_notes": "Cross-provider verification routed to gpt-5-4 (OpenAI), 2 rounds, $0.1348 routed verification spend. R1 ISSUES_FOUND with one Major (D7 in-form worktree info note not rendered when the parallel checkbox is checked) - DISPUTED as out-of-session-scope: the round-1 prompt's spec excerpt ended at the Session 2 plan, so the verifier could not see that the spec assigns the D7 note to Session 3 step 2 verbatim ('Parallel worktree info (D7): checking the box surfaces the worktree note'); Session 2's plan scopes the checkbox to the copied prompt text only. R2, fed the Session 3 spec text, accepted the disposition and returned VERIFIED with no remaining Session-2-scope issues. Structured findings persisted to s2-issues.json (schemaVersion 2, resolution_status advisory-disagreement, resolved_in_round 2). Orchestrator-made design decision flagged to and endorsed by the verifier in BOTH rounds: the structure-only scaffold (no starter session set) is the correct reading of D1/D4/D5. Next-orchestrator recommendation routed to gemini-pro (analysis, $0.0023).",
   "files_changed": [
-    "tools/dabbler-ai-orchestration/src/utils/gettingStartedDetection.ts",
     "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
+    "tools/dabbler-ai-orchestration/src/utils/consumerBootstrap.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gettingStartedActions.ts",
+    "tools/dabbler-ai-orchestration/src/wizard/planImport.ts",
+    "tools/dabbler-ai-orchestration/src/wizard/sessionGenPrompt.ts",
     "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
-    "tools/dabbler-ai-orchestration/src/extension.ts",
     "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
     "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
-    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedDetection.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
     "docs/session-sets/060-getting-started-redesign/activity-log.json"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
     "engine": "claude-code",
     "provider": "anthropic",
-    "model": "claude-opus-4-8",
+    "model": "claude-fable-5",
     "effort": "medium",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 wires the three form actions (build-structure / import-plan / build-session-sets) onto the data-gs-action hooks this session left inert, reusing the same scaffolder/planning/decomposition engines; same orchestrator keeps the dual-mode rendering and protocol context with no provider switch warranted."
+      "specifics": "Routed analysis (gemini-pro): the claude-code engine successfully orchestrated the two preceding sessions with similar TypeScript and VS Code extension tasks; continuing maintains context and leverages a proven workflow for this codebase. Session 3 adds the D6 env-var validation, the D7 worktree note (carrying s2-issues.json's deferred finding), the D8 static instructions doc, and the old-path retirement."
     }
   },
   "blockers": []

@@ -43,6 +43,7 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
       requiresE2E: false,
       uatScope: "none",
       tier: "full",
+      verificationMode: "out-of-band-or-none",
     },
     uatSummary: null,
     root: "/x",
@@ -51,6 +52,7 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
     schemaVersionOnDisk: null,
     prerequisites: null,
     blockedByPrereqs: false,
+    plusFraction: false,
   };
 }
 

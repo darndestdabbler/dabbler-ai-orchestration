@@ -1,0 +1,3 @@
+- **Issue** → Valid quoted YAML enum values are treated as invalid, so a spec like `tier: "lightweight"` / `verificationMode: "dedicated-sessions"` silently falls back to `full` / `out-of-band-or-none`, hiding both the `lw` marker and the `+` fraction.
+  **Location** → `src/utils/fileSystem.ts`, `parseSessionSetConfig` (`stringRe(...)` / `tier` / `verificationMode` parsing).
+  **Fix** → Accept optional single/double quotes around scalar enum values before validation, and add coverage for quoted `tier` + quoted `verificationMode` in `src/test/suite/tierLegibility.test.ts`.

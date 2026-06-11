@@ -378,7 +378,7 @@ suite("Set 047 / S5 — blockedByPrereqsBadge", () => {
       sessionsCompleted: 0,
       lastTouched: null,
       liveSession: null,
-      config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full" },
+      config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none" },
       uatSummary: null,
       root: "/x",
       needsMigration: false,
@@ -386,6 +386,7 @@ suite("Set 047 / S5 — blockedByPrereqsBadge", () => {
       schemaVersionOnDisk: null,
       prerequisites: null,
       blockedByPrereqs: false,
+      plusFraction: false,
       ...over,
     };
   }

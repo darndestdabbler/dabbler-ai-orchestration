@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Valid quoted YAML enum values are treated as invalid, so a spec like tier: \"lightweight\" / verificationMode: \"dedicated-sessions\" silently falls back to full / out-of-band-or-none, hiding both the lw marker and the + fraction. Location: src/utils/fileSystem.ts, parseSessionSetConfig (stringRe / tier / verificationMode parsing). Fix: accept optional single/double quotes around scalar enum values before validation, and add coverage for quoted tier + quoted verificationMode in src/test/suite/tierLegibility.test.ts.",
+      "category": "correctness",
+      "severity": "Major",
+      "issueId": "S061-S1-V1-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Static review of the stringRe regex ([\\w-]+ cannot match a quoted scalar) against the YAML spec shapes the triStateRe already accepts in quoted form.",
+      "suggestedTestOrCheck": "tierLegibility.test.ts: parseSessionSetConfig on a spec with tier: \"lightweight\" and verificationMode: \"dedicated-sessions\" (double- and single-quoted) returns the quoted values, not the defaults.",
+      "resolution_status": "fixed",
+      "resolution_notes": "stringRe now accepts optional single/double quotes ((?:\"([\\w-]+)\"|'([\\w-]+)'|([\\w-]+))) with a stringValue capture-picker; all three call sites (uatScope, tier, verificationMode) updated; 4 quoted-value tests added (double, single, quoted+comment, quoted-invalid-defaults). Round-2 gpt-5-4 re-verify: VERIFIED.",
+      "resolved_in_round": 2
+    }
+  ]
+}

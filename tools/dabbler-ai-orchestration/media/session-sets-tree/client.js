@@ -265,6 +265,22 @@
           escAttr(row.migrationTooltip || "") + '">' +
           escHtml(row.migrationMarker) + '</span>'
       : "";
+    // Set 061 S1 (D2): quiet "lw" tier marker on Lightweight rows —
+    // same unobtrusive pattern as the Set 050 migration asterisk.
+    // Empty marker → no span (Full rows stay unmarked).
+    const tierSpan = row.tierMarker
+      ? '<span class="row-tier-marker" title="' +
+          escAttr(row.tierTooltip || "") + '" aria-label="' +
+          escAttr(row.tierTooltip || "") + '">' +
+          escHtml(row.tierMarker) + '</span>'
+      : "";
+    // Set 061 S1 (D1): when the fraction carries the `+` suffix, the
+    // host ships a tooltip explaining why the denominator can grow.
+    // It rides the fraction span's title attribute; the marker stays
+    // aria-hidden (the tooltip duplicates, not replaces, the signal).
+    const fractionTitle = row.fractionTooltip
+      ? ' title="' + escAttr(row.fractionTooltip) + '"'
+      : "";
     return (
       '<div role="treeitem" tabindex="-1" aria-level="2"' +
       ' aria-selected="false" data-slug="' + escAttr(row.slug) + '"' +
@@ -272,9 +288,10 @@
       ' data-context-value="' + escAttr(row.contextValue) + '"' +
       ' class="row row-' + escAttr(row.state) + '">' +
         '<div class="row-header" role="presentation">' +
-          '<span class="' + fractionCls + '" aria-hidden="true">' + escHtml(row.fraction || "") + '</span>' +
+          '<span class="' + fractionCls + '" aria-hidden="true"' + fractionTitle + '>' + escHtml(row.fraction || "") + '</span>' +
           '<span class="row-text">' +
             '<span class="row-name">' + escHtml(row.name) + '</span>' +
+            tierSpan +
             migrationSpan +
             descSpan +
           '</span>' +

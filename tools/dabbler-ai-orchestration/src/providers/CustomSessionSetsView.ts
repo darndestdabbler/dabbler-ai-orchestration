@@ -34,11 +34,14 @@ import {
   bucketSets,
   blockedByPrereqsBadge,
   forceClosedBadge,
+  fractionTooltip,
   ICON_FILES,
   isCurrentSessionInFlight,
   migrationMarker,
   migrationTooltip,
   sortBucket,
+  tierMarker,
+  tierTooltip,
   touchedDate,
   uatBadge,
 } from "./SessionSetsModel";
@@ -162,9 +165,15 @@ function descriptionFor(set: SessionSet): string {
 // directive was that every row in the Session Set Explorer must carry
 // a fraction so a not-yet-spec'd set doesn't render visually identical
 // to a malformed row.
+// Set 061 Session 1 (spec D1): a Lightweight dedicated-sessions set
+// whose typed verification session has not been appended yet renders a
+// `+` suffix ("2/3+") warning that the denominator can still grow. The
+// "?" denominator branch skips the suffix — an unknown denominator
+// already communicates the uncertainty the `+` exists to add.
 function fractionFor(set: SessionSet): string {
   if (set.totalSessions && set.totalSessions > 0) {
-    return `${set.sessionsCompleted}/${set.totalSessions}`;
+    const plus = set.plusFraction ? "+" : "";
+    return `${set.sessionsCompleted}/${set.totalSessions}${plus}`;
   }
   return `${set.sessionsCompleted}/?`;
 }
@@ -594,11 +603,16 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     // session-state.json continues to be written by start_session /
     // close_session (the check-out semantics still serve coordination
     // and audit-log purposes); only the UI surface retires.
+    // Set 061 S1 (D1): the tooltip ships only when the rendered
+    // fraction actually carries the `+` suffix (the "?"-denominator
+    // branch suppresses the suffix even when plusFraction is true).
+    const fraction = fractionFor(set);
     return {
       slug: set.name,
       name: set.name,
       state: set.state,
-      fraction: fractionFor(set),
+      fraction,
+      fractionTooltip: fraction.endsWith("+") ? fractionTooltip(set) : "",
       description: descriptionFor(set),
       contextValue: contextValueFor(set),
       iconSlug: ICON_FILES[set.state] ?? "",
@@ -607,6 +621,9 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // "(needs migration)" description label.
       migrationMarker: migrationMarker(set),
       migrationTooltip: migrationTooltip(set),
+      // Set 061 S1 (D2): quiet "lw" marker + tooltip on Lightweight rows.
+      tierMarker: tierMarker(set),
+      tierTooltip: tierTooltip(set),
       accordionHtml: null,
       accordionUpdatedAt: null,
     };

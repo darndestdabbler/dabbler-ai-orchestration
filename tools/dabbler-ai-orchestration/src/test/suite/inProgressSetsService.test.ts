@@ -123,7 +123,7 @@ function fakeSet(
       forceClosed: null,
       completedSessions: [],
     },
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full" },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none" },
     uatSummary: null,
     root: "/tmp",
     needsMigration: false,
@@ -131,6 +131,7 @@ function fakeSet(
     schemaVersionOnDisk: null,
     prerequisites: null,
     blockedByPrereqs: false,
+    plusFraction: false,
   };
 }
 

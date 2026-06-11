@@ -1,0 +1,84 @@
+{
+  "sessionSetName": "061-explorer-ux-polish",
+  "createdDate": "2026-06-11T07:52:06.821943-04:00",
+  "totalSessions": 4,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/ai-assignment",
+      "dateTime": "2026-06-11T07:52:06.832158-04:00",
+      "description": "Authored ai-assignment.md via route(analysis) on gemini-pro",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 4640,
+          "outputTokens": 1394,
+          "costUsd": 0.0197
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/spec-config-parsing",
+      "dateTime": "2026-06-11T08:09:58.766932-04:00",
+      "description": "Extended parseSessionSetConfig with verificationMode (enum-validated, defaults out-of-band-or-none); added VerificationMode type + SessionSetConfig field",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/plus-fraction",
+      "dateTime": "2026-06-11T08:09:58.766932-04:00",
+      "description": "New pure module src/utils/tierLegibility.ts (shouldRenderPlusFraction D1 predicate + hasTypedVerificationSession + tooltips); wired into readSessionSets (plusFraction on SessionSet), fractionFor + RowPayload.fractionTooltip + client.js title attr",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/tier-marker",
+      "dateTime": "2026-06-11T08:09:58.766932-04:00",
+      "description": "D2 quiet lw marker: tierMarker/tierTooltip in SessionSetsModel, RowPayload.tierMarker/tierTooltip, client.js tierSpan, tree.css .row-tier-marker (Set 050 asterisk pattern)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/tests",
+      "dateTime": "2026-06-11T08:09:58.766932-04:00",
+      "description": "tierLegibility.test.ts (config parsing matrix, D1 predicate matrix incl. before/after typed session, D2 markers, readSessionSets e2e fixtures); suites: TS 720 pass + 2 pre-existing Set-026 fails, Python 1185 pass/1 skip, esbuild compile clean",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/verified",
+      "dateTime": "2026-06-11T08:16:36.095488-04:00",
+      "description": "Cross-provider verification R1 gpt-5-4 ISSUES_FOUND (1 Major: quoted YAML enum values rejected by stringRe) -> fixed + 4 tests -> R2 gpt-5-4 VERIFIED (724 TS pass)",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 237244,
+          "outputTokens": 8244,
+          "costUsd": 0.71677
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 5611,
+          "outputTokens": 1136,
+          "costUsd": 0.031067
+        }
+      ]
+    }
+  ]
+}

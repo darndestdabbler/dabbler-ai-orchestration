@@ -39,7 +39,14 @@ export interface RowPayload {
   // right-aligned bold colored list-icon column on the left side of
   // the row. Always non-empty when totalSessions > 0; may be "" only
   // when the set has no totalSessions on disk yet.
-  fraction: string;                // e.g. "3/6", "0/4", "3/3"
+  fraction: string;                // e.g. "3/6", "0/4", "3/3", "2/3+" (Set 061 D1)
+  // Set 061 Session 1 (spec D1): hover text for the fraction column.
+  // Non-empty ONLY when the fraction carries the `+` suffix (a
+  // Lightweight dedicated-sessions set whose typed verification
+  // session has not been appended yet); explains why the denominator
+  // can still grow. The webview sets it as the fraction span's
+  // `title` attribute when present.
+  fractionTooltip: string;
   description: string;             // remaining description after fraction extraction (e.g. "session 4 in flight  ·  2026-05-18")
   contextValue: string;            // for ActionRegistry membership tests (e.g., "sessionSet:in-progress:uat")
   iconSlug: string;                // "in-progress.svg" / "done.svg" / etc.
@@ -51,6 +58,12 @@ export interface RowPayload {
   // the row name with the tooltip as its `title` attribute.
   migrationMarker: string;
   migrationTooltip: string;
+  // Set 061 Session 1 (spec D2): the quiet "lw" marker + tooltip on
+  // Lightweight rows (Set 050 asterisk pattern — de-emphasized
+  // foreground, help cursor). Empty on Full rows (the default and the
+  // majority; marking the exception keeps rows quiet).
+  tierMarker: string;
+  tierTooltip: string;
   // Set 034: the per-row orchestrator-tracking accordion is retired.
   // These fields remain on the protocol so older host/webview pairings
   // stay structurally compatible, but the host always emits null and

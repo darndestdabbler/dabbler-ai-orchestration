@@ -5,6 +5,7 @@ import { listGitWorktrees } from "./git";
 import { readStatus } from "./sessionState";
 import { isCancelled, readCancellationState } from "./cancelLifecycle";
 import { readProgress, SessionStateInvariantError, normalizeToV4Shape } from "./progress";
+import { LedgerSessionLike, shouldRenderPlusFraction } from "./tierLegibility";
 import {
   SessionSet,
   SessionState,
@@ -190,11 +191,16 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   // `requiresUAT: false`, `requiresE2E: false`. Pre-Set-048 specs without
   // explicit `tier:` resolve to `"full"` so existing 47 sets continue to
   // run under canonical Full-tier discipline.
+  // Set 061 Session 1: `verificationMode` joins the parsed fields —
+  // the Set 057 per-set verification choice's spec-config seed.
+  // Absent defaults to `"out-of-band-or-none"` (the strictly-opt-in
+  // Set 057 contract).
   const config: SessionSetConfig = {
     requiresUAT: false,
     requiresE2E: false,
     uatScope: "none",
     tier: "full",
+    verificationMode: "out-of-band-or-none",
   };
   if (!fs.existsSync(specPath)) return config;
   let text: string;
@@ -214,8 +220,18 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
       `^\\s*${key}\\s*:\\s*(?:"(suggested)"|(true|false|suggested))\\s*(?:#.*)?$`,
       "im",
     );
+  // Set 061 S1 (verifier fix S061-S1-V1-001): accept optional single or
+  // double quotes around scalar enum values — YAML allows either, and
+  // the tri-state parser above already accepts quoted "suggested".
+  // Without this, tier: "lightweight" / verificationMode:
+  // "dedicated-sessions" silently fell back to their defaults.
   const stringRe = (key: string) =>
-    new RegExp(`^\\s*${key}\\s*:\\s*([\\w-]+)\\s*(?:#.*)?$`, "im");
+    new RegExp(
+      `^\\s*${key}\\s*:\\s*(?:"([\\w-]+)"|'([\\w-]+)'|([\\w-]+))\\s*(?:#.*)?$`,
+      "im",
+    );
+  const stringValue = (m: RegExpMatchArray | null): string | null =>
+    m ? (m[1] ?? m[2] ?? m[3] ?? null) : null;
   const parseTriState = (m: RegExpMatchArray | null): TriStateFlag | null => {
     if (!m) return null;
     const raw = (m[1] ?? m[2] ?? "").toLowerCase();
@@ -229,14 +245,22 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   if (uat !== null) config.requiresUAT = uat;
   const e2e = parseTriState(block.match(triStateRe("requiresE2E")));
   if (e2e !== null) config.requiresE2E = e2e;
-  const scope = block.match(stringRe("uatScope"));
-  if (scope) config.uatScope = scope[1];
-  const tier = block.match(stringRe("tier"));
+  const scope = stringValue(block.match(stringRe("uatScope")));
+  if (scope) config.uatScope = scope;
+  const tier = stringValue(block.match(stringRe("tier")));
   if (tier) {
-    const v = tier[1].toLowerCase();
+    const v = tier.toLowerCase();
     if (v === "full" || v === "lightweight") config.tier = v;
     // Unknown tier values silently fall back to "full" — schema validator
     // (separate from this parser) is responsible for surfacing the typo.
+  }
+  const vm = stringValue(block.match(stringRe("verificationMode")));
+  if (vm) {
+    const v = vm.toLowerCase();
+    if (v === "out-of-band-or-none" || v === "dedicated-sessions") {
+      config.verificationMode = v;
+    }
+    // Unknown values fall back to the default, same posture as `tier`.
   }
   return config;
 }
@@ -476,6 +500,12 @@ export function readSessionSets(root: string): SessionSet[] {
     // command without re-reading the file.
     let needsMigration = false;
     let migrationTargetSchemaVersion: 3 | 4 | null = null;
+    // Set 061 Session 1 (spec D1): the normalized sessions[] ledger,
+    // captured for the plus-fraction predicate (which needs to see
+    // whether a `type: "verification"` session has been appended yet).
+    // Stays null when the state file is absent/unreadable — that reads
+    // as "no typed session yet", which is correct for fresh sets.
+    let ledgerSessions: unknown = null;
     // Set 050 S4: the raw on-disk schemaVersion, surfaced only for the
     // asterisk tooltip ("Ran under schema v<N>"). null when absent /
     // non-numeric (the asterisk then reads "an older schema").
@@ -611,6 +641,11 @@ export function readSessionSets(root: string): SessionSet[] {
           schemaVersion?: number;
           sessions?: unknown;
         };
+        // Set 061 Session 1: the shim preserves per-session extras
+        // (including the Set 057 `type` field) via entry spread, so
+        // the normalized ledger is the right predicate input for
+        // every input schema version.
+        ledgerSessions = sd.sessions ?? null;
 
         // Set 030 Session 3: route progress reads through the v3/v4
         // helper. `readProgress` itself runs through `normalizeToV4Shape`
@@ -699,6 +734,12 @@ export function readSessionSets(root: string): SessionSet[] {
     const config = parseSessionSetConfig(specPath);
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
+    // Set 061 Session 1 (spec D1): derived, never persisted.
+    const plusFraction = shouldRenderPlusFraction(
+      config.tier,
+      config.verificationMode,
+      ledgerSessions as LedgerSessionLike[] | null,
+    );
 
     sets.push({
       name: entry.name,
@@ -726,6 +767,7 @@ export function readSessionSets(root: string): SessionSet[] {
       // against an up-to-date snapshot. Sets without declared
       // prerequisites stay at false in both passes.
       blockedByPrereqs: false,
+      plusFraction,
     });
   }
 

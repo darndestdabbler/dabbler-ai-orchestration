@@ -43,6 +43,7 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
       requiresE2E: false,
       uatScope: "none",
       tier: "full",
+      verificationMode: "out-of-band-or-none",
     },
     uatSummary: null,
     root: "/x",
@@ -51,6 +52,7 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     schemaVersionOnDisk: null,
     prerequisites: null,
     blockedByPrereqs: false,
+    plusFraction: false,
     ...over,
   };
 }

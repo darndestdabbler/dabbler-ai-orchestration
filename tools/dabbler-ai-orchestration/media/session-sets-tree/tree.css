@@ -255,6 +255,22 @@ body.vscode-light, body.vscode-high-contrast-light {
 }
 
 /*
+ * Set 061 S1 (spec D2): the quiet "lw" tier marker on Lightweight
+ * rows — same deliberately-quiet treatment as the migration asterisk
+ * above (de-emphasized foreground, help cursor, tooltip on hover).
+ * Slightly smaller than the row name so "lw" reads as an annotation,
+ * not part of the slug.
+ */
+.row-tier-marker {
+  display: inline;
+  margin-left: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+  cursor: help;
+}
+
+/*
  * Set 049 S4 (rip-out): the Set 045 harvest-record badges
  * (`.harvest-badges` / `.harvest-badge*`) and coordination-conflict
  * pills (`.conflict-pills` / `.conflict-pill` / `.conflict-severity-*`)

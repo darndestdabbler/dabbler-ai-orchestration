@@ -1,20 +1,25 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "061-explorer-ux-polish",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
-      "title": "Lightweight legibility — N/M+ fraction + tier marker",
-      "status": "not-started",
-      "startedAt": null,
+      "title": "Lightweight legibility \u2014 N/M+ fraction + tier marker",
+      "status": "in-progress",
+      "startedAt": "2026-06-11T07:50:16.986945-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "high"
+      },
       "verificationVerdict": null
     },
     {
       "number": 2,
-      "title": "Prerequisite UX — quiet marker + explanatory tooltip",
+      "title": "Prerequisite UX \u2014 quiet marker + explanatory tooltip",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -23,7 +28,7 @@
     },
     {
       "number": 3,
-      "title": "Switch tier… action on not-started sets",
+      "title": "Switch tier\u2026 action on not-started sets",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

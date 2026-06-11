@@ -1,0 +1,3 @@
+VERIFIED
+
+The `stringRe`/`stringValue` change correctly fixes S061-S1-V1-001: quoted `tier` and `verificationMode` values are now extracted, lowercased, validated, and no longer silently fall back to defaults when valid. In the touched parsing paths, unquoted values, inline-comment cases, and invalid-value fallback behavior remain unchanged, so no regression is introduced for `uatScope`, `tier`, or `verificationMode`.

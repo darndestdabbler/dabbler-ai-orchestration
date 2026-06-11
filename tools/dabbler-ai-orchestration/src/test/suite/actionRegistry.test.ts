@@ -40,7 +40,13 @@ function fakeSet(
     sessionsCompleted: 0,
     lastTouched: null,
     liveSession: null,
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full" },
+    config: {
+      requiresUAT: false,
+      requiresE2E: false,
+      uatScope: "none",
+      tier: "full",
+      verificationMode: "out-of-band-or-none",
+    },
     uatSummary: null,
     root: "/x",
     needsMigration: false,
@@ -48,6 +54,7 @@ function fakeSet(
     schemaVersionOnDisk: null,
     prerequisites: null,
     blockedByPrereqs: false,
+    plusFraction: false,
     ...over,
   };
 }
@@ -312,7 +319,13 @@ suite("ActionRegistry", () => {
   test("result is sorted by group ascending so menu order is deterministic", () => {
     const got = applicableActions(
       fakeSet("in-progress", {
-        config: { requiresUAT: true, requiresE2E: true, uatScope: "", tier: "full" },
+        config: {
+          requiresUAT: true,
+          requiresE2E: true,
+          uatScope: "",
+          tier: "full",
+          verificationMode: "out-of-band-or-none",
+        },
         sessionsCompleted: 2,
         needsMigration: true,
         migrationTargetSchemaVersion: 4,

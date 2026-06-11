@@ -59,11 +59,23 @@ export type TriStateFlag = boolean | "suggested";
 // `"full"` when the field is absent.
 export type SessionSetTier = "full" | "lightweight";
 
+// Set 061 Session 1 (spec D1): how a Lightweight set's per-set
+// verification runs (the Set 057 choice). `out-of-band-or-none` is the
+// default — copyable review prompts, no runtime session growth.
+// `dedicated-sessions` appends typed verification/remediation sessions
+// to the ledger at runtime, which is what makes the Explorer's `N/M+`
+// fraction warning meaningful. The spec-config field is the SEED only
+// (the durable record is the activity-log `verification_mode` entry);
+// the Explorer reads the seed because it is the cheap, always-present
+// declarative signal. Inert on Full tier.
+export type VerificationMode = "out-of-band-or-none" | "dedicated-sessions";
+
 export interface SessionSetConfig {
   requiresUAT: TriStateFlag;
   requiresE2E: TriStateFlag;
   uatScope: string;
   tier: SessionSetTier;
+  verificationMode: VerificationMode;
 }
 
 // Set 047 Session 5: prerequisites field schema landed by spec §3.3.
@@ -182,6 +194,14 @@ export interface SessionSet {
   // set) keep `blockedByPrereqs: true` so a typo doesn't silently
   // unblock the row. False when `prerequisites` is null or empty.
   blockedByPrereqs: boolean;
+  // Set 061 Session 1 (spec D1): derived in-memory by `readSessionSets`
+  // via `shouldRenderPlusFraction` — true ONLY when the set is
+  // `tier: lightweight` AND `verificationMode: dedicated-sessions` AND
+  // no `type: "verification"` session exists yet in the sessions[]
+  // ledger. Drives the `N/M+` fraction suffix that warns the
+  // denominator will grow when typed verification/remediation sessions
+  // are appended. Never persisted (spec non-goal: no new state fields).
+  plusFraction: boolean;
 }
 
 // Set 052 S2: reconciled with the on-disk schema the router actually

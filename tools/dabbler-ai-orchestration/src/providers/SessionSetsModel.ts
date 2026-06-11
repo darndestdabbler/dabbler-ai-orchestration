@@ -1,5 +1,10 @@
 import * as vscode from "vscode";
 import { SessionSet, SessionState } from "../types";
+import {
+  PLUS_FRACTION_TOOLTIP,
+  tierMarkerFor,
+  tierTooltipFor,
+} from "../utils/tierLegibility";
 
 // Set 029 Session 3: data-layer extraction from SessionSetsProvider so
 // both the existing native `TreeView` (S3 ship) and the future custom
@@ -38,6 +43,25 @@ export function migrationTooltip(set: SessionSet): string {
 // (the package.json `when` clause that consumes the key is declarative).
 export function hasSubCurrentSets(allSets: SessionSet[]): boolean {
   return allSets.some((s) => s.needsMigration);
+}
+
+// Set 061 Session 1 (spec D2): the quiet per-row "lw" tier marker.
+// Same shape as migrationMarker/migrationTooltip above — pure
+// functions of the SessionSet so the renderer and tests share one
+// source. Full rows get no marker (Full is the default and the
+// majority; marking the exception keeps rows quiet).
+export function tierMarker(set: SessionSet): string {
+  return tierMarkerFor(set.config?.tier ?? "full");
+}
+
+export function tierTooltip(set: SessionSet): string {
+  return tierTooltipFor(set.config?.tier ?? "full");
+}
+
+// Set 061 Session 1 (spec D1): hover text for the `N/M+` fraction.
+// Non-empty only when the row's fraction carries the `+` suffix.
+export function fractionTooltip(set: SessionSet): string {
+  return set.plusFraction ? PLUS_FRACTION_TOOLTIP : "";
 }
 
 export const ICON_FILES: Record<SessionState, string> = {

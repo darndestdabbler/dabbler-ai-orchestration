@@ -1,0 +1,257 @@
+{
+  "ProjectName": "Dabbler AI Orchestration VS Code extension",
+  "ReleaseLabel": "0.30.0 (Set 061 'Explorer UX Polish')",
+  "Notes": "UAT must be executed against a LOCAL build (F5 extension host or packaged .vsix), NOT a published build. This checklist covers the three new Session Set Explorer features from Set 061 and includes a no-regression sweep of the Set 060 Getting Started surfaces.",
+  "Review": [
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Lightweight Legibility (D1/D2)",
+      "ItemLabel": "N/M+ renders on Lightweight dedicated-sessions set",
+      "HumanAction": "1. Open a workspace with a `tier: lightweight`, `verificationMode: dedicated-sessions` set that has completed its work sessions but has no verification session. 2. In the Session Set Explorer, observe the session fraction on that row.",
+      "Expectation": "The session fraction shows a trailing '+', e.g., '3/3+'. The fraction does not increment the denominator.",
+      "E2ETestReference": "tierLegibility.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Lightweight Legibility (D1/D2)",
+      "ItemLabel": "N/M+ fraction has correct tooltip",
+      "HumanAction": "Hover the mouse over the session fraction from the previous test.",
+      "Expectation": "A tooltip appears with the exact text: 'Lightweight dedicated-sessions set: verification/remediation sessions are appended when the work sessions complete, so the session count can still grow.'",
+      "E2ETestReference": "tierLegibility.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Lightweight Legibility (D1/D2)",
+      "ItemLabel": "N/M+ drops after verification session is added",
+      "HumanAction": "1. Using the same set, append a `type: 'verification'` session to the ledger. 2. Reload the view. 3. Observe the session fraction.",
+      "Expectation": "The '+' disappears, and the fraction becomes an honest N/M, e.g., '3/4'.",
+      "E2ETestReference": "tierLegibility.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Lightweight Legibility (D1/D2)",
+      "ItemLabel": "N/M+ is absent on Full-tier and Lightweight Mode-A sets",
+      "HumanAction": "In the Session Set Explorer, observe a Full-tier set and a `tier: lightweight`, `verificationMode: out-of-band-or-none` set.",
+      "Expectation": "Neither row shows a '+' on its session fraction, regardless of session state.",
+      "E2ETestReference": "tierLegibility.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Lightweight Legibility (D1/D2)",
+      "ItemLabel": "'lw' marker appears on Lightweight sets",
+      "HumanAction": "Observe any `tier: lightweight` set row in the Session Set Explorer.",
+      "Expectation": "A small 'lw' marker appears after the set name. The cursor changes to a help cursor when hovering the marker.",
+      "E2ETestReference": "tierLegibility.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Lightweight Legibility (D1/D2)",
+      "ItemLabel": "'lw' marker is de-emphasized and unobtrusive",
+      "HumanAction": "Visually inspect the 'lw' marker on a Lightweight set row.",
+      "Expectation": "The marker is visually quiet, de-emphasized (e.g., lower opacity or muted color), and does not distract from the set name.",
+      "IsJudgmentItem": true,
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Lightweight Legibility (D1/D2)",
+      "ItemLabel": "'lw' marker has correct tooltip",
+      "HumanAction": "Hover the mouse over the 'lw' marker.",
+      "Expectation": "A tooltip appears with the exact text: 'Lightweight tier — router-off; verification per the set's verificationMode.'",
+      "E2ETestReference": "tierLegibility.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Lightweight Legibility (D1/D2)",
+      "ItemLabel": "'lw' marker is absent on Full-tier sets",
+      "HumanAction": "Observe any Full-tier set row in the Session Set Explorer.",
+      "Expectation": "No 'lw' marker is present.",
+      "E2ETestReference": "tierLegibility.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Prerequisite UX (D3)",
+      "ItemLabel": "Blocked marker '⛓︎' appears on unsatisfied non-terminal rows",
+      "HumanAction": "1. Open a workspace with a 'not started' or 'in progress' set that has at least one unsatisfied prerequisite. 2. Observe the set row in the Explorer.",
+      "Expectation": "A chains glyph '⛓︎' appears after the set name.",
+      "E2ETestReference": "prerequisites.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Prerequisite UX (D3)",
+      "ItemLabel": "Blocked marker '⛓︎' renders as a text glyph",
+      "HumanAction": "Visually inspect the '⛓︎' marker.",
+      "Expectation": "The marker renders as a standard monochrome text glyph, not a color emoji.",
+      "IsJudgmentItem": true,
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Prerequisite UX (D3)",
+      "ItemLabel": "Blocked marker tooltip correctly lists multiple/unknown prerequisites",
+      "HumanAction": "1. Use a fixture set that depends on one 'in progress' prerequisite and one prerequisite with a typo'd, unresolvable slug. 2. Hover the '⛓︎' marker.",
+      "Expectation": "Tooltip appears with the exact format: 'Blocked by prerequisites: <slug1> (in progress), <bad-slug> (unknown set — check the slug) — all must complete first.'",
+      "E2ETestReference": "prerequisites.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Prerequisite UX (D3)",
+      "ItemLabel": "Old '[BLOCKED BY PREREQS]' description badge is absent",
+      "HumanAction": "Observe the same blocked set row from the previous test.",
+      "Expectation": "The description area of the tree item does NOT contain the old all-caps '[BLOCKED BY PREREQS]' text.",
+      "E2ETestReference": "prerequisites.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Prerequisite UX (D3)",
+      "ItemLabel": "Blocked marker is suppressed on terminal-state rows",
+      "HumanAction": "1. Open a workspace where a 'complete' or 'cancelled' set has an unsatisfied prerequisite. 2. Observe the set row.",
+      "Expectation": "No '⛓︎' marker is visible on the row.",
+      "E2ETestReference": "prerequisites.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Prerequisite UX (D3)",
+      "ItemLabel": "'Open Prerequisite Spec' action opens the correct file",
+      "HumanAction": "1. Right-click on a blocked set row with an unsatisfied prerequisite. 2. Select 'Open Prerequisite Spec'.",
+      "Expectation": "The `spec.md` file for the prerequisite set is opened in the editor.",
+      "E2ETestReference": "prerequisites.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Switch Tier Action (D4)",
+      "ItemLabel": "'Switch Tier…' appears ONLY on not-started rows",
+      "HumanAction": "1. Right-click a 'not-started' set. 2. Right-click an 'in-progress' set. 3. Right-click a 'complete' set. 4. Right-click a 'cancelled' set.",
+      "Expectation": "The 'Switch Tier…' action is present in the context menu ONLY for the 'not-started' set.",
+      "E2ETestReference": "actionRegistry.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Switch Tier Action (D4)",
+      "ItemLabel": "Switching Lightweight → Full rewrites spec and refreshes",
+      "HumanAction": "1. On a 'not-started' Lightweight set, right-click and select 'Switch Tier…'. 2. Choose 'Full' from the QuickPick. 3. Check the set's `spec.md` file and the Explorer view.",
+      "Expectation": "The `spec.md` is updated to `tier: full`. The file is otherwise byte-identical. The Explorer view refreshes, and the row no longer has the 'lw' marker.",
+      "E2ETestReference": "tierRewrite.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Switch Tier Action (D4)",
+      "ItemLabel": "Switching Full → Lightweight rewrites spec and refreshes",
+      "HumanAction": "1. On a 'not-started' Full set, right-click and select 'Switch Tier…'. 2. Choose 'Lightweight' from the QuickPick. 3. Check the set's `spec.md` file and the Explorer view.",
+      "Expectation": "The `spec.md` is updated to `tier: lightweight`. The file is otherwise byte-identical. The Explorer view refreshes, and the row now has the 'lw' marker.",
+      "E2ETestReference": "tierRewrite.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Switch Tier Action (D4)",
+      "ItemLabel": "Switch-to-Full guardrail fires warning if no provider key is visible",
+      "HumanAction": "1. Ensure no `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GEMINI_API_KEY` is set in the environment. 2. Switch a set to 'Full' tier.",
+      "Expectation": "The tier switch succeeds. An info toast confirms the switch, and a separate WARNING toast appears with text like: 'No provider API key (...) is visible to VS Code — Full-tier routing needs at least one...'",
+      "E2ETestReference": "tierRewrite.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Switch Tier Action (D4)",
+      "ItemLabel": "Switch-to-Full guardrail fires warning if router-config is missing",
+      "HumanAction": "1. Ensure the workspace root does NOT contain `ai_router/router-config.yaml`. 2. Switch a set to 'Full' tier.",
+      "Expectation": "The tier switch succeeds. An info toast confirms the switch, and a separate WARNING toast appears with text like: 'ai_router/router-config.yaml was not found in this workspace...'",
+      "E2ETestReference": "tierRewrite.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Switch Tier Action (D4)",
+      "ItemLabel": "Shows 'already on tier' message for same-tier selection",
+      "HumanAction": "1. On a 'not-started' Full set, invoke 'Switch Tier…'. 2. Select 'Full' again.",
+      "Expectation": "An INFO toast appears with text like: '\"<name>\" is already on the full tier.'",
+      "E2ETestReference": "tierRewrite.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session Set Explorer",
+      "Subarea": "Switch Tier Action (D4)",
+      "ItemLabel": "Repairs malformed tier declaration on same-tier selection",
+      "HumanAction": "1. On a not-started set, manually edit the spec.md Session Set Configuration block to a malformed/typo'd tier scalar, e.g. `tier: ful` (NOT a commented `# tier:` line and NOT a valid value with a trailing comment — those are preserved, not repaired). 2. Invoke 'Switch Tier…' and select the canonical tier the value was a typo of (e.g. 'Full').",
+      "Expectation": "An INFO toast appears with text like: 'Repaired \"<name>\"'s malformed tier declaration — now explicitly full.' The spec.md tier scalar is corrected to `tier: full` and everything else in the file is byte-identical.",
+      "E2ETestReference": "tierRewrite.test.ts",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Getting Started & No-Regression",
+      "Subarea": "Set 060 Surfaces",
+      "ItemLabel": "No-folder CTA view is shown correctly",
+      "HumanAction": "Open VS Code with no folder/workspace open. View the Dabbler AI side panel.",
+      "Expectation": "The 'Open Folder' call-to-action view is displayed.",
+      "IsJudgmentItem": true,
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Getting Started & No-Regression",
+      "Subarea": "Set 060 Surfaces",
+      "ItemLabel": "Getting Started form appears in a workspace with no sets",
+      "HumanAction": "Open a project folder that has no session sets yet (no docs/session-sets/<set> folders). View the Dabbler AI Orchestration side panel.",
+      "Expectation": "The Getting Started form is displayed — a Full/Lightweight tier radio, a 'create parallel session sets' checkbox, and the staged action buttons (Build project structure / Import or copy plan / Build session sets). It does NOT prompt for a first-session-set title or name.",
+      "IsJudgmentItem": true,
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Getting Started & No-Regression",
+      "Subarea": "Set 060 Surfaces",
+      "ItemLabel": "Getting Started form shows Full-tier key/router warnings",
+      "HumanAction": "1. In the Getting Started form, select 'Full' tier. 2. Ensure no provider key is set and no router-config exists.",
+      "Expectation": "The form displays the warnings about needing a provider key and the `ai-router` configuration.",
+      "IsJudgmentItem": true,
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Getting Started & No-Regression",
+      "Subarea": "Set 060 Surfaces",
+      "ItemLabel": "Creating a set dismisses form and shows Session Set Explorer",
+      "HumanAction": "Complete the Getting Started form and create a new Session Set.",
+      "Expectation": "A new set is created on disk. The Getting Started form is replaced by the Session Set Explorer view, listing the new set.",
+      "IsJudgmentItem": true,
+      "Passes": true,
+      "Feedback": ""
+    }
+  ]
+}

@@ -214,6 +214,58 @@
           "costUsd": 0.016727
         }
       ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/uat-checklist",
+      "dateTime": "2026-06-11T10:06:12.769226-04:00",
+      "description": "Authored 061-explorer-ux-polish-uat-checklist.json (25 rows, 6 judgment) via route(documentation) -> gemini-pro $0.0641. Covers D1 N/M+ before/after typed verification session + tooltip, D1 negatives (Full/Mode-A), D2 lw marker+tooltip present/absent, D3 blocked glyph U+26D3+FE0E + multi/unknown-slug tooltip + badge-absent + terminal suppression + Open Prerequisite Spec, D4 Switch Tier not-started-only + both directions + switch-to-Full guardrails + already-on-tier + repaired-malformed, and a Set 060 Getting Started no-regression sweep. Validated routed draft against shipped strings/glyph; corrected 2 rows (malformed-scalar example was actually valid; GS form misdescribed as name/create + .dabbler dir).",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "task_type": "documentation",
+          "model": "gemini-pro",
+          "cost_usd": 0.0641365,
+          "purpose": "UAT checklist draft"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-004/local-build",
+      "dateTime": "2026-06-11T10:08:09.329258-04:00",
+      "description": "Built local UAT .vsix: tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.29.0.vsix (31 files, ~1003 KB). Pre-build TS unit suite: 752 passing + 2 pre-existing Set-026 failures (configEditor-foundation, notificationsSection) \u2014 no S4 regressions (S4 added only the UAT checklist doc). Awaiting operator UAT on a local build (F5 dev host or Install-from-VSIX) as the pre-publish gate before the 0.30.0 bump.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-004/deferral-close",
+      "dateTime": "2026-06-11T16:25:48.245585-04:00",
+      "description": "Set cut short by operator direction (2026-06-11): operator UAT and the 0.30.0 Marketplace release are deferred to Set 062 (062-lightweight-verification-affordance), which ships one combined 0.30.0 carrying both sets (Set 059->060 fold precedent). Remaining S4 steps (operator UAT, version bump, tag push) are superseded per the spec's Session 4 scope-change note (commit ba32b33). Session 4 closes by recording this deferral; wrote the set's change-log.md. The authored UAT checklist (061-explorer-ux-polish-uat-checklist.json) carries forward - Set 062's combined checklist subsumes its rows.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-004/verified",
+      "dateTime": "2026-06-11T16:28:29.143326-04:00",
+      "description": "Cross-provider verification of the deferral close: VERIFIED, 0 issues (s4-verification.md). Verifier gemini-2.5-pro via direct call_model fallback after the router's first-choice gpt-5-4 verifier hit OpenAI 429 rate limits on two consecutive route() attempts (3 retries each) - the Step 6 verifier-failure ladder's cross-provider fallback. Tokens 7817 in / 111 out; cost ~$0.011 ESTIMATED from token counts at published gemini-2.5-pro pricing (direct call_model bypasses router metrics, so no router-metrics.jsonl entry exists for this call).",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gemini-2.5-pro",
+          "taskType": "session-verification",
+          "inputTokens": 7817,
+          "outputTokens": 111,
+          "costUsd": 0.011,
+          "costEstimated": true
+        }
+      ]
     }
   ]
 }

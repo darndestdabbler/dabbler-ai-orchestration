@@ -1,40 +1,17 @@
 {
   "status": "completed",
-  "summary": "Session 3: `Switch Tier…` action shipped per D4 — new pure byte-preserving rewrite helper src/utils/tierRewrite.ts (rewriteSpecTier: config-block-scoped tier rewrite mirroring parseSessionSetConfig's regexes; preserves quote style / trailing comments / CRLF; absent-key insertion for lightweight, already-target for full; commented lines immune; malformed scalars repaired; non-config tier strings untouched) plus switchToFullWarnings guardrail predicate reusing providerKeyPresent. New command dabblerSessionSets.switchTier (commands/switchTier.ts): not-started re-check, tier QuickPick reusing the exported Getting Started promptTier copy (placeholder names the set + current tier), helper-driven decision, view refresh, outcome-specific messages incl. malformed-scalar 'Repaired'. ActionRegistry flat entry group 504 gated isNotStarted (17 actions); package.json contribution; extension.ts safeRegister; watcherInventory allowlist 190→191/226→227 (import line shift). D4 guardrails inform-only on switch-to-full: missing provider key + missing <workspace>/ai_router/router-config.yaml → points at Dabbler: Install ai-router. Tests: tierRewrite.test.ts 16-case rewrite matrix + 5 guardrail tests; actionRegistry not-started-only gating test. TS 752 pass + 2 pre-existing Set-026 failures; Python 1185 pass / 1 skip; dist committed in-sync. Verification: R1 gpt-5-4 ISSUES_FOUND 2 Major — S061-S3-V1-001 (set.root guardrail base) DISPROVEN empirically (set.root IS the workspace root, fileSystem.ts:420/761; diff context gap); S061-S3-V1-002 half FIXED (early same-tier return removed; helper is single decision authority; typo-repair test) half DISPROVEN (parser lowercases, fileSystem.ts:253; case-variant test). R2 narrow re-verify gpt-5-4: VERIFIED. Routed spend $0.1385. Note for S4 UAT: menu label is Title-Case 'Switch Tier…' vs spec prose 'Switch tier…'.",
+  "summary": "Session 4 (final): deferral close under the operator-directed cut-short (2026-06-11). Done before the cut: authored 061-explorer-ux-polish-uat-checklist.json (25 rows, 6 judgment; routed gemini-pro draft $0.0641, validated + 2 rows corrected against shipped strings/glyphs) and built the local UAT .vsix (dabbler-ai-orchestration-0.29.0.vsix; TS suite 752 passing + 2 pre-existing Set-026 failures). Deferred to Set 062 per the spec's Session 4 scope-change note (commit ba32b33): operator UAT (walked against 062's fixture workspace; 062's combined checklist subsumes this set's rows) and the Marketplace 0.30.0 release (one combined release from 062 carrying both sets - the Set 059->060 fold precedent). This close records the deferral, writes the set's change-log.md, and runs the normal close-out gates; the set closes complete, not cancelled. Verification: deferral-close consistency VERIFIED 0 issues by gemini-2.5-pro (s4-verification.md) via direct call_model fallback after the first-choice gpt-5-4 verifier hit OpenAI 429 rate limits twice (Step 6 verifier-failure ladder); cost ~$0.011 estimated from token counts (direct call bypasses router metrics). Set total routed spend ~$0.245.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "tools/dabbler-ai-orchestration/src/utils/tierRewrite.ts",
-    "tools/dabbler-ai-orchestration/src/commands/switchTier.ts",
-    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
-    "tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts",
-    "tools/dabbler-ai-orchestration/src/extension.ts",
-    "tools/dabbler-ai-orchestration/package.json",
-    "tools/dabbler-ai-orchestration/dist/extension.js",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map",
-    "tools/dabbler-ai-orchestration/src/test/suite/tierRewrite.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
-    "docs/session-sets/061-explorer-ux-polish/ai-assignment.md",
-    "docs/session-sets/061-explorer-ux-polish/s3-verification.md",
-    "docs/session-sets/061-explorer-ux-polish/s3-verification-round-2.md",
-    "docs/session-sets/061-explorer-ux-polish/s3-issues.json",
-    "docs/session-sets/061-explorer-ux-polish/s3-close-reason.md",
+    "docs/session-sets/061-explorer-ux-polish/061-explorer-ux-polish-uat-checklist.json",
+    "docs/session-sets/061-explorer-ux-polish/change-log.md",
+    "docs/session-sets/061-explorer-ux-polish/s4-verification.md",
     "docs/session-sets/061-explorer-ux-polish/activity-log.json",
     "docs/session-sets/061-explorer-ux-polish/session-state.json",
     "docs/session-sets/061-explorer-ux-polish/session-events.jsonl",
     "docs/session-sets/061-explorer-ux-polish/disposition.json"
   ],
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "codex",
-    "provider": "openai",
-    "model": "gpt-5.4",
-    "effort": "medium",
-    "reason": {
-      "code": "switch-due-to-cost",
-      "specifics": "Per the routed ai-assignment analysis, Session 4 is release mechanics (UAT checklist authoring, local .vsix build, version bump, tag push on operator authorization) — procedural, file-system-centric work where a CLI-oriented model at medium effort is the cheaper appropriate fit."
-    }
-  },
   "blockers": []
 }

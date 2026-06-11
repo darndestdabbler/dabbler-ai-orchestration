@@ -50,10 +50,10 @@ low
 | 6    | Cross-provider verification of session goals. | route(session-verification) |
 
 ### Actuals (filled after the session)
-- Orchestrator used: 
-- Total routed cost: 
-- Deviations from recommendation: 
-- Notes for next-session calibration: 
+- Orchestrator used: anthropic claude-fable-5 @ effort=high (Claude Code)
+- Total routed cost: $0.2020 (documentation gemini-pro $0.0037 + auto-verify gpt-5-4-mini $0.0079; session-verification R1 gpt-5-4 $0.1829 + R2 $0.0075)
+- Deviations from recommendation: model claude-fable-5 instead of claude-opus-4-7 (operator's session launch); Step 3 `Open Prerequisite Spec` shipped rather than deferred (fell out of the openFile plumbing cheaply); Step 4 routed draft's auto-verifier flagged a missing QuickPick mention — folded in before integration.
+- Notes for next-session calibration: R1 session-verification returned a single Major that was a verifier miscount (17-vs-16 expected IDs) — disproven with a scripted count + test re-run, R2 accepted (VERIFIED). Feeding the diff (dist/ excluded, ~17k input tokens) instead of full files kept R1 at $0.18 vs S1's $0.72.
 
 **Next-session orchestrator recommendation (Session 3):**
 anthropic claude-opus-4-7 @ effort=max

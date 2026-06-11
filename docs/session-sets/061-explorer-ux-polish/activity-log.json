@@ -130,6 +130,30 @@
       "description": "prerequisites.test.ts: unsatisfied-list assertions on all derivation cases + cross-root readAllSessionSets test (two stub workspace roots) + blockedMarker/blockedTooltip suite (terminal suppression, unknown-slug copy, multi-prereq tooltip) + badge-retired source scan; actionRegistry.test.ts: 16-action registry + openPrerequisiteSpec applicability matrix; 7 fakeSet fixtures gained unsatisfiedPrereqs; Playwright blocked-by-prereqs.spec.ts rewritten badge->marker (4 scenarios incl. tooltip title attr). Suites: TS 730 pass + 2 pre-existing Set-026 fails, tsc clean, esbuild clean, Python 1185 pass/1 skip (1 env-key-only failure passes with keys loaded)",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/verified",
+      "dateTime": "2026-06-11T08:56:36.671913-04:00",
+      "description": "Cross-provider verification R1 gpt-5-4 ISSUES_FOUND (1 Major: alleged 17-vs-16 actionRegistry expected-set inconsistency) -> DISPROVEN empirically (scripted regex count = 16 IDs; openFolder/openPlaywright never members; test + full suite re-run 730 pass) -> R2 gpt-5-4 accepted disposition: VERIFIED. Artifacts: s2-verification.md, s2-verification-round-2.md, s2-issues.json",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 16961,
+          "outputTokens": 9364,
+          "costUsd": 0.182863
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 1172,
+          "outputTokens": 305,
+          "costUsd": 0.007505
+        }
+      ]
     }
   ]
 }

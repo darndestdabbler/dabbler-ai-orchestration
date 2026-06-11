@@ -1,0 +1,11 @@
+VERDICT: ISSUES_FOUND
+
+The production changes substantially satisfy the Session 2 contract: `deriveBlockedByPrereqs` now carries full unsatisfied prereq details while keeping the compatibility boolean aligned to `unsatisfiedPrereqs.length > 0`; the old `[BLOCKED BY PREREQS]` description badge is removed from the rendering path; the webview renders an escaped quiet marker + tooltip with terminal-state suppression preserved; `Open Prerequisite Spec` is registered, contributed, and its host-side behavior covers single/multiple/unknown prereqs; and the README/schema docs match the implemented UX. I did not find a grounded production-path correctness defect in the diff. The problem is in the verification evidence: one of the new tests is internally inconsistent, so the reported green TS suite is not reliable until that test is fixed and rerun.
+
+Issue 1
+- description: `src/test/suite/actionRegistry.test.ts` (`"ROW_ACTIONS exposes the 16 menu-surface actions..."`) is internally inconsistent after adding `dabblerSessionSets.openPrerequisiteSpec`: the `expected` set now contains 17 distinct command IDs, but the test still asserts `ROW_ACTIONS.length === 16`. Fix by changing the asserted count to 17, or by removing the extra expected/action entry if one of those commands is not actually intended to live in `ROW_ACTIONS`, then rerun the targeted test and full TS suite.
+- category: testing
+- severity: Major
+- issueType: deterministic-defect
+- verificationMethod: Static inspection of the modified `expected` set in `actionRegistry.test.ts`; manual count of the listed IDs yields 17 (`openSpec`, `openActivityLog`, `openChangeLog`, `openSessionState`, `openFolder`, `openPlaywright`, 4 copy prompts, `copySlug`, `openOrchestratorWriterLog`, `openPrerequisiteSpec`, `migrate`, `migrateToV4`, `cancel`, `restore`), which cannot agree with the asserted length of 16 if the test is run as committed.
+- suggestedTestOrCheck: Correct the count and run the single `ActionRegistry` count test first, then rerun the full TS unit suite to re-establish the session’s claimed green status.

@@ -1,0 +1,3 @@
+VERDICT: VERIFIED
+
+The disposition resolves Issue 1. The committed `expected` set shown contains 16 command IDs, not 17; the Round-1 count incorrectly included `openFolder` and `openPlaywright`, which are not present in that block and are explicitly out of scope for `ROW_ACTIONS`. The reported rerun also confirms the test passes as committed, including the independent `deepStrictEqual(got, expected)` membership check. With that Round-1 issue established as a false positive and no other grounded Critical/Major Round-1 issues remaining, the Session 2 changes are verified.

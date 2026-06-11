@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Round-1 verifier claimed src/test/suite/actionRegistry.test.ts is internally inconsistent: the `expected` set allegedly contains 17 distinct command IDs while the test asserts ROW_ACTIONS.length === 16, so the reported green TS suite would be unreliable.",
+      "category": "testing",
+      "severity": "Major",
+      "issueId": "S061-S2-V1-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Round-1 static inspection with a manual count of the expected-set members (the count included openFolder and openPlaywright).",
+      "suggestedTestOrCheck": "Run the single ActionRegistry count test, then the full TS suite.",
+      "resolution_status": "disproven",
+      "resolution_notes": "False positive — Round-1 miscount. The committed expected block contains exactly 16 strings (scripted regex count); openFolder and the Playwright reveal command were never members (Command-Palette-only per the Set 048 L2 lock). The test passes as committed, including the independent deepStrictEqual membership check, and the full TS suite re-ran 730 passing + 2 pre-existing Set-026 failures. Round-2 gpt-5-4 re-verify accepted the disposition: VERIFIED.",
+      "resolved_in_round": 2
+    }
+  ]
+}

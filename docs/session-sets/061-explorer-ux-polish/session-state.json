@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "061-explorer-ux-polish",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Lightweight legibility — N/M+ fraction + tier marker",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "Prerequisite UX — quiet marker + explanatory tooltip",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "Switch tier… action on not-started sets",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 4,
+      "title": "Operator UAT on a local build, then 0.30.0 release",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

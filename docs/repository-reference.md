@@ -64,11 +64,11 @@ can learn it.
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
 | `dabbler-ai-router` | `0.16.0` | **Published to PyPI 2026-06-05** (tag `v0.16.0`, release.yml run 27023463909). Sets 058–060 did not change the packaged surface. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.29.0` | Set 060 bumped; local operator UAT **passed 2026-06-11** and the operator authorized the publish in-session; the `vsix-v0.29.0` tag push (publish-vscode.yml) follows the Session 4 close-out. | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.29.0` | **Published 2026-06-11** to the VS Code Marketplace + Open VSX (tag `vsix-v0.29.0`, publish-vscode.yml run 27340063729) after the local operator UAT gate passed and the operator authorized the publish in-session. | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
 
-- **Extension `0.29.0`** — Set 060, Getting Started redesign (dual-mode Session Set Explorer onboarding form, static editor instructions, inline Full-tier key warning, worktree disclosure, path-referenced tier-aware decomposition prompt, old wizard retired) and the held Set 059 activation fix. Marketplace-only; local operator UAT passed 2026-06-11; publish operator-authorized, tag `vsix-v0.29.0` push follows the set's close-out.
+- **Extension `0.29.0`** — Set 060, Getting Started redesign (dual-mode Session Set Explorer onboarding form, static editor instructions, inline Full-tier key warning, worktree disclosure, path-referenced tier-aware decomposition prompt, old wizard retired) and the held Set 059 activation fix. Marketplace-only; local operator UAT passed 2026-06-11; published 2026-06-11 (tag `vsix-v0.29.0`, run 27340063729).
 - **Extension `0.28.0`** — Set 058, tier-model clarity & consumer-repo bootstrap (shared template writer; uniform tier-aware scaffolding; canonical `spec.md`/engine-file/`start-here.md` templates; CI drift guards). Marketplace-only; `ai_router` packaged surface unchanged. Published 2026-06-09 (tag `vsix-v0.28.0`, run 27228430570).
 - **`dabbler-ai-router 0.16.0`** — Set 057, Lightweight dedicated verification/remediation sessions (`verificationMode`, hand-off close, Q6 close-out gate). PyPI-only; extension untouched. Published 2026-06-05 (tag `v0.16.0`).
 - **`dabbler-ai-router 0.15.0`** — Set 054, verificationVerdict persistence. PyPI-only. Published 2026-06-02 (tag `v0.15.0`).

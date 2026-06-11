@@ -220,6 +220,20 @@ action; suite green.
 
 ### Session 4 of 4: Operator UAT on a local build, then 0.30.0 release
 
+> **Scope change (operator-directed, 2026-06-11): Set 061 is cut short.**
+> The operator UAT and the 0.30.0 release are **deferred to Set 062**
+> (`062-lightweight-verification-affordance`): the D1/D2
+> Lightweight-legibility surfaces cannot be adequately UAT'd without 062's
+> verification affordance and its hello-world UAT fixture workspace, and one
+> combined Marketplace **0.30.0** now ships from Set 062 carrying this set's
+> changes (the Set 059→060 fold precedent). Session 4 was already in flight
+> when this was decided — step 1 (the UAT checklist) and the local `.vsix`
+> build are done; the remaining steps (operator UAT, version bump, release)
+> are **superseded**. Session 4 closes by recording this deferral, writing
+> the set's `change-log.md`, and running the normal close-out gates. The
+> authored checklist carries forward: Set 062's combined checklist subsumes
+> its rows.
+
 **Goal:** Gate the release on a passing local UAT, then ship.
 **Steps:**
 1. Author the set's ad-hoc UAT checklist (`061-explorer-ux-polish-uat-checklist.json`,

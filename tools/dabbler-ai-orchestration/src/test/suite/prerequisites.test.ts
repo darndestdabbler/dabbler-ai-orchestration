@@ -5,15 +5,26 @@ import * as path from "path";
 
 import {
   parsePrerequisites,
+  readAllSessionSets,
   readSessionSets,
 } from "../../utils/fileSystem";
-import { blockedByPrereqsBadge } from "../../providers/SessionSetsModel";
+import {
+  BLOCKED_MARKER,
+  blockedMarker,
+  blockedTooltip,
+} from "../../providers/SessionSetsModel";
 import { SessionSet, SessionState } from "../../types";
 
 // Set 047 Session 5 — spec.md ``prerequisites`` field schema +
 // `readSessionSets` derives `blockedByPrereqs` cross-reference.
 // Tests cover (1) the parser shape, (2) `readSessionSets`'
-// cross-reference pass, (3) the badge predicate.
+// cross-reference pass, (3) the marker + tooltip predicates.
+//
+// Set 061 Session 2 (spec D3): the cross-reference now also carries
+// the full unsatisfied list (`unsatisfiedPrereqs`) so the blocked
+// marker's tooltip can name each blocking prerequisite and its
+// current state; the `[BLOCKED BY PREREQS]` description badge is
+// retired in favor of the quiet marker (Set 050 asterisk pattern).
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-prereq-test-"));
@@ -263,6 +274,11 @@ suite("Set 047 / S5 — readSessionSets cross-reference derivation", () => {
       assert.deepStrictEqual(blocked.prerequisites, [
         { slug: "046-prereq", condition: "complete" },
       ]);
+      // Set 061 S2 (D3): the derivation carries the unsatisfied list
+      // (slug + condition + target state) for the marker's tooltip.
+      assert.deepStrictEqual(blocked.unsatisfiedPrereqs, [
+        { slug: "046-prereq", condition: "complete", targetState: "in-progress" },
+      ]);
     } finally {
       fs.rmSync(root, { recursive: true });
     }
@@ -288,6 +304,7 @@ suite("Set 047 / S5 — readSessionSets cross-reference derivation", () => {
       const sets = readSessionSets(root);
       const unblocked = sets.find((s) => s.name === "047-unblocked")!;
       assert.strictEqual(unblocked.blockedByPrereqs, false);
+      assert.deepStrictEqual(unblocked.unsatisfiedPrereqs, []);
     } finally {
       fs.rmSync(root, { recursive: true });
     }
@@ -313,6 +330,11 @@ suite("Set 047 / S5 — readSessionSets cross-reference derivation", () => {
       // A missing-target slug keeps the row blocked — a silent unblock
       // on typo would mask the very dependency error the field is for.
       assert.strictEqual(set.blockedByPrereqs, true);
+      // Set 061 S2 (D3): the unknown target is named with the
+      // "unknown" sentinel so the tooltip can say "check the slug".
+      assert.deepStrictEqual(set.unsatisfiedPrereqs, [
+        { slug: "999-does-not-exist", condition: "complete", targetState: "unknown" },
+      ]);
     } finally {
       fs.rmSync(root, { recursive: true });
     }
@@ -327,6 +349,7 @@ suite("Set 047 / S5 — readSessionSets cross-reference derivation", () => {
       const set = sets.find((s) => s.name === "047-standalone")!;
       assert.strictEqual(set.prerequisites, null);
       assert.strictEqual(set.blockedByPrereqs, false);
+      assert.deepStrictEqual(set.unsatisfiedPrereqs, []);
     } finally {
       fs.rmSync(root, { recursive: true });
     }
@@ -356,13 +379,65 @@ suite("Set 047 / S5 — readSessionSets cross-reference derivation", () => {
       const sets = readSessionSets(root);
       const set = sets.find((s) => s.name === "047-multi")!;
       assert.strictEqual(set.blockedByPrereqs, true);
+      // Set 061 S2 (D3): only the UNSATISFIED prereq is carried —
+      // the satisfied one (044-done) does not appear in the list.
+      assert.deepStrictEqual(set.unsatisfiedPrereqs, [
+        { slug: "046-in-progress", condition: "complete", targetState: "in-progress" },
+      ]);
     } finally {
       fs.rmSync(root, { recursive: true });
     }
   });
+
+  test("cross-root: prereq satisfied by a set discovered in a different root (Set 061 S2)", () => {
+    // Two workspace roots: the dependant lives in rootA; its prereq
+    // lives — complete — in rootB. The merged readAllSessionSets()
+    // pass must resolve it (the S5 Important-2 re-derivation), so the
+    // dependant is NOT blocked even though a single-root scan of
+    // rootA alone would read the slug as unknown.
+    const rootA = setupRepo();
+    const rootB = setupRepo();
+    const vscode = require("vscode");
+    const origFolders = vscode.workspace.workspaceFolders;
+    try {
+      writeSpec(
+        setDir(rootA, "047-dependant"),
+        specWithPrereqs(
+          1,
+          [
+            "prerequisites:",
+            "  - slug: 046-elsewhere",
+            "    condition: complete",
+          ].join("\n"),
+        ),
+      );
+      writeState(setDir(rootA, "047-dependant"), "not-started", 1);
+      writeSpec(setDir(rootB, "046-elsewhere"), specWithPrereqs(1, ""));
+      writeState(setDir(rootB, "046-elsewhere"), "complete", 1);
+
+      // Sanity: the single-root scan of rootA reads the slug as
+      // unknown → blocked.
+      const single = readSessionSets(rootA).find((s) => s.name === "047-dependant")!;
+      assert.strictEqual(single.blockedByPrereqs, true);
+      assert.strictEqual(single.unsatisfiedPrereqs[0].targetState, "unknown");
+
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: rootA }, name: "rootA", index: 0 },
+        { uri: { fsPath: rootB }, name: "rootB", index: 1 },
+      ];
+      const merged = readAllSessionSets();
+      const dep = merged.find((s) => s.name === "047-dependant")!;
+      assert.strictEqual(dep.blockedByPrereqs, false);
+      assert.deepStrictEqual(dep.unsatisfiedPrereqs, []);
+    } finally {
+      vscode.workspace.workspaceFolders = origFolders;
+      fs.rmSync(rootA, { recursive: true });
+      fs.rmSync(rootB, { recursive: true });
+    }
+  });
 });
 
-suite("Set 047 / S5 — blockedByPrereqsBadge", () => {
+suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
   function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     return {
       name: "x",
@@ -386,37 +461,100 @@ suite("Set 047 / S5 — blockedByPrereqsBadge", () => {
       schemaVersionOnDisk: null,
       prerequisites: null,
       blockedByPrereqs: false,
+      unsatisfiedPrereqs: [],
       plusFraction: false,
       ...over,
     };
   }
 
-  test("renders the badge when blockedByPrereqs=true on a non-terminal row", () => {
+  const ONE_UNSATISFIED = [
+    { slug: "045-log-harvest", condition: "complete" as const, targetState: "in-progress" as const },
+  ];
+
+  test("renders the marker when unsatisfied prereqs exist on a non-terminal row", () => {
+    for (const state of ["not-started", "in-progress"] as SessionState[]) {
+      assert.strictEqual(
+        blockedMarker(fakeSet({ state, blockedByPrereqs: true, unsatisfiedPrereqs: ONE_UNSATISFIED })),
+        BLOCKED_MARKER,
+      );
+    }
+  });
+
+  test("suppresses the marker on complete/cancelled rows (terminal suppression unchanged)", () => {
+    for (const state of ["complete", "cancelled"] as SessionState[]) {
+      assert.strictEqual(
+        blockedMarker(fakeSet({ state, blockedByPrereqs: true, unsatisfiedPrereqs: ONE_UNSATISFIED })),
+        "",
+      );
+      assert.strictEqual(
+        blockedTooltip(fakeSet({ state, blockedByPrereqs: true, unsatisfiedPrereqs: ONE_UNSATISFIED })),
+        "",
+      );
+    }
+  });
+
+  test("renders nothing when no prereq is unsatisfied", () => {
+    assert.strictEqual(blockedMarker(fakeSet()), "");
+    assert.strictEqual(blockedTooltip(fakeSet()), "");
+  });
+
+  test("marker is a text-presentation glyph, not the all-caps badge", () => {
+    // The Set 047 badge text is retired — the marker is a single
+    // chain glyph with U+FE0E so themes render it as text, not emoji.
+    assert.strictEqual(BLOCKED_MARKER, "⛓︎");
+    assert.ok(!BLOCKED_MARKER.includes("BLOCKED"));
+  });
+
+  test("tooltip names each unsatisfied prerequisite with its current state", () => {
+    const set = fakeSet({
+      state: "not-started",
+      blockedByPrereqs: true,
+      unsatisfiedPrereqs: [
+        { slug: "045-log-harvest", condition: "complete", targetState: "in-progress" },
+        { slug: "047-state-file-schema-v4-audit", condition: "complete", targetState: "not-started" },
+      ],
+    });
     assert.strictEqual(
-      blockedByPrereqsBadge(fakeSet({ state: "not-started", blockedByPrereqs: true })),
-      "[BLOCKED BY PREREQS]",
-    );
-    assert.strictEqual(
-      blockedByPrereqsBadge(fakeSet({ state: "in-progress", blockedByPrereqs: true })),
-      "[BLOCKED BY PREREQS]",
+      blockedTooltip(set),
+      "Blocked by prerequisites: 045-log-harvest (in progress), " +
+        "047-state-file-schema-v4-audit (not started) — all must complete first.",
     );
   });
 
-  test("suppresses the badge on complete/cancelled rows (no longer actionable)", () => {
+  test("tooltip explains unknown-slug prereqs (typos stay blocking AND self-explanatory)", () => {
+    const set = fakeSet({
+      state: "in-progress",
+      blockedByPrereqs: true,
+      unsatisfiedPrereqs: [
+        { slug: "999-typo", condition: "complete", targetState: "unknown" },
+      ],
+    });
     assert.strictEqual(
-      blockedByPrereqsBadge(fakeSet({ state: "complete", blockedByPrereqs: true })),
-      "",
-    );
-    assert.strictEqual(
-      blockedByPrereqsBadge(fakeSet({ state: "cancelled", blockedByPrereqs: true })),
-      "",
+      blockedTooltip(set),
+      "Blocked by prerequisites: 999-typo (unknown set — check the slug) — all must complete first.",
     );
   });
+});
 
-  test("renders nothing when blockedByPrereqs=false", () => {
-    assert.strictEqual(
-      blockedByPrereqsBadge(fakeSet({ blockedByPrereqs: false })),
-      "",
-    );
+suite("Set 061 / S2 — [BLOCKED BY PREREQS] badge retired (D3)", () => {
+  // The all-caps description badge must not survive anywhere in the
+  // shipped Explorer surface: not in the model helpers, not in the
+  // host's RowPayload assembly, not in the webview renderer. A source
+  // scan keeps the retirement honest without depending on private
+  // functions.
+  test("badge literal is gone from the model, view, and webview client", () => {
+    const extRoot = path.resolve(__dirname, "..", "..", "..");
+    const shippedSources = [
+      path.join(extRoot, "src", "providers", "SessionSetsModel.ts"),
+      path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
+      path.join(extRoot, "media", "session-sets-tree", "client.js"),
+    ];
+    for (const file of shippedSources) {
+      const text = fs.readFileSync(file, "utf8");
+      assert.ok(
+        !text.includes("[BLOCKED BY PREREQS]"),
+        `badge literal still present in ${path.basename(file)}`,
+      );
+    }
   });
 });

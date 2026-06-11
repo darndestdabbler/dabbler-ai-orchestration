@@ -52,6 +52,7 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
     schemaVersionOnDisk: null,
     prerequisites: null,
     blockedByPrereqs: false,
+    unsatisfiedPrereqs: [],
     plusFraction: false,
   };
 }

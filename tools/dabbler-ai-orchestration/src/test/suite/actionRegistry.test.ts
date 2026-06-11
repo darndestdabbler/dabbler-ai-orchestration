@@ -54,6 +54,7 @@ function fakeSet(
     schemaVersionOnDisk: null,
     prerequisites: null,
     blockedByPrereqs: false,
+    unsatisfiedPrereqs: [],
     plusFraction: false,
     ...over,
   };
@@ -66,7 +67,7 @@ function ids(set: SessionSet, supports: ActionSupports): string[] {
 }
 
 suite("ActionRegistry", () => {
-  test("ROW_ACTIONS exposes the 14 menu-surface actions (Set 048 S3 reshape + Set 049 S1 hygiene + Set 049 S4 rip-out)", () => {
+  test("ROW_ACTIONS exposes the 16 menu-surface actions (Set 048 S3 reshape + Set 049 S1 hygiene + Set 049 S4 rip-out + Set 061 S2 prereq spec)", () => {
     // Set 048 S3 reshape:
     //   - L3 removed `dabblerSessionSets.openAiAssignment`.
     //   - L2 narrowed the Open File submenu to exactly 4 entries
@@ -91,6 +92,10 @@ suite("ActionRegistry", () => {
     //   - `dabbler.checkOutOrchestrator` ("Set Orchestrator…") retired
     //     alongside the check-out / check-in coordination layer. The
     //     writer-log opener stays.
+    // Set 061 S2 (spec D3):
+    //   - dabblerSessionSets.openPrerequisiteSpec — flat companion to
+    //     the blocked marker, gated to non-terminal rows with at least
+    //     one unsatisfied prerequisite.
     const expected = new Set([
       "dabblerSessionSets.openSpec",
       "dabblerSessionSets.openActivityLog",
@@ -103,6 +108,7 @@ suite("ActionRegistry", () => {
       "dabbler.copyStartNextParallelSessionPrompt",
       "dabblerSessionSets.copySlug",
       "dabbler.openOrchestratorWriterLog",
+      "dabblerSessionSets.openPrerequisiteSpec",
       "dabblerSessionSets.migrate",
       "dabblerSessionSets.migrateToV4",
       "dabblerSessionSets.cancel",
@@ -110,7 +116,7 @@ suite("ActionRegistry", () => {
     ]);
     const got = new Set(ROW_ACTIONS.map((a) => a.id));
     assert.deepStrictEqual(got, expected);
-    assert.strictEqual(ROW_ACTIONS.length, 15);
+    assert.strictEqual(ROW_ACTIONS.length, 16);
   });
 
   test("openAiAssignment fully removed (L3)", () => {
@@ -350,6 +356,30 @@ suite("ActionRegistry", () => {
       const groups = cat.map((a) => a.group);
       const sorted = [...groups].sort((a, b) => a - b);
       assert.deepStrictEqual(groups, sorted);
+    }
+  });
+
+  test("openPrerequisiteSpec appears only on non-terminal rows with unsatisfied prereqs (Set 061 S2)", () => {
+    const unsatisfied = [
+      { slug: "044-prereq", condition: "complete" as const, targetState: "in-progress" as const },
+    ];
+    for (const st of ["in-progress", "not-started"] as SessionState[]) {
+      assert.ok(
+        ids(fakeSet(st, { blockedByPrereqs: true, unsatisfiedPrereqs: unsatisfied }), ALL_SUPPORTED)
+          .includes("dabblerSessionSets.openPrerequisiteSpec"),
+        `openPrerequisiteSpec missing for blocked state=${st}`,
+      );
+      assert.ok(
+        !ids(fakeSet(st), ALL_SUPPORTED).includes("dabblerSessionSets.openPrerequisiteSpec"),
+        `openPrerequisiteSpec leaked onto unblocked state=${st}`,
+      );
+    }
+    for (const st of ["complete", "cancelled"] as SessionState[]) {
+      assert.ok(
+        !ids(fakeSet(st, { blockedByPrereqs: true, unsatisfiedPrereqs: unsatisfied }), ALL_SUPPORTED)
+          .includes("dabblerSessionSets.openPrerequisiteSpec"),
+        `openPrerequisiteSpec leaked onto terminal state=${st} (same suppression as the marker)`,
+      );
     }
   });
 

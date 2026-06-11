@@ -45,6 +45,7 @@ function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
     schemaVersionOnDisk: null,
     prerequisites: null,
     blockedByPrereqs: false,
+    unsatisfiedPrereqs: [],
     plusFraction: false,
     ...over,
   };

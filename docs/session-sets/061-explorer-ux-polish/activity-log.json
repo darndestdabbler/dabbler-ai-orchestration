@@ -79,6 +79,57 @@
           "costUsd": 0.031067
         }
       ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/unsatisfied-list",
+      "dateTime": "2026-06-11T08:42:28.967049-04:00",
+      "description": "Extended deriveBlockedByPrereqs to carry the full unsatisfied list (UnsatisfiedPrerequisite: slug+condition+targetState, 'unknown' for unresolvable slugs) on SessionSet.unsatisfiedPrereqs; blockedByPrereqs kept as compatibility boolean == list non-empty",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/marker-tooltip",
+      "dateTime": "2026-06-11T08:42:28.967596-04:00",
+      "description": "D3 quiet blocked marker: BLOCKED_MARKER chain glyph (U+26D3+FE0E) + blockedMarker/blockedTooltip in SessionSetsModel (terminal suppression unchanged); RowPayload.blockedMarker/blockedTooltip; client.js blockedSpan + tree.css .row-blocked-marker (Set 050 asterisk pattern); [BLOCKED BY PREREQS] badge retired from descriptionFor; ActionRegistry gains dabblerSessionSets.openPrerequisiteSpec (flat, non-terminal blocked rows only) + openFile.ts handler (direct open / QuickPick when multiple; unknown-slug info message) + package.json contribution",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/docs",
+      "dateTime": "2026-06-11T08:42:28.968149-04:00",
+      "description": "README 'Prerequisites and the blocked marker' section authored via route(documentation) on gemini-pro (auto-verify gpt-5-4-mini flagged missing QuickPick mention -> folded in); stale badge refs reconciled in README flat-actions list (also dropped retired 'Set Orchestrator') + session-state-schema.md Prerequisites/Bucketing sections + new pointer paragraph",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "documentation",
+          "inputTokens": 961,
+          "outputTokens": 254,
+          "costUsd": 0.003741
+        },
+        {
+          "model": "gpt-5-4-mini",
+          "taskType": "documentation-verify",
+          "inputTokens": 1455,
+          "outputTokens": 1519,
+          "costUsd": 0.007927
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/tests",
+      "dateTime": "2026-06-11T08:47:48.776575-04:00",
+      "description": "prerequisites.test.ts: unsatisfied-list assertions on all derivation cases + cross-root readAllSessionSets test (two stub workspace roots) + blockedMarker/blockedTooltip suite (terminal suppression, unknown-slug copy, multi-prereq tooltip) + badge-retired source scan; actionRegistry.test.ts: 16-action registry + openPrerequisiteSpec applicability matrix; 7 fakeSet fixtures gained unsatisfiedPrereqs; Playwright blocked-by-prereqs.spec.ts rewritten badge->marker (4 scenarios incl. tooltip title attr). Suites: TS 730 pass + 2 pre-existing Set-026 fails, tsc clean, esbuild clean, Python 1185 pass/1 skip (1 env-key-only failure passes with keys loaded)",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

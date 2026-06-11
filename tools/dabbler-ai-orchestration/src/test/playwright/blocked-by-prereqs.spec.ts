@@ -1,17 +1,23 @@
-// Layer-3 rendering smoke for the Set 047 Session 5 blockedByPrereqs
-// surface. The Explorer derives `blockedByPrereqs` on each set's
-// in-memory record by cross-referencing the spec's `prerequisites:`
-// field against the target set's `status`. The renderer surfaces a
-// `[BLOCKED BY PREREQS]` badge on non-terminal rows whose
-// `blockedByPrereqs` is true.
+// Layer-3 rendering smoke for the blocked-by-prerequisites surface.
+// The Explorer derives `blockedByPrereqs` (+ the Set 061 S2
+// `unsatisfiedPrereqs` list) on each set's in-memory record by
+// cross-referencing the spec's `prerequisites:` field against the
+// target set's `status`.
+//
+// Set 061 S2 (spec D3): the renderer surfaces a quiet chain-glyph
+// marker (`.row-blocked-marker`, U+26D3 U+FE0E) next to the row name
+// whose tooltip names each unsatisfied prerequisite and its current
+// state. The old all-caps `[BLOCKED BY PREREQS]` description badge is
+// retired — these scenarios assert the marker AND the badge's absence.
 //
 // Scenarios covered:
-//   1. Two-set fixture with prereq IN-PROGRESS → dependant renders
-//      the [BLOCKED BY PREREQS] badge.
+//   1. Two-set fixture with prereq NOT-COMPLETE → dependant renders
+//      the blocked marker (with the explanatory tooltip), no badge.
 //   2. Same fixture flipped: prereq COMPLETE → dependant renders no
-//      badge (i.e., unblocked).
-//   3. Spec without prerequisites: → no badge, regardless of any
-//      other set's status.
+//      marker (i.e., unblocked).
+//   3. Terminal-state dependant → marker suppressed even when the
+//      cross-reference would mark it blocked.
+//   4. Spec without prerequisites → no marker.
 
 import { expect, test } from "@playwright/test";
 import * as fs from "fs";
@@ -26,6 +32,9 @@ import {
   openSessionSetsView,
   triggerRefresh,
 } from "./electronLaunch";
+
+// Must match BLOCKED_MARKER in src/providers/SessionSetsModel.ts.
+const BLOCKED_MARKER = "⛓︎";
 
 interface PerTest {
   tmpPath?: string;
@@ -109,10 +118,10 @@ function setStatusToComplete(setDir: string): void {
 }
 
 // ---------------------------------------------------------------------
-// Scenario 1: dependant renders [BLOCKED BY PREREQS] when prereq is
-// not-yet-complete.
+// Scenario 1: dependant renders the quiet blocked marker (and not the
+// retired badge) when the prereq is not-yet-complete.
 // ---------------------------------------------------------------------
-test("renders [BLOCKED BY PREREQS] when prereq target is in-progress", async () => {
+test("renders the blocked marker + tooltip when prereq target is not complete", async () => {
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-prereq-blocked");
@@ -131,12 +140,25 @@ test("renders [BLOCKED BY PREREQS] when prereq target is in-progress", async () 
     const texts = await treeitemTexts(tree);
     const joined = texts.join("\n");
     expect(joined).toContain("047-dependant");
-    expect(joined).toContain("[BLOCKED BY PREREQS]");
-    // Sanity: the prereq row itself should NOT carry the badge
+    // Quiet marker on the dependant row; badge text retired.
+    const depRow = texts.find((t) => t.includes("047-dependant"));
+    expect(depRow).toBeDefined();
+    expect(depRow!).toContain(BLOCKED_MARKER);
+    expect(joined).not.toContain("[BLOCKED BY PREREQS]");
+    // The tooltip (title attribute) names the blocking prereq and its
+    // current state.
+    const markerEl = tree
+      .locator('[role="treeitem"]', { hasText: "047-dependant" })
+      .locator(".row-blocked-marker");
+    await expect(markerEl).toHaveAttribute(
+      "title",
+      "Blocked by prerequisites: 044-prereq (not started) — all must complete first.",
+    );
+    // Sanity: the prereq row itself should NOT carry the marker
     // (it has no prereqs of its own).
     const prereqRow = texts.find((t) => t.includes("044-prereq"));
     expect(prereqRow).toBeDefined();
-    expect(prereqRow!).not.toContain("[BLOCKED BY PREREQS]");
+    expect(prereqRow!).not.toContain(BLOCKED_MARKER);
   } finally {
     await teardown(per);
   }
@@ -144,9 +166,9 @@ test("renders [BLOCKED BY PREREQS] when prereq target is in-progress", async () 
 
 // ---------------------------------------------------------------------
 // Scenario 2: same dependant, with the prereq flipped to complete →
-// no badge.
+// no marker.
 // ---------------------------------------------------------------------
-test("no [BLOCKED BY PREREQS] badge when prereq target is complete", async () => {
+test("no blocked marker when prereq target is complete", async () => {
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-prereq-unblocked");
@@ -162,27 +184,27 @@ test("no [BLOCKED BY PREREQS] badge when prereq target is complete", async () =>
     const texts = await treeitemTexts(tree);
     const depRow = texts.find((t) => t.includes("047-unblocked"));
     expect(depRow).toBeDefined();
-    expect(depRow!).not.toContain("[BLOCKED BY PREREQS]");
+    expect(depRow!).not.toContain(BLOCKED_MARKER);
   } finally {
     await teardown(per);
   }
 });
 
 // ---------------------------------------------------------------------
-// Scenario 3 (S5 verifier Nice-to-have-2): badge suppressed when the
-// dependant itself is in a terminal state (complete / cancelled).
-// The cross-reference still sets blockedByPrereqs=true, but the
-// renderer (and contextValueFor) suppress the badge — once a set is
+// Scenario 3 (S5 verifier Nice-to-have-2, carried forward): marker
+// suppressed when the dependant itself is in a terminal state
+// (complete / cancelled). The cross-reference still derives
+// blocked, but the renderer suppresses the marker — once a set is
 // closed, its dependency status is no longer actionable.
 // ---------------------------------------------------------------------
-test("no [BLOCKED BY PREREQS] badge on terminal-state row even when blockedByPrereqs=true", async () => {
+test("no blocked marker on terminal-state row even when the cross-reference derives blocked", async () => {
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-prereq-terminal");
     // Prereq target stays not-started (so blockedByPrereqs would be
     // true for any depending set under the cross-reference rule).
     makeSet(per.tmpPath, "044-still-not-started", 1);
-    // Dependant is COMPLETE on disk; badge must be suppressed on the
+    // Dependant is COMPLETE on disk; marker must be suppressed on the
     // terminal row even though the cross-reference would otherwise
     // mark it blocked.
     const depHandle = makeSet(per.tmpPath, "047-completed-dep", 1);
@@ -196,7 +218,7 @@ test("no [BLOCKED BY PREREQS] badge on terminal-state row even when blockedByPre
     const texts = await treeitemTexts(tree);
     const depRow = texts.find((t) => t.includes("047-completed-dep"));
     expect(depRow).toBeDefined();
-    expect(depRow!).not.toContain("[BLOCKED BY PREREQS]");
+    expect(depRow!).not.toContain(BLOCKED_MARKER);
   } finally {
     await teardown(per);
   }
@@ -204,9 +226,9 @@ test("no [BLOCKED BY PREREQS] badge on terminal-state row even when blockedByPre
 
 // ---------------------------------------------------------------------
 // Scenario 4: a set without prerequisites declared never carries the
-// badge.
+// marker.
 // ---------------------------------------------------------------------
-test("no [BLOCKED BY PREREQS] badge when prerequisites field is absent", async () => {
+test("no blocked marker when prerequisites field is absent", async () => {
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-prereq-absent");
@@ -220,7 +242,7 @@ test("no [BLOCKED BY PREREQS] badge when prerequisites field is absent", async (
     const texts = await treeitemTexts(tree);
     const row = texts.find((t) => t.includes("047-standalone"));
     expect(row).toBeDefined();
-    expect(row!).not.toContain("[BLOCKED BY PREREQS]");
+    expect(row!).not.toContain(BLOCKED_MARKER);
   } finally {
     await teardown(per);
   }

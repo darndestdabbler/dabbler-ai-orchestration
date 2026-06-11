@@ -12,6 +12,7 @@ import {
   SessionSetConfig,
   SessionSetPrerequisite,
   TriStateFlag,
+  UnsatisfiedPrerequisite,
   UatSummary,
   LiveSession,
 } from "../types";
@@ -767,6 +768,7 @@ export function readSessionSets(root: string): SessionSet[] {
       // against an up-to-date snapshot. Sets without declared
       // prerequisites stay at false in both passes.
       blockedByPrereqs: false,
+      unsatisfiedPrereqs: [],
       plusFraction,
     });
   }
@@ -811,6 +813,13 @@ export function readSessionSets(root: string): SessionSet[] {
  * row; an unknown prereq slug also blocks (typo / missing set must
  * surface, not silently unblock).
  *
+ * Set 061 Session 2 (spec D3): the pass no longer collapses to a
+ * boolean — it also carries the full unsatisfied list (slug,
+ * condition, target state or "unknown") onto ``unsatisfiedPrereqs``
+ * so the blocked marker's tooltip can name what the row is waiting
+ * on. ``blockedByPrereqs`` stays as the compatibility boolean and
+ * always equals ``unsatisfiedPrereqs.length > 0``.
+ *
  * Idempotent: callable on a `sets` array that has been merged
  * across roots in `readAllSessionSets`, so cross-root prerequisites
  * resolve against the merged view rather than the per-root scan
@@ -822,21 +831,30 @@ function deriveBlockedByPrereqs(sets: SessionSet[]): void {
   for (const s of sets) {
     if (!s.prerequisites || s.prerequisites.length === 0) {
       s.blockedByPrereqs = false;
+      s.unsatisfiedPrereqs = [];
       continue;
     }
-    let blocked = false;
+    const unsatisfied: UnsatisfiedPrerequisite[] = [];
     for (const prereq of s.prerequisites) {
       const target = setsByName.get(prereq.slug);
       if (!target) {
-        blocked = true;
-        break;
+        unsatisfied.push({
+          slug: prereq.slug,
+          condition: prereq.condition,
+          targetState: "unknown",
+        });
+        continue;
       }
       if (prereq.condition === "complete" && target.state !== "complete") {
-        blocked = true;
-        break;
+        unsatisfied.push({
+          slug: prereq.slug,
+          condition: prereq.condition,
+          targetState: target.state,
+        });
       }
     }
-    s.blockedByPrereqs = blocked;
+    s.blockedByPrereqs = unsatisfied.length > 0;
+    s.unsatisfiedPrereqs = unsatisfied;
   }
 }
 

@@ -20,10 +20,15 @@
     {
       "number": 2,
       "title": "Prerequisite UX \u2014 quiet marker + explanatory tooltip",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-06-11T08:21:23.716406-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "high"
+      },
       "verificationVerdict": null
     },
     {

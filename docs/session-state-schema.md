@@ -924,8 +924,9 @@ Configuration block that declares which other sets must complete
 before this one is workable. The Explorer cross-references each
 set's prereqs against the target set's `status` and adds a
 `blockedByPrereqs: boolean` derived property to the in-memory
-`SessionSet` record. Blocked rows render a `[BLOCKED BY PREREQS]`
-badge in the Explorer description.
+`SessionSet` record. Blocked rows render a quiet chain marker (⛓︎)
+next to the row name (Set 061 S2 — see the end of this section; the
+former all-caps description badge is retired).
 
 ### Spec-side declaration
 
@@ -968,12 +969,22 @@ a set in another). The derivation rules:
 - ANY unsatisfied prereq blocks the row.
 - An unknown target slug (typo / missing set) keeps the row
   blocked — typos do NOT silently unblock.
-- The `[BLOCKED BY PREREQS]` badge is suppressed on terminal-state
-  rows (`complete` / `cancelled`) because once a set has closed,
+- The blocked marker is suppressed on terminal-state rows
+  (`complete` / `cancelled`) because once a set has closed,
   its dependency status is no longer actionable.
 
 The `blockedByPrereqs` property is a derived in-memory boolean;
 it is never persisted to the state file.
+
+Set 061 Session 2: the Session Set Explorer renders an unobtrusive
+chain marker (⛓︎) on blocked rows, replacing the former all-caps text
+badge; its tooltip names each unsatisfied prerequisite and its current
+state. The derivation carries the unsatisfied list (slug + condition +
+target state, `"unknown"` for unresolvable slugs) on the in-memory
+record as `unsatisfiedPrereqs` alongside the compatibility boolean
+`blockedByPrereqs` — both derived, never persisted. Terminal-state
+suppression is unchanged. See the extension README's "Prerequisites
+and the blocked marker" section for the user-facing description.
 
 ---
 
@@ -1176,8 +1187,9 @@ in earlier versions of this doc are still tolerated for reading old
 files but are not exercised by v4 writers.
 
 A row whose set declares `prerequisites:` and has at least one
-unsatisfied prereq target ALSO renders the `[BLOCKED BY PREREQS]`
-badge in its description — the badge is suppressed on terminal-state
+unsatisfied prereq target ALSO renders the quiet blocked chain
+marker (⛓︎) next to its name (Set 061 S2 — formerly an all-caps
+description badge) — the marker is suppressed on terminal-state
 rows (Complete / Cancelled).
 
 ---

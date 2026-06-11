@@ -32,7 +32,8 @@ import { SessionSet } from "../types";
 import { ScanState } from "./scanState";
 import {
   bucketSets,
-  blockedByPrereqsBadge,
+  blockedMarker,
+  blockedTooltip,
   forceClosedBadge,
   fractionTooltip,
   ICON_FILES,
@@ -139,6 +140,11 @@ function contextValueFor(set: SessionSet): string {
 // description entirely — it now renders as an unobtrusive asterisk next
 // to the row name (see migrationMarker / migrationTooltip on RowPayload)
 // rather than as an intrusive trailing label.
+//
+// Set 061 S2 (spec D3): the all-caps blocked-by-prereqs badge follows
+// the same path — retired from the description in favor of the quiet
+// blocked marker + explanatory tooltip next to the row name (see
+// blockedMarker / blockedTooltip on RowPayload).
 function descriptionFor(set: SessionSet): string {
   const bits: string[] = [];
   if (set.state === "in-progress" && set.liveSession?.currentSession != null) {
@@ -148,7 +154,6 @@ function descriptionFor(set: SessionSet): string {
     touchedDate(set),
     uatBadge(set),
     forceClosedBadge(set),
-    blockedByPrereqsBadge(set),
   ].filter(Boolean);
   bits.push(...extras);
   return bits.join("  ·  ");
@@ -624,6 +629,10 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // Set 061 S1 (D2): quiet "lw" marker + tooltip on Lightweight rows.
       tierMarker: tierMarker(set),
       tierTooltip: tierTooltip(set),
+      // Set 061 S2 (D3): quiet blocked marker + tooltip naming each
+      // unsatisfied prerequisite; replaces the description badge.
+      blockedMarker: blockedMarker(set),
+      blockedTooltip: blockedTooltip(set),
       accordionHtml: null,
       accordionUpdatedAt: null,
     };

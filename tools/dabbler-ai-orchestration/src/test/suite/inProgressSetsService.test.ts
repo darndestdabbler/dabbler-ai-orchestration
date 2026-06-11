@@ -131,6 +131,7 @@ function fakeSet(
     schemaVersionOnDisk: null,
     prerequisites: null,
     blockedByPrereqs: false,
+    unsatisfiedPrereqs: [],
     plusFraction: false,
   };
 }

@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { SessionSet } from "../types";
-import { PLAYWRIGHT_REL_DEFAULT } from "../utils/fileSystem";
+import { SessionSet, UnsatisfiedPrerequisite } from "../types";
+import { PLAYWRIGHT_REL_DEFAULT, readAllSessionSets } from "../utils/fileSystem";
 
 interface SetItem extends vscode.TreeItem {
   set: SessionSet;
@@ -16,6 +16,49 @@ function openIfExists(filePath: string | undefined, label: string): void {
     return;
   }
   vscode.commands.executeCommand("vscode.open", vscode.Uri.file(filePath));
+}
+
+// Set 061 S2 (spec D3): companion to the blocked marker. Opens the
+// spec.md of the prerequisite set blocking `item.set` — directly when
+// one prerequisite is unsatisfied, via QuickPick when several are.
+// Unknown slugs (typos / missing sets) are listed but explained rather
+// than opened; resolution reuses the same merged cross-root scan the
+// blocked derivation itself runs on.
+async function openPrerequisiteSpec(set: SessionSet): Promise<void> {
+  const unsatisfied: UnsatisfiedPrerequisite[] = set.unsatisfiedPrereqs ?? [];
+  if (unsatisfied.length === 0) {
+    vscode.window.showInformationMessage(
+      `"${set.name}" has no unsatisfied prerequisites.`
+    );
+    return;
+  }
+  const allSets = readAllSessionSets();
+  const bySlug = new Map(allSets.map((s) => [s.name, s]));
+  const openTarget = (p: UnsatisfiedPrerequisite): void => {
+    if (p.targetState === "unknown") {
+      vscode.window.showInformationMessage(
+        `Prerequisite "${p.slug}" does not match any session set — check the slug in ${set.name}/spec.md.`
+      );
+      return;
+    }
+    openIfExists(bySlug.get(p.slug)?.specPath, `Prerequisite spec (${p.slug})`);
+  };
+  if (unsatisfied.length === 1) {
+    openTarget(unsatisfied[0]);
+    return;
+  }
+  const picked = await vscode.window.showQuickPick(
+    unsatisfied.map((p) => ({
+      label: p.slug,
+      description:
+        p.targetState === "unknown"
+          ? "unknown set — check the slug"
+          : p.targetState.replace("-", " "),
+      prereq: p,
+    })),
+    { placeHolder: `Prerequisites blocking "${set.name}"` }
+  );
+  if (picked) openTarget((picked as { prereq: UnsatisfiedPrerequisite }).prereq);
 }
 
 function findPlaywrightTests(set: SessionSet): string[] {
@@ -82,6 +125,18 @@ export function registerOpenFileCommands(context: vscode.ExtensionContext): void
     vscode.commands.registerCommand("dabblerSessionSets.openSessionState", (item: SetItem) =>
       openIfExists(item?.set?.statePath, "Session state")
     ),
+    // Set 061 S2 (spec D3): blocked-marker companion. Tolerates a
+    // bare Command Palette invocation (no row context) with an
+    // informational no-op, matching the other openFile commands.
+    vscode.commands.registerCommand("dabblerSessionSets.openPrerequisiteSpec", (item: SetItem) => {
+      if (!item?.set) {
+        vscode.window.showInformationMessage(
+          "Open Prerequisite Spec is available from a session-set row's context menu."
+        );
+        return;
+      }
+      void openPrerequisiteSpec(item.set);
+    }),
     vscode.commands.registerCommand("dabblerSessionSets.openFolder", (item: SetItem) => {
       if (!item?.set) return;
       vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(item.set.dir));

@@ -90,6 +90,18 @@ export interface SessionSetPrerequisite {
   condition: "complete";
 }
 
+// Set 061 Session 2 (spec D3): one unsatisfied prerequisite, carried on
+// the SessionSet record so the blocked marker's tooltip can name what
+// the row is waiting on instead of collapsing to a boolean.
+// `targetState` is the prereq target's bucketed state at scan time, or
+// "unknown" when no scanned set matches the slug (typo / missing set —
+// still blocking, per the Set 047 rule).
+export interface UnsatisfiedPrerequisite {
+  slug: string;
+  condition: "complete";
+  targetState: SessionState | "unknown";
+}
+
 export interface UatSummary {
   totalItems: number;
   pendingItems: number;
@@ -193,7 +205,15 @@ export interface SessionSet {
   // else is "still blocking". Unknown prereq slugs (typo, missing
   // set) keep `blockedByPrereqs: true` so a typo doesn't silently
   // unblock the row. False when `prerequisites` is null or empty.
+  // Set 061 Session 2 (spec D3): kept for compatibility; always equals
+  // `unsatisfiedPrereqs.length > 0`.
   blockedByPrereqs: boolean;
+  // Set 061 Session 2 (spec D3): the full unsatisfied list behind
+  // `blockedByPrereqs` — slug, required condition, and the target's
+  // current state ("unknown" for unresolvable slugs). Derived in-memory
+  // by the same cross-reference pass; never persisted. Empty when the
+  // row is unblocked.
+  unsatisfiedPrereqs: UnsatisfiedPrerequisite[];
   // Set 061 Session 1 (spec D1): derived in-memory by `readSessionSets`
   // via `shouldRenderPlusFraction` — true ONLY when the set is
   // `tier: lightweight` AND `verificationMode: dedicated-sessions` AND

@@ -105,6 +105,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabblerSessionSets.openPrerequisiteSpec",
+        "title": "Open Prerequisite Spec",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabblerSessionSets.openFolder",
         "title": "Reveal Folder",
         "category": "Dabbler"

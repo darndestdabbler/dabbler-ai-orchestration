@@ -271,6 +271,22 @@ body.vscode-light, body.vscode-high-contrast-light {
 }
 
 /*
+ * Set 061 S2 (spec D3): the quiet blocked-by-prerequisites marker —
+ * a single chain glyph (text presentation, never colored emoji) after
+ * the row name, replacing the old all-caps [BLOCKED BY PREREQS]
+ * description badge. Same deliberately-quiet treatment as the
+ * migration / tier markers above; the tooltip carries the actual
+ * signal (each unsatisfied prerequisite and its current state).
+ */
+.row-blocked-marker {
+  display: inline;
+  margin-left: 4px;
+  font-size: 0.85em;
+  color: var(--vscode-descriptionForeground, #8a8a8a);
+  cursor: help;
+}
+
+/*
  * Set 049 S4 (rip-out): the Set 045 harvest-record badges
  * (`.harvest-badges` / `.harvest-badge*`) and coordination-conflict
  * pills (`.conflict-pills` / `.conflict-pill` / `.conflict-severity-*`)

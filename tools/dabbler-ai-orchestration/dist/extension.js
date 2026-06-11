@@ -15518,6 +15518,31 @@ async function restoreSessionSet(sessionSetDir, reason = "") {
   }
 }
 
+// src/utils/tierLegibility.ts
+function hasTypedVerificationSession(sessions) {
+  if (!Array.isArray(sessions))
+    return false;
+  return sessions.some(
+    (s) => s !== null && typeof s === "object" && s.type === "verification"
+  );
+}
+function shouldRenderPlusFraction(tier, verificationMode, sessions) {
+  if (tier !== "lightweight")
+    return false;
+  if (verificationMode !== "dedicated-sessions")
+    return false;
+  return !hasTypedVerificationSession(sessions);
+}
+var PLUS_FRACTION_TOOLTIP = "Lightweight dedicated-sessions set: verification/remediation sessions are appended when the work sessions complete, so the session count can still grow.";
+var TIER_MARKER = "lw";
+var TIER_MARKER_TOOLTIP = "Lightweight tier \u2014 router-off; verification per the set's verificationMode.";
+function tierMarkerFor(tier) {
+  return tier === "lightweight" ? TIER_MARKER : "";
+}
+function tierTooltipFor(tier) {
+  return tier === "lightweight" ? TIER_MARKER_TOOLTIP : "";
+}
+
 // src/utils/fileSystem.ts
 var SESSION_SETS_REL = path4.join("docs", "session-sets");
 var PLAYWRIGHT_REL_DEFAULT = "tests";
@@ -15633,7 +15658,8 @@ function parseSessionSetConfig(specPath) {
     requiresUAT: false,
     requiresE2E: false,
     uatScope: "none",
-    tier: "full"
+    tier: "full",
+    verificationMode: "out-of-band-or-none"
   };
   if (!fs4.existsSync(specPath))
     return config;
@@ -15651,7 +15677,11 @@ function parseSessionSetConfig(specPath) {
     `^\\s*${key}\\s*:\\s*(?:"(suggested)"|(true|false|suggested))\\s*(?:#.*)?$`,
     "im"
   );
-  const stringRe = (key) => new RegExp(`^\\s*${key}\\s*:\\s*([\\w-]+)\\s*(?:#.*)?$`, "im");
+  const stringRe = (key) => new RegExp(
+    `^\\s*${key}\\s*:\\s*(?:"([\\w-]+)"|'([\\w-]+)'|([\\w-]+))\\s*(?:#.*)?$`,
+    "im"
+  );
+  const stringValue = (m) => m ? m[1] ?? m[2] ?? m[3] ?? null : null;
   const parseTriState = (m) => {
     if (!m)
       return null;
@@ -15670,14 +15700,21 @@ function parseSessionSetConfig(specPath) {
   const e2e = parseTriState(block.match(triStateRe("requiresE2E")));
   if (e2e !== null)
     config.requiresE2E = e2e;
-  const scope = block.match(stringRe("uatScope"));
+  const scope = stringValue(block.match(stringRe("uatScope")));
   if (scope)
-    config.uatScope = scope[1];
-  const tier = block.match(stringRe("tier"));
+    config.uatScope = scope;
+  const tier = stringValue(block.match(stringRe("tier")));
   if (tier) {
-    const v = tier[1].toLowerCase();
+    const v = tier.toLowerCase();
     if (v === "full" || v === "lightweight")
       config.tier = v;
+  }
+  const vm = stringValue(block.match(stringRe("verificationMode")));
+  if (vm) {
+    const v = vm.toLowerCase();
+    if (v === "out-of-band-or-none" || v === "dedicated-sessions") {
+      config.verificationMode = v;
+    }
   }
   return config;
 }
@@ -15824,6 +15861,7 @@ function readSessionSets(root) {
     let liveSession = null;
     let needsMigration = false;
     let migrationTargetSchemaVersion = null;
+    let ledgerSessions = null;
     let schemaVersionOnDisk = null;
     const eventsPath = path4.join(dir, "session-events.jsonl");
     if (fs4.existsSync(activityPath)) {
@@ -15863,12 +15901,13 @@ function readSessionSets(root) {
         let preNormalizeSd = rawSd;
         if (rawSd && typeof rawSd === "object" && !Array.isArray(rawSd) && rawSd.sessions === void 0 && (!Array.isArray(rawSd.completedSessions) || // noqa: D13 - v2-compat ledger-merge for synthesizer input
         rawSd.completedSessions.length === 0)) {
-          const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
-          if (ledgerSessions.length > 0) {
-            preNormalizeSd = { ...rawSd, completedSessions: ledgerSessions };
+          const ledgerSessions2 = readClosedSessionsFromLedger(eventsPath);
+          if (ledgerSessions2.length > 0) {
+            preNormalizeSd = { ...rawSd, completedSessions: ledgerSessions2 };
           }
         }
         const sd = normalizeToV4Shape(preNormalizeSd, specPath);
+        ledgerSessions = sd.sessions ?? null;
         let progressTotal = null;
         let progressCompleted = null;
         let progressCurrent = null;
@@ -15914,6 +15953,11 @@ function readSessionSets(root) {
     const config = parseSessionSetConfig(specPath);
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
+    const plusFraction = shouldRenderPlusFraction(
+      config.tier,
+      config.verificationMode,
+      ledgerSessions
+    );
     sets.push({
       name: entry.name,
       dir,
@@ -15939,7 +15983,9 @@ function readSessionSets(root) {
       // once every set's `state` is known so each prereq can resolve
       // against an up-to-date snapshot. Sets without declared
       // prerequisites stay at false in both passes.
-      blockedByPrereqs: false
+      blockedByPrereqs: false,
+      unsatisfiedPrereqs: [],
+      plusFraction
     });
   }
   deriveBlockedByPrereqs(sets);
@@ -15964,21 +16010,30 @@ function deriveBlockedByPrereqs(sets) {
   for (const s of sets) {
     if (!s.prerequisites || s.prerequisites.length === 0) {
       s.blockedByPrereqs = false;
+      s.unsatisfiedPrereqs = [];
       continue;
     }
-    let blocked = false;
+    const unsatisfied = [];
     for (const prereq of s.prerequisites) {
       const target = setsByName.get(prereq.slug);
       if (!target) {
-        blocked = true;
-        break;
+        unsatisfied.push({
+          slug: prereq.slug,
+          condition: prereq.condition,
+          targetState: "unknown"
+        });
+        continue;
       }
       if (prereq.condition === "complete" && target.state !== "complete") {
-        blocked = true;
-        break;
+        unsatisfied.push({
+          slug: prereq.slug,
+          condition: prereq.condition,
+          targetState: target.state
+        });
       }
     }
-    s.blockedByPrereqs = blocked;
+    s.blockedByPrereqs = unsatisfied.length > 0;
+    s.unsatisfiedPrereqs = unsatisfied;
   }
 }
 function readAllSessionSets() {
@@ -16019,6 +16074,15 @@ function migrationTooltip(set) {
 function hasSubCurrentSets(allSets) {
   return allSets.some((s) => s.needsMigration);
 }
+function tierMarker(set) {
+  return tierMarkerFor(set.config?.tier ?? "full");
+}
+function tierTooltip(set) {
+  return tierTooltipFor(set.config?.tier ?? "full");
+}
+function fractionTooltip(set) {
+  return set.plusFraction ? PLUS_FRACTION_TOOLTIP : "";
+}
 var ICON_FILES = {
   complete: "done.svg",
   "in-progress": "in-progress.svg",
@@ -16042,12 +16106,33 @@ function uatBadge(set) {
 function forceClosedBadge(set) {
   return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
 }
-function blockedByPrereqsBadge(set) {
-  if (!set.blockedByPrereqs)
+var BLOCKED_MARKER = "\u26D3\uFE0E";
+function targetStateLabel(state) {
+  switch (state) {
+    case "in-progress":
+      return "in progress";
+    case "not-started":
+      return "not started";
+    case "unknown":
+      return "unknown set \u2014 check the slug";
+    default:
+      return state;
+  }
+}
+function blockedMarker(set) {
+  if (set.unsatisfiedPrereqs.length === 0)
     return "";
   if (set.state === "complete" || set.state === "cancelled")
     return "";
-  return "[BLOCKED BY PREREQS]";
+  return BLOCKED_MARKER;
+}
+function blockedTooltip(set) {
+  if (blockedMarker(set) === "")
+    return "";
+  const parts = set.unsatisfiedPrereqs.map(
+    (p2) => `${p2.slug} (${targetStateLabel(p2.targetState)})`
+  );
+  return `Blocked by prerequisites: ${parts.join(", ")} \u2014 all must complete first.`;
 }
 function bucketSets(all) {
   return {
@@ -16085,6 +16170,7 @@ var hasCompletedSession = (s) => s.sessionsCompleted > 0;
 var isCompleteState = (s) => s.state === "complete";
 var needsMigrationToV3 = (s) => s.needsMigration && s.migrationTargetSchemaVersion === 3;
 var needsMigrationToV4 = (s) => s.needsMigration && s.migrationTargetSchemaVersion === 4;
+var hasUnsatisfiedPrereqs = (s) => inFlightLike(s) && s.unsatisfiedPrereqs.length > 0;
 var ROW_ACTIONS = [
   // Open File ▸ submenu. L2 locks the four entries to: Spec, Activity
   // Log, Change Log, Session State. "Open AI Assignment" removed per
@@ -16142,6 +16228,11 @@ var ROW_ACTIONS = [
   // surface (the log itself is preserved provisionally per T5).
   { id: "dabblerSessionSets.copySlug", label: "Copy Slug", group: 501, category: "flat", when: () => true },
   { id: "dabbler.openOrchestratorWriterLog", label: "Open Orchestrator Writer Log", group: 502, category: "flat", when: () => true },
+  // Set 061 S2 (spec D3): companion to the blocked marker — jumps to
+  // the spec of whichever unsatisfied prerequisite is blocking this
+  // row (QuickPick when more than one). Reuses the openSpec plumbing
+  // in commands/openFile.ts.
+  { id: "dabblerSessionSets.openPrerequisiteSpec", label: "Open Prerequisite Spec", group: 503, category: "flat", when: hasUnsatisfiedPrereqs },
   { id: "dabblerSessionSets.migrate", label: "Migrate to v3 schema", group: 801, category: "flat", when: needsMigrationToV3 },
   { id: "dabblerSessionSets.migrateToV4", label: "Migrate to v4 schema", group: 802, category: "flat", when: needsMigrationToV4 },
   {
@@ -22663,15 +22754,15 @@ function descriptionFor(set) {
   const extras = [
     touchedDate(set),
     uatBadge(set),
-    forceClosedBadge(set),
-    blockedByPrereqsBadge(set)
+    forceClosedBadge(set)
   ].filter(Boolean);
   bits.push(...extras);
   return bits.join("  \xB7  ");
 }
 function fractionFor(set) {
   if (set.totalSessions && set.totalSessions > 0) {
-    return `${set.sessionsCompleted}/${set.totalSessions}`;
+    const plus = set.plusFraction ? "+" : "";
+    return `${set.sessionsCompleted}/${set.totalSessions}${plus}`;
   }
   return `${set.sessionsCompleted}/?`;
 }
@@ -22996,11 +23087,13 @@ var CustomSessionSetsView = class _CustomSessionSetsView {
     return { key, label, count: subset.length, rows };
   }
   buildRow(set) {
+    const fraction = fractionFor(set);
     return {
       slug: set.name,
       name: set.name,
       state: set.state,
-      fraction: fractionFor(set),
+      fraction,
+      fractionTooltip: fraction.endsWith("+") ? fractionTooltip(set) : "",
       description: descriptionFor(set),
       contextValue: contextValueFor(set),
       iconSlug: ICON_FILES[set.state] ?? "",
@@ -23009,6 +23102,13 @@ var CustomSessionSetsView = class _CustomSessionSetsView {
       // "(needs migration)" description label.
       migrationMarker: migrationMarker(set),
       migrationTooltip: migrationTooltip(set),
+      // Set 061 S1 (D2): quiet "lw" marker + tooltip on Lightweight rows.
+      tierMarker: tierMarker(set),
+      tierTooltip: tierTooltip(set),
+      // Set 061 S2 (D3): quiet blocked marker + tooltip naming each
+      // unsatisfied prerequisite; replaces the description badge.
+      blockedMarker: blockedMarker(set),
+      blockedTooltip: blockedTooltip(set),
       accordionHtml: null,
       accordionUpdatedAt: null
     };
@@ -23917,6 +24017,40 @@ function openIfExists(filePath, label) {
   }
   vscode14.commands.executeCommand("vscode.open", vscode14.Uri.file(filePath));
 }
+async function openPrerequisiteSpec(set) {
+  const unsatisfied = set.unsatisfiedPrereqs ?? [];
+  if (unsatisfied.length === 0) {
+    vscode14.window.showInformationMessage(
+      `"${set.name}" has no unsatisfied prerequisites.`
+    );
+    return;
+  }
+  const allSets = readAllSessionSets();
+  const bySlug = new Map(allSets.map((s) => [s.name, s]));
+  const openTarget = (p2) => {
+    if (p2.targetState === "unknown") {
+      vscode14.window.showInformationMessage(
+        `Prerequisite "${p2.slug}" does not match any session set \u2014 check the slug in ${set.name}/spec.md.`
+      );
+      return;
+    }
+    openIfExists(bySlug.get(p2.slug)?.specPath, `Prerequisite spec (${p2.slug})`);
+  };
+  if (unsatisfied.length === 1) {
+    openTarget(unsatisfied[0]);
+    return;
+  }
+  const picked = await vscode14.window.showQuickPick(
+    unsatisfied.map((p2) => ({
+      label: p2.slug,
+      description: p2.targetState === "unknown" ? "unknown set \u2014 check the slug" : p2.targetState.replace("-", " "),
+      prereq: p2
+    })),
+    { placeHolder: `Prerequisites blocking "${set.name}"` }
+  );
+  if (picked)
+    openTarget(picked.prereq);
+}
 function findPlaywrightTests(set) {
   const cfg = vscode14.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
@@ -23994,6 +24128,18 @@ function registerOpenFileCommands(context) {
       "dabblerSessionSets.openSessionState",
       (item) => openIfExists(item?.set?.statePath, "Session state")
     ),
+    // Set 061 S2 (spec D3): blocked-marker companion. Tolerates a
+    // bare Command Palette invocation (no row context) with an
+    // informational no-op, matching the other openFile commands.
+    vscode14.commands.registerCommand("dabblerSessionSets.openPrerequisiteSpec", (item) => {
+      if (!item?.set) {
+        vscode14.window.showInformationMessage(
+          "Open Prerequisite Spec is available from a session-set row's context menu."
+        );
+        return;
+      }
+      void openPrerequisiteSpec(item.set);
+    }),
     vscode14.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
       if (!item?.set)
         return;

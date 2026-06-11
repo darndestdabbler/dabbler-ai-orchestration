@@ -141,10 +141,11 @@ Sign-up links and a full prerequisites checklist live in the
   two-step submenus: **Open File ▸** (Spec / Activity Log / Change
   Log / Session State), **Copy Eval ▸** (four copyable review
   prompts — Evaluate Specification / Most Recent Session / Session
-  Set / Start Next Session), and flat actions for Set Orchestrator,
-  Open Orchestrator Writer Log, Migrate to v4 schema, Cancel set,
-  and Restore set. The right-click menu honors light/dark theme
-  natively and dismisses on Escape or click-outside.
+  Set / Start Next Session), and flat actions for Copy Slug,
+  Open Orchestrator Writer Log, Open Prerequisite Spec (on blocked
+  rows), Migrate to v4 schema, Cancel set, and Restore set. The
+  right-click menu honors light/dark theme natively and dismisses
+  on Escape or click-outside.
 - **Copyable review prompts.** Four `Dabbler: Copy …` commands
   (also under Copy Eval ▸ in the right-click menu) author review
   prompts that reference your session-set artifacts by path rather
@@ -173,8 +174,25 @@ Sign-up links and a full prerequisites checklist live in the
   contract. Lightweight consumers with hand-edited shapes can run
   `python -m ai_router.migrate_lightweight_to_canonical_v4`.
   Specs can declare a `prerequisites:` field listing other session-
-  set slugs; rows with unmet prereqs render a
-  **[BLOCKED BY PREREQS]** badge until their dependencies close.
+  set slugs — see **Prerequisites and the blocked marker** below.
+- **Prerequisites and the blocked marker** — declare dependencies in
+  a set's `spec.md` to block it until other sets are complete:
+
+  ```yaml
+  prerequisites:
+    - slug: 047-state-file-schema-v4-audit
+      condition: complete
+  ```
+
+  The Explorer shows a quiet chain marker (⛓︎) on blocked sets.
+  Hover the marker for a tooltip listing each unsatisfied
+  prerequisite and its current state ("in progress", "not started",
+  or "unknown set — check the slug" for a slug that doesn't match
+  any set; typos keep the row blocked rather than silently
+  unblocking it). The marker is hidden on complete/cancelled sets.
+  A right-click action "Open Prerequisite Spec" jumps straight to
+  the blocking dependency's spec — when more than one prerequisite
+  is unsatisfied, a QuickPick lists them with their states.
 - **Visual config editor** (`Dabbler: Open Dabbler Config Editor`) —
   edit `router-config.yaml`, `budget.yaml`, and the gitignored
   `local-overrides.yaml` through a six-section panel without touching

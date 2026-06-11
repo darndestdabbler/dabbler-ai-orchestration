@@ -64,6 +64,13 @@ const needsMigrationToV3 = (s: SessionSet): boolean =>
 const needsMigrationToV4 = (s: SessionSet): boolean =>
   s.needsMigration && s.migrationTargetSchemaVersion === 4;
 
+// Set 061 S2 (spec D3): surfaced only on rows that actually render the
+// blocked marker — non-terminal rows with at least one unsatisfied
+// prerequisite. Same suppression rule as `blockedMarker` in
+// SessionSetsModel: a closed set's dependency status is not actionable.
+const hasUnsatisfiedPrereqs = (s: SessionSet): boolean =>
+  inFlightLike(s) && s.unsatisfiedPrereqs.length > 0;
+
 // Ordered list. `group` controls QuickPick sort within a category;
 // `category` controls which top-level item or submenu the entry lands
 // under. The numeric bands:
@@ -111,6 +118,11 @@ export const ROW_ACTIONS: RowAction[] = [
   // surface (the log itself is preserved provisionally per T5).
   { id: "dabblerSessionSets.copySlug",          label: "Copy Slug",                    group: 501, category: "flat", when: () => true },
   { id: "dabbler.openOrchestratorWriterLog",    label: "Open Orchestrator Writer Log", group: 502, category: "flat", when: () => true },
+  // Set 061 S2 (spec D3): companion to the blocked marker — jumps to
+  // the spec of whichever unsatisfied prerequisite is blocking this
+  // row (QuickPick when more than one). Reuses the openSpec plumbing
+  // in commands/openFile.ts.
+  { id: "dabblerSessionSets.openPrerequisiteSpec", label: "Open Prerequisite Spec",    group: 503, category: "flat", when: hasUnsatisfiedPrereqs },
   { id: "dabblerSessionSets.migrate",           label: "Migrate to v3 schema",         group: 801, category: "flat", when: needsMigrationToV3 },
   { id: "dabblerSessionSets.migrateToV4",       label: "Migrate to v4 schema",         group: 802, category: "flat", when: needsMigrationToV4 },
   { id: "dabblerSessionSets.cancel",            label: "Cancel Session Set",           group: 901, category: "flat",

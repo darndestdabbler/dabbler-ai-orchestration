@@ -274,6 +274,16 @@
           escAttr(row.tierTooltip || "") + '">' +
           escHtml(row.tierMarker) + '</span>'
       : "";
+    // Set 061 S2 (D3): quiet blocked-by-prerequisites marker — the
+    // tooltip names each unsatisfied prerequisite and its current
+    // state. Replaces the old all-caps blocked-by-prereqs description
+    // badge. Empty marker → no span (unblocked + terminal stay quiet).
+    const blockedSpan = row.blockedMarker
+      ? '<span class="row-blocked-marker" title="' +
+          escAttr(row.blockedTooltip || "") + '" aria-label="' +
+          escAttr(row.blockedTooltip || "") + '">' +
+          escHtml(row.blockedMarker) + '</span>'
+      : "";
     // Set 061 S1 (D1): when the fraction carries the `+` suffix, the
     // host ships a tooltip explaining why the denominator can grow.
     // It rides the fraction span's title attribute; the marker stays
@@ -293,6 +303,7 @@
             '<span class="row-name">' + escHtml(row.name) + '</span>' +
             tierSpan +
             migrationSpan +
+            blockedSpan +
             descSpan +
           '</span>' +
         '</div>' +

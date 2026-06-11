@@ -139,17 +139,44 @@ export function forceClosedBadge(set: SessionSet): string {
   return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
 }
 
-// Set 047 Session 5 (spec §3.3): badge surfaced on rows whose spec.md
-// declares ``prerequisites:`` and at least one prereq's condition is
-// not yet satisfied (target set is not ``state: "complete"`` for the
-// ``condition: complete`` enum). Suppressed on terminal-state rows —
-// once a set is itself ``complete`` or ``cancelled``, the dependency
-// status is no longer actionable (an operator viewing a closed row
-// doesn't need to start work behind a now-irrelevant prereq).
-export function blockedByPrereqsBadge(set: SessionSet): string {
-  if (!set.blockedByPrereqs) return "";
+// Set 061 Session 2 (spec D3): the quiet blocked-by-prerequisites
+// marker that replaces the Set 047 all-caps blocked-by-prereqs
+// description badge. Same shape as migrationMarker/tierMarker above — pure
+// functions of the SessionSet so the renderer and tests share one
+// source. The terminal-state suppression rule is unchanged: once a set
+// is itself ``complete`` or ``cancelled``, the dependency status is no
+// longer actionable (an operator viewing a closed row doesn't need to
+// start work behind a now-irrelevant prereq).
+//
+// Glyph: U+26D3 CHAINS with U+FE0E (text presentation selector) so the
+// marker renders as a theme-colored text glyph, not a colored emoji.
+export const BLOCKED_MARKER = "⛓︎";
+
+// Operator-facing label for a prereq target's bucketed state inside the
+// blocked tooltip. The "unknown" sentinel names the typo case loudly —
+// an unresolvable slug still blocks (Set 047 rule) and the tooltip says
+// why instead of leaving the operator to guess.
+function targetStateLabel(state: string): string {
+  switch (state) {
+    case "in-progress": return "in progress";
+    case "not-started": return "not started";
+    case "unknown": return "unknown set — check the slug";
+    default: return state; // "complete" / "cancelled" pass through
+  }
+}
+
+export function blockedMarker(set: SessionSet): string {
+  if (set.unsatisfiedPrereqs.length === 0) return "";
   if (set.state === "complete" || set.state === "cancelled") return "";
-  return "[BLOCKED BY PREREQS]";
+  return BLOCKED_MARKER;
+}
+
+export function blockedTooltip(set: SessionSet): string {
+  if (blockedMarker(set) === "") return "";
+  const parts = set.unsatisfiedPrereqs.map(
+    (p) => `${p.slug} (${targetStateLabel(p.targetState)})`,
+  );
+  return `Blocked by prerequisites: ${parts.join(", ")} — all must complete first.`;
 }
 
 // modeBadge kept as a no-op stub for existing imports / tests. Set 026

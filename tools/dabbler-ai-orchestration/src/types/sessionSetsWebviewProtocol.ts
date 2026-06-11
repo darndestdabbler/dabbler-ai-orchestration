@@ -64,6 +64,15 @@ export interface RowPayload {
   // majority; marking the exception keeps rows quiet).
   tierMarker: string;
   tierTooltip: string;
+  // Set 061 Session 2 (spec D3): the quiet blocked-by-prerequisites
+  // marker + tooltip that replace the Set 047 `[BLOCKED BY PREREQS]`
+  // description badge. `blockedMarker` is a single theme-safe glyph on
+  // blocked non-terminal rows (else ""); `blockedTooltip` names EACH
+  // unsatisfied prerequisite with its current state ("unknown set —
+  // check the slug" for unresolvable slugs). Same rendering pattern as
+  // the migration / tier markers above.
+  blockedMarker: string;
+  blockedTooltip: string;
   // Set 034: the per-row orchestrator-tracking accordion is retired.
   // These fields remain on the protocol so older host/webview pairings
   // stay structurally compatible, but the host always emits null and

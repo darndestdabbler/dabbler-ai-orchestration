@@ -22371,16 +22371,19 @@ var vscode7 = __toESM(require("vscode"));
 var fs10 = __toESM(require("fs"));
 var path12 = __toESM(require("path"));
 var PLAN_PATH = path12.join("docs", "planning", "project-plan.md");
-var SAMPLE_CONTEXT = {
-  repoName: "example-app",
-  setTitle: "Example feature",
-  purpose: "A worked example \u2014 replace with the real set's purpose.",
-  slug: "001-example-feature",
-  created: "2026-01-01",
-  tier: "full",
-  verificationMode: "out-of-band-or-none",
-  totalSessions: 3
-};
+var PLAN_REL_POSIX = "docs/planning/project-plan.md";
+function sampleContext(tier) {
+  return {
+    repoName: "example-app",
+    setTitle: "Example feature",
+    purpose: "A worked example \u2014 replace with the real set's purpose.",
+    slug: "001-example-feature",
+    created: "2026-01-01",
+    tier,
+    verificationMode: "out-of-band-or-none",
+    totalSessions: 3
+  };
+}
 var PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator asked for parallel session sets
   where possible: the orchestration runs independent session sets concurrently in
   separate git worktrees, merged back to the main branch when the sets complete.
@@ -22389,10 +22392,16 @@ var PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator as
   Session Set Configuration block (slug + \`condition: complete\`). Any set with no
   \`prerequisites:\` is treated as safe to start in parallel.
 `;
-function buildSessionGenPrompt(planText, bundle, options = {}) {
-  const exampleSpec = renderSpec(bundle, SAMPLE_CONTEXT);
-  const exampleState = renderSessionState(bundle, SAMPLE_CONTEXT);
+function buildSessionGenPrompt(bundle, options = {}) {
+  const exemplarTier = options.tier ?? "full";
+  const ctx = sampleContext(exemplarTier);
+  const exampleSpec = renderSpec(bundle, ctx);
+  const exampleState = renderSessionState(bundle, ctx);
   const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
+  const tierGuidance = options.tier ? `- **Tier.** The operator selected the **${options.tier}** tier in the Getting Started
+  form \u2014 author each new set with \`tier: ${options.tier}\` unless the project plan
+  explicitly calls for a different tier on a specific set.
+` : "";
   return `You are a session-set architect for an AI-led software development workflow (the Dabbler session-set workflow).
 
 Given a project plan, decompose it into a sequence of session sets. Each session set is a
@@ -22418,7 +22427,7 @@ For EACH session set, scaffold a folder \`docs/session-sets/<NNN-slug>/\` contai
 - **\`session-state.json\`** MUST use \`"schemaVersion": 4\` and \`"status": "not-started"\`.
   Never emit the retired schemaVersion-2 state shape.
 
-## Worked example \u2014 \`spec.md\` for a 3-session Full set (\`001-example-feature\`)
+## Worked example \u2014 \`spec.md\` for a 3-session ${exemplarTier === "lightweight" ? "Lightweight" : "Full"} set (\`001-example-feature\`)
 
 Match this shape; substitute your own title/purpose/slug/tier and emit exactly one session
 block per planned session:
@@ -22444,12 +22453,15 @@ ${exampleState}
 - Both tiers run the same Python lifecycle (\`start_session\` / \`close_session\`), state
   handling, and close-out. Lightweight is router-off, not Python-off \u2014 pick \`tier:
   lightweight\` when the project opts out of metered API calls.
-${parallelGuidance}
+${tierGuidance}${parallelGuidance}
 ---
 
-Project plan:
+## The project plan (read it from the workspace)
 
-${planText}`;
+The authoritative input for this decomposition is the project plan at
+\`${PLAN_REL_POSIX}\` in this workspace. Read that file directly \u2014 it is
+intentionally NOT inlined here. Decompose the plan it describes into session
+sets per the rules above.`;
 }
 async function copySessionSetGenPrompt(context, options = {}) {
   const root = vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -22476,8 +22488,7 @@ async function copySessionSetGenPrompt(context, options = {}) {
     );
     return false;
   }
-  const planText = fs10.readFileSync(planPath, "utf8");
-  const prompt = buildSessionGenPrompt(planText, bundle, options);
+  const prompt = buildSessionGenPrompt(bundle, options);
   await vscode7.env.clipboard.writeText(prompt);
   vscode7.window.showInformationMessage(
     "Session-set generation prompt copied to clipboard. Paste it into your AI assistant. When you receive the specs, save each one to docs/session-sets/<NNN-slug>/spec.md (alongside its session-state.json).\n\nCost reminder: each session set typically costs $0.10\u2013$2.00 depending on model and effort. Review the generated specs before running all sessions.",
@@ -22511,7 +22522,7 @@ async function routeGettingStartedAction(msg, handlers) {
       await handlers.copyPlanPrompt();
       return true;
     case "build-session-sets":
-      await handlers.buildSessionSets(msg.parallel === true);
+      await handlers.buildSessionSets(msg.parallel === true, asTier(msg.tier) ?? "full");
       return true;
     default:
       console.warn(
@@ -22568,9 +22579,9 @@ function makeGettingStartedHandlers(context) {
       await copyPlanningPrompt();
     },
     // Step 3 (D4): copy the decomposition prompt, honoring the parallel
-    // checkbox in the prompt text.
-    async buildSessionSets(parallel) {
-      await copySessionSetGenPrompt(context, { parallel });
+    // checkbox and the tier radio in the prompt text (S4).
+    async buildSessionSets(parallel, tier) {
+      await copySessionSetGenPrompt(context, { parallel, tier });
     }
   };
 }

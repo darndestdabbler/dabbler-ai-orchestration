@@ -1,0 +1,238 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "Set 060 - Getting Started redesign (local UAT gate for extension 0.29.0)",
+  "DocumentDate": "6/11/2026, 5:49:46 AM",
+  "Notes": "Ad-hoc, per-set operator UAT for the Getting Started redesign. Execute this checklist against the local build produced for Session 4 (F5 extension host and/or the packaged VSIX generated under tools/dabbler-ai-orchestration by npm run package). This checklist intentionally focuses on the human-attestable webview and activation surfaces from Set 060 Session 4: no-folder empty state, folder plus form, the three setup steps on both tiers, the Full-tier environment-variable warning, the parallel-worktree note, the static editor instructions, and the flip from the form to the session-set list once a set exists. Underlying unit and integration coverage from Sessions 1-3 remains valuable context, but these rows stay manual because the release gate is live operator confirmation rather than stub-host automation. File shape follows the uat-checklist-editor schema.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "36%",
+      "8%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Workspace state",
+      "Subarea": "No folder open",
+      "ItemLabel": "Session Set Explorer shows the no-folder CTA instead of hanging",
+      "HumanAction": "Open VS Code with no workspace folder, open the Dabbler AI Orchestration activity-bar view, and observe the Session Set Explorer surface.",
+      "Expectation": "The view renders an explicit 'Open or create a project folder' call to action. It does not hang, and it does not show the session-set list or the old wizard panel.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Workspace state",
+      "Subarea": "Open folder with no session sets",
+      "ItemLabel": "Explorer renders the Getting Started form when the folder has no session sets",
+      "HumanAction": "Open an empty project folder, then open the Dabbler AI Orchestration activity-bar view.",
+      "Expectation": "The Session Set Explorer shows the three-step Getting Started form with the Full/Lightweight radio and the parallel-session-sets checkbox. The normal session-set tree is hidden until a set exists.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Workspace state",
+      "Subarea": "Open folder with no session sets",
+      "ItemLabel": "Static editor instructions open alongside the form",
+      "HumanAction": "With the Getting Started form visible, observe the editor pane and open the generated instructions document if it is not already focused.",
+      "Expectation": "A static Getting Started instructions document opens in the editor (docs/dabbler/getting-started.md or the equivalent generated path) and carries the five-step teaching copy: Scaffold Project Structure, Create/Import Project Plan, Decompose Plan Into Session Sets, Start the First Session, and Trust But Verify.",
+      "IsJudgmentItem": true,
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Full tier",
+      "ItemLabel": "Full tier warns when no provider API key is visible at launch",
+      "HumanAction": "Launch VS Code or the F5 extension host with none of ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY visible in the process environment. Select Full in the Getting Started form and inspect the area below the Build project structure button.",
+      "Expectation": "A warning appears under the Build button explaining that Full-tier setup requires at least one provider API key and that the window must be reloaded after setting the variable. The warning is specific to Full tier.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Full tier",
+      "ItemLabel": "Full-tier build completes with no session-set title prompt and marks Step 1 complete",
+      "HumanAction": "In an empty project folder, select Full and click Build project structure. Walk through any folder-selection flow if prompted.",
+      "Expectation": "The scaffold writes into the open folder without asking for a first-session-set title. Step 1 greys out and shows a green check when complete. The folder contains .venv, the engine bootstrap files, docs/dabbler/start-here.md, and the expected Full-tier scaffold including ai_router/router-config.yaml.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Lightweight tier",
+      "ItemLabel": "Lightweight build omits the Full-tier warning and writes the lightweight scaffold",
+      "HumanAction": "In a second empty project folder, select Lightweight and click Build project structure.",
+      "Expectation": "No provider-key warning is shown. Step 1 greys out and shows a green check when complete. The scaffold matches Full except for the expected Lightweight differences: no ai_router/router-config.yaml (and no Full-only budget/config surfaces), while the spec carries tier: lightweight.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Project-plan step",
+      "Subarea": "Import existing plan",
+      "ItemLabel": "Import project-plan.md copies the selected file into docs/planning and marks Step 2 complete",
+      "HumanAction": "Use the Import project-plan.md action to select a prepared plan file.",
+      "Expectation": "The selected file is copied into docs/planning/project-plan.md, the form refreshes, and Step 2 greys out with a green check.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Project-plan step",
+      "Subarea": "Copy prompt for planning",
+      "ItemLabel": "Copy prompt for planning places the planning prompt on the clipboard without mutating workspace files",
+      "HumanAction": "Use the Copy prompt for planning action before importing a plan, then paste the clipboard contents into a scratch buffer for inspection.",
+      "Expectation": "The clipboard receives the planning prompt text. The prompt is coherent and ready to hand to an AI planner, and the workspace does not gain docs/planning/project-plan.md until the operator explicitly imports or creates one.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Session-set step",
+      "Subarea": "Parallel-session note",
+      "ItemLabel": "Checking the parallel-session checkbox surfaces the git-worktree info note",
+      "HumanAction": "Check Create parallel session sets where possible, then inspect the guidance below the Build session sets button.",
+      "Expectation": "An informational note appears explaining that parallel session sets use git worktrees and merge back into the main branch when the sets complete.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Session-set step",
+      "Subarea": "Build session sets",
+      "ItemLabel": "Build session sets copies the decomposition prompt and reflects the parallel choice",
+      "HumanAction": "After Step 2 is complete, run Build session sets with the parallel checkbox both unchecked and checked, pasting the copied prompt into a scratch buffer each time.",
+      "Expectation": "The action copies the decomposition prompt rather than running inline AI work. The copied text changes appropriately when the parallel checkbox is enabled, so the downstream planner receives the worktree preference.",
+      "Passes": true,
+      "Feedback": "Operator feedback on the preliminary pass: inlining the full project plan made the prompt hard to read. Fixed in the Session 4 build (the prompt now references docs/planning/project-plan.md instead of embedding it; the tier radio also rides the action so exemplars match the selected tier). Operator re-walked on the S4 build 2026-06-11: prompt references the plan without embedding it - good to go.",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Session-set step",
+      "Subarea": "Mode flip after set creation",
+      "ItemLabel": "Once a session set exists, the Explorer flips from the Getting Started form to the session-set list",
+      "HumanAction": "Create at least one docs/session-sets/NNN-... folder and a valid session-state.json through the copied planning flow or by importing an existing set, then refresh the workspace if needed.",
+      "Expectation": "The Getting Started form disappears and the normal session-set list appears in the Session Set Explorer without requiring the old wizard path.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Command entry points",
+      "Subarea": "Get Started command",
+      "ItemLabel": "The command-palette Get Started entry opens the same form-plus-instructions surface",
+      "HumanAction": "Run Dabbler: Open Get Started (dabbler.getStarted) from the Command Palette in an empty-folder workspace.",
+      "Expectation": "The command routes to the new Getting Started experience rather than the retired wizard panel. The same form and static instructions appear, with no duplicate tier or title prompts.",
+      "Passes": true,
+      "Feedback": "",
+      "Result": "pending"
+    },
+    {
+      "FunctionalArea": "Workspace state",
+      "Subarea": "No folder open",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Workspace state",
+      "Subarea": "Open folder with no session sets",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Full tier",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Lightweight tier",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": "I am wondering how hard it would be to support switching tiers ... just in case a user wants to do that either for a new session set or even within a session set.  Will the infrastructure support it?  If so, what would be the best approach to it -- for all in-progress session sets, have option buttons that appear below the session set to allow a user to switch tiers?  That might be too hard.  Perhaps it would be impossible to support  simultaneous lightweight and full tiers for parallel sessions.  Your thoughts? "
+    },
+    {
+      "FunctionalArea": "Project-plan step",
+      "Subarea": "Import existing plan",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Project-plan step",
+      "Subarea": "Copy prompt for planning",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session-set step",
+      "Subarea": "Parallel-session note",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session-set step",
+      "Subarea": "Build session sets",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": "It would be better to not copy the entire plan into the prompt because it is harder for users to read the prompt.  Why can't we just have the prompt point to docs/planning/project-plan.md?"
+    },
+    {
+      "FunctionalArea": "Session-set step",
+      "Subarea": "Mode flip after set creation",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Command entry points",
+      "Subarea": "Get Started command",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    }
+  ]
+}

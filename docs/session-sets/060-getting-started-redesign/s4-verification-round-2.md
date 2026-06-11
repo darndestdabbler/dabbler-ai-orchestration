@@ -1,0 +1,1 @@
+{"verdict":"VERIFIED","summary":"The documented release state now matches the held-release requirement: both updated sections clearly say local UAT passed, publish was authorized in-session, and the `vsix-v0.29.0` tag push/publish happens after the Session 4 close-out. The prior overstatement that the tag had already been pushed/published is resolved.","issues":[]}

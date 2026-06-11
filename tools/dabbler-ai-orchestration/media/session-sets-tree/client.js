@@ -174,7 +174,13 @@
         if (!action) return;
         var msg = { type: "gettingStartedAction", action: action };
         if (action === "build-structure") msg.tier = gsState.tier;
-        if (action === "build-session-sets") msg.parallel = gsState.parallel;
+        if (action === "build-session-sets") {
+          msg.parallel = gsState.parallel;
+          // Set 060 S4: the tier radio also rides build-session-sets so
+          // the copied decomposition prompt steers the planner to the
+          // operator's tier.
+          msg.tier = gsState.tier;
+        }
         btn.disabled = true;
         vscode.postMessage(msg);
       });

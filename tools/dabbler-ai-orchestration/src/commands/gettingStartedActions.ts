@@ -31,7 +31,7 @@ export interface GettingStartedHandlers {
   buildStructure(tier: Tier): Promise<void>;
   importPlan(): Promise<void>;
   copyPlanPrompt(): Promise<void>;
-  buildSessionSets(parallel: boolean): Promise<void>;
+  buildSessionSets(parallel: boolean, tier: Tier): Promise<void>;
 }
 
 /**
@@ -62,7 +62,10 @@ export async function routeGettingStartedAction(
       await handlers.copyPlanPrompt();
       return true;
     case "build-session-sets":
-      await handlers.buildSessionSets(msg.parallel === true);
+      // Set 060 S4: the tier radio rides this action too (same untrusted
+      // narrowing as build-structure) so the copied decomposition prompt
+      // steers the planner to the operator's tier.
+      await handlers.buildSessionSets(msg.parallel === true, asTier(msg.tier) ?? "full");
       return true;
     default:
       console.warn(
@@ -125,9 +128,9 @@ export function makeGettingStartedHandlers(
     },
 
     // Step 3 (D4): copy the decomposition prompt, honoring the parallel
-    // checkbox in the prompt text.
-    async buildSessionSets(parallel: boolean): Promise<void> {
-      await copySessionSetGenPrompt(context, { parallel });
+    // checkbox and the tier radio in the prompt text (S4).
+    async buildSessionSets(parallel: boolean, tier: Tier): Promise<void> {
+      await copySessionSetGenPrompt(context, { parallel, tier });
     },
   };
 }

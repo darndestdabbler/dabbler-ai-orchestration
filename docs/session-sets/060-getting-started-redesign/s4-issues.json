@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 4,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Release docs overstate the held-release state: docs/repository-reference.md and the set's change-log.md stated that vsix-v0.29.0 was already pushed/published on 2026-06-11, but per the spec's held-release mechanics (and the session's own account) the tag push happens only AFTER verification and the close-out commit - so the committed documentation asserted a release step that had not yet occurred.",
+      "category": "correctness",
+      "severity": "Major",
+      "issueId": "S060-S4-V1-001",
+      "issueType": "incorrect-content",
+      "verificationMethod": "Static review of the Session 4 diff (repository-reference.md release-status rows + change-log.md release header) against the spec's 'Held release' step and the stated push-after-close-out sequencing.",
+      "suggestedTestOrCheck": "Re-read the release-state wording in both docs: pre-push state ('UAT passed, publish authorized, tag push follows close-out') before the tag exists; 'pushed/published' only after the publish workflow actually completes.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Both documents reworded to the truthful pre-push state (UAT passed 2026-06-11; publish operator-authorized in-session; vsix-v0.29.0 tag push follows the Session 4 close-out). The 'published + run id' facts are recorded in a small post-publish follow-up commit only after publish-vscode.yml completes successfully. Round 2 (s4-verification-round-2.md) confirmed the fix and returned VERIFIED.",
+      "resolved_in_round": 2
+    }
+  ]
+}

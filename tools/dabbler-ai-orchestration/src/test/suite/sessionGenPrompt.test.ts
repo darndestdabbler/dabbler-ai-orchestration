@@ -28,10 +28,15 @@ function canonicalBundleDir(): string {
 const bundle: TemplateBundle = loadTemplateBundle(canonicalBundleDir());
 
 suite("buildSessionGenPrompt (Set 058 S2)", () => {
-  const prompt = buildSessionGenPrompt("PLAN_CONTENT_MARKER", bundle);
+  const prompt = buildSessionGenPrompt(bundle);
 
-  test("embeds the plan text", () => {
-    assert.ok(prompt.includes("PLAN_CONTENT_MARKER"));
+  test("references the plan path instead of inlining plan content (Set 060 S4)", () => {
+    // Operator UAT feedback: inlining the full plan made the copied
+    // prompt unreadable. The prompt now points the (path-aware)
+    // assistant at the canonical plan location — same contract as the
+    // Set 048 copyable review prompts (paths, never contents).
+    assert.ok(prompt.includes("docs/planning/project-plan.md"));
+    assert.ok(prompt.includes("Read that file directly"));
   });
 
   test("demands the canonical schemaVersion 4 / NNN- / tier shape", () => {

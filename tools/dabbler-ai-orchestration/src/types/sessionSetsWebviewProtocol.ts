@@ -213,9 +213,11 @@ export interface GettingStartedActionMsg {
   type: "gettingStartedAction";
   action: GettingStartedActionId;
   // Form state riders. `tier` rides build-structure (the Full/Lightweight
-  // radio); `parallel` rides build-session-sets (the "create parallel
-  // session sets where possible" checkbox, D7). Both are untrusted
-  // webview input — the host narrows them before use.
+  // radio) AND — since Set 060 S4 — build-session-sets, where it steers
+  // the copied decomposition prompt's exemplars/guidance to the
+  // operator's tier. `parallel` rides build-session-sets (the "create
+  // parallel session sets where possible" checkbox, D7). Both are
+  // untrusted webview input — the host narrows them before use.
   tier?: "full" | "lightweight";
   parallel?: boolean;
 }

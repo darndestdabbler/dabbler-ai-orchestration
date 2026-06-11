@@ -56,7 +56,8 @@ interface CallLog {
   buildStructure: Array<"full" | "lightweight">;
   importPlan: number;
   copyPlanPrompt: number;
-  buildSessionSets: boolean[];
+  // Set 060 S4: build-session-sets carries (parallel, tier).
+  buildSessionSets: Array<{ parallel: boolean; tier: "full" | "lightweight" }>;
 }
 
 function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog } {
@@ -72,7 +73,8 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
     buildStructure: async (tier) => void calls.buildStructure.push(tier),
     importPlan: async () => void calls.importPlan++,
     copyPlanPrompt: async () => void calls.copyPlanPrompt++,
-    buildSessionSets: async (parallel) => void calls.buildSessionSets.push(parallel),
+    buildSessionSets: async (parallel, tier) =>
+      void calls.buildSessionSets.push({ parallel, tier }),
   };
   return { handlers, calls };
 }
@@ -133,7 +135,27 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     await post(undefined);
     await post("true");      // strings are not booleans
     await post(1);
-    assert.deepStrictEqual(calls.buildSessionSets, [true, false, false, false, false]);
+    assert.deepStrictEqual(
+      calls.buildSessionSets.map((c) => c.parallel),
+      [true, false, false, false, false],
+    );
+  });
+
+  test("build-session-sets narrows its tier rider like build-structure (Set 060 S4)", async () => {
+    const { handlers, calls } = recordingHandlers();
+    const post = (tier?: unknown) =>
+      routeGettingStartedAction(
+        { type: "gettingStartedAction", action: "build-session-sets", tier } as GettingStartedActionMsg,
+        handlers,
+      );
+    await post("lightweight");
+    await post("full");
+    await post(undefined);
+    await post("LIGHTWEIGHT"); // case-sensitive narrowing
+    assert.deepStrictEqual(
+      calls.buildSessionSets.map((c) => c.tier),
+      ["lightweight", "full", "full", "full"],
+    );
   });
 
   test("ignores unknown actions (returns false, no handler runs)", async () => {
@@ -267,12 +289,12 @@ suite("renderStructureBootstrap (Set 060 S2)", () => {
   });
 });
 
-// ---------- 3. buildSessionGenPrompt parallel option (D4/D7) ----------
+// ---------- 3. buildSessionGenPrompt parallel + tier options (D4/D7, S4) ----------
 
 suite("buildSessionGenPrompt — parallel option (Set 060 S2)", () => {
-  const base = buildSessionGenPrompt("PLAN_CONTENT_MARKER", bundle);
-  const parallel = buildSessionGenPrompt("PLAN_CONTENT_MARKER", bundle, { parallel: true });
-  const explicitlyOff = buildSessionGenPrompt("PLAN_CONTENT_MARKER", bundle, { parallel: false });
+  const base = buildSessionGenPrompt(bundle);
+  const parallel = buildSessionGenPrompt(bundle, { parallel: true });
+  const explicitlyOff = buildSessionGenPrompt(bundle, { parallel: false });
 
   test("parallel: true adds worktree + prerequisites decomposition guidance", () => {
     assert.ok(parallel.includes("git worktrees"));
@@ -290,7 +312,30 @@ suite("buildSessionGenPrompt — parallel option (Set 060 S2)", () => {
   test("parallel guidance does not displace the canonical-shape requirements", () => {
     assert.ok(/schemaVersion.*4/.test(parallel));
     assert.ok(parallel.includes("NNN-"));
-    assert.ok(parallel.includes("PLAN_CONTENT_MARKER"));
+    assert.ok(parallel.includes("docs/planning/project-plan.md"));
+  });
+});
+
+suite("buildSessionGenPrompt — tier option (Set 060 S4 UAT feedback)", () => {
+  const noTier = buildSessionGenPrompt(bundle);
+  const light = buildSessionGenPrompt(bundle, { tier: "lightweight" });
+  const full = buildSessionGenPrompt(bundle, { tier: "full" });
+
+  test("tier: lightweight renders Lightweight exemplars + operator-tier guidance", () => {
+    assert.ok(/tier:\s*lightweight/.test(light));
+    assert.ok(light.includes("3-session Lightweight set"));
+    assert.ok(light.includes("operator selected the **lightweight** tier"));
+  });
+
+  test("tier: full renders Full exemplars + operator-tier guidance", () => {
+    assert.ok(/tier:\s*full/.test(full));
+    assert.ok(full.includes("3-session Full set"));
+    assert.ok(full.includes("operator selected the **full** tier"));
+  });
+
+  test("omitted tier keeps the Full exemplar and stays generic (palette command)", () => {
+    assert.ok(/tier:\s*full/.test(noTier));
+    assert.ok(!noTier.includes("operator selected the"));
   });
 });
 

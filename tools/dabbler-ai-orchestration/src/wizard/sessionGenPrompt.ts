@@ -4,6 +4,7 @@ import * as path from "path";
 import {
   BootstrapContext,
   TemplateBundle,
+  Tier,
   loadTemplateBundle,
   renderSessionState,
   renderSpec,
@@ -12,23 +13,31 @@ import {
 
 const PLAN_PATH = path.join("docs", "planning", "project-plan.md");
 
+// Forward-slashed form for use inside the prompt text (the reading
+// assistant resolves it against the workspace root on any platform).
+const PLAN_REL_POSIX = "docs/planning/project-plan.md";
+
 /**
  * Concrete sample context used to render the prompt's worked exemplars.
- * A FULL set with three sessions exercises the session-expansion path
- * (so the AI is shown three numbered blocks / objects, not the bundle's
- * two-block illustrative sample) and a fixed slug/date keeps the prompt
- * deterministic for the test suite.
+ * A 3-session set exercises the session-expansion path (so the AI is
+ * shown three numbered blocks / objects, not the bundle's two-block
+ * illustrative sample) and a fixed slug/date keeps the prompt
+ * deterministic for the test suite. The tier defaults to FULL and is
+ * overridden by {@link SessionGenPromptOptions.tier} (Set 060 S4) so a
+ * Lightweight operator's exemplars steer the planner to Lightweight sets.
  */
-const SAMPLE_CONTEXT: BootstrapContext = {
-  repoName: "example-app",
-  setTitle: "Example feature",
-  purpose: "A worked example — replace with the real set's purpose.",
-  slug: "001-example-feature",
-  created: "2026-01-01",
-  tier: "full",
-  verificationMode: "out-of-band-or-none",
-  totalSessions: 3,
-};
+function sampleContext(tier: Tier): BootstrapContext {
+  return {
+    repoName: "example-app",
+    setTitle: "Example feature",
+    purpose: "A worked example — replace with the real set's purpose.",
+    slug: "001-example-feature",
+    created: "2026-01-01",
+    tier,
+    verificationMode: "out-of-band-or-none",
+    totalSessions: 3,
+  };
+}
 
 /**
  * Build the session-set generation prompt from the canonical template
@@ -58,6 +67,15 @@ export interface SessionGenPromptOptions {
    * worktree.
    */
   parallel?: boolean;
+  /**
+   * Set 060 S4 (operator UAT feedback): the tier the operator selected
+   * in the Getting Started form's radio. When set, the worked exemplars
+   * render with that tier and the prompt tells the planner to author new
+   * sets on it unless the plan says otherwise. Absent (the bare
+   * ``dabbler.generateSessionSetPrompt`` palette command, which has no
+   * radio) the exemplars stay Full and the guidance stays generic.
+   */
+  tier?: Tier;
 }
 
 const PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator asked for parallel session sets
@@ -70,13 +88,20 @@ const PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator 
 `;
 
 export function buildSessionGenPrompt(
-  planText: string,
   bundle: TemplateBundle,
   options: SessionGenPromptOptions = {},
 ): string {
-  const exampleSpec = renderSpec(bundle, SAMPLE_CONTEXT);
-  const exampleState = renderSessionState(bundle, SAMPLE_CONTEXT);
+  const exemplarTier: Tier = options.tier ?? "full";
+  const ctx = sampleContext(exemplarTier);
+  const exampleSpec = renderSpec(bundle, ctx);
+  const exampleState = renderSessionState(bundle, ctx);
   const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
+  const tierGuidance = options.tier
+    ? `- **Tier.** The operator selected the **${options.tier}** tier in the Getting Started
+  form — author each new set with \`tier: ${options.tier}\` unless the project plan
+  explicitly calls for a different tier on a specific set.
+`
+    : "";
 
   return `You are a session-set architect for an AI-led software development workflow (the Dabbler session-set workflow).
 
@@ -103,7 +128,7 @@ For EACH session set, scaffold a folder \`docs/session-sets/<NNN-slug>/\` contai
 - **\`session-state.json\`** MUST use \`"schemaVersion": 4\` and \`"status": "not-started"\`.
   Never emit the retired schemaVersion-2 state shape.
 
-## Worked example — \`spec.md\` for a 3-session Full set (\`001-example-feature\`)
+## Worked example — \`spec.md\` for a 3-session ${exemplarTier === "lightweight" ? "Lightweight" : "Full"} set (\`001-example-feature\`)
 
 Match this shape; substitute your own title/purpose/slug/tier and emit exactly one session
 block per planned session:
@@ -129,20 +154,30 @@ ${exampleState}
 - Both tiers run the same Python lifecycle (\`start_session\` / \`close_session\`), state
   handling, and close-out. Lightweight is router-off, not Python-off — pick \`tier:
   lightweight\` when the project opts out of metered API calls.
-${parallelGuidance}
+${tierGuidance}${parallelGuidance}
 ---
 
-Project plan:
+## The project plan (read it from the workspace)
 
-${planText}`;
+The authoritative input for this decomposition is the project plan at
+\`${PLAN_REL_POSIX}\` in this workspace. Read that file directly — it is
+intentionally NOT inlined here. Decompose the plan it describes into session
+sets per the rules above.`;
 }
 
 /**
- * Read the project plan, build the decomposition prompt, and copy it to
- * the clipboard. Shared by the `dabbler.generateSessionSetPrompt`
- * command (no options) and the Getting Started form's "Build session
- * sets" action (which forwards the parallel checkbox, Set 060 S2).
- * Returns true when a prompt was copied.
+ * Build the decomposition prompt and copy it to the clipboard. Shared by
+ * the `dabbler.generateSessionSetPrompt` command (no options) and the
+ * Getting Started form's "Build session sets" action (which forwards the
+ * parallel checkbox + tier radio, Set 060 S2/S4). Returns true when a
+ * prompt was copied.
+ *
+ * Set 060 S4 (operator UAT feedback): the prompt REFERENCES the plan at
+ * docs/planning/project-plan.md instead of inlining its full text — the
+ * audience is a path-aware assistant opened in the workspace (the same
+ * contract as the Set 048 copyable review prompts), and inlining made the
+ * prompt hard for operators to read. The existence check below stays, so
+ * the copied reference is never dangling.
  */
 export async function copySessionSetGenPrompt(
   context: vscode.ExtensionContext,
@@ -174,8 +209,7 @@ export async function copySessionSetGenPrompt(
     return false;
   }
 
-  const planText = fs.readFileSync(planPath, "utf8");
-  const prompt = buildSessionGenPrompt(planText, bundle, options);
+  const prompt = buildSessionGenPrompt(bundle, options);
 
   await vscode.env.clipboard.writeText(prompt);
   vscode.window.showInformationMessage(

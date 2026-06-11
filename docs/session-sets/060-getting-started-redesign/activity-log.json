@@ -168,6 +168,75 @@
           "costUsd": 0.2579575
         }
       ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/uat-feedback-fixes",
+      "dateTime": "2026-06-11T05:34:46.830387-04:00",
+      "description": "Folded the two operator UAT-feedback changes into S4 before the gate: (A) buildSessionGenPrompt no longer inlines the project plan - the copied prompt references docs/planning/project-plan.md (path-aware-assistant contract, same as Set 048 review prompts); existence check retained so the reference is never dangling. (B) The form tier radio now rides the build-session-sets action (untrusted-narrowed like build-structure); the prompt exemplars + an operator-tier guidance line steer the planner to the selected tier (palette command without a radio stays generic Full). Tests updated/added: path-reference pin, 3 tier-option tests, tier-rider narrowing; 699 TS passing / same 2 pre-existing stub failures; tsc + esbuild clean.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-004/local-vsix-built",
+      "dateTime": "2026-06-11T05:34:46.831392-04:00",
+      "description": "Packaged dabbler-ai-orchestration-0.29.0.vsix (990.54 KB, 31 files) including the S4 fixes + extended CHANGELOG. NOTE: the 0.29.0 version bump (package.json + lock) and the base 0.29.0 CHANGELOG entry were found PRE-WRITTEN uncommitted in the working tree (authored out-of-band for the operator preliminary-UAT build); kept, extended with the S4 entries, date 2026-06-11, commit deferred to UAT pass per spec. Preliminary operator UAT: 10/11 rows pass, 1 untested (copy-plan-prompt). HANDED TO OPERATOR for the gate re-walk.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-004/operator-uat-passed",
+      "dateTime": "2026-06-11T06:10:43.931515-04:00",
+      "description": "Operator UAT gate PASSED 2026-06-11: preliminary walk passed all rows (1 initially untested row - copy-plan-prompt - operator tested in follow-up: works fine; operator flipped its Passes themselves); the two feedback items were folded into the S4 build and the operator re-walked row 10 on the rebuilt 0.29.0 vsix (prompt references the plan without embedding - good to go) and explicitly authorized the Marketplace publish. Outcome recorded in 060-getting-started-redesign-uat-checklist.json (row-10 feedback note). PyPI NOT needed: ai_router packaged surface unchanged since published v0.16.0 (only Set 058 unpackaged CI script touched ai_router/ since).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-004/version-bumped",
+      "dateTime": "2026-06-11T06:10:43.931515-04:00",
+      "description": "Version finalized at 0.29.0: the package.json+lock bump and base CHANGELOG entry were found PRE-WRITTEN uncommitted (operator UAT-build prep); kept, CHANGELOG extended with the S4 changes (path-referenced decomposition prompt, tier threading, setupNewProject convergence/wizard removal), entry dated 2026-06-11. repository-reference.md release status updated: 0.29.0 UAT-passed + tag push; ALSO corrected stale held wording on already-published rows (ext 0.28.0 published 2026-06-09 run 27228430570; router v0.16.0 2026-06-05, v0.15.0 2026-06-02 - verified via gh run list) and the stale 0.13.3 committed-VSIX file-map row -> 0.29.0. change-log.md authored (final-session gate).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-004/verified",
+      "dateTime": "2026-06-11T06:17:18.972992-04:00",
+      "description": "Cross-provider verification routed to gpt-5-4 (session-verification), 2 rounds: R1 ISSUES_FOUND 1 Major (S060-S4-V1-001 - release docs said the vsix tag was already pushed although the push follows close-out) -> both docs reworded to the truthful pre-push state -> R2 VERIFIED. Raw outputs s4-verification.md / s4-verification-round-2.md; structured findings s4-issues.json (fixed, resolved_in_round 2). GOTCHA mid-session: the shell env LOST the provider keys (present at session start, present in Windows User registry throughout) - recovered by loading the User env into the process via PowerShell before routing.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 12955,
+          "outputTokens": 7427,
+          "costUsd": 0.1437925
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 1605,
+          "outputTokens": 149,
+          "costUsd": 0.0062475
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-004/change-log-written",
+      "dateTime": "2026-06-11T06:17:18.974998-04:00",
+      "description": "change-log.md authored for the set (final-session gate): why the set existed, per-session ship list, the S4 UAT-feedback fixes, deferred Set 061 candidates (Explorer UX polish + Switch-tier action), verification + cost summary.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

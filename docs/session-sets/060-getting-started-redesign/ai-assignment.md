@@ -73,3 +73,19 @@ verification still routed for release safety. (The routed output
 named "claude-haiku-1", which is not a real model id; recorded here
 as the current Haiku tier, claude-haiku-4-5. Raw analysis preserved
 in the activity log entry.)
+
+## Session 4: Operator UAT on a local build, then bump 0.29.0 + held release
+
+### Actuals (filled after the session)
+- Orchestrator used: claude-code claude-fable-5 @ effort=medium
+- Total routed cost: $0.1500 (gpt-5-4 session-verification, 2 rounds:
+  R1 $0.1438 ISSUES_FOUND 1 Major → fixed → R2 $0.0062 VERIFIED)
+- Deviations from recommendation: operator continued the in-flight
+  claude-fable-5 conversation rather than switching to the
+  recommended haiku-4-5 @ low — the session also absorbed two
+  UAT-feedback code changes (path-referenced decomposition prompt +
+  tier threading), which justified the more capable tier.
+- Notes for next-session calibration: n/a (final session). The R1
+  Major was a release-state tense error (docs said "pushed" before
+  the tag existed) — keep release docs in the pre-push state until
+  the publish workflow actually completes.

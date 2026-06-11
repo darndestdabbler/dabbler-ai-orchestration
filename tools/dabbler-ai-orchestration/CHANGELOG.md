@@ -5,6 +5,52 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.29.0] — 2026-06-11 (Set 060 — Getting Started redesign)
+
+Replaces the prompt-chain onboarding with a dual-mode Getting Started flow in
+the Session Set Explorer and ships the held 0.28.1 activation fixes from
+Set 059.
+
+### Added
+
+- A stateful three-step Getting Started form inside the Session Set Explorer
+  for empty workspaces: build project structure, import/copy a project plan,
+  and copy the session-set decomposition prompt.
+- A static editor-side Getting Started instructions document that opens
+  alongside the form and carries the SVG-approved onboarding copy.
+
+### Changed
+
+- The Session Set Explorer now has three startup states: a no-folder CTA when
+  no workspace is open, the Getting Started form when a folder has no session
+  sets, and the normal session-set list once a set exists.
+- Build project structure reuses the no-title-prompt scaffold path in the open
+  folder, so the old first-session-set title prompt is gone from the primary
+  onboarding flow.
+- Full-tier setup warns inline when no provider API key is visible at launch
+  and tells the operator to reload after setting one; Lightweight shows no such
+  warning.
+- The parallel-session checkbox now surfaces the git-worktree disclosure in
+  place, and `dabbler.getStarted` routes to the new form + instructions rather
+  than the retired wizard path.
+- `dabbler.setupNewProject` converges on the same no-prompt structure-only
+  scaffold the form drives (tier QuickPick only); the retired
+  title/purpose/session-count prompts, git-init confirmation modal, and
+  worktree opt-in modal are gone, and the Set 021 wizard panel
+  (`webview/wizard.html`) is removed.
+- The copied session-set decomposition prompt now **references** the plan at
+  `docs/planning/project-plan.md` instead of inlining its full text (operator
+  UAT feedback — the inlined plan made the prompt hard to read; the audience
+  is a path-aware assistant opened in the workspace).
+- The Getting Started form's tier radio now rides the Build session sets
+  action, so the copied decomposition prompt's worked exemplars and guidance
+  steer the planner to the operator's selected tier.
+
+### Fixed
+
+- Carries forward Set 059's no-folder activation fix and tier-selection
+  plumbing fix, which were never released as a standalone 0.28.1 publish.
+
 ## [0.28.1] — 2026-06-09 (Set 059 — Extension activation & scaffold fix)
 
 > **Not released standalone.** This version number was never tag-pushed; the

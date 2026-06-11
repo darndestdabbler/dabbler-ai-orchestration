@@ -6,16 +6,16 @@
     {
       "number": 1,
       "title": "Verification marker \u2014 states, predicates, tooltips",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-06-11T16:29:35.932599-04:00",
-      "completedAt": null,
+      "completedAt": "2026-06-11T16:50:40.990394-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-fable-5",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

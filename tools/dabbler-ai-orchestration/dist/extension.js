@@ -7762,14 +7762,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs31 = this.flowScalar(this.type);
+              const fs32 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs31, sep: [] });
+                map.items.push({ start, key: fs32, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs31);
+                this.stack.push(fs32);
               } else {
-                Object.assign(it, { key: fs31, sep: [] });
+                Object.assign(it, { key: fs32, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7897,13 +7897,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs31 = this.flowScalar(this.type);
+              const fs32 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs31, sep: [] });
+                fc.items.push({ start: [], key: fs32, sep: [] });
               else if (it.sep)
-                this.stack.push(fs31);
+                this.stack.push(fs32);
               else
-                Object.assign(it, { key: fs31, sep: [] });
+                Object.assign(it, { key: fs32, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -14681,8 +14681,8 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode30 = __toESM(require("vscode"));
-var fs30 = __toESM(require("fs"));
+var vscode31 = __toESM(require("vscode"));
+var fs31 = __toESM(require("fs"));
 var path31 = __toESM(require("path"));
 
 // src/providers/CustomSessionSetsView.ts
@@ -16272,6 +16272,9 @@ var needsMigrationToV3 = (s) => s.needsMigration && s.migrationTargetSchemaVersi
 var needsMigrationToV4 = (s) => s.needsMigration && s.migrationTargetSchemaVersion === 4;
 var hasUnsatisfiedPrereqs = (s) => inFlightLike(s) && s.unsatisfiedPrereqs.length > 0;
 var isNotStarted = (s) => s.state === "not-started";
+var kickoffEligible = (s) => s.config.tier === "lightweight" && s.config.verificationMode === "dedicated-sessions" && s.completedVerification === null && s.state !== "cancelled";
+var setupVerificationEligible = (s) => isNotStarted(s) && s.config.tier === "lightweight";
+var showsOutOfBandMarker = (s) => s.verificationMarker === "v?";
 var ROW_ACTIONS = [
   // Open File ▸ submenu. L2 locks the four entries to: Spec, Activity
   // Log, Change Log, Session State. "Open AI Assignment" removed per
@@ -16318,6 +16321,15 @@ var ROW_ACTIONS = [
     category: "copyEval",
     when: (s) => inFlightLike(s)
   },
+  // Set 062 S2 (spec D2): paste-ready agent handoff into the Set 057
+  // dedicated-verification flow (typed session, different engine).
+  {
+    id: "dabbler.copyVerificationKickoffPrompt",
+    label: "Verification Kickoff",
+    group: 306,
+    category: "copyEval",
+    when: kickoffEligible
+  },
   // Flat actions — appear at the top level of the QuickPick. The
   // spec §3.3 table lists v4 only because v4 is the canonical target;
   // the v3 entry is kept here for legacy v1/v2 sets (mutually exclusive
@@ -16337,6 +16349,28 @@ var ROW_ACTIONS = [
   // Set 061 S3 (spec D4): rewrite the spec's `tier:` value via a tier
   // QuickPick; not-started rows only. See commands/switchTier.ts.
   { id: "dabblerSessionSets.switchTier", label: "Switch Tier\u2026", group: 504, category: "flat", when: isNotStarted },
+  // Set 062 S2 (spec D3): rewrite the spec's `verificationMode:` seed
+  // via a confirmed QuickPick; not-started Lightweight rows only (the
+  // predicate widens to completed Mode-A rows in Session 3). See
+  // commands/setupVerification.ts.
+  {
+    id: "dabblerSessionSets.setupVerification",
+    label: "Set Up Dedicated Verification\u2026",
+    group: 505,
+    category: "flat",
+    when: setupVerificationEligible
+  },
+  // Set 062 S2 (spec step 4): reuse the existing out-of-band note
+  // command on exactly the rows that render `v?` — the sanctioned
+  // recording path; the detail names the marker-clearing consequence.
+  {
+    id: "dabbler.openExternalVerificationDoc",
+    label: "Open External Verification Note",
+    group: 506,
+    category: "flat",
+    detail: "Record the out-of-band verdict \u2014 creating external-verification.md clears the v? marker.",
+    when: showsOutOfBandMarker
+  },
   { id: "dabblerSessionSets.migrate", label: "Migrate to v3 schema", group: 801, category: "flat", when: needsMigrationToV3 },
   { id: "dabblerSessionSets.migrateToV4", label: "Migrate to v4 schema", group: 802, category: "flat", when: needsMigrationToV4 },
   {
@@ -16376,12 +16410,12 @@ function buildTopLevelItems(categorized) {
     items.push({ label: "Copy Prompt \u25B8", dabblerKind: "copyEval" });
   }
   for (const action of categorized.flat) {
-    items.push({ label: action.label, dabblerKind: "action", action });
+    items.push({ label: action.label, detail: action.detail, dabblerKind: "action", action });
   }
   return items;
 }
 function buildSubmenuItems(submenu) {
-  return submenu.map((action) => ({ label: action.label, action }));
+  return submenu.map((action) => ({ label: action.label, detail: action.detail, action }));
 }
 function planLeftClickActivation(setName, state) {
   const openCommand = { commandId: "dabblerSessionSets.openSpec", setName };
@@ -17349,27 +17383,27 @@ var init_simple_git_options = __esm({
     };
   }
 });
-function appendTaskOptions(options, commands28 = []) {
+function appendTaskOptions(options, commands29 = []) {
   if (!filterPlainObject(options)) {
-    return commands28;
+    return commands29;
   }
-  return Object.keys(options).reduce((commands29, key) => {
+  return Object.keys(options).reduce((commands210, key) => {
     const value = options[key];
     if (r(value)) {
-      commands29.push(value);
+      commands210.push(value);
     } else if (filterPrimitives(value, ["boolean"])) {
-      commands29.push(key + "=" + value);
+      commands210.push(key + "=" + value);
     } else if (Array.isArray(value)) {
       for (const v of value) {
         if (!filterPrimitives(v, ["string", "number"])) {
-          commands29.push(key + "=" + v);
+          commands210.push(key + "=" + v);
         }
       }
     } else {
-      commands29.push(key);
+      commands210.push(key);
     }
-    return commands29;
-  }, commands28);
+    return commands210;
+  }, commands29);
 }
 function getTrailingOptions(args, initialPrimitive = 0, objectOnly = false) {
   const command = [];
@@ -17499,18 +17533,18 @@ function checkIsRepoTask(action) {
     case "root":
       return checkIsRepoRootTask();
   }
-  const commands28 = ["rev-parse", "--is-inside-work-tree"];
+  const commands29 = ["rev-parse", "--is-inside-work-tree"];
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     onError,
     parser
   };
 }
 function checkIsRepoRootTask() {
-  const commands28 = ["rev-parse", "--git-dir"];
+  const commands29 = ["rev-parse", "--git-dir"];
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     onError,
     parser(path32) {
@@ -17519,9 +17553,9 @@ function checkIsRepoRootTask() {
   };
 }
 function checkIsBareRepoTask() {
-  const commands28 = ["rev-parse", "--is-bare-repository"];
+  const commands29 = ["rev-parse", "--is-bare-repository"];
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     onError,
     parser
@@ -17611,18 +17645,18 @@ function configurationErrorTask(error) {
     }
   };
 }
-function straightThroughStringTask(commands28, trimmed2 = false) {
+function straightThroughStringTask(commands29, trimmed2 = false) {
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return trimmed2 ? String(text).trim() : text;
     }
   };
 }
-function straightThroughBufferTask(commands28) {
+function straightThroughBufferTask(commands29) {
   return {
-    commands: commands28,
+    commands: commands29,
     format: "buffer",
     parser(buffer) {
       return buffer;
@@ -17668,9 +17702,9 @@ function cleanWithOptionsTask(mode, customArgs) {
   return cleanTask(cleanMode, options);
 }
 function cleanTask(mode, customArgs) {
-  const commands28 = ["clean", `-${mode}`, ...customArgs];
+  const commands29 = ["clean", `-${mode}`, ...customArgs];
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return cleanSummaryParser(mode === "n", text);
@@ -17833,13 +17867,13 @@ function asConfigScope(scope, fallback) {
   return fallback;
 }
 function addConfigTask(key, value, append2, scope) {
-  const commands28 = ["config", `--${scope}`];
+  const commands29 = ["config", `--${scope}`];
   if (append2) {
-    commands28.push("--add");
+    commands29.push("--add");
   }
-  commands28.push(key, value);
+  commands29.push(key, value);
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return text;
@@ -17847,12 +17881,12 @@ function addConfigTask(key, value, append2, scope) {
   };
 }
 function getConfigTask(key, scope) {
-  const commands28 = ["config", "--null", "--show-origin", "--get-all", key];
+  const commands29 = ["config", "--null", "--show-origin", "--get-all", key];
   if (scope) {
-    commands28.splice(1, 0, `--${scope}`);
+    commands29.splice(1, 0, `--${scope}`);
   }
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return configGetParser(text, key);
@@ -17860,12 +17894,12 @@ function getConfigTask(key, scope) {
   };
 }
 function listConfigTask(scope) {
-  const commands28 = ["config", "--list", "--show-origin", "--null"];
+  const commands29 = ["config", "--list", "--show-origin", "--null"];
   if (scope) {
-    commands28.push(`--${scope}`);
+    commands29.push(`--${scope}`);
   }
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return configListParser(text);
@@ -17977,10 +18011,10 @@ function grep_default() {
       if (typeof searchTerm === "string") {
         searchTerm = grepQueryBuilder().param(searchTerm);
       }
-      const commands28 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
+      const commands29 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
       return this._runTask(
         {
-          commands: commands28,
+          commands: commands29,
           format: "utf-8",
           parser(stdOut) {
             return parseGrep(stdOut);
@@ -18029,12 +18063,12 @@ __export2(reset_exports, {
   resetTask: () => resetTask
 });
 function resetTask(mode, customArgs) {
-  const commands28 = ["reset"];
+  const commands29 = ["reset"];
   if (isValidResetMode(mode)) {
-    commands28.push(`--${mode}`);
+    commands29.push(`--${mode}`);
   }
-  commands28.push(...customArgs);
-  return straightThroughStringTask(commands28);
+  commands29.push(...customArgs);
+  return straightThroughStringTask(commands29);
 }
 function getResetMode(mode) {
   if (isValidResetMode(mode)) {
@@ -18203,10 +18237,10 @@ var init_tasks_pending_queue = __esm({
     };
   }
 });
-function pluginContext(task, commands28) {
+function pluginContext(task, commands29) {
   return {
     method: first(task.commands) || "",
-    commands: commands28
+    commands: commands29
   };
 }
 function onErrorReceived(target, logger) {
@@ -18507,11 +18541,11 @@ var init_change_working_directory = __esm({
   }
 });
 function checkoutTask(args) {
-  const commands28 = ["checkout", ...args];
-  if (commands28[1] === "-b" && commands28.includes("-B")) {
-    commands28[1] = remove(commands28, "-B");
+  const commands29 = ["checkout", ...args];
+  if (commands29[1] === "-b" && commands29.includes("-B")) {
+    commands29[1] = remove(commands29, "-B");
   }
-  return straightThroughStringTask(commands28);
+  return straightThroughStringTask(commands29);
 }
 function checkout_default() {
   return {
@@ -18643,7 +18677,7 @@ var init_parse_commit = __esm({
   }
 });
 function commitTask(message, files, customArgs) {
-  const commands28 = [
+  const commands29 = [
     "-c",
     "core.abbrev=40",
     "commit",
@@ -18652,7 +18686,7 @@ function commitTask(message, files, customArgs) {
     ...customArgs
   ];
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser: parseCommitResult
   };
@@ -18704,11 +18738,11 @@ var init_first_commit = __esm({
   }
 });
 function hashObjectTask(filePath, write) {
-  const commands28 = ["hash-object", filePath];
+  const commands29 = ["hash-object", filePath];
   if (write) {
-    commands28.push("-w");
+    commands29.push("-w");
   }
-  return straightThroughStringTask(commands28, true);
+  return straightThroughStringTask(commands29, true);
 }
 var init_hash_object = __esm({
   "src/lib/tasks/hash-object.ts"() {
@@ -18758,15 +18792,15 @@ function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
 function initTask(bare = false, path32, customArgs) {
-  const commands28 = ["init", ...customArgs];
-  if (bare && !hasBareCommand(commands28)) {
-    commands28.splice(1, 0, bareCommand);
+  const commands29 = ["init", ...customArgs];
+  if (bare && !hasBareCommand(commands29)) {
+    commands29.splice(1, 0, bareCommand);
   }
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands28.includes("--bare"), path32, text);
+      return parseInit(commands29.includes("--bare"), path32, text);
     }
   };
 }
@@ -18998,14 +19032,14 @@ __export2(diff_exports, {
 });
 function diffSummaryTask(customArgs) {
   let logFormat = logFormatFromCommand(customArgs);
-  const commands28 = ["diff"];
+  const commands29 = ["diff"];
   if (logFormat === "") {
     logFormat = "--stat";
-    commands28.push("--stat=4096");
+    commands29.push("--stat=4096");
   }
-  commands28.push(...customArgs);
-  return validateLogFormatConfig(commands28) || {
-    commands: commands28,
+  commands29.push(...customArgs);
+  return validateLogFormatConfig(commands29) || {
+    commands: commands29,
     format: "utf-8",
     parser: getDiffParser(logFormat)
   };
@@ -19523,18 +19557,18 @@ function pushTagsTask(ref = {}, customArgs) {
   return pushTask(ref, customArgs);
 }
 function pushTask(ref = {}, customArgs) {
-  const commands28 = ["push", ...customArgs];
+  const commands29 = ["push", ...customArgs];
   if (ref.branch) {
-    commands28.splice(1, 0, ref.branch);
+    commands29.splice(1, 0, ref.branch);
   }
   if (ref.remote) {
-    commands28.splice(1, 0, ref.remote);
+    commands29.splice(1, 0, ref.remote);
   }
-  remove(commands28, "-v");
-  append(commands28, "--verbose");
-  append(commands28, "--porcelain");
+  remove(commands29, "-v");
+  append(commands29, "--verbose");
+  append(commands29, "--porcelain");
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser: parsePushResult
   };
@@ -19549,19 +19583,19 @@ var init_push = __esm({
 function show_default() {
   return {
     showBuffer() {
-      const commands28 = ["show", ...getTrailingOptions(arguments, 1)];
-      if (!commands28.includes("--binary")) {
-        commands28.splice(1, 0, "--binary");
+      const commands29 = ["show", ...getTrailingOptions(arguments, 1)];
+      if (!commands29.includes("--binary")) {
+        commands29.splice(1, 0, "--binary");
       }
       return this._runTask(
-        straightThroughBufferTask(commands28),
+        straightThroughBufferTask(commands29),
         trailingFunctionArgument(arguments)
       );
     },
     show() {
-      const commands28 = ["show", ...getTrailingOptions(arguments, 1)];
+      const commands29 = ["show", ...getTrailingOptions(arguments, 1)];
       return this._runTask(
-        straightThroughStringTask(commands28),
+        straightThroughStringTask(commands29),
         trailingFunctionArgument(arguments)
       );
     }
@@ -19771,7 +19805,7 @@ var init_StatusSummary = __esm({
   }
 });
 function statusTask(customArgs) {
-  const commands28 = [
+  const commands29 = [
     "status",
     "--porcelain",
     "-b",
@@ -19781,7 +19815,7 @@ function statusTask(customArgs) {
   ];
   return {
     format: "utf-8",
-    commands: commands28,
+    commands: commands29,
     parser(text) {
       return parseStatusSummary(text);
     }
@@ -19896,10 +19930,10 @@ var init_clone = __esm({
     init_task();
     init_utils();
     cloneTask = (repo, directory, customArgs) => {
-      const commands28 = ["clone", ...customArgs];
-      filterString(repo) && commands28.push(c(repo));
-      filterString(directory) && commands28.push(c(directory));
-      return straightThroughStringTask(commands28);
+      const commands29 = ["clone", ...customArgs];
+      filterString(repo) && commands29.push(c(repo));
+      filterString(directory) && commands29.push(c(directory));
+      return straightThroughStringTask(commands29);
     };
     cloneMirrorTask = (repo, directory, customArgs) => {
       append(customArgs, "--mirror");
@@ -20253,23 +20287,23 @@ __export2(branch_exports, {
   deleteBranchTask: () => deleteBranchTask,
   deleteBranchesTask: () => deleteBranchesTask
 });
-function containsDeleteBranchCommand(commands28) {
+function containsDeleteBranchCommand(commands29) {
   const deleteCommands = ["-d", "-D", "--delete"];
-  return commands28.some((command) => deleteCommands.includes(command));
+  return commands29.some((command) => deleteCommands.includes(command));
 }
 function branchTask(customArgs) {
   const isDelete = containsDeleteBranchCommand(customArgs);
   const isCurrentOnly = customArgs.includes("--show-current");
-  const commands28 = ["branch", ...customArgs];
-  if (commands28.length === 1) {
-    commands28.push("-a");
+  const commands29 = ["branch", ...customArgs];
+  if (commands29.length === 1) {
+    commands29.push("-a");
   }
-  if (!commands28.includes("-v")) {
-    commands28.splice(1, 0, "-v");
+  if (!commands29.includes("-v")) {
+    commands29.splice(1, 0, "-v");
   }
   return {
     format: "utf-8",
-    commands: commands28,
+    commands: commands29,
     parser(stdOut, stdErr) {
       if (isDelete) {
         return parseBranchDeletions(stdOut, stdErr).all[0];
@@ -20419,16 +20453,16 @@ function disallowedCommand(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function fetchTask(remote, branch, customArgs) {
-  const commands28 = ["fetch", ...customArgs];
+  const commands29 = ["fetch", ...customArgs];
   if (remote && branch) {
-    commands28.push(remote, branch);
+    commands29.push(remote, branch);
   }
-  const banned = commands28.find(disallowedCommand);
+  const banned = commands29.find(disallowedCommand);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser: parseFetchResult
   };
@@ -20478,12 +20512,12 @@ __export2(pull_exports, {
   pullTask: () => pullTask
 });
 function pullTask(remote, branch, customArgs) {
-  const commands28 = ["pull", ...customArgs];
+  const commands29 = ["pull", ...customArgs];
   if (remote && branch) {
-    commands28.splice(1, 0, remote, branch);
+    commands29.splice(1, 0, remote, branch);
   }
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser(stdOut, stdErr) {
       return parsePullResult(stdOut, stdErr);
@@ -20549,29 +20583,29 @@ function addRemoteTask(remoteName, remoteRepo, customArgs) {
   return straightThroughStringTask(["remote", "add", ...customArgs, remoteName, remoteRepo]);
 }
 function getRemotesTask(verbose) {
-  const commands28 = ["remote"];
+  const commands29 = ["remote"];
   if (verbose) {
-    commands28.push("-v");
+    commands29.push("-v");
   }
   return {
-    commands: commands28,
+    commands: commands29,
     format: "utf-8",
     parser: verbose ? parseGetRemotesVerbose : parseGetRemotes
   };
 }
 function listRemotesTask(customArgs) {
-  const commands28 = [...customArgs];
-  if (commands28[0] !== "ls-remote") {
-    commands28.unshift("ls-remote");
+  const commands29 = [...customArgs];
+  if (commands29[0] !== "ls-remote") {
+    commands29.unshift("ls-remote");
   }
-  return straightThroughStringTask(commands28);
+  return straightThroughStringTask(commands29);
 }
 function remoteTask(customArgs) {
-  const commands28 = [...customArgs];
-  if (commands28[0] !== "remote") {
-    commands28.unshift("remote");
+  const commands29 = [...customArgs];
+  if (commands29[0] !== "remote") {
+    commands29.unshift("remote");
   }
-  return straightThroughStringTask(commands28);
+  return straightThroughStringTask(commands29);
 }
 function removeRemoteTask(remoteName) {
   return straightThroughStringTask(["remote", "remove", remoteName]);
@@ -20589,14 +20623,14 @@ __export2(stash_list_exports, {
 });
 function stashListTask(opt = {}, customArgs) {
   const options = parseLogOptions(opt);
-  const commands28 = ["stash", "list", ...options.commands, ...customArgs];
+  const commands29 = ["stash", "list", ...options.commands, ...customArgs];
   const parser4 = createListLogSummaryParser(
     options.splitter,
     options.fields,
-    logFormatFromCommand(commands28)
+    logFormatFromCommand(commands29)
   );
-  return validateLogFormatConfig(commands28) || {
-    commands: commands28,
+  return validateLogFormatConfig(commands29) || {
+    commands: commands29,
     format: "utf-8",
     parser: parser4
   };
@@ -20624,11 +20658,11 @@ function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
 }
 function subModuleTask(customArgs) {
-  const commands28 = [...customArgs];
-  if (commands28[0] !== "submodule") {
-    commands28.unshift("submodule");
+  const commands29 = [...customArgs];
+  if (commands29[0] !== "submodule") {
+    commands29.unshift("submodule");
   }
-  return straightThroughStringTask(commands28);
+  return straightThroughStringTask(commands29);
 }
 function updateSubModuleTask(customArgs) {
   return subModuleTask(["update", ...customArgs]);
@@ -20913,9 +20947,9 @@ var require_git = __commonJS2({
     Git2.prototype.branchLocal = function(then) {
       return this._runTask(branchLocalTask2(), trailingFunctionArgument2(arguments));
     };
-    Git2.prototype.raw = function(commands28) {
-      const createRestCommands = !Array.isArray(commands28);
-      const command = [].slice.call(createRestCommands ? arguments : commands28, 0);
+    Git2.prototype.raw = function(commands29) {
+      const createRestCommands = !Array.isArray(commands29);
+      const command = [].slice.call(createRestCommands ? arguments : commands29, 0);
       for (let i2 = 0; i2 < command.length && createRestCommands; i2++) {
         if (!filterPrimitives2(command[i2])) {
           command.splice(i2, command.length - i2);
@@ -21050,9 +21084,9 @@ var require_git = __commonJS2({
       return this._runTask(task, trailingFunctionArgument2(arguments));
     };
     Git2.prototype.revparse = function() {
-      const commands28 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
+      const commands29 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
       return this._runTask(
-        straightThroughStringTask2(commands28, true),
+        straightThroughStringTask2(commands29, true),
         trailingFunctionArgument2(arguments)
       );
     };
@@ -23229,8 +23263,8 @@ var CustomSessionSetsView = class _CustomSessionSetsView {
   loadWelcomeHtmlFromPackageJson() {
     try {
       const pkgPath = vscode10.Uri.joinPath(this.context.extensionUri, "package.json").fsPath;
-      const fs31 = require("fs");
-      const pkg = JSON.parse(fs31.readFileSync(pkgPath, "utf8"));
+      const fs32 = require("fs");
+      const pkg = JSON.parse(fs32.readFileSync(pkgPath, "utf8"));
       const entries = pkg?.contributes?.viewsWelcome ?? [];
       const ours = entries.find((e) => e.view === _CustomSessionSetsView.viewType);
       if (!ours?.contents)
@@ -24449,6 +24483,40 @@ function sanitizeSlugForPrompt(slug) {
 function buildStartNextSessionPrompt(set) {
   return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
+function buildVerificationKickoffPrompt(set) {
+  const slug = sanitizeSlugForPrompt(set.name);
+  const setDirRel = sanitizeSlugForPrompt(relFromRoot(set.root, set.dir));
+  const specRel = relFromRoot(set.root, set.specPath);
+  const activityRel = relFromRoot(set.root, set.activityPath);
+  const stateRel = relFromRoot(set.root, set.statePath);
+  return `Run the dedicated cross-provider verification flow for the Lightweight
+session set \`${slug}\` (verificationMode: dedicated-sessions).
+
+1. Read the "Mode B \u2014 dedicated-sessions" part of Step 6 in
+   docs/ai-led-session-workflow.md \u2014 it is the authoritative procedure
+   for typed verification/remediation sessions, including the
+   bounded-round rules and the hand-off close.
+2. Confirm you are a DIFFERENT engine from the one that ran this set's
+   work sessions: read the per-session \`orchestrator\` blocks in
+   ${stateRel}. Cross-provider review is the point; the close-out gate
+   enforces it.
+3. Open the typed verification session through the blessed writer
+   (never hand-edit the state file), running Python through the
+   workspace venv:
+   \`python -m ai_router.start_session --session-set-dir ${setDirRel} --type verification --engine <your-engine> --provider <your-provider>\`
+4. Review the completed work sessions against the spec and the
+   activity log, then record the verdict per the workflow doc.
+   Files to read (relative to repo root):
+     - ${specRel}
+     - ${activityRel}
+     - ${stateRel}
+5. If findings require remediation, seed the structured findings
+   envelope and chain the hand-off close in one atomic write:
+   \`python -m ai_router.start_session --session-set-dir ${setDirRel} --type remediation --handoff --handoff-verdict ISSUES_FOUND --engine <work-engine> --provider <work-provider>\`
+6. Follow the workflow doc's bounded-round rules for any further
+   verify/remediate rounds and for when to stop to a human.
+`;
+}
 function buildStartNextParallelSessionPrompt(set) {
   return `Start the next parallel session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
@@ -24506,6 +24574,15 @@ function registerCopyPromptCommands(context) {
           return;
         const prompt = buildStartNextParallelSessionPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Start the next parallel session of ${item.set.name}`);
+      }
+    ),
+    vscode16.commands.registerCommand(
+      "dabbler.copyVerificationKickoffPrompt",
+      async (item) => {
+        if (!item?.set)
+          return;
+        const prompt = buildVerificationKickoffPrompt(item.set);
+        await copyToClipboard(prompt, `Copied: Verification kickoff prompt for ${item.set.name}`);
       }
     )
   );
@@ -28112,29 +28189,231 @@ function registerSwitchTierCommand(context) {
   );
 }
 
+// src/commands/setupVerification.ts
+var vscode30 = __toESM(require("vscode"));
+var fs30 = __toESM(require("fs"));
+
+// src/utils/verificationModeRewrite.ts
+var CONFIG_BLOCK_RE2 = /(##\s*Session Set Configuration[\s\S]*?```ya?ml\s*)([\s\S]*?)(```)/i;
+var VERIFICATION_MODE_LINE_RE = /^([ \t]*verificationMode[ \t]*:[ \t]*)(?:"([\w-]+)"|'([\w-]+)'|([\w-]+))([ \t]*(?:#[^\r\n]*)?\r?)$/im;
+var VERIFICATION_MODES = [
+  "out-of-band-or-none",
+  "dedicated-sessions"
+];
+var VERIFICATION_MODE_ENTRY_KIND = "verification_mode";
+function rewriteSpecVerificationMode(specText, target) {
+  const block = CONFIG_BLOCK_RE2.exec(specText);
+  if (!block) {
+    return {
+      text: specText,
+      changed: false,
+      outcome: "no-config-block",
+      previousMode: "out-of-band-or-none"
+    };
+  }
+  const bodyStart = block.index + block[1].length;
+  const body = block[2];
+  const line = VERIFICATION_MODE_LINE_RE.exec(body);
+  if (!line) {
+    if (target === "out-of-band-or-none") {
+      return {
+        text: specText,
+        changed: false,
+        outcome: "already-target",
+        previousMode: "out-of-band-or-none"
+      };
+    }
+    const newline = body.includes("\r\n") || !body.includes("\n") && specText.includes("\r\n") ? "\r\n" : "\n";
+    const insertion = `verificationMode: ${target}${newline}`;
+    const text2 = specText.slice(0, bodyStart) + insertion + specText.slice(bodyStart);
+    return { text: text2, changed: true, outcome: "rewritten", previousMode: "out-of-band-or-none" };
+  }
+  const rawValue = (line[2] ?? line[3] ?? line[4] ?? "").toLowerCase();
+  const previousMode = rawValue === "dedicated-sessions" ? "dedicated-sessions" : "out-of-band-or-none";
+  if (rawValue === target) {
+    return { text: specText, changed: false, outcome: "already-target", previousMode };
+  }
+  const quote = line[2] !== void 0 ? '"' : line[3] !== void 0 ? "'" : "";
+  const rewrittenLine = `${line[1]}${quote}${target}${quote}${line[5]}`;
+  const lineStart = bodyStart + (line.index ?? 0);
+  const lineEnd = lineStart + line[0].length;
+  const text = specText.slice(0, lineStart) + rewrittenLine + specText.slice(lineEnd);
+  return { text, changed: true, outcome: "rewritten", previousMode };
+}
+function verificationModeRecordExists(activityLogText) {
+  if (typeof activityLogText !== "string" || activityLogText.length === 0) {
+    return false;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(activityLogText);
+  } catch {
+    return false;
+  }
+  if (parsed === null || typeof parsed !== "object")
+    return false;
+  const entries = parsed.entries;
+  if (!Array.isArray(entries))
+    return false;
+  return entries.some(
+    (e) => e !== null && typeof e === "object" && e.kind === VERIFICATION_MODE_ENTRY_KIND && VERIFICATION_MODES.includes(e.choice)
+  );
+}
+
+// src/commands/setupVerification.ts
+var DEDICATED_CONSEQUENCE_COPY = "One-way once the set starts: typed verification/remediation sessions are appended at runtime, so the session count grows (the N/M+ fraction) and the mode can no longer be switched back.";
+var OUT_OF_BAND_CONSEQUENCE_COPY = "Returns to the default posture: verification happens out of band (copyable review prompts; the verdict is recorded by hand in external-verification.md). No typed sessions are appended.";
+function buildModePickItems(current) {
+  const annotate = (mode, base) => mode === current ? `${base} \u2014 current` : base;
+  return [
+    {
+      label: "Dedicated sessions",
+      description: annotate(
+        "dedicated-sessions",
+        "Typed verification/remediation sessions on a different engine"
+      ),
+      detail: DEDICATED_CONSEQUENCE_COPY,
+      value: "dedicated-sessions"
+    },
+    {
+      label: "Out-of-band or none",
+      description: annotate(
+        "out-of-band-or-none",
+        "Default \u2014 copyable review prompts, manual verdict note"
+      ),
+      detail: OUT_OF_BAND_CONSEQUENCE_COPY,
+      value: "out-of-band-or-none"
+    }
+  ];
+}
+function buildConfirmationItems(target) {
+  return [
+    {
+      label: `Switch to ${target}`,
+      detail: target === "dedicated-sessions" ? DEDICATED_CONSEQUENCE_COPY : OUT_OF_BAND_CONSEQUENCE_COPY,
+      confirmed: true
+    },
+    { label: "Cancel", confirmed: false }
+  ];
+}
+async function setupVerification(set) {
+  if (set.config.tier !== "lightweight") {
+    vscode30.window.showInformationMessage(
+      `"${set.name}" is a Full-tier set \u2014 verificationMode governs Lightweight verification only (Full tier verifies through the router automatically).`
+    );
+    return;
+  }
+  if (set.state !== "not-started") {
+    vscode30.window.showInformationMessage(
+      `"${set.name}" has already started \u2014 the verification-mode seed can only be rewritten on a not-started set.`
+    );
+    return;
+  }
+  let activityLogText = null;
+  try {
+    if (fs30.existsSync(set.activityPath)) {
+      activityLogText = fs30.readFileSync(set.activityPath, "utf8");
+    }
+  } catch {
+    activityLogText = null;
+  }
+  if (verificationModeRecordExists(activityLogText)) {
+    vscode30.window.showInformationMessage(
+      `"${set.name}" already has a durable verification-mode record in its activity log \u2014 the spec seed is no longer the authority, so the mode cannot be changed from here.`
+    );
+    return;
+  }
+  const current = set.config.verificationMode;
+  const picked = await vscode30.window.showQuickPick(buildModePickItems(current), {
+    placeHolder: `Verification mode for "${set.name}" (currently ${current})`,
+    ignoreFocusOut: true
+  });
+  if (!picked)
+    return;
+  const target = picked.value;
+  if (target !== current) {
+    const confirmation = await vscode30.window.showQuickPick(
+      buildConfirmationItems(target),
+      { placeHolder: `Confirm verification-mode change for "${set.name}"` }
+    );
+    if (!confirmation?.confirmed)
+      return;
+  }
+  let specText;
+  try {
+    specText = fs30.readFileSync(set.specPath, "utf8");
+  } catch {
+    vscode30.window.showErrorMessage(
+      `Could not read ${set.specPath} \u2014 verification mode not changed.`
+    );
+    return;
+  }
+  const result = rewriteSpecVerificationMode(specText, target);
+  if (result.outcome === "no-config-block") {
+    vscode30.window.showWarningMessage(
+      `"${set.name}"'s spec.md has no Session Set Configuration block \u2014 add one (see the authoring guide) before changing the verification mode.`
+    );
+    return;
+  }
+  if (result.outcome === "already-target") {
+    vscode30.window.showInformationMessage(
+      `"${set.name}" already uses ${target} verification.`
+    );
+    return;
+  }
+  try {
+    fs30.writeFileSync(set.specPath, result.text, "utf8");
+  } catch {
+    vscode30.window.showErrorMessage(
+      `Could not write ${set.specPath} \u2014 verification mode not changed.`
+    );
+    return;
+  }
+  void vscode30.commands.executeCommand("dabblerSessionSets.refresh");
+  vscode30.window.showInformationMessage(
+    result.previousMode === target ? `Repaired "${set.name}"'s malformed verificationMode declaration \u2014 now explicitly ${target}.` : `"${set.name}" verificationMode \u2192 ${target}.`
+  );
+}
+function registerSetupVerificationCommand(context) {
+  context.subscriptions.push(
+    vscode30.commands.registerCommand(
+      "dabblerSessionSets.setupVerification",
+      (item) => {
+        if (!item?.set) {
+          vscode30.window.showInformationMessage(
+            "Set Up Dedicated Verification\u2026 is available from a not-started Lightweight session-set row's context menu."
+          );
+          return;
+        }
+        void setupVerification(item.set);
+      }
+    )
+  );
+}
+
 // src/extension.ts
 var SESSION_SETS_REL4 = path31.join("docs", "session-sets");
 function evaluateRouterCapabilityContextKey() {
-  const folders = vscode30.workspace.workspaceFolders ?? [];
+  const folders = vscode31.workspace.workspaceFolders ?? [];
   let routes = false;
   try {
     routes = folders.some((f) => routesCost(f.uri.fsPath));
   } catch {
     routes = false;
   }
-  vscode30.commands.executeCommand("setContext", "dabblerSessionSets.routesCost", routes);
+  vscode31.commands.executeCommand("setContext", "dabblerSessionSets.routesCost", routes);
 }
 function evaluateSupportContextKeys(allSets) {
-  const cfg = vscode30.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode31.workspace.getConfiguration("dabblerSessionSets");
   const uatPref = cfg.get("uatSupport.enabled", "auto");
   const e2ePref = cfg.get("e2eSupport.enabled", "auto");
   const anyUat = allSets.some((s) => s.config?.requiresUAT);
   const anyE2e = allSets.some((s) => s.config?.requiresE2E);
   const uatActive = uatPref === "always" || uatPref === "auto" && anyUat;
   const e2eActive = e2ePref === "always" || e2ePref === "auto" && anyE2e;
-  vscode30.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
-  vscode30.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
-  vscode30.commands.executeCommand(
+  vscode31.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
+  vscode31.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
+  vscode31.commands.executeCommand(
     "setContext",
     "dabblerSessionSets.hasSubCurrentSets",
     hasSubCurrentSets(allSets)
@@ -28147,7 +28426,7 @@ function activate(context) {
   const provider = new CustomSessionSetsView(context, scanState);
   context.subscriptions.push({ dispose: () => provider.dispose() });
   context.subscriptions.push(
-    vscode30.window.registerWebviewViewProvider(CustomSessionSetsView.viewType, provider)
+    vscode31.window.registerWebviewViewProvider(CustomSessionSetsView.viewType, provider)
   );
   const evaluateContextKeys = () => {
     evaluateSupportContextKeys(readAllSessionSets());
@@ -28162,7 +28441,7 @@ function activate(context) {
     );
   }
   context.subscriptions.push(
-    vscode30.workspace.onDidChangeConfiguration((e) => {
+    vscode31.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") || e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
         evaluateContextKeys();
       }
@@ -28182,22 +28461,22 @@ function activate(context) {
     boundRoots = want;
     for (const root of roots) {
       const sessionSetsAbs = path31.join(root, SESSION_SETS_REL4);
-      const pattern = new vscode30.RelativePattern(
+      const pattern = new vscode31.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json}"
       );
-      const watcher = vscode30.workspace.createFileSystemWatcher(pattern);
+      const watcher = vscode31.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => provider.refresh();
       watcher.onDidCreate(onEvent);
       watcher.onDidDelete(onEvent);
       watcher.onDidChange(onEvent);
       watcherSubs.push(watcher);
       context.subscriptions.push(watcher);
-      const gsPattern = new vscode30.RelativePattern(
+      const gsPattern = new vscode31.RelativePattern(
         root,
         "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**,docs/session-sets/*}"
       );
-      const gsWatcher = vscode30.workspace.createFileSystemWatcher(gsPattern);
+      const gsWatcher = vscode31.workspace.createFileSystemWatcher(gsPattern);
       gsWatcher.onDidCreate(onEvent);
       gsWatcher.onDidDelete(onEvent);
       gsWatcher.onDidChange(onEvent);
@@ -28218,11 +28497,11 @@ function activate(context) {
       err
     );
   }
-  context.subscriptions.push(vscode30.workspace.onDidChangeWorkspaceFolders(refreshAll));
+  context.subscriptions.push(vscode31.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 3e4);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
   context.subscriptions.push(
-    vscode30.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
+    vscode31.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
   );
   const safeRegister = (name, fn) => {
     try {
@@ -28302,22 +28581,26 @@ function activate(context) {
     "registerSwitchTierCommand",
     () => registerSwitchTierCommand(context)
   );
+  safeRegister(
+    "registerSetupVerificationCommand",
+    () => registerSetupVerificationCommand(context)
+  );
   setImmediate(() => {
     scanState.setReady();
   });
   const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
-  if (!hasSeenOnboarding && (vscode30.workspace.workspaceFolders?.length ?? 0) > 0) {
+  if (!hasSeenOnboarding && (vscode31.workspace.workspaceFolders?.length ?? 0) > 0) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs30.existsSync(path31.join(r2, SESSION_SETS_REL4));
+        return fs31.existsSync(path31.join(r2, SESSION_SETS_REL4));
       } catch {
         return false;
       }
     });
     if (!hasSessionSets) {
       context.workspaceState.update("hasSeenOnboarding", true);
-      vscode30.commands.executeCommand("dabbler.getStarted");
+      vscode31.commands.executeCommand("dabbler.getStarted");
     }
   }
 }

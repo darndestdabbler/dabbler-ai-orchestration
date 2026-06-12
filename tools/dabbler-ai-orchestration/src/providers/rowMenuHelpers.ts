@@ -44,13 +44,16 @@ export function buildTopLevelItems(categorized: CategorizedActions): TopLevelPic
     items.push({ label: "Copy Prompt ▸", dabblerKind: "copyEval" });
   }
   for (const action of categorized.flat) {
-    items.push({ label: action.label, dabblerKind: "action", action });
+    // Set 062 S2: registry entries may carry a `detail` line (e.g. the
+    // marker-clearing consequence on "Open External Verification
+    // Note"); pass it through so the QuickPick renders it.
+    items.push({ label: action.label, detail: action.detail, dabblerKind: "action", action });
   }
   return items;
 }
 
 export function buildSubmenuItems(submenu: RowAction[]): SubmenuPickItem[] {
-  return submenu.map((action) => ({ label: action.label, action }));
+  return submenu.map((action) => ({ label: action.label, detail: action.detail, action }));
 }
 
 // ----- L5 left-click dual-action decision -----

@@ -20,10 +20,15 @@
     {
       "number": 2,
       "title": "Agent handoff + not-started toggle",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-06-12T03:38:41.791496-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "high"
+      },
       "verificationVerdict": null
     },
     {

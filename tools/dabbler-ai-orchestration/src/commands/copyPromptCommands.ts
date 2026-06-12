@@ -174,6 +174,53 @@ export function buildStartNextSessionPrompt(set: SessionSet): string {
   return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
 
+// Set 062 Session 2 (spec D2): the dedicated-verification kickoff
+// prompt for Lightweight `dedicated-sessions` sets. Pointer-style per
+// L1 — references the workflow doc's Mode B section and the blessed
+// `start_session --type …` CLI surface; embeds NO doc bodies or rule
+// text that could go stale. The generic start-next-session prompt is
+// deliberately NOT reused: the dedicated flow is typed-session +
+// different-engine, not a spec session. The prompt never instructs the
+// UI (or the operator) to append sessions by hand — the agent's own
+// `start_session --type verification` is the only session creator.
+export function buildVerificationKickoffPrompt(set: SessionSet): string {
+  const slug = sanitizeSlugForPrompt(set.name);
+  // The set-dir path is spliced into backtick-delimited command lines,
+  // so it gets the same backtick defense as the slug.
+  const setDirRel = sanitizeSlugForPrompt(relFromRoot(set.root, set.dir));
+  const specRel = relFromRoot(set.root, set.specPath);
+  const activityRel = relFromRoot(set.root, set.activityPath);
+  const stateRel = relFromRoot(set.root, set.statePath);
+  return (
+    `Run the dedicated cross-provider verification flow for the Lightweight\n` +
+    `session set \`${slug}\` (verificationMode: dedicated-sessions).\n` +
+    `\n` +
+    `1. Read the "Mode B — dedicated-sessions" part of Step 6 in\n` +
+    `   docs/ai-led-session-workflow.md — it is the authoritative procedure\n` +
+    `   for typed verification/remediation sessions, including the\n` +
+    `   bounded-round rules and the hand-off close.\n` +
+    `2. Confirm you are a DIFFERENT engine from the one that ran this set's\n` +
+    `   work sessions: read the per-session \`orchestrator\` blocks in\n` +
+    `   ${stateRel}. Cross-provider review is the point; the close-out gate\n` +
+    `   enforces it.\n` +
+    `3. Open the typed verification session through the blessed writer\n` +
+    `   (never hand-edit the state file), running Python through the\n` +
+    `   workspace venv:\n` +
+    `   \`python -m ai_router.start_session --session-set-dir ${setDirRel} --type verification --engine <your-engine> --provider <your-provider>\`\n` +
+    `4. Review the completed work sessions against the spec and the\n` +
+    `   activity log, then record the verdict per the workflow doc.\n` +
+    `   Files to read (relative to repo root):\n` +
+    `     - ${specRel}\n` +
+    `     - ${activityRel}\n` +
+    `     - ${stateRel}\n` +
+    `5. If findings require remediation, seed the structured findings\n` +
+    `   envelope and chain the hand-off close in one atomic write:\n` +
+    `   \`python -m ai_router.start_session --session-set-dir ${setDirRel} --type remediation --handoff --handoff-verdict ISSUES_FOUND --engine <work-engine> --provider <work-provider>\`\n` +
+    `6. Follow the workflow doc's bounded-round rules for any further\n` +
+    `   verify/remediate rounds and for when to stop to a human.\n`
+  );
+}
+
 // Set 049 S1 hygiene: parallel-session variant. The
 // `dabblerSessionSets.copyStartCommand.parallel` command in
 // copyCommand.ts already builds this text but is not surfaced in the
@@ -234,6 +281,14 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
         if (!item?.set) return;
         const prompt = buildStartNextParallelSessionPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Start the next parallel session of ${item.set.name}`);
+      },
+    ),
+    vscode.commands.registerCommand(
+      "dabbler.copyVerificationKickoffPrompt",
+      async (item: SetItem) => {
+        if (!item?.set) return;
+        const prompt = buildVerificationKickoffPrompt(item.set);
+        await copyToClipboard(prompt, `Copied: Verification kickoff prompt for ${item.set.name}`);
       },
     ),
   );

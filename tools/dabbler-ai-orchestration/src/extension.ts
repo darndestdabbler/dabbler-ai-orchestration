@@ -33,6 +33,7 @@ import { registerExternalVerificationCommand } from "./commands/externalVerifica
 import { registerResolveSetNumberCommand } from "./commands/resolveSetNumber";
 import { registerUpgradeOlderSetsCommand } from "./commands/upgradeOlderSets";
 import { registerSwitchTierCommand } from "./commands/switchTier";
+import { registerSetupVerificationCommand } from "./commands/setupVerification";
 import { hasSubCurrentSets } from "./providers/SessionSetsModel";
 import { routesCost } from "./utils/routerConfig";
 import { SessionSet } from "./types";
@@ -365,6 +366,11 @@ export function activate(context: vscode.ExtensionContext): void {
   // Set 061 S3 (spec D4): tier switch on not-started sets.
   safeRegister("registerSwitchTierCommand", () =>
     registerSwitchTierCommand(context),
+  );
+  // Set 062 S2 (spec D3): verification-mode seed rewrite on
+  // not-started Lightweight sets.
+  safeRegister("registerSetupVerificationCommand", () =>
+    registerSetupVerificationCommand(context),
   );
 
   // Set 030 Session 5: flip scanState to "ready" once activation

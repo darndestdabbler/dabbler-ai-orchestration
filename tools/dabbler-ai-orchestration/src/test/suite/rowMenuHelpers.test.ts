@@ -104,6 +104,21 @@ suite("rowMenuHelpers — buildSubmenuItems", () => {
   test("returns empty array for empty input", () => {
     assert.deepStrictEqual(buildSubmenuItems([]), []);
   });
+
+  test("passes a registry detail line through to the QuickPick item (Set 062 S2)", () => {
+    const withDetail = action({
+      id: "dabbler.openExternalVerificationDoc",
+      label: "Open External Verification Note",
+      detail: "Record the out-of-band verdict — creating external-verification.md clears the v? marker.",
+    });
+    const [sub] = buildSubmenuItems([withDetail]);
+    assert.strictEqual(sub.detail, withDetail.detail);
+    const top = buildTopLevelItems(cat({ flat: [withDetail] }));
+    assert.strictEqual(top[0].detail, withDetail.detail);
+    // Actions without a detail stay detail-less (no empty-string noise).
+    const [plain] = buildSubmenuItems([action({ id: "x", label: "Spec" })]);
+    assert.strictEqual(plain.detail, undefined);
+  });
 });
 
 suite("rowMenuHelpers — planLeftClickActivation (L5)", () => {

@@ -1,0 +1,6 @@
+```json
+{"verdict":"ISSUES_FOUND","issues":[{"id":"S062-S2-V1-001","severity":"Major","category":"Correctness","file":"tools/dabbler-ai-orchestration/src/commands/setupVerification.ts","description":"The Session 2 safety gate for `dabblerSessionSets.setupVerification` is too narrow: it only blocks when `activity-log.json` contains a recognized `verification_mode` record, and it silently treats unreadable logs as 'no record'. Locked decision D3 requires the B→A reverse to stop being offered once any activity-log record exists, and the seed rewrite should not proceed when the durable history cannot be inspected. As written, a not-started-but-already-touched set can still be switched, creating the spec-vs-history drift D3 is meant to prevent.","recommendation":"Add a separate guard that fail-loud inspects `activity-log.json` for any existing entries (not just `verification_mode` ones), and refuse the rewrite if the file cannot be read/parsed or if any record is present. Keep `verificationModeRecordExists` only as the Python-parity helper from step 1, not as the sole Session 2 command gate."}]}
+```
+
+- Rewrite helper, kickoff prompt, ActionRegistry wiring, `v?` external-note action, and test coverage are otherwise in place.
+- The remaining gap is the locked D3 no-history safety check.

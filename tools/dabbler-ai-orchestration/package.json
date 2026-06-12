@@ -115,6 +115,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabblerSessionSets.setupVerification",
+        "title": "Set Up Dedicated Verification…",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabblerSessionSets.openFolder",
         "title": "Reveal Folder",
         "category": "Dabbler"
@@ -157,6 +162,11 @@
       {
         "command": "dabbler.copyStartNextParallelSessionPrompt",
         "title": "Copy: Start the next parallel session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.copyVerificationKickoffPrompt",
+        "title": "Copy: Verification kickoff prompt",
         "category": "Dabbler"
       },
       {

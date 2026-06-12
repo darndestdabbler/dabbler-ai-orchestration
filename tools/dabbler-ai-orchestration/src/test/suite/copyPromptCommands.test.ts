@@ -6,6 +6,7 @@ import {
   buildSetAccomplishmentsPrompt,
   buildStartNextSessionPrompt,
   buildStartNextParallelSessionPrompt,
+  buildVerificationKickoffPrompt,
   sanitizeSlugForPrompt,
 } from "../../commands/copyPromptCommands";
 import { SessionSet, SessionState } from "../../types";
@@ -181,6 +182,83 @@ suite("copyPromptCommands — start-next-parallel-session prompt (Set 049 S1 hyg
   test("sanitizes backticks consistent with the non-parallel variant", () => {
     const out = buildStartNextParallelSessionPrompt(fakeSet("evil`-name"));
     assert.strictEqual(out, "Start the next parallel session of `evil'-name`.");
+    assert.ok(!out.includes("``"));
+  });
+});
+
+suite("copyPromptCommands — verification kickoff prompt (Set 062 S2, spec D2)", () => {
+  const lwDedicated = () =>
+    fakeSet("062-fixture", {
+      config: {
+        requiresUAT: false,
+        requiresE2E: false,
+        uatScope: "none",
+        tier: "lightweight",
+        verificationMode: "dedicated-sessions",
+      },
+    });
+
+  test("pointer-style: references the workflow doc section, never embeds its body", () => {
+    const out = buildVerificationKickoffPrompt(lwDedicated());
+    assert.ok(out.includes("docs/ai-led-session-workflow.md"), "must point at the workflow doc");
+    assert.ok(out.includes("Mode B"), "must name the dedicated-sessions section");
+    // Body text from the doc (e.g. the derived-state table or the
+    // resolution_status enum) must NOT be embedded — it would go stale.
+    assert.ok(!out.includes("resolution_status"), "doc rule tables must not be embedded");
+    assert.ok(!out.includes("closed-dispositioned"), "derived-state ladder must not be embedded");
+  });
+
+  test("instructs the blessed typed-session writer with the set's real directory", () => {
+    const out = buildVerificationKickoffPrompt(lwDedicated());
+    assert.ok(
+      out.includes(
+        "python -m ai_router.start_session --session-set-dir docs/session-sets/062-fixture --type verification",
+      ),
+      `kickoff must use the blessed writer; got: ${out}`,
+    );
+    assert.ok(!out.includes("\\"), "paths must be slash-separated regardless of OS");
+  });
+
+  test("demands a different engine and points at the per-session orchestrator blocks", () => {
+    const out = buildVerificationKickoffPrompt(lwDedicated());
+    assert.ok(/DIFFERENT engine/i.test(out));
+    assert.ok(out.includes("docs/session-sets/062-fixture/session-state.json"));
+  });
+
+  test("chains remediation via --type remediation --handoff", () => {
+    const out = buildVerificationKickoffPrompt(lwDedicated());
+    assert.ok(out.includes("--type remediation --handoff --handoff-verdict ISSUES_FOUND"));
+  });
+
+  test("references the spec and activity log by path (L1)", () => {
+    const out = buildVerificationKickoffPrompt(lwDedicated());
+    assert.ok(out.includes("docs/session-sets/062-fixture/spec.md"));
+    assert.ok(out.includes("docs/session-sets/062-fixture/activity-log.json"));
+  });
+
+  test("is NOT the generic start-next-session prompt (D2: the dedicated flow is not generic)", () => {
+    const out = buildVerificationKickoffPrompt(lwDedicated());
+    assert.ok(!out.includes("Start the next session of"));
+  });
+
+  test("never instructs hand-editing the state file or UI-created sessions", () => {
+    const out = buildVerificationKickoffPrompt(lwDedicated());
+    assert.ok(/never hand-edit the state file/i.test(out));
+  });
+
+  test("sanitizes backticks in the slug like the other prompt builders", () => {
+    const out = buildVerificationKickoffPrompt(
+      fakeSet("evil`-name", {
+        config: {
+          requiresUAT: false,
+          requiresE2E: false,
+          uatScope: "none",
+          tier: "lightweight",
+          verificationMode: "dedicated-sessions",
+        },
+      }),
+    );
+    assert.ok(out.includes("`evil'-name`"));
     assert.ok(!out.includes("``"));
   });
 });

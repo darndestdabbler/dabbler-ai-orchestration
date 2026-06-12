@@ -44,6 +44,10 @@ export interface RowAction {
   label: string;
   group: number;
   category: ActionCategory;
+  // Set 062 S2: optional QuickPick detail line (second row under the
+  // label). Used where the menu entry itself must explain a
+  // consequence — e.g. "creating the note clears the v? marker".
+  detail?: string;
   when: (set: SessionSet, supports: ActionSupports) => boolean;
 }
 
@@ -75,6 +79,36 @@ const hasUnsatisfiedPrereqs = (s: SessionSet): boolean =>
 // started — mid-set switching is deliberately unsupported (Set 057
 // verificationMode immutability; per-session escape hatch: --no-router).
 const isNotStarted = (s: SessionSet): boolean => s.state === "not-started";
+
+// Set 062 S2 (spec D2): the dedicated-verification kickoff prompt is
+// offered while a Mode-B set still owes its verification — Lightweight,
+// `dedicated-sessions`, no COMPLETED `type: verification` session yet.
+// Cancelled rows are excluded (verification on an abandoned set is not
+// actionable — the same terminal suppression every Set 061/062 marker
+// applies); in-flight typed sessions keep the entry visible so a
+// stalled verification session can be re-kicked.
+const kickoffEligible = (s: SessionSet): boolean =>
+  s.config.tier === "lightweight" &&
+  s.config.verificationMode === "dedicated-sessions" &&
+  s.completedVerification === null &&
+  s.state !== "cancelled";
+
+// Set 062 S2 (spec D3): the verification-mode seed rewrite is offered
+// on not-started Lightweight rows ONLY at this session (no durable
+// record exists yet, so the spec seed is the authority — mirrors
+// `Switch Tier…`; the handler also guards against a stray activity-log
+// record). Both directions are legal here, so the gate is
+// mode-agnostic. Session 3 widens the predicate to completed Mode-A
+// rows through the blessed Python writer.
+const setupVerificationEligible = (s: SessionSet): boolean =>
+  isNotStarted(s) && s.config.tier === "lightweight";
+
+// Set 062 S2 (spec step 4): the sanctioned out-of-band recording path,
+// surfaced exactly where the `v?` marker renders (completed Mode-A
+// rows with no note and no typed verification session) — the derived
+// marker glyph already encodes every suppression rule.
+const showsOutOfBandMarker = (s: SessionSet): boolean =>
+  s.verificationMarker === "v?";
 
 // Ordered list. `group` controls QuickPick sort within a category;
 // `category` controls which top-level item or submenu the entry lands
@@ -111,6 +145,10 @@ export const ROW_ACTIONS: RowAction[] = [
   // pattern is only meaningful on non-terminal rows.
   { id: "dabbler.copyStartNextParallelSessionPrompt", label: "Start New Parallel Session", group: 305, category: "copyEval",
     when: (s) => inFlightLike(s) },
+  // Set 062 S2 (spec D2): paste-ready agent handoff into the Set 057
+  // dedicated-verification flow (typed session, different engine).
+  { id: "dabbler.copyVerificationKickoffPrompt", label: "Verification Kickoff", group: 306, category: "copyEval",
+    when: kickoffEligible },
 
   // Flat actions — appear at the top level of the QuickPick. The
   // spec §3.3 table lists v4 only because v4 is the canonical target;
@@ -131,6 +169,18 @@ export const ROW_ACTIONS: RowAction[] = [
   // Set 061 S3 (spec D4): rewrite the spec's `tier:` value via a tier
   // QuickPick; not-started rows only. See commands/switchTier.ts.
   { id: "dabblerSessionSets.switchTier",        label: "Switch Tier…",                 group: 504, category: "flat", when: isNotStarted },
+  // Set 062 S2 (spec D3): rewrite the spec's `verificationMode:` seed
+  // via a confirmed QuickPick; not-started Lightweight rows only (the
+  // predicate widens to completed Mode-A rows in Session 3). See
+  // commands/setupVerification.ts.
+  { id: "dabblerSessionSets.setupVerification", label: "Set Up Dedicated Verification…", group: 505, category: "flat",
+    when: setupVerificationEligible },
+  // Set 062 S2 (spec step 4): reuse the existing out-of-band note
+  // command on exactly the rows that render `v?` — the sanctioned
+  // recording path; the detail names the marker-clearing consequence.
+  { id: "dabbler.openExternalVerificationDoc",  label: "Open External Verification Note", group: 506, category: "flat",
+    detail: "Record the out-of-band verdict — creating external-verification.md clears the v? marker.",
+    when: showsOutOfBandMarker },
   { id: "dabblerSessionSets.migrate",           label: "Migrate to v3 schema",         group: 801, category: "flat", when: needsMigrationToV3 },
   { id: "dabblerSessionSets.migrateToV4",       label: "Migrate to v4 schema",         group: 802, category: "flat", when: needsMigrationToV4 },
   { id: "dabblerSessionSets.cancel",            label: "Cancel Session Set",           group: 901, category: "flat",

@@ -40,10 +40,10 @@ moderate
 | 4 | Reuse `dabbler.openExternalVerificationDoc` | t2 |
 | 5 | Tests | t3 |
 ### Actuals (filled after the session)
-- Orchestrator used:
-- Total routed cost:
-- Deviations from recommendation:
-- Notes for next-session calibration:
+- Orchestrator used: claude-code claude-fable-5 @ effort=high
+- Total routed cost: $0.3083 (session-verification only: gpt-5-4 R1 $0.2608 ISSUES_FOUND → R2 narrow re-verify $0.0475 VERIFIED)
+- Deviations from recommendation: orchestrator was fable-5/high, not opus-4-8/medium (same holder as Session 1 picked the set back up). Implementation again routed $0 — the t2/t3 step-table routing did not apply (orchestrator-direct TS work).
+- Notes for next-session calibration: OpenAI recovered — the router's gpt-5-4 verifier pick worked first try (no gemini fallback needed; S1's 429 contingency did not recur). R1 found 1 Major (gate too narrow vs the locked D3 "any activity-log record" language) — pointing the verifier at the locked-design excerpts is what surfaced it; keep doing that in S3, especially for the D4 gates.
 
 ## Session 3: Sanctioned A→B on completed sets (blessed writer + wiring)
 ### Recommended orchestrator

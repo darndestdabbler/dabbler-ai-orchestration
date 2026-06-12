@@ -1,7 +1,7 @@
 {
   "sessionSetName": "062-lightweight-verification-affordance",
   "createdDate": "2026-06-11T16:31:34.905812-04:00",
-  "totalSessions": 0,
+  "totalSessions": 5,
   "entries": [
     {
       "sessionNumber": 1,
@@ -62,6 +62,75 @@
           "outputTokens": 121,
           "costUsd": 0.0213,
           "costEstimated": true
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/rewrite-helper",
+      "dateTime": "2026-06-12T03:59:05.942958-04:00",
+      "description": "verificationModeRewrite.ts: pure byte-preserving rewriter for the spec-config verificationMode: scalar - sibling of tierRewrite.ts (same CONFIG_BLOCK_RE, same outcome enum rewritten/already-target/no-config-block, same quote/comment/CRLF preservation and absent-key insertion, default out-of-band-or-none, typo-repair path). Plus verificationModeRecordExists - TS mirror of Python has_verification_mode_record (kind=verification_mode + valid choice; tolerant of missing/unparseable logs) - the D3 durable-record gate that refuses the seed rewrite once the Set 057 capture has fired. 19-test matrix in verificationModeRewrite.test.ts incl. sibling-key isolation and record-gate cases.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/kickoff-prompt",
+      "dateTime": "2026-06-12T03:59:05.942958-04:00",
+      "description": "dabbler.copyVerificationKickoffPrompt: buildVerificationKickoffPrompt in copyPromptCommands.ts (D2, pointer-style L1) - references the workflow doc's Mode B section, instructs the agent to confirm it is a DIFFERENT engine via the per-session orchestrator blocks, open the typed session via the blessed start_session --type verification (never hand-edit the state file), record the verdict, chain remediation via --type remediation --handoff --handoff-verdict ISSUES_FOUND; embeds no doc bodies. Backtick defense extended to the set-dir path spliced into command lines. ActionRegistry copyEval entry 'Verification Kickoff' (group 306) on Lightweight dedicated-sessions rows with no completed verification session, cancelled excluded. 8 content tests.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/setup-action",
+      "dateTime": "2026-06-12T03:59:05.942958-04:00",
+      "description": "dabblerSessionSets.setupVerification ('Set Up Dedicated Verification...', flat group 505): not-started Lightweight rows only this session (predicate widens to complete Mode-A rows in Session 3 via the blessed writer). Handler: defense-in-depth re-checks (tier/state), durable-record refusal via verificationModeRecordExists (no drift by construction), mode QuickPick with current-mode annotation (both directions legal pre-record, mirroring Switch Tier), explicit confirmation step whose one-way consequence copy names the N/M+ growth (A->B) or the out-of-band default posture (B->A), seed rewrite via the pure helper (same-mode pick repairs malformed scalars per S061-S3-V1-002), refresh + toast. Pure pickable-content builders exported and pinned in setupVerification.test.ts (10 tests incl. no-'unverified'-language).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/external-note-action",
+      "dateTime": "2026-06-12T03:59:05.942958-04:00",
+      "description": "Reused dabbler.openExternalVerificationDoc (already item-aware) as a flat row action 'Open External Verification Note' (group 506) surfaced exactly on v? rows (predicate: verificationMarker === 'v?' - the derived glyph already encodes every suppression rule); RowAction gained an optional detail field, passed through buildTopLevelItems/buildSubmenuItems to the QuickPick, carrying 'creating external-verification.md clears the v? marker'. package.json: 2 new command contributions; extension.ts: registerSetupVerificationCommand (safeRegister); watcherInventory allowlist lines bumped 191->192 / 227->228 for the import shift (the recurring Set 051/059 gotcha).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/tests",
+      "dateTime": "2026-06-12T03:59:05.948118-04:00",
+      "description": "Suites: TS unit 831 passing (was 788 after S1; +43 this session) + the 2 pre-existing Set-026 failures (configEditor-foundation, notificationsSection - unchanged baseline); tsc --noEmit clean; esbuild compile + template-bundle copy clean; Python 1185 passed / 1 skipped (no Python touched). ActionRegistry count test updated 17->20 with per-state x tier x mode applicability matrices for the three new entries.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/verified",
+      "dateTime": "2026-06-12T04:07:20.175045-04:00",
+      "description": "Cross-provider verification (router pick gpt-5-4, OpenAI recovered from yesterday's 429s): R1 ISSUES_FOUND - 1 Major S062-S2-V1-001 (the setupVerification gate only checked for a verification_mode record and failed open on unreadable logs; D3's locked language is 'any activity-log record' + fail-loud). Finding ACCEPTED and fixed: new inspectActivityLog (no-records|has-records|unreadable) gates the command broadly and fail-loud; verificationModeRecordExists retained as the Python-parity helper only; +4 gate tests (TS suite 835 passing, same 2 pre-existing Set-026 failures). R2 narrow re-verify: VERIFIED 0 issues. Artifacts: s2-verification.md, s2-issues.json (resolution annotated), s2-verification-round-2.md. Routed cost R1 $0.2608 + R2 $0.0475 = $0.3083.",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 17550,
+          "outputTokens": 14460,
+          "costUsd": 0.260775
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 8034,
+          "outputTokens": 1827,
+          "costUsd": 0.04749
         }
       ]
     }

@@ -252,7 +252,12 @@ prerequisites:           # optional; sets that must complete before this one is 
   seed (recorded automatically at the first `start_session` when no choice
   exists yet) or from an explicit `start_session --verification-mode …`.
   Omitting both leaves the default `out-of-band-or-none` applying
-  implicitly (strictly opt-in). The field is inert on Full tier (which
+  implicitly (strictly opt-in). A set that already started under Mode A
+  can still opt in later through the sanctioned blessed writer
+  (`python -m ai_router.change_verification_mode <slug>`, Set 062 —
+  A→B only, gated, recorded as a superseding `verification_mode_change`
+  entry; see `docs/ai-led-session-workflow.md` → *Sanctioned Mode A →
+  Mode B transition*). The field is inert on Full tier (which
   keeps automatic, rule-based cross-provider verification).
 
   **Session `type` (Set 057).** The `dedicated-sessions` flow appends

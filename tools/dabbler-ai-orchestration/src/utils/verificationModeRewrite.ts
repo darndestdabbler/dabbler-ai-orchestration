@@ -53,6 +53,20 @@ export const VERIFICATION_MODES: readonly VerificationMode[] = [
 // Python's `VERIFICATION_MODE_ENTRY_KIND`.
 export const VERIFICATION_MODE_ENTRY_KIND = "verification_mode";
 
+// Python's `VERIFICATION_MODE_CHANGE_ENTRY_KIND` (Set 062 S3): the
+// blessed-writer transition record appended by
+// `python -m ai_router.change_verification_mode` on a completed Mode-A
+// set. A durable mode record of EITHER kind means the spec seed has
+// lost authority.
+export const VERIFICATION_MODE_CHANGE_ENTRY_KIND = "verification_mode_change";
+
+// The kinds that carry a durable verification-mode `choice` — mirrors
+// Python's `_VERIFICATION_MODE_RECORD_KINDS`.
+const VERIFICATION_MODE_RECORD_KINDS: readonly string[] = [
+  VERIFICATION_MODE_ENTRY_KIND,
+  VERIFICATION_MODE_CHANGE_ENTRY_KIND,
+];
+
 export type VerificationModeRewriteOutcome =
   // The value was rewritten (or the key inserted) — `text` differs.
   | "rewritten"
@@ -189,14 +203,16 @@ export function inspectActivityLog(activityLogText: string): ActivityLogInspecti
 
 /**
  * TS mirror of `dedicated_verification.has_verification_mode_record`:
- * true iff the activity log carries at least one entry with
- * `kind: "verification_mode"` and a recognized `choice`. Takes the raw
- * activity-log.json text (`null` when the file does not exist) so the
- * predicate stays pure; missing / unparseable / shapeless logs read as
- * "no record", matching the Python reader's tolerant posture. NOT the
- * Session 2 command gate (that is `inspectActivityLog` above, which is
- * broader and fail-loud per S062-S2-V1-001) — this parity helper exists
- * for callers that need the specific Set 057 capture signal.
+ * true iff the activity log carries at least one entry with a durable
+ * verification-mode kind (`verification_mode` — the Set 057 capture —
+ * or `verification_mode_change` — the Set 062 blessed transition) and a
+ * recognized `choice`. Takes the raw activity-log.json text (`null`
+ * when the file does not exist) so the predicate stays pure; missing /
+ * unparseable / shapeless logs read as "no record", matching the Python
+ * reader's tolerant posture. NOT the Session 2 command gate (that is
+ * `inspectActivityLog` above, which is broader and fail-loud per
+ * S062-S2-V1-001) — this parity helper exists for callers that need
+ * the durable-record signal.
  */
 export function verificationModeRecordExists(
   activityLogText: string | null | undefined,
@@ -217,7 +233,9 @@ export function verificationModeRecordExists(
     (e) =>
       e !== null &&
       typeof e === "object" &&
-      (e as { kind?: unknown }).kind === VERIFICATION_MODE_ENTRY_KIND &&
+      VERIFICATION_MODE_RECORD_KINDS.includes(
+        (e as { kind?: unknown }).kind as string,
+      ) &&
       VERIFICATION_MODES.includes((e as { choice?: unknown }).choice as VerificationMode),
   );
 }

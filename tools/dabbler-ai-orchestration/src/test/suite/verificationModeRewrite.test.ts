@@ -1,5 +1,6 @@
 import * as assert from "assert";
 import {
+  VERIFICATION_MODE_CHANGE_ENTRY_KIND,
   VERIFICATION_MODE_ENTRY_KIND,
   inspectActivityLog,
   rewriteSpecVerificationMode,
@@ -239,6 +240,26 @@ suite("verificationModeRewrite — verificationModeRecordExists (D3 durable-reco
       ],
     });
     assert.strictEqual(verificationModeRecordExists(log), true);
+  });
+
+  // Set 062 S3: the blessed transition record counts as a durable mode
+  // record (Python parity — has_verification_mode_record gained the
+  // same both-kinds recognition; the S3-audit F3 capture-idempotency
+  // fix depends on it).
+  test("a verification_mode_change entry is a durable record (S3 both-kinds parity)", () => {
+    assert.strictEqual(
+      verificationModeRecordExists(
+        record(VERIFICATION_MODE_CHANGE_ENTRY_KIND, "dedicated-sessions"),
+      ),
+      true,
+    );
+  });
+
+  test("a verification_mode_change entry with an unrecognized choice is not a record", () => {
+    assert.strictEqual(
+      verificationModeRecordExists(record(VERIFICATION_MODE_CHANGE_ENTRY_KIND, "yolo")),
+      false,
+    );
   });
 });
 

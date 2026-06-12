@@ -149,7 +149,7 @@ var require_ms = __commonJS({
 // node_modules/debug/src/common.js
 var require_common = __commonJS({
   "node_modules/debug/src/common.js"(exports2, module2) {
-    function setup(env8) {
+    function setup(env9) {
       createDebug.debug = createDebug;
       createDebug.default = createDebug;
       createDebug.coerce = coerce;
@@ -158,8 +158,8 @@ var require_common = __commonJS({
       createDebug.enabled = enabled;
       createDebug.humanize = require_ms();
       createDebug.destroy = destroy;
-      Object.keys(env8).forEach((key) => {
-        createDebug[key] = env8[key];
+      Object.keys(env9).forEach((key) => {
+        createDebug[key] = env9[key];
       });
       createDebug.names = [];
       createDebug.skips = [];
@@ -513,20 +513,20 @@ var require_supports_color = __commonJS({
     var os3 = require("os");
     var tty = require("tty");
     var hasFlag = require_has_flag();
-    var { env: env8 } = process;
+    var { env: env9 } = process;
     var forceColor;
     if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
       forceColor = 0;
     } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
       forceColor = 1;
     }
-    if ("FORCE_COLOR" in env8) {
-      if (env8.FORCE_COLOR === "true") {
+    if ("FORCE_COLOR" in env9) {
+      if (env9.FORCE_COLOR === "true") {
         forceColor = 1;
-      } else if (env8.FORCE_COLOR === "false") {
+      } else if (env9.FORCE_COLOR === "false") {
         forceColor = 0;
       } else {
-        forceColor = env8.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env8.FORCE_COLOR, 10), 3);
+        forceColor = env9.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env9.FORCE_COLOR, 10), 3);
       }
     }
     function translateLevel(level) {
@@ -554,7 +554,7 @@ var require_supports_color = __commonJS({
         return 0;
       }
       const min = forceColor || 0;
-      if (env8.TERM === "dumb") {
+      if (env9.TERM === "dumb") {
         return min;
       }
       if (process.platform === "win32") {
@@ -564,34 +564,34 @@ var require_supports_color = __commonJS({
         }
         return 1;
       }
-      if ("CI" in env8) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env8) || env8.CI_NAME === "codeship") {
+      if ("CI" in env9) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env9) || env9.CI_NAME === "codeship") {
           return 1;
         }
         return min;
       }
-      if ("TEAMCITY_VERSION" in env8) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env8.TEAMCITY_VERSION) ? 1 : 0;
+      if ("TEAMCITY_VERSION" in env9) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env9.TEAMCITY_VERSION) ? 1 : 0;
       }
-      if (env8.COLORTERM === "truecolor") {
+      if (env9.COLORTERM === "truecolor") {
         return 3;
       }
-      if ("TERM_PROGRAM" in env8) {
-        const version = parseInt((env8.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-        switch (env8.TERM_PROGRAM) {
+      if ("TERM_PROGRAM" in env9) {
+        const version = parseInt((env9.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env9.TERM_PROGRAM) {
           case "iTerm.app":
             return version >= 3 ? 3 : 2;
           case "Apple_Terminal":
             return 2;
         }
       }
-      if (/-256(color)?$/i.test(env8.TERM)) {
+      if (/-256(color)?$/i.test(env9.TERM)) {
         return 2;
       }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env8.TERM)) {
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env9.TERM)) {
         return 1;
       }
-      if ("COLORTERM" in env8) {
+      if ("COLORTERM" in env9) {
         return 1;
       }
       return min;
@@ -11060,20 +11060,20 @@ var require_compile = __commonJS({
     var util_1 = require_util();
     var validate_1 = require_validate();
     var SchemaEnv = class {
-      constructor(env8) {
+      constructor(env9) {
         var _a2;
         this.refs = {};
         this.dynamicAnchors = {};
         let schema;
-        if (typeof env8.schema == "object")
-          schema = env8.schema;
-        this.schema = env8.schema;
-        this.schemaId = env8.schemaId;
-        this.root = env8.root || this;
-        this.baseId = (_a2 = env8.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env8.schemaId || "$id"]);
-        this.schemaPath = env8.schemaPath;
-        this.localRefs = env8.localRefs;
-        this.meta = env8.meta;
+        if (typeof env9.schema == "object")
+          schema = env9.schema;
+        this.schema = env9.schema;
+        this.schemaId = env9.schemaId;
+        this.root = env9.root || this;
+        this.baseId = (_a2 = env9.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env9.schemaId || "$id"]);
+        this.schemaPath = env9.schemaPath;
+        this.localRefs = env9.localRefs;
+        this.meta = env9.meta;
         this.$async = schema === null || schema === void 0 ? void 0 : schema.$async;
         this.refs = {};
       }
@@ -11257,15 +11257,15 @@ var require_compile = __commonJS({
           baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
         }
       }
-      let env8;
+      let env9;
       if (typeof schema != "boolean" && schema.$ref && !(0, util_1.schemaHasRulesButRef)(schema, this.RULES)) {
         const $ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schema.$ref);
-        env8 = resolveSchema.call(this, root, $ref);
+        env9 = resolveSchema.call(this, root, $ref);
       }
       const { schemaId } = this.opts;
-      env8 = env8 || new SchemaEnv({ schema, schemaId, root, baseId });
-      if (env8.schema !== env8.root.schema)
-        return env8;
+      env9 = env9 || new SchemaEnv({ schema, schemaId, root, baseId });
+      if (env9.schema !== env9.root.schema)
+        return env9;
       return void 0;
     }
   }
@@ -12668,8 +12668,8 @@ var require_ref = __commonJS({
       schemaType: "string",
       code(cxt) {
         const { gen, schema: $ref, it } = cxt;
-        const { baseId, schemaEnv: env8, validateName, opts, self } = it;
-        const { root } = env8;
+        const { baseId, schemaEnv: env9, validateName, opts, self } = it;
+        const { root } = env9;
         if (($ref === "#" || $ref === "#/") && baseId === root.baseId)
           return callRootRef();
         const schOrEnv = compile_1.resolveRef.call(self, root, baseId, $ref);
@@ -12679,8 +12679,8 @@ var require_ref = __commonJS({
           return callValidate(schOrEnv);
         return inlineRefSchema(schOrEnv);
         function callRootRef() {
-          if (env8 === root)
-            return callRef(cxt, validateName, env8, env8.$async);
+          if (env9 === root)
+            return callRef(cxt, validateName, env9, env9.$async);
           const rootName = gen.scopeValue("root", { ref: root });
           return callRef(cxt, (0, codegen_1._)`${rootName}.validate`, root, root.$async);
         }
@@ -12710,14 +12710,14 @@ var require_ref = __commonJS({
     exports2.getValidate = getValidate;
     function callRef(cxt, v, sch, $async) {
       const { gen, it } = cxt;
-      const { allErrors, schemaEnv: env8, opts } = it;
+      const { allErrors, schemaEnv: env9, opts } = it;
       const passCxt = opts.passContext ? names_1.default.this : codegen_1.nil;
       if ($async)
         callAsyncRef();
       else
         callSyncRef();
       function callAsyncRef() {
-        if (!env8.$async)
+        if (!env9.$async)
           throw new Error("async schema referenced by sync schema");
         const valid = gen.let("valid");
         gen.try(() => {
@@ -16273,7 +16273,7 @@ var needsMigrationToV4 = (s) => s.needsMigration && s.migrationTargetSchemaVersi
 var hasUnsatisfiedPrereqs = (s) => inFlightLike(s) && s.unsatisfiedPrereqs.length > 0;
 var isNotStarted = (s) => s.state === "not-started";
 var kickoffEligible = (s) => s.config.tier === "lightweight" && s.config.verificationMode === "dedicated-sessions" && s.completedVerification === null && s.state !== "cancelled";
-var setupVerificationEligible = (s) => isNotStarted(s) && s.config.tier === "lightweight";
+var setupVerificationEligible = (s) => s.config.tier === "lightweight" && (isNotStarted(s) || isCompleteState(s) && s.config.verificationMode === "out-of-band-or-none");
 var showsOutOfBandMarker = (s) => s.verificationMarker === "v?";
 var ROW_ACTIONS = [
   // Open File ▸ submenu. L2 locks the four entries to: Spec, Activity
@@ -16349,9 +16349,9 @@ var ROW_ACTIONS = [
   // Set 061 S3 (spec D4): rewrite the spec's `tier:` value via a tier
   // QuickPick; not-started rows only. See commands/switchTier.ts.
   { id: "dabblerSessionSets.switchTier", label: "Switch Tier\u2026", group: 504, category: "flat", when: isNotStarted },
-  // Set 062 S2 (spec D3): rewrite the spec's `verificationMode:` seed
-  // via a confirmed QuickPick; not-started Lightweight rows only (the
-  // predicate widens to completed Mode-A rows in Session 3). See
+  // Set 062 S2+S3 (spec D3): not-started Lightweight rows get the
+  // confirmed spec-seed rewrite; completed Mode-A rows get the
+  // blessed-writer transition (A->B only). See
   // commands/setupVerification.ts.
   {
     id: "dabblerSessionSets.setupVerification",
@@ -16507,9 +16507,9 @@ var PROVIDER_KEY_VARS = [
   "OPENAI_API_KEY",
   "GEMINI_API_KEY"
 ];
-function providerKeyPresent(env8) {
+function providerKeyPresent(env9) {
   return PROVIDER_KEY_VARS.some((k2) => {
-    const v = env8[k2];
+    const v = env9[k2];
     return typeof v === "string" && v.trim().length > 0;
   });
 }
@@ -16518,10 +16518,10 @@ function selectExplorerMode(hasFolder, hasAnySets) {
     return "no-folder";
   return hasAnySets ? "list" : "getting-started";
 }
-function computeGettingStarted(hasFolder, root, hasAnySets, fsi, env8 = {}) {
+function computeGettingStarted(hasFolder, root, hasAnySets, fsi, env9 = {}) {
   const mode = selectExplorerMode(hasFolder, hasAnySets);
   const completion = mode === "getting-started" && root ? detectCompletion(root, fsi) : { structureBuilt: false, planPresent: false, sessionSetsPresent: false };
-  return { mode, ...completion, providerKeyPresent: providerKeyPresent(env8) };
+  return { mode, ...completion, providerKeyPresent: providerKeyPresent(env9) };
 }
 var nodeDetectionFs = {
   exists(p2) {
@@ -21187,8 +21187,8 @@ function abortPlugin(signal) {
 function blockUnsafeOperationsPlugin(options = {}) {
   return {
     type: "spawn.args",
-    action(args, { env: env8 }) {
-      for (const vulnerability of ne(args, env8)) {
+    action(args, { env: env9 }) {
+      for (const vulnerability of ne(args, env9)) {
         if (options[vulnerability.category] !== true) {
           throw new GitPluginError(void 0, "unsafe", vulnerability.message);
         }
@@ -26786,10 +26786,10 @@ ${msgs}`,
       "except Exception as e:",
       "  print(json.dumps({'ok': False, 'error': str(e)}))"
     ].join("\n");
-    const env8 = { ...process.env, PUSHOVER_API_KEY: apiKeyValue, PUSHOVER_USER_KEY: userKeyValue };
+    const env9 = { ...process.env, PUSHOVER_API_KEY: apiKeyValue, PUSHOVER_USER_KEY: userKeyValue };
     const child = cp4.spawn(pythonPath, ["-c", script], {
       cwd: path21.dirname(aiRouterDir),
-      env: env8,
+      env: env9,
       windowsHide: true
     });
     let stdout = "";
@@ -28100,9 +28100,9 @@ function rewriteSpecTier(specText, target) {
   return { text, changed: true, outcome: "rewritten", previousTier };
 }
 var ROUTER_CONFIG_REL2 = "ai_router/router-config.yaml";
-function switchToFullWarnings(routerConfigExists, env8) {
+function switchToFullWarnings(routerConfigExists, env9) {
   const warnings = [];
-  if (!providerKeyPresent(env8)) {
+  if (!providerKeyPresent(env9)) {
     warnings.push(
       "No provider API key (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY) is visible to VS Code \u2014 Full-tier routing needs at least one. Set a key, then reload the window."
     );
@@ -28191,16 +28191,12 @@ function registerSwitchTierCommand(context) {
 
 // src/commands/setupVerification.ts
 var vscode30 = __toESM(require("vscode"));
+var cp7 = __toESM(require("child_process"));
 var fs30 = __toESM(require("fs"));
 
 // src/utils/verificationModeRewrite.ts
 var CONFIG_BLOCK_RE2 = /(##\s*Session Set Configuration[\s\S]*?```ya?ml\s*)([\s\S]*?)(```)/i;
 var VERIFICATION_MODE_LINE_RE = /^([ \t]*verificationMode[ \t]*:[ \t]*)(?:"([\w-]+)"|'([\w-]+)'|([\w-]+))([ \t]*(?:#[^\r\n]*)?\r?)$/im;
-var VERIFICATION_MODES = [
-  "out-of-band-or-none",
-  "dedicated-sessions"
-];
-var VERIFICATION_MODE_ENTRY_KIND = "verification_mode";
 function rewriteSpecVerificationMode(specText, target) {
   const block = CONFIG_BLOCK_RE2.exec(specText);
   if (!block) {
@@ -28240,24 +28236,19 @@ function rewriteSpecVerificationMode(specText, target) {
   const text = specText.slice(0, lineStart) + rewrittenLine + specText.slice(lineEnd);
   return { text, changed: true, outcome: "rewritten", previousMode };
 }
-function verificationModeRecordExists(activityLogText) {
-  if (typeof activityLogText !== "string" || activityLogText.length === 0) {
-    return false;
-  }
+function inspectActivityLog(activityLogText) {
   let parsed;
   try {
     parsed = JSON.parse(activityLogText);
   } catch {
-    return false;
+    return "unreadable";
   }
   if (parsed === null || typeof parsed !== "object")
-    return false;
+    return "unreadable";
   const entries = parsed.entries;
   if (!Array.isArray(entries))
-    return false;
-  return entries.some(
-    (e) => e !== null && typeof e === "object" && e.kind === VERIFICATION_MODE_ENTRY_KIND && VERIFICATION_MODES.includes(e.choice)
-  );
+    return "unreadable";
+  return entries.length > 0 ? "has-records" : "no-records";
 }
 
 // src/commands/setupVerification.ts
@@ -28296,6 +28287,140 @@ function buildConfirmationItems(target) {
     { label: "Cancel", confirmed: false }
   ];
 }
+var CHANGE_WRITER_MODULE = "ai_router.change_verification_mode";
+function buildChangeWriterArgs(setDir) {
+  return ["-m", CHANGE_WRITER_MODULE, setDir, "--json"];
+}
+function parseChangeWriterOutput(stdout) {
+  let data;
+  try {
+    data = JSON.parse(stdout.trim());
+  } catch {
+    return null;
+  }
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    return null;
+  }
+  const obj = data;
+  if (typeof obj.ok !== "boolean" || typeof obj.code !== "string" || typeof obj.reason !== "string") {
+    return null;
+  }
+  return { ok: obj.ok, code: obj.code, reason: obj.reason };
+}
+function runChangeWriter(pythonPath, setDir, cwd) {
+  return new Promise((resolve4) => {
+    const child = cp7.spawn(pythonPath, buildChangeWriterArgs(setDir), {
+      cwd,
+      windowsHide: true
+    });
+    let stdout = "";
+    let stderr = "";
+    let spawnErrored = false;
+    child.stdout?.on("data", (c3) => stdout += c3.toString("utf8"));
+    child.stderr?.on("data", (c3) => stderr += c3.toString("utf8"));
+    child.on("error", (err) => {
+      spawnErrored = true;
+      resolve4({
+        ok: false,
+        code: "spawn-error",
+        reason: `could not spawn Python (${err.message}) \u2014 install Python / create the workspace .venv, or set dabblerSessionSets.pythonPath.`
+      });
+    });
+    child.on("close", (exitCode) => {
+      if (spawnErrored)
+        return;
+      const parsed = parseChangeWriterOutput(stdout);
+      if (parsed) {
+        resolve4(parsed);
+        return;
+      }
+      if (isAiRouterNotInstalled(stderr)) {
+        resolve4({
+          ok: false,
+          code: "router-not-installed",
+          reason: describeAiRouterImportFailure(pythonPath)
+        });
+        return;
+      }
+      resolve4({
+        ok: false,
+        code: "writer-error",
+        reason: (stderr.trim() || stdout.trim() || `exit ${exitCode}`).slice(
+          0,
+          400
+        )
+      });
+    });
+  });
+}
+async function applyCompletedSetTransition(set, pythonPath, deps) {
+  const result = await deps.runWriter(pythonPath, set.dir, set.root);
+  if (!result.ok) {
+    if (result.code.startsWith("refused-")) {
+      deps.showInfo(
+        `Verification mode not changed (${result.code}): ${result.reason}`
+      );
+      return "refused";
+    }
+    deps.showError(
+      `Verification mode not changed \u2014 the blessed writer did not run (${result.code}): ${result.reason}`
+    );
+    return "writer-unavailable";
+  }
+  let seedAligned = false;
+  try {
+    const specText = deps.readFile(set.specPath);
+    const rewrite = rewriteSpecVerificationMode(specText, "dedicated-sessions");
+    if (rewrite.outcome === "already-target") {
+      seedAligned = true;
+    } else if (rewrite.outcome === "rewritten") {
+      deps.writeFile(set.specPath, rewrite.text);
+      seedAligned = true;
+    }
+  } catch {
+    seedAligned = false;
+  }
+  await deps.copyToClipboard(buildVerificationKickoffPrompt(set));
+  deps.refresh();
+  if (seedAligned) {
+    deps.showInfo(
+      "verificationMode \u2192 dedicated-sessions. Kickoff prompt copied \u2014 paste it to your AI agent."
+    );
+    return "changed";
+  }
+  deps.showWarning(
+    "verificationMode \u2192 dedicated-sessions (recorded), but spec.md's seed could not be updated \u2014 set `verificationMode: dedicated-sessions` in the Session Set Configuration block by hand so the Explorer matches the record. Kickoff prompt copied."
+  );
+  return "changed-seed-misaligned";
+}
+function realCompletedSetDeps() {
+  return {
+    runWriter: runChangeWriter,
+    readFile: (p2) => fs30.readFileSync(p2, "utf8"),
+    writeFile: (p2, text) => fs30.writeFileSync(p2, text, "utf8"),
+    copyToClipboard: (text) => Promise.resolve(vscode30.env.clipboard.writeText(text)),
+    showInfo: (m) => void vscode30.window.showInformationMessage(m),
+    showWarning: (m) => void vscode30.window.showWarningMessage(m),
+    showError: (m) => void vscode30.window.showErrorMessage(m),
+    refresh: () => void vscode30.commands.executeCommand("dabblerSessionSets.refresh")
+  };
+}
+async function setupVerificationOnCompletedSet(set) {
+  const confirmation = await vscode30.window.showQuickPick(
+    buildConfirmationItems("dedicated-sessions"),
+    {
+      placeHolder: `Enable dedicated verification for "${set.name}"? The transition is recorded by the blessed writer.`,
+      ignoreFocusOut: true
+    }
+  );
+  if (!confirmation?.confirmed)
+    return;
+  await applyCompletedSetTransition(
+    set,
+    resolvePythonInterpreter(set.root),
+    realCompletedSetDeps()
+  );
+}
 async function setupVerification(set) {
   if (set.config.tier !== "lightweight") {
     vscode30.window.showInformationMessage(
@@ -28303,25 +28428,42 @@ async function setupVerification(set) {
     );
     return;
   }
+  if (set.state === "complete") {
+    if (set.config.verificationMode === "dedicated-sessions") {
+      vscode30.window.showInformationMessage(
+        `"${set.name}" already uses dedicated-sessions verification \u2014 use the Verification Kickoff prompt to hand the typed flow to an agent.`
+      );
+      return;
+    }
+    await setupVerificationOnCompletedSet(set);
+    return;
+  }
   if (set.state !== "not-started") {
     vscode30.window.showInformationMessage(
-      `"${set.name}" has already started \u2014 the verification-mode seed can only be rewritten on a not-started set.`
+      `"${set.name}" is ${set.state} \u2014 dedicated verification is set up on a not-started set (seed rewrite) or a completed set (recorded transition). In-flight sets are excluded deliberately.`
     );
     return;
   }
-  let activityLogText = null;
-  try {
-    if (fs30.existsSync(set.activityPath)) {
+  if (fs30.existsSync(set.activityPath)) {
+    let activityLogText = null;
+    try {
       activityLogText = fs30.readFileSync(set.activityPath, "utf8");
+    } catch {
+      activityLogText = null;
     }
-  } catch {
-    activityLogText = null;
-  }
-  if (verificationModeRecordExists(activityLogText)) {
-    vscode30.window.showInformationMessage(
-      `"${set.name}" already has a durable verification-mode record in its activity log \u2014 the spec seed is no longer the authority, so the mode cannot be changed from here.`
-    );
-    return;
+    const inspection = activityLogText === null ? "unreadable" : inspectActivityLog(activityLogText);
+    if (inspection === "unreadable") {
+      vscode30.window.showErrorMessage(
+        `Could not inspect "${set.name}"'s activity log (${set.activityPath}) \u2014 refusing to change the verification mode while the set's history is unreadable.`
+      );
+      return;
+    }
+    if (inspection === "has-records") {
+      vscode30.window.showInformationMessage(
+        `"${set.name}" already has activity-log history \u2014 the verification-mode seed is no longer safely rewritable from here.`
+      );
+      return;
+    }
   }
   const current = set.config.verificationMode;
   const picked = await vscode30.window.showQuickPick(buildModePickItems(current), {
@@ -28381,7 +28523,7 @@ function registerSetupVerificationCommand(context) {
       (item) => {
         if (!item?.set) {
           vscode30.window.showInformationMessage(
-            "Set Up Dedicated Verification\u2026 is available from a not-started Lightweight session-set row's context menu."
+            "Set Up Dedicated Verification\u2026 is available from a not-started or completed Lightweight session-set row's context menu."
           );
           return;
         }

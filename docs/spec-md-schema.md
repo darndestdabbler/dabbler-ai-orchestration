@@ -132,7 +132,10 @@ content-aware close-out gate. The field is **inert on Full tier**
 (which always runs automatic, rule-based cross-provider verification);
 it is written for shape uniformity but the router ignores it there.
 The field only *seeds* the choice — the durable record is an
-`activity-log.json` entry written once at set start. See
+`activity-log.json` entry written once at set start, superseded later
+only by the sanctioned A→B blessed writer
+(`python -m ai_router.change_verification_mode`, Set 062; a spec edit
+alone never changes a started set's effective mode). See
 [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md)
 → *Field semantics* for the seeding/recording contract.
 

@@ -1,0 +1,6 @@
+```json
+{
+  "verdict": "VERIFIED",
+  "issues": []
+}
+```

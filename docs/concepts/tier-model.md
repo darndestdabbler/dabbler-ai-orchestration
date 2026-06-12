@@ -81,7 +81,10 @@ three engine files, `start-here.md`, the templated `spec.md`) is identical.
   provider reviews the work; the verdict is recorded; issues are remediated).
 - **Lightweight** makes **zero metered API calls**, so the router cannot
   auto-verify. Verification on Lightweight is **per-set, not per-session**,
-  and follows the `verificationMode` chosen once at set start (Set 057):
+  and follows the `verificationMode` chosen once at set start (Set 057;
+  a completed Mode-A set can opt in later through the sanctioned A→B
+  blessed writer `python -m ai_router.change_verification_mode`,
+  Set 062):
   - **`out-of-band-or-none`** (the default) — the operator pastes a copyable
     review prompt into a *different* path-aware AI assistant and records the
     verdict by hand in `external-verification.md`, **or** opts out entirely

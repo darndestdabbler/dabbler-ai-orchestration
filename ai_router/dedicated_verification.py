@@ -77,6 +77,19 @@ DEFAULT_VERIFICATION_MODE = VERIFICATION_MODE_OUT_OF_BAND
 # ``suggestion_disposition`` so the dedicated-verification choice never
 # overloads the UAT/E2E choice enum.
 VERIFICATION_MODE_ENTRY_KIND = "verification_mode"
+# Set 062 (D4): the blessed-writer transition record. A superseding
+# entry appended by :func:`change_verification_mode` when a completed
+# Mode-A set opts in to dedicated verification (A->B only). Kept as its
+# own ``kind`` so the once-at-set-start capture record and the sanctioned
+# later transition stay distinguishable in the audit trail.
+VERIFICATION_MODE_CHANGE_ENTRY_KIND = "verification_mode_change"
+# The kinds that carry a durable verification-mode ``choice``. Order in
+# the activity log (NOT kind priority) decides precedence: the last
+# valid entry of either kind wins in :func:`read_verification_mode`.
+_VERIFICATION_MODE_RECORD_KINDS = (
+    VERIFICATION_MODE_ENTRY_KIND,
+    VERIFICATION_MODE_CHANGE_ENTRY_KIND,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -139,15 +152,19 @@ def read_verification_mode(session_set_dir: str | Path) -> str:
     """Return the durable ``verificationMode`` record, or the default.
 
     Walks ``activity-log.json`` for entries with
-    ``kind == "verification_mode"`` and returns the most recent valid
-    ``choice``. Returns :data:`DEFAULT_VERIFICATION_MODE`
-    (``out-of-band-or-none``) when no record exists or on any read error —
-    the feature is opt-in, so "not recorded" means current behavior.
+    ``kind == "verification_mode"`` (the Set 057 once-at-set-start
+    capture) or ``kind == "verification_mode_change"`` (the Set 062
+    blessed transition record) and returns the most recent valid
+    ``choice`` — the last valid entry of either kind in file order wins,
+    so a sanctioned A->B transition supersedes the original capture.
+    Returns :data:`DEFAULT_VERIFICATION_MODE` (``out-of-band-or-none``)
+    when no record exists or on any read error — the feature is opt-in,
+    so "not recorded" means current behavior.
 
     Note: an optional spec-config ``verificationMode`` field may seed the
     operator prompt's default (Set 057 Q5), but it is NOT the durable
-    record — only the activity-log entry is. This reader intentionally
-    consults the durable record only.
+    record — only the activity-log entries are. This reader intentionally
+    consults the durable records only.
     """
     log_path = Path(session_set_dir) / "activity-log.json"
     if not log_path.exists():
@@ -159,7 +176,7 @@ def read_verification_mode(session_set_dir: str | Path) -> str:
         return DEFAULT_VERIFICATION_MODE
     chosen = DEFAULT_VERIFICATION_MODE
     for entry in log.get("entries", []):
-        if entry.get("kind") != VERIFICATION_MODE_ENTRY_KIND:
+        if entry.get("kind") not in _VERIFICATION_MODE_RECORD_KINDS:
             continue
         choice = entry.get("choice")
         if choice in VERIFICATION_MODES:
@@ -199,13 +216,18 @@ def read_spec_verification_mode(session_set_dir: str | Path) -> Optional[str]:
 
 
 def has_verification_mode_record(session_set_dir: str | Path) -> bool:
-    """Return True iff a durable ``verification_mode`` entry already exists.
+    """Return True iff a durable verification-mode record already exists.
 
-    Used by the start-of-set capture wiring to make recording idempotent:
-    the seed-from-spec path records only when the operator has not already
-    chosen a mode (a later explicit ``--verification-mode`` always records
-    a fresh entry and wins because :func:`read_verification_mode` returns
-    the most recent valid choice).
+    Counts both record kinds — the Set 057 ``verification_mode`` capture
+    AND the Set 062 ``verification_mode_change`` blessed transition. Used
+    by the start-of-set capture wiring to make recording idempotent: the
+    seed-from-spec path records only when no durable choice exists yet.
+    Recognizing the change record here is load-bearing (Set 062 S3 audit
+    F3): the capture runs on *every* ``start_session`` — including the
+    typed-session starts that follow a blessed A->B transition on a set
+    that never recorded an original capture — and a re-recorded stale
+    spec seed appended *after* the change record would silently revert
+    the transition under the reader's last-valid-entry-wins rule.
     """
     log_path = Path(session_set_dir) / "activity-log.json"
     if not log_path.exists():
@@ -216,7 +238,7 @@ def has_verification_mode_record(session_set_dir: str | Path) -> bool:
     except (OSError, json.JSONDecodeError):
         return False
     return any(
-        entry.get("kind") == VERIFICATION_MODE_ENTRY_KIND
+        entry.get("kind") in _VERIFICATION_MODE_RECORD_KINDS
         and entry.get("choice") in VERIFICATION_MODES
         for entry in log.get("entries", [])
     )
@@ -344,6 +366,11 @@ def record_verification_mode(
         "choice": mode,
     }
     entries.append(entry)
+    _write_activity_log_atomic(log_path, log)
+
+
+def _write_activity_log_atomic(log_path: Path, log: dict) -> None:
+    """Atomic temp-file-rename write of ``activity-log.json``."""
     log_dir = log_path.parent
     fd, tmp_path = tempfile.mkstemp(suffix=".activity-log.tmp", dir=str(log_dir))
     try:
@@ -357,6 +384,260 @@ def record_verification_mode(
         except OSError:
             pass
         raise
+
+
+# ---------------------------------------------------------------------------
+# Sanctioned A->B transition writer (Set 062 D4)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class VerificationModeChangeResult:
+    """Outcome of :func:`change_verification_mode`.
+
+    ``ok`` is True only when the transition record was appended. ``code``
+    is a stable machine token (``"changed"`` on success; a ``refused-*``
+    token naming the failed gate otherwise) so CLI/extension consumers can
+    branch without parsing prose. ``reason`` is the operator-facing
+    explanation; ``record`` carries the appended entry on success.
+    """
+
+    ok: bool
+    code: str
+    reason: str
+    record: Optional[dict] = None
+
+
+def _refuse(code: str, reason: str) -> VerificationModeChangeResult:
+    return VerificationModeChangeResult(ok=False, code=code, reason=reason)
+
+
+def change_verification_mode(
+    session_set_dir: str | Path,
+    *,
+    target_mode: str = VERIFICATION_MODE_DEDICATED,
+) -> VerificationModeChangeResult:
+    """Append a sanctioned ``verification_mode_change`` record (Set 062 D4).
+
+    The blessed writer for the Mode A -> Mode B transition on a set that
+    has already started (the not-started seed rewrite stays the
+    extension's spec-edit path). The transition is **recorded, not snuck
+    past** the Set 057 capture: A->B is purely additive — work sessions
+    execute identically under both modes; the mode only governs whether
+    typed sessions are appended afterward — so a superseding activity-log
+    record preserves the reason the capture is immutable while making the
+    opt-in auditable. :func:`read_verification_mode` honors the latest
+    record, so the Q6 close-out gate, the seven-state derivation, and the
+    cross-provider validator all follow the transition with no other
+    write.
+
+    Gates (fail loud, checked in order, nothing written on refusal):
+
+    1. ``target_mode`` must be ``dedicated-sessions`` — A->B only; B->A
+       is refused unconditionally (and is structurally unreachable
+       besides: this writer never records ``out-of-band-or-none``).
+    2. The set directory must exist and carry a parseable ``spec.md``
+       declaring ``tier: lightweight`` (the mode machinery is inert on
+       Full tier). An unconfirmable tier refuses — fail closed.
+    3. An existing-but-unreadable ``activity-log.json`` refuses (the
+       record's home is uninspectable; the S2 verifier's fail-loud
+       lesson). A *missing* log is created minimal on success — the
+       implicit-default Mode A population never recorded anything.
+    4. The effective recorded mode must be ``out-of-band-or-none``.
+    5. No ``type: verification``/``remediation`` session may exist in the
+       ledger and no session may be in flight (``session-state.json``
+       must be readable to confirm both — fail closed otherwise).
+
+    Returns a :class:`VerificationModeChangeResult`; never raises for a
+    gate refusal. ``python -m ai_router.change_verification_mode`` is the
+    CLI wrapper (the engine-agnostic entry point for Copilot/Codex/Gemini
+    flows and the extension's spawn target).
+    """
+    # Gate 1 — direction. B->A is refused after any record exists by
+    # design lock; this writer refuses it always (the not-started seed
+    # rewrite is the only sanctioned B->A surface, and only while no
+    # record exists).
+    if target_mode != VERIFICATION_MODE_DEDICATED:
+        return _refuse(
+            "refused-target-mode",
+            f"target mode {target_mode!r} is not allowed: the sanctioned "
+            "transition is out-of-band-or-none -> dedicated-sessions only "
+            "(A->B). B->A is never recorded by the blessed writer.",
+        )
+
+    set_dir = Path(session_set_dir)
+    spec_path = set_dir / "spec.md"
+    # Gate 2 — a real Lightweight session set.
+    if not set_dir.is_dir() or not spec_path.is_file():
+        return _refuse(
+            "refused-no-session-set",
+            f"{set_dir} is not a session-set directory (missing dir or "
+            "spec.md).",
+        )
+    tier: Optional[str] = None
+    try:
+        # Set 048 S5 bare-import lesson + static guard: never a bare
+        # `from spec_config import …` (works only under the test
+        # sys.path shim; ModuleNotFoundError under pip-install). The
+        # relative form covers package use; the absolute form covers
+        # this module being imported by bare filename (the test
+        # convention), where relative imports have no parent package.
+        try:
+            from .spec_config import parse_session_set_config
+        except ImportError:  # pragma: no cover - import shim
+            from ai_router.spec_config import (  # type: ignore[no-redef]
+                parse_session_set_config,
+            )
+
+        tier = parse_session_set_config(spec_path).tier
+    except Exception:
+        tier = None
+    if tier != "lightweight":
+        detail = (
+            f"spec.md declares tier: {tier}"
+            if tier is not None
+            else "spec.md's tier cannot be confirmed (unparseable config)"
+        )
+        return _refuse(
+            "refused-not-lightweight",
+            f"{detail}; verificationMode governs Lightweight verification "
+            "only, so the transition writer refuses (fail closed).",
+        )
+
+    # Gate 3 — the record's home must be inspectable when it exists.
+    log_path = set_dir / "activity-log.json"
+    log: Optional[dict] = None
+    if log_path.exists():
+        try:
+            with log_path.open("r", encoding="utf-8") as f:
+                loaded = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            loaded = None
+        if not isinstance(loaded, dict) or not isinstance(
+            loaded.get("entries", []), list
+        ):
+            return _refuse(
+                "refused-activity-log-unreadable",
+                f"{log_path} exists but cannot be read/parsed; refusing to "
+                "record a mode transition while the set's history is "
+                "uninspectable (fail loud).",
+            )
+        log = loaded
+
+    # Gate 4 — effective recorded mode must still be Mode A.
+    effective = read_verification_mode(set_dir)
+    if effective != VERIFICATION_MODE_OUT_OF_BAND:
+        return _refuse(
+            "refused-already-dedicated",
+            "the durable record already says dedicated-sessions — there is "
+            "nothing to transition. If spec.md still reads "
+            "out-of-band-or-none, align the seed to dedicated-sessions so "
+            "the Explorer (which reads the spec) matches the record.",
+        )
+
+    # Gate 5 — ledger gates: no typed sessions, nothing in flight.
+    state_path = set_dir / "session-state.json"
+    if not state_path.is_file():
+        return _refuse(
+            "refused-state-unreadable",
+            f"{state_path} not found; cannot confirm the no-typed-sessions "
+            "and nothing-in-flight gates (fail closed).",
+        )
+    try:
+        with state_path.open("r", encoding="utf-8") as f:
+            raw_state = json.load(f)
+        normalized = normalize_to_v4_shape(raw_state, spec_path)
+    except Exception:
+        return _refuse(
+            "refused-state-unreadable",
+            f"{state_path} cannot be read/normalized; cannot confirm the "
+            "no-typed-sessions and nothing-in-flight gates (fail closed).",
+        )
+    sessions = normalized.get("sessions") or []
+    typed = [
+        s
+        for s in sessions
+        if isinstance(s, dict) and _session_type(s) != SESSION_TYPE_WORK
+    ]
+    if typed:
+        numbers = ", ".join(str(s.get("number")) for s in typed)
+        return _refuse(
+            "refused-typed-session-exists",
+            f"the ledger already carries typed session(s) ({numbers}) — "
+            "the dedicated flow is already in motion; there is nothing to "
+            "transition.",
+        )
+    in_flight = any(
+        isinstance(s, dict) and s.get("status") == SESSION_STATUS_IN_PROGRESS
+        for s in sessions
+    )
+    # Plan-less carve-out: no sessions[] ledger but a top-level
+    # in-progress status IS an in-flight session.
+    if not sessions and normalized.get("status") == SESSION_STATUS_IN_PROGRESS:
+        in_flight = True
+    if in_flight:
+        return _refuse(
+            "refused-session-in-flight",
+            "a session is in flight; the mode transition contends with a "
+            "running session — close it first, then re-run.",
+        )
+
+    # All gates pass — append the superseding record (atomic write).
+    if log is None:
+        log = {
+            "sessionSetName": set_dir.name,
+            "createdDate": _now_iso_utc(),
+            "totalSessions": 0,
+            "entries": [],
+        }
+    entries = log.setdefault("entries", [])
+    completed_numbers = [
+        s.get("number")
+        for s in sessions
+        if isinstance(s, dict)
+        and s.get("status") == SESSION_STATUS_COMPLETE
+        and isinstance(s.get("number"), int)
+    ]
+    session_number = max(completed_numbers, default=0)
+    step_number = (
+        max(
+            (
+                int(e.get("stepNumber", 0))
+                for e in entries
+                if e.get("sessionNumber") == session_number
+            ),
+            default=0,
+        )
+        + 1
+    )
+    entry = {
+        "sessionNumber": session_number,
+        "stepNumber": step_number,
+        "stepKey": f"session-{session_number:03d}/verification-mode-change",
+        "dateTime": _now_iso_utc(),
+        "description": (
+            "Blessed writer recorded verificationMode transition: "
+            "out-of-band-or-none -> dedicated-sessions (A->B, additive; "
+            "typed sessions may now be appended and the dedicated-sessions "
+            "close-out gate applies)."
+        ),
+        "status": "complete",
+        "routedApiCalls": [],
+        "kind": VERIFICATION_MODE_CHANGE_ENTRY_KIND,
+        "choice": target_mode,
+        "previousMode": VERIFICATION_MODE_OUT_OF_BAND,
+    }
+    entries.append(entry)
+    _write_activity_log_atomic(log_path, log)
+    return VerificationModeChangeResult(
+        ok=True,
+        code="changed",
+        reason=(
+            "verificationMode transition recorded: out-of-band-or-none -> "
+            "dedicated-sessions."
+        ),
+        record=entry,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -835,6 +1116,7 @@ __all__ = [
     "VERIFICATION_MODES",
     "DEFAULT_VERIFICATION_MODE",
     "VERIFICATION_MODE_ENTRY_KIND",
+    "VERIFICATION_MODE_CHANGE_ENTRY_KIND",
     "STATE_WORK_IN_PROGRESS",
     "STATE_AWAITING_VERIFICATION",
     "STATE_AWAITING_REMEDIATION",
@@ -844,6 +1126,8 @@ __all__ = [
     "STATE_CLOSED_NO_VERIFICATION",
     "WORKFLOW_STATES",
     "DedicatedVerificationResult",
+    "VerificationModeChangeResult",
+    "change_verification_mode",
     "read_verification_mode",
     "record_verification_mode",
     "read_spec_verification_mode",

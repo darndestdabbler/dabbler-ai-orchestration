@@ -93,15 +93,22 @@ const kickoffEligible = (s: SessionSet): boolean =>
   s.completedVerification === null &&
   s.state !== "cancelled";
 
-// Set 062 S2 (spec D3): the verification-mode seed rewrite is offered
-// on not-started Lightweight rows ONLY at this session (no durable
-// record exists yet, so the spec seed is the authority — mirrors
-// `Switch Tier…`; the handler also guards against a stray activity-log
-// record). Both directions are legal here, so the gate is
-// mode-agnostic. Session 3 widens the predicate to completed Mode-A
-// rows through the blessed Python writer.
+// Set 062 S2+S3 (spec D3): `Set Up Dedicated Verification…` is offered
+// on Lightweight rows in exactly two states:
+//   - not-started (S2): no durable record exists yet, so the spec seed
+//     is the authority — the handler rewrites it byte-preservingly
+//     (mirrors `Switch Tier…`; both directions legal; the handler also
+//     guards against a stray activity-log record).
+//   - complete Mode-A (S3): the realistic "I finished the work, now I
+//     want it verified" case — the handler routes through the blessed
+//     Python writer (`ai_router.change_verification_mode`), A->B only.
+// `in-progress` is excluded deliberately (contention with a running
+// session; verification is not yet due) and completed Mode-B rows have
+// nothing to set up (the kickoff prompt is their affordance).
 const setupVerificationEligible = (s: SessionSet): boolean =>
-  isNotStarted(s) && s.config.tier === "lightweight";
+  s.config.tier === "lightweight" &&
+  (isNotStarted(s) ||
+    (isCompleteState(s) && s.config.verificationMode === "out-of-band-or-none"));
 
 // Set 062 S2 (spec step 4): the sanctioned out-of-band recording path,
 // surfaced exactly where the `v?` marker renders (completed Mode-A
@@ -169,9 +176,9 @@ export const ROW_ACTIONS: RowAction[] = [
   // Set 061 S3 (spec D4): rewrite the spec's `tier:` value via a tier
   // QuickPick; not-started rows only. See commands/switchTier.ts.
   { id: "dabblerSessionSets.switchTier",        label: "Switch Tier…",                 group: 504, category: "flat", when: isNotStarted },
-  // Set 062 S2 (spec D3): rewrite the spec's `verificationMode:` seed
-  // via a confirmed QuickPick; not-started Lightweight rows only (the
-  // predicate widens to completed Mode-A rows in Session 3). See
+  // Set 062 S2+S3 (spec D3): not-started Lightweight rows get the
+  // confirmed spec-seed rewrite; completed Mode-A rows get the
+  // blessed-writer transition (A->B only). See
   // commands/setupVerification.ts.
   { id: "dabblerSessionSets.setupVerification", label: "Set Up Dedicated Verification…", group: 505, category: "flat",
     when: setupVerificationEligible },

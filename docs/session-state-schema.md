@@ -255,6 +255,15 @@ Key rules:
   (`validate_dedicated_verification`); the seven workflow states are
   derived from `type` + verdicts + the latest `sN-issues.json` by
   `derive_workflow_state` (Set 057 Q3 — derived, never persisted).
+- Whether the dedicated flow applies is governed by the durable
+  verification-mode record in `activity-log.json`: the Set 057
+  once-at-set-start capture (`kind: "verification_mode"`) or the Set 062
+  sanctioned A→B transition (`kind: "verification_mode_change"`,
+  appended only by `python -m ai_router.change_verification_mode` on a
+  Lightweight Mode-A set with no typed sessions and nothing in flight —
+  B→A is refused). The read path honors the latest record of either
+  kind; see `docs/ai-led-session-workflow.md` → *Sanctioned Mode A →
+  Mode B transition*.
 
 The migration from v3 reorganized the lifecycle so that **per-session
 attribution survives the set's full lifetime**: who ran each session

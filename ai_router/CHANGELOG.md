@@ -5,6 +5,44 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added (Set 062 S3 — sanctioned Mode A -> Mode B transition)
+
+- **`python -m ai_router.change_verification_mode <session-set-dir-or-slug>`**
+  — the blessed writer for the sanctioned `out-of-band-or-none` ->
+  `dedicated-sessions` transition on a Lightweight set that has already
+  started (Set 062 D4). Appends a superseding
+  `kind: "verification_mode_change"` record to `activity-log.json`,
+  gated fail-loud: Lightweight tier; effective recorded mode
+  `out-of-band-or-none`; no `type: verification`/`remediation` session
+  in the ledger; nothing in flight; target `dedicated-sessions` only
+  (A->B — B->A is refused; the locked rationale: A->B is purely
+  additive, so it does not violate why the Set 057 capture is
+  immutable, but it must be **recorded, not snuck past** the capture).
+  Exit 0 on success, 3 on gate refusal; `--json` emits a machine
+  envelope (`{ok, code, reason, record}`) for programmatic consumers
+  (the VS Code extension's `Set Up Dedicated Verification…` action on
+  completed Mode-A rows spawns this CLI).
+- **`dedicated_verification.change_verification_mode(...)`** /
+  **`VerificationModeChangeResult`** — the library surface behind the
+  CLI, with stable `refused-*` reason codes per gate.
+- **`VERIFICATION_MODE_CHANGE_ENTRY_KIND`** (`"verification_mode_change"`)
+  — the new activity-log record kind.
+
+### Changed
+
+- **`read_verification_mode(...)`** now honors the latest valid record
+  of either kind (`verification_mode` or `verification_mode_change`,
+  file order, last wins) — so the Q6 set-terminal close gate, the
+  seven-state derivation, and the content-aware validator all follow a
+  sanctioned transition with no other change. (`start_session --type …`
+  never reads the mode — audited empirically in Set 062 S3 — so typed
+  sessions work immediately after the transition.)
+- **`has_verification_mode_record(...)`** recognizes both kinds, so the
+  once-at-set-start capture stays a no-op after a blessed transition —
+  closing the audit-found hazard where a later `start_session` on a set
+  whose only record is a `verification_mode_change` could re-record a
+  stale spec seed after it and silently revert the transition.
+
 ## [0.16.0] — 2026-06-05 (Set 057 — Lightweight dedicated verification sessions)
 
 Replaces the Lightweight tier's semi-manual copy/paste review-prompt step

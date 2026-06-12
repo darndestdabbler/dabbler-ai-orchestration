@@ -60,10 +60,13 @@ high
 | 4 | Documentation | t2 |
 | 5 | Tests | t3 |
 ### Actuals (filled after the session)
-- Orchestrator used:
-- Total routed cost:
-- Deviations from recommendation:
-- Notes for next-session calibration:
+- Orchestrator used: claude-code claude-fable-5 @ effort=high
+- Total routed cost: $0.4046 (session-verification gpt-5-4: R1 $0.2928 ISSUES_FOUND → R2 narrow re-verify $0.1086 VERIFIED; + $0.0032 gemini-pro analysis for the Session 4 recommendation refresh)
+- Deviations from recommendation: orchestrator was fable-5/high, not opus-4-8/high (same holder as Sessions 1–2 picked the set back up; effort matched). Implementation again routed $0 — the t2/t3 step-table routing did not apply (orchestrator-direct Python + TS work).
+- Notes for next-session calibration: feeding the verifier the locked-design excerpts surfaced findings again (R1: 1 Critical + 1 Major + 1 Minor) — but the Critical and Minor were context gaps, not defects: the Critical hypothesized an attack through UNCHANGED code (the Set 057 capture-immutability check) that the diff-only context didn't show, and was disproven by an executed minimal repro then pinned as a regression test. Calibration: when a design hinges on unchanged gate-adjacent code, include those function bodies alongside the diff in R1 — it would have saved a round. The Major (missing invocation/fallback-path tests) was real and is the second straight session where the verifier caught a too-narrow test surface; budget for branch-matrix tests up front.
+
+**Next-session orchestrator recommendation (Session 4):**
+gpt-5-4 (openai gpt-5.4) @ effort=high — REVISED from the set-start gemini-2.5-pro/medium recommendation by routed gemini-pro analysis at S3 close ($0.0032). Rationale (routed): Session 4's success condition is exact conformance of many fixture files to strict schema validators and drift guards, not raw content generation; gpt-5-4 demonstrated the strongest grasp of the project's invariants across Sessions 2–3 as the verifier, so cost-priority gives way to conformance-priority.
 
 ## Session 4: Hello-world UAT fixture workspace
 ### Recommended orchestrator

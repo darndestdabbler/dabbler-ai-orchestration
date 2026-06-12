@@ -1502,6 +1502,47 @@ it, in precedence order:
 log entry, and the workflow states below are **derived**, never stored
 (Set 057 Q3; see "Derived workflow states").
 
+**Sanctioned Mode A → Mode B transition (Set 062).** The capture above
+is immutable — but a completed Mode-A set may still opt in to dedicated
+verification through one blessed path:
+
+```
+python -m ai_router.change_verification_mode docs/session-sets/<slug>
+```
+
+The writer appends a **superseding** `kind: "verification_mode_change"`
+record to `activity-log.json`, and the mode-resolution read path
+(`dedicated_verification.read_verification_mode`) honors the latest
+record of either kind — so the Q6 close-out gate, the seven-state
+derivation, and the content-aware validator all follow the transition.
+The locked rationale: **A→B is purely additive** — work sessions execute
+identically under both modes; the mode only governs whether typed
+sessions are appended afterward — so the transition does not violate the
+reason the Set 057 capture is immutable, but it must be **recorded, not
+snuck past** the capture (a spec-seed edit alone is ignored by Python
+and honored only by the Explorer — exactly the silent drift the blessed
+writer exists to prevent). The gates, all fail-loud and checked before
+any write:
+
+- the set is **Lightweight** (the mode machinery is inert on Full);
+- the effective recorded mode is **`out-of-band-or-none`**;
+- **no `type: verification`/`remediation` session** exists in the ledger;
+- **no session is in flight**;
+- the target is **`dedicated-sessions` only** — **B→A is refused**,
+  always (the not-started spec-seed rewrite is the only sanctioned B→A
+  surface, and only while no activity-log record exists).
+
+The Session Set Explorer's `Set Up Dedicated Verification…` action on a
+**completed** Mode-A row runs this writer (and only on writer success
+aligns the spec seed and copies the verification kickoff prompt); on a
+**not-started** row the same action rewrites the spec seed instead (no
+durable record exists yet, so the seed is still the authority);
+`in-progress` sets are deliberately excluded. After a sanctioned
+transition, `start_session --type verification` works immediately —
+the typed-session writers never read the mode record (audited
+empirically in Set 062 S3; the record's runtime effect is the close
+gate, the derived states, and the validator).
+
 ---
 
 ##### Mode A — `out-of-band-or-none`: copyable review prompts

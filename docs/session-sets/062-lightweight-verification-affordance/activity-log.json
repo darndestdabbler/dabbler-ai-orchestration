@@ -133,6 +133,73 @@
           "costUsd": 0.04749
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/mode-read-audit",
+      "dateTime": "2026-06-12T04:18:38.914494-04:00",
+      "description": "Audit-first (spec D4): traced every consumer of the recorded verificationMode. F1 read_verification_mode (dedicated_verification.py:138) is the single choke point - validate_dedicated_verification:544, derive_workflow_state:809, and close_session Q6 gate (close_session.py:1692-1700) all resolve through it (last valid kind==verification_mode entry wins). F2 start_session --type does NOT read the mode (register_typed_session_start gates only on type/plan/in-flight) so no start_session change is needed. F3 HAZARD: has_verification_mode_record only counts the original kind, and _capture_verification_mode runs on every start_session - a later typed-session start on a set whose only record is verification_mode_change would re-capture a stale out-of-band spec seed AFTER the change record and silently disarm the Q6 gate under last-wins; fix = idempotency check recognizes both kinds. F4 tier gate reads spec tier; Explorer reads spec only (unchanged); TS verificationModeRecordExists mirrors the Python check and gains both-kinds parity. Full findings + locked design consequences in s3-mode-read-audit.md (written before any code).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/blessed-writer",
+      "dateTime": "2026-06-12T04:34:51.541269-04:00",
+      "description": "D4 blessed writer shipped: dedicated_verification.change_verification_mode (VerificationModeChangeResult w/ stable refused-* codes) + CLI ai_router/change_verification_mode.py (positional dir-or-slug, --to, --json; exit 0/2/3 mirroring start_session). Gates in order, fail-loud, nothing written on refusal: target dedicated-sessions only (B->A always refused) -> dir+spec+tier lightweight (fail closed on unconfirmable tier) -> existing-but-unreadable activity log refused (S2 fail-loud lesson; missing log created minimal) -> effective recorded mode out-of-band-or-none -> no typed sessions + nothing in flight (state must normalize; plan-less in-progress counts as in flight). Record: kind=verification_mode_change, choice, previousMode, attributed to highest completed session, atomic temp-rename write (extracted shared _write_activity_log_atomic). Read path: read_verification_mode + has_verification_mode_record now honor BOTH kinds (last valid wins) - closes audit F3 capture-clobber hazard. 29 new tests in test_change_verification_mode.py (every gate, precedence, capture idempotency, validator/derive_state integration, CLI exit codes + JSON envelope).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/ui-wiring",
+      "dateTime": "2026-06-12T04:34:51.541269-04:00",
+      "description": "Extension wiring: ActionRegistry setupVerificationEligible widened to lightweight AND (not-started OR (complete AND mode A)) - complete Mode-B/in-progress/cancelled/Full excluded. setupVerification.ts state-dispatches: complete Mode-A -> straight-to-confirmation (A->B only, one-way N/M+ consequence copy) -> spawns the blessed writer via resolvePythonInterpreter + cp.spawn -m ai_router.change_verification_mode <dir> --json (upgradeOlderSets Set-050 precedent, isAiRouterNotInstalled stderr detection); ONLY on writer success aligns spec seed (rewriteSpecVerificationMode) + copies buildVerificationKickoffPrompt + locked toast; refusals/spawn failures inform and change NOTHING (D3 no-drift-by-construction); seed-alignment failure after success warns w/ manual fix but keeps record authoritative. Pure helpers buildChangeWriterArgs/parseChangeWriterOutput exported for hostless tests + CHANGE_WRITER_MODULE pinned against the real ai_router file (cross-language drift guard). verificationModeRecordExists TS mirror gained both-kinds parity.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/docs",
+      "dateTime": "2026-06-12T04:34:51.541269-04:00",
+      "description": "Docs: workflow doc gained the normative Sanctioned Mode A -> Mode B transition subsection under Capturing-the-choice (locked rationale verbatim: additive A->B, recorded-not-snuck, B->A refused; full gate list; Explorer phasing; start_session --type never reads the mode). Pointer-level updates: authoring guide field semantics, spec-md-schema verificationMode paragraph, tier-model chosen-once parenthetical, session-state-schema typed-session rules (both record kinds + read-path precedence). ai_router/CHANGELOG.md Unreleased entry (Added: CLI + library + new kind; Changed: read path + capture idempotency w/ the F3 hazard explained).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/verified",
+      "dateTime": "2026-06-12T04:59:35.724105-04:00",
+      "description": "Cross-provider verification (router pick gpt-5-4, both rounds): R1 ISSUES_FOUND - 1 Critical S062-S3-V1-001 (claimed start_session --verification-mode could supersede a blessed change record incl. B->A) DISPROVEN by executed minimal repro: the capture path is immutable after ANY durable record (Set 057 Q5 check runs before cli_choice; this session extended it to both kinds) - context gap, the unchanged immutability code was not in the R1 diff; pinned by new regression test test_explicit_cli_b_to_a_cannot_supersede_change_record. 1 Major S062-S3-V1-002 ACCEPTED+FIXED: completed-set flow extracted to applyCompletedSetTransition(set, pythonPath, deps) w/ injected deps; 6 branch tests pin the invocation/fallback matrix (refusal + spawn/router failure touch NOTHING per the D3 no-drift lock; success aligns seed only after the record; seed-misalignment still copies prompt + warns). 1 Minor S062-S3-V1-003 DISPROVEN: docs/activity-log-schema.md does not exist; record kinds documented in the canonical homes all updated this session. Both challenges recorded via record_adjudication (context-gap / reverify-reshaped). R2 narrow re-verify w/ reshaped context (full capture-path bodies + repro output + fix diffs): VERIFIED 0 issues. s3-issues.json persisted w/ dispositions. Post-fix suites: Py 1216 passed/1 skipped, TS 849 passing + 2 pre-existing, tsc/esbuild clean. Routed: R1 $0.2928 + R2 $0.1086.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 23406,
+          "outputTokens": 15616,
+          "costUsd": 0.292755
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 10152,
+          "outputTokens": 5546,
+          "costUsd": 0.10857
+        },
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.0032
+        }
+      ]
     }
   ]
 }

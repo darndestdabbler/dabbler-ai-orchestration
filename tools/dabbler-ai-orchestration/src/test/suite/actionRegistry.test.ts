@@ -506,7 +506,7 @@ suite("ActionRegistry", () => {
     );
   });
 
-  test("setupVerification — not-started Lightweight rows only at this session (spec D3)", () => {
+  test("setupVerification — not-started (both modes) + complete Mode-A Lightweight rows (spec D3, S3 widening)", () => {
     // Both modes are eligible on a not-started Lightweight row (the
     // QuickPick offers both directions while no durable record exists).
     for (const mode of ["out-of-band-or-none", "dedicated-sessions"] as const) {
@@ -516,21 +516,41 @@ suite("ActionRegistry", () => {
         `setupVerification missing for not-started LW mode=${mode}`,
       );
     }
-    // Started / terminal rows are excluded — Session 3 widens to
-    // complete Mode-A rows through the blessed writer.
-    for (const st of ["in-progress", "complete", "cancelled"] as SessionState[]) {
+    // Session 3: complete Mode-A rows go through the blessed writer —
+    // the realistic "work done, now verify it" entry point.
+    assert.ok(
+      ids(
+        fakeSet("complete", { config: lwConfig("out-of-band-or-none") }),
+        ALL_SUPPORTED,
+      ).includes("dabblerSessionSets.setupVerification"),
+      "setupVerification missing on a complete Mode-A LW row (the S3 blessed-writer path)",
+    );
+    // Complete Mode-B rows have nothing to set up — the kickoff prompt
+    // is their affordance (and B->A is never offered).
+    assert.ok(
+      !ids(
+        fakeSet("complete", { config: lwConfig("dedicated-sessions") }),
+        ALL_SUPPORTED,
+      ).includes("dabblerSessionSets.setupVerification"),
+      "setupVerification leaked onto a complete Mode-B row — B->A is never offered",
+    );
+    // In-flight rows are excluded deliberately (contention with a
+    // running session); cancelled rows are terminal.
+    for (const st of ["in-progress", "cancelled"] as SessionState[]) {
       assert.ok(
         !ids(fakeSet(st, { config: lwConfig("out-of-band-or-none") }), ALL_SUPPORTED)
           .includes("dabblerSessionSets.setupVerification"),
-        `setupVerification leaked onto state=${st} — the seed rewrite is only authoritative pre-start`,
+        `setupVerification leaked onto state=${st}`,
       );
     }
     // Full tier never offers it (verificationMode is inert on Full).
-    assert.ok(
-      !ids(fakeSet("not-started"), ALL_SUPPORTED)
-        .includes("dabblerSessionSets.setupVerification"),
-      "setupVerification leaked onto a Full-tier row",
-    );
+    for (const st of ["not-started", "complete"] as SessionState[]) {
+      assert.ok(
+        !ids(fakeSet(st), ALL_SUPPORTED)
+          .includes("dabblerSessionSets.setupVerification"),
+        `setupVerification leaked onto a Full-tier ${st} row`,
+      );
+    }
   });
 
   test("openExternalVerificationDoc — surfaced exactly on v? rows (spec step 4)", () => {

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "issueId": "S062-S3-V1-001",
+      "severity": "Critical",
+      "category": "DesignLockDeviation",
+      "issueType": "missing-context",
+      "file": "ai_router/dedicated_verification.py",
+      "description": "Verifier claimed start_session --verification-mode passed after a blessed verification_mode_change record could append a fresh verification_mode entry that supersedes the transition (incl. B->A) under last-of-either-kind-wins.",
+      "verificationMethod": "Minimal repro executed: blessed transition then resolve_and_record_verification_mode(cli_choice=out-of-band-or-none) \u2014 the exact call start_session makes. Returned None, appended nothing, effective mode stayed dedicated-sessions.",
+      "resolution_status": "not-reproducible",
+      "resolution_notes": "DISPROVEN empirically. The capture path (resolve_and_record_verification_mode, the only production caller of record_verification_mode) has been immutable-after-first-record since Set 057 Q5 \u2014 the immutability check runs BEFORE cli_choice is consulted \u2014 and this session extended has_verification_mode_record to count BOTH kinds, so a change record also arms the immutability. The unchanged immutability code was not in the R1 diff context (context gap). Pinned forever by the new regression test test_explicit_cli_b_to_a_cannot_supersede_change_record.",
+      "resolved_in_round": 2
+    },
+    {
+      "issueId": "S062-S3-V1-002",
+      "severity": "Major",
+      "category": "Completeness",
+      "issueType": "standards-departure",
+      "file": "tools/dabbler-ai-orchestration/src/test/suite/setupVerification.test.ts",
+      "description": "Spec step 5 requires TS invocation/fallback-path coverage for the completed-set flow; only the pure helpers (buildChangeWriterArgs/parseChangeWriterOutput) were pinned \u2014 the spawn-failure / refusal / success-only-side-effects branches were untested.",
+      "verificationMethod": "Review of the added tests vs spec Session 3 step 5 (TS predicate widening + invocation/fallback paths).",
+      "resolution_status": "fixed",
+      "resolution_notes": "ACCEPTED and fixed: the completed-set core was extracted as applyCompletedSetTransition(set, pythonPath, deps) with injected deps (runWriter/readFile/writeFile/copyToClipboard/toasts/refresh); 6 new branch tests assert observable side effects per branch \u2014 gate refusal and spawn/router failures touch NOTHING (D3 no-drift lock), success aligns the seed only AFTER the writer recorded, seed-misalignment still copies the prompt and warns with the manual fix, already-target needs no write. TS suite 849 passing (+6), tsc clean.",
+      "resolved_in_round": 2
+    },
+    {
+      "issueId": "S062-S3-V1-003",
+      "severity": "Minor",
+      "category": "Completeness",
+      "issueType": "missing-context",
+      "file": "docs/activity-log-schema.md",
+      "description": "Verifier required the new record kind be documented in docs/activity-log-schema.md.",
+      "verificationMethod": "Filesystem check: docs/activity-log-schema.md does not exist in the repo; grep shows activity-log record kinds (suggestion_disposition precedent) are documented in ai-led-session-workflow.md and the authoring guide.",
+      "resolution_status": "not-reproducible",
+      "resolution_notes": "The named doc does not exist \u2014 there is no activity-log schema doc in this repo. Record kinds have always been documented in the workflow doc + authoring guide (the suggestion_disposition and verification_mode precedents), and this session updated both, plus session-state-schema.md (the transition rules + both kinds + read-path precedence) and the ai_router CHANGELOG. The spec phrase activity-log/session-state schema docs maps to those canonical homes.",
+      "resolved_in_round": 2
+    }
+  ]
+}

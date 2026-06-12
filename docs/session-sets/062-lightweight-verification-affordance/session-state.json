@@ -34,10 +34,15 @@
     {
       "number": 3,
       "title": "Sanctioned A\u2192B on completed sets (blessed writer + wiring)",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-06-12T04:13:20.622451-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "high"
+      },
       "verificationVerdict": null
     },
     {

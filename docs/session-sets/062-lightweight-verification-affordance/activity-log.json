@@ -323,6 +323,24 @@
       "description": "Versions bumped post-UAT per spec order: extension 0.29.0 -> 0.30.0 (npm version: package.json + both package-lock nodes) + CHANGELOG [0.30.0] 2026-06-12 entry naming Sets 061+062 (combined-release rationale, per-set Added sections, README note); ai_router 0.16.0 -> 0.17.0 (pyproject.toml + ai_router/__init__.py __version__ - the Set 049/051 drift gotcha checked deliberately) + CHANGELOG [Unreleased] -> [0.17.0] 2026-06-12; repository-reference.md release-status table + version walk updated in PRE-PUSH wording (publish PENDING, tags awaiting operator authorization; run ids recorded post-publish only). Drift guard OK post-edits.",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 8,
+      "stepKey": "session-005/verified",
+      "dateTime": "2026-06-12T08:54:42.667903-04:00",
+      "description": "Cross-provider verification (router pick gpt-5-4): R1 VERIFIED, 0 issues, $0.1720 - the first R1-clean round of the set. The R1 prompt led with the conventions block (suite baseline = TS 864 pass + the 2 tracked Set-026 fails / Py 1216 pass; pre-push release contract; operator-UAT result incl. the removed duplicate checklist block; synthetic-fixture rule) plus the unchanged gate-adjacent context (resolvePythonInterpreter precedence, committed .code-workspace) - the S3/S4 context-gap calibration applied and credited. Raw output saved unedited to s5-verification.md; structured findings to s5-issues.json (empty).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 9,
+      "stepKey": "session-005/change-log-written",
+      "dateTime": "2026-06-12T08:54:42.667903-04:00",
+      "description": "Final-session close-out artifacts: change-log.md (full 5-session narrative, releases HELD wording, deviations section, post-publish follow-ups incl. old-hero-png removal), disposition.json rewritten for Session 5 (verdict VERIFIED, 27 files_changed, next_orchestrator null - set ends), ai-assignment.md Session 5 actuals (orchestrator matched the routed recommendation; $0.1720 routed; calibration note: up-front conventions block is the default R1 shape now).",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

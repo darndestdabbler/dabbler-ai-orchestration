@@ -106,7 +106,7 @@ low
 | 4 | Cross-provider verification | t3 |
 | 5 | Release | human-only |
 ### Actuals (filled after the session)
-- Orchestrator used:
-- Total routed cost:
-- Deviations from recommendation:
-- Notes for next-session calibration:
+- Orchestrator used: claude-code claude-fable-5 @ effort=high (matched the S4-close routed revision)
+- Total routed cost: $0.1720 (session-verification gpt-5-4, R1 VERIFIED 0 issues — single round)
+- Deviations from recommendation: none on orchestrator (the revised recommendation was followed). Step-table routing again did not apply — checklist authoring, UAT prep, bumps, and docs were orchestrator-direct; the human-only steps (UAT walk, release authorization) stayed human-only (tags held at close).
+- Notes for next-session calibration: the S3/S4 lesson paid off measurably — stating the suite-baseline convention, the release pre-push contract, and the unchanged gate-adjacent code (resolver precedence + committed fixture workspace file) up front in the R1 prompt produced the set's first R1-clean VERIFIED (every prior session burned a round on a context gap). Treat the up-front conventions block as the default R1 prompt shape from now on. UAT prep that actually executes the click paths (live CLI runs on a generated workspace copy) caught a shipped defect (cp1252 migrator crash) that the unit suites structurally cannot see — same family as the Set 058 lesson, now confirmed for spawned-CLI surfaces too.

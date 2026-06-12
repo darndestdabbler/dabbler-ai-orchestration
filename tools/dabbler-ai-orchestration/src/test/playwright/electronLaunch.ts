@@ -88,6 +88,10 @@ const _ELECTRON_VAR_ALLOWLIST_WINDOWS = [
 
 const _ELECTRON_VAR_ALLOWLIST_GUI = [
   "DISPLAY",                        // X11 (Linux)
+  "XAUTHORITY",                     // X11 auth cookie — xvfb-run creates one;
+                                    // without it the X connection is refused
+                                    // and Electron dies with "The platform
+                                    // failed to initialize" (ui/aura)
   "WAYLAND_DISPLAY",                // Wayland (Linux/macOS)
   "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE",  // XDG desktop (Linux)
   "DBUS_SESSION_BUS_ADDRESS",       // D-Bus session (Linux)

@@ -3,10 +3,11 @@
 **Status:** COMPLETE (5 of 5 sessions) — 2026-06-12.
 **Release:** extension **0.30.0** (combined — carries Set 061's deferred
 Explorer changes plus this set's; the Set 059→060 fold precedent) and
-**`dabbler-ai-router` 0.17.0**. Both version-bumped and operator-UAT'd
-2026-06-12; **tag pushes (`vsix-v0.30.0`, `v0.17.0`) held for explicit
-operator authorization** per the release contract. Run ids recorded in a
-post-publish follow-up commit.
+**`dabbler-ai-router` 0.17.0**. Both operator-UAT'd 2026-06-12 and
+**PUBLISHED 2026-06-12** after in-session operator authorization:
+Marketplace + Open VSX tag `vsix-v0.30.0` (publish-vscode.yml run
+27417089796, success) and PyPI tag `v0.17.0` (release.yml run
+27417089861, success).
 
 ## Why this set existed
 
@@ -113,9 +114,18 @@ synthesis in Set 061's `verification-affordance-synthesis.md`.
 
 ## Follow-ups (post-publish)
 
-- Push `vsix-v0.30.0` + `v0.17.0` **only with operator authorization**; watch
-  both publish runs to completion; record run ids in
-  `docs/repository-reference.md` + this file in a follow-up commit.
-- Remove the superseded `media/session-set-explorer-in-action.png` in that
-  same follow-up (the live 0.29.0 Marketplace page hotlinks it until 0.30.0
-  replaces the listing).
+- ~~Push `vsix-v0.30.0` + `v0.17.0` with operator authorization~~ — DONE
+  2026-06-12: operator authorized in-session; both runs succeeded
+  (Marketplace run 27417089796, PyPI run 27417089861); run ids recorded
+  here and in `docs/repository-reference.md`.
+- ~~Remove the superseded `media/session-set-explorer-in-action.png`~~ —
+  DONE in the post-publish commit (root README + repository-reference file
+  map repointed to the new screenshots first).
+- **Open (future set candidate):** the `Test` workflow on master has been
+  red since before Set 061 — the macOS Playwright Layer-3 job fails with
+  `harness_cli make-set` `FileExistsError` temp-dir collisions (several
+  specs). Pre-existing; 0.29.0 and 0.30.0 both shipped over it; release
+  gates are the local suites + operator UAT, but a red default-branch CI
+  masks real regressions. Candidate: a CI-repair set (fix the harness
+  temp-dir reuse on macOS; then consider making Test green a release
+  prerequisite).

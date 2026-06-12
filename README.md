@@ -5,7 +5,7 @@ with cross-provider verification, automatic cost tracking, git-
 worktree-aware session-set state, and a Session Set Explorer in the
 activity bar.
 
-![Session Set Explorer in action](tools/dabbler-ai-orchestration/media/session-set-explorer-in-action.png)
+![The Session Set Explorer beside a session-set spec: in-progress, not-started (blocked), and complete sets with their session fractions](tools/dabbler-ai-orchestration/media/session-set-explorer-and-spec.png)
 
 ---
 

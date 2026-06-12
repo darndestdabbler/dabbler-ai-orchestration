@@ -5,6 +5,8 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-06-12 (Set 062 — Lightweight verification affordance)
+
 ### Added (Set 062 S3 — sanctioned Mode A -> Mode B transition)
 
 - **`python -m ai_router.change_verification_mode <session-set-dir-or-slug>`**

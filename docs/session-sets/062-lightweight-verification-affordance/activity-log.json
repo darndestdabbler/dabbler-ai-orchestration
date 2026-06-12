@@ -296,6 +296,33 @@
       "description": "Pre-publish gate OPEN, handed to operator: local .vsix built (dabbler-ai-orchestration-0.29.0.vsix - version bumps only after UAT passes, per spec step order); fresh fixture workspace generated (dabbler-uat-workspace-0JZGgz) with pinned interpreter; blessed-writer success (exit 0, verification_mode_change appended) + refusal (exit 3) + migrator (exit 0 post-fix) all CLI-validated live against a generated copy before handoff. Operator walks the 12 pending checklist rows.",
       "status": "in-progress",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "session-005/operator-uat-passed",
+      "dateTime": "2026-06-12T08:48:16.104245-04:00",
+      "description": "OPERATOR UAT PASSED 2026-06-12: all 12 operator-walk rows Passes=true (operator-saved results; only feedback = a cosmetic note on walk 1 about repeated 001..-style numbering across the two fixture projects - the rendered states matched the table). Checklist bookkeeping finished: Result flipped to complete on the 12 walked rows; the checklist-editor save had appended a duplicate 23-row block (Passes=false, no content) - removed, the operator-completed 23 rows are the record. Gate CLOSED.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "session-005/readme-screenshots",
+      "dateTime": "2026-06-12T08:48:16.104245-04:00",
+      "description": "Operator-requested pre-publish README refresh: hero image swapped to media/session-set-explorer-and-spec.png (replaces session-set-explorer-in-action; OLD png kept on disk until 0.30.0 publishes - the live 0.29.0 Marketplace page hotlinks raw@master, deleting now would break it; remove in the post-publish run-id commit); media/getting-started.png added under Get started; Copy Eval list updated to 6 prompts; flat-action list gains Switch Tier/Set Up Dedicated Verification/Open External Verification Note; new Lightweight-verification-at-a-glance feature bullet.",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "session-005/versions-bumped",
+      "dateTime": "2026-06-12T08:48:16.104245-04:00",
+      "description": "Versions bumped post-UAT per spec order: extension 0.29.0 -> 0.30.0 (npm version: package.json + both package-lock nodes) + CHANGELOG [0.30.0] 2026-06-12 entry naming Sets 061+062 (combined-release rationale, per-set Added sections, README note); ai_router 0.16.0 -> 0.17.0 (pyproject.toml + ai_router/__init__.py __version__ - the Set 049/051 drift gotcha checked deliberately) + CHANGELOG [Unreleased] -> [0.17.0] 2026-06-12; repository-reference.md release-status table + version walk updated in PRE-PUSH wording (publish PENDING, tags awaiting operator authorization; run ids recorded post-publish only). Drift guard OK post-edits.",
+      "status": "complete",
+      "routedApiCalls": []
     }
   ]
 }

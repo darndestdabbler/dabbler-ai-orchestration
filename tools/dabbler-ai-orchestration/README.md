@@ -4,7 +4,7 @@ An AI-led coding-session workflow for VS Code. Manage structured AI
 sessions, automatic cross-provider verification, cost tracking, and
 git-worktree-aware session-set state — all from the activity bar.
 
-![Session Set Explorer in action](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/session-set-explorer-in-action.png)
+![The Session Set Explorer beside a session-set spec: in-progress, not-started (blocked), and complete sets with their session fractions](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/session-set-explorer-and-spec.png)
 
 ---
 
@@ -75,6 +75,8 @@ editor. On the Full tier the form warns under the Build button when
 no provider API key is set. (The Set 021 Get Started wizard panel
 was retired in extension 0.29.0 in favor of this form.)
 
+![The Getting Started form in the Session Set Explorer: build project structure with a Full/Lightweight tier choice, create or import a project plan, build session sets](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
+
 ---
 
 ## What it'll cost
@@ -139,11 +141,14 @@ Sign-up links and a full prerequisites checklist live in the
   so you can paste straight into the AI chat and resume work in two
   keystrokes. Right-click opens a native VS Code QuickPick with
   two-step submenus: **Open File ▸** (Spec / Activity Log / Change
-  Log / Session State), **Copy Eval ▸** (four copyable review
-  prompts — Evaluate Specification / Most Recent Session / Session
-  Set / Start Next Session), and flat actions for Copy Slug,
-  Open Orchestrator Writer Log, Open Prerequisite Spec (on blocked
-  rows), Migrate to v4 schema, Cancel set, and Restore set. The
+  Log / Session State), **Copy Eval ▸** (copyable prompts —
+  Evaluate Specification / Most Recent Session / Session Set /
+  Start Next Session / Start New Parallel Session / Verification
+  Kickoff), and flat actions for Copy Slug, Open Orchestrator
+  Writer Log, Open Prerequisite Spec (on blocked rows), Switch
+  Tier… (not-started rows), Set Up Dedicated Verification… and
+  Open External Verification Note (eligible Lightweight rows),
+  Migrate to v4 schema, Cancel set, and Restore set. The
   right-click menu honors light/dark theme natively and dismisses
   on Escape or click-outside.
 - **Copyable review prompts.** Four `Dabbler: Copy …` commands
@@ -165,6 +170,21 @@ Sign-up links and a full prerequisites checklist live in the
   it). Same Session Set Explorer, same `session-state.json`
   lifecycle, same close-out gates — just no API spend on
   verification.
+- **Lightweight verification at a glance.** Lightweight rows carry a
+  quiet `lw` marker, and sets using dedicated verification sessions
+  show an honest `N/M+` fraction (the `+` says the session count can
+  still grow). Two verification-posture markers appear at the
+  actionable moment: `v?` on a completed out-of-band set the
+  Explorer cannot vouch for, and `v+` when the work is done and a
+  dedicated verification session is owed. Clicking a marker opens
+  the row menu — **Verification Kickoff** copies a paste-ready
+  handoff prompt that has a *different* AI engine run the typed
+  verification/remediation flow, and **Set Up Dedicated
+  Verification…** switches a set's `verificationMode` safely (a
+  spec-seed rewrite on not-started sets; a recorded, gated
+  transition through the `ai_router` blessed writer on completed
+  sets). Verified sets stay quiet — the verdict lives in the
+  fraction tooltip, and no positive badge is shown.
 - **Schema-v4 migrator + prerequisites.** Set 047 introduced the v4
   `session-state.json` shape where every per-session lifecycle field
   (orchestrator, startedAt, completedAt, verdict) lives in a

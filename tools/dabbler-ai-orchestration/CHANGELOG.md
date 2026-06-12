@@ -5,13 +5,70 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Changed (Set 062 S5)
+## [0.30.0] — 2026-06-12 (Sets 061 + 062 — Explorer UX polish + Lightweight verification affordance)
 
-- `npm run make-uat-workspace` now pins `dabblerSessionSets.pythonPath`
-  to this checkout's repo-root `.venv` interpreter in the *generated*
-  `.code-workspace` (never the committed fixture), so the python-backed
-  row actions (the blessed verification-mode writer, the v4 migrator)
-  work in the disposable UAT workspace with zero operator setup.
+One combined release: Set 061's Explorer changes shipped unreleased
+(its release session was deferred into Set 062 by operator direction),
+so this version carries both sets, gated on one combined operator UAT
+against the new fixture workspace.
+
+### Added (Set 061 — Explorer UX polish)
+
+- **`N/M+` session fraction** on Lightweight `dedicated-sessions` sets
+  whose ledger has no completed `type: verification` session — the `+`
+  says verification/remediation sessions are appended when the work
+  sessions complete, so the count can still grow. Tooltip explains it;
+  the fraction returns to an honest `N/M` once a typed session lands.
+- **`lw` tier marker** on Lightweight rows (quiet, help cursor,
+  tooltip: router-off; verification per the set's `verificationMode`).
+- **Blocked chain marker (⛓︎)** replaces the all-caps
+  `[BLOCKED BY PREREQS]` description badge; its tooltip names each
+  unsatisfied prerequisite and its current state (unknown slugs say
+  "unknown set — check the slug" and keep the row blocked).
+- **`Switch Tier…` row action** on not-started sets: byte-preserving
+  `tier:` scalar rewrite with same-tier detection, malformed-scalar
+  repair, and inform-only Full-tier guardrails (missing provider key /
+  missing `ai_router/router-config.yaml` warn but never block).
+
+### Added (Set 062 — Lightweight verification affordance)
+
+- **Verification-posture markers**: `v?` on completed Mode-A
+  (`out-of-band-or-none`) sets with no `external-verification.md` and
+  no typed verification session; `v+` on Mode-B (`dedicated-sessions`)
+  sets whose work sessions are all complete while verification is
+  still owed or in flight. Marker click opens the row context menu —
+  it never mutates state. Verified and note-bearing sets stay quiet
+  (no positive badge); the persisted verdict surfaces in the fraction
+  tooltip ("Verification: VERIFIED (session N)").
+- **`Verification Kickoff` copy action** on eligible Mode-B rows: a
+  pointer-style prompt handing the Set 057 typed
+  verification/remediation flow to a *different* AI engine
+  (`start_session --type verification`, remediation chaining via
+  `--handoff`) — references docs and commands, embeds no content that
+  can go stale.
+- **`Set Up Dedicated Verification…` row action** (Mode A → Mode B),
+  phased by set state: on not-started sets a confirmed,
+  byte-preserving `verificationMode:` seed rewrite (both directions
+  legal while no activity-log history exists); on completed sets a
+  recorded transition through the new `ai_router` blessed writer
+  (`change_verification_mode`) — only on writer success does the spec
+  seed align and the kickoff prompt land on the clipboard; failures
+  inform and change nothing. In-flight sets are excluded; B→A is
+  never offered once any activity-log record exists.
+- **`Open External Verification Note`** offered on `v?` rows — the
+  sanctioned out-of-band record; creating the note clears the marker.
+- **UAT fixture workspace**: a committed hello-world fixture matrix
+  (`test-fixtures/uat-matrix/`) covering every marker/action state in
+  Sets 061 + 062, with `npm run make-uat-workspace` generating a
+  disposable copy outside the repo. The generated `.code-workspace`
+  pins `dabblerSessionSets.pythonPath` to the checkout's `.venv` so
+  python-backed row actions work with zero setup.
+
+### Changed
+
+- Marketplace README: new Session Set Explorer + Getting Started
+  screenshots; feature list updated for the 061/062 row actions and
+  markers.
 
 ## [0.29.0] — 2026-06-11 (Set 060 — Getting Started redesign)
 

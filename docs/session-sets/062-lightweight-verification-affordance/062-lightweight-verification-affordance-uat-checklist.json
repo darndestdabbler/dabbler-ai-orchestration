@@ -1,10 +1,16 @@
 {
   "ProjectName": "Dabbler AI Orchestration",
   "ReleaseLabel": "Extension 0.30.0 (Sets 061 'Explorer UX Polish' + 062 'Lightweight Verification Affordance') + ai_router 0.17.0",
-  "DocumentDate": "6/12/2026",
+  "DocumentDate": "6/12/2026, 8:30:43 AM",
   "Notes": "Combined ad-hoc per-set UAT gating BOTH releases (the 059->060 fold precedent): extension 0.30.0 carries Set 061's deferred surfaces plus Set 062's, and ai_router 0.17.0 carries the blessed verification-mode writer. This checklist SUBSUMES docs/session-sets/061-explorer-ux-polish/061-explorer-ux-polish-uat-checklist.json. UAT runs against a LOCAL build (.vsix or F5 dev host), never a published one (Set 058 lesson). DESIGNED FOR A SHORT OPERATOR PASS: every mechanically-coverable row was pre-verified by the AI orchestrator on 2026-06-12 (Passes=true / Result=complete, the deterministic check named in ProgrammaticVerification) against this suite baseline: Python 1216 passed + 1 skipped; TS unit 864 passing with exactly the 2 tracked pre-existing Set-026 failures (configEditor-foundation, notificationsSection) -- the agreed-green baseline; drift guards clean. The operator walk is the 'Operator walk' items only, in order, ~15 minutes, all against the disposable fixture workspace from `npm run make-uat-workspace` (the generated copy pins dabblerSessionSets.pythonPath to the repo .venv, so the python-backed row actions work with zero setup; mutating actions are safe -- the copy is throwaway). If the Explorer does not auto-refresh after a mutating action, use the view's refresh button. Row-state references (001..006) are the fixture sets documented in test-fixtures/uat-matrix/README.md.",
   "Configuration": {
-    "reviewWidths": ["6%", "14%", "36%", "8%", "36%"]
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "36%",
+      "8%",
+      "36%"
+    ]
   },
   "Review": [
     {
@@ -14,9 +20,9 @@
       "HumanAction": "Open the generated uat-matrix workspace and look at the hello-world-lightweight rows in the Session Set Explorer. Compare each against: 001-greet-the-world = 'lw' only (no v-marker, no '+'); 002-greet-quietly = 'lw' + 'v?'; 003-greet-with-note = 'lw' only (note suppresses the marker); 004-add-a-farewell = 'lw' + fraction '1/2+' (no 'v+'); 005-shout-the-greeting = 'lw' + '2/2+' AND 'v+'; 006-whisper-mode = 'lw' + plain '3/3' (no marker, no '+').",
       "Expectation": "Every row matches the table. No positive 'verified' badge anywhere — quiet is success on 003 and 006.",
       "ProgrammaticVerification": "uatMatrixFixtures.test.ts (14 tests) derives every row through the real readSessionSets scan and pins these exact signals — but it runs on a vscode-stub, so the live webview rendering is what this item confirms (the Set 058 lesson).",
-      "Passes": false,
-      "Feedback": "",
-      "Result": "pending"
+      "Passes": true,
+      "Feedback": "You accidentally repeated some numbers, but what you have shown matches your the table.",
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Session Set Explorer",
@@ -25,9 +31,9 @@
       "HumanAction": "Look at the hello-world-full rows: 001-hello-page = fraction '1/3' with the in-flight annotation and NO markers (no 'lw', no 'v?'/'v+', no '+'); 002-style-the-greeting = blocked chain marker (⛓︎); 003-publish-the-page = blocked chain marker (⛓︎); 004-legacy-greeting-notes = asterisk (*) needs-migration marker.",
       "Expectation": "Control row is completely unmarked (Full tier is the quiet default). Both blocked rows show the chain glyph; the old all-caps '[BLOCKED BY PREREQS]' badge is absent. The v3 row shows the asterisk.",
       "ProgrammaticVerification": "uatMatrixFixtures.test.ts pins the derived signals; prerequisites.test.ts pins blocked derivation incl. unknown-slug; live rendering is the operator portion.",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Session Set Explorer",
@@ -36,9 +42,9 @@
       "HumanAction": "Hover, in order: (a) 'v?' on 002-greet-quietly; (b) 'v+' on 005-shout-the-greeting; (c) the '2/2+' fraction on 005; (d) the '3/3' fraction on 006-whisper-mode; (e) the 'lw' marker on any lightweight row.",
       "Expectation": "(a) 'Lightweight — verification is out-of-band or none. The Explorer cannot tell whether this set was reviewed out of band. Click for verification options.' (b) 'Dedicated verification enabled — a verification/remediation session is still owed or in flight. Click for the next step.' (c) 'Lightweight dedicated-sessions set: verification/remediation sessions are appended when the work sessions complete, so the session count can still grow.' (d) contains 'Verification: VERIFIED (session 3)'. (e) 'Lightweight tier — router-off; verification per the set's verificationMode.'",
       "ProgrammaticVerification": "verificationMarker.test.ts + tierLegibility.test.ts pin these strings as constants; live tooltip surfacing is the operator portion.",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Session Set Explorer",
@@ -47,9 +53,9 @@
       "HumanAction": "Hover: (a) the chain marker on hello-world-full/002-style-the-greeting; (b) the chain marker on 003-publish-the-page; (c) the asterisk on 004-legacy-greeting-notes.",
       "Expectation": "(a) names '001-hello-page (in progress)' in the 'Blocked by prerequisites: … — all must complete first.' format. (b) names '099-cdn-rollout (unknown set — check the slug)'. (c) says the set ran under schema v3.",
       "ProgrammaticVerification": "prerequisites.test.ts pins the tooltip format incl. the unknown-slug arm; uatMatrixFixtures.test.ts pins schemaVersionOnDisk=3 for row 004.",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Session Set Explorer",
@@ -58,9 +64,9 @@
       "HumanAction": "Glance over both project folders' rows.",
       "Expectation": "Markers are visually muted (lower opacity / muted color, help cursor on hover) and do not compete with the set names.",
       "IsJudgmentItem": true,
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Verification affordance (062 D1)",
@@ -69,9 +75,9 @@
       "HumanAction": "Click the 'v?' marker on 002-greet-quietly; observe the QuickPick that opens (note it offers 'Open External Verification Note' and 'Set Up Dedicated Verification…'); press Esc. Click the 'v+' marker on 005-shout-the-greeting; observe it offers 'Verification Kickoff'; press Esc.",
       "Expectation": "Each click opens the row's context QuickPick. Dismissing changes nothing — rows re-render identically.",
       "ProgrammaticVerification": "Marker click posts the existing showRowContextMenu message (verificationMarker.test.ts + webview protocol tests); no mutation path exists in the handler.",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Agent handoff (062 D2)",
@@ -80,9 +86,9 @@
       "HumanAction": "On 005-shout-the-greeting, open the row menu and pick 'Verification Kickoff'. Paste the clipboard into any editor tab and read it.",
       "Expectation": "The prompt references (not embeds): the 'Mode B — dedicated-sessions' part of Step 6 in docs/ai-led-session-workflow.md; checking the per-session orchestrator blocks to confirm a DIFFERENT engine; opening the typed session via `python -m ai_router.start_session --session-set-dir … --type verification`; and chaining remediation via `--type remediation --handoff`. No doc bodies are pasted in; the set's spec/activity-log/state file paths are listed.",
       "ProgrammaticVerification": "copyPromptCommands tests pin the builder content (references, sanitization, no embedded bodies); actionRegistry tests pin eligibility (Lightweight Mode-B, no completed verification).",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Out-of-band record (062 D1/D3)",
@@ -91,9 +97,9 @@
       "HumanAction": "On 002-greet-quietly, open the row menu and pick 'Open External Verification Note'. The file opens (created empty). Return to the Explorer (refresh if needed).",
       "Expectation": "002's 'v?' marker is gone — the row now reads like 003-greet-with-note (quiet is success). No other change to the row.",
       "ProgrammaticVerification": "verificationMarker.test.ts pins note-presence suppression; externalVerification.ts creates with flag 'wx' (never truncates an existing note).",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Sanctioned A→B on completed sets (062 D3/D4)",
@@ -102,9 +108,9 @@
       "HumanAction": "Still on 002-greet-quietly (complete, Mode A), open the row menu and pick 'Set Up Dedicated Verification…'. Confirm through the one-way confirmation step.",
       "Expectation": "Success toast: 'verificationMode → dedicated-sessions. Kickoff prompt copied — paste it to your AI agent.' After refresh the row's fraction reads '2/2+'. The clipboard now holds the kickoff prompt. (Under the hood a verification_mode_change record was appended to the fixture copy's activity-log.json and the spec seed was aligned — the committed fixtures are untouched.)",
       "ProgrammaticVerification": "Live CLI run 2026-06-12 on a generated workspace copy: change_verification_mode exited 0 and appended the kind=verification_mode_change record; immediate re-run refused exit 3 (refused-already-dedicated). UI invocation/fallback branches are dependency-injection tested (setupVerification tests); writer gates have full Python coverage (S3).",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Not-started toggle (062 D3)",
@@ -113,9 +119,9 @@
       "HumanAction": "On 001-greet-the-world (not-started), open the row menu and pick 'Set Up Dedicated Verification…'. Read the confirmation copy, confirm A→B. Observe the row. Then run it again and switch back B→A.",
       "Expectation": "Confirmation names the consequence (the session count can grow — N/M+). After A→B the row's fraction gains the '+'. The reverse direction is offered ONLY here (no activity-log history) and returns the row to its original quiet Mode-A state.",
       "ProgrammaticVerification": "verificationModeRewrite tests (byte-preserving matrix) + setupVerification tests (B→A hidden once ANY activity-log record exists — the S2 verifier Major, fixed and pinned).",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Switch Tier (061 D4)",
@@ -124,9 +130,9 @@
       "HumanAction": "On 001-greet-the-world (not-started), pick 'Switch Tier…' → 'Full'. Observe toasts and the row. Right-click 005-shout-the-greeting and 002-greet-quietly to confirm 'Switch Tier…' is absent there. Optionally switch 001 back to Lightweight.",
       "Expectation": "001 loses its 'lw' marker; an info toast confirms the switch; a separate WARNING toast notes ai_router/router-config.yaml was not found in this workspace (the fixture project has none). The action is absent on non-not-started rows. (A no-API-key warning appears only if no provider key is visible to VS Code — with keys set in your environment it should not fire.)",
       "ProgrammaticVerification": "tierRewrite.test.ts (byte-preservation, guardrails, same-tier message, malformed repair) + actionRegistry.test.ts (not-started-only gating).",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Schema migration",
@@ -135,9 +141,9 @@
       "HumanAction": "On hello-world-full/004-legacy-greeting-notes, open the row menu and pick 'Migrate to v4 schema'. Observe the notification and the row after refresh.",
       "Expectation": "The migration succeeds (notification reports it; a session-state.v3.bak.json appears beside the state file in the fixture copy) and the asterisk disappears.",
       "ProgrammaticVerification": "Live CLI run 2026-06-12 on a generated copy under a cp1252 console: exit 0, clean ASCII output. NOTE: this session FIXED a real defect here — the migrator banners printed Unicode arrows/em-dashes that crashed under Windows cp1252 (the exact encoding the extension's spawn pipes use), which would have failed this very click. Fixed ASCII-only per the repo convention; migrator suites re-run green (154 passed).",
-      "Passes": false,
+      "Passes": true,
       "Feedback": "",
-      "Result": "pending"
+      "Result": "complete"
     },
     {
       "FunctionalArea": "Lightweight legibility (061 D1/D2)",

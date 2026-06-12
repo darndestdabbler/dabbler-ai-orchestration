@@ -141,4 +141,31 @@
 
 ## Repo-Specific Lessons
 
-> **TODO:** Add lessons specific to this repo below as the project matures.
+## A Test Layer Nobody Runs Rots Silently — And Fail-Fast Masks How Far
+
+- **Context:** The Layer-3 Playwright suite (the only CI gate that
+  exercises the real webview) between Set 047 and the 2026-06-12
+  CI repair.
+- **Failure or friction:** The `Test` workflow had NEVER been green.
+  Sessions run the TS unit + Python suites at close; nobody ran
+  Layer 3 locally between set closes, so five independent rot
+  families accumulated (specs asserting pre-Set-050/060 UI, a
+  Set 061 spec that was committed without ever being executed, a
+  harness premise invalidated by Set 049's v4 writers). The matrix's
+  fail-fast then cancelled the ubuntu/windows jobs whenever macOS
+  failed, hiding both that the rot was OS-independent AND a separate
+  Linux-only env bug (`XAUTHORITY` missing from the Electron-launch
+  allowlist) that had never once executed to failure.
+- **Lesson:** A test layer that isn't part of anyone's routine run is
+  not a gate — it's decoration that decays. And a red default-branch
+  CI is worse than no CI: every new real regression lands invisibly
+  behind the standing failure.
+- **Action for future sessions:** (1) Any session that changes
+  Explorer-rendering surfaces, the state-file writers, or the
+  fixture harness must run `npm run test:playwright` locally before
+  close — the close-out "suite green" convention includes Layer 3
+  for those scopes. (2) When CI is red, treat "which jobs were
+  CANCELLED" as unknown coverage, not passing coverage. (3) Repaired
+  2026-06-12 (commits 4cc135e, a139f22, 61a9bbf — first-ever green
+  run 27420899764); if the workflow goes red again, fix it in-flight
+  rather than letting a standing failure re-accumulate.

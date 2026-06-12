@@ -121,11 +121,14 @@ synthesis in Set 061's `verification-affordance-synthesis.md`.
 - ~~Remove the superseded `media/session-set-explorer-in-action.png`~~ —
   DONE in the post-publish commit (root README + repository-reference file
   map repointed to the new screenshots first).
-- **Open (future set candidate):** the `Test` workflow on master has been
-  red since before Set 061 — the macOS Playwright Layer-3 job fails with
-  `harness_cli make-set` `FileExistsError` temp-dir collisions (several
-  specs). Pre-existing; 0.29.0 and 0.30.0 both shipped over it; release
-  gates are the local suites + operator UAT, but a red default-branch CI
-  masks real regressions. Candidate: a CI-repair set (fix the harness
-  temp-dir reuse on macOS; then consider making Test green a release
-  prerequisite).
+- ~~The `Test` workflow on master red since before Set 061~~ — **FIXED
+  ad-hoc same day** (post-set curator work, commits 4cc135e + a139f22 +
+  61a9bbf): five OS-independent spec/harness rot families repaired
+  (two-set fixtures via `makeAdditionalSet`; webview locator scoped by
+  extensionId + `iframe#active-frame`; welcome specs updated to the
+  Set 060 Getting Started form; genuine-v2/v3 state downgrades) plus
+  the never-before-executed Linux env bug (`XAUTHORITY` absent from
+  the Electron-launch allowlist). First-ever green `Test` run:
+  27420899764, 2026-06-12, all 8 jobs. Lesson recorded in
+  `docs/planning/lessons-learned.md` (Repo-Specific). Still open as a
+  policy question: making a green `Test` run a release prerequisite.

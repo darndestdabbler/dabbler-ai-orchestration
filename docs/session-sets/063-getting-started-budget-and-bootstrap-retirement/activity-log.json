@@ -94,6 +94,57 @@
           "costUsd": 0.03515
         }
       ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/budget-step",
+      "dateTime": "2026-06-12T14:38:54.850109-04:00",
+      "description": "D1 shipped: pure-TS writer utils/budgetYaml.ts (post-migration sec-2.4 shape, mode bands, no-clobber, $0-requires-pick refusal); budget block rendered in gettingStartedHtml.js step 1 (Full-only visibility, $0 radio pair w/ locked copy, inline validation element); client.js wiring (gsState.budget/zeroMethod, build-structure blocked until valid, riders budgetUsd/zeroBudgetMethod); protocol riders + host narrowing asBudgetChoice; scaffoldConsumerRepo writes ai_router/budget.yaml at scaffold time Full-only w/ outcome reporting; summary message names written/kept outcome; tree.css gs-budget styles",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/retirement",
+      "dateTime": "2026-06-12T14:38:54.850109-04:00",
+      "description": "D2 shipped per s1-audit sec-1.1 items 1-11: copyAdoptionBootstrapPrompt.ts deleted; extension.ts import+safeRegister removed; package.json command + viewsWelcome contribution removed, description reworded to name the Getting Started form; CustomSessionSetsView welcome pipe removed (welcomeHtml field/init/payload, loadWelcomeHtmlFromPackageJson, renderWelcomeMarkdown, escHtml/escAttr - compiler confirmed no surviving caller); SnapshotPayload.gettingStarted now REQUIRED + welcomeHtml field dropped (closes sec-1.4 resurrection path); client.js welcome fallback branch removed; tree.css .welcome removed; scanState.ts context-key publication removed (manager + webview scanState messages stay); stale comments touched up (extension.ts x3, scanState.ts, activationNoFolder.test.ts, loading-state.spec.ts x2, session-sets-tree.spec.ts, electronLaunch.ts); watcherInventory allowlist lines 192/228 -> 191/227 (import-removal shift)",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/tests",
+      "dateTime": "2026-06-12T14:43:13.465799-04:00",
+      "description": "Tests + suites green: budgetYaml.test.ts unit matrix (4 mode bands, \\ w/ each method, narrowing, no-clobber, editor-schema acceptance via validateBatch, migrator-no-op TS twin, scaffold tier gate) + gettingStartedHtml budget rendering/validation suites + asBudgetChoice narrowing + rider-forward test; golden cold-start snapshot untouched (template bundle not modified) and passing. TS mocha 907 pass + 2 pre-existing Set-026 fails; Python 1222 pass/1 skip; Playwright Layer 3 LOCAL 18 passed (4.9m); drift_guard OK",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/verified",
+      "dateTime": "2026-06-12T14:51:52.139227-04:00",
+      "description": "Cross-provider verification: R1 gpt-5-4 ISSUES_FOUND (1 Major Correctness: Full build fails open on malformed budget rider; 1 Minor Completeness: Lightweight rendered budget input hidden not omitted) -> both fixed (router fail-closed rejection + budgetBlockHtml omission w/ tier-change local re-render), s2-issues.json persisted w/ resolutions, suites re-run green (TS 908+2 pre-existing) -> R2 gpt-5-4 VERIFIED (narrow re-verify, no regressions)",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 27324,
+          "outputTokens": 10202,
+          "costUsd": 0.22134
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 11186,
+          "outputTokens": 3404,
+          "costUsd": 0.079025
+        }
+      ]
     }
   ]
 }

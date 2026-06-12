@@ -19,6 +19,7 @@ import {
   resolveBundledTemplateDir,
   structureOnlyContext,
 } from "../utils/consumerBootstrap";
+import { BudgetChoice, BudgetWriteOutcome, writeBudgetYaml } from "../utils/budgetYaml";
 
 // ---------- pure scaffolding core (tested without VS Code) ----------
 
@@ -43,6 +44,16 @@ export interface ScaffoldDeps {
    * starter set's title) leaves it unset.
    */
   structureOnly?: boolean;
+  /**
+   * Set 063 S2 (spec D1): the form's budget / NTE pick. Written to
+   * ``ai_router/budget.yaml`` at scaffold time on the FULL tier only —
+   * Lightweight never writes the file (the Set 058 D3 divergence stays
+   * the sole one). No-clobber: an existing budget.yaml is kept and the
+   * skip reported via ``budgetOutcome``.
+   */
+  budget?: BudgetChoice;
+  /** Timestamp source for the budget write (injectable for tests). */
+  now?: Date;
 }
 
 export interface ScaffoldResult {
@@ -52,6 +63,8 @@ export interface ScaffoldResult {
   installMessage: string;
   /** True when the Lightweight divergence removed a seeded router-config.yaml. */
   routerConfigRemoved: boolean;
+  /** Budget-write outcome; null when no budget was provided or tier is Lightweight. */
+  budgetOutcome: BudgetWriteOutcome | null;
 }
 
 /**
@@ -107,12 +120,21 @@ export async function scaffoldConsumerRepo(
     }
   }
 
+  // Set 063 S2 (spec D1): the budget / NTE step's write — Full tier
+  // only, no-clobber, post-migration shape (see utils/budgetYaml.ts).
+  let budgetOutcome: ScaffoldResult["budgetOutcome"] = null;
+  if (deps.budget && deps.ctx.tier === "full") {
+    const r = writeBudgetYaml(deps.projectDir, deps.budget, deps.fileOps, deps.now);
+    budgetOutcome = r.outcome;
+  }
+
   return {
     written,
     skipped,
     installOk: install.ok,
     installMessage: install.message,
     routerConfigRemoved,
+    budgetOutcome,
   };
 }
 
@@ -239,11 +261,17 @@ function makeScaffoldInstallPrompts() {
  * venv + ``dabbler-ai-router`` install; Lightweight removes the seeded
  * router config (the Set 058 sole divergence) via the shared
  * {@link scaffoldConsumerRepo} path.
+ *
+ * Set 063 S2 (spec D1): ``budget`` carries the form's Full-tier budget /
+ * NTE pick; the scaffold writes ``ai_router/budget.yaml`` (no-clobber)
+ * when present. The Command-Palette `setupNewProject` flow has no budget
+ * input and leaves it unset — no file is written on that path.
  */
 export async function buildProjectStructureNoPrompt(
   context: vscode.ExtensionContext,
   projectDir: string,
   tier: Tier,
+  budget?: BudgetChoice,
 ): Promise<ScaffoldResult | undefined> {
   // git init, silently when needed. The folder is the operator's chosen
   // project folder and the repo-layout standard expects a git repo;
@@ -283,6 +311,7 @@ export async function buildProjectStructureNoPrompt(
         bundle,
         fileOps: makeFileOps(),
         structureOnly: true,
+        budget,
         reportProgress: (m) => progress.report({ message: m }),
         installRouter: () =>
           installAiRouter({
@@ -296,10 +325,19 @@ export async function buildProjectStructureNoPrompt(
       }),
   );
 
+  // Set 063 S2 (spec D1): name the budget outcome so a kept existing
+  // file is reported, not silent (the no-clobber "skip + report" rule).
+  const budgetNote =
+    result.budgetOutcome === "written"
+      ? " Budget saved to ai_router/budget.yaml."
+      : result.budgetOutcome === "skipped-exists"
+        ? " Existing ai_router/budget.yaml kept (budget input not applied)."
+        : "";
   const summary =
     `Project structure built (${tier} tier): ${result.written.length} file(s) written` +
     (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") +
-    `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}`;
+    `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` +
+    budgetNote;
   if (result.installOk) {
     vscode.window.showInformationMessage(summary);
   } else {

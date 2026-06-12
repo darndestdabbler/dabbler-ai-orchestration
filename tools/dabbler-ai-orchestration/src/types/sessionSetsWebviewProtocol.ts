@@ -130,19 +130,14 @@ export interface GettingStartedPayload {
 
 export interface SnapshotPayload {
   buckets: BucketPayload[];
-  // Empty when no sets at all; webview falls back to viewsWelcome HTML.
   hasAnySets: boolean;
-  // Welcome HTML (rendered host-side from package.json `viewsWelcome`
-  // contents — preserves declarative source per Q3 = a). Retained as a
-  // fallback for older webview pairings; the Set 060 dual-mode surface
-  // (below) supersedes it as the no-sets empty state.
-  welcomeHtml: string;
-  // Set 060 Session 1: the dual-mode Getting Started state. Optional so
-  // the type contract matches the runtime contract — a pre-Set-060 host
-  // omits the field entirely, and the webview falls back to the
-  // `hasAnySets`/`welcomeHtml` behavior when it is absent (`undefined`)
-  // OR `null` (S1 verifier Issue 3). The current host always populates it.
-  gettingStarted?: GettingStartedPayload | null;
+  // Set 060 Session 1: the dual-mode Getting Started state. Set 063 S2
+  // (spec D2): REQUIRED — the field's pre-Set-060 optionality (and the
+  // `welcomeHtml` fallback it gated) modeled hosts that no longer exist,
+  // and leaving it optional kept a dead webview welcome branch revivable
+  // by a host-side regression. `computeGettingStarted` is total (always
+  // returns a mode), so the host can always populate it.
+  gettingStarted: GettingStartedPayload;
 }
 
 // ----- Host → Webview -----
@@ -249,10 +244,18 @@ export interface GettingStartedActionMsg {
   // radio) AND — since Set 060 S4 — build-session-sets, where it steers
   // the copied decomposition prompt's exemplars/guidance to the
   // operator's tier. `parallel` rides build-session-sets (the "create
-  // parallel session sets where possible" checkbox, D7). Both are
+  // parallel session sets where possible" checkbox, D7). All riders are
   // untrusted webview input — the host narrows them before use.
   tier?: "full" | "lightweight";
   parallel?: boolean;
+  // Set 063 S2 (spec D1): the budget / NTE step's riders on
+  // build-structure, Full tier only (the webview omits both on
+  // Lightweight). `budgetUsd` is the validated dollar amount (>= 0);
+  // `zeroBudgetMethod` is the operator's required zero-rule pick, sent
+  // only when budgetUsd === 0. Host narrowing lives in
+  // utils/budgetYaml.ts (asBudgetUsd / asZeroBudgetMethod).
+  budgetUsd?: number;
+  zeroBudgetMethod?: "manual-via-other-engine" | "skipped";
 }
 
 export type WebviewToHost =

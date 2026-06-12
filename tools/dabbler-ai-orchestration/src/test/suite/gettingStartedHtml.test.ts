@@ -23,6 +23,16 @@ import { createRequire } from "module";
 const requireFromPackageRoot = createRequire(
   path.join(process.cwd(), "package.json"),
 );
+// Set 063 S2: budget controls ride the webview control state. Optional
+// here because most pre-063 assertions don't exercise them; the module
+// treats absent budget fields as empty input / no zero-rule pick.
+interface GsControls {
+  tier: "full" | "lightweight";
+  parallel: boolean;
+  budget?: string;
+  zeroMethod?: string | null;
+}
+
 const gsHtml = requireFromPackageRoot(
   "./media/session-sets-tree/gettingStartedHtml.js",
 ) as {
@@ -35,12 +45,22 @@ const gsHtml = requireFromPackageRoot(
       sessionSetsPresent: boolean;
       providerKeyPresent: boolean;
     },
-    controls: { tier: "full" | "lightweight"; parallel: boolean },
+    controls: GsControls,
   ): string;
   envWarningHtml(visible: boolean): string;
   worktreeNoteHtml(visible: boolean): string;
+  budgetBlockHtml(controls: GsControls): string;
+  parseBudgetInput(raw: unknown):
+    | { ok: true; value: number }
+    | { ok: false; error: string };
+  validateBudgetControls(controls: GsControls):
+    | { ok: true; budgetUsd: number; zeroMethod: string | null }
+    | { ok: false; error: string };
   ENV_WARNING_TEXT: string;
   WORKTREE_NOTE_TEXT: string;
+  BUDGET_LABEL_TEXT: string;
+  BUDGET_HELP_TEXT: string;
+  BUDGET_ZERO_CHOICE_TEXT: string;
 };
 
 function gs(overrides: Partial<{
@@ -190,5 +210,140 @@ suite("gettingStartedHtml — D7 worktree note (S060-S2-V1-001)", () => {
     const checkboxIdx = html.indexOf('name="gs-parallel"');
     const noteIdx = html.indexOf('data-gs-note="worktree"');
     assert.ok(checkboxIdx < noteIdx, "note not after the checkbox");
+  });
+});
+
+// ---------- Set 063 S2 (spec D1): the budget / NTE step ----------
+
+suite("gettingStartedHtml — budget block rendering (Set 063 S2)", () => {
+  test("Full tier renders the budget input inside step 1, before the Build button", () => {
+    const html = gsHtml.renderGettingStarted(gs(), FULL);
+    assert.strictEqual(isVisible(html, "data-gs-budget"), true);
+    assert.ok(html.includes('name="gs-budget"'));
+    assert.ok(html.includes('placeholder="25"'));
+    assert.ok(html.includes(gsHtml.BUDGET_LABEL_TEXT));
+    const tierIdx = html.indexOf('name="gs-tier"');
+    const budgetIdx = html.indexOf("data-gs-budget");
+    const buildIdx = html.indexOf('data-gs-action="build-structure"');
+    const step2Idx = html.indexOf("2. Create or import a project plan");
+    assert.ok(
+      tierIdx < budgetIdx && budgetIdx < buildIdx && buildIdx < step2Idx,
+      "budget block must sit in step 1 between the tier radio and the Build button",
+    );
+  });
+
+  test("Lightweight OMITS the budget block entirely (never renders the input)", () => {
+    // S2 verifier R1 Minor: the D1 lock says Lightweight never renders
+    // the input — absent from the DOM, not present-but-hidden.
+    const html = gsHtml.renderGettingStarted(gs(), LIGHT);
+    assert.ok(!html.includes("data-gs-budget"), "budget block must be absent");
+    assert.ok(!html.includes('name="gs-budget"'), "budget input must be absent");
+    assert.ok(!html.includes('name="gs-zero-method"'), "zero-rule pair must be absent");
+  });
+
+  test("control state survives re-render (input value + zero-rule pick)", () => {
+    const html = gsHtml.renderGettingStarted(gs(), {
+      tier: "full",
+      parallel: false,
+      budget: "0",
+      zeroMethod: "skipped",
+    });
+    assert.ok(/name="gs-budget"[^>]*value="0"/.test(html));
+    assert.ok(/value="skipped" checked/.test(html));
+  });
+
+  test("$0 input reveals the zero-rule radio pair with the locked copy", () => {
+    const zero = gsHtml.renderGettingStarted(gs(), {
+      tier: "full",
+      parallel: false,
+      budget: "0",
+      zeroMethod: null,
+    });
+    assert.strictEqual(isVisible(zero, "data-gs-zero-choice"), true);
+    assert.ok(zero.includes(gsHtml.BUDGET_ZERO_CHOICE_TEXT));
+    assert.ok(zero.includes('value="manual-via-other-engine"'));
+    assert.ok(zero.includes('value="skipped"'));
+  });
+
+  test("non-zero / empty input keeps the zero-rule pair hidden", () => {
+    for (const budget of ["25", "", "abc"]) {
+      const html = gsHtml.renderGettingStarted(gs(), {
+        tier: "full",
+        parallel: false,
+        budget,
+        zeroMethod: null,
+      });
+      assert.strictEqual(isVisible(html, "data-gs-zero-choice"), false, budget);
+    }
+  });
+
+  test("the validation element renders hidden and empty initially", () => {
+    const html = gsHtml.renderGettingStarted(gs(), FULL);
+    assert.ok(html.includes("data-gs-budget-error"));
+    assert.strictEqual(isVisible(html, "data-gs-budget-error"), false);
+  });
+});
+
+suite("gettingStartedHtml — parseBudgetInput / validateBudgetControls (Set 063 S2)", () => {
+  test("accepts plain dollar amounts >= 0 (whitespace tolerated)", () => {
+    for (const [raw, value] of [
+      ["25", 25],
+      ["0", 0],
+      ["12.5", 12.5],
+      [" 100 ", 100],
+    ] as const) {
+      const r = gsHtml.parseBudgetInput(raw);
+      assert.deepStrictEqual(r, { ok: true, value }, String(raw));
+    }
+  });
+
+  test("rejects empty, non-numeric, and negative input with inline messages", () => {
+    for (const raw of ["", "   ", "abc", "$25", "10 dollars", "-1", "-0.5"]) {
+      const r = gsHtml.parseBudgetInput(raw);
+      assert.strictEqual(r.ok, false, raw);
+      assert.ok(!r.ok && r.error.length > 0, raw);
+    }
+  });
+
+  test("validateBudgetControls: >0 passes with no zero-rule needed", () => {
+    const r = gsHtml.validateBudgetControls({
+      tier: "full",
+      parallel: false,
+      budget: "25",
+      zeroMethod: null,
+    });
+    assert.deepStrictEqual(r, { ok: true, budgetUsd: 25, zeroMethod: null });
+  });
+
+  test("validateBudgetControls: $0 blocks until a zero-rule is picked", () => {
+    const blocked = gsHtml.validateBudgetControls({
+      tier: "full",
+      parallel: false,
+      budget: "0",
+      zeroMethod: null,
+    });
+    assert.strictEqual(blocked.ok, false);
+    assert.ok(!blocked.ok && blocked.error === gsHtml.BUDGET_ZERO_CHOICE_TEXT);
+    for (const method of ["manual-via-other-engine", "skipped"]) {
+      const r = gsHtml.validateBudgetControls({
+        tier: "full",
+        parallel: false,
+        budget: "0",
+        zeroMethod: method,
+      });
+      assert.deepStrictEqual(r, { ok: true, budgetUsd: 0, zeroMethod: method }, method);
+    }
+  });
+
+  test("validateBudgetControls: invalid input blocks with the parse message", () => {
+    for (const budget of ["", "abc", "-3"]) {
+      const r = gsHtml.validateBudgetControls({
+        tier: "full",
+        parallel: false,
+        budget,
+        zeroMethod: null,
+      });
+      assert.strictEqual(r.ok, false, budget);
+    }
   });
 });

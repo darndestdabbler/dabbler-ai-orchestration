@@ -8,26 +8,25 @@ import * as vscode from "vscode";
  * from the tree provider's `getChildren()`. On a workspace with sets,
  * the tree rendered immediately; on a workspace where the scan was
  * cold (cache empty, filesystem slow, many sets) `getChildren()`
- * briefly returned `[]` before the cache populated. VS Code's
- * `viewsWelcome` contribution renders whenever `getChildren()` returns
- * an empty array — so operators saw the welcome CTA flash for a few
- * frames before the tree appeared.
+ * briefly returned `[]` before the cache populated — so operators saw
+ * an empty-state flash for a few frames before the tree appeared.
  *
  * The fix is a tri-state lifecycle ("idle" → "loading" → "ready")
- * surfaced both as a public property the tree provider can branch on
- * AND as a VS Code context key (`dabblerSessionSets.scanState`) the
- * package.json's `viewsWelcome.when` clause uses to suppress the
- * welcome content while loading.
+ * surfaced as a public property the view provider branches on: the
+ * webview protocol's `scanState` messages (the `rowsSnapshot` rider
+ * and `scanStateChanged`) drive the client's loading sentinel while
+ * the scan is cold. (The `dabblerSessionSets.scanState` CONTEXT KEY
+ * this manager used to publish was retired in Set 063 S2 with the
+ * `viewsWelcome` contribution — its `when` clause was the key's sole
+ * consumer once the Set 060 Getting Started form replaced the welcome
+ * empty state.)
  *
  * Why a singleton-shaped manager and not a plain enum:
- *   - The manager owns the `setContext` calls so the rest of the
- *     extension never touches `scanState` context keys directly.
- *   - Listeners (the tree provider's `_onDidChangeTreeData`) subscribe
- *     to state transitions via `onDidChange`; the tree refreshes
+ *   - Listeners (the view provider's snapshot scheduler) subscribe
+ *     to state transitions via `onDidChange`; the view refreshes
  *     reactively when the scan finishes instead of being polled.
  *   - Tests can construct a `ScanState` directly with no vscode side
- *     effects (the `setContext` calls are vscode commands; the stub
- *     harness no-ops them).
+ *     effects.
  *
  * Why not Promise/await directly:
  * `readAllSessionSets()` is currently synchronous-on-the-event-loop;
@@ -39,8 +38,6 @@ import * as vscode from "vscode";
  */
 
 export type ScanPhase = "idle" | "loading" | "ready";
-
-const CONTEXT_KEY = "dabblerSessionSets.scanState";
 
 export class ScanState {
   private _phase: ScanPhase = "idle";
@@ -64,12 +61,6 @@ export class ScanState {
   private _setPhase(next: ScanPhase): void {
     if (this._phase === next) return;
     this._phase = next;
-    // The setContext command is a vscode command, not an API call.
-    // It works under @vscode/test-electron, gets stubbed by the
-    // mocha stub harness, and is irrelevant under Playwright (which
-    // runs against a real Electron process). The fire-and-forget
-    // shape matches the rest of the codebase's context-key writes.
-    void vscode.commands.executeCommand("setContext", CONTEXT_KEY, next);
     this._emitter.fire(next);
   }
 

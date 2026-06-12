@@ -663,8 +663,8 @@ export async function openSessionSetsView(
   // content, so a bare `iframe` locator can strict-mode-violate on
   // fast runs (observed on the macOS CI runner).
   const inner = outer.frameLocator("iframe#active-frame");
-  // Wait for the tree to render (client.js has received the first
-  // rowsSnapshot or welcomeHtml fallback fired).
+  // Wait for the view to render (client.js has received the first
+  // rowsSnapshot).
   await inner.locator("#root").waitFor({ state: "attached", timeout: 30_000 });
   return inner;
 }

@@ -39,8 +39,10 @@
   // Set 060 Session 2: the Getting Started form's control state. Kept
   // here (like bucketCollapsed) so a snapshot re-render — which happens
   // after every action and on every watcher tick — doesn't snap the
-  // tier radio back to Full or untick the parallel checkbox.
-  const gsState = { tier: "full", parallel: false };
+  // tier radio back to Full or untick the parallel checkbox. Set 063
+  // S2: `budget` (raw input string) and `zeroMethod` (the $0 zero-rule
+  // radio pick) ride along for the same reason.
+  const gsState = { tier: "full", parallel: false, budget: "", zeroMethod: null };
   // Set 060 Session 3: the Getting Started surface HTML builders moved
   // to gettingStartedHtml.js (a UMD-lite module loaded as a second
   // <script> before this file) so the rendering — including the D6
@@ -110,6 +112,9 @@
     // "getting-started" replace the old viewsWelcome empty state; "list"
     // falls through to the bucket tree below. Session 2 wires the form
     // actions onto the `data-gs-action` hooks (wireGettingStarted).
+    // Set 063 S2 (spec D2): `gettingStarted` is required on the snapshot
+    // now — the pre-Set-060 welcome-HTML fallback branch is retired with
+    // the rest of the adoption-bootstrap path.
     var gs = lastSnapshot.gettingStarted;
     if (gs && gs.mode !== "list") {
       root.innerHTML =
@@ -117,13 +122,6 @@
           ? gsHtml.renderNoFolder()
           : gsHtml.renderGettingStarted(gs, gsState);
       wireGettingStarted();
-      return;
-    }
-    if (!gs && !lastSnapshot.hasAnySets) {
-      // Backward-compat fallback for a pre-Set-060 host that did not
-      // ship `gettingStarted`: render the welcome HTML (host-escaped via
-      // renderWelcomeMarkdown, safe to insert).
-      root.innerHTML = '<div class="welcome">' + lastSnapshot.welcomeHtml + '</div>';
       return;
     }
 
@@ -158,7 +156,11 @@
     Array.from(root.querySelectorAll('input[name="gs-tier"]')).forEach(function (input) {
       input.addEventListener("change", function () {
         if (input.checked) gsState.tier = input.value === "lightweight" ? "lightweight" : "full";
-        syncEnvWarning();
+        // Set 063 S2 (R1 Minor fix): the budget block is OMITTED from
+        // the Lightweight render (not hidden), so a tier flip
+        // re-renders the form surface locally. gsState carries every
+        // control value, so nothing is lost; no host round-trip.
+        render();
       });
     });
     Array.from(root.querySelectorAll('input[name="gs-parallel"]')).forEach(function (input) {
@@ -167,13 +169,45 @@
         syncWorktreeNote();
       });
     });
+    // Set 063 S2 (spec D1): budget input + the $0 zero-rule radio pair.
+    // Typing updates gsState and flips the zero-choice visibility in
+    // place; any edit clears a standing validation message (the next
+    // Build click re-validates).
+    Array.from(root.querySelectorAll('input[name="gs-budget"]')).forEach(function (input) {
+      input.addEventListener("input", function () {
+        gsState.budget = input.value;
+        syncBudgetBlock();
+        showBudgetError(null);
+      });
+    });
+    Array.from(root.querySelectorAll('input[name="gs-zero-method"]')).forEach(function (input) {
+      input.addEventListener("change", function () {
+        if (input.checked) gsState.zeroMethod = input.value;
+        showBudgetError(null);
+      });
+    });
     Array.from(root.querySelectorAll("[data-gs-action]")).forEach(function (btn) {
       btn.addEventListener("click", function (ev) {
         ev.stopPropagation();
         var action = btn.getAttribute("data-gs-action");
         if (!action) return;
         var msg = { type: "gettingStartedAction", action: action };
-        if (action === "build-structure") msg.tier = gsState.tier;
+        if (action === "build-structure") {
+          msg.tier = gsState.tier;
+          // Set 063 S2 (spec D1): on Full, Build is blocked until the
+          // budget validates (required amount; $0 additionally needs the
+          // zero-rule pick). Lightweight never renders the input and
+          // posts no budget riders.
+          if (gsState.tier !== "lightweight") {
+            var check = gsHtml.validateBudgetControls(gsState);
+            if (!check.ok) {
+              showBudgetError(check.error);
+              return; // button stays enabled; the operator fixes and retries
+            }
+            msg.budgetUsd = check.budgetUsd;
+            if (check.budgetUsd === 0) msg.zeroBudgetMethod = check.zeroMethod;
+          }
+        }
         if (action === "build-session-sets") {
           msg.parallel = gsState.parallel;
           // Set 060 S4: the tier radio also rides build-session-sets so
@@ -187,16 +221,10 @@
     });
   }
 
-  // D6 (Set 060 S3): show the provider-key warning only while the Full
-  // radio is selected and the host reported no key. The element is
-  // always rendered (hidden or not) so this is a pure visibility flip.
-  function syncEnvWarning() {
-    var warning = root.querySelector('[data-gs-warning="env"]');
-    if (!warning) return;
-    var gs = lastSnapshot && lastSnapshot.gettingStarted;
-    var keyPresent = !gs || gs.providerKeyPresent !== false;
-    warning.hidden = !(gsState.tier !== "lightweight" && !keyPresent);
-  }
+  // D6 note (Set 060 S3 → Set 063 S2): the provider-key warning's
+  // visibility is computed in renderGettingStarted from the tier
+  // control; tier-radio changes re-render the surface (see the tier
+  // listener above), so no standalone visibility-flip helper remains.
 
   // D7 (Set 060 S3): show the worktree note only while the parallel
   // checkbox is checked.
@@ -204,6 +232,27 @@
     var note = root.querySelector('[data-gs-note="worktree"]');
     if (!note) return;
     note.hidden = !gsState.parallel;
+  }
+
+  // Set 063 S2 (spec D1): the nested $0 zero-rule pair shows only
+  // while the parsed value is exactly 0. Pure visibility flip on input
+  // events (re-rendering per keystroke would drop input focus). The
+  // block itself is omitted from the Lightweight render entirely, so
+  // there is no block-level flip.
+  function syncBudgetBlock() {
+    var zero = root.querySelector("[data-gs-zero-choice]");
+    if (!zero) return;
+    var parsed = gsHtml.parseBudgetInput(gsState.budget);
+    zero.hidden = !(parsed.ok && parsed.value === 0);
+  }
+
+  // Set 063 S2 (spec D1): the inline validation element under the
+  // budget input. `message` null hides it; a string reveals it.
+  function showBudgetError(message) {
+    var el = root.querySelector("[data-gs-budget-error]");
+    if (!el) return;
+    el.textContent = message || "";
+    el.hidden = !message;
   }
 
   function renderBucket(bucket) {

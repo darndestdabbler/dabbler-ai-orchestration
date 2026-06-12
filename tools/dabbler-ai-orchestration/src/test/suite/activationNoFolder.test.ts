@@ -169,8 +169,8 @@ suite("activation — no workspace folder open (Set 059 regression)", () => {
     activateTracked();
     // Onboarding auto-`getStarted` is reserved for an opened workspace; in a
     // bare no-folder window it must stay quiet (workspaceState does not persist
-    // there, so otherwise it would pop on every launch). The view's welcome CTA
-    // and the Command Palette remain the entry points.
+    // there, so otherwise it would pop on every launch). The view's Getting
+    // Started surface and the Command Palette remain the entry points.
     assert.ok(
       !executed.includes("dabbler.getStarted"),
       `onboarding should not auto-fire getStarted with no folder; executed: ${executed.join(", ")}`,

@@ -1,7 +1,7 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Getting Started form, session-set explorer, cost dashboard, and adoption-bootstrap entry point for the Dabbler AI-led workflow.",
+  "description": "Getting Started form (the onboarding entry point), session-set explorer, and cost dashboard for the Dabbler AI-led workflow.",
   "version": "0.31.0",
   "publisher": "DarndestDabbler",
   "private": true,
@@ -60,13 +60,6 @@
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "dabblerSessionSets",
-        "when": "dabblerSessionSets.scanState == ready",
-        "contents": "No session sets in this workspace yet.\n\nThe quickest way to get started is to copy the adoption bootstrap prompt and paste it into a fresh AI chat (Claude Code, Gemini Code Assist, or any GPT-based tool). The AI will fetch the canonical setup instructions, talk you through a budget-threshold dialog, and present a numbered checklist of every intended write for batch approval before executing — no per-write prompts.\n[Copy adoption bootstrap prompt](command:dabbler.copyAdoptionBootstrapPrompt)\nPrefer a guided setup? The Session Set Explorer shows a step-by-step Getting Started form, with companion instructions in the editor.\n[Open Get Started](command:dabbler.getStarted)\nMore on the workflow: [Dabbler AI Orchestration on GitHub](https://github.com/darndestdabbler/dabbler-ai-orchestration#readme)"
-      }
-    ],
     "commands": [
       {
         "command": "dabblerSessionSets.refresh",
@@ -179,11 +172,6 @@
         "title": "Get Started",
         "category": "Dabbler",
         "icon": "$(star)"
-      },
-      {
-        "command": "dabbler.copyAdoptionBootstrapPrompt",
-        "title": "Copy adoption bootstrap prompt",
-        "category": "Dabbler"
       },
       {
         "command": "dabbler.setupNewProject",

@@ -32,7 +32,8 @@
   // D6 (Set 060 S3): the Full-tier provider-key warning, rendered
   // under the Build button. Shown only when the tier radio is on
   // "full" AND the host reported no provider key in its environment;
-  // client.js toggles `hidden` on radio changes without a host
+  // tier-radio changes re-render the form surface locally (Set 063
+  // S2), so visibility is computed here on every render — no host
   // round-trip. The copy carries the two load-bearing instructions:
   // set at least one key, then RELOAD THE WINDOW (the extension host
   // captures the merged Windows System + User environment at launch,
@@ -53,10 +54,63 @@
     "in its own worktree and is merged back to the main branch when " +
     "the sets complete.";
 
+  // Set 063 S2 (spec D1): the Full-tier budget / NTE step inside the
+  // Build-project-structure step. The label/help copy frames the value
+  // as the project's verification spending cap; the $0 copy is the
+  // consult-resolved wording (no silent default — the operator picks
+  // the zero-budget verification rule explicitly).
+  var BUDGET_LABEL_TEXT = "Verification budget (USD, not-to-exceed)";
+  var BUDGET_HELP_TEXT =
+    "Spending cap for cross-provider verification, written to " +
+    "ai_router/budget.yaml. Enter 0 to opt out of paid verification.";
+  var BUDGET_ZERO_CHOICE_TEXT =
+    "A $0 budget still needs a verification rule. Choose whether to " +
+    "check each session in another engine or skip verification.";
+
+  /**
+   * Parse the raw budget input. Required dollar amount: numeric and
+   * >= 0; empty / non-numeric / negative are rejected with the inline
+   * message the validation element shows (D1 lock).
+   */
+  function parseBudgetInput(raw) {
+    var trimmed = String(raw == null ? "" : raw).trim();
+    if (trimmed === "") {
+      return { ok: false, error: "Enter a budget amount in dollars (0 or more)." };
+    }
+    var value = Number(trimmed);
+    if (!isFinite(value)) {
+      return { ok: false, error: "Enter the budget as a plain number, like 25." };
+    }
+    if (value < 0) {
+      return { ok: false, error: "The budget can't be negative." };
+    }
+    return { ok: true, value: value };
+  }
+
+  /**
+   * Validate the form's budget control state ahead of the Build action
+   * (Full tier only — the caller skips this entirely on Lightweight).
+   * Returns `{ ok: true, budgetUsd, zeroMethod }` (zeroMethod null for
+   * values > 0) or `{ ok: false, error }` when Build must stay blocked.
+   */
+  function validateBudgetControls(controls) {
+    var parsed = parseBudgetInput(controls.budget);
+    if (!parsed.ok) return { ok: false, error: parsed.error };
+    if (parsed.value === 0) {
+      var method = controls.zeroMethod;
+      if (method !== "manual-via-other-engine" && method !== "skipped") {
+        return { ok: false, error: BUDGET_ZERO_CHOICE_TEXT };
+      }
+      return { ok: true, budgetUsd: 0, zeroMethod: method };
+    }
+    return { ok: true, budgetUsd: parsed.value, zeroMethod: null };
+  }
+
   /**
    * The D6 warning element. `visible` = (tier === "full" &&
    * !gs.providerKeyPresent); rendered hidden (not omitted) so the
-   * client can flip visibility on radio changes without re-rendering.
+   * structure is stable across renders (visibility recomputes on the
+   * tier-change re-render).
    */
   function envWarningHtml(visible) {
     return (
@@ -75,6 +129,55 @@
       (visible ? "" : " hidden") +
       ">" +
       escHtml(WORKTREE_NOTE_TEXT) +
+      "</div>"
+    );
+  }
+
+  function escAttr(s) {
+    return escHtml(s).replace(/"/g, "&quot;");
+  }
+
+  /**
+   * Set 063 S2 (spec D1): the budget / NTE block inside step 1. Full
+   * tier ONLY — on Lightweight the block (input, zero-rule pair,
+   * validation element) is OMITTED from the DOM entirely, not rendered
+   * hidden (S2 verifier R1 Minor: the D1 lock says Lightweight never
+   * renders the input). Tier-radio changes therefore re-render the
+   * form surface (client.js) instead of visibility-flipping this
+   * block; gsState preserves the operator's values across the
+   * re-render. The nested $0 zero-rule radio pair keeps its own
+   * `hidden` flip (input events are high-frequency; re-rendering on
+   * every keystroke would drop focus). The validation element starts
+   * hidden; client.js fills and reveals it when a Build click fails
+   * validation.
+   */
+  function budgetBlockHtml(controls) {
+    if (controls.tier === "lightweight") return "";
+    var parsed = parseBudgetInput(controls.budget == null ? "" : controls.budget);
+    var zeroVisible = parsed.ok && parsed.value === 0;
+    var manualChecked =
+      controls.zeroMethod === "manual-via-other-engine" ? " checked" : "";
+    var skippedChecked = controls.zeroMethod === "skipped" ? " checked" : "";
+    return (
+      '<div class="gs-budget" data-gs-budget>' +
+        '<label class="gs-budget-label" for="gs-budget-input">' +
+          escHtml(BUDGET_LABEL_TEXT) +
+        "</label>" +
+        '<input class="gs-budget-input" id="gs-budget-input" name="gs-budget"' +
+          ' type="text" inputmode="decimal" placeholder="25" value="' +
+          escAttr(controls.budget == null ? "" : controls.budget) + '">' +
+        '<div class="gs-budget-help">' + escHtml(BUDGET_HELP_TEXT) + "</div>" +
+        '<div class="gs-zero-choice" data-gs-zero-choice' +
+          (zeroVisible ? "" : " hidden") + ">" +
+          '<div class="gs-zero-copy">' + escHtml(BUDGET_ZERO_CHOICE_TEXT) + "</div>" +
+          '<label class="gs-radio"><input type="radio" name="gs-zero-method"' +
+            ' value="manual-via-other-engine"' + manualChecked +
+            "> Check in another engine</label>" +
+          '<label class="gs-radio"><input type="radio" name="gs-zero-method"' +
+            ' value="skipped"' + skippedChecked +
+            "> Skip verification</label>" +
+        "</div>" +
+        '<div class="gs-validation" data-gs-budget-error role="alert" hidden></div>' +
       "</div>"
     );
   }
@@ -120,8 +223,9 @@
    * The full Getting Started form. `gs` is the host's
    * GettingStartedPayload (three D3 completion flags +
    * providerKeyPresent); `controls` is the webview-local control
-   * state `{ tier: "full"|"lightweight", parallel: boolean }` so
-   * re-renders keep the operator's picks (Set 060 S2).
+   * state `{ tier: "full"|"lightweight", parallel: boolean,
+   * budget: string, zeroMethod: string|null }` so re-renders keep the
+   * operator's picks (Set 060 S2; budget controls Set 063 S2).
    */
   function renderGettingStarted(gs, controls) {
     var fullChecked = controls.tier === "lightweight" ? "" : " checked";
@@ -137,6 +241,7 @@
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="full"' + fullChecked + '> Full</label>' +
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="lightweight"' + lightChecked + '> Lightweight</label>' +
       '</div>' +
+      budgetBlockHtml(controls) +
       '<button class="gs-button" type="button" data-gs-action="build-structure">' +
         'Build project structure' +
       '</button>' +
@@ -182,7 +287,13 @@
     gsStep: gsStep,
     envWarningHtml: envWarningHtml,
     worktreeNoteHtml: worktreeNoteHtml,
+    budgetBlockHtml: budgetBlockHtml,
+    parseBudgetInput: parseBudgetInput,
+    validateBudgetControls: validateBudgetControls,
     ENV_WARNING_TEXT: ENV_WARNING_TEXT,
     WORKTREE_NOTE_TEXT: WORKTREE_NOTE_TEXT,
+    BUDGET_LABEL_TEXT: BUDGET_LABEL_TEXT,
+    BUDGET_HELP_TEXT: BUDGET_HELP_TEXT,
+    BUDGET_ZERO_CHOICE_TEXT: BUDGET_ZERO_CHOICE_TEXT,
   };
 });

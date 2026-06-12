@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "title": "Full-tier build path fails open when the budget rider is missing or malformed",
+      "category": "Correctness",
+      "severity": "Major",
+      "description": "D1 makes the budget required on the Full Getting Started path, and this codebase explicitly treats webview riders as untrusted. But `asBudgetChoice()` in `src/commands/gettingStartedActions.ts` returns `undefined` for missing/invalid `budgetUsd` or `$0` without a zero-method, and `routeGettingStartedAction()` still calls `handlers.buildStructure(tier, undefined)` for `tier === \"full\"`. `scaffoldConsumerRepo()` then completes a Full scaffold with `budgetOutcome: null`, producing a Full repo without `ai_router/budget.yaml`. The new tests in `src/test/suite/gettingStartedActions.test.ts` explicitly lock in that fail-open behavior (`malformed riders narrow to undefined (scaffold proceeds, no write)`). Fix: on the webview `build-structure` action, reject/abort Full-tier builds unless the budget rider narrows successfully; only the separate command-palette setup path should remain budgetless.",
+      "resolution_status": "fixed",
+      "resolution_note": "routeGettingStartedAction now REJECTS a Full-tier build-structure action whose budget rider does not narrow (returns false, handler never runs, console.warn) — fail-closed at the host boundary; the webview-validated path is unaffected and the palette setupNewProject flow remains the only budgetless entry. Tests updated: the former fail-open lock-in test now asserts rejection for each malformed-rider shape on Full, and the dispatch/tier-narrowing tests carry a valid budget rider."
+    },
+    {
+      "title": "Lightweight still renders the budget input hidden instead of omitting it",
+      "category": "Completeness",
+      "severity": "Minor",
+      "description": "D1 says the budget step is rendered on Full tier only and that Lightweight never renders the input. In `media/session-sets-tree/gettingStartedHtml.js`, `budgetBlockHtml()` always emits the budget controls and merely adds `hidden` when `controls.tier === \"lightweight\"`; `src/test/suite/gettingStartedHtml.test.ts` asserts that hidden behavior instead of absence. Fix: conditionally exclude the budget block from the Lightweight render path rather than keeping the input in the DOM under `hidden`.",
+      "resolution_status": "fixed",
+      "resolution_note": "budgetBlockHtml now returns an empty string on Lightweight (the block — input, zero-rule pair, validation element — is OMITTED from the DOM, not hidden); client.js re-renders the form surface on tier-radio changes (gsState preserves every control value across the re-render, so the flip stays host-round-trip-free). Test updated to assert absence on the Lightweight render."
+    }
+  ]
+}

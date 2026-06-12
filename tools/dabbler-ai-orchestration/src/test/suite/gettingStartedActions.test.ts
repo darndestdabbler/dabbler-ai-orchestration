@@ -20,8 +20,10 @@ import * as os from "os";
 import * as path from "path";
 import {
   GettingStartedHandlers,
+  asBudgetChoice,
   routeGettingStartedAction,
 } from "../../commands/gettingStartedActions";
+import { BudgetChoice } from "../../utils/budgetYaml";
 import { scaffoldConsumerRepo } from "../../commands/gitScaffold";
 import { FileOps } from "../../utils/aiRouterInstall";
 import {
@@ -54,6 +56,8 @@ const bundle: TemplateBundle = loadTemplateBundle(canonicalBundleDir());
 interface CallLog {
   openFolder: number;
   buildStructure: Array<"full" | "lightweight">;
+  // Set 063 S2: the narrowed budget rider build-structure forwards.
+  buildStructureBudgets: Array<BudgetChoice | undefined>;
   importPlan: number;
   copyPlanPrompt: number;
   // Set 060 S4: build-session-sets carries (parallel, tier).
@@ -64,13 +68,17 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
   const calls: CallLog = {
     openFolder: 0,
     buildStructure: [],
+    buildStructureBudgets: [],
     importPlan: 0,
     copyPlanPrompt: 0,
     buildSessionSets: [],
   };
   const handlers: GettingStartedHandlers = {
     openFolder: async () => void calls.openFolder++,
-    buildStructure: async (tier) => void calls.buildStructure.push(tier),
+    buildStructure: async (tier, budget) => {
+      calls.buildStructure.push(tier);
+      calls.buildStructureBudgets.push(budget);
+    },
     importPlan: async () => void calls.importPlan++,
     copyPlanPrompt: async () => void calls.copyPlanPrompt++,
     buildSessionSets: async (parallel, tier) =>
@@ -90,7 +98,11 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
       "build-session-sets",
     ] as const) {
       const handled = await routeGettingStartedAction(
-        { type: "gettingStartedAction", action },
+        // Set 063 S2: Full build-structure REQUIRES a budget rider (the
+        // fail-closed R1 fix), so the dispatch probe carries one.
+        action === "build-structure"
+          ? { type: "gettingStartedAction", action, budgetUsd: 25 }
+          : { type: "gettingStartedAction", action },
         handlers,
       );
       assert.strictEqual(handled, true, action);
@@ -104,9 +116,16 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
 
   test("forwards a valid tier rider and defaults invalid / missing tiers to full", async () => {
     const { handlers, calls } = recordingHandlers();
+    // Budget rider present throughout: tier narrowing is the concern
+    // here, and Full without a budget is rejected since the R1 fix.
     const post = (tier?: unknown) =>
       routeGettingStartedAction(
-        { type: "gettingStartedAction", action: "build-structure", tier } as GettingStartedActionMsg,
+        {
+          type: "gettingStartedAction",
+          action: "build-structure",
+          tier,
+          budgetUsd: 25,
+        } as GettingStartedActionMsg,
         handlers,
       );
     await post("lightweight");
@@ -158,6 +177,59 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     );
   });
 
+  test("forwards narrowed budget riders on build-structure (Set 063 S2)", async () => {
+    const { handlers, calls } = recordingHandlers();
+    const post = (riders: Partial<GettingStartedActionMsg>) =>
+      routeGettingStartedAction(
+        {
+          type: "gettingStartedAction",
+          action: "build-structure",
+          ...riders,
+        } as GettingStartedActionMsg,
+        handlers,
+      );
+    assert.strictEqual(await post({ tier: "full", budgetUsd: 25 }), true);
+    assert.strictEqual(
+      await post({ tier: "full", budgetUsd: 0, zeroBudgetMethod: "skipped" }),
+      true,
+    );
+    // Lightweight drops the rider but still builds (no budget file).
+    assert.strictEqual(await post({ tier: "lightweight", budgetUsd: 25 }), true);
+    assert.deepStrictEqual(calls.buildStructureBudgets, [
+      { thresholdUsd: 25 },
+      { thresholdUsd: 0, zeroMethod: "skipped" },
+      undefined,
+    ]);
+  });
+
+  test("REJECTS a Full build-structure whose budget rider does not narrow (R1 fail-closed fix)", async () => {
+    const { handlers, calls } = recordingHandlers();
+    const post = (riders: Partial<GettingStartedActionMsg>) =>
+      routeGettingStartedAction(
+        {
+          type: "gettingStartedAction",
+          action: "build-structure",
+          ...riders,
+        } as GettingStartedActionMsg,
+        handlers,
+      );
+    for (const riders of [
+      { tier: "full" as const },                                   // no rider at all
+      { tier: "full" as const, budgetUsd: -5 },                    // negative
+      { tier: "full" as const, budgetUsd: "25" as unknown as number }, // wrong type
+      { tier: "full" as const, budgetUsd: 0 },                     // $0 without the pick
+      {},                                                          // tier defaults to full
+    ]) {
+      const handled = await post(riders);
+      assert.strictEqual(handled, false, JSON.stringify(riders));
+    }
+    assert.strictEqual(
+      calls.buildStructure.length,
+      0,
+      "no handler may run for a rejected Full build",
+    );
+  });
+
   test("ignores unknown actions (returns false, no handler runs)", async () => {
     const { handlers, calls } = recordingHandlers();
     const handled = await routeGettingStartedAction(
@@ -170,6 +242,55 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     assert.strictEqual(calls.importPlan, 0);
     assert.strictEqual(calls.copyPlanPrompt, 0);
     assert.strictEqual(calls.buildSessionSets.length, 0);
+  });
+});
+
+// ---------- 1b. asBudgetChoice narrowing (Set 063 S2, spec D1) ----------
+
+suite("asBudgetChoice — untrusted budget-rider narrowing", () => {
+  const msg = (riders: Partial<GettingStartedActionMsg>): GettingStartedActionMsg =>
+    ({
+      type: "gettingStartedAction",
+      action: "build-structure",
+      ...riders,
+    }) as GettingStartedActionMsg;
+
+  test("valid amounts narrow on the Full tier", () => {
+    assert.deepStrictEqual(asBudgetChoice(msg({ budgetUsd: 25 }), "full"), {
+      thresholdUsd: 25,
+    });
+    assert.deepStrictEqual(
+      asBudgetChoice(msg({ budgetUsd: 0, zeroBudgetMethod: "manual-via-other-engine" }), "full"),
+      { thresholdUsd: 0, zeroMethod: "manual-via-other-engine" },
+    );
+  });
+
+  test("Lightweight always narrows to undefined (never writes the file)", () => {
+    assert.strictEqual(asBudgetChoice(msg({ budgetUsd: 25 }), "lightweight"), undefined);
+  });
+
+  test("malformed riders narrow to undefined (the router then fail-closes on Full)", () => {
+    for (const riders of [
+      {},
+      { budgetUsd: -5 },
+      { budgetUsd: NaN },
+      { budgetUsd: "25" as unknown as number },
+      { budgetUsd: 0 }, // $0 without the required zero-rule pick
+      { budgetUsd: 0, zeroBudgetMethod: "api" as unknown as "skipped" },
+    ]) {
+      assert.strictEqual(
+        asBudgetChoice(msg(riders), "full"),
+        undefined,
+        JSON.stringify(riders),
+      );
+    }
+  });
+
+  test("a zero-rule rider on a positive amount is ignored, not recorded", () => {
+    assert.deepStrictEqual(
+      asBudgetChoice(msg({ budgetUsd: 25, zeroBudgetMethod: "skipped" }), "full"),
+      { thresholdUsd: 25 },
+    );
   });
 });
 

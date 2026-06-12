@@ -1,17 +1,19 @@
 // Layer 3 rendering smoke for the activation-time loading state,
-// Set 030 Session 5. Verifies the viewsWelcome `when` clause gates the
-// "no sets" CTA on scanState == ready — i.e., an empty workspace
-// surfaces the CTA AFTER the scan completes, not as a flash before
-// the tree first paints.
+// Set 030 Session 5. Verifies an empty workspace surfaces the
+// Getting Started empty state AFTER the scan completes, not as a
+// flash before the view first paints. (The viewsWelcome `when`-clause
+// gating this spec originally asserted was retired with the welcome
+// CTA in Sets 060/063 — the webview's scanState-driven loading
+// sentinel is the gating mechanism now.)
 //
 // This is a structural smoke, not a timing smoke: by the time
 // Playwright connects via CDP, the activation function has already
 // returned and scanState has flipped to "ready" via setImmediate. We
-// assert the steady-state shape (welcome content present, scan done)
-// because we can't reliably observe the loading sentinel itself in
-// the cross-process timing window. The architectural unit-level
-// invariant (`provider.getChildren()` returns the loading sentinel
-// while scanState == "loading") is covered by mocha unit tests.
+// assert the steady-state shape (Getting Started form present, scan
+// done) because we can't reliably observe the loading sentinel itself
+// in the cross-process timing window. The architectural unit-level
+// invariant (the loading sentinel renders while scanState ==
+// "loading") is covered by mocha unit tests.
 
 import { expect, test } from "@playwright/test";
 import * as fs from "fs";
@@ -55,8 +57,8 @@ async function teardown(per: PerTest): Promise<void> {
 }
 
 // ---------------------------------------------------------------------
-// Scenario: empty docs/session-sets directory → welcome CTA appears
-// after scan completes (no flash before).
+// Scenario: empty docs/session-sets directory → the Getting Started
+// form appears after scan completes (no flash before).
 // ---------------------------------------------------------------------
 test("Getting Started form renders after scan completes on an empty workspace", async () => {
   const per: PerTest = {};
@@ -83,12 +85,11 @@ test("Getting Started form renders after scan completes on an empty workspace", 
 
     // Set 060 (Getting Started redesign): an open folder with no
     // session sets renders the staged Getting Started form inside the
-    // Explorer webview (gettingStarted.mode == "getting-started"),
-    // replacing the old viewsWelcome "Copy adoption bootstrap prompt"
-    // empty state this spec asserted pre-060. The companion
-    // instructions doc auto-opens as a markdown preview — a second
-    // webview iframe — which is why openSessionSetsView scopes its
-    // outer locator to the side bar.
+    // Explorer webview (gettingStarted.mode == "getting-started") —
+    // the only empty state since Set 063 retired the welcome CTA. The
+    // companion instructions doc auto-opens as a markdown preview — a
+    // second webview iframe — which is why openSessionSetsView scopes
+    // its outer locator to the side bar.
     const inner = await openSessionSetsView(per.launch.page);
     await expect(inner.locator(".getting-started")).toBeVisible({
       timeout: 30_000,

@@ -10,7 +10,6 @@ import { registerOpenFileCommands } from "./commands/openFile";
 import { registerCopyCommands } from "./commands/copyCommand";
 import { registerCopyPromptCommands } from "./commands/copyPromptCommands";
 import { registerGitScaffoldCommand } from "./commands/gitScaffold";
-import { registerCopyAdoptionBootstrapPromptCommand } from "./commands/copyAdoptionBootstrapPrompt";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerInstallAiRouterCommands } from "./commands/installAiRouterCommands";
@@ -93,12 +92,12 @@ export function activate(context: vscode.ExtensionContext): void {
   // `[]` with no folders, the context-key / watcher blocks are wrapped in
   // try/catch, and `onDidChangeWorkspaceFolders(refreshAll)` re-runs the
   // folder-dependent runtime the moment a folder is added. The view renders its
-  // `viewsWelcome` CTA as the empty state instead of hanging.
+  // Getting Started surface as the empty state instead of hanging.
 
   // Set 030 Session 5: scanState lifecycle. Flip to "loading" BEFORE
   // we register the tree provider so the very first `getChildren()`
   // sees `phase === "loading"` and returns the sentinel — no
-  // welcome-CTA flash window. The async `setImmediate` below flips
+  // empty-state flash window. The async `setImmediate` below flips
   // to "ready" after the synchronous body of `activate` returns,
   // which lets the tree provider's reactive `onDidChange` refresh
   // swap the sentinel for real rows on the next render tick.
@@ -292,9 +291,6 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerCopyCommands", () => registerCopyCommands(context));
   safeRegister("registerCopyPromptCommands", () => registerCopyPromptCommands(context));
   safeRegister("registerGitScaffoldCommand", () => registerGitScaffoldCommand(context));
-  safeRegister("registerCopyAdoptionBootstrapPromptCommand", () =>
-    registerCopyAdoptionBootstrapPromptCommand(context),
-  );
   safeRegister("registerTroubleshootCommand", () => registerTroubleshootCommand(context));
   safeRegister("registerGetStartedCommand", () => registerGetStartedCommand(context));
   safeRegister("registerPlanImportCommand", () => registerPlanImportCommand(context));
@@ -389,8 +385,8 @@ export function activate(context: vscode.ExtensionContext): void {
   // reliably in an empty (no-folder) window, so without this guard the wizard
   // would auto-pop on EVERY fresh no-folder launch — intrusive when the user
   // opened a blank window for something unrelated. With no folder the user
-  // still reaches Get Started via the view's welcome CTA or the Command
-  // Palette; auto-onboarding is reserved for an opened workspace.
+  // still reaches Get Started via the view's Getting Started surface or the
+  // Command Palette; auto-onboarding is reserved for an opened workspace.
   const hasSeenOnboarding = context.workspaceState.get<boolean>("hasSeenOnboarding", false);
   if (!hasSeenOnboarding && (vscode.workspace.workspaceFolders?.length ?? 0) > 0) {
     const roots = discoverRoots();

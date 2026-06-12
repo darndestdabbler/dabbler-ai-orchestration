@@ -193,7 +193,6 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   private version = 0;
   private renderTimer: NodeJS.Timeout | undefined;
   private cache: SessionSet[] | null = null;
-  private welcomeHtml: string;
   // Set 060 Session 2: bound once at construction; injectable for tests.
   private readonly gettingStartedHandlers: GettingStartedHandlers;
   // Set 060 Session 3 (D8): the static instructions doc auto-opens
@@ -210,7 +209,6 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     gettingStartedHandlers?: GettingStartedHandlers,
     openInstructions?: () => void | Promise<void>,
   ) {
-    this.welcomeHtml = this.loadWelcomeHtmlFromPackageJson();
     this.gettingStartedHandlers =
       gettingStartedHandlers ?? makeGettingStartedHandlers(context);
     this.openInstructions =
@@ -474,7 +472,6 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     const payload: SnapshotPayload = {
       buckets: this.buildBuckets(all),
       hasAnySets: all.length > 0,
-      welcomeHtml: this.welcomeHtml,
       gettingStarted: this.buildGettingStarted(all),
     };
 
@@ -653,48 +650,6 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     };
   }
 
-  // ----- Welcome HTML extraction -----
-
-  // Parse package.json `viewsWelcome` contribution for our view id
-  // and convert the contents markdown to an HTML fragment the
-  // webview can render. Keeps the package.json declaration as the
-  // single source of truth (per S4 Q3 = a, GPT M4 cleanliness).
-  private loadWelcomeHtmlFromPackageJson(): string {
-    try {
-      const pkgPath = vscode.Uri.joinPath(this.context.extensionUri, "package.json").fsPath;
-      const fs = require("fs") as typeof import("fs");
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-      const entries: Array<{ view?: string; contents?: string }> = pkg?.contributes?.viewsWelcome ?? [];
-      const ours = entries.find((e) => e.view === CustomSessionSetsView.viewType);
-      if (!ours?.contents) return this.escHtml("No welcome content available.");
-      return this.renderWelcomeMarkdown(ours.contents);
-    } catch {
-      return this.escHtml("No welcome content available.");
-    }
-  }
-
-  // Minimal markdown → HTML for the viewsWelcome contents. Supports
-  // paragraphs (separated by \n) and the two link forms the actual
-  // entry uses: `[label](command:foo)` and `[label](https://...)`.
-  // Stays narrow on purpose — we control the source string in
-  // package.json, so we don't need a full markdown parser.
-  private renderWelcomeMarkdown(src: string): string {
-    const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
-    const paragraphs = src.split(/\n+/);
-    const out = paragraphs.map((p) => {
-      const escapedTextWithPlaceholders = this.escHtml(p);
-      // Re-find link patterns in the ESCAPED text since escHtml
-      // doesn't touch `[`, `]`, `(`, `)`.
-      const withLinks = escapedTextWithPlaceholders.replace(linkRe, (_m, label, href) => {
-        const safeHref = this.escAttr(href);
-        const safeLabel = this.escHtml(label);
-        return `<a href="${safeHref}">${safeLabel}</a>`;
-      });
-      return `<p>${withLinks}</p>`;
-    });
-    return out.join("\n");
-  }
-
   // ----- Webview shell HTML -----
 
   // The host-side webview HTML only sets up the document chrome +
@@ -741,19 +696,6 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;
-  }
-
-  // ----- Local escape helpers (welcome path; renderShell only) -----
-
-  private escHtml(s: string): string {
-    return String(s ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
-
-  private escAttr(s: string): string {
-    return this.escHtml(s).replace(/"/g, "&quot;");
   }
 }
 

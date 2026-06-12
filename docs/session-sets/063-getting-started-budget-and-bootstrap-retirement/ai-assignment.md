@@ -27,10 +27,10 @@ moderate
 | 4 | Cross-provider verification of the audit record. | `route(task_type="review", model="sonnet")` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (TBD)
-- Total routed cost: (TBD)
-- Deviations from recommendation: (TBD)
-- Notes for next-session calibration: (TBD)
+- Orchestrator used: Claude Code `anthropic, claude-fable-5` @ effort=`high`
+- Total routed cost: $0.4984 (analysis $0.0144 + architecture $0.3488 gpt-5-4 + $0.0088 gemini-pro + session-verification $0.0911 R1 + $0.0352 R2)
+- Deviations from recommendation: orchestrator was Claude Code, not the recommended Gemini Code Assist (operator's choice). Steps 1–2 ran as direct empirical audit (Grep/Read at file:line) rather than routed `code_analysis` — the evidence-gathering was file mechanics, not routable reasoning; step 3's contested locks went to a routed two-provider consult (gpt-5-4 + gemini-pro, `architecture`) instead of a single opus `design_spec`.
+- Notes for next-session calibration: the gpt-5-4 architecture consult returned 23,020 output tokens ($0.3488 — 70% of session spend); cap consult output (max_tokens / tighter prompt) when the question set is three items.
 
 ---
 
@@ -54,10 +54,10 @@ high
 | 5 | Cross-provider verification of the implementation against the locks. | `route(task_type="code_review", model="sonnet")` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (TBD)
-- Total routed cost: (TBD)
-- Deviations from recommendation: (TBD)
-- Notes for next-session calibration: (TBD)
+- Orchestrator used: Claude Code `anthropic, claude-fable-5` @ effort=`high` (as recommended)
+- Total routed cost: $0.3004 (session-verification gpt-5-4: R1 $0.2213 + narrow R2 $0.0790)
+- Deviations from recommendation: step 5 ran as the canonical `session-verification` task type (the recommender's `code_review` label), routed by the router to gpt-5-4 rather than the suggested sonnet; steps 1–4 orchestrator-direct/local as recommended.
+- Notes for next-session calibration: R1 caught a real host-boundary fail-open (webview-side validation alone is not enforcement — untrusted riders must fail closed). Budget the verification at two rounds when a session adds a new webview→host channel.
 
 ---
 

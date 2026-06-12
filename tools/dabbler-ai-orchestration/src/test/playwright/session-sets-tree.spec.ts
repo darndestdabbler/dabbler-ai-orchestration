@@ -146,8 +146,8 @@ test("Getting Started form renders when no session sets exist (webview path)", a
 
     // Set 060 (Getting Started redesign): a folder with no session
     // sets renders the staged Getting Started form in the Explorer
-    // webview, replacing the old `.welcome` viewsWelcome empty state
-    // this spec asserted pre-060.
+    // webview — the only empty state since Set 063 retired the
+    // `.welcome` viewsWelcome fallback this spec asserted pre-060.
     await expect(inner.locator(".getting-started")).toBeVisible({
       timeout: 30_000,
     });

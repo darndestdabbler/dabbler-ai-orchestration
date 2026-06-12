@@ -23,15 +23,43 @@ import * as vscode from "vscode";
 import { GettingStartedActionMsg } from "../types/sessionSetsWebviewProtocol";
 import { asTier, buildProjectStructureNoPrompt } from "./gitScaffold";
 import { Tier } from "../utils/consumerBootstrap";
+import {
+  BudgetChoice,
+  asBudgetUsd,
+  asZeroBudgetMethod,
+} from "../utils/budgetYaml";
 import { copyPlanningPrompt, importPlanFromFile } from "../wizard/planImport";
 import { copySessionSetGenPrompt } from "../wizard/sessionGenPrompt";
 
 export interface GettingStartedHandlers {
   openFolder(): Promise<void>;
-  buildStructure(tier: Tier): Promise<void>;
+  buildStructure(tier: Tier, budget?: BudgetChoice): Promise<void>;
   importPlan(): Promise<void>;
   copyPlanPrompt(): Promise<void>;
   buildSessionSets(parallel: boolean, tier: Tier): Promise<void>;
+}
+
+/**
+ * Set 063 S2 (spec D1): narrow the untrusted budget riders on a
+ * build-structure message to a {@link BudgetChoice}, or undefined when
+ * the riders are absent / malformed / tier-inapplicable. Lightweight
+ * never writes the file, so the rider is dropped outright there. A $0
+ * budget without the required zero-rule pick narrows to undefined too —
+ * the host never invents the operator's choice (the writer would refuse
+ * it anyway); the scaffold still runs, just without a budget write.
+ */
+export function asBudgetChoice(
+  msg: GettingStartedActionMsg,
+  tier: Tier,
+): BudgetChoice | undefined {
+  if (tier !== "full") return undefined;
+  const thresholdUsd = asBudgetUsd(msg.budgetUsd);
+  if (thresholdUsd === undefined) return undefined;
+  if (thresholdUsd === 0) {
+    const zeroMethod = asZeroBudgetMethod(msg.zeroBudgetMethod);
+    return zeroMethod ? { thresholdUsd, zeroMethod } : undefined;
+  }
+  return { thresholdUsd };
 }
 
 /**
@@ -50,9 +78,24 @@ export async function routeGettingStartedAction(
       return true;
     case "build-structure": {
       // Untrusted tier rider: narrow, defaulting to "full" (the radio's
-      // checked default) when absent or unrecognized.
+      // checked default) when absent or unrecognized. The Set 063 budget
+      // riders narrow alongside (Full only; see asBudgetChoice).
       const tier = asTier(msg.tier) ?? "full";
-      await handlers.buildStructure(tier);
+      const budget = asBudgetChoice(msg, tier);
+      if (tier === "full" && !budget) {
+        // S2 verifier R1 Major (fail-closed): D1 makes the budget
+        // REQUIRED on the Full form path. The webview blocks Build until
+        // its riders validate, so a Full action arriving without a
+        // narrowable budget is a hostile/buggy webview — reject it
+        // rather than scaffolding a Full repo with no budget.yaml. The
+        // Command-Palette setupNewProject flow (no webview, no budget
+        // input) stays the only budgetless entry point.
+        console.warn(
+          "[gettingStarted] rejected Full-tier build-structure without a valid budget rider",
+        );
+        return false;
+      }
+      await handlers.buildStructure(tier, budget);
       return true;
     }
     case "import-plan":
@@ -98,11 +141,12 @@ export function makeGettingStartedHandlers(
     // Step 1: scaffold into the OPEN workspace folder (D5) with no
     // prompts. Folder-picker fallback when none is open (spec S2 step 1)
     // — pick, scaffold there, then open the folder so the form's live
-    // state tracks the scaffolded root.
-    async buildStructure(tier: Tier): Promise<void> {
+    // state tracks the scaffolded root. Set 063 S2 (D1): the narrowed
+    // budget pick rides through to the scaffold's budget.yaml write.
+    async buildStructure(tier: Tier, budget?: BudgetChoice): Promise<void> {
       const openRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (openRoot) {
-        await buildProjectStructureNoPrompt(context, openRoot, tier);
+        await buildProjectStructureNoPrompt(context, openRoot, tier, budget);
         return;
       }
       const picked = await vscode.window.showOpenDialog({
@@ -113,7 +157,7 @@ export function makeGettingStartedHandlers(
         title: "Select the folder to build the project structure into",
       });
       if (!picked?.[0]) return;
-      await buildProjectStructureNoPrompt(context, picked[0].fsPath, tier);
+      await buildProjectStructureNoPrompt(context, picked[0].fsPath, tier, budget);
       await vscode.commands.executeCommand("vscode.openFolder", picked[0]);
     },
 

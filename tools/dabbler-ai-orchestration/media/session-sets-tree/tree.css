@@ -39,18 +39,9 @@ html, body {
 .loading-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
 .loading-subtitle { font-size: 12px; opacity: 0.7; }
 
-/* ---- Welcome panel (rendered from package.json viewsWelcome) ---- */
-.welcome {
-  padding: 12px 14px;
-  font-size: 13px;
-  line-height: 1.55;
-}
-.welcome p { margin: 0 0 8px 0; }
-.welcome a {
-  color: var(--vscode-textLink-foreground);
-  text-decoration: none;
-}
-.welcome a:hover { color: var(--vscode-textLink-activeForeground); text-decoration: underline; }
+/* Set 063 S2 (spec D2): the `.welcome` panel styles are retired with
+ * the pre-Set-060 welcome-HTML fallback (the Getting Started form is
+ * the only empty-state surface). */
 
 /* ---- Ambiguity banner (multi-in-progress fail-closed signal) ---- */
 .ambiguity-banner {
@@ -420,4 +411,56 @@ body.vscode-light, body.vscode-high-contrast-light {
   color: var(--vscode-foreground);
 }
 .gs-note[hidden] { display: none; }
+
+/* Set 063 S2 (D1): the Full-tier budget / NTE block inside step 1.
+   OMITTED from the Lightweight render entirely; the nested $0
+   zero-rule pair and the validation message carry `hidden` flips. */
+.gs-budget {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.gs-budget-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.gs-budget-input {
+  width: 110px;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+}
+.gs-budget-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+.gs-budget-help {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+.gs-zero-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 8px;
+  border-left: 3px solid
+    var(--vscode-inputValidation-infoBorder, #3794ff);
+  background: var(--vscode-inputValidation-infoBackground, rgba(55, 148, 255, 0.10));
+}
+.gs-zero-choice[hidden] { display: none; }
+.gs-zero-copy { font-size: 11px; line-height: 1.45; }
+.gs-validation {
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 6px 8px;
+  border-left: 3px solid
+    var(--vscode-inputValidation-errorBorder, #f14c4c);
+  background: var(--vscode-inputValidation-errorBackground, rgba(241, 76, 76, 0.12));
+  color: var(--vscode-foreground);
+}
+.gs-validation[hidden] { display: none; }
 

@@ -16,7 +16,16 @@
     "docs/session-sets/065-verification-surface-empirics/disposition.json"
   ],
   "verification_message_ids": [],
-  "next_orchestrator": null,
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-8",
+    "effort": "low",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Architectural continuity is critical since S2 is a direct implementation spike based on S1's design work. Staying with the incumbent maintains context, minimizes risk, and avoids the overhead of onboarding a new model mid-project."
+    }
+  },
   "blockers": [],
   "lessons_cited": [
     "L-064-3",

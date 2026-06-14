@@ -70,3 +70,34 @@ workflow.)_
   recipe doc, and a large-context read-only dogfood over a 154 KB file;
   frontier reasoning keeps the classifier evidence and the projection
   coherent.
+
+## Session 4 — Templates, docs sweep, release, close-out
+
+> Authored via routed analysis (`route(task_type="analysis")`,
+> gemini-2.5-pro, $0.0036) per the no-self-opine rule.
+
+| Step | Recommended AI |
+| :--- | :--- |
+| D7 template bundle: 3 metadata-aware templates + TS writer/esbuild + golden regen | GPT-5.4 (openai) |
+| D7 cross-repo notice doc | Gemini 2.5 Pro (google) |
+| D8 canonical lifecycle doc + docs sweep | Gemini 2.5 Pro (google) |
+| D8 release: PyPI + Marketplace bumps + CHANGELOGs + repository-reference | Gemini 2.5 Pro (google) |
+| Cross-provider session verification | Claude Opus 4.8 (anthropic) |
+
+_(Actual S4 run: orchestrated by Claude Opus 4.8. The lifecycle doc and the
+cross-repo notice were authored via routed `documentation` calls (gemini-pro);
+the template skeletons and the TS writer/esbuild wiring were mechanical
+derivations done directly; verification is cross-provider per the workflow.)_
+
+## Next-session-set recommendation
+
+> Produced via routed analysis (`route(task_type="analysis")`, gemini-2.5-pro,
+> $0.0036) per the no-self-opine rule.
+
+Proceed with **Set 065 — "verification-surface empirics."** Following the
+foundational lifecycle work in Set 064, it is the right time to measure the
+effectiveness of the verification strategy (whether path-aware critique is worth
+promoting and whether per-session routed verification is still worth keeping).
+The empirical data validates the current workflow before committing to new
+feature sets. Set 065 was already design-locked and consensus-reviewed, deferred
+until Set 064 closed.

@@ -1,0 +1,72 @@
+# Lessons Learned — `acme-app`
+
+> **Purpose:** Capture durable tactics, failure patterns, and workflow lessons
+> that should influence future sessions before the same mistake repeats.
+
+This is the always-loaded **active** tier of the guidance lifecycle. Its sibling
+`lessons-archive.md` holds archived entries and is **not** read at session
+start. The canonical reference for the lifecycle (metadata, citation, archival,
+ceilings) is the lifecycle doc in the orchestration repo:
+<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guidance-lifecycle.md>.
+
+**Authoring + lifecycle rules:**
+
+- Add entries when a failure, surprise, or avoidable friction reveals a
+  better repeatable strategy. Give each new lesson a **metadata trailer**
+  (see below) so its usage and lifecycle can be tracked.
+- **Per-lesson metadata trailer.** Directly under each `##` lesson
+  heading, add a one-line HTML comment:
+  `<!-- lesson: id="L-<set>-<seq>" added-set="NNN" last-used-set="NNN" status="active" scope="repo-specific" -->`.
+  The `id` is minted once and is permanent across heading renames.
+  Validate trailers with `python -m ai_router.validate_guidance_meta`.
+- **Citation records real usage.** When a lesson is instrumental in a
+  session, list its id in `disposition.lessons_cited` and run
+  `python -m ai_router.cite_lessons --set <N> <id> …` as part of the final
+  commit — that updates the lesson's `last-used-set` inside the pushed
+  work. This usage signal is what every archival decision relies on.
+- **Promotion is orthogonal to archival.** When a lesson has proven itself
+  in two or more different contexts, propose promoting it to
+  `project-guidance.md`. Promotion is a separate axis from archival: a
+  durable tactic can stay active for many sets without being promoted, and a
+  rare-but-critical lesson that fires once in 50 sets is **not** archived for
+  disuse. There is **no** "promote within N sets or archive" rule.
+- **Never delete a lesson; move active → archive.** Archive a lesson when
+  **any** of: it is superseded (`superseded-by` set); it is encoded into live
+  automation (`encoded-in` names a test/lint/guard/template); its subsystem
+  was retired; or it has had no `last-used-set` activity for the disuse window
+  (default 20 sets, `guidance.disuse_window_sets`) **and** is not referenced
+  by active guidance. Archival moves the full text to `lessons-archive.md` (it
+  is never lost) and is **operator-reviewed**, never automatic.
+- **Token ceiling is a backstop, not the trigger.** This file is capped at
+  `guidance.active_lessons_ceiling_tokens` (default 10,000 tokens). Over
+  ceiling means a pruning sweep is **required before adding** new content; the
+  sweep archives by the evidence rules above, not by raw length. Check current
+  overhead with `python -m ai_router.guidance_report`. A repo that is already
+  far over budget on day one uses the one-time
+  [backlog-remediation recipe](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guidance-backlog-remediation.md).
+
+---
+
+## Portable Lessons (all AI-led-workflow repos)
+
+> **TODO:** Portable lessons that apply to every AI-led-workflow repo are
+> maintained in the orchestration repo's
+> [`lessons-learned.md`](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/planning/lessons-learned.md).
+> Copy in only the ones this repo actually relies on, each with its metadata
+> trailer, rather than mirroring the whole list (mirroring re-creates the bloat
+> this lifecycle exists to prevent).
+
+---
+
+## Repo-Specific Lessons
+
+> **TODO:** Replace this example with the first real lesson. Keep the metadata
+> trailer on every entry.
+
+## Example Lesson Heading (delete me)
+<!-- lesson: id="L-001-1" added-set="001" last-used-set="001" status="active" scope="repo-specific" -->
+
+- **Context:** When this lesson applies.
+- **Failure or friction:** What went wrong or was avoidably hard.
+- **Lesson:** The repeatable strategy that prevents it.
+- **Action for future sessions:** The concrete thing to do next time.

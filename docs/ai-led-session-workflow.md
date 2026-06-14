@@ -39,7 +39,9 @@ before changing architecture, testing strategy, workflow assets, or
 human-UAT conventions. Do **not** read `docs/planning/lessons-archive.md`
 at session start — the archive (Set 064) is the preserved, never-auto-
 loaded tier; search it on demand with `python -m ai_router.guidance_search
---archive`.
+--archive`. The guidance lifecycle these files follow (per-lesson metadata,
+citation-at-close, archival triggers, ceilings) is documented canonically
+in [`docs/guidance-lifecycle.md`](guidance-lifecycle.md).
 
 ## Overview
 

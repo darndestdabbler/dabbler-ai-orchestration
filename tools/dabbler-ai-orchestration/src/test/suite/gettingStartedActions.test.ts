@@ -320,7 +320,7 @@ const PROJECT = "/repo";
 const cfgPath = path.join(PROJECT, "ai_router", "router-config.yaml").replace(/\\/g, "/");
 
 suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
-  test("writes exactly the five structure artifacts and NO starter session set", async () => {
+  test("writes exactly the eight structure artifacts and NO starter session set", async () => {
     const { ops, store } = memFileOps();
     const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
@@ -330,14 +330,17 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
       structureOnly: true,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Five since Set 060 S3: the D8 getting-started.md teaching doc
-    // ships with the structure scaffold.
-    assert.strictEqual(result.written.length, 5);
+    // Eight since Set 064 D7: the three docs/planning/ guidance-lifecycle
+    // starters join the five Set-060 structure artifacts.
+    assert.strictEqual(result.written.length, 8);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
     assert.ok(store.has("/repo/docs/dabbler/start-here.md"));
     assert.ok(store.has("/repo/docs/dabbler/getting-started.md"));
+    assert.ok(store.has("/repo/docs/planning/lessons-learned.md"));
+    assert.ok(store.has("/repo/docs/planning/project-guidance.md"));
+    assert.ok(store.has("/repo/docs/planning/lessons-archive.md"));
     // The whole point of structureOnly: no docs/session-sets path is
     // materialized, so the dual-mode Explorer stays on the form
     // (hasAnySets keys on a renderable set) and no unnamed starter set
@@ -379,12 +382,12 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 4);
+    assert.strictEqual(result.written.length, 7);
   });
 });
 
 suite("renderStructureBootstrap (Set 060 S2)", () => {
-  test("renders the five structure files, fully token-substituted", () => {
+  test("renders the eight structure files, fully token-substituted", () => {
     const { files } = renderStructureBootstrap(
       bundle,
       structureOnlyContext("my-app", "full", "2026-06-10"),
@@ -398,6 +401,10 @@ suite("renderStructureBootstrap (Set 060 S2)", () => {
         // Set 060 S3 (D8): the static Getting Started teaching doc.
         "docs/dabbler/getting-started.md",
         "docs/dabbler/start-here.md",
+        // Set 064 (D7): guidance-lifecycle starters under docs/planning/.
+        "docs/planning/lessons-archive.md",
+        "docs/planning/lessons-learned.md",
+        "docs/planning/project-guidance.md",
       ].sort(),
     );
     for (const [rel, content] of Object.entries(files)) {

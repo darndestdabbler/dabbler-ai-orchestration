@@ -5,6 +5,52 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-06-14 (Set 064 — guidance lifecycle & pruning)
+
+### Added (Set 064 — steady-state lifecycle D1–D5)
+
+- **Guidance cost reporter** (`python -m ai_router.guidance_report`,
+  `ai_router/guidance_report.py`). Prints the recurring overhead of the
+  always-loaded guidance files — bytes and an estimated token count
+  (`ceil(chars/4)` proxy), per file and combined — against the ceilings.
+  Read-only by default; `--write-headers` stamps an auto-generated
+  `<!-- guidance-overhead: ... -->` header into each capped file and
+  `--check` exits non-zero when over ceiling. ASCII-only terminal output
+  (cp1252).
+- **Per-lesson metadata schema + round-trip parser**
+  (`ai_router/guidance_meta.py`) and a validator
+  (`python -m ai_router.validate_guidance_meta`). Lessons carry a
+  one-line HTML-comment trailer (`id`, `added-set`, `last-used-set`,
+  `status`, optional `superseded-by` / `encoded-in` / `scope`) that the
+  parser round-trips while preserving human readability.
+- **Citation-at-close keystone.** `close_session` records
+  `disposition.lessons_cited` into the close-out event, and
+  `python -m ai_router.cite_lessons --set <N> <id> …` updates each cited
+  lesson's `last-used-set` inside the pushed work. The no-citation
+  default is inert (silence never auto-evicts).
+- **Active/archive split.** `python -m ai_router.guidance_search
+  --archive` greps the never-auto-loaded `lessons-archive.md`; the move
+  rule is "never delete; move active → archive".
+- **Guidance config** (`ai_router/guidance_config.py`, optional
+  `guidance:` block in `router-config.yaml`): `active_lessons_ceiling_tokens`
+  (10,000), `project_guidance_ceiling_tokens` (6,000), `disuse_window_sets`
+  (20). Ceilings are a hard backstop (sweep-before-add), not the archive
+  trigger; archival is evidence-based and operator-reviewed.
+
+### Added (Set 064 — backlog remediation D6)
+
+- **Routed bulk-triage helper** (`ai_router/guidance_triage.py`):
+  classifies each heading-delimited block of an over-budget lessons file
+  as `keep-active | archive | promote | merge | drop`, projects the
+  post-remediation active-tier size against the ceiling, and writes an
+  operator-reviewed proposal without editing the target file. The
+  deterministic surface (byte-exact offset-slice extraction, projection,
+  truncation-aware batching) is pure and unit-tested with an injected
+  `route_fn`; raw routed output is persisted UTF-8 before any display.
+
+> Canonical reference: `docs/guidance-lifecycle.md` (steady-state) and
+> `docs/guidance-backlog-remediation.md` (one-time over-budget recipe).
+
 ## [0.18.0] — 2026-06-12 (metrics session-set normalization)
 
 ### Changed

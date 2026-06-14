@@ -155,6 +155,51 @@
       "description": "Cross-provider gpt-5-4 verification, 3 rounds: R1 ISSUES_FOUND (2 Major+3 Minor) all fixed; R2 4/5 confirmed + merge-target residual; R3 VERIFIED. s3-issues.json records dispositions. Python 1300 passed/1 skipped; TS unchanged (2 tracked Set-026 fails).",
       "status": "completed",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/start",
+      "dateTime": "2026-06-14T05:36:58.159915-04:00",
+      "description": "Session 4 started (final): D7 consumer propagation + D8 docs/release/close-out. Read required guidance docs, spec, S3 close artifacts; registered session start; gathered version state (ai_router 0.18.0, ext 0.32.0); located consumer-bootstrap template bundle (docs/templates/consumer-bootstrap + dist mirror).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-004/docs-sweep",
+      "dateTime": "2026-06-14T05:49:17.346247-04:00",
+      "description": "Authored canonical engine-agnostic docs/guidance-lifecycle.md (routed gemini-pro doc, $0.0228, 3 verifier-flagged Minor gaps enriched), docs/cross-repo-guidance-lifecycle-notice.md (routed, $0.0082, doc refs -> GitHub blob URLs), and the S4 ai-assignment table + next-set rec (routed analysis $0.0036).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-004/templates",
+      "dateTime": "2026-06-14T06:13:12.771271-04:00",
+      "description": "D7 wired 3 guidance templates into consumerBootstrap.ts (renderConsumerBootstrap 7->10, renderStructureBootstrap 5->8) + esbuild required + README + golden regen + count assertions in 3 test files (TS 908 pass, 2 tracked Set-026 baseline). vsce ls confirms vsix packages all 10 templates.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-004/versions-bumped",
+      "dateTime": "2026-06-14T06:13:12.771271-04:00",
+      "description": "D8 release: ai_router 0.18.0->0.19.0 (pyproject+__init__+CHANGELOG 0.19.0 covering D1-D6), extension 0.32.0->0.33.0 (package.json+lock+CHANGELOG 0.33.0 carrying Set 063+064 D7), repository-reference release table + version walk in pre-push wording. Python 1300 pass/1 skip; drift_guard clean; guidance headers re-stamped under ceiling.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-004/verified",
+      "dateTime": "2026-06-14T06:13:12.771271-04:00",
+      "description": "Cross-provider verification gpt-5-4 (cross-provider for Claude orchestrator), 3 rounds. R1 ISSUES_FOUND (2 Major: reporter --write-headers omission, template pointed at non-scaffolded authoring guide; 1 Minor: disuse vs rare-but-critical wording) all fixed -> R2 confirmed 1+2, flagged residual wording -> harmonized -> R3 VERIFIED. s4-issues.json records dispositions. Verification spend ~$0.28.",
+      "status": "completed",
+      "routedApiCalls": []
     }
   ]
 }

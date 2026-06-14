@@ -20,6 +20,17 @@
 | [`engine-file.claude-tail.md`](engine-file.claude-tail.md) | the `CLAUDE.md` bootstrap tail | yes |
 | [`engine-file.agents-tail.md`](engine-file.agents-tail.md) | the `AGENTS.md` bootstrap tail | yes |
 | [`engine-file.gemini-tail.md`](engine-file.gemini-tail.md) | the `GEMINI.md` bootstrap tail | yes |
+| [`lessons-learned.md.template`](lessons-learned.md.template) | `docs/planning/lessons-learned.md` — the always-loaded **active** guidance tier with the per-lesson metadata-trailer convention (Set 064 D7) | yes |
+| [`project-guidance.md.template`](project-guidance.md.template) | `docs/planning/project-guidance.md` — Principles/Conventions skeleton, ceiling-aware (Set 064 D7) | yes |
+| [`lessons-archive.md.template`](lessons-archive.md.template) | `docs/planning/lessons-archive.md` — the never-auto-loaded **archive** tier, seeded empty (Set 064 D7) | yes |
+
+The three `docs/planning/` guidance starters are repo-level structure (not
+per-set), so they are written by **both** the full session-set scaffold and the
+structure-only "Build project structure" path. The scaffold's skip-existing
+guard means an existing repo's accumulated guidance is never clobbered on a
+re-run. They consume only `{{REPO_NAME}}` and point at the canonical
+[guidance-lifecycle doc](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guidance-lifecycle.md)
+via a GitHub URL (a fresh consumer repo has no local copy of this repo's `docs/`).
 
 Each engine file in the consumer repo is rendered as
 **`<shared body>` + `"\n"` + `<that engine's tail>`** — one shared body, three

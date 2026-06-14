@@ -114,6 +114,9 @@ before any session: `docs/planning/project-guidance.md`,
 `docs/planning/lessons-archive.md` at session start — the archive (Set
 064) is the preserved, never-auto-loaded tier, searched on demand via
 `python -m ai_router.guidance_search --archive`, not loaded into context.
+The full guidance lifecycle (per-lesson metadata, citation-at-close,
+archival triggers, ceilings) is documented canonically in
+`docs/guidance-lifecycle.md`.
 
 ## Running the router
 

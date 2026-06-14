@@ -1,0 +1,30 @@
+# Lessons Archive — `{{REPO_NAME}}`
+
+> **Purpose:** The never-auto-loaded **archive** tier of the guidance lifecycle.
+> Archived lessons move here from `lessons-learned.md` (the always-loaded active
+> tier) when the evidence rules call for it. **Archive never means delete** —
+> entries here keep their full text and stay reachable.
+
+This file is **not** read at session start. Do not add it to any "read these
+files at session start" instruction. Search it on demand with:
+
+```sh
+python -m ai_router.guidance_search --archive
+```
+
+A lesson is moved here (operator-reviewed, never automatic) when **any** of:
+it is superseded, it is encoded into live automation (`encoded-in`), its
+subsystem was retired, or it has had no `last-used-set` activity for the disuse
+window **and** is not referenced by active guidance. The canonical lifecycle
+reference is
+<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guidance-lifecycle.md>.
+
+Archived entries keep the same `<!-- lesson: ... -->` metadata trailer they
+carried while active, with `status="archived"` (and `superseded-by` / `encoded-in`
+filled in where that was the reason).
+
+---
+
+## Archived Lessons
+
+_(empty — no lessons have been archived yet)_

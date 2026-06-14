@@ -85,7 +85,7 @@ const PROJECT = "/repo";
 const cfgPath = path.join(PROJECT, "ai_router", "router-config.yaml").replace(/\\/g, "/");
 
 suite("scaffoldConsumerRepo — file writes", () => {
-  test("writes the seven artifacts under the project dir", async () => {
+  test("writes the ten artifacts under the project dir", async () => {
     const { ops, store } = memFileOps();
     const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
@@ -94,15 +94,18 @@ suite("scaffoldConsumerRepo — file writes", () => {
       fileOps: ops,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Seven since Set 060 S3: the D8 getting-started.md teaching doc
-    // ships on every scaffold path.
-    assert.strictEqual(result.written.length, 7);
+    // Ten since Set 064 D7: the three docs/planning/ guidance-lifecycle
+    // starters join the seven Set-060 scaffold artifacts.
+    assert.strictEqual(result.written.length, 10);
     assert.strictEqual(result.skipped.length, 0);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
     assert.ok(store.has("/repo/docs/dabbler/start-here.md"));
     assert.ok(store.has("/repo/docs/dabbler/getting-started.md"));
+    assert.ok(store.has("/repo/docs/planning/lessons-learned.md"));
+    assert.ok(store.has("/repo/docs/planning/project-guidance.md"));
+    assert.ok(store.has("/repo/docs/planning/lessons-archive.md"));
     assert.ok(store.has("/repo/docs/session-sets/001-first-feature/spec.md"));
     assert.ok(store.has("/repo/docs/session-sets/001-first-feature/session-state.json"));
   });
@@ -118,7 +121,7 @@ suite("scaffoldConsumerRepo — file writes", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 6);
+    assert.strictEqual(result.written.length, 9);
   });
 });
 
@@ -170,6 +173,6 @@ suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
     });
     assert.strictEqual(result.installOk, false);
     assert.strictEqual(result.installMessage, "pip failed");
-    assert.strictEqual(result.written.length, 7); // artifacts still written
+    assert.strictEqual(result.written.length, 10); // artifacts still written
   });
 });

@@ -71,6 +71,17 @@ export interface TemplateBundle {
   claudeTail: string;
   agentsTail: string;
   geminiTail: string;
+  /**
+   * Set 064 (D7): the metadata-aware guidance-lifecycle starters a new repo
+   * inherits under ``docs/planning/`` — the always-loaded active
+   * ``lessons-learned.md``, the ``project-guidance.md`` skeleton, and the
+   * never-auto-loaded ``lessons-archive.md`` (seeded empty). They carry the
+   * per-lesson metadata trailer convention and point at the canonical
+   * lifecycle doc so a fresh repo starts the lifecycle on day one.
+   */
+  lessonsLearnedTemplate: string;
+  projectGuidanceTemplate: string;
+  lessonsArchiveTemplate: string;
 }
 
 /** Filenames inside ``docs/templates/consumer-bootstrap/``. */
@@ -83,6 +94,9 @@ const BUNDLE_FILES = {
   claudeTail: "engine-file.claude-tail.md",
   agentsTail: "engine-file.agents-tail.md",
   geminiTail: "engine-file.gemini-tail.md",
+  lessonsLearnedTemplate: "lessons-learned.md.template",
+  projectGuidanceTemplate: "project-guidance.md.template",
+  lessonsArchiveTemplate: "lessons-archive.md.template",
 } as const;
 
 /**
@@ -105,7 +119,7 @@ export function resolveBundledTemplateDir(extensionPath: string): string {
 }
 
 /**
- * Read all seven template files from a bundle directory. Line endings are
+ * Read all template files from a bundle directory. Line endings are
  * normalized to LF on read: the marker-matching in {@link expandSpecSessions}
  * keys off literal ``\n`` sequences, so a CRLF checkout (Windows
  * ``core.autocrlf``) would otherwise silently skip session expansion. Render
@@ -123,6 +137,9 @@ export function loadTemplateBundle(bundleDir: string): TemplateBundle {
     claudeTail: read(BUNDLE_FILES.claudeTail),
     agentsTail: read(BUNDLE_FILES.agentsTail),
     geminiTail: read(BUNDLE_FILES.geminiTail),
+    lessonsLearnedTemplate: read(BUNDLE_FILES.lessonsLearnedTemplate),
+    projectGuidanceTemplate: read(BUNDLE_FILES.projectGuidanceTemplate),
+    lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate),
   };
 }
 
@@ -342,6 +359,29 @@ export const GETTING_STARTED_REL_PATH = path.posix.join(
 );
 
 /**
+ * Set 064 (D7): output paths of the guidance-lifecycle starters. Repo-level
+ * ``docs/planning/`` files — part of a fresh repo's structure, so both the
+ * full scaffold and the structure-only scaffold emit them. The scaffold's
+ * skip-existing guard protects an existing repo's accumulated guidance from
+ * being clobbered on a re-run.
+ */
+export const LESSONS_LEARNED_REL_PATH = path.posix.join("docs", "planning", "lessons-learned.md");
+export const PROJECT_GUIDANCE_REL_PATH = path.posix.join("docs", "planning", "project-guidance.md");
+export const LESSONS_ARCHIVE_REL_PATH = path.posix.join("docs", "planning", "lessons-archive.md");
+
+/** Render the three guidance-lifecycle starters (token-substituted). */
+function guidanceFiles(
+  bundle: TemplateBundle,
+  ctx: BootstrapContext,
+): Record<string, string> {
+  return {
+    [LESSONS_LEARNED_REL_PATH]: substituteTokens(bundle.lessonsLearnedTemplate, ctx),
+    [PROJECT_GUIDANCE_REL_PATH]: substituteTokens(bundle.projectGuidanceTemplate, ctx),
+    [LESSONS_ARCHIVE_REL_PATH]: substituteTokens(bundle.lessonsArchiveTemplate, ctx),
+  };
+}
+
+/**
  * Render every consumer-bootstrap artifact for ``ctx`` from ``bundle``.
  * Returns a path -> content map (paths relative to the consumer repo root,
  * forward-slashed). Throws if any template leaves a ``{{TOKEN}}``
@@ -359,6 +399,8 @@ export function renderConsumerBootstrap(
     [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
     [specRelPath(ctx)]: renderSpec(bundle, ctx),
     [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
+    // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
+    ...guidanceFiles(bundle, ctx),
   };
 
   const leftovers = new Set<string>();
@@ -374,9 +416,10 @@ export function renderConsumerBootstrap(
 }
 
 /**
- * Render ONLY the project-structure artifacts — the three engine files +
- * the cold-start ``docs/dabbler/start-here.md`` — with NO starter session
- * set (Set 060 S2, spec D5). The Getting Started form's "Build project
+ * Render ONLY the project-structure artifacts — the three engine files,
+ * the cold-start ``docs/dabbler/start-here.md``, the Getting Started doc,
+ * and the Set 064 ``docs/planning/`` guidance-lifecycle starters — with NO
+ * starter session set (Set 060 S2, spec D5). The Getting Started form's "Build project
  * structure" step must not seed a ``docs/session-sets/...`` set: there is
  * no title prompt to name one, and materializing a set would flip the
  * dual-mode Explorer to "list" mid-form, hiding steps 2 and 3. Session
@@ -400,6 +443,10 @@ export function renderStructureBootstrap(
     // with the structure scaffold too, so the editor-open path can
     // prefer the workspace copy once the structure is built.
     [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 064 (D7): the guidance-lifecycle starters are repo structure too,
+    // so a fresh repo built via "Build project structure" starts the
+    // lifecycle with docs/planning/ in place.
+    ...guidanceFiles(bundle, ctx),
   };
 
   const leftovers = new Set<string>();

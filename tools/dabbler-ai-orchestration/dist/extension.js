@@ -22155,7 +22155,10 @@ var BUNDLE_FILES = {
   sharedBody: "engine-file.shared-body.md",
   claudeTail: "engine-file.claude-tail.md",
   agentsTail: "engine-file.agents-tail.md",
-  geminiTail: "engine-file.gemini-tail.md"
+  geminiTail: "engine-file.gemini-tail.md",
+  lessonsLearnedTemplate: "lessons-learned.md.template",
+  projectGuidanceTemplate: "project-guidance.md.template",
+  lessonsArchiveTemplate: "lessons-archive.md.template"
 };
 var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
 function resolveBundledTemplateDir(extensionPath) {
@@ -22171,7 +22174,10 @@ function loadTemplateBundle(bundleDir) {
     sharedBody: read(BUNDLE_FILES.sharedBody),
     claudeTail: read(BUNDLE_FILES.claudeTail),
     agentsTail: read(BUNDLE_FILES.agentsTail),
-    geminiTail: read(BUNDLE_FILES.geminiTail)
+    geminiTail: read(BUNDLE_FILES.geminiTail),
+    lessonsLearnedTemplate: read(BUNDLE_FILES.lessonsLearnedTemplate),
+    projectGuidanceTemplate: read(BUNDLE_FILES.projectGuidanceTemplate),
+    lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate)
   };
 }
 function padSessionNumber(n) {
@@ -22287,6 +22293,16 @@ var GETTING_STARTED_REL_PATH = path9.posix.join(
   "dabbler",
   "getting-started.md"
 );
+var LESSONS_LEARNED_REL_PATH = path9.posix.join("docs", "planning", "lessons-learned.md");
+var PROJECT_GUIDANCE_REL_PATH = path9.posix.join("docs", "planning", "project-guidance.md");
+var LESSONS_ARCHIVE_REL_PATH = path9.posix.join("docs", "planning", "lessons-archive.md");
+function guidanceFiles(bundle, ctx) {
+  return {
+    [LESSONS_LEARNED_REL_PATH]: substituteTokens(bundle.lessonsLearnedTemplate, ctx),
+    [PROJECT_GUIDANCE_REL_PATH]: substituteTokens(bundle.projectGuidanceTemplate, ctx),
+    [LESSONS_ARCHIVE_REL_PATH]: substituteTokens(bundle.lessonsArchiveTemplate, ctx)
+  };
+}
 function renderConsumerBootstrap(bundle, ctx) {
   const files = {
     "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
@@ -22295,7 +22311,9 @@ function renderConsumerBootstrap(bundle, ctx) {
     [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
     [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
     [specRelPath(ctx)]: renderSpec(bundle, ctx),
-    [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx)
+    [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
+    // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
+    ...guidanceFiles(bundle, ctx)
   };
   const leftovers = /* @__PURE__ */ new Set();
   for (const content of Object.values(files)) {
@@ -22318,7 +22336,11 @@ function renderStructureBootstrap(bundle, ctx) {
     // D8 (Set 060 S3): the static Getting Started teaching doc ships
     // with the structure scaffold too, so the editor-open path can
     // prefer the workspace copy once the structure is built.
-    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate
+    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 064 (D7): the guidance-lifecycle starters are repo structure too,
+    // so a fresh repo built via "Build project structure" starts the
+    // lifecycle with docs/planning/ in place.
+    ...guidanceFiles(bundle, ctx)
   };
   const leftovers = /* @__PURE__ */ new Set();
   for (const content of Object.values(files)) {

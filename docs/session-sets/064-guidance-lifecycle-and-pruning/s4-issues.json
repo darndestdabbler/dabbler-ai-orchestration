@@ -1,0 +1,39 @@
+{
+  "session": 4,
+  "session_set": "064-guidance-lifecycle-and-pruning",
+  "verifier": "gpt-5-4",
+  "rounds": 3,
+  "final_verdict": "VERIFIED",
+  "findings": [
+    {
+      "id": "S4-1",
+      "round": 1,
+      "severity": "Major",
+      "category": "Correctness",
+      "summary": "docs/guidance-lifecycle.md and ai_router/CHANGELOG.md documented guidance_report as stamping in-file headers without noting the required --write-headers flag (the bare command is read-only).",
+      "location": "docs/guidance-lifecycle.md (Cost Reporter section); ai_router/CHANGELOG.md (0.19.0 reporter bullet)",
+      "disposition": "FIXED",
+      "resolution": "Lifecycle doc now shows three invocations (bare=read-only report, --write-headers=stamp, --check=gate), states read-only-by-default, and that only --write-headers mutates; commands table notes the flags. CHANGELOG reporter bullet rewritten to read-only-by-default + --write-headers stamps + --check gates. Confirmed resolved R2."
+    },
+    {
+      "id": "S4-2",
+      "round": 1,
+      "severity": "Major",
+      "category": "Completeness",
+      "summary": "The scaffolded project-guidance.md starter told consumers to read docs/planning/session-set-authoring-guide.md, a file the D7 scaffold does not create (so a fresh consumer repo is pointed at a nonexistent local file).",
+      "location": "docs/templates/consumer-bootstrap/project-guidance.md.template (Workflow Expectations bullet)",
+      "disposition": "FIXED",
+      "resolution": "Bullet now reads 'read this file and docs/planning/lessons-learned.md' (both scaffolded) and references the authoring guide via a canonical GitHub URL, noting a fresh repo has no local copy. Golden fixtures regenerated; TS suite green. Confirmed resolved R2."
+    },
+    {
+      "id": "S4-3",
+      "round": 1,
+      "severity": "Minor",
+      "category": "Consistency",
+      "summary": "The disuse-archival rule ('When to archive') and the rare-but-critical example ('Promotion is orthogonal to archival') were worded inconsistently — one implied disuse candidacy, the other said rare-but-critical lessons are 'not a candidate'.",
+      "location": "docs/guidance-lifecycle.md",
+      "disposition": "FIXED",
+      "resolution": "R1 fix added an operator-review exemption clause to the Disused bullet; R2 flagged a residual phrasing mismatch; R2 fix harmonized BOTH bullets to: a rare-but-critical lesson may cross the disuse window and surface as a candidate by the raw rule, but is spared at operator review and not archived for disuse. Confirmed resolved R3 (VERIFIED)."
+    }
+  ]
+}

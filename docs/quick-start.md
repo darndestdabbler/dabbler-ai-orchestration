@@ -153,6 +153,8 @@ The agent then:
    `session-set-authoring-guide.md` (Step 0). It does **not** read
    `lessons-archive.md` — that is the never-auto-loaded archive tier
    (Set 064), searched on demand via `ai_router.guidance_search --archive`.
+   The lifecycle these files follow is documented in
+   [`docs/guidance-lifecycle.md`](guidance-lifecycle.md).
 2. **Reads the spec** and the activity log to find its current step; registers
    the session start so the VS Code Explorer shows the set as in-progress
    (Step 1–3).

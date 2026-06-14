@@ -25,6 +25,10 @@ function copyTemplateBundle() {
     "engine-file.claude-tail.md",
     "engine-file.agents-tail.md",
     "engine-file.gemini-tail.md",
+    // Set 064 (D7): guidance-lifecycle starters.
+    "lessons-learned.md.template",
+    "project-guidance.md.template",
+    "lessons-archive.md.template",
   ];
   for (const f of required) {
     if (!fs.existsSync(path.join(src, f))) {

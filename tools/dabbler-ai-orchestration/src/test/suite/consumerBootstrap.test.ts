@@ -135,6 +135,9 @@ suite("consumerBootstrap — spec.md render", () => {
       claudeTail: crlf(bundle.claudeTail),
       agentsTail: crlf(bundle.agentsTail),
       geminiTail: crlf(bundle.geminiTail),
+      lessonsLearnedTemplate: crlf(bundle.lessonsLearnedTemplate),
+      projectGuidanceTemplate: crlf(bundle.projectGuidanceTemplate),
+      lessonsArchiveTemplate: crlf(bundle.lessonsArchiveTemplate),
     };
     const spec = renderSpec(crlfBundle, ctx({ totalSessions: 3 }));
     const headers = (spec.match(/### Session \d+ of 3:/g) || []).map((h) =>
@@ -196,7 +199,7 @@ suite("consumerBootstrap — engine files", () => {
 });
 
 suite("consumerBootstrap — full render", () => {
-  test("produces the seven artifacts at canonical relative paths", () => {
+  test("produces the ten artifacts at canonical relative paths", () => {
     const { files } = renderConsumerBootstrap(bundle, ctx());
     const keys = Object.keys(files).sort();
     assert.deepStrictEqual(keys, [
@@ -206,6 +209,10 @@ suite("consumerBootstrap — full render", () => {
       // Set 060 S3 (D8): the static Getting Started teaching doc.
       "docs/dabbler/getting-started.md",
       "docs/dabbler/start-here.md",
+      // Set 064 (D7): guidance-lifecycle starters under docs/planning/.
+      "docs/planning/lessons-archive.md",
+      "docs/planning/lessons-learned.md",
+      "docs/planning/project-guidance.md",
       "docs/session-sets/001-user-authentication/session-state.json",
       "docs/session-sets/001-user-authentication/spec.md",
     ]);
@@ -254,7 +261,7 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
     );
   });
 
-  test("the REAL packaged dist bundle exists with all seven files", () => {
+  test("the REAL packaged dist bundle exists with all ten files", () => {
     // Pins the actual build artifact the .vsix ships (esbuild copyTemplateBundle
     // writes it; it is committed alongside dist/extension.js). A broken copy
     // step or a missing packaged bundle fails here, not on a user's machine.
@@ -268,6 +275,10 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
       "engine-file.claude-tail.md",
       "engine-file.agents-tail.md",
       "engine-file.gemini-tail.md",
+      // Set 064 (D7): guidance-lifecycle starters.
+      "lessons-learned.md.template",
+      "project-guidance.md.template",
+      "lessons-archive.md.template",
     ];
     for (const f of required) {
       assert.ok(
@@ -277,7 +288,7 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
     }
     // And it must actually render.
     const { files } = renderConsumerBootstrap(loadTemplateBundle(distDir), ctx());
-    assert.strictEqual(Object.keys(files).length, 7);
+    assert.strictEqual(Object.keys(files).length, 10);
   });
 
   test("loadTemplateBundle reads a bundle laid out at the packaged path", () => {

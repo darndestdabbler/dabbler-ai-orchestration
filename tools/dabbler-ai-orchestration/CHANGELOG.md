@@ -5,6 +5,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-06-14 (Set 064 — guidance-lifecycle scaffold templates)
+
+> **Release note:** `0.32.0` (Set 063) was version-bumped but never tag-pushed
+> to the Marketplace; its last published predecessor is `0.31.0`. This `0.33.0`
+> release therefore carries **both** Set 063 (the Getting Started budget step,
+> below) and Set 064's template-bundle additions, in one publish through the
+> green-Test gate.
+
+### Added (Set 064 D7 — consumer-bootstrap guidance starters)
+
+- **The consumer-bootstrap template bundle now ships the guidance-lifecycle
+  starters.** Three new metadata-aware templates —
+  `lessons-learned.md.template` (the always-loaded active tier, carrying the
+  per-lesson metadata-trailer convention), `project-guidance.md.template`
+  (ceiling-aware Principles/Conventions skeleton), and
+  `lessons-archive.md.template` (the never-auto-loaded archive tier, seeded
+  empty) — are rendered into `docs/planning/` by both the full session-set
+  scaffold (`renderConsumerBootstrap`) and the structure-only "Build project
+  structure" path (`renderStructureBootstrap`). They consume only
+  `{{REPO_NAME}}` and link the canonical `docs/guidance-lifecycle.md` via a
+  GitHub URL. The scaffold's skip-existing guard means an existing repo's
+  accumulated guidance is never clobbered on a re-run. esbuild copies the new
+  templates into `dist/templates/consumer-bootstrap`; the cold-start golden
+  snapshot fixtures (`test-fixtures/cold-start/{full,lightweight}`) are
+  regenerated to include them.
+
 ## [0.32.0] — 2026-06-12 (Set 063 — Getting Started budget step + adoption-bootstrap retirement)
 
 ### Added

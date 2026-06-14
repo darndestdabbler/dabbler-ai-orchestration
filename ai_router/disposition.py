@@ -99,6 +99,16 @@ class Disposition:
       extension tokens are accepted but trigger a stderr warning via
       :func:`validate_disposition`.  Written to ``session-state.json``
       by ``close_session`` when non-null.
+    - ``lessons_cited``: Set 064 (D3, citation-at-close keystone) — the
+      ids of the guidance lessons (``L-<set>-<seq>``) that were
+      instrumental in this session. The work agent populates it and runs
+      ``python -m ai_router.cite_lessons`` so the markdown ``last-used-set``
+      edit lands inside the committed work; ``close_session`` reads this
+      field only to record a ``lessons_cited`` entry in the
+      ``closeout_succeeded`` event (and to flag unknown ids as a
+      non-blocking mismatch). Omit-empty: absent when no lessons were
+      cited, so older readers never see an unexpected key. An
+      empty/absent list is fully inert — silence never auto-evicts.
     """
 
     status: str
@@ -109,6 +119,7 @@ class Disposition:
     next_orchestrator: Optional[NextOrchestrator] = None
     blockers: List[str] = field(default_factory=list)
     verification_verdict: Optional[str] = None
+    lessons_cited: List[str] = field(default_factory=list)
 
 
 def _disposition_path(session_set_dir: str) -> str:
@@ -189,6 +200,10 @@ def disposition_to_dict(disposition: Disposition) -> dict:
     }
     if disposition.verification_verdict is not None:
         d["verification_verdict"] = disposition.verification_verdict
+    # Omit-empty (Set 064 D3): the key is absent when no lessons were
+    # cited, so readers that pre-date this field never see it.
+    if disposition.lessons_cited:
+        d["lessons_cited"] = list(disposition.lessons_cited)
     return d
 
 
@@ -209,6 +224,7 @@ def disposition_from_dict(data: dict) -> Disposition:
         next_orchestrator=_next_orchestrator_from_dict(data.get("next_orchestrator")),
         blockers=list(data.get("blockers") or []),
         verification_verdict=data.get("verification_verdict"),
+        lessons_cited=list(data.get("lessons_cited") or []),
     )
 
 
@@ -319,6 +335,7 @@ def validate_disposition(
             "next_orchestrator": disposition.next_orchestrator,
             "blockers": disposition.blockers,
             "verification_verdict": disposition.verification_verdict,
+            "lessons_cited": disposition.lessons_cited,
         }
     elif isinstance(disposition, dict):
         data = disposition
@@ -423,5 +440,13 @@ def validate_disposition(
                 "accepted but consider using the canonical token",
                 file=sys.stderr,
             )
+
+    # Set 064 D3: lessons_cited, when present, must be a list of strings.
+    # Whether each id actually exists in a guidance file is a non-blocking
+    # check done by close_session (a typo'd id is a mismatch warning, not a
+    # disposition error), so this stays a shape check only.
+    lessons_cited = data.get("lessons_cited")
+    if lessons_cited is not None and not _is_str_list(lessons_cited):
+        errors.append("lessons_cited must be a list of strings")
 
     return (len(errors) == 0), errors

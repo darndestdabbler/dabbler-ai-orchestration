@@ -79,7 +79,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional
+from typing import Callable, Iterable, List, Optional, Tuple
 
 
 # Module logger for loud WARNING lines on the ``--force`` path. Emits to
@@ -127,6 +127,9 @@ try:
         release_lock,
     )
     from check_migrations import summarize_drift  # type: ignore[import-not-found]
+    from guidance_config import discover_guidance_files  # type: ignore[import-not-found]
+    from guidance_meta import find_entry  # type: ignore[import-not-found]
+    from guidance_report import summarize_overhead  # type: ignore[import-not-found]
 except ImportError:
     from .disposition import (  # type: ignore[no-redef]
         Disposition,
@@ -150,6 +153,9 @@ except ImportError:
         release_lock,
     )
     from .check_migrations import summarize_drift  # type: ignore[no-redef]
+    from .guidance_config import discover_guidance_files  # type: ignore[no-redef]
+    from .guidance_meta import find_entry  # type: ignore[no-redef]
+    from .guidance_report import summarize_overhead  # type: ignore[no-redef]
 
 
 # ---------------------------------------------------------------------------
@@ -646,6 +652,46 @@ def _peek_orchestrator_identity(session_set_dir: str) -> dict:
 def _read_disposition_or_none(session_set_dir: str) -> Optional[Disposition]:
     """Return the parsed disposition, or None if the file is absent / malformed."""
     return read_disposition(session_set_dir)
+
+
+def _resolve_lessons_cited(
+    disposition: Optional[Disposition],
+    repo_root: Optional[str] = None,
+) -> Tuple[List[str], List[str]]:
+    """Return ``(cited_ids, unknown_ids)`` from ``disposition.lessons_cited``.
+
+    Set 064 D3: ``close_session`` records which guidance lessons the work
+    agent cited so the ``closeout_succeeded`` event carries the audit
+    trail. It also **validates** each id against the on-disk guidance
+    files — an id present in no file is returned in *unknown_ids* and
+    surfaced as a **non-blocking** mismatch (a typo'd citation must not
+    fail close-out; the cite_lessons CLI is where a missing id has
+    already been reported at commit time).
+
+    Fail-open: any error discovering or reading the guidance files yields
+    an empty *unknown_ids* (we never block a close on a metadata read).
+    """
+    if disposition is None or not disposition.lessons_cited:
+        return [], []
+    cited = list(disposition.lessons_cited)
+    try:
+        found = discover_guidance_files(repo_root)
+        texts: List[str] = []
+        for path in found.values():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    texts.append(f.read())
+            except OSError:
+                continue
+        unknown = [
+            lid
+            for lid in cited
+            if not any(find_entry(t, lid) is not None for t in texts)
+        ]
+    except Exception:
+        # Never let a guidance-metadata read disrupt close-out.
+        unknown = []
+    return cited, unknown
 
 
 def _close_is_terminal(session_set_dir: str, session_number: Optional[int]) -> bool:
@@ -1744,6 +1790,20 @@ def run(
         cs_fields: dict = {"method": method, **orchestrator_identity}
         if verdict is not None:
             cs_fields["verdict"] = verdict
+        # Set 064 D3: stamp the cited-lesson ids into the audit event so
+        # the close record names which guidance lessons this set used.
+        # Unknown ids (present in no guidance file) are recorded as a
+        # non-blocking mismatch — never fail close-out on a typo'd id.
+        cited_ids, unknown_cited = _resolve_lessons_cited(disposition)
+        if cited_ids:
+            cs_fields["lessons_cited"] = cited_ids
+        if unknown_cited:
+            cs_fields["lessons_cited_unknown"] = unknown_cited
+            outcome.messages.append(
+                "warning: disposition.lessons_cited names id(s) not found "
+                f"in any guidance file: {', '.join(unknown_cited)} "
+                "(recorded as a non-blocking mismatch)"
+            )
         _emit_event(
             session_set_dir,
             "closeout_succeeded",
@@ -1839,6 +1899,11 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
             if drift_line:
                 print(drift_line, file=sys.stderr)
+        # Set 064 D5 backstop: soft guidance over-ceiling advisory
+        # (non-blocking, fail-open, stderr-only; never affects exit code).
+        overhead_line = summarize_overhead()
+        if overhead_line:
+            print(overhead_line, file=sys.stderr)
     except Exception:  # noqa: BLE001
         pass
 

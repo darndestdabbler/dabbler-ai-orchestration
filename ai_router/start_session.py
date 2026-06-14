@@ -112,6 +112,7 @@ try:
         resolve_session_set_dir,
     )
     from check_migrations import summarize_drift  # type: ignore[import-not-found]
+    from guidance_report import summarize_overhead  # type: ignore[import-not-found]
 except ImportError:
     from .progress import (  # type: ignore[no-redef]
         SessionStateInvariantError,
@@ -135,6 +136,7 @@ except ImportError:
         resolve_session_set_dir,
     )
     from .check_migrations import summarize_drift  # type: ignore[no-redef]
+    from .guidance_report import summarize_overhead  # type: ignore[no-redef]
 
 
 EXIT_OK = 0
@@ -708,6 +710,12 @@ def _run_under_lock(args: argparse.Namespace) -> int:
         drift_line = summarize_drift(os.path.dirname(os.path.abspath(session_set_dir)))
         if drift_line:
             print(drift_line, file=sys.stderr)
+        # Set 064 D5 backstop: soft over-ceiling advisory for the
+        # guidance files. Same non-blocking, fail-open, stderr-only
+        # posture as the drift advisory; never changes exit status.
+        overhead_line = summarize_overhead()
+        if overhead_line:
+            print(overhead_line, file=sys.stderr)
     except Exception:
         pass
 
@@ -788,6 +796,11 @@ def _run_typed_session(
         )
         if drift_line:
             print(drift_line, file=sys.stderr)
+        # Set 064 D5 backstop: soft guidance over-ceiling advisory
+        # (non-blocking, fail-open, stderr-only).
+        overhead_line = summarize_overhead()
+        if overhead_line:
+            print(overhead_line, file=sys.stderr)
     except Exception:
         pass
 
@@ -851,6 +864,11 @@ def _run_typed_handoff(
         )
         if drift_line:
             print(drift_line, file=sys.stderr)
+        # Set 064 D5 backstop: soft guidance over-ceiling advisory
+        # (non-blocking, fail-open, stderr-only).
+        overhead_line = summarize_overhead()
+        if overhead_line:
+            print(overhead_line, file=sys.stderr)
     except Exception:
         pass
 

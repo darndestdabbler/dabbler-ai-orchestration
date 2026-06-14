@@ -150,7 +150,9 @@ A developer runs one session by telling their AI agent:
 The agent then:
 
 1. **Reads guidance** — `project-guidance.md`, `lessons-learned.md`,
-   `session-set-authoring-guide.md` (Step 0).
+   `session-set-authoring-guide.md` (Step 0). It does **not** read
+   `lessons-archive.md` — that is the never-auto-loaded archive tier
+   (Set 064), searched on demand via `ai_router.guidance_search --archive`.
 2. **Reads the spec** and the activity log to find its current step; registers
    the session start so the VS Code Explorer shows the set as in-progress
    (Step 1–3).
@@ -223,7 +225,8 @@ and say:
 **What the agent does (you watch, approve, or redirect):**
 
 1. Reads `project-guidance.md`, `lessons-learned.md`, and
-   `session-set-authoring-guide.md` (Step 0).
+   `session-set-authoring-guide.md` (Step 0) — **not** `lessons-archive.md`
+   (the never-auto-loaded archive tier, Set 064).
 2. Finds the active session set and calls `register_session_start()` — the
    VS Code Explorer will show the set as in-progress (Step 1–3).
 3. Implements the session plan from `spec.md` — writes code, edits files,

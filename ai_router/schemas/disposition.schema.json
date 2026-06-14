@@ -46,6 +46,10 @@
     "verification_verdict": {
       "type": "string",
       "minLength": 1
+    },
+    "lessons_cited": {
+      "type": "array",
+      "items": { "type": "string" }
     }
   },
   "allOf": [

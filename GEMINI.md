@@ -110,7 +110,10 @@ author a session set under `docs/session-sets/<slug>/` and follow the
 full procedure in `docs/ai-led-session-workflow.md`. Required reading
 before any session: `docs/planning/project-guidance.md`,
 `docs/planning/lessons-learned.md`, and
-`docs/planning/session-set-authoring-guide.md`.
+`docs/planning/session-set-authoring-guide.md`. Do **not** read
+`docs/planning/lessons-archive.md` at session start — the archive (Set
+064) is the preserved, never-auto-loaded tier, searched on demand via
+`python -m ai_router.guidance_search --archive`, not loaded into context.
 
 ## Running the router
 

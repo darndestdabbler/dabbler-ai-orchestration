@@ -36,7 +36,10 @@ Read `docs/planning/project-guidance.md`,
 `docs/planning/lessons-learned.md`, and
 `docs/planning/session-set-authoring-guide.md` before every session and
 before changing architecture, testing strategy, workflow assets, or
-human-UAT conventions.
+human-UAT conventions. Do **not** read `docs/planning/lessons-archive.md`
+at session start — the archive (Set 064) is the preserved, never-auto-
+loaded tier; search it on demand with `python -m ai_router.guidance_search
+--archive`.
 
 ## Overview
 
@@ -52,6 +55,7 @@ Orchestrator (Claude / Codex / Gemini)
   |-- reads instruction file (CLAUDE.md / AGENTS.md / GEMINI.md)
   |-- reads project-guidance.md, lessons-learned.md,
   |   and session-set-authoring-guide.md
+  |   (NOT lessons-archive.md -- never auto-loaded; Set 064)
   |-- reads spec.md (incl. Session Set Configuration block)
   |   in the active session set
   |-- reads activity-log.json for prior progress
@@ -1040,7 +1044,10 @@ involved.
 Before doing anything else:
 
 1. Read `docs/planning/project-guidance.md`
-2. Read `docs/planning/lessons-learned.md`
+2. Read `docs/planning/lessons-learned.md` (its **active** tier only —
+   do **not** read `docs/planning/lessons-archive.md`, which is never
+   auto-loaded; search it on demand with
+   `python -m ai_router.guidance_search --archive`)
 3. Read `docs/planning/session-set-authoring-guide.md`
 4. Then load keys from the environment and confirm all required keys
    are present (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`,
@@ -2058,8 +2065,19 @@ Candidate moves include:
 - **Principle → Convention.** A principle that turns out to be a specific
   rule rather than durable strategy.
 - **Relocation within a file.** Moving an item to a more fitting section.
+- **Active → Archive (Set 064).** A lesson is an **archival** candidate —
+  orthogonal to promotion — when **any** of: it is superseded
+  (`superseded-by` set), encoded into live automation (`encoded-in` names a
+  test/lint/guard/template), its subsystem was retired, or it has had no
+  `last-used-set` activity for the disuse window (default 20 sets,
+  `guidance.disuse_window_sets`) **and** is not referenced by active
+  guidance. Move accepted candidates (full text) to
+  `docs/planning/lessons-archive.md`; never delete. Promotion is **not** a
+  precondition for staying active, and disuse alone (without the
+  "unreferenced" half) is **not** sufficient.
 - **Staleness flag.** An item whose driving context is gone may be flagged
-  for the human — but do not delete. Only move, with a note about why.
+  for the human as an Active → Archive candidate — but do not delete. Only
+  move, with a note about why.
 
 Procedure:
 
@@ -2701,7 +2719,9 @@ This is the authoritative rules list. Instruction files (`CLAUDE.md`,
    `docs/planning/project-guidance.md`,
    `docs/planning/lessons-learned.md`, and
    `docs/planning/session-set-authoring-guide.md` are mandatory
-   pre-session context.
+   pre-session context. `docs/planning/lessons-archive.md` is **not** —
+   it is the never-auto-loaded archive tier (Set 064), searched on demand
+   via `python -m ai_router.guidance_search --archive`.
 9. **Treat pending human UAT as blocking** *(applies only when the active
    spec declares `requiresUAT: true`).* Do not start downstream sessions
    on top of a checklist the human has not yet reviewed unless the human

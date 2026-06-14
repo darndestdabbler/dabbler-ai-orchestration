@@ -40,3 +40,33 @@ workflow.)_
 - **reason.specifics:** Session 2 implements a complex, multi-file design
   with a new serialization contract; Opus is needed for coherent reasoning
   across new modules and the `close_session` integration.
+
+## Session 3 — Backlog-remediation recipe + harvester dogfood (planned)
+
+| Step | Recommended AI |
+| :--- | :--- |
+| D6: routed bulk-triage helper (classify keep/archive/promote/merge) | GPT-5.4 (openai) |
+| D6: backlog-remediation recipe doc | Gemini 2.5 Pro (google) |
+| Harvester read-only dogfood + projected size | GPT-5.4 (openai) |
+| Unit tests (Python) on a fixture | GPT-5.4 (openai) |
+| Cross-provider verification | GPT-5.4 (openai) — gemini verified S2, alternate provider |
+
+## Next-session-3 orchestrator recommendation
+
+> Produced via routed analysis (`route(task_type="analysis")`,
+> gemini-pro, $0.0016) per the no-self-opine rule. The routed call
+> recommended `claude-code` / `anthropic` / high effort ("SOTA model for
+> the routed classification logic, documentation authoring, and
+> large-context analysis"); its returned model id was a stale token and
+> is normalized to the current frontier `claude-opus-4-8`. Because S3
+> stays on the same engine/provider/model as S2, the reason code is
+> `continue-current-trajectory` (the routed call's `other` is not a valid
+> code in `NEXT_ORCHESTRATOR_REASON_CODES`).
+
+- **engine:** Claude Code · **provider:** anthropic · **model:**
+  claude-opus-4-8 · **effort:** high
+- **reason.code:** `continue-current-trajectory`
+- **reason.specifics:** S3 ships a routed bulk-triage classifier, a portable
+  recipe doc, and a large-context read-only dogfood over a 154 KB file;
+  frontier reasoning keeps the classifier evidence and the projection
+  coherent.

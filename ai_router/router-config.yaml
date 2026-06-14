@@ -653,3 +653,18 @@ state:
 output:
   cost_report_on_exit: true    # print cost summary when session ends
   verbose: false               # detailed logging of each API call
+
+# --- Guidance lifecycle (Set 064) ---
+# Token ceilings for the always-loaded guidance files and the disuse
+# window for the D5 archive trigger. The whole block is optional and
+# fully defaulted (ai_router/guidance_config.py) — a repo with no block
+# inherits these exact values. Ceilings are a HARD BACKSTOP, not the
+# archive trigger: over ceiling means a pruning sweep is required before
+# adding new content, but the sweep archives by the evidence rules
+# (superseded / encoded-in-automation / subsystem-retired / disused-AND-
+# unreferenced), never by raw length. Tokens are the ceil(chars/4)
+# proxy the reporter prints, not a billing number.
+guidance:
+  active_lessons_ceiling_tokens: 10000   # docs/planning/lessons-learned.md (~40 KB)
+  project_guidance_ceiling_tokens: 6000  # docs/planning/project-guidance.md (~24 KB)
+  disuse_window_sets: 20                  # D5: archive after N sets unused AND unreferenced

@@ -47,6 +47,69 @@
       "description": "Cross-provider verification of the audit record (gpt-5.4): VERDICT VERIFIED, 0 Critical/Major/Minor, 2 nice-to-haves applied. Python suite 1221 passed/1 skipped/0 failed (after clearing a pre-existing drift-guard false positive).",
       "status": "completed",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/metadata",
+      "dateTime": "2026-06-14T04:39:35.860640-04:00",
+      "description": "D2: shipped guidance_meta.py (HTML-comment trailer parser/formatter, fixed canonical order + omit-empty, surgical byte-preserving last-used-set rewrite, doc parser, cross-file id-uniqueness validator) + guidance_config.py (ceilings/window + chars/4 token estimate + file discovery) + validate_guidance_meta CLI. 25 tests.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/citation",
+      "dateTime": "2026-06-14T04:39:35.860640-04:00",
+      "description": "D3 keystone: added disposition.lessons_cited (omit-empty) + schema parity; cite_lessons CLI (surgical last-used-set update, archive reactivation [reconsider] warning, set-label zero-pad); close_session reads disposition.lessons_cited into the closeout_succeeded event (lessons_cited + non-blocking lessons_cited_unknown) with NO markdown mutation. 18 tests. Dogfooded: cited L-064-3/4/9/10 -> last-used-set=064 in lessons-learned.md.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/reporter",
+      "dateTime": "2026-06-14T04:39:35.860640-04:00",
+      "description": "D1: guidance_report.py (per-file+combined bytes/lines/~tokens, per-active-file ceilings, --check CI gate, opt-in --write-headers stable marker block, summarize_overhead fail-open advisory) + guidance_search.py (active+project-guidance default, --archive / --archive-only, enclosing-lesson id tag). 11 tests. Stamped freshness headers into both capped files.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/archive-split",
+      "dateTime": "2026-06-14T04:39:35.860640-04:00",
+      "description": "D4: created docs/planning/lessons-archive.md (never-auto-loaded tier, seeded empty) + edited all 10 always-load sites (CLAUDE/AGENTS/GEMINI.md, ai-led-session-workflow.md x4, quick-start.md x2, project-guidance.md) to exclude the archive; added an Active->Archive candidate move to the Step 9 reorganization list.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/triggers",
+      "dateTime": "2026-06-14T04:39:35.860640-04:00",
+      "description": "D5: evidence-based archive triggers + N=20 disuse window + 10k/6k token ceilings as a hard backstop + 'promotion is orthogonal to archival' policy text in lessons-learned.md; router-config guidance: block; over-ceiling advisory chained into start_session (3 sites) + close_session (fail-open, stderr-only, never changes exit status).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/tests",
+      "dateTime": "2026-06-14T04:39:35.860640-04:00",
+      "description": "Suites green: Python 1270 passed / 1 skipped / 0 failed (+49 new). TS 908 passing / 2 failing (the known tracked Set-026 baseline; S2 touched no TS).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/verified",
+      "dateTime": "2026-06-14T04:39:35.860640-04:00",
+      "description": "Cross-provider verification (gemini-2.5-pro, $0.045): VERDICT VERIFIED, 0 Critical/Major/Minor; per-deliverable analysis confirmed D1-D5. R1 clean via the up-front conventions block (lesson L-064-10).",
+      "status": "completed",
+      "routedApiCalls": []
     }
   ]
 }

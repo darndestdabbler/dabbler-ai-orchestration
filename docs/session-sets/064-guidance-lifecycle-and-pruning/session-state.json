@@ -34,16 +34,16 @@
     {
       "number": 3,
       "title": "Session 3",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-06-14T04:46:22.616286-04:00",
-      "completedAt": null,
+      "completedAt": "2026-06-14T05:30:26.600316-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-4-8",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 4,

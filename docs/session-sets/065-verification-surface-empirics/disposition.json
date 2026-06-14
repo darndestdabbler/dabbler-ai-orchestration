@@ -1,36 +1,37 @@
 {
   "status": "completed",
-  "summary": "Set 065 Session 1 of 3: retrospective verification-surface bake-off over harvester 008-012 (n=5). Delivered bake-off-results.md + bake-off-data.json + forward-ab-design.md (all research/doc; no shipping-code change, no release). FINDINGS: promote path-aware STRONGLY supported (12 unique real defects routed missed, mostly Major + 2 wrong-data Criticals C9/C3); the win is BOTH context-access (isolated by 012 C3 same-provider GPT) AND provider-diversity (010 Gemini-only) -- entangled, unseparable at n=5; ~92% of catches PROBEABLE (-> pre-registered-falsifier/contract-test lever); 'is routed worth keeping' UNANSWERED (all routed-only catches order-confounded/out-of-scope; only evidenced defense is cadence -> needs forward Experiments A capability + B cadence). VERIFICATION: gpt-5.4 cross-provider, R1 ISSUES_FOUND (1 Major cadence-test gap in the A/B design + 3 Minor overclaims) all fixed -> R2 VERIFIED 0 remaining, $0.086 routed.",
+  "summary": "Set 065 Session 2 of 3: integration-surface spike (SDK vs CLI vs first-party). Hands-on, read-only; no shipping-code change, no release. Surveyed surfaces ON THIS HOST: GitHub Copilot CLI 1.0.51 (present, headless, subscription-authed) and claude -p 2.1.63 (present but REFUSES to nest in a Claude Code session) on PATH; codex+gemini CLIs absent; Claude Agent SDK installable (20 transitive deps + wraps Node CLI); first-party adapter buildable (httpx-only). PROVED a representative pair headless against a 4-file fixture (probeable C9-analog + novel-reasoning latent-TypeError) with a structured-output critique prompt that pastes NO file contents (forces tool use): (1) Copilot CLI (default model claude-sonnet-4.6) caught BOTH bugs 3/3, 5-6 tool calls (4 file reads), billing=subscription (premiumRequests:1/run, $0 marginal), ~18-27s -- model swaps to GPT/Gemini/Opus all plan-gated 'not available' on this seat; (2) first-party tool-loop adapter (Anthropic API via httpx, deterministic-servant read_file/grep/list_dir) caught BOTH 3/3 + a bonus finding, 4 read_file calls, metered ~$0.024/run, ~17-22s. GO verdict: path-aware critique CAN be a routed call. Recommendation: PRIMARY = first-party adapter (best preserves multi-provider control + anti-bias servant ownership + httpx-only footprint; only Anthropic exercised here), ALTERNATIVE = Copilot CLI subscription for seat-holders. VERIFICATION: gpt-5.4 cross-provider, R1 ISSUES_FOUND (1 Major: 'delivers multi-provider deterministically' overstated -> only Anthropic run; 2 Minor: 'full determinism' wording + Copilot default-tools claim) all fixed -> R2 VERIFIED 0 remaining. Verify spend $0.069 + spike metered ~$0.072 + routing $0.002.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "docs/session-sets/065-verification-surface-empirics/spec.md",
-    "docs/session-sets/065-verification-surface-empirics/bake-off-results.md",
-    "docs/session-sets/065-verification-surface-empirics/bake-off-data.json",
-    "docs/session-sets/065-verification-surface-empirics/forward-ab-design.md",
-    "docs/session-sets/065-verification-surface-empirics/run_s1_verification.py",
-    "docs/session-sets/065-verification-surface-empirics/s1-verification.md",
-    "docs/session-sets/065-verification-surface-empirics/run_s1_verification_r2.py",
-    "docs/session-sets/065-verification-surface-empirics/s1-verification-r2.md",
+    "docs/session-sets/065-verification-surface-empirics/spike-report.md",
+    "docs/session-sets/065-verification-surface-empirics/spike_first_party_adapter.py",
+    "docs/session-sets/065-verification-surface-empirics/copilot-trace-sample.jsonl",
+    "docs/session-sets/065-verification-surface-empirics/first-party-trace-sample.json",
+    "docs/session-sets/065-verification-surface-empirics/run_s2_verification.py",
+    "docs/session-sets/065-verification-surface-empirics/s2-verification.md",
+    "docs/session-sets/065-verification-surface-empirics/run_s2_verification_r2.py",
+    "docs/session-sets/065-verification-surface-empirics/s2-verification-r2.md",
+    "docs/session-sets/065-verification-surface-empirics/run_next_orch.py",
+    "docs/session-sets/065-verification-surface-empirics/next-orchestrator-rec.md",
     "docs/session-sets/065-verification-surface-empirics/activity-log.json",
     "docs/session-sets/065-verification-surface-empirics/disposition.json"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
-    "engine": "claude-code",
+    "engine": "claude",
     "provider": "anthropic",
     "model": "claude-opus-4-8",
-    "effort": "low",
+    "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Architectural continuity is critical since S2 is a direct implementation spike based on S1's design work. Staying with the incumbent maintains context, minimizes risk, and avoids the overhead of onboarding a new model mid-project."
+      "specifics": "Routed recommendation (gemini-pro, cross-provider, $0.0017): S3 is the final synthesis over the full set's history (S1 bake-off + S2 spike + consensus journal), so the incumbent's context continuity is critical for quality and efficiency; cross-provider verification supplies the independent review, so a fresh-perspective orchestrator is not required."
     }
   },
   "blockers": [],
   "lessons_cited": [
     "L-064-3",
     "L-064-7",
-    "L-064-9",
     "L-064-10"
   ]
 }

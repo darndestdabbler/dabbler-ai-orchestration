@@ -1,0 +1,77 @@
+{
+  "tool_calls": [
+    {
+      "name": "read_file",
+      "input": {
+        "path": "data.json"
+      }
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "resolver.py"
+      }
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "index.json"
+      }
+    },
+    {
+      "name": "read_file",
+      "input": {
+        "path": "config.py"
+      }
+    }
+  ],
+  "api_calls": [
+    {
+      "turn": 0,
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 952,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 180,
+        "service_tier": "standard",
+        "inference_geo": "global"
+      }
+    },
+    {
+      "turn": 1,
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 1803,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 0
+        },
+        "output_tokens": 887,
+        "service_tier": "standard",
+        "inference_geo": "global"
+      }
+    }
+  ],
+  "model": "claude-sonnet-4-6",
+  "final_text": "Now I have a clear picture of all four files. Let me analyze the defects carefully.\n\n**Finding 1 \u2014 `build_unresolved_index` silently ignores `header_refs` (Critical, data-integrity)**\n\n`resolver.py` only iterates over `data[\"body_refs\"]` to collect unresolved references. `data.json` clearly contains a second list, `header_refs`, which includes `CurrencyTable` with `\"resolved\": false`. Because the loop never touches `header_refs`, `CurrencyTable` is never added to the result. Yet `index.json` documents the output as *\"the complete set of ALL unresolved references in the module\"* and is treated as *\"the authoritative superset\"* by downstream consumers. The produced index (`[\"RoundingPolicy\"]`) silently omits `CurrencyTable`, making the artifact factually wrong without any error or warning.\n\n**Finding 2 \u2014 `resolve_chain` terminates immediately when `max_depth` is `None` (Critical, latent bug)**\n\n`config.py` explicitly documents that `max_depth = None` means *\"unbounded\"* recursion. However, `resolve_chain` guards recursion with `if depth < config[\"max_depth\"]`. In Python, comparing an integer to `None` with `<` raises a `TypeError` in Python 3. Even setting that aside, the design intent is that `None` should allow unlimited recursion, but the code treats it as a hard stop (the condition is always `False` or raises), so the chain is never actually followed regardless of depth. On the current (non-recursive) stub the crash is latent, but the moment real recursive calls are wired in, every call with the default config will either raise `TypeError` or silently return without recursing.\n\n**Finding 3 \u2014 `index.json` is stale / inconsistent with the code's own output (Major, data-integrity)**\n\nEven ignoring finding 1, the `index.json` file as committed lists only `[\"RoundingPolicy\"]`, which happens to match what the *buggy* code produces, but the file's own `_doc` field claims it is the complete, authoritative superset. It should contain at minimum `[\"CurrencyTable\", \"RoundingPolicy\"]`. Downstream consumers that trust `index.json` without re-running the resolver will act on an incomplete dataset.\n\n{\"verdict\": \"ISSUES_FOUND\", \"findings\": [{\"title\": \"build_unresolved_index ignores header_refs, silently omitting CurrencyTable from the unresolved index\", \"severity\": \"Critical\", \"file\": \"resolver.py\", \"why_real\": \"The loop only iterates data['body_refs'], so the unresolved header reference 'CurrencyTable' is never collected, making the emitted index factually incomplete despite being documented as the authoritative superset of ALL unresolved references.\"}, {\"title\": \"resolve_chain comparison 'depth < config[\\\"max_depth\\\"]' crashes (TypeError) or never recurses when max_depth is None\", \"severity\": \"Critical\", \"file\": \"resolver.py\", \"why_real\": \"config.py documents None as the 'unbounded' sentinel, but Python 3 raises TypeError on 'int < None', so every call with the default config will either crash or (on the current stub) silently skip all recursion, violating the documented unbounded-depth contract.\"}, {\"title\": \"index.json is missing the unresolved reference CurrencyTable, making it inconsistent with its own authoritative-superset claim\", \"severity\": \"Major\", \"file\": \"index.json\", \"why_real\": \"The file's _doc field declares it the complete authoritative index, yet it omits CurrencyTable (an unresolved header_ref in data.json), so any downstream consumer reading this file directly will act on incorrect data.\"}]}",
+  "summary": {
+    "wall_s": 21.6,
+    "input_tokens": 2755,
+    "output_tokens": 1067,
+    "metered_cost_usd": 0.02427,
+    "tool_call_count": 4,
+    "tool_names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  }
+}

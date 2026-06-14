@@ -44,7 +44,7 @@
       "stepNumber": 5,
       "stepKey": "session-001/forward-ab-design",
       "dateTime": "2026-06-14T13:26:12.083215-04:00",
-      "description": "Authored forward-ab-design.md: Experiment A (capability, blind same-frozen-tree 2x2 context x provider, seeded defects) + Experiment B (cadence, staged-snapshot intervention study) \u2014 added after R1 verification flagged the capability/cadence gap.",
+      "description": "Authored forward-ab-design.md: Experiment A (capability, blind same-frozen-tree 2x2 context x provider, seeded defects) + Experiment B (cadence, staged-snapshot intervention study) — added after R1 verification flagged the capability/cadence gap.",
       "status": "completed",
       "routedApiCalls": []
     },
@@ -54,6 +54,78 @@
       "stepKey": "session-001/verified",
       "dateTime": "2026-06-14T13:26:12.084615-04:00",
       "description": "Cross-provider verification (gpt-5.4, cross-provider for Claude orchestrator), 2 rounds via direct call_model. R1 ISSUES_FOUND (1 Major: A/B held cadence constant yet claimed to settle routed's cadence defense; 3 Minor wording) all fixed (split Exp A/B; provider-diversity vs multiplicity; post-hoc probeable; bounded cadence claim) -> R2 VERIFIED, 0 remaining. Routed verification spend $0.086. Up-front conventions block (L-064-10) kept R1 focused on real defects.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/start",
+      "dateTime": "2026-06-14T14:16:28.437679-04:00",
+      "description": "Registered S2 (start_session). Re-read required guidance + session-state-schema + S1 deliverables (bake-off-results, forward-ab-design). S1 next-orchestrator rec = Claude Code (continuity for the implementation spike).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/surfaces-surveyed",
+      "dateTime": "2026-06-14T14:16:28.437679-04:00",
+      "description": "Surveyed integration surfaces on this host: Copilot CLI 1.0.51 (present, headless, subscription-authed) and claude -p 2.1.63 (present but REFUSES to nest in a Claude Code session) on PATH; codex+gemini CLIs absent; Claude Agent SDK installable (20 transitive deps + wraps Node CLI); first-party adapter buildable (httpx only). Characterized each on path-awareness rung, billing, harness-vs-model, Python avail, deps.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/representative-pair-proven",
+      "dateTime": "2026-06-14T14:16:28.437679-04:00",
+      "description": "Proved a CLI (Copilot `copilot -p --allow-all-tools --output-format json`) and an SDK-class surface (first-party tool-loop adapter via Anthropic Messages API, deterministic-servant toolset read_file/grep/list_dir) headless against a 4-file read-only fixture with a structured-output critique prompt that pastes NO file contents (forces tool use).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/structured-verdict-captured",
+      "dateTime": "2026-06-14T14:16:28.437679-04:00",
+      "description": "Both surfaces emitted a clean final-line JSON verdict 3/3 runs (verdict + findings[] with severity/file/why_real). Copilot via prompt-instructed JSON; first-party via prompt-forced JSON (hardenable to schema tool-call).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/measurements-recorded",
+      "dateTime": "2026-06-14T14:16:28.437679-04:00",
+      "description": "Measured: Copilot billing=subscription (premiumRequests:1/run, no metered $), ~18-27s, 5-6 tool calls (4 file reads) per run; first-party billing=metered BYOK ~$0.024/run, ~17-22s, 4 read_file calls. Instrumented tool-call traces from Copilot JSONL (tool.execution_start/toolName) and first-party by construction. Determinism: 3/3 each. Copilot model availability plan-gated -> only claude-sonnet-4.6 reachable on this seat (gpt-5/gpt-5.2/opus-4.1/gemini-2.5-pro all 'not available').",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/c9-analog-retested",
+      "dateTime": "2026-06-14T14:16:28.437679-04:00",
+      "description": "Capability proof per catch-class: probeable C9-analog (header_refs undercount vs index.json superset claim) AND novel-reasoning (resolve_chain depth<config[max_depth] latent TypeError on documented None-default path). BOTH surfaces caught BOTH classes 3/3; first-party surfaced a bonus real finding (dead recursion guard). Stated limit: 4-file repo never exercises rung-2 semantic indexing -> deferred to forward A/B.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/decision-matrix-built",
+      "dateTime": "2026-06-14T14:16:28.437679-04:00",
+      "description": "Built SDK-vs-CLI-vs-first-party decision matrix scored against the complexity/quality rubric (deterministic + out-of-band + minimal-deps + controllable-anti-bias). First-party wins on multi-provider control, anti-bias servant ownership, and dep footprint (httpx+150LOC vs vendor SDK 20 deps); Copilot wins on $0-marginal subscription cost.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/report-written",
+      "dateTime": "2026-06-14T14:16:28.437679-04:00",
+      "description": "Wrote spike-report.md with GO verdict: primary = first-party tool-loop adapter (metered BYOK via route()); alternative = Copilot CLI (subscription) for seat-holders, with multi-provider/anti-bias/sandbox caveats. Deliverables: spike-report.md, spike_first_party_adapter.py, copilot-trace-sample.jsonl, first-party-trace-sample.json.",
       "status": "completed",
       "routedApiCalls": []
     }

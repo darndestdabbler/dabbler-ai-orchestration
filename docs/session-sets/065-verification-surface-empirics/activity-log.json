@@ -1,0 +1,61 @@
+{
+  "sessionSetName": "065-verification-surface-empirics",
+  "createdDate": "2026-06-14T13:26:12.081308-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/start",
+      "dateTime": "2026-06-14T13:26:12.082126-04:00",
+      "description": "Registered S1 (start_session, 3 sessions). Re-read required guidance fresh post-064 (project-guidance, lessons-learned, authoring-guide; 064 reshaped the guidance system). Confirmed field clear (064 complete, nothing in-progress); resolved next set number = 065.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/corpus-inventory",
+      "dateTime": "2026-06-14T13:26:12.083215-04:00",
+      "description": "Enumerated routed + path-aware verification artifacts across harvester 008-012; confirmed per-provider GPT/Gemini split exists for all sets and that 011 is the only set with a 2nd path-aware round (matches operator note).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/extraction",
+      "dateTime": "2026-06-14T13:26:12.083215-04:00",
+      "description": "Delegated per-set finding extraction to 5 parallel sub-agents (sonnet) over each set's routed + path-aware artifacts (rubric: push context-heavy work off the main agent). Aggregated structured per-set findings + provenance.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/synthesis",
+      "dateTime": "2026-06-14T13:26:12.083215-04:00",
+      "description": "Built bake-off-data.json + bake-off-results.md: 4-bucket classification (12 critique-only real / 10 routed-only / ~4 both / 0 real missed-by-both), set-type stratification, probeable-vs-novel partition (~92% probeable), and de-confounding: context-access isolated by 012 C3 (same-provider GPT snippet-miss->repo-catch), provider-diversity by 010 (Gemini-only catch). Two existence proofs (C9, C3) verified against harvester artifacts directly.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/forward-ab-design",
+      "dateTime": "2026-06-14T13:26:12.083215-04:00",
+      "description": "Authored forward-ab-design.md: Experiment A (capability, blind same-frozen-tree 2x2 context x provider, seeded defects) + Experiment B (cadence, staged-snapshot intervention study) \u2014 added after R1 verification flagged the capability/cadence gap.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/verified",
+      "dateTime": "2026-06-14T13:26:12.084615-04:00",
+      "description": "Cross-provider verification (gpt-5.4, cross-provider for Claude orchestrator), 2 rounds via direct call_model. R1 ISSUES_FOUND (1 Major: A/B held cadence constant yet claimed to settle routed's cadence defense; 3 Minor wording) all fixed (split Exp A/B; provider-diversity vs multiplicity; post-hoc probeable; bounded cadence claim) -> R2 VERIFIED, 0 remaining. Routed verification spend $0.086. Up-front conventions block (L-064-10) kept R1 focused on real defects.",
+      "status": "completed",
+      "routedApiCalls": []
+    }
+  ]
+}

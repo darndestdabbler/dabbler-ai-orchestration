@@ -1,0 +1,27 @@
+{
+  "status": "completed",
+  "summary": "Set 065 Session 1 of 3: retrospective verification-surface bake-off over harvester 008-012 (n=5). Delivered bake-off-results.md + bake-off-data.json + forward-ab-design.md (all research/doc; no shipping-code change, no release). FINDINGS: promote path-aware STRONGLY supported (12 unique real defects routed missed, mostly Major + 2 wrong-data Criticals C9/C3); the win is BOTH context-access (isolated by 012 C3 same-provider GPT) AND provider-diversity (010 Gemini-only) -- entangled, unseparable at n=5; ~92% of catches PROBEABLE (-> pre-registered-falsifier/contract-test lever); 'is routed worth keeping' UNANSWERED (all routed-only catches order-confounded/out-of-scope; only evidenced defense is cadence -> needs forward Experiments A capability + B cadence). VERIFICATION: gpt-5.4 cross-provider, R1 ISSUES_FOUND (1 Major cadence-test gap in the A/B design + 3 Minor overclaims) all fixed -> R2 VERIFIED 0 remaining, $0.086 routed.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "docs/session-sets/065-verification-surface-empirics/spec.md",
+    "docs/session-sets/065-verification-surface-empirics/bake-off-results.md",
+    "docs/session-sets/065-verification-surface-empirics/bake-off-data.json",
+    "docs/session-sets/065-verification-surface-empirics/forward-ab-design.md",
+    "docs/session-sets/065-verification-surface-empirics/run_s1_verification.py",
+    "docs/session-sets/065-verification-surface-empirics/s1-verification.md",
+    "docs/session-sets/065-verification-surface-empirics/run_s1_verification_r2.py",
+    "docs/session-sets/065-verification-surface-empirics/s1-verification-r2.md",
+    "docs/session-sets/065-verification-surface-empirics/activity-log.json",
+    "docs/session-sets/065-verification-surface-empirics/disposition.json"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": [],
+  "lessons_cited": [
+    "L-064-3",
+    "L-064-7",
+    "L-064-9",
+    "L-064-10"
+  ]
+}

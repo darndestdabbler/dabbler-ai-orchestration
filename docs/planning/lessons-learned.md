@@ -91,7 +91,7 @@ last-pruned-set: (none)   generated: 2026-06-14
 - **Action for future sessions:** Trust the guard for cheap routed work.
 
 ## Persist Routed Output To Disk Before Display Or Logging
-<!-- lesson: id="L-064-3" last-used-set="064" status="active" scope="portable" -->
+<!-- lesson: id="L-064-3" last-used-set="065" status="active" scope="portable" -->
 
 - **Context:** Any routed call on Windows where the default console code page
   is `cp1252`.
@@ -148,7 +148,7 @@ last-pruned-set: (none)   generated: 2026-06-14
 - **Action for future sessions:** Never self-opine on which model is cheaper.
 
 ## Schema-Only Re-Verifies Need `max_tier` Pinned To Block Auto-Escalation
-<!-- lesson: id="L-064-7" last-used-set="064" status="active" scope="portable" -->
+<!-- lesson: id="L-064-7" last-used-set="065" status="active" scope="portable" -->
 
 - **Context:** Round 2 of cross-provider session verification when the
   Round 1 response was substantively correct but used non-standard
@@ -195,7 +195,7 @@ last-pruned-set: (none)   generated: 2026-06-14
   code before routing verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="064" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="065" status="active" scope="portable" -->
 
 - **Context:** Building a cross-provider verification prompt whose
   evidence bundle includes `git diff` / `git diff --stat` output
@@ -212,7 +212,7 @@ last-pruned-set: (none)   generated: 2026-06-14
   alongside the diff so additions are visible.
 
 ## State The Suite Baseline And Release Contract Up Front In Verification Round 1
-<!-- lesson: id="L-064-10" added-set="062" last-used-set="064" status="active" scope="portable" -->
+<!-- lesson: id="L-064-10" added-set="062" last-used-set="065" status="active" scope="portable" -->
 
 - **Context:** Cross-provider session verification of sessions with
   known-tracked test failures, release mechanics, or deliberate

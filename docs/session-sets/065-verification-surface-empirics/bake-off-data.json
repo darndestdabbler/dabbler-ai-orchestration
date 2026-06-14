@@ -1,0 +1,121 @@
+{
+  "_meta": {
+    "set": "065-verification-surface-empirics",
+    "session": 1,
+    "produced": "2026-06-14",
+    "corpus": "dabbler-access-harvester sets 008-012 (n=5)",
+    "method": "5 parallel extraction sub-agents (sonnet) over each set's routed + path-aware verification artifacts; aggregated + de-confounded by the orchestrator (opus). Findings cite the harvester artifacts.",
+    "surfaces": {
+      "routed": "single cross-provider API session-verification (snippet/diff-fed, NOT path-aware), per-session, ran FIRST, rounds R1..Rn",
+      "path_aware": "GitHub Copilot driving GPT-5.4 AND Gemini-Pro separately (full repo access, probes), usually closeout/set-wide, ran SECOND (except 008 where it ran first)"
+    },
+    "confounds_present": ["context-access", "provider-multiplicity", "cadence", "round-count", "order"]
+  },
+  "sets": [
+    {
+      "set": "008-manifest-vba-ingestion-and-parser-hardening",
+      "set_type": "cross-artifact",
+      "routed": { "validator": "gpt-5.4", "cadence": "per-session", "max_rounds": 2, "real_catches": 0, "note": "only routed-only finding was a FALSE POSITIVE (S3 R1 evidence-packaging gap, no code change)" },
+      "path_aware": { "scope": "S2 interim", "providers": ["gpt-5.4", "gemini-pro"], "rounds": 1, "order_vs_routed": "FIRST (ran before routed S2)" },
+      "critique_only_real": [
+        { "defect": "H3 namedArgument contextual-keyword scope hole", "severity": "Major", "found_by": ["gpt-5.4", "gemini-pro"], "probeable": true },
+        { "defect": "H4 TypeSuffix not bridged to ReturnType (suffixed fn projects Void)", "severity": "Major", "found_by": ["gpt-5.4", "gemini-pro"], "probeable": true }
+      ],
+      "routed_only_real": [],
+      "both": [],
+      "notes": "Order REVERSED here (path-aware first). Path-aware caught 2 real Majors routed never saw; routed caught 0 real defects."
+    },
+    {
+      "set": "009-output-encoding-correctness",
+      "set_type": "cross-artifact",
+      "routed": { "validator": "gpt-5-4", "cadence": "per-session", "max_rounds": 2, "real_catches": 3 },
+      "path_aware": { "scope": "S1", "providers": ["gpt-5.4", "gemini-pro"], "rounds": 1, "order_vs_routed": "SECOND (post-remediation)" },
+      "critique_only_real": [
+        { "defect": "DA-1 'matches RunParse' overclaim (UTF-16 BE BOM divergence)", "severity": "Minor", "found_by": ["gpt-5.4", "gemini-pro"], "probeable": true },
+        { "defect": "DA-2 'all fixtures ASCII' overclaim (DatabaseYaml has 92 non-ASCII)", "severity": "Minor", "found_by": ["gpt-5.4"], "probeable": true }
+      ],
+      "routed_only_real": [
+        { "defect": "test pre-registration masks translator self-bootstrap", "severity": "Minor", "probeable": true },
+        { "defect": "ReadAllText path mutation-survivable (no non-ASCII fixture)", "severity": "Minor", "probeable": true },
+        { "defect": "BOM contract validated by inspection only", "severity": "Minor", "probeable": true }
+      ],
+      "both": [ { "defect": "DA-3 BOM-precedence test non-discriminating", "severity": "Minor", "note": "routed found upstream gap; path-aware found post-fix nuance" } ],
+      "false_positives": [
+        { "by": "gemini-pro", "defect": "DA-2 escalated to Major MUST_FIX", "disposition": "DISPROVEN by GPT probe" },
+        { "by": "gemini-pro", "defect": "DA-4 wrong-layer escalated to Major MUST_FIX", "disposition": "DISPROVEN by GPT" }
+      ],
+      "notes": "Closest the corpus comes to routed pulling weight: 3 real Minor TEST-RIGOR catches (a distinct class). All Minor. Gemini over-escalated twice; GPT (path-aware) disproved both."
+    },
+    {
+      "set": "010-output-contract-fidelity-batch",
+      "set_type": "local-logic",
+      "routed": { "validator": "gpt-5-4", "cadence": "per-session", "max_rounds": 3, "real_catches": 4 },
+      "path_aware": { "scope": "whole-set", "providers": ["gpt-5-4", "gemini-pro"], "rounds": 1, "order_vs_routed": "SECOND (post-remediation)" },
+      "critique_only_real": [
+        { "defect": "MakeTable (SELECT..INTO) emits Sql.Parsed.QueryType='Select', contradicts DAO QueryTypeCode", "severity": "Major", "found_by": ["gemini-pro"], "probeable": true, "note": "GPT-path-aware MISSED (VERIFIED)" },
+        { "defect": "numeric regex rejects valid .5 / 1. -> degrades real data to NULL", "severity": "Major", "found_by": ["gemini-pro"], "probeable": true, "note": "GPT-path-aware MISSED (VERIFIED)" }
+      ],
+      "routed_only_real": [
+        { "defect": "DAO code 144 label collision + Q11 exclusion", "severity": "Major", "probeable": true, "stage": "remediation-introduced" },
+        { "defect": "IsInvalidDataToken false-positive on blank/whitespace cells", "severity": "Major", "probeable": true },
+        { "defect": "missing-ir-dir early-return suppressed FORM_SPEC_MISSING", "severity": "Minor", "probeable": true },
+        { "defect": "IsInvalidDataToken binary-family hole", "severity": "Major", "probeable": true, "stage": "remediation-introduced" }
+      ],
+      "both": [],
+      "notes": "CLEAN PROVIDER-MULTIPLICITY ISOLATION: both critique-only catches were Gemini-ONLY; GPT-path-aware (same provider as routed validator) ALSO missed them. Here context-access (via GPT) did NOT help; the second provider did."
+    },
+    {
+      "set": "011-resolver-and-navigation-wiring",
+      "set_type": "cross-artifact",
+      "routed": { "validator": "gpt-5.4 (S1,S2)", "cadence": "per-session", "max_rounds": 2, "real_catches": 0, "note": "S3 had NO routed verification (path-aware only); S1 routed findings were disproven false positives" },
+      "path_aware": { "scope": "S3 + set-wide addendum", "providers": ["gpt-5.4", "gemini-pro"], "rounds": 2, "order_vs_routed": "SECOND; only 2-round path-aware set in corpus" },
+      "critique_only_real": [
+        { "defect": "C9 unresolved-items.json procedure-body-scoped undercount", "severity": "Major/Critical", "found_by": ["gpt-5.4", "gemini-pro"], "probeable": true, "note": "routed S2 R1 was CLEAN" },
+        { "defect": "C1 interpretation-guide join-key misdirection (TargetName vs nonexistent Name)", "severity": "Major", "found_by": ["gpt-5.4"], "probeable": true },
+        { "defect": "C7b Resolved ref can target VBA_RESOLVE_FAILURE stub", "severity": "Minor", "found_by": ["gemini-pro"], "probeable": false },
+        { "defect": "R2-1 C1-fix introduced ParserOutput-optional-on-both inaccuracy", "severity": "Major", "found_by": ["gpt-5.4"], "probeable": true, "stage": "remediation-introduced" },
+        { "defect": "R2-2 C9-disclosure overclaimed module-level completeness", "severity": "Major", "found_by": ["gpt-5.4"], "probeable": true, "stage": "remediation-introduced" }
+      ],
+      "routed_only_real": [],
+      "missed_by_both_disproven": ["S1-A1 scope contamination (disproven)", "S1-B owningClass divergence (disproven)"],
+      "notes": "C9 = the headline. R2-1/R2-2 = GPT caught errors in the orchestrator's OWN R1 fixes (the 2nd-round value). Provider split: C9 both, C1/R2-1/R2-2 GPT-only, C7b Gemini-only."
+    },
+    {
+      "set": "012-switchboard-and-report-chain-edges",
+      "set_type": "cross-artifact",
+      "routed": { "validator": "gpt-5-4 (all sessions, S3 reached R4)", "cadence": "per-session", "max_rounds": 4, "real_catches": 3 },
+      "path_aware": { "scope": "S3 set-wide", "providers": ["gpt-5-4", "gemini-pro"], "rounds": 1, "order_vs_routed": "SECOND" },
+      "critique_only_real": [
+        { "defect": "C3 form/report name-collision overwrites owner kind -> fabricated Report endpoint (WRONG DATA)", "severity": "Major/Critical", "found_by": ["gpt-5-4", "gemini-pro"], "probeable": true, "stage": "original", "note": "routed gpt-5-4 VERIFIED across R1-R4; explicitly judged 'low-risk hardening, not a blocker'" }
+      ],
+      "routed_only_real": [
+        { "defect": "S2 TempVars regex fabricates edges (not token-aware)", "severity": "Major", "probeable": true, "note": "took routed 3 rounds to fully close; path-aware out of scope (S2)" },
+        { "defect": "S1 nullable numeric coercion to 0", "severity": "Major", "probeable": true },
+        { "defect": "S2 object-level embedded macro silent drop", "severity": "Major", "probeable": false }
+      ],
+      "both": [
+        { "defect": "C1 named-arg OpenForm/OpenReport target dropped", "severity": "Major" },
+        { "defect": "C4 non-bang TempVars setter forms miss supplier edge", "severity": "Major" },
+        { "defect": "member-wrapped LHS write false read-edge", "severity": "Major" }
+      ],
+      "same_provider_isolation": "gpt-5-4 was BOTH routed validator AND a path-aware provider. Routed-GPT (snippet) missed C3 across R1-R4; path-aware-GPT (full repo) caught it. Single isolation variable = context mode. CLEAN context-access evidence.",
+      "notes": "C3 = strongest existence proof (4 routed rounds, wrong-data, stage=original so order does not excuse routed). Routed also caught 3 real Majors in S1/S2 work path-aware did not cover (out-of-scope, not a clean miss)."
+    }
+  ],
+  "aggregate": {
+    "critique_only_real_total": 12,
+    "critique_only_probeable": 11,
+    "critique_only_probeable_pct": "~92%",
+    "critique_only_non_probeable": ["011 C7b (latent-not-triggerable)"],
+    "critique_only_by_provider": { "both": 5, "gpt_only": 4, "gemini_only": 3, "interpretation": "NEITHER provider alone catches all; GPT-only misses 010's two Majors + C7b; Gemini-only misses C1/R2-1/R2-2. Provider-multiplicity is load-bearing WITHIN path-aware." },
+    "critique_only_severity": "mostly Major; 2 Critical-class wrong-data/structural (C9, C3)",
+    "routed_only_real_total": 10,
+    "routed_only_clean_evidence_routed_beats_pathaware": 0,
+    "routed_only_caveat": "ALL routed-only catches are order-confounded (path-aware saw post-fix code) or out-of-scope (different session). NO clean case of routed catching a real defect path-aware missed on the same code. Routed catches cluster in build-time implementation defects + test-rigor (009) -> plausibly CADENCE value, not unique capability. UNTESTED -> forward A/B.",
+    "clean_isolations": {
+      "context_access": "012 C3 (same-provider GPT: snippet miss -> repo catch)",
+      "provider_diversity": "010 (GPT-path-aware missed; Gemini-only caught) — context-access alone insufficient there; this is a provider-specific blind spot (diversity), NOT the full two-reviewer multiplicity effect (that needs the forward pair-vs-single comparison)"
+    },
+    "false_positive_cost": "Gemini over-escalated twice in 009 (DA-2/DA-4 Major MUST_FIX), both disproven by GPT probes. Path-aware is not noise-free; the 2-provider cross-check is part of its reliability."
+  }
+}

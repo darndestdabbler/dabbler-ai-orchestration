@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dabbler.ai/schemas/path-aware-critique.schema.json",
+  "title": "PathAwareCritique",
+  "description": "Set 066 — the saved multi-provider path-aware critique artifact for one session set. Written as path-aware-critique.json beside spec.md at the session-set root. Records the operator-run, multi-provider path-aware review (today GitHub Copilot driving GPT-5.4 + Gemini-Pro over the repo; the first-party tool-loop adapter is deferred to Set 067). The Set-066 S2 close-out gate confirms a valid, content-non-trivial artifact of this shape exists before a set-terminal close when the recorded pathAwareCritique policy is 'required'. This JSON Schema is the STRUCTURAL contract; the runtime gate uses the pure-Python validator ai_router.path_aware_critique.validate_path_aware_critique_artifact, which additionally enforces the multi-provider semantic rule (at least two DISTINCT providers — a constraint JSON Schema cannot express). A structurally-valid artifact with two entries from the same provider passes this schema but is rejected by the Python validator. See docs/path-aware-critique-schema.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "sessionSetName",
+    "pathAwareCritique",
+    "critiques"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "Envelope schema version. 1 = the v1 contract locked in Set 066 S1.",
+      "type": "integer",
+      "enum": [1]
+    },
+    "sessionSetName": {
+      "description": "The slug of the session set this critique covers (the session-set directory basename).",
+      "type": "string",
+      "minLength": 1
+    },
+    "pathAwareCritique": {
+      "description": "The policy level this artifact was produced under. An artifact is only produced for 'advisory' or 'required' sets; 'none' is accepted so the enum stays a single source of truth with the per-set attribute, but a 'none' set produces no artifact in practice.",
+      "type": "string",
+      "enum": ["none", "advisory", "required"]
+    },
+    "critiquedAt": {
+      "description": "Optional ISO-8601 timestamp recording when the critique was run.",
+      "type": "string",
+      "minLength": 1
+    },
+    "blastRadius": {
+      "description": "Optional echo of the ai_router.blast_radius recommendation that motivated the policy (pSet / recommended / categories). Advisory metadata; no runtime gate reads it.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "critiques": {
+      "description": "The per-provider critique entries. At least two (multi-provider). The runtime Python validator additionally requires at least two DISTINCT providers.",
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/Critique" }
+    }
+  },
+  "$defs": {
+    "Critique": {
+      "type": "object",
+      "description": "One provider's path-aware critique. provider/model/verdict are required and non-empty; each entry must be content-non-trivial (a non-empty summary OR at least one finding). Extra provider-emitted keys are tolerated (additionalProperties open).",
+      "additionalProperties": true,
+      "required": ["provider", "model", "verdict"],
+      "properties": {
+        "provider": {
+          "description": "The provider that produced this critique (e.g. 'openai', 'google', 'anthropic'). Distinct providers across entries is what makes the artifact multi-provider.",
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "description": "The model id used (e.g. 'gpt-5.4', 'gemini-2.5-pro').",
+          "type": "string",
+          "minLength": 1
+        },
+        "verdict": {
+          "description": "The critic's verdict, preserved verbatim (e.g. 'VERIFIED', 'ISSUES_FOUND').",
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "description": "The critic's prose verdict / reasoning. Required (non-empty) unless the entry carries at least one finding instead.",
+          "type": "string"
+        },
+        "findings": {
+          "description": "The critic's structured findings for this artifact. Each finding requires a non-empty description.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/Finding" }
+        }
+      },
+      "anyOf": [
+        {
+          "required": ["summary"],
+          "properties": { "summary": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "required": ["findings"],
+          "properties": { "findings": { "type": "array", "minItems": 1 } }
+        }
+      ]
+    },
+    "Finding": {
+      "type": "object",
+      "description": "One critique finding. Only description is reliably required; severity and category are loose optional strings; extra critic-emitted keys are tolerated.",
+      "additionalProperties": true,
+      "required": ["description"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,15 +1,20 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "066-path-aware-critique-policy",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Policy surface + blast-radius predicate + artifact contract",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-06-15T06:20:08.677910-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-4-8",
+        "effort": "high"
+      },
       "verificationVerdict": null
     },
     {

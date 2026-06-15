@@ -108,6 +108,7 @@ requiresE2E: true|false        # required
 uatScope: none | per-session | per-set  # required when requiresUAT: true
 uatStyle: ad-hoc | dsl                  # optional; default ad-hoc
 verificationMode: out-of-band-or-none | dedicated-sessions  # Lightweight only; default out-of-band-or-none; inert on Full
+pathAwareCritique: none | advisory | required  # tier-orthogonal (both tiers); default none
 effort: low | medium | high             # optional; orchestrator hint
 totalSessions: <int>                    # optional; canonical session count
 ```
@@ -139,10 +140,29 @@ alone never changes a started set's effective mode). See
 [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md)
 → *Field semantics* for the seeding/recording contract.
 
+**`pathAwareCritique`** (Set 066; **tier-orthogonal** — applies on both
+Full and Lightweight) selects the set's path-aware critique policy: an
+end-of-set, multi-provider review that retrieves repo ground truth itself
+(today an operator-run GitHub Copilot driving GPT-5.4 + Gemini-Pro; the
+first-party adapter is deferred to Set 067). `none` (**default**) is no
+gate — the feature is strictly opt-in, preserving the walk-away promise on
+both tiers. `advisory` recommends a critique (a missing/invalid artifact
+warns, never blocks). `required` arms the Set-066 close-out gate: a
+set-terminal close confirms a valid multi-provider
+[`path-aware-critique.json`](path-aware-critique-schema.md) artifact
+exists (hard-block in an interactive TTY, soft-warn headless). Like
+`verificationMode`, the spec field only *seeds* the choice — the durable
+record is an `activity-log.json` entry written **once at set start and
+immutable thereafter**; `python -m ai_router.blast_radius` *recommends* a
+value from the set's changed surface (the operator confirms — never an
+auto-set). The close-out gate itself ships in Set 066 Session 2. See the
+authoring guide → *Field semantics*.
+
 Both tiers declare the same field set; only `tier` (and, on
-Lightweight, `verificationMode`) drives a behavior difference. The yaml
-block is parsed by `fileSystem.ts:parseSessionSetConfig` and by
-`ai_router`'s spec reader; field names must match exactly.
+Lightweight, `verificationMode`) drives a tier-conditional behavior
+difference — `pathAwareCritique` is **tier-orthogonal** (identical on
+both). The yaml block is parsed by `fileSystem.ts:parseSessionSetConfig`
+and by `ai_router`'s spec reader; field names must match exactly.
 
 ### 4. Sessions parent (L2, named exactly `## Sessions`)
 

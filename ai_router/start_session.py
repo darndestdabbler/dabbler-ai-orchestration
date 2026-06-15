@@ -322,6 +322,25 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "step reads."
         ),
     )
+    p.add_argument(
+        "--path-aware-critique",
+        dest="path_aware_critique",
+        default=None,
+        choices=["none", "advisory", "required"],
+        help=(
+            "Set 066 (S1): record the tier-orthogonal pathAwareCritique "
+            "policy once at set start. ``required`` arms the Set-066 "
+            "close-out gate (a valid multi-provider critique artifact must "
+            "exist before a set-terminal close); ``advisory`` warns but "
+            "never blocks; ``none`` (the default) is no gate. When omitted, "
+            "the writer seeds the choice from spec.md's Session Set "
+            "Configuration ``pathAwareCritique`` field if present (recorded "
+            "only when no choice exists yet); otherwise nothing is recorded "
+            "and the default ``none`` applies implicitly. The durable record "
+            "is an activity-log.json entry every later step reads; it is "
+            "immutable after the first record."
+        ),
+    )
     # Set 048 Session 2: --no-router mode flag. Highest precedence
     # source for runtime_mode.resolve_no_router_mode (CLI flag > env
     # var DABBLER_NO_ROUTER > spec.md tier field > default full mode).
@@ -368,6 +387,38 @@ def _capture_verification_mode(
                 resolve_and_record_verification_mode,
             )
         resolve_and_record_verification_mode(
+            session_set_dir,
+            cli_choice=cli_choice,
+            session_number=session_number,
+        )
+    except Exception:
+        pass
+
+
+def _capture_path_aware_critique(
+    session_set_dir: str,
+    session_number: int,
+    cli_choice: Optional[str],
+) -> None:
+    """Set 066 (S1): record the pathAwareCritique policy once at set start.
+
+    Best-effort: delegates to
+    :func:`path_aware_critique.resolve_and_record_path_aware_critique`
+    (CLI choice wins; otherwise the spec.md seed is recorded only when no
+    durable record exists yet). A bad explicit ``--path-aware-critique`` is
+    already rejected by argparse ``choices``; any other failure here must
+    never block the session-start write, so it is swallowed.
+    """
+    try:
+        try:
+            from path_aware_critique import (  # type: ignore[import-not-found]
+                resolve_and_record_path_aware_critique,
+            )
+        except ImportError:
+            from .path_aware_critique import (  # type: ignore[no-redef]
+                resolve_and_record_path_aware_critique,
+            )
+        resolve_and_record_path_aware_critique(
             session_set_dir,
             cli_choice=cli_choice,
             session_number=session_number,
@@ -686,6 +737,13 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     # exists yet). Best-effort — never blocks the boundary write.
     _capture_verification_mode(
         session_set_dir, requested, getattr(args, "verification_mode", None)
+    )
+
+    # Set 066 (S1): capture the tier-orthogonal pathAwareCritique policy
+    # once at set start (CLI flag wins; spec.md seed recorded only when no
+    # record exists yet). Best-effort — never blocks the boundary write.
+    _capture_path_aware_critique(
+        session_set_dir, requested, getattr(args, "path_aware_critique", None)
     )
 
     # Set 049 (T5): best-effort observability log so a post-hoc

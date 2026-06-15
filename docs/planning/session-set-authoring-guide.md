@@ -216,6 +216,7 @@ requiresE2E: false       # true | false | "suggested" — E2E test coverage requ
 uatStyle: ad-hoc         # dsl | ad-hoc (only meaningful when requiresUAT: true; default ad-hoc)
 uatScope: per-session    # per-session | per-set | none (only meaningful when requiresUAT: true)
 verificationMode: out-of-band-or-none  # Lightweight only (Set 057); dedicated-sessions | out-of-band-or-none (default). Seeds the once-at-set-start choice.
+pathAwareCritique: none  # tier-orthogonal (Set 066); none | advisory | required (default none). Seeds the once-at-set-start choice.
 prerequisites:           # optional; sets that must complete before this one is workable
   - slug: 047-state-file-schema-v4-audit
     condition: complete
@@ -273,6 +274,38 @@ prerequisites:           # optional; sets that must complete before this one is 
   in spec.md and take their step list from the workflow doc, so the
   authored session count in the spec stays fixed even as the runtime count
   grows.
+
+- **`pathAwareCritique`** (Set 066; **tier-orthogonal** — valid on both
+  Full and Lightweight) — the set's path-aware critique policy: an
+  end-of-set, **multi-provider** review that retrieves repo ground truth
+  itself rather than reviewing a snippet the biased author pasted (the
+  Set 065 evidence: 12 unique real defects incl. two Criticals a
+  single-shot verifier missed; the 010-vs-C3 split proves a single
+  provider is insufficient, so the gate requires >=2 distinct providers).
+  Three levels:
+  - `none` (**default**) — no gate. The feature is strictly opt-in; a set
+    that declares nothing pays nothing, preserving the walk-away promise on
+    both tiers.
+  - `advisory` — a critique is recommended; a missing or invalid artifact
+    **warns** at close but never blocks.
+  - `required` — the Set-066 close-out gate confirms a valid multi-provider
+    [`path-aware-critique.json`](../path-aware-critique-schema.md) artifact
+    exists at the set-terminal close (hard-block in an interactive TTY,
+    soft-warn headless — the Set 057 Q6 fail-posture pattern).
+
+  Like `verificationMode`, the spec field only **seeds** the choice: the
+  durable record is an `activity-log.json` entry written **once at set
+  start and immutable thereafter** (a later
+  `start_session --path-aware-critique …` on a started set is a no-op, so a
+  mid-set downgrade cannot silently disarm a gate the set already opted
+  into). Unlike `verificationMode` (Lightweight-only), this attribute is
+  **tier-orthogonal** — the close-out wiring is net-new on the Full-tier
+  close path precisely *because* the existing `dedicated-sessions` gate is
+  Lightweight-only, not because the attribute is Full-tier-specific. The
+  close-out gate itself ships in **Set 066 Session 2**; Session 1 ships the
+  attribute, the saved-artifact contract, and the blast-radius predicate
+  that recommends a value (`python -m ai_router.blast_radius <paths…>` —
+  **advisory only; the operator confirms, it is never a hard auto-set**).
 
 - **`requiresUAT: true`** — the set must produce a
   `<slug>-uat-checklist.json` and human-UAT review is a precondition
@@ -370,7 +403,9 @@ block with all five values spelled out as their defaults.
 
 If the block is **present but a field is omitted**, the missing field
 takes its default (`"full"` for `tier`, `false` for boolean tri-state
-flags, `"ad-hoc"` for `uatStyle`, `none` for `uatScope`).
+flags, `"ad-hoc"` for `uatStyle`, `none` for `uatScope`, and — for the
+opt-in attributes — `out-of-band-or-none` for `verificationMode` and
+`none` for `pathAwareCritique`, i.e. no path-aware critique gate).
 
 **The safe default is no UAT and no E2E gate.** Authors who want UAT
 or E2E coverage must opt in explicitly. This keeps every set's gates

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "066-path-aware-critique-policy",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-06-15T12:00:00-04:00",
+  "blastRadius": {
+    "pSet": true,
+    "recommended": "required",
+    "categories": ["wiring", "shared-schema"]
+  },
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Read the close-out gate wiring and the artifact validator over the repo. One real defect: the gate fired on a non-terminal close.",
+      "findings": [
+        {
+          "description": "The close-out check fires on every session close, not only the set-terminal close, so a mid-set close on a `required` set would block.",
+          "severity": "Major",
+          "category": "correctness"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "Independently read the attribute machinery and the multi-provider validator with repo access. The immutability path and the distinct-provider check hold; no defects found."
+    }
+  ]
+}

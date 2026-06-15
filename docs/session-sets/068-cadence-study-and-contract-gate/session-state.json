@@ -6,16 +6,16 @@
     {
       "number": 1,
       "title": "run_test disposable-worktree sandbox + tool (+ ReDoS isolation)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-06-15T14:19:55.555511-04:00",
-      "completedAt": null,
+      "completedAt": "2026-06-15T15:00:47.837192-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-4-8",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

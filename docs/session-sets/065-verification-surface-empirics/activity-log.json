@@ -128,6 +128,56 @@
       "description": "Wrote spike-report.md with GO verdict: primary = first-party tool-loop adapter (metered BYOK via route()); alternative = Copilot CLI (subscription) for seat-holders, with multi-provider/anti-bias/sandbox caveats. Deliverables: spike-report.md, spike_first_party_adapter.py, copilot-trace-sample.jsonl, first-party-trace-sample.json.",
       "status": "completed",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/start",
+      "dateTime": "2026-06-14T15:05:00-04:00",
+      "description": "Registered S3 (start_session, final session). Re-read required guidance (project-guidance, lessons-learned, authoring-guide) + workflow doc + S1/S2 deliverables (bake-off-results, forward-ab-design, spike-report) + dispositions. Confirmed orchestrator = claude-opus-4-8 high per routed next-orch rec.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/open-question-resolved",
+      "dateTime": "2026-06-14T15:05:00-04:00",
+      "description": "Routed the open design question (spec step 4: can one agent author falsifiers/contract AND implement and still get pre-commitment benefit?) for independent input rather than self-opine. gemini-pro ($0.0101): blast-radius-gated -- same-agent OK for low-blast-radius/probeable under temporal-separation + immutability; independence MANDATORY for high-blast-radius/cross-artifact/ambiguous-novel. Saved s3-openq-analysis.md.",
+      "status": "completed",
+      "routedApiCalls": [{"task_type": "analysis", "model": "gemini-pro", "cost_usd": 0.0101}]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/proposal-written",
+      "dateTime": "2026-06-14T15:05:00-04:00",
+      "description": "Authored docs/proposals/2026-06-14-verification-surface-empirics/proposal.md (synthesis, 4 candidates scored vs complexity/quality rubric, explicit recs a-d, open-question resolution, unifying single-core-predicate rule organized around the two-delegation-modes frame) + consensus-journal.md (carries pre-065 gpt-5.4/gemini-2.5-pro locked decisions + S3 routed analysis).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/proposal-verified",
+      "dateTime": "2026-06-14T15:05:00-04:00",
+      "description": "Cross-provider verification of the proposal (gpt-5.4, 4 rounds). R1 ISSUES_FOUND (5 Major + 1 Minor, all consistency/calibration: one-predicate over-unification, set-vs-task gating, Candidate-2 mis-scoring, overhead-placement overstatement, Mode-2 over-generalization, deterministic mislabel) -> fixed (P_task/P_set split + heuristic-extension framing, re-scored Candidate 2, in-band carve-outs, hypothesis-framed generalization) -> R2 3 residual -> R3 1 residual -> R4 VERIFIED 0 remaining. L-064-7 pinned max_tier=3 on re-verifies; L-064-10 up-front conventions block. Verify spend $0.445.",
+      "status": "completed",
+      "routedApiCalls": [
+        {"task_type": "session-verification", "model": "gpt-5-4", "cost_usd": 0.169017},
+        {"task_type": "session-verification", "model": "gpt-5-4", "cost_usd": 0.127375},
+        {"task_type": "session-verification", "model": "gpt-5-4", "cost_usd": 0.100113},
+        {"task_type": "session-verification", "model": "gpt-5-4", "cost_usd": 0.049403}
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/change-log-and-next-set",
+      "dateTime": "2026-06-14T15:05:00-04:00",
+      "description": "Authored change-log.md (set complete, 3/3 VERIFIED). Routed next-session-set recommendation (L-064-6): gemini-pro ($0.0033) -> 'mode2-pull-verifier-adapter' (~4 sessions, ships release): build the first-party tool-loop adapter as the production Mode-2 engine + forward-A/B execution vehicle. Wrote final disposition.json (next_orchestrator null; lessons_cited L-064-3/6/7/10).",
+      "status": "completed",
+      "routedApiCalls": [{"task_type": "analysis", "model": "gemini-pro", "cost_usd": 0.0033}]
     }
   ]
 }

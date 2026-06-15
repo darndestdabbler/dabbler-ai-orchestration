@@ -136,7 +136,7 @@ last-pruned-set: (none)   generated: 2026-06-14
   2026-05-01 to avoid duplicate guidance drifting in two places.
 
 ## Always Route `ai-assignment.md` And Next-Orchestrator / Next-Set Recommendations
-<!-- lesson: id="L-064-6" status="active" scope="portable" -->
+<!-- lesson: id="L-064-6" last-used-set="065" status="active" scope="portable" -->
 
 - **Context:** Authoring `ai-assignment.md` (Step 3.5) or next-orchestrator /
   next-session-set recommendations (Step 8).

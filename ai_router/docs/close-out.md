@@ -338,6 +338,29 @@ returns the corresponding exit code without touching downstream state.
    Each gate returns `(passed: bool, remediation: str)`. The first
    failing gate stops the phase; the script emits `closeout_failed`
    with the remediation and exits 1.
+7b. **Content-aware close-out gates** (run after the deterministic gates,
+    before the state flip; each fires only on the **set-terminal** close
+    and never on a non-terminal work-session close):
+   - **External-verification soft gate** (Set 048 §3.5) — `--no-router`
+     mode only; warns when `external-verification.md` is missing.
+   - **Dedicated-verification gate** (Set 057 Q6) — fires when the durable
+     `verificationMode == dedicated-sessions` (**Lightweight only**);
+     confirms a different-engine verification session ran.
+   - **Path-aware-critique gate** (Set 066) — **tier-orthogonal** (Full
+     *and* Lightweight). Fires when the durable `pathAwareCritique` record
+     (an `activity-log.json` entry written once at set start; default
+     `none`) is `advisory` or `required`. It confirms a valid
+     **multi-provider** `path-aware-critique.json` artifact exists at the
+     session-set root (`>=2` distinct providers, each content-non-trivial;
+     validated by `ai_router.path_aware_critique`). Fail posture:
+     `required` **hard-blocks** in an interactive TTY (`gate_failed` +
+     `closeout_failed`, `failed_checks: ["path_aware_critique_gate"]`) and
+     **soft-warns** in non-TTY / headless / under `--accept-suggestions`;
+     `advisory` **always soft-warns** and never blocks; `none` skips. The
+     wiring is **net-new** on the Full-tier close path — the
+     dedicated-verification gate above is Lightweight-only, so the
+     attribute could not reuse it. Fail-open in the non-block direction:
+     any internal error never wedges close-out.
 8. **Wait for verification to terminate** (bounded by `--timeout`):
    - **API mode** — verification is already synchronous; this is a
      no-op flagged as `method: "api"`.

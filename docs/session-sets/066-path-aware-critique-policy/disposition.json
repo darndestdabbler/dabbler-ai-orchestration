@@ -1,37 +1,31 @@
 {
   "status": "completed",
-  "summary": "Session 1 of 3 -- Policy surface + blast-radius predicate + artifact contract. Shipped the tier-orthogonal Path-Aware Critique policy foundations (no close-out gate yet; that is Session 2). (1) ATTRIBUTE: new ai_router/path_aware_critique.py adds the `pathAwareCritique: none|advisory|required` per-set policy attribute with the seed -> record-once-at-set-start -> immutable machinery, deliberately mirroring the Set-057 verificationMode pattern (own activity-log `kind: path_aware_critique`, default `none` = strictly opt-in, no gate). The spec field parses for free via the shared _extract_session_set_configuration_block (read_spec_path_aware_critique), exactly as verificationMode is read -- so no session_state.py/spec_config.py edit was needed. start_session gained --path-aware-critique + best-effort _capture_path_aware_critique wired after _capture_verification_mode (end-to-end smoke confirmed seed->record->read). (2) PREDICATE: new ai_router/blast_radius.py implements the proposal's core predicate P_set = any(P_task) -- classifies a set's changed/planned surface into cross-artifact/shared-schema/wiring/index and RECOMMENDS a value (required when P_set, advisory for low-blast code, none for docs/empty). Advisory only: operator confirms, never a hard auto-set. ASCII-only CLI (`python -m ai_router.blast_radius <paths>` + --json). (3) ARTIFACT: docs/path-aware-critique.schema.json (structural contract) + docs/path-aware-critique-schema.md + example, plus a pure-Python validate_path_aware_critique_artifact (no jsonschema, which is test-only) the Session-2 gate will call -- enforces >=2 DISTINCT providers (the 010-vs-C3 multi-provider lesson) and content-non-triviality. (4) DOCS: spec-md-schema.md + session-set-authoring-guide.md document the new field (tier-orthogonal; net-new Full-tier wiring deferred to S2). (5) TESTS: 70 new (attribute parse/seed/record/immutability; predicate classification + recommendation + CLI; artifact accept/reject; JSON-schema static contract + dual-validation drift guard). Full ai_router suite green: 1372 passed / 1 skipped. Cross-provider session verification (gpt-5.4): Round 1 ISSUES_FOUND with 3 Major -- one REAL (the pure-Python validator was more lenient than the JSON Schema on 4 structural cases: extra top-level key, non-array findings, non-string summary, finding missing description) which was FIXED (validator now matches the schema; accept-sets agree except the intended distinct-provider rule; pinned by new TestStructuralParity) -- and two FALSE POSITIVES disproven with evidence (start_session.py IS in _WIRING_SIGNALS and yields `required`; the corrupt-log read path cannot silently disarm any gate because record_ raises on corrupt JSON and close-out's check_activity_log_entry refuses to close an unreadable log, and the behavior mirrors the cross-provider-verified verificationMode readers). Round 2 VERIFIED. No release this session (PyPI ai_router release is Session 3).",
+  "summary": "Session 2 of 3 -- Net-new content-aware close-out wiring. Shipped the tier-orthogonal Path-Aware Critique close-out GATE that enforces the Session-1 policy attribute. (1) GATE VALIDATOR: ai_router/path_aware_critique.py gains validate_path_aware_critique_gate() + PathAwareCritiqueGateResult -- a posture-agnostic, never-raising, tier-orthogonal validator that reads the durable pathAwareCritique record (none -> no-op; advisory/required -> locate path-aware-critique.json beside spec.md and run the S1 multi-provider validator). It deliberately MIRRORS validate_dedicated_verification's shape (Set 057 Q6) rather than reusing it -- the Erratum proved that gate is Lightweight-only (gates on verificationMode), so this wiring is NET-NEW on the Full-tier close path. (2) WIRING: close_session.run() gained the gate after the dedicated_verification gate, before the success path: fires ONLY on the set-terminal close (_close_is_terminal), required -> HARD-block in an interactive TTY / SOFT-warn non-TTY/headless/--accept-suggestions (the Set 057 Q6 fail-posture), advisory -> ALWAYS soft-warn never block, none -> skip; ASCII-only; fail-open in the non-block direction (the module import lives INSIDE the broad try/except so any import-time failure skips the gate rather than wedging close-out). emits closeout_failed with failed_checks=[\"path_aware_critique_gate\"] on a hard block. (3) TESTS: 19 new (13 close-gate end-to-end across level x tier {full,lightweight} + TTY/headless/--accept-suggestions fail-posture + single-provider/trivial/missing-artifact blocks on required + advisory-never-blocks + non-terminal-close-skips + unrecorded-default-skips; 6 gate-validator units). Full ai_router suite green: 1391 passed / 1 skipped (S1 was 1372). (4) DOCS: ai_router/docs/close-out.md (new step 7b documenting the three content-aware close-out gates) + docs/ai-led-session-workflow.md (a path-aware-critique close-out-gate paragraph paralleling the Set 057 Q6 note). Cross-provider session verification (gpt-5.4): Round 1 ISSUES_FOUND -- 1 Major (the module import sat OUTSIDE the broad fail-open try/except, so a non-ImportError import failure could wedge close-out, contradicting the fail-open contract) which was FIXED (import moved inside the guard, a deliberate strengthening over the mirrored Set 057 block), and 1 Minor (apparent doc mojibake) DISPROVEN as a cp1252 harness artifact -- the files on disk are valid UTF-8 (cat -v shows 0xC2A7 section-sign and 0xE28094 em dash, consistent with the surrounding docs), the mojibake existed only in the verifier's cp1252-decoded diff; Round 2 (UTF-8 diff) VERIFIED. No release this session (the PyPI ai_router release carrying this gate is Session 3). The manual-workflow docs, reusable prompt template, and the dogfood critique artifact for this set are Session 3.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
     "ai_router/path_aware_critique.py",
-    "ai_router/blast_radius.py",
-    "ai_router/start_session.py",
-    "docs/path-aware-critique.schema.json",
-    "docs/path-aware-critique-schema-example.json",
-    "docs/path-aware-critique-schema.md",
-    "docs/spec-md-schema.md",
-    "docs/planning/session-set-authoring-guide.md",
+    "ai_router/close_session.py",
+    "ai_router/docs/close-out.md",
+    "docs/ai-led-session-workflow.md",
     "ai_router/tests/test_path_aware_critique.py",
-    "ai_router/tests/test_blast_radius.py",
-    "ai_router/tests/test_path_aware_critique_schema.py",
+    "ai_router/tests/test_path_aware_critique_close_gate.py",
     "docs/session-sets/066-path-aware-critique-policy/session-state.json",
     "docs/session-sets/066-path-aware-critique-policy/activity-log.json",
     "docs/session-sets/066-path-aware-critique-policy/session-events.jsonl",
-    "docs/session-sets/066-path-aware-critique-policy/ai-assignment.md",
     "docs/session-sets/066-path-aware-critique-policy/disposition.json",
-    "docs/session-sets/066-path-aware-critique-policy/s1-verification.md",
-    "docs/session-sets/066-path-aware-critique-policy/s1-verification-round-2.md"
+    "docs/session-sets/066-path-aware-critique-policy/s2-verification.md",
+    "docs/session-sets/066-path-aware-critique-policy/s2-verification-round-2.md"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-opus-4-8",
+    "engine": "gpt-5-4",
+    "provider": "openai",
+    "model": "gpt-5-4",
     "effort": "high",
     "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Routed recommendation (gemini-pro analysis, cross-provider to reduce self-bias): Session 2 wires the net-new content-aware close-out gate into ai_router/close_session.py and must MIRROR the dedicated_verification gate's shape -- both files the Session-1 author already mapped, so continuity of that architectural context outweighs fresh-eyes value."
+      "code": "other",
+      "specifics": "Routed recommendation (cross-provider analysis, to reduce self-bias). The analysis recommended a fresh-eyes engine over continuity for Session 3: 'the primary deliverables are canonical documentation, a reusable prompt template, and a dogfooded critique artifact, culminating in a public release. Using a different top-tier model to interpret the existing implementation and author the canonical workflow serves as a powerful real-world test of the system's clarity and usability -- if an entirely different orchestrator can comprehend the architecture, produce high-quality docs, and generate a valid critique artifact that passes the S1/S2 gates, that is strong evidence the system is robust and not reliant on implicit model-specific context. This cross-provider validation is critical before a public release and outweighs continuity.' Model normalized from the routed 'gpt-4o' (not in this repo's orchestrator roster) to the rostered top-tier OpenAI engine gpt-5-4; the operator confirms the actual S3 orchestrator, noting that the PyPI publish runbook (git tag push / gh CLI / green-Test prerequisite) is operator-driven regardless of engine."
     }
   },
   "blockers": []

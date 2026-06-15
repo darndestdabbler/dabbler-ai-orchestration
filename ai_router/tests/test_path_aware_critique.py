@@ -348,3 +348,69 @@ class TestArtifactValidator:
         )
         found = pac.find_path_aware_critique_artifact(d)
         assert found is not None and found.is_file()
+
+
+# --------------------------------------------------------------------------
+# the close-out gate validator (Set 066 S2) -- posture-agnostic ok/not-ok
+# --------------------------------------------------------------------------
+
+
+class TestGateValidator:
+    def _write_artifact(self, d: Path, art: dict) -> None:
+        (d / pac.PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME).write_text(
+            json.dumps(art), encoding="utf-8"
+        )
+
+    def test_none_is_a_noop(self, tmp_path):
+        d = _set_dir(tmp_path)  # no record -> default none
+        res = pac.validate_path_aware_critique_gate(d)
+        assert res.level == NONE
+        assert res.applicable is False
+        assert res.ok is True
+
+    def test_required_missing_artifact_not_ok(self, tmp_path):
+        d = _set_dir(tmp_path)
+        pac.record_path_aware_critique(d, REQ)
+        res = pac.validate_path_aware_critique_gate(d)
+        assert res.level == REQ
+        assert res.applicable is True
+        assert res.ok is False
+        assert res.artifact_result is None
+        assert res.corrective  # an operator action is offered
+
+    def test_required_valid_artifact_ok(self, tmp_path):
+        d = _set_dir(tmp_path)
+        pac.record_path_aware_critique(d, REQ)
+        self._write_artifact(d, _valid_artifact())
+        res = pac.validate_path_aware_critique_gate(d)
+        assert res.ok is True
+        assert res.applicable is True
+        assert res.artifact_result is not None and res.artifact_result.ok
+
+    def test_required_single_provider_artifact_not_ok(self, tmp_path):
+        d = _set_dir(tmp_path)
+        pac.record_path_aware_critique(d, REQ)
+        art = _valid_artifact()
+        art["critiques"][1]["provider"] = "openai"  # collapse to one provider
+        self._write_artifact(d, art)
+        res = pac.validate_path_aware_critique_gate(d)
+        assert res.ok is False
+        assert res.artifact_result is not None
+        assert res.artifact_result.code == pac.ARTIFACT_SINGLE_PROVIDER
+
+    def test_advisory_missing_artifact_applicable_but_not_ok(self, tmp_path):
+        # The validator reports not-ok; advisory POSTURE (never block) is the
+        # close_session caller's job, not this function's.
+        d = _set_dir(tmp_path)
+        pac.record_path_aware_critique(d, ADV)
+        res = pac.validate_path_aware_critique_gate(d)
+        assert res.level == ADV
+        assert res.applicable is True
+        assert res.ok is False
+
+    def test_advisory_valid_artifact_ok(self, tmp_path):
+        d = _set_dir(tmp_path)
+        pac.record_path_aware_critique(d, ADV)
+        self._write_artifact(d, _valid_artifact())
+        res = pac.validate_path_aware_critique_gate(d)
+        assert res.ok is True

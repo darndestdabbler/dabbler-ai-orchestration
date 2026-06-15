@@ -1775,6 +1775,91 @@ def run(
             )
             return outcome
 
+        # Set 066 S2 path-aware-critique close-out gate (net-new, tier-
+        # ORTHOGONAL). When the durable ``pathAwareCritique`` record is
+        # ``advisory`` or ``required``, confirm a valid multi-provider
+        # critique artifact exists at the SET-TERMINAL close. Posture mirrors
+        # the Set 057 Q6 split for ``required`` (HARD-block in an interactive
+        # TTY, SOFT-warn non-TTY / headless / --accept-suggestions);
+        # ``advisory`` ALWAYS soft-warns and never blocks; ``none`` skips
+        # entirely. This is NET-NEW wiring reaching the Full-tier close path:
+        # the dedicated_verification gate above is Lightweight-only (it gates
+        # on verificationMode), so this attribute could not reuse it (Set 066
+        # spec Erratum). Fires ONLY on the set-terminal close, and fail-open
+        # in the non-block direction — any internal error here never wedges
+        # close-out.
+        pac_gate_failed = False
+        pac_detail = ""
+        # The module import lives INSIDE the broad fail-open guard (a
+        # deliberate strengthening over the Set 057 dedicated_verification
+        # block, which imports before its guard): the "any internal error
+        # never wedges close-out" contract must also cover a non-ImportError
+        # failure during module import/initialization, not only the
+        # bare-vs-relative ImportError shim. S2 verifier Major.
+        try:
+            try:
+                from path_aware_critique import (  # type: ignore[import-not-found]
+                    PATH_AWARE_CRITIQUE_NONE,
+                    PATH_AWARE_CRITIQUE_REQUIRED,
+                    read_path_aware_critique,
+                    validate_path_aware_critique_gate,
+                )
+            except ImportError:
+                from .path_aware_critique import (  # type: ignore[no-redef]
+                    PATH_AWARE_CRITIQUE_NONE,
+                    PATH_AWARE_CRITIQUE_REQUIRED,
+                    read_path_aware_critique,
+                    validate_path_aware_critique_gate,
+                )
+            pac_level = read_path_aware_critique(session_set_dir)
+            if (
+                pac_level != PATH_AWARE_CRITIQUE_NONE
+                and _close_is_terminal(session_set_dir, outcome.session_number)
+            ):
+                pac = validate_path_aware_critique_gate(session_set_dir)
+                if pac.applicable and not pac.ok:
+                    pac_detail = f"{pac.reason} {pac.corrective}".strip()
+                    if pac_level == PATH_AWARE_CRITIQUE_REQUIRED:
+                        non_interactive = bool(
+                            getattr(args, "accept_suggestions", False)
+                        ) or not sys.stdin.isatty()
+                        if non_interactive:
+                            soft = (
+                                "WARNING (Set 066 path-aware-critique soft "
+                                "gate, non-TTY/--accept-suggestions): "
+                                f"{pac_detail}"
+                            )
+                            print(soft, file=sys.stderr)
+                            outcome.messages.append(soft)
+                        else:
+                            pac_gate_failed = True
+                    else:
+                        # advisory: never blocks; always soft-warns so a
+                        # missing/invalid artifact is visible at close.
+                        soft = (
+                            "WARNING (Set 066 path-aware-critique advisory): "
+                            f"{pac_detail}"
+                        )
+                        print(soft, file=sys.stderr)
+                        outcome.messages.append(soft)
+        except Exception:
+            pac_gate_failed = False
+        if pac_gate_failed:
+            outcome.result = "gate_failed"
+            outcome.messages.append(
+                "gate path_aware_critique failed (Set 066, hard-TTY): "
+                f"{pac_detail} Pass --accept-suggestions to bypass "
+                "non-interactively (incident/headless only)."
+            )
+            _emit_event(
+                session_set_dir,
+                "closeout_failed",
+                outcome.session_number,
+                outcome,
+                failed_checks=["path_aware_critique_gate"],
+            )
+            return outcome
+
         outcome.result = "succeeded"
         # Include the orchestrator-identity snapshot in the
         # closeout_succeeded payload so the audit trail records

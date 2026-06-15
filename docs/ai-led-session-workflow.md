@@ -1805,6 +1805,36 @@ content-blind and inert on Lightweight (no events ledger), so it cannot
 see session `type`; the blessed writers plus this validator are the entire
 enforcement surface (Set 057 S1 Audit Lock → Concrete defect).
 
+**Path-aware-critique close-out gate (Set 066).** A second content-aware
+close-out gate, **tier-orthogonal** (it runs on Full *and* Lightweight).
+It fires when the durable `pathAwareCritique` record — an `activity-log.json`
+entry written **once at set start and immutable thereafter** (default
+`none`, seeded from the spec's `pathAwareCritique: none | advisory |
+required` field; see the authoring guide) — is `advisory` or `required`.
+On the **set-terminal** close it confirms a valid **multi-provider**
+`path-aware-critique.json` artifact exists at the session-set root (`>=2`
+distinct providers, each carrying a non-empty summary or a finding with a
+description; validated by `ai_router.path_aware_critique`). Fail posture:
+
+- `required` — **hard-blocks in an interactive TTY** (`gate_failed`,
+  `failed_checks: ["path_aware_critique_gate"]`) and **soft-warns in
+  non-TTY / headless** or under `--accept-suggestions`, mirroring the
+  Set 057 Q6 split above;
+- `advisory` — **always soft-warns** and never blocks;
+- `none` — skips entirely (strictly opt-in; a set that declares nothing
+  pays no gate, preserving the walk-away promise on both tiers).
+
+The wiring is **net-new** on the Full-tier close path: the
+dedicated-verification gate above gates on `verificationMode` and is
+Lightweight-only, so this attribute could not reuse it (the Set 065
+proposal's "reuse the dedicated gate" claim was a verified erratum). Like
+the Q6 gate it fires only on the set-terminal close and is fail-open in the
+non-block direction — any internal error never wedges close-out. The
+blast-radius predicate (`python -m ai_router.blast_radius <paths…>`)
+*recommends* a level (advisory only; the operator confirms). The manual
+operator flow that produces the artifact and the reusable prompt template
+are documented in Set 066 Session 3.
+
 ### Step 7: Handle Verification Result
 
 **VERIFIED:** Proceed to commit.

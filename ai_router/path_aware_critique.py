@@ -627,3 +627,126 @@ def find_path_aware_critique_artifact(
     """
     candidate = Path(session_set_dir) / PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME
     return candidate if candidate.is_file() else None
+
+
+# ---------------------------------------------------------------------------
+# Content-aware close-out gate (Set 066 S2)
+# ---------------------------------------------------------------------------
+
+# The one-line operator action the close-out gate prints when the artifact
+# is missing or invalid. ASCII-only (project-guidance Code Style).
+_GATE_CORRECTIVE = (
+    "Produce a multi-provider path-aware critique and save it as "
+    f"{PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME} at the session-set root "
+    "(>=2 distinct providers, each carrying a non-empty summary or at least "
+    "one finding with a description; see docs/path-aware-critique-schema.md "
+    "and the prompt template), then re-run close_session."
+)
+
+
+@dataclass(frozen=True)
+class PathAwareCritiqueGateResult:
+    """Outcome of :func:`validate_path_aware_critique_gate`.
+
+    The Set-066 S2 close-out gate consumes this. ``level`` is the durable
+    recorded policy (``none`` / ``advisory`` / ``required``). ``applicable``
+    is False only when ``level == none`` (the gate is a no-op and ``ok`` is
+    True). When applicable, ``ok`` reports whether a valid multi-provider
+    critique artifact exists; ``reason`` explains the verdict (ASCII-only)
+    and ``corrective`` carries the one-line operator action the gate prints
+    when ``ok`` is False. ``artifact_result`` carries the underlying
+    :class:`PathAwareCritiqueArtifactResult` when an artifact file was found
+    and validated (``None`` when the artifact file was absent).
+
+    The hard-block-vs-soft-warn **posture** is the *caller's* decision and
+    depends on ``level``: ``required`` hard-blocks in an interactive TTY /
+    soft-warns headless; ``advisory`` always soft-warns and never blocks.
+    This validator is posture-agnostic — it reports only ok/not-ok, exactly
+    like :func:`ai_router.dedicated_verification.validate_dedicated_verification`.
+    """
+
+    level: str
+    applicable: bool
+    ok: bool
+    reason: str
+    corrective: str = ""
+    artifact_result: Optional[PathAwareCritiqueArtifactResult] = None
+
+
+def validate_path_aware_critique_gate(
+    session_set_dir: Union[str, Path],
+) -> PathAwareCritiqueGateResult:
+    """Confirm a valid multi-provider critique artifact for the recorded policy.
+
+    The content-aware close-time validator backing the Set-066 S2 close-out
+    gate. Reads the durable ``pathAwareCritique`` record
+    (:func:`read_path_aware_critique`) and:
+
+    - ``none`` -> ``applicable=False, ok=True`` (no-op);
+    - ``advisory`` / ``required`` -> locates the saved
+      :data:`PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME` beside spec.md and runs
+      :func:`validate_path_aware_critique_artifact`; ``ok`` is True iff a
+      valid multi-provider, content-non-trivial artifact exists.
+
+    Never raises (mirrors
+    :func:`ai_router.dedicated_verification.validate_dedicated_verification`):
+    a missing or unreadable artifact is reported as ``ok=False`` with a
+    corrective, so the close-out gate decides posture rather than crashing.
+    This function is **tier-orthogonal** — it consults only the
+    tier-independent ``pathAwareCritique`` record, so it behaves identically
+    on Full and Lightweight.
+    """
+    level = read_path_aware_critique(session_set_dir)
+    if level == PATH_AWARE_CRITIQUE_NONE:
+        return PathAwareCritiqueGateResult(
+            level=level,
+            applicable=False,
+            ok=True,
+            reason=(
+                "pathAwareCritique is 'none'; no path-aware critique gate "
+                "(no-op)."
+            ),
+        )
+
+    artifact_path = find_path_aware_critique_artifact(session_set_dir)
+    if artifact_path is None:
+        return PathAwareCritiqueGateResult(
+            level=level,
+            applicable=True,
+            ok=False,
+            reason=(
+                f"pathAwareCritique={level} but no "
+                f"{PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME} artifact was found "
+                "at the session-set root."
+            ),
+            corrective=_GATE_CORRECTIVE,
+            artifact_result=None,
+        )
+
+    result = validate_path_aware_critique_artifact(artifact_path)
+    if result.ok:
+        return PathAwareCritiqueGateResult(
+            level=level,
+            applicable=True,
+            ok=True,
+            reason=(
+                "a valid multi-provider critique artifact exists "
+                f"({len(result.providers)} distinct provider(s): "
+                f"{list(result.providers)}; {result.findings_count} "
+                "finding(s))."
+            ),
+            artifact_result=result,
+        )
+
+    return PathAwareCritiqueGateResult(
+        level=level,
+        applicable=True,
+        ok=False,
+        reason=(
+            f"pathAwareCritique={level} but the "
+            f"{PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME} artifact is invalid "
+            f"({result.code}): {'; '.join(result.reasons)}"
+        ),
+        corrective=_GATE_CORRECTIVE,
+        artifact_result=result,
+    )

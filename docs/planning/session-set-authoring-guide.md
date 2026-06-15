@@ -199,6 +199,15 @@ Sets that depend on each other should declare prerequisites in the
 spec (see *Cross-set dependencies* below) so a session-state explorer
 or human can see the DAG at a glance.
 
+> **For novel / high-variance efforts, consider a multi-orchestrator planning
+> pass before committing the decomposition.** The plan → decompose boundary is the
+> highest-leverage place to spend independent-perspective effort: several engines
+> each propose an architecture (or, when sequencing is the hard part, a
+> decomposition), then adversarially cross-critique and synthesize, with the
+> operator confirming. Gate it on *variance/novelty*, not importance — skip it for
+> routine increments. See
+> [`orchestration-strategy.md`](orchestration-strategy.md).
+
 ---
 
 ## The Session Set Configuration block

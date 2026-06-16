@@ -175,7 +175,7 @@ last-pruned-set: (none)   generated: 2026-06-16
   re-verify is wording-only.
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="068" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="069" status="active" scope="portable" -->
 
 - **Context:** Authoring a doc that supersedes or replaces a retired one
   (Set 063 S3: `docs/budget-yaml-schema.md` replacing the schema section

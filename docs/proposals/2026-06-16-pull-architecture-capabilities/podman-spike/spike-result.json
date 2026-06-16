@@ -1,0 +1,40 @@
+{
+  "image": "pull-spike:local",
+  "repo_root": "/mnt/c/Users/denmi/source/repos/dabbler-ai-orchestration",
+  "checks": [
+    {
+      "name": "known-failing probe returns raw exit+output",
+      "passed": true,
+      "detail": "exit=7 stderr~='Resource limits are not supported and ig'"
+    },
+    {
+      "name": "network is denied (--network=none)",
+      "passed": true,
+      "detail": "exit=1 (nonzero/blocked = good)"
+    },
+    {
+      "name": "repo mount is read-only (write to /repo fails AND nothing leaks)",
+      "passed": true,
+      "detail": "exit=1 leaked_to_real_tree=False"
+    },
+    {
+      "name": "scratch tmpfs is writable",
+      "passed": true,
+      "detail": "exit=0"
+    },
+    {
+      "name": "wall-clock timeout kills the probe",
+      "passed": true,
+      "detail": "timed_out=True wall=13.542s"
+    },
+    {
+      "name": "crash-safe teardown (timed-out container removed)",
+      "passed": true,
+      "detail": "removed=True err=None"
+    }
+  ],
+  "wall": {
+    "trivial_probe_s": 1.541
+  },
+  "podman_version": "4.9.3"
+}

@@ -67,18 +67,49 @@ Same `smoke_test.py` on an `ubuntu-latest` runner (Podman is preinstalled):
           python smoke_test.py --image pull-spike:local --repo-root "$GITHUB_WORKSPACE"
 ```
 
-## Results — fill this in (the GO/NO-GO record)
+## Results — GO (run by the orchestrator, 2026-06-16)
 
 | Environment | podman version | machine start (s) | per-probe wall (s) | criteria passed | verdict |
 |---|---|---|---|---|---|
-| Win11+WSL2 (dev) | | | | /6 | GO / NO-GO |
-| Linux CI | n/a (native) | | | /6 | GO / NO-GO |
+| Win11+WSL2 (Ubuntu, rootless) | 4.9.3 | n/a (apt-in-existing-Ubuntu; no `podman machine`) | ~1.5 | **6/6** | **GO** |
+| Linux CI | n/a (native) | — | — | not run this pass | pending |
 
-- **Virtualization available on the fleet?** yes / no / partial — notes:
-- **Blockers / surprises:**
-- **Cost note** (machine-start amortized over N probes; per-probe overhead):
-- **Overall verdict (gates rung (b)):** GO / NO-GO —
-- `spike-result.json` from each run is the raw artifact; commit it alongside this.
+- **Install path:** `apt install podman uidmap fuse-overlayfs slirp4netns` inside the
+  already-running Ubuntu WSL2 distro — **no `podman machine`, no Fedora switch.**
+  Rootless, `overlay` storage driver, `newuidmap` present. The three classic
+  WSL-rootless gotchas were **already handled** on this box (subuid/subgid present,
+  `XDG_RUNTIME_DIR` set, systemd PID 1).
+- **Virtualization available on the fleet?** yes (host `HypervisorPresent=True`;
+  WSL2 + systemd live). *Caveat: confirmed on one dev box — verify across the fleet
+  before broad rollout (the one remaining environmental unknown).*
+- **All containment properties HELD:** `--network=none` blocks egress; the
+  `/mnt/c` repo bind-mount is **read-only** (write failed, nothing leaked to the
+  real tree); `/scratch` tmpfs writable; wall-clock timeout kills a hung probe;
+  crash-safe teardown removes the timed-out container (`--rm` + name-keyed
+  `podman rm -f`).
+- **Finding 1 (record, not a blocker): rootless cgroups-v1 ignores resource caps.**
+  Podman warned *"Resource limits are not supported and ignored on cgroups V1
+  rootless systems"* — so `--memory` / `--pids-limit` / `--cpus` were **not
+  enforced** here. The effective bound on a runaway probe is the **wall-clock
+  timeout** (which works) + `--network=none` + read-only FS; the resource caps are
+  DoS-hardening, not a security boundary. *Production fix (S4): enable cgroup v2 +
+  delegation to restore mem/pid/cpu caps; until then, lean on the wall-clock + a
+  conservative timeout.*
+- **Finding 2 (cost note): timeout teardown is slow in rootless WSL.** A trivial
+  probe is ~1.5 s, but force-removing a *timed-out* live container added ~10 s
+  (total ~13.5 s for the timeout case). Per-probe steady-state cost is the ~1.5 s;
+  budget extra for the (rare) timeout path. *S4: consider a shorter default
+  timeout + async teardown.*
+- **Finding 3 (S4 refinement): separate probe output from podman runtime warnings.**
+  Raw capture (correct) mixed podman's own warning into the probe's stderr. For
+  clean evidence, have the probe write results to `/scratch` or capture stdout/stderr
+  via a structured channel so a finding's transcript is the probe's output, not the
+  runtime's diagnostics.
+- **Overall verdict (gates rung (b)): GO.** The model-authored-execution lane is
+  feasible on the Win11+WSL2 fleet with rootless Podman; the strategy holds. Open
+  items folded into Set 069 S4 (cgroup-v2 caps, timeout/teardown tuning, output
+  separation) and a fleet-wide virtualization check.
+- Raw artifact: `spike-result.json` (committed alongside this).
 
 ## After a green spike
 

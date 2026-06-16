@@ -5,7 +5,39 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.22.1] — 2026-06-16 (post-0.22.0 fixes — Set 068 whole-set critique)
+
+> **Why 0.22.1 exists.** The `v0.22.0` tag was pushed at commit `32874dd`, which
+> was **before** the Set 068 manual whole-set path-aware critique (GPT-5.4 +
+> Gemini-2.5-Pro) landed its fixes (`23c705e`). So PyPI **0.22.0 shipped without
+> the fixes below** — they ride in 0.22.1. (PyPI versions are immutable, hence a
+> patch release rather than a re-tag.)
+
+### Fixed (Set 068 whole-set path-aware critique)
+
+The operator's manual whole-set critique found defects the per-session routed
+verification AND the automated dogfood both missed:
+
+- **`run_test` temp-dir creation could escape the cage contract (Major).**
+  `run_test_in_cage` created the temp parent with `tempfile.mkdtemp` *before* the
+  protected `try`/`finally`, so a failing `worktrees_parent` raised instead of
+  returning the contracted raw `error` result. Moved under a guard
+  (`run_test_sandbox.py`). +regression test.
+- **Contract-gate validators could raise on invalid UTF-8 (Major).**
+  `_load_json_artifact` caught only `OSError` / `json.JSONDecodeError`, so a
+  non-UTF-8 `contract-manifest.json` / `contract-floor-result.json` raised
+  `UnicodeDecodeError` through validators that promise never-raising — crashing
+  close-out. Now also catches `UnicodeError` (`contract_gate.py`). +regression test.
+- **Stale cut-over echoes (Major/Minor).** `docs/contract-gate.md`, the
+  `router-config.yaml` `contractGate` comment, and the `__init__.py` `run_test`
+  export note still described the demotion as pending / overstated the cage's
+  containment; updated to the live gated policy and the bounded
+  (not-an-OS-sandbox) guarantee.
+
 ## [0.22.0] — 2026-06-16 (Set 068 — the cadence study + the contract-test gate)
+
+> Released from commit `32874dd`. **Note:** the Set 068 whole-set critique fixes
+> are in **0.22.1**, not this release (see above).
 
 > Carries the whole of Set 068 (S1–S6): the `run_test` execution cage + ReDoS
 > isolation, the contract-test / CDC gate, and the per-session routed-verification
@@ -65,29 +97,6 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   portable heuristic is now a cheap **pre-filter** only; a pattern that defeats it
   is bounded by a hard subprocess timeout (raw `ERROR:` returned, parent never
   hangs) rather than relying on the heuristic as the sole defense.
-
-### Fixed (pre-release, caught by the Set 068 whole-set path-aware critique)
-
-The operator's manual whole-set critique (GPT-5.4 + Gemini-2.5-Pro) of the
-0.22.0 candidate found defects the per-session routed verification and the
-automated dogfood both missed; all fixed before the tag was pushed:
-
-- **`run_test` temp-dir creation could escape the cage contract (Major).**
-  `run_test_in_cage` created the temp parent with `tempfile.mkdtemp` *before* the
-  protected `try`/`finally`, so a failing `worktrees_parent` raised instead of
-  returning the contracted raw `error` result. Moved under a guard that converts
-  the setup failure into `RunTestResult(error=…)` (`run_test_sandbox.py`).
-- **Contract-gate validators could raise on invalid UTF-8 (Major).**
-  `_load_json_artifact` caught only `OSError` / `json.JSONDecodeError`, so a
-  non-UTF-8 `contract-manifest.json` / `contract-floor-result.json` raised
-  `UnicodeDecodeError` through validators that promise never-raising — crashing
-  close-out instead of yielding the documented unreadable path. Now also catches
-  `UnicodeError` (`contract_gate.py`; same class as the S5 activity-log fix).
-- **Stale cut-over echoes (Major/Minor).** `docs/contract-gate.md`, the
-  `router-config.yaml` `contractGate` comment, and the `__init__.py` `run_test`
-  export note still described the demotion as pending / overstated the cage's
-  containment; updated to the live gated policy and the bounded (not-an-OS-sandbox)
-  guarantee.
 
 ### Docs
 

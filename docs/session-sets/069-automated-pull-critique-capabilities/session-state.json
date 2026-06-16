@@ -6,14 +6,14 @@
     {
       "number": 1,
       "title": "Execution-evidence protocol + evidence-tiered findings",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-06-16T04:22:51.012512-04:00",
-      "completedAt": null,
+      "completedAt": "2026-06-16T05:10:57.454345-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

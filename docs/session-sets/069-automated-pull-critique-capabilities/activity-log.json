@@ -58,6 +58,51 @@
       "description": "Cross-provider verification (gpt-5-4, gated->REQUIRED). R1 FAIL with 3 REAL findings: (1) unknown run_test name captured as command_id could back a false REPRODUCED -> added RunTestConfig.resolve_id, capture resolved TRUSTED id; (2) submit_verdict schema always advertised evidenceTier/commandId, breaking read-only additivity -> gated behind allow_evidence=(run_test_config is not None); (3) test gap on the fallback path -> added real-cage + collapse + schema-gating tests (finding 8 doc was UNVERIFIED only because the doc edit post-dated R1 staging). R2 PASS, all 9 areas, no findings. Full suite 1767 passed/1 skip. ~/usr/bin/bash.473 metered (R1 /usr/bin/bash.276 + R2 /usr/bin/bash.197).",
       "status": "done",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register-and-read",
+      "dateTime": "2026-06-16T06:53:20.478027-04:00",
+      "description": "Registered S3 (claude/opus-4-8/medium). Read proposal section 1.4/3.3, pull_verifier.py, pull_critique.py, evidence_protocol.py (S1), run_test_sandbox.py, path_aware_critique.py + schema, session-set-authoring-guide, project-guidance, lessons-learned, S1/S2 dispositions.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "build-probe-template-lane",
+      "dateTime": "2026-06-16T06:53:20.478027-04:00",
+      "description": "Built ai_router/probe_templates.py (declarations + typed-arg validation + in-cage driver harness + cage-backed runner + seed library); wired run_probe_template tool + cage dispatch + lane-keyed templateId evidence into pull_verifier.pull_route (each _Execution carries its own replay context); threaded ProbeTemplateConfig + --probe-templates CLI through pull_critique.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "fix-latent-unicodeerror",
+      "dateTime": "2026-06-16T06:53:20.478027-04:00",
+      "description": "Dogfood seed template surfaced + fixed a still-latent 0.22.x UnicodeError class in four path_aware_critique.py readers (same class Set 068 fixed in contract_gate); added regression. Broader sweep scope-noted as deferred (L-069-1).",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "tests-and-suite",
+      "dateTime": "2026-06-16T06:53:20.478027-04:00",
+      "description": "Added 53 unit tests (no metered calls); full ai_router pytest suite green 1820 passed / 1 skip.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-06-16T06:53:20.478027-04:00",
+      "description": "gpt-5-4 gated->REQUIRED: R1 FAIL (3 findings: exit-code gating, lane-keyed match, test gap) -> R2 (3 confirmed + 1 new: shared replay cfg) -> R3 PASS. ~$0.705 metered.",
+      "status": "completed",
+      "routedApiCalls": []
     }
   ]
 }

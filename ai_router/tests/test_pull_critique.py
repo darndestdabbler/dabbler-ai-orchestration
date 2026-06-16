@@ -19,6 +19,7 @@ import pytest
 
 import pull_critique as pc  # conftest puts ai_router/ on sys.path
 import pull_verifier as pv
+import probe_templates as pt
 from path_aware_critique import (
     record_path_aware_critique,
     validate_path_aware_critique_artifact,
@@ -504,40 +505,75 @@ def test_producer_honors_explicit_caps(tmp_path):
 # --- Set 069 S2: CLI builds exec/diff configs from flags --------------------
 
 
-def test_build_exec_configs_run_test_requires_ref():
-    args = SimpleNamespace(
-        run_test_cmd="pytest -q", run_test_named=None, exec_ref=None,
-        diff_base=None, diff_head="",
+def _exec_args(**overrides):
+    """A SimpleNamespace with every flag _build_exec_configs reads, defaulted off."""
+    base = dict(
+        run_test_cmd=None, run_test_named=None, exec_ref=None,
+        diff_base=None, diff_head="", probe_templates=False,
     )
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def test_build_exec_configs_run_test_requires_ref():
+    args = _exec_args(run_test_cmd="pytest -q")
     with pytest.raises(pc.PullCritiqueError):
         pc._build_exec_configs(args, repo_root=".", config=None)
 
 
 def test_build_exec_configs_builds_both():
-    args = SimpleNamespace(
+    args = _exec_args(
         run_test_cmd="pytest -q", run_test_named=["unit=python -m pytest x"],
-        exec_ref="HEAD", diff_base="main", diff_head="",
+        exec_ref="HEAD", diff_base="main",
     )
-    rt, diff = pc._build_exec_configs(args, repo_root="/r", config=None)
+    rt, diff, probe = pc._build_exec_configs(args, repo_root="/r", config=None)
     assert rt.repo_root == "/r" and rt.ref == "HEAD"
     assert rt.command == ("pytest", "-q")
     assert rt.commands == {"unit": ("python", "-m", "pytest", "x")}
     assert diff.base_ref == "main"
+    assert probe is None  # --probe-templates not requested
 
 
 def test_build_exec_configs_rejects_bad_named():
-    args = SimpleNamespace(
-        run_test_cmd=None, run_test_named=["no-equals-sign"], exec_ref="HEAD",
-        diff_base=None, diff_head="",
-    )
+    args = _exec_args(run_test_named=["no-equals-sign"], exec_ref="HEAD")
     with pytest.raises(pc.PullCritiqueError):
         pc._build_exec_configs(args, repo_root=".", config=None)
 
 
 def test_build_exec_configs_none_when_no_flags():
-    args = SimpleNamespace(
-        run_test_cmd=None, run_test_named=None, exec_ref=None,
-        diff_base=None, diff_head="",
-    )
-    rt, diff = pc._build_exec_configs(args, repo_root=".", config=None)
+    args = _exec_args()
+    rt, diff, probe = pc._build_exec_configs(args, repo_root=".", config=None)
+    assert rt is None and diff is None and probe is None
+
+
+# --- Set 069 S3: CLI builds the probe-template config; producer threads it ---
+
+
+def test_build_exec_configs_builds_probe_template_config():
+    args = _exec_args(probe_templates=True, exec_ref="HEAD")
+    rt, diff, probe = pc._build_exec_configs(args, repo_root="/r", config=None)
     assert rt is None and diff is None
+    assert probe is not None
+    assert probe.repo_root == "/r" and probe.ref == "HEAD"
+    # The built-in seed library is wired in.
+    assert "malformed_artifact_bytes" in probe.templates
+
+
+def test_build_exec_configs_probe_templates_requires_ref():
+    args = _exec_args(probe_templates=True)  # no exec_ref
+    with pytest.raises(pc.PullCritiqueError):
+        pc._build_exec_configs(args, repo_root=".", config=None)
+
+
+def test_producer_threads_probe_template_config(tmp_path):
+    set_dir = _make_set(tmp_path)
+    run, captured = _capturing_runner()
+    probe = pt.ProbeTemplateConfig(repo_root=str(tmp_path), ref="HEAD")
+    pc.produce_path_aware_critique(
+        set_dir, sandbox_dir=tmp_path, write=False, run_pull=run,
+        probe_template_config=probe,
+    )
+    call = captured["calls"][0]
+    assert call["probe_template_config"] is probe
+    # The template lane is an execution lane -> blast-radius-budgeted caps.
+    assert isinstance(call["caps"], pv.PullCaps)

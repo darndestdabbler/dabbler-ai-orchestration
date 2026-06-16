@@ -134,7 +134,12 @@ def read_path_aware_critique(session_set_dir: Union[str, Path]) -> str:
     try:
         with log_path.open("r", encoding="utf-8") as f:
             log = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        # UnicodeError (invalid UTF-8 bytes) is a ValueError subclass but NOT a
+        # json.JSONDecodeError, so without it an invalid-UTF-8 activity log would
+        # escape this reader's never-raising contract and crash close-out - the
+        # exact 0.22.x class Set 068 S5/S6 fixed in contract_gate but left latent
+        # in this sibling (Set 069 S3 probe-template dogfood).
         return DEFAULT_PATH_AWARE_CRITIQUE
     chosen = DEFAULT_PATH_AWARE_CRITIQUE
     for entry in log.get("entries", []):
@@ -194,7 +199,9 @@ def has_path_aware_critique_record(session_set_dir: Union[str, Path]) -> bool:
     try:
         with log_path.open("r", encoding="utf-8") as f:
             log = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        # Invalid UTF-8 (a UnicodeError, not a JSONDecodeError) must not raise
+        # here either (Set 069 S3); an unreadable log means "no durable record".
         return False
     return any(
         entry.get("kind") in _PATH_AWARE_CRITIQUE_RECORD_KINDS
@@ -228,7 +235,11 @@ def path_aware_critique_record_unreadable(
     try:
         with log_path.open("r", encoding="utf-8") as f:
             json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        # Invalid UTF-8 bytes (a UnicodeError, not a JSONDecodeError) make the log
+        # unreadable -> surface it as the loud warning instead of letting it
+        # escape and crash close-out (Set 069 S3); this is the close-out gate's
+        # signal that a 'required' set's durable record cannot be read.
         return True
     return False
 
@@ -499,7 +510,13 @@ def validate_path_aware_critique_artifact(
         try:
             with path.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, json.JSONDecodeError, UnicodeError) as exc:
+            # UnicodeError (invalid UTF-8 bytes) is a ValueError, NOT an OSError or
+            # JSONDecodeError, so without it a malformed-bytes artifact would
+            # escape this validator's never-raising contract and crash the
+            # close-out gate - the same 0.22.x class fixed in contract_gate's
+            # _load_json_artifact (Set 069 S3 probe-template dogfood found it
+            # still latent here).
             return PathAwareCritiqueArtifactResult(
                 ok=False,
                 code=ARTIFACT_UNREADABLE,

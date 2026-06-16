@@ -503,3 +503,44 @@ class TestGateValidator:
             json.dumps({"entries": []}), encoding="utf-8"
         )
         assert pac.path_aware_critique_record_unreadable(d) is False  # clean
+
+
+# --------------------------------------------------------------------------
+# Set 069 S3: the readers never raise on invalid UTF-8 bytes (the 0.22.x class
+# the probe-template lane found still latent here; fixed by adding UnicodeError
+# to the (OSError, json.JSONDecodeError) guards). A bare write of raw bytes is an
+# invalid-UTF-8 activity log / artifact a reader catching only OSError /
+# JSONDecodeError would crash on.
+# --------------------------------------------------------------------------
+
+
+_INVALID_UTF8 = b"\xff\xfe not valid utf-8 \x80\x81"
+
+
+class TestMalformedBytesNeverRaise:
+    def _bad_log(self, tmp_path: Path) -> Path:
+        d = tmp_path / "069-set"
+        d.mkdir()
+        (d / "activity-log.json").write_bytes(_INVALID_UTF8)
+        return d
+
+    def test_read_path_aware_critique_defaults_on_invalid_utf8(self, tmp_path):
+        d = self._bad_log(tmp_path)
+        assert pac.read_path_aware_critique(d) == pac.DEFAULT_PATH_AWARE_CRITIQUE
+
+    def test_has_record_false_on_invalid_utf8(self, tmp_path):
+        d = self._bad_log(tmp_path)
+        assert pac.has_path_aware_critique_record(d) is False
+
+    def test_record_unreadable_true_on_invalid_utf8(self, tmp_path):
+        # The loud-warning path: an unreadable durable record must be SURFACED
+        # (True), not silently disarm the gate AND not crash close-out.
+        d = self._bad_log(tmp_path)
+        assert pac.path_aware_critique_record_unreadable(d) is True
+
+    def test_artifact_validator_unreadable_on_invalid_utf8(self, tmp_path):
+        bad = tmp_path / "path-aware-critique.json"
+        bad.write_bytes(_INVALID_UTF8)
+        res = pac.validate_path_aware_critique_artifact(bad)
+        assert res.ok is False
+        assert res.code == pac.ARTIFACT_UNREADABLE

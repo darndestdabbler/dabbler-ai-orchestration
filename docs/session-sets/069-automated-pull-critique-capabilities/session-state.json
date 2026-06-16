@@ -32,10 +32,15 @@
     {
       "number": 3,
       "title": "The probe-template lane (the missing middle)",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-06-16T06:00:52.116810-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-4-8",
+        "effort": "medium"
+      },
       "verificationVerdict": null
     },
     {

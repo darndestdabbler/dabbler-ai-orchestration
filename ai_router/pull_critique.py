@@ -66,6 +66,7 @@ try:  # package vs bare-import (mirrors the rest of ai_router)
     )
     from .blast_radius import classify_paths
     from .run_test_sandbox import run_test_caps_from_config
+    from .probe_templates import BUILTIN_PROBE_TEMPLATES, ProbeTemplateConfig
     from .config import load_config
 except ImportError:  # pragma: no cover - test/bare context
     from pull_verifier import (  # type: ignore
@@ -87,6 +88,10 @@ except ImportError:  # pragma: no cover - test/bare context
     )
     from blast_radius import classify_paths  # type: ignore
     from run_test_sandbox import run_test_caps_from_config  # type: ignore
+    from probe_templates import (  # type: ignore
+        BUILTIN_PROBE_TEMPLATES,
+        ProbeTemplateConfig,
+    )
     from config import load_config  # type: ignore
 
 
@@ -346,6 +351,7 @@ def produce_path_aware_critique(
     write: bool = True,
     run_test_config: Optional[RunTestConfig] = None,
     diff_config: Optional[DiffConfig] = None,
+    probe_template_config: Optional["ProbeTemplateConfig"] = None,
     caps: Optional[PullCaps] = None,
     run_pull: Callable[..., PullResult] = pull_route,
 ) -> ProducerResult:
@@ -387,6 +393,13 @@ def produce_path_aware_critique(
         Set 069 S2 - when provided, the critics are offered the read-only
         ``get_diff`` tool (raw unified diff + changed paths over the
         operator-pinned ref range). Absent it, no diff tool is offered.
+    probe_template_config:
+        Set 069 S3 - when provided, the critics are offered the
+        ``run_probe_template`` lane: each critic may invoke an operator-authored,
+        versioned probe template by id with typed, validated args (the harness is
+        human-authored; the model supplies only inputs), and a reproduced defect
+        flows through the S1 evidence protocol (orchestrator-replayed,
+        ``templateId`` transcript-backed). Absent it, no template tool is offered.
     caps:
         Per-run :class:`PullCaps`. Default ``None`` resolves the configured caps
         in :func:`pull_route`; but when an execution lane is active (a
@@ -421,7 +434,11 @@ def produce_path_aware_critique(
     # disposition). This is the "deeper probing" depth lever - earned by blast
     # radius, not a magic constant. The read-only path (no execution lane) leaves
     # caps=None so pull_route resolves the configured ceiling, unchanged.
-    exec_enabled = run_test_config is not None or diff_config is not None
+    exec_enabled = (
+        run_test_config is not None
+        or diff_config is not None
+        or probe_template_config is not None
+    )
     if caps is None and exec_enabled:
         cfg_for_caps = config if config is not None else load_config(
             os.environ.get("AI_ROUTER_CONFIG")
@@ -448,6 +465,7 @@ def produce_path_aware_critique(
                 caps=caps,
                 run_test_config=run_test_config,
                 diff_config=diff_config,
+                probe_template_config=probe_template_config,
             )
         except Exception as exc:  # a provider failure must not abort the others
             skipped.append(f"{label}: run raised {type(exc).__name__}: {exc}")
@@ -561,13 +579,14 @@ def _parse_providers(specs: Optional[List[str]]) -> Tuple[Tuple[str, Optional[st
 
 def _build_exec_configs(
     args, repo_root: str, config: Optional[dict]
-) -> Tuple[Optional[RunTestConfig], Optional[DiffConfig]]:
-    """Build the optional ``RunTestConfig`` / ``DiffConfig`` from CLI flags.
+) -> Tuple[Optional[RunTestConfig], Optional[DiffConfig], Optional[ProbeTemplateConfig]]:
+    """Build the optional ``RunTestConfig`` / ``DiffConfig`` / ``ProbeTemplateConfig``.
 
-    Raises :class:`PullCritiqueError` on a misconfiguration (run_test requested
-    without a pinned ref, or a malformed ``NAME=CMD``). A shell-style command
-    string is ``shlex.split`` into an argv; no shell is ever invoked (the cage
-    runs ``shell=False``), so this only tokenizes an operator-authored command.
+    Raises :class:`PullCritiqueError` on a misconfiguration (run_test or
+    probe-templates requested without a pinned ref, or a malformed ``NAME=CMD``).
+    A shell-style command string is ``shlex.split`` into an argv; no shell is ever
+    invoked (the cage runs ``shell=False``), so this only tokenizes an
+    operator-authored command.
     """
     import shlex
 
@@ -609,7 +628,21 @@ def _build_exec_configs(
             base_ref=args.diff_base,
             head_ref=args.diff_head or "",
         )
-    return run_test_config, diff_config
+
+    probe_template_config: Optional[ProbeTemplateConfig] = None
+    if getattr(args, "probe_templates", False):
+        if not args.exec_ref:
+            raise PullCritiqueError(
+                "--probe-templates requires --exec-ref (the pinned ref the cage "
+                "checks out per probe)"
+            )
+        probe_template_config = ProbeTemplateConfig(
+            repo_root=repo_root,
+            ref=args.exec_ref,
+            templates=dict(BUILTIN_PROBE_TEMPLATES),
+            caps=run_test_caps_from_config(config),
+        )
+    return run_test_config, diff_config, probe_template_config
 
 
 def _main(argv: Optional[List[str]] = None) -> int:
@@ -710,6 +743,15 @@ def _main(argv: Optional[List[str]] = None) -> int:
         default="",
         help="the 'to' side of get_diff (default: the working tree)",
     )
+    parser.add_argument(
+        "--probe-templates",
+        action="store_true",
+        help=(
+            "enable the run_probe_template lane with the built-in template "
+            "library (operator-authored, versioned probe harnesses the critic "
+            "invokes with typed args). Requires --exec-ref."
+        ),
+    )
     args = parser.parse_args(argv)
 
     providers = _parse_providers(args.provider)
@@ -726,7 +768,7 @@ def _main(argv: Optional[List[str]] = None) -> int:
     except Exception:  # pragma: no cover - config load is best-effort for caps
         cli_config = None
     try:
-        run_test_config, diff_config = _build_exec_configs(
+        run_test_config, diff_config, probe_template_config = _build_exec_configs(
             args, repo_root, cli_config
         )
     except PullCritiqueError as exc:
@@ -742,6 +784,7 @@ def _main(argv: Optional[List[str]] = None) -> int:
             write=not args.dry_run,
             run_test_config=run_test_config,
             diff_config=diff_config,
+            probe_template_config=probe_template_config,
         )
     except PullCritiqueError as exc:
         # ASCII-sanitize the error path too: a non-ASCII set path / message must

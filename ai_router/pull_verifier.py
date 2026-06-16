@@ -577,6 +577,15 @@ RUN_TEST_TOOL = "run_test"
 # rung 3). Offered ONLY when a DiffConfig is passed to pull_route().
 GET_DIFF_TOOL = "get_diff"
 
+# Set 069 S3: the probe-template lane (proposal rung 4, "the missing middle").
+# Like run_test it dispatches to the disposable-worktree CAGE (execution, NOT
+# re-derivable, so OUTSIDE the byte-equality guard) and is NOT a member of
+# _CANONICAL. The model selects an OPERATOR-AUTHORED, versioned template by id and
+# supplies TYPED, validated args; the harness (ai_router.probe_templates) is
+# human-authored and runs in the cage. Offered ONLY when a ProbeTemplateConfig is
+# passed to pull_route(); absent it, the loop is byte-for-byte the prior behavior.
+RUN_PROBE_TEMPLATE_TOOL = "run_probe_template"
+
 
 @dataclass(frozen=True)
 class RunTestConfig:
@@ -645,14 +654,24 @@ def _run_test_tool_schema() -> dict:
 
 @dataclass(frozen=True)
 class _Execution:
-    """A captured ``run_test`` execution, for orchestrator-side evidence tagging.
+    """A captured cage execution, for orchestrator-side evidence tagging.
 
     Records exactly the raw facts a REPRODUCED-grade transcript needs (the
-    operator-authored command id + resolved argv, the raw output, the exit code),
-    so :func:`_stamp_evidence_tiers` can build a falsifier transcript and replay
-    it on a fresh checkout. Captured ONLY for a clean cage run (``ran`` and no
-    cage ``error`` and no teardown leak) - a leaky/failed cage run cannot back a
+    trusted probe identifier + resolved argv, the raw output, the exit code), so
+    :func:`_stamp_evidence_tiers` can build a falsifier transcript and replay it on
+    a fresh checkout. Captured ONLY for a clean cage run (``ran`` and no cage
+    ``error`` and no teardown leak) - a leaky/failed cage run cannot back a
     reproduced claim.
+
+    Two lanes share this record, discriminated by ``kind`` (Set 069 S3):
+
+    - ``"command"`` (run_test): the trusted ``command_id`` (a configured name or
+      ``"default"``); the transcript carries ``commandId`` and a ``test_entrypoint``
+      whose ref is the resolved argv.
+    - ``"template"`` (run_probe_template): the operator-authored ``template_id`` +
+      the validated ``template_args``; the transcript carries ``templateId`` +
+      ``args`` and the template's declared PUBLIC ``entrypoint_kind`` /
+      ``entrypoint_ref`` (meta-oracle).
     """
 
     command_id: str  # the stable trusted-command id (requested name or "default")
@@ -660,6 +679,25 @@ class _Execution:
     argv: Tuple[str, ...]
     exit_code: Optional[int]
     raw_output: str
+    kind: str = "command"  # "command" (run_test) | "template" (run_probe_template)
+    template_id: str = ""  # the operator-authored probe-template id (template lane)
+    template_args: Optional[dict] = None  # validated typed args (template lane)
+    entrypoint_kind: str = ENTRYPOINT_TEST  # transcript entrypoint kind (template lane)
+    entrypoint_ref: str = ""  # transcript entrypoint ref (template lane)
+    # The replay context CAPTURED FROM THE LANE THAT RAN THIS PROBE (Set 069 S3,
+    # GPT-5.4 R2 finding 1): each execution carries its OWN repo_root / ref / caps
+    # so the pristine replay re-runs it against the SAME tree it ran against -
+    # never a different lane's config. This decouples replay from any single
+    # shared cfg, so mixing the run_test lane (one repo/ref) and the probe-template
+    # lane (possibly another) can never replay a finding against the wrong tree.
+    repo_root: str = ""
+    ref: str = ""
+    caps: Optional[object] = None  # run_test_sandbox.RunTestCaps; None -> default
+
+    @property
+    def match_id(self) -> str:
+        """The id the agent names to back a REPRODUCED claim (command or template)."""
+        return self.template_id if self.kind == "template" else self.command_id
 
 
 def _dispatch_run_test(
@@ -705,6 +743,10 @@ def _dispatch_run_test(
             argv=tuple(cmd),
             exit_code=res.exit_code,
             raw_output=res.output,
+            # Replay context from THIS lane's config (S3 R2 finding 1).
+            repo_root=cfg.repo_root,
+            ref=cfg.ref,
+            caps=cfg.caps,
         )
     return content, is_error, elided, execution
 
@@ -787,6 +829,88 @@ def _dispatch_get_diff(cfg: DiffConfig) -> Tuple[str, bool, bool]:
     )
     elided = names.stdout_elided or diff.stdout_elided
     return body, False, elided
+
+
+def _run_probe_template_tool_schema(cfg: "object") -> dict:
+    """Build the ``run_probe_template`` tool schema, listing available templates.
+
+    ``cfg`` is the active ``probe_templates.ProbeTemplateConfig``; its library is
+    rendered into the description so the model knows which operator-authored
+    templates exist and what TYPED args each declares. The model supplies only a
+    template id + typed args - never code or argv.
+    """
+    templates = getattr(cfg, "templates", {}) or {}
+    lines = [templates[tid].describe() for tid in sorted(templates)]
+    listing = "\n".join(f"- {ln}" for ln in lines) or "- (no templates configured)"
+    return {
+        "name": RUN_PROBE_TEMPLATE_TOOL,
+        "description": (
+            "Invoke an OPERATOR-AUTHORED, versioned probe template by id with "
+            "TYPED, validated args, in the disposable-worktree cage (fresh "
+            "checkout at the pinned ref, discarded after). You DO NOT author code "
+            "or a command - you only select a template and supply its declared "
+            "typed inputs; an unknown id or invalid args come back as a raw ERROR "
+            "you can correct. Returns the RAW exit code + captured output (the "
+            "probe exits 1 when it reproduced the defect, 0 when the entrypoint "
+            "was robust). Available templates:\n" + listing
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "templateId": {
+                    "type": "string",
+                    "description": "the probe-template id to invoke (see the list)",
+                },
+                "args": {
+                    "type": "object",
+                    "description": "the template's declared typed args",
+                },
+            },
+            "required": ["templateId"],
+        },
+    }
+
+
+def _dispatch_run_probe_template(
+    cfg: "object", args: dict
+) -> Tuple[str, bool, bool, Optional["_Execution"]]:
+    """Run one ``run_probe_template`` call in the cage (Set 069 S3).
+
+    Returns ``(raw_text, is_error, elided, execution)``. ``execution`` is a
+    template-kind :class:`_Execution` for a clean cage run (so a REPRODUCED claim
+    can be replayed + transcript-backed), or ``None`` when the template is unknown,
+    the args are invalid, or the cage errored / leaked. Dispatched OUTSIDE the
+    byte-equality guard (execution is non-re-derivable, like run_test).
+    """
+    try:
+        from .probe_templates import run_probe_template
+    except ImportError:  # pragma: no cover - test/bare context
+        from probe_templates import run_probe_template  # type: ignore
+    template_id = args.get("templateId") if isinstance(args, dict) else None
+    raw_args = args.get("args") if isinstance(args, dict) else None
+    content, is_error, elided, run = run_probe_template(cfg, template_id, raw_args)
+    execution: Optional[_Execution] = None
+    if run is not None:
+        res = run.result
+        execution = _Execution(
+            command_id="",
+            requested_name="",
+            argv=tuple(run.argv),
+            exit_code=getattr(res, "exit_code", None),
+            raw_output=getattr(res, "output", ""),
+            kind="template",
+            template_id=run.template.template_id,
+            template_args=dict(run.args) if run.args else None,
+            entrypoint_kind=run.template.entrypoint_kind,
+            entrypoint_ref=run.template.entrypoint_ref,
+            # Replay context from THE PROBE-TEMPLATE lane's config (S3 R2 finding
+            # 1): a template execution replays against ITS OWN repo/ref, never a
+            # different lane's, even when both lanes are active with diff configs.
+            repo_root=getattr(cfg, "repo_root", ""),
+            ref=getattr(cfg, "ref", ""),
+            caps=getattr(cfg, "caps", None),
+        )
+    return content, is_error, elided, execution
 
 
 # ---------------------------------------------------------------------------
@@ -925,40 +1049,57 @@ def _probe_tool_schemas() -> List[dict]:
     ]
 
 
-def _verdict_tool_schema(allow_evidence: bool = False) -> dict:
+def _verdict_tool_schema(
+    allow_evidence: bool = False, allow_template_evidence: bool = False
+) -> dict:
     """Build the ``submit_verdict`` schema.
 
     ``allow_evidence`` (Set 069 S2) gates the per-finding ``evidenceTier`` /
-    ``commandId`` proposal fields. They are offered ONLY when the run_test
-    execution lane is active (a ``RunTestConfig`` was passed), because only then
-    can the orchestrator replay a REPRODUCED claim. When False the schema is
-    byte-for-byte the Set 067/068 read-only shape, so the no-config agent-facing
-    surface is unchanged (GPT-5.4 S2 verification, finding 2).
+    ``commandId`` proposal fields - offered when the ``run_test`` lane is active.
+    ``allow_template_evidence`` (Set 069 S3) gates the ``templateId`` proposal
+    field - offered when the ``run_probe_template`` lane is active. ``evidenceTier``
+    is added when EITHER lane can back a replay. The orchestrator confers
+    REPRODUCED only by replaying the named probe on a fresh checkout (you cannot
+    self-grant it). When BOTH flags are False the schema is byte-for-byte the Set
+    067/068 read-only shape, so the no-config agent-facing surface is unchanged
+    (GPT-5.4 S2 verification, finding 2).
     """
     finding_props: dict = {
         "description": {"type": "string"},
         "severity": {"type": "string"},
         "category": {"type": "string"},
     }
-    if allow_evidence:
+    if allow_evidence or allow_template_evidence:
         # The agent may PROPOSE an evidence tier; it is advisory only. The
-        # orchestrator confers REPRODUCED solely by replaying the named command
-        # on a fresh checkout (you cannot self-grant it).
+        # orchestrator confers REPRODUCED solely by replaying the named probe on
+        # a fresh checkout (you cannot self-grant it).
         finding_props["evidenceTier"] = {
             "type": "string",
             "description": (
-                "optional: propose REPRODUCED (only if a run_test you triggered "
-                "reproduced this defect) or HYPOTHESIS (a flagged suspicion). "
-                "Omit for a read-claim. The orchestrator replays a REPRODUCED "
-                "claim and downgrades it to a read-claim if the replay does not "
-                "match - you cannot self-grant it."
+                "optional: propose REPRODUCED (only if a probe you triggered - a "
+                "run_test or a run_probe_template - reproduced this defect) or "
+                "HYPOTHESIS (a flagged suspicion). Omit for a read-claim. The "
+                "orchestrator replays a REPRODUCED claim and downgrades it to a "
+                "read-claim if the replay does not match - you cannot self-grant "
+                "it."
             ),
         }
+    if allow_evidence:
         finding_props["commandId"] = {
             "type": "string",
             "description": (
                 "optional: the run_test command name (or 'default') that "
-                "reproduced this defect; required to back a REPRODUCED proposal."
+                "reproduced this defect; required to back a REPRODUCED proposal "
+                "from the run_test lane."
+            ),
+        }
+    if allow_template_evidence:
+        finding_props["templateId"] = {
+            "type": "string",
+            "description": (
+                "optional: the run_probe_template id that reproduced this defect; "
+                "required to back a REPRODUCED proposal from the probe-template "
+                "lane."
             ),
         }
     return {
@@ -1057,16 +1198,17 @@ def _parse_verdict(provider: str, model: str, payload: dict) -> PullCritique:
 # ---------------------------------------------------------------------------
 
 
-def _run_pristine_replay(
-    cfg: RunTestConfig, execution: "_Execution"
-) -> Optional[object]:
+def _run_pristine_replay(execution: "_Execution") -> Optional[object]:
     """Replay an execution on a SECOND pristine checkout (returns a RunTestResult).
 
     The load-bearing trust step: the orchestrator (not the agent) re-runs the
-    same operator-authored command on a fresh detached worktree, so a REPRODUCED
-    finding becomes a re-runnable falsifier. Module-level so tests can monkeypatch
-    it without a real cage. Returns ``None`` on any cage import/run failure (a
-    missing replay collapses the claim to a read-claim).
+    same operator-authored probe argv on a fresh detached worktree, so a
+    REPRODUCED finding becomes a re-runnable falsifier. The replay uses the
+    execution's OWN captured ``repo_root`` / ``ref`` / ``caps`` - the exact tree
+    the probe ran against - so a template execution is never replayed against a
+    different lane's config (S3 R2 finding 1). Module-level so tests can
+    monkeypatch it without a real cage. Returns ``None`` on any cage import/run
+    failure (a missing replay collapses the claim to a read-claim).
     """
     try:
         from .run_test_sandbox import run_test_in_cage
@@ -1074,15 +1216,14 @@ def _run_pristine_replay(
         from run_test_sandbox import run_test_in_cage  # type: ignore
     try:
         return run_test_in_cage(
-            cfg.repo_root, cfg.ref, execution.argv, caps=cfg.caps
+            execution.repo_root, execution.ref, execution.argv,
+            caps=execution.caps,
         )
     except Exception:  # pragma: no cover - defensive; a replay error => no tag
         return None
 
 
-def _build_transcript(
-    cfg: RunTestConfig, execution: "_Execution"
-) -> Optional[dict]:
+def _build_transcript(execution: "_Execution") -> Optional[dict]:
     """Build a falsifier transcript for an execution + its pristine replay.
 
     Returns the transcript dict (the S1 ``EvidenceTranscript`` shape) when the
@@ -1091,10 +1232,12 @@ def _build_transcript(
     :func:`evidence_protocol.validate_transcript` agrees - in particular the
     replay must reproduce the same ``outputHash`` (a deterministic falsifier); a
     flaky command's replay will mismatch and the finding collapses to a
-    read-claim. The entrypoint is always ``test_entrypoint`` (a trusted
-    operator-authored command), satisfying the meta-oracle rule by construction.
+    read-claim. Both the original run and the replay use the execution's OWN
+    captured replay context (repo/ref/caps). The entrypoint is the command lane's
+    ``test_entrypoint`` (a trusted operator-authored command) or the template's
+    declared PUBLIC entrypoint - satisfying the meta-oracle rule by construction.
     """
-    replay = _run_pristine_replay(cfg, execution)
+    replay = _run_pristine_replay(execution)
     if (
         replay is None
         or not getattr(replay, "ran", False)
@@ -1103,24 +1246,37 @@ def _build_transcript(
     ):
         return None
     transcript: dict = {
-        "pinnedRef": cfg.ref,
-        "commandId": execution.command_id,
+        "pinnedRef": execution.ref,
         "pristineCheckout": True,
         "exitCode": execution.exit_code,
         "rawOutput": execution.raw_output,
         "outputHash": hash_output(execution.raw_output),
-        "entrypoint": {
-            "kind": ENTRYPOINT_TEST,
-            "ref": " ".join(execution.argv),
-        },
         "replay": {
             "pristineCheckout": True,
             "exitCode": replay.exit_code,
             "outputHash": hash_output(replay.output),
         },
     }
-    if execution.requested_name:
-        transcript["args"] = {"name": execution.requested_name}
+    if execution.kind == "template":
+        # The probe-template lane: a templateId-keyed falsifier driving the
+        # template's declared PUBLIC entrypoint (meta-oracle by construction).
+        transcript["templateId"] = execution.template_id
+        transcript["entrypoint"] = {
+            "kind": execution.entrypoint_kind,
+            "ref": execution.entrypoint_ref,
+        }
+        if execution.template_args:
+            transcript["args"] = execution.template_args
+    else:
+        # The run_test lane: a commandId-keyed falsifier; the entrypoint is the
+        # trusted operator-authored command (test_entrypoint), ref = the argv.
+        transcript["commandId"] = execution.command_id
+        transcript["entrypoint"] = {
+            "kind": ENTRYPOINT_TEST,
+            "ref": " ".join(execution.argv),
+        }
+        if execution.requested_name:
+            transcript["args"] = {"name": execution.requested_name}
     return transcript
 
 
@@ -1128,50 +1284,66 @@ def _stamp_evidence_tiers(
     critique: PullCritique,
     payload: dict,
     executions: List["_Execution"],
-    cfg: RunTestConfig,
 ) -> PullCritique:
     """Apply the S1 evidence protocol to a verdict's findings (orchestrator-side).
 
-    For each finding, read the agent's *proposed* ``evidenceTier`` / ``commandId``
-    from the raw ``submit_verdict`` payload (aligned by index with the parsed
-    findings - :func:`_parse_verdict` preserves order 1:1). Then:
+    For each finding, read the agent's *proposed* ``evidenceTier`` + the probe id
+    (``commandId`` or ``templateId``) from the raw ``submit_verdict`` payload
+    (aligned by index with the parsed findings - :func:`_parse_verdict` preserves
+    order 1:1). Then:
 
     - a proposed ``REPRODUCED`` is conferred ONLY by :func:`authoritative_tier`
-      on a transcript that replays clean (the orchestrator does the replay); if
-      the named command was never run, or the replay does not match, the claim
+      on a transcript that replays clean (the orchestrator does the replay, using
+      the matched execution's OWN captured repo/ref/caps - never a shared cfg);
+      if the named probe was never run, or the replay does not match, the claim
       **collapses to a read-claim** (no field) - the agent can never self-grant
       REPRODUCED;
     - a proposed ``HYPOTHESIS`` is preserved (a flagged, agent-proposed
       suspicion);
     - anything else stays the ASSERTED default (no on-disk field), so a read-only
       critique entry is byte-identical to the Set 067/068 shape.
-
-    ``cfg`` is the active :class:`RunTestConfig`, used to drive the pristine
-    replay (same repo / ref / caps the triggered run used).
     """
     raw_findings = payload.get("findings") if isinstance(payload, dict) else None
     if not isinstance(raw_findings, list):
         raw_findings = []
-    by_id: Dict[str, _Execution] = {}
+    # Lane-keyed maps: a commandId resolves ONLY against run_test executions and a
+    # templateId ONLY against probe-template executions, so a command id that
+    # happens to equal a template id can never cross-bind a finding to the wrong
+    # execution (GPT-5.4 S3 verification, finding 2). First run wins for a given id.
+    by_command: Dict[str, _Execution] = {}
+    by_template: Dict[str, _Execution] = {}
     for ex in executions:
-        by_id.setdefault(ex.command_id, ex)  # first run wins for a given id
+        if ex.kind == "template":
+            by_template.setdefault(ex.template_id, ex)
+        else:
+            by_command.setdefault(ex.command_id, ex)
 
     new_findings: List[Finding] = []
     for i, finding in enumerate(critique.findings):
         proposed = None
         command_id = None
+        template_id = None
         if i < len(raw_findings) and isinstance(raw_findings[i], dict):
             proposed = raw_findings[i].get("evidenceTier")
             command_id = raw_findings[i].get("commandId")
+            template_id = raw_findings[i].get("templateId")
+        has_cmd = isinstance(command_id, str) and command_id != ""
+        has_tpl = isinstance(template_id, str) and template_id != ""
 
         if proposed == EVIDENCE_REPRODUCED:
             ex: Optional[_Execution] = None
-            if isinstance(command_id, str) and command_id in by_id:
-                ex = by_id[command_id]
-            elif not command_id and len(executions) == 1:
-                # No command named, but exactly one run happened -> unambiguous.
+            if has_cmd and has_tpl:
+                # Ambiguous: the agent named BOTH a command and a template id ->
+                # do not guess a lane; collapse to a read-claim.
+                ex = None
+            elif has_cmd:
+                ex = by_command.get(command_id)
+            elif has_tpl:
+                ex = by_template.get(template_id)
+            elif len(executions) == 1:
+                # No probe named, but exactly one run happened -> unambiguous.
                 ex = executions[0]
-            transcript = _build_transcript(cfg, ex) if ex else None
+            transcript = _build_transcript(ex) if ex else None
             tier = authoritative_tier(EVIDENCE_REPRODUCED, transcript)
             if tier == EVIDENCE_REPRODUCED:
                 new_findings.append(
@@ -1863,6 +2035,7 @@ def pull_route(
     servant: Optional[DeterministicServant] = None,
     run_test_config: Optional[RunTestConfig] = None,
     diff_config: Optional[DiffConfig] = None,
+    probe_template_config: Optional["object"] = None,
 ) -> PullResult:
     """Drive a capped, instrumented, sandbox-confined read-only tool loop.
 
@@ -1905,10 +2078,18 @@ def pull_route(
         tools.append(_run_test_tool_schema())
     if diff_config is not None:
         tools.append(_get_diff_tool_schema())
-    # The evidence-proposal fields are offered ONLY when the run_test lane is
-    # active (the only lane that can back a REPRODUCED replay), so the no-config
-    # agent-facing surface is byte-for-byte the Set 067/068 read-only schema.
-    tools.append(_verdict_tool_schema(allow_evidence=run_test_config is not None))
+    if probe_template_config is not None:
+        tools.append(_run_probe_template_tool_schema(probe_template_config))
+    # The evidence-proposal fields are offered ONLY when an execution lane that can
+    # back a REPRODUCED replay is active (run_test -> commandId; run_probe_template
+    # -> templateId), so the no-config agent-facing surface is byte-for-byte the
+    # Set 067/068 read-only schema.
+    tools.append(
+        _verdict_tool_schema(
+            allow_evidence=run_test_config is not None,
+            allow_template_evidence=probe_template_config is not None,
+        )
+    )
     transcript: List[dict] = [{"role": "user", "text": instruction}]
     trace = PullTrace()
     critique: Optional[PullCritique] = None
@@ -2020,12 +2201,20 @@ def pull_route(
         for vc in verdict_calls:
             try:
                 critique = _parse_verdict(provider_name, model, vc.input)
-                # Set 069 S2: evidence-tier the findings (orchestrator-applied).
+                # Set 069 S2/S3: evidence-tier the findings (orchestrator-applied).
                 # Only when an execution lane is active AND a verdict carries
-                # findings - so the read-only path is byte-for-byte unchanged.
-                if run_test_config is not None and critique.findings:
+                # findings - so the read-only path is byte-for-byte unchanged. Each
+                # captured execution carries its OWN replay context (repo/ref/caps
+                # from the lane that ran it), so stamping needs no shared cfg and a
+                # mixed-lane run replays every finding against the right tree (S3
+                # R2 finding 1).
+                exec_lane = (
+                    run_test_config is not None
+                    or probe_template_config is not None
+                )
+                if exec_lane and critique.findings:
                     critique = _stamp_evidence_tiers(
-                        critique, vc.input, executions, run_test_config
+                        critique, vc.input, executions
                     )
                 trace.stop_reason = STOP_VERDICT
                 finalized = True
@@ -2096,6 +2285,33 @@ def pull_route(
             # same posture as run_test). Recorded as a real probe.
             if tc.name == GET_DIFF_TOOL and diff_config is not None:
                 content, is_error, elided = _dispatch_get_diff(diff_config)
+                trace.tool_calls.append(
+                    ToolCallRecord(
+                        turn=turn,
+                        name=tc.name,
+                        args=tc.input,
+                        raw=True,
+                        elided=elided,
+                        result_chars=len(content),
+                        error=is_error,
+                    )
+                )
+                results.append(
+                    {"id": tc.id, "name": tc.name, "content": content}
+                )
+                continue
+            # Set 069 S3: run_probe_template -> the cage (like run_test, OUTSIDE
+            # the byte-equality guard; a clean run is captured so a REPRODUCED
+            # claim can be replayed + transcript-backed via the templateId lane).
+            if (
+                tc.name == RUN_PROBE_TEMPLATE_TOOL
+                and probe_template_config is not None
+            ):
+                content, is_error, elided, execution = _dispatch_run_probe_template(
+                    probe_template_config, tc.input
+                )
+                if execution is not None:
+                    executions.append(execution)
                 trace.tool_calls.append(
                     ToolCallRecord(
                         turn=turn,

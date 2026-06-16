@@ -226,3 +226,59 @@ critique is byte-for-byte the read-only Set 067/068 loop:
 
 The Podman model-authored-probe lane (rung b) and the ceiling→floor ratchet
 (rungs 5–6) are later sessions; S2 ships the trusted-command lanes only.
+
+---
+
+## What Set 069 S3 added (the probe-template lane — "the missing middle")
+
+S2 let a critic **trigger** a fixed operator-authored command. The next rung up
+(proposal rung 4) is the **probe-template lane**: operator-authored, **versioned**
+probe harnesses the critic invokes with **typed, validated args**. It is the
+narrowest lane that finds *novel-but-local* edge cases (e.g. "feed malformed bytes
+to this validator", "call this entrypoint with a bad parent dir") without
+arbitrary code execution — the two 0.22.x bugs were exactly this shape. The
+harness stays inside the trusted-command model (it runs in the same
+disposable-worktree cage); the model supplies **only** typed inputs — never code,
+never argv. All additive: absent a `ProbeTemplateConfig` the loop is byte-for-byte
+the prior behavior.
+
+- **Declarations + typed-arg validation** (`ai_router/probe_templates.py`). A
+  `ProbeTemplate` is a versioned record naming the **real public entrypoint** it
+  drives (`entrypoint_kind` is one of the meta-oracle `PUBLIC_ENTRYPOINT_KINDS`)
+  and its typed `ArgSpec` inputs. `validate_template_args` enforces
+  required-present / exact-type / enum-membership / no-unknown-keys and **never
+  raises** — an invalid call returns to the model as a raw `ERROR:` it can correct.
+- **The harness (the driver).** The per-template probe bodies run **inside the
+  cage** as `python -m ai_router.probe_templates --run <id> <json-args>`; because
+  the cage's cwd is the disposable checkout, the driver imports the code **under
+  review** from that worktree and drives its public entrypoint, printing a single
+  **deterministic** `PROBE_RESULT:` line (no addresses / temp paths) so a pristine
+  replay reproduces the same `outputHash`. Exit `1` = reproduced the defect, `0` =
+  the entrypoint was robust, `2` = a probe-internal error.
+- **`run_probe_template` tool.** Pass a `ProbeTemplateConfig` (repo root + pinned
+  ref + the template library + caps) and each critic is offered the
+  `run_probe_template` tool (select a template id + supply its typed args).
+  Dispatched to the cage like `run_test` (outside the byte-equality guard). A
+  clean run is captured so a `REPRODUCED` claim can be replayed; the agent
+  proposes `evidenceTier` + **`templateId`**, and the orchestrator confers
+  `REPRODUCED` only after a matching pristine replay — emitting a `templateId`
+  falsifier transcript (the Set 066 `EvidenceTranscript` `commandId` XOR
+  `templateId`) whose entrypoint is the template's declared **public** surface.
+  CLI: `--probe-templates` (+ `--exec-ref`).
+- **The seed library** (`BUILTIN_PROBE_TEMPLATES`) — repo-authored, drives
+  `ai_router`'s own public entrypoints; these are the templates that would have
+  caught the two 0.22.x bug classes:
+  - `malformed_artifact_bytes` → feeds malformed bytes (incl. invalid UTF-8) to
+    `validate_path_aware_critique_artifact` and checks it does not crash. **This
+    found a still-latent instance of the 0.22.x UnicodeError class**: four readers
+    in `path_aware_critique.py` caught only `(OSError, json.JSONDecodeError)` and
+    crashed on invalid UTF-8 — fixed in S3 by adding `UnicodeError` (the same fix
+    Set 068 applied to `contract_gate`).
+  - `bad_parent_dir` → calls `run_test_in_cage` with a bad `worktrees_parent` and
+    checks it returns a clean error rather than letting `mkdtemp`'s `OSError`
+    escape (the run_test mkdtemp-escaped-try/finally class).
+
+The *mechanism* is repo-portable; the *seed library* is repo-authored (a consumer
+repo writes its own templates against its own public entrypoints). The Podman
+model-authored-probe lane (rung b) and the ceiling→floor ratchet (rungs 5–6)
+remain later sessions.

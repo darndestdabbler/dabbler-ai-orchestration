@@ -20,6 +20,8 @@ from types import SimpleNamespace
 import pytest
 
 import pull_verifier as pv  # conftest puts ai_router/ on sys.path
+import probe_templates as pt
+import run_test_sandbox as rts
 
 
 # --- A minimal router config (no real provider call is ever made here) ------
@@ -1944,9 +1946,13 @@ class TestGetDiffWiring:
 
 def _exec(command_id="default", name="", argv=("pytest", "-q"),
           exit_code=1, raw_output="FAILED test_x"):
+    # Each execution carries its OWN replay context (Set 069 S3): repo_root / ref
+    # / caps from the lane that ran it, so _build_transcript stamps a real
+    # pinnedRef and _run_pristine_replay (when not faked) targets the right tree.
     return pv._Execution(
         command_id=command_id, requested_name=name, argv=tuple(argv),
         exit_code=exit_code, raw_output=raw_output,
+        repo_root=".", ref="HEAD",
     )
 
 
@@ -1955,9 +1961,6 @@ def _fake_replay(output, *, ran=True, error=None, removed=True, exit_code=1):
         ran=ran, error=error, worktree_removed=removed,
         exit_code=exit_code, output=output,
     )
-
-
-_CFG = pv.RunTestConfig(repo_root=".", ref="HEAD", command=("pytest", "-q"))
 
 
 def _crit(findings):
@@ -2023,14 +2026,14 @@ class TestStampEvidenceTiers:
     def test_reproduced_conferred_on_matching_clean_replay(self, monkeypatch):
         monkeypatch.setattr(
             pv, "_run_pristine_replay",
-            lambda cfg, ex: _fake_replay(ex.raw_output),  # replay matches
+            lambda ex: _fake_replay(ex.raw_output),  # replay matches
         )
         crit = _crit([pv.Finding(description="bug", severity="Major")])
         payload = {"findings": [
             {"description": "bug", "evidenceTier": "REPRODUCED",
              "commandId": "default"}
         ]}
-        out = pv._stamp_evidence_tiers(crit, payload, [_exec()], _CFG)
+        out = pv._stamp_evidence_tiers(crit, payload, [_exec()])
         f = out.findings[0]
         assert f.evidence_tier == pv.EVIDENCE_REPRODUCED
         assert f.transcript is not None
@@ -2044,14 +2047,14 @@ class TestStampEvidenceTiers:
     def test_reproduced_collapses_when_replay_mismatches(self, monkeypatch):
         monkeypatch.setattr(
             pv, "_run_pristine_replay",
-            lambda cfg, ex: _fake_replay("DIFFERENT OUTPUT"),  # mismatch
+            lambda ex: _fake_replay("DIFFERENT OUTPUT"),  # mismatch
         )
         crit = _crit([pv.Finding(description="bug")])
         payload = {"findings": [
             {"description": "bug", "evidenceTier": "REPRODUCED",
              "commandId": "default"}
         ]}
-        out = pv._stamp_evidence_tiers(crit, payload, [_exec()], _CFG)
+        out = pv._stamp_evidence_tiers(crit, payload, [_exec()])
         # Collapsed to a read-claim: no tier field, no transcript.
         assert out.findings[0].evidence_tier == ""
         assert out.findings[0].transcript is None
@@ -2059,27 +2062,27 @@ class TestStampEvidenceTiers:
     def test_reproduced_collapses_when_no_execution(self, monkeypatch):
         monkeypatch.setattr(
             pv, "_run_pristine_replay",
-            lambda cfg, ex: _fake_replay(ex.raw_output),
+            lambda ex: _fake_replay(ex.raw_output),
         )
         crit = _crit([pv.Finding(description="bug")])
         payload = {"findings": [
             {"description": "bug", "evidenceTier": "REPRODUCED",
              "commandId": "default"}
         ]}
-        out = pv._stamp_evidence_tiers(crit, payload, [], _CFG)  # no runs
+        out = pv._stamp_evidence_tiers(crit, payload, [])  # no runs
         assert out.findings[0].evidence_tier == ""
 
     def test_reproduced_collapses_when_commandid_unknown(self, monkeypatch):
         monkeypatch.setattr(
             pv, "_run_pristine_replay",
-            lambda cfg, ex: _fake_replay(ex.raw_output),
+            lambda ex: _fake_replay(ex.raw_output),
         )
         crit = _crit([pv.Finding(description="bug")])
         payload = {"findings": [
             {"description": "bug", "evidenceTier": "REPRODUCED",
              "commandId": "nope"}  # not among the executions
         ]}
-        out = pv._stamp_evidence_tiers(crit, payload, [_exec()], _CFG)
+        out = pv._stamp_evidence_tiers(crit, payload, [_exec()])
         assert out.findings[0].evidence_tier == ""
 
     def test_hypothesis_preserved(self):
@@ -2087,14 +2090,14 @@ class TestStampEvidenceTiers:
         payload = {"findings": [
             {"description": "maybe", "evidenceTier": "HYPOTHESIS"}
         ]}
-        out = pv._stamp_evidence_tiers(crit, payload, [], _CFG)
+        out = pv._stamp_evidence_tiers(crit, payload, [])
         assert out.findings[0].evidence_tier == pv.EVIDENCE_HYPOTHESIS
         assert out.findings[0].transcript is None
 
     def test_untagged_stays_asserted_default(self):
         crit = _crit([pv.Finding(description="read claim")])
         payload = {"findings": [{"description": "read claim"}]}
-        out = pv._stamp_evidence_tiers(crit, payload, [], _CFG)
+        out = pv._stamp_evidence_tiers(crit, payload, [])
         # No on-disk field -> byte-identical to a pre-069 entry.
         assert out.findings[0].evidence_tier == ""
         assert "evidenceTier" not in out.findings[0].to_dict()
@@ -2105,7 +2108,7 @@ class TestStampEvidenceTiers:
         # -> no match -> collapse, even with a clean matching replay available.
         monkeypatch.setattr(
             pv, "_run_pristine_replay",
-            lambda cfg, ex: _fake_replay(ex.raw_output),
+            lambda ex: _fake_replay(ex.raw_output),
         )
         crit = _crit([pv.Finding(description="bug")])
         payload = {"findings": [
@@ -2113,7 +2116,7 @@ class TestStampEvidenceTiers:
              "commandId": "missing"}  # the unmatched name the model passed
         ]}
         out = pv._stamp_evidence_tiers(
-            crit, payload, [_exec(command_id="default")], _CFG
+            crit, payload, [_exec(command_id="default")]
         )
         assert out.findings[0].evidence_tier == ""
 
@@ -2187,7 +2190,7 @@ class TestEvidenceTierEndToEnd:
         monkeypatch.setattr(pv, "_dispatch_run_test", fake_dispatch)
         monkeypatch.setattr(
             pv, "_run_pristine_replay",
-            lambda cfg, ex: _fake_replay("AssertionError"),
+            lambda ex: _fake_replay("AssertionError"),
         )
         verdict = _resp(tool_calls=[_tc("submit_verdict", {
             "verdict": "ISSUES_FOUND", "summary": "a real bug",
@@ -2224,3 +2227,313 @@ class TestEvidenceTierEndToEnd:
         }
         res = validate_path_aware_critique_artifact(artifact)
         assert res.ok, res.reasons
+
+
+# ===========================================================================
+# Set 069 S3: the probe-template lane (run_probe_template) - offered only when
+# configured; dispatched to the cage; templateId evidence flows through S1.
+# ===========================================================================
+
+
+def _probe_run(template_id="malformed_artifact_bytes", args=None,
+               argv=None, exit_code=1, output="PROBE_RESULT: reproduced: ..."):
+    template = pt.BUILTIN_PROBE_TEMPLATES[template_id]
+    args = {"corruption": "invalid-utf8"} if args is None else args
+    argv = pt.build_probe_argv(template_id, args) if argv is None else argv
+    result = SimpleNamespace(
+        ran=True, error=None, worktree_removed=True, exit_code=exit_code,
+        output=output,
+    )
+    return pt.ProbeRun(template=template, args=args, argv=argv, result=result)
+
+
+_PT_CFG = pt.ProbeTemplateConfig(repo_root=".", ref="HEAD")
+
+
+class TestRunProbeTemplateWiring:
+    def test_not_offered_without_config(self, sandbox):
+        b = _ToolCapturingBinding(
+            queue=[_resp(tool_calls=[_tc("read_file", {"path": "a.py"})]),
+                   _VERDICT_OK]
+        )
+        pv.pull_route(sandbox, "review", binding=b, config=CONFIG)
+        assert all("run_probe_template" not in names for names in b.tools_seen)
+
+    def test_offered_and_dispatched_to_cage(self, sandbox, monkeypatch):
+        calls = []
+
+        def fake_dispatch(cfg, args):
+            calls.append((cfg, args))
+            return ("exit_code=1\n--- output ---\nPROBE_RESULT: robust", False,
+                    False, None)
+
+        monkeypatch.setattr(pv, "_dispatch_run_probe_template", fake_dispatch)
+        verdict = _resp(tool_calls=[
+            _tc("submit_verdict", {"verdict": "VERIFIED", "summary": "probed"}, "v1")
+        ])
+        b = _ToolCapturingBinding(
+            queue=[_resp(tool_calls=[
+                _tc("run_probe_template",
+                    {"templateId": "malformed_artifact_bytes",
+                     "args": {"corruption": "invalid-utf8"}}, "p1")]),
+                   verdict]
+        )
+        result = pv.pull_route(
+            sandbox, "review", binding=b, config=CONFIG,
+            probe_template_config=_PT_CFG,
+        )
+        assert "run_probe_template" in b.tools_seen[0]
+        assert len(calls) == 1
+        assert result.ok is True
+        rec = result.trace.tool_calls[0]
+        assert rec.name == "run_probe_template" and rec.raw is True
+        assert rec.error is False
+
+    def test_template_error_recorded_as_error_probe(self, sandbox, monkeypatch):
+        monkeypatch.setattr(
+            pv, "_dispatch_run_probe_template",
+            lambda cfg, args: (
+                "ERROR: run_probe_template: unknown templateId 'x'", True,
+                False, None),
+        )
+        b = FakeBinding(
+            queue=[_resp(tool_calls=[
+                _tc("run_probe_template", {"templateId": "x"}, "p1")]),
+                   _VERDICT_OK]
+        )
+        result = pv.pull_route(
+            sandbox, "review", binding=b, config=CONFIG,
+            probe_template_config=_PT_CFG,
+        )
+        assert result.ok is True
+        assert result.trace.tool_calls[0].error is True
+
+
+class TestVerdictSchemaTemplateGating:
+    def test_template_lane_offers_templateid_not_commandid(self):
+        sch = pv._verdict_tool_schema(allow_template_evidence=True)
+        props = sch["parameters"]["properties"]["findings"]["items"]["properties"]
+        assert "evidenceTier" in props and "templateId" in props
+        assert "commandId" not in props
+
+    def test_both_lanes_offer_both_ids(self):
+        sch = pv._verdict_tool_schema(
+            allow_evidence=True, allow_template_evidence=True
+        )
+        props = sch["parameters"]["properties"]["findings"]["items"]["properties"]
+        assert {"evidenceTier", "commandId", "templateId"} <= set(props)
+
+    def test_no_lane_offers_neither(self):
+        props = (pv._verdict_tool_schema()["parameters"]["properties"]
+                 ["findings"]["items"]["properties"])
+        assert "templateId" not in props and "commandId" not in props
+
+
+class TestDispatchRunProbeTemplate:
+    def test_clean_run_builds_template_execution(self, monkeypatch):
+        run = _probe_run(args={"corruption": "invalid-utf8"})
+        monkeypatch.setattr(
+            pt, "run_probe_template",
+            lambda cfg, tid, raw: (run.result.output, False, False, run),
+        )
+        content, is_error, _elided, execution = pv._dispatch_run_probe_template(
+            _PT_CFG,
+            {"templateId": "malformed_artifact_bytes",
+             "args": {"corruption": "invalid-utf8"}},
+        )
+        assert is_error is False and execution is not None
+        assert execution.kind == "template"
+        assert execution.template_id == "malformed_artifact_bytes"
+        assert execution.template_args == {"corruption": "invalid-utf8"}
+        assert execution.entrypoint_kind == pt.ENTRYPOINT_PUBLIC_API
+        assert execution.match_id == "malformed_artifact_bytes"
+
+    def test_error_run_captures_no_execution(self, monkeypatch):
+        monkeypatch.setattr(
+            pt, "run_probe_template",
+            lambda cfg, tid, raw: ("ERROR: ...", True, False, None),
+        )
+        _c, is_error, _el, execution = pv._dispatch_run_probe_template(
+            _PT_CFG, {"templateId": "nope"}
+        )
+        assert is_error is True and execution is None
+
+
+class TestTemplateEvidenceEndToEnd:
+    def test_template_reproduced_flows_to_critique_entry(
+        self, sandbox, monkeypatch
+    ):
+        run = _probe_run(output="PROBE_RESULT: reproduced: raised UnicodeDecodeError")
+
+        def fake_dispatch(cfg, args):
+            return (run.result.output, False, False, pv._Execution(
+                command_id="", requested_name="", argv=tuple(run.argv),
+                exit_code=run.result.exit_code, raw_output=run.result.output,
+                kind="template", template_id=run.template.template_id,
+                template_args=dict(run.args),
+                entrypoint_kind=run.template.entrypoint_kind,
+                entrypoint_ref=run.template.entrypoint_ref,
+                repo_root=".", ref="HEAD",
+            ))
+
+        monkeypatch.setattr(pv, "_dispatch_run_probe_template", fake_dispatch)
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay",
+            lambda ex: _fake_replay(ex.raw_output),
+        )
+        verdict = _resp(tool_calls=[_tc("submit_verdict", {
+            "verdict": "ISSUES_FOUND", "summary": "a real crash",
+            "findings": [{"description": "validator crashes on bad bytes",
+                          "severity": "Major", "category": "correctness",
+                          "evidenceTier": "REPRODUCED",
+                          "templateId": "malformed_artifact_bytes"}],
+        }, "v1")])
+        b = FakeBinding(queue=[
+            _resp(tool_calls=[_tc("run_probe_template", {
+                "templateId": "malformed_artifact_bytes",
+                "args": {"corruption": "invalid-utf8"}}, "p1")]),
+            verdict,
+        ])
+        result = pv.pull_route(
+            sandbox, "review", binding=b, config=CONFIG,
+            probe_template_config=_PT_CFG,
+        )
+        assert result.ok
+        entry = result.critique.to_critique_entry()
+        f0 = entry["findings"][0]
+        assert f0["evidenceTier"] == "REPRODUCED"
+        assert f0["transcript"]["templateId"] == "malformed_artifact_bytes"
+        assert f0["transcript"]["entrypoint"]["kind"] == pt.ENTRYPOINT_PUBLIC_API
+        assert f0["transcript"]["args"] == {"corruption": "invalid-utf8"}
+
+        # The S1 protocol accepts the templateId falsifier...
+        from evidence_protocol import validate_transcript
+        ok, reasons = validate_transcript(f0["transcript"])
+        assert ok, reasons
+        # ...and the Set 066 artifact built from it validates.
+        from path_aware_critique import validate_path_aware_critique_artifact
+        artifact = {
+            "schemaVersion": 1, "sessionSetName": "069-x",
+            "pathAwareCritique": "required",
+            "critiques": [entry, {"provider": "google",
+                                  "model": "gemini-2.5-pro", "verdict": "VERIFIED",
+                                  "summary": "ok", "findings": []}],
+        }
+        assert validate_path_aware_critique_artifact(artifact).ok
+
+    def test_template_build_transcript_branch(self, monkeypatch):
+        # Unit: _build_transcript emits a templateId (not commandId) transcript
+        # for a template-kind execution, with the template's public entrypoint.
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay",
+            lambda ex: _fake_replay(ex.raw_output),
+        )
+        ex = pv._Execution(
+            command_id="", requested_name="",
+            argv=("python", "-m", "ai_router.probe_templates"),
+            exit_code=1, raw_output="PROBE_RESULT: reproduced",
+            kind="template", template_id="malformed_artifact_bytes",
+            template_args={"corruption": "invalid-utf8"},
+            entrypoint_kind=pt.ENTRYPOINT_PUBLIC_API,
+            entrypoint_ref="ai_router.path_aware_critique.x",
+        )
+        t = pv._build_transcript(ex)
+        assert t["templateId"] == "malformed_artifact_bytes"
+        assert "commandId" not in t
+        assert t["entrypoint"] == {
+            "kind": pt.ENTRYPOINT_PUBLIC_API,
+            "ref": "ai_router.path_aware_critique.x",
+        }
+        assert t["args"] == {"corruption": "invalid-utf8"}
+
+
+class TestEvidenceLaneMatching:
+    """Set 069 S3 (GPT-5.4 finding 2): commandId / templateId resolve per lane."""
+
+    def _tmpl_ex(self, tid, output="PROBE_RESULT: reproduced"):
+        return pv._Execution(
+            command_id="", requested_name="",
+            argv=("python", "-m", "ai_router.probe_templates"),
+            exit_code=1, raw_output=output, kind="template", template_id=tid,
+            template_args={"corruption": "invalid-utf8"},
+            entrypoint_kind=pt.ENTRYPOINT_PUBLIC_API,
+            entrypoint_ref="ai_router.path_aware_critique.x",
+            repo_root=".", ref="HEAD",
+        )
+
+    def _cmd_ex(self, cid, output="FAILED test_x"):
+        return pv._Execution(
+            command_id=cid, requested_name=("" if cid == "default" else cid),
+            argv=("pytest", "-q"), exit_code=1, raw_output=output,
+            repo_root=".", ref="HEAD",
+        )
+
+    def test_both_ids_collapse_to_read_claim(self, monkeypatch):
+        # A finding naming BOTH a commandId and a templateId is ambiguous -> the
+        # orchestrator must not guess a lane; collapse to a read-claim.
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay", lambda ex: _fake_replay(ex.raw_output)
+        )
+        crit = _crit([pv.Finding(description="bug")])
+        payload = {"findings": [{"description": "bug", "evidenceTier": "REPRODUCED",
+                                 "commandId": "shared", "templateId": "shared"}]}
+        out = pv._stamp_evidence_tiers(
+            crit, payload, [self._cmd_ex("shared"), self._tmpl_ex("shared")]
+        )
+        assert out.findings[0].evidence_tier == ""
+
+    def test_commandid_does_not_bind_template_execution(self, monkeypatch):
+        # A command id colliding with a template id must bind to the COMMAND
+        # execution only. Here ONLY a template execution exists with id "shared";
+        # a commandId="shared" claim must NOT match it -> collapse.
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay", lambda ex: _fake_replay(ex.raw_output)
+        )
+        crit = _crit([pv.Finding(description="bug")])
+        payload = {"findings": [{"description": "bug", "evidenceTier": "REPRODUCED",
+                                 "commandId": "shared"}]}
+        out = pv._stamp_evidence_tiers(crit, payload, [self._tmpl_ex("shared")])
+        assert out.findings[0].evidence_tier == ""
+
+    def test_templateid_binds_template_lane_when_ids_collide(self, monkeypatch):
+        # With BOTH lanes' executions sharing the id "shared", a templateId claim
+        # binds the TEMPLATE execution (its public_api entrypoint), never the
+        # command one.
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay", lambda ex: _fake_replay(ex.raw_output)
+        )
+        crit = _crit([pv.Finding(description="bug")])
+        payload = {"findings": [{"description": "bug", "evidenceTier": "REPRODUCED",
+                                 "templateId": "shared"}]}
+        out = pv._stamp_evidence_tiers(
+            crit, payload, [self._cmd_ex("shared"), self._tmpl_ex("shared")]
+        )
+        f = out.findings[0]
+        assert f.evidence_tier == pv.EVIDENCE_REPRODUCED
+        assert f.transcript["templateId"] == "shared"
+        assert f.transcript["entrypoint"]["kind"] == pt.ENTRYPOINT_PUBLIC_API
+
+    def test_replay_uses_executions_own_repo_and_ref(self, monkeypatch):
+        # GPT-5.4 S3 R2 finding 1: each execution replays against ITS OWN captured
+        # repo/ref, never a shared cfg. Build a template execution pinned to a
+        # DIFFERENT repo/ref than the command lane and confirm the replay (and the
+        # transcript pinnedRef) use the TEMPLATE execution's own context.
+        seen = {}
+
+        def fake_cage(repo_root, ref, argv, *, caps=None):
+            seen["repo_root"] = repo_root
+            seen["ref"] = ref
+            return _fake_replay("PROBE_RESULT: reproduced")
+
+        monkeypatch.setattr(rts, "run_test_in_cage", fake_cage)
+        ex = pv._Execution(
+            command_id="", requested_name="",
+            argv=("python", "-m", "ai_router.probe_templates"),
+            exit_code=1, raw_output="PROBE_RESULT: reproduced", kind="template",
+            template_id="malformed_artifact_bytes",
+            entrypoint_kind=pt.ENTRYPOINT_PUBLIC_API, entrypoint_ref="ai_router.x",
+            repo_root="/tmpl-repo", ref="tmpl-ref",
+        )
+        t = pv._build_transcript(ex)
+        assert seen == {"repo_root": "/tmpl-repo", "ref": "tmpl-ref"}
+        assert t["pinnedRef"] == "tmpl-ref"

@@ -1,0 +1,16 @@
+# Podman feasibility-spike image (pre-Set-069). NOT production.
+#
+# Minimal, operator-authored, NO embedded secrets. The spike only needs an
+# interpreter to run probes; a real image would add the project's pinned runtime
+# deps. In production this MUST be pinned by digest (FROM python@sha256:...),
+# built once, and the model never touches it. For the spike, a tag is fine.
+FROM python:3.11-slim
+
+# A non-root user (rootless Podman already maps to an unprivileged host user; this
+# is belt-and-suspenders so the probe cannot rely on being root inside).
+RUN useradd --create-home --uid 10001 probe
+USER probe
+WORKDIR /scratch
+
+# No ENTRYPOINT: the harness supplies the full probe argv (e.g. python -c "...").
+CMD ["python", "-c", "print('spike image OK')"]

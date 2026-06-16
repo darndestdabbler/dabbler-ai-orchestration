@@ -129,8 +129,8 @@ python -m ai_router.pull_critique docs/session-sets/<slug>
 python -m ai_router.pull_critique docs/session-sets/<slug> \
     --provider openai:gpt-5.4 --provider google --dry-run
 
-# Default sandbox is the cwd (repo root) so a critic can read changed source
-# anywhere in the tree; override with --sandbox.
+# Default sandbox is the git repo root CONTAINING the session-set dir, so a
+# critic can read changed source anywhere in the tree; override with --sandbox.
 ```
 
 ### Guarantees
@@ -165,11 +165,19 @@ else:
 
 ---
 
-## What is NOT here (deferred to Set 068)
+## What Set 068 added (shipped)
 
-- The disposable-worktree **`run_test`** tool (the only tool needing a write
-  cage) and the **contract-test / CDC gate**.
-- **Experiment B** (the cadence study) and the routed **keep / demote / retire**
-  decision. Set 067 leaves routed per-session verification **unchanged**;
-  Experiment A ruled out only a *capability* defense for routed, not its
-  cadence defense.
+Set 067 left these to Set 068; they are now built:
+
+- The disposable-worktree **`run_test`** execution cage
+  (`ai_router/run_test_sandbox.py`) — the one tool needing a write cage — and
+  the deterministic **contract-test / CDC gate** (`ai_router/contract_gate.py`,
+  [`../../docs/contract-gate.md`](../../docs/contract-gate.md)), the floor for
+  the ~95%-probeable defect bulk.
+- **Experiment B** (the cadence study) ran, and the routed **keep / demote /
+  retire** decision was made: **DEMOTE**. Per-session routed verification is no
+  longer mandatory on every session — it is **gated** on a deterministic
+  blast-radius / coupling predicate (`ai_router/routed_gate.py`). The end-of-set
+  path-aware critique (this adapter) + the contract-test gate are now the primary
+  verification surface. Full strategy:
+  [`../../docs/verification-surface-strategy.md`](../../docs/verification-surface-strategy.md).

@@ -75,7 +75,9 @@ Orchestrator (Claude / Codex / Gemini)
   |-- runs repo build && test suite (TODO: set build command in
   |                                    CLAUDE.md / AGENTS.md / GEMINI.md)
   |
-  |-- MANDATORY: end-of-session verification
+  |-- GATED (Set 068 DEMOTE): end-of-session verification
+  |     |-- runs `python -m ai_router.routed_gate` on the session diff;
+  |     |   runs the routed call only when the predicate trips
   |     |-- sends all work to a DIFFERENT AI provider
   |     |-- saves raw verifier output (never edited)
   |     +-- fixes issues if found (max 2 retries)
@@ -242,7 +244,11 @@ Session 2 of 5, etc.). Each session:
 
 - Has a defined list of steps in `spec.md`
 - Is executed by exactly one orchestrator in one conversation
-- Ends with a mandatory cross-provider verification
+- Ends with cross-provider verification **when the Set 068 routed-gate predicate
+  trips on the session diff** (the DEMOTE cut-over; see *Verification-surface
+  policy* and Step 6) — always run for a multi-file/coupling/contract change, and
+  the end-of-set path-aware critique + contract-test gate remain the primary
+  surface for the rest
 - Produces a commit on completion
 
 If a session creates or refreshes a checklist for later human UAT execution,
@@ -263,16 +269,19 @@ review, or documentation itself. The router:
 
 ### Cross-Provider Verification
 
-Every session ends with an independent verification step. The orchestrator
-sends its work to a model from a **different AI provider** than the one that
-did the work. This catches provider-specific biases and blind spots:
+A session ends with an independent verification step **when the Set 068
+routed-gate predicate trips on its diff** (the DEMOTE cut-over — see
+*Verification-surface policy* immediately below; before Set 068 this ran on
+every session). When it runs, the orchestrator sends its work to a model from a
+**different AI provider** than the one that did the work. This catches
+provider-specific biases and blind spots:
 
 - If the orchestrator is Claude and used Gemini for routing, verification
   goes to Opus or Sonnet (Anthropic)
 - If the orchestrator is Codex/Gemini, verification goes to an Anthropic model
 - The verifier's raw output is saved and never edited
 
-### Verification-surface policy (Set 068 — DEMOTE, transition-guarded)
+### Verification-surface policy (Set 068 — DEMOTE, cut over S6)
 
 Set 067–068 ran two pre-registered experiments to settle whether the
 every-session per-session routed verification above is the right **default**
@@ -299,14 +308,24 @@ The **target state**:
   (multi-file/module changes, public API/schema/contract changes, cross-module
   refactors/moves/renames, build/CI/config changes, a changed surface with no
   contract test, or a high-blast-radius/post-failed-loop session). Small,
-  single-file, probe-covered diffs bypass it.
+  single-file, probe-covered diffs bypass it. The predicate is implemented
+  deterministically in `ai_router/routed_gate.py`
+  (`evaluate_routed_gate` / `python -m ai_router.routed_gate`), building on the
+  Set 066 blast-radius core predicate (`blast_radius.classify_paths`) plus the
+  session-level triggers above. The S4 consensus required it to be a
+  **deterministic diff heuristic, not a per-session feeling** — so the only
+  operator inputs are the three honestly-declared facts the diff cannot show
+  (`--contract-uncovered`, `--high-blast`, `--post-failed-loop`), each of which
+  can only **raise** the verdict to REQUIRED.
 
-> **Transition guard — NOT yet in effect.** The demotion does **not** cut over
-> until the S5 contract-test gate is **live and stable**. **Until then,
-> per-session routed verification remains MANDATORY on every Full-tier session,
-> exactly as described above and in Step 6.** S5 builds the gate (and the
-> diff-inspection seam the gating predicate needs); S6 wires the predicate and
-> flips this default. RETIRE was rejected as premature and is reopenable later
+> **Transition guard — CLEARED; the demotion is now in effect (S6).** The cut-over
+> waited on the S5 contract-test gate being **live and stable**; that floor
+> shipped in Set 068 S5, so S6 wired the predicate (`routed_gate.py`), flipped
+> the workflow default (Step 6 is now gated, not mandatory), and flipped the
+> `router-config.yaml` `verification:` anchor. Per-session routed verification is
+> **gated, not gone** — a tripped predicate is the only path to a routed call,
+> and the end-of-set path-aware critique + contract-test gate are the primary
+> surface for the rest. RETIRE was rejected as premature and is reopenable later
 > only on telemetry (`routed-fate-decision.md` §5).
 
 ### Significance flagging
@@ -1440,16 +1459,37 @@ dotnet test
 
 Log the result with `log.log_step()`.
 
-### Step 6: End-of-Session Verification (MANDATORY)
+### Step 6: End-of-Session Verification (GATED — Set 068 DEMOTE)
 
 **The orchestrator must not verify its own work.** The `route()` function
 dispatches to a different AI provider for independent review.
 
-> **Note (Set 068 DEMOTE, transition-guarded).** This step is **still MANDATORY
-> on every Full-tier session.** The Set 068 S4 decision to *demote* per-session
-> routed verification to a blast-radius-gated check (see *Verification-surface
-> policy* under Key Concepts) does **not** take effect until the S5 contract-test
-> gate is live; until that cutover, run this step exactly as written.
+> **Note (Set 068 DEMOTE — CUT OVER as of S6).** This step is no longer run on
+> *every* session. The Set 068 S4 decision demoted per-session routed
+> verification to a **blast-radius / coupling-gated** check (see
+> *Verification-surface policy* under Key Concepts); the S5 contract-test gate —
+> the deterministic replacement floor the transition guard waited on — is now
+> live, so S6 executed the cut-over. **Run this step when, and only when, the
+> deterministic gate trips on the session diff:**
+>
+> ```bash
+> python -m ai_router.routed_gate $(git diff --name-only <base>...HEAD)
+> # exit 0 = REQUIRED (run this step); exit 10 = may SKIP. Add
+> # --contract-uncovered / --high-blast / --post-failed-loop to RAISE to
+> # REQUIRED for the facts the diff cannot show (those flags only raise, never
+> # lower). --json prints the verdict + the triggers that fired.
+> ```
+>
+> The predicate fires on a multi-file/multi-module diff, a public
+> API/schema/contract change, a cross-module refactor, a build/CI/config change,
+> a surface with no contract probe, or a high-blast/post-failed-loop session
+> (`ai_router/routed_gate.py`). A small, single-module, probe-covered diff
+> bypasses the routed call — its safety net is the end-of-set path-aware critique
+> + the contract-test gate. When the gate trips, run this step **exactly as
+> written below**; record the gate verdict (and the triggers) in the session log
+> either way, so a skipped routed call is an auditable decision, not a silent
+> omission. The verifier still routes to a **different provider** than the
+> orchestrator.
 
 When this step terminates with a `VERIFIED` verdict and
 `disposition.json` reports `status: "completed"`, the orchestration

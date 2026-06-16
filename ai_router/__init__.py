@@ -59,7 +59,7 @@ the SessionLog class:
     log.log_step(session_number=1, step_number=1, ...)
 """
 
-__version__ = "0.20.0"
+__version__ = "0.22.0"
 
 from .config import load_config, resolve_generation_params
 from .models import estimate_complexity, pick_model
@@ -996,6 +996,29 @@ from .contract_gate import (
     DEFAULT_CONTRACT_GATE,
     CONTRACT_MANIFEST_FILENAME,
     CONTRACT_FLOOR_RESULT_FILENAME,
+)
+
+# Set 068 S6: the per-session routed-verification gating predicate. The S4
+# keep/demote/retire decision DEMOTED routed verification from mandatory-every-
+# session to a programmatic blast-radius/coupling-gated check; this is the
+# cut-over the transition guard deferred to S6 (now that the S5 contract-test
+# gate -- the replacement floor -- is live). evaluate_routed_gate() builds on
+# blast_radius.classify_paths plus the S4 section-3 session-level triggers and is
+# DETERMINISTIC (the consensus required a programmatic heuristic, not a per-
+# session feeling). See routed_gate.py + docs/ai-led-session-workflow.md ->
+# "Verification-surface policy".
+from .routed_gate import (
+    evaluate_routed_gate,
+    RoutedGateDecision,
+    ROUTED_GATE_TRIGGERS,
+    BREADTH_THRESHOLD,
+    TRIGGER_BLAST_RADIUS,
+    TRIGGER_MULTI_MODULE,
+    TRIGGER_BREADTH,
+    TRIGGER_BUILD_CI_CONFIG,
+    TRIGGER_CONTRACT_UNCOVERED,
+    TRIGGER_HIGH_BLAST,
+    TRIGGER_POST_FAILED_LOOP,
 )
 
 

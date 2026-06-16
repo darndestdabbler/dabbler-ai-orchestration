@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "068-cadence-study-and-contract-gate",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-06-16T01:03:33.582535-04:00",
+  "critiques": [
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the implementation, tests, and documentation for the per-session routed-verification gating predicate and the associated policy changes. The core logic in `ai_router/routed_gate.py` is sound and well-tested in `ai_router/tests/test_routed_gate.py`, with coverage for all specified triggers, edge cases, and the critical \"overrides can only raise\" invariant. The \"cut-over\" to this new gated policy is correctly and consistently reflected in the primary workflow document (`docs/ai-led-session-workflow.md`), the router configuration (`ai_router/router-config.yaml`), and the new strategic synthesis document (`docs/verification-surface-strategy.md`). Release artifacts (`pyproject.toml`, `ai_router/CHANGELOG.md`) are also consistent. All checked claims were substantiated by the code on disk.",
+      "findings": []
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "I reviewed the Set 068 shipped surfaces directly from disk, including ai_router/routed_gate.py, ai_router/tests/test_routed_gate.py, ai_router/__init__.py, ai_router/router-config.yaml, docs/ai-led-session-workflow.md, docs/verification-surface-strategy.md, ai_router/docs/close-out.md, ai_router/docs/pull-verifier.md, docs/proposals/2026-06-14-verification-surface-empirics/proposal.md, the Set 068 spec/change-log, and the saved path-aware critique artifact. The routed-gate code and its test file are broadly consistent, but I found material doc drift in the workflow after the claimed cut-over and a bad saved critique artifact that records repository-false findings while the set claims the artifact was successfully produced as its required dogfood output.",
+      "findings": [
+        {
+          "description": "The workflow doc still asserts mandatory per-session verification in sections outside the updated Step 6, contradicting the Set 068 cut-over claim that routed verification is now gated. Ground truth: docs/ai-led-session-workflow.md still says each session 'Ends with a mandatory cross-provider verification' and its standalone 'Cross-Provider Verification' section says 'Every session ends with an independent verification step', while the same file's overview and 'Verification-surface policy' sections say Set 068 demoted this to a routed_gate-based gated check. This leaves the canonical workflow internally inconsistent about current behavior. Fix: update the stale mandatory-language sections to reflect the gated predicate, and explicitly distinguish routed per-session verification from the always-run end-of-set path-aware critique / contract gate.",
+          "severity": "Major",
+          "category": "contract-drift"
+        },
+        {
+          "description": "The checked-in required dogfood artifact contains repository-false findings but is still presented as this set's saved path-aware critique output. Ground truth: docs/session-sets/068-cadence-study-and-contract-gate/path-aware-critique.json records a Google critique claiming docs/ai-led-session-workflow.md and docs/verification-surface-strategy.md are missing and that python modules are not under ai_router/, but those files and paths do exist on disk. Because the artifact is the required close-out evidence that 'the critique ran', keeping a provider entry that demonstrably misread the repository undermines the set's own verification evidence and any downstream remediation that consumes it. Fix: rerun the critique producer/manual flow from a clean repository-root sandbox and replace this artifact with the actual raw provider outputs from a correctly scoped run; do not keep a known-bad critique as the saved dogfood artifact.",
+          "severity": "Major",
+          "category": "false-confidence"
+        }
+      ]
+    }
+  ]
+}

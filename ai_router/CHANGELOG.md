@@ -5,6 +5,73 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-06-16 (Set 068 — the cadence study + the contract-test gate)
+
+> Carries the whole of Set 068 (S1–S6): the `run_test` execution cage + ReDoS
+> isolation, the contract-test / CDC gate, and the per-session routed-verification
+> **DEMOTE** cut-over. No extension / Marketplace change this set. Full strategy:
+> `docs/verification-surface-strategy.md`.
+
+### Added
+
+- **`run_test` disposable-worktree execution cage (`run_test_sandbox.py`, S1).**
+  The first **write-capable but caged** tool for the Set 067 pull-verifier
+  adapter: an operator-configured argv runs `shell=False`, write-confined to a
+  detached, disposable git worktree created from a pinned ref, with a hard
+  wall-clock timeout (process-tree kill), a per-stream output cap, and
+  **crash-safe teardown** (remove → recursive delete → prune, then a
+  `git worktree list` leak check that surfaces a surviving registration as a hard
+  `ERROR:`). It returns the **raw** exit code + captured output (the
+  deterministic-servant discipline extended to execution; the real tree is never
+  mutated). Offered to the loop **only** when a `RunTestConfig` is passed — absent
+  that, the loop is byte-for-byte the 0.21.x read-only loop. It is a bounded
+  verification cage, **not** a CI runner and **not** an adversarial OS sandbox
+  (scope + threat model in `run-test-contract.md`).
+- **Contract-test / CDC gate (`contract_gate.py`, `docs/contract-gate.md`, S5).**
+  A per-set, opt-in `contractGate` (`none|advisory|required`) deterministic
+  **floor** that confirms a set's contract/falsifier tests ran and **passed** in
+  the `run_test` cage and cover every probeable defect class, reserving the
+  path-aware agent for the non-probeable residual. Mirrors the Set 066 path-aware
+  gate shape (produce-then-validate: `python -m ai_router.contract_gate run`
+  produces the raw `contract-floor-result.json`; the close-out gate validates it).
+  Posture: `required` hard-blocks TTY / soft-warns headless; `advisory` always
+  soft-warns; `none` skips; fail-open in the non-block direction. Pure-Python
+  validators with L-066-1 parity discipline + the `contract-manifest.schema.json`
+  / `contract-floor-result.schema.json` references.
+- **Per-session routed-verification gating predicate (`routed_gate.py`, S6).**
+  `evaluate_routed_gate` / `python -m ai_router.routed_gate` — the deterministic
+  predicate that implements the DEMOTE cut-over: per-session routed verification
+  now fires only when a blast-radius / coupling predicate trips on the session
+  diff. Built on `blast_radius.classify_paths` (the Set 066 core predicate) plus
+  session-level triggers (multi-module span, diff breadth, build/CI/config
+  surface) and three operator overrides that can only **raise** the verdict to
+  REQUIRED. CLI exit-code contract: `0` REQUIRED / `10` SKIP (`--json` exits 0).
+
+### Changed
+
+- **Per-session routed verification is DEMOTED from mandatory to gated.** On the
+  evidence of Experiment A (capability — the lever is repository context-access,
+  which a snippet-fed routed call structurally lacks) and Experiment B (cadence —
+  the defense does not hold under the pre-registered rule, though the mechanism is
+  real and narrow), cross-provider consensus + operator confirmation chose
+  **DEMOTE**. The Set 068 S4 transition guard held the cut-over until the S5
+  contract-test floor shipped; S6 executed it. `docs/ai-led-session-workflow.md`
+  (Step 6 + the *Verification-surface policy* section) and the
+  `router-config.yaml` `verification:` anchor are flipped accordingly. The
+  end-of-set path-aware critique + the contract-test gate are now the primary
+  verification surface; routed is **gated, not gone** (RETIRE rejected as
+  premature, reopenable only on telemetry).
+- **`grep` ReDoS defense relocated onto a killable subprocess (S1).** The 0.21.1
+  portable heuristic is now a cheap **pre-filter** only; a pattern that defeats it
+  is bounded by a hard subprocess timeout (raw `ERROR:` returned, parent never
+  hangs) rather than relying on the heuristic as the sole defense.
+
+### Docs
+
+- New canonical `docs/verification-surface-strategy.md` synthesis (supersedes the
+  Set 065 proposal's open questions); `ai_router/docs/close-out.md` documents the
+  contract-test gate; `ai_router/docs/pull-verifier.md` records what Set 068 added.
+
 ## [0.21.1] — 2026-06-15 (Set 067 follow-up — whole-set adversarial-critique fixes)
 
 > Published to PyPI 2026-06-15 (tag `v0.21.1`, `release.yml` run `27566067021`,

@@ -1,5 +1,12 @@
 # Proposal — Verification-Surface Strategy
 
+> **Superseded (2026-06-16, Set 068 S6):** this proposal's open questions are
+> now settled and the strategy is built. See the canonical
+> [`docs/verification-surface-strategy.md`](../../verification-surface-strategy.md)
+> for the decided-and-shipped outcome (path-aware critique + contract-test gate +
+> the demoted/gated per-session routed verification). This proposal remains the
+> design-rationale record.
+>
 > **Status:** Proposal (not adopted). Production changes are a *future*
 > implementation set.
 > **Date:** 2026-06-14

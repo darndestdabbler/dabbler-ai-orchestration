@@ -536,17 +536,34 @@ escalation:
 # checks the work of the original model to catch provider-specific
 # blind spots and biases.
 #
-# Verification-surface policy (Set 068 S4 — DEMOTE, transition-guarded):
-# Experiments A+B settled that per-session routed verification should be
-# DEMOTED from mandatory-every-session to a blast-radius/coupling-gated check,
-# with the end-of-set path-aware critique + the S5 contract-test gate as the
-# primary surface. The cut-over does NOT take effect until the S5 contract-test
-# gate is live and stable — until then per-session routed verification stays
-# MANDATORY on every Full-tier session and NO flag here is flipped. Full record:
-# docs/session-sets/068-cadence-study-and-contract-gate/routed-fate-decision.md;
+# Verification-surface policy (Set 068 — DEMOTE, CUT OVER S6):
+# Experiments A+B settled that per-session routed verification should be DEMOTED
+# from mandatory-every-session to a blast-radius/coupling-gated check, with the
+# end-of-set path-aware critique + the S5 contract-test gate as the primary
+# surface. The S4 transition guard held the cut-over until the S5 contract-test
+# gate was live and stable; that floor shipped in Set 068 S5, so S6 EXECUTES the
+# cut-over: per-session routed verification is now GATED, fired only when the
+# deterministic routed_gate predicate (below) trips on the session diff. Full
+# record: docs/session-sets/068-cadence-study-and-contract-gate/routed-fate-decision.md;
 # policy: docs/ai-led-session-workflow.md -> "Verification-surface policy".
 verification:
   enabled: true
+
+  # --- Per-session routed-verification gate (Set 068 S6 cut-over) ---
+  # The DEMOTE decision retains per-session routed verification but GATES it on a
+  # programmatic blast-radius / coupling predicate over the session diff
+  # (ai_router/routed_gate.py -> evaluate_routed_gate). The S4 consensus required
+  # this to be a DETERMINISTIC heuristic, not an operator's per-session feeling
+  # (the most dangerous sessions are the ones whose risk is under-recognized at
+  # the time). The orchestrator runs it at Step 6:
+  #   python -m ai_router.routed_gate $(git diff --name-only <base>...HEAD)
+  # Exit 0 = REQUIRED (run the routed call), 10 = may SKIP. The predicate is
+  # biased toward REQUIRED; the three operator overrides can only RAISE the
+  # verdict, never lower it. These knobs are documentation of the defaults baked
+  # into routed_gate.py (the CLI accepts --breadth-threshold to override).
+  routed_gate:
+    enabled: true
+    breadth_threshold: 4        # distinct-file count that trips the breadth trigger
 
   # Verifier selection is RULE-BASED, not map-based. A candidate
   # verifier must be:

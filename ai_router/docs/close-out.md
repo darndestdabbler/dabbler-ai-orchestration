@@ -361,6 +361,21 @@ returns the corresponding exit code without touching downstream state.
      dedicated-verification gate above is Lightweight-only, so the
      attribute could not reuse it. Fail-open in the non-block direction:
      any internal error never wedges close-out.
+   - **Contract-test / CDC gate** (Set 068 S5) — **tier-orthogonal**. Fires
+     when the durable `contractGate` record (an `activity-log.json` entry
+     written once at set start; default `none`) is `advisory` or `required`.
+     It validates the saved `contract-floor-result.json` + `contract-manifest.json`
+     at the set root: the floor command **ran and passed** in the disposable
+     `run_test` cage, the result matches this set and the manifest, and **every
+     probeable defect class names a covering test** (the non-probeable residual
+     is reported as agent-reserved, never a failure; validated by
+     `ai_router.contract_gate.validate_contract_gate`). The floor is **produced
+     out-of-band** (`python -m ai_router.contract_gate run`) and only
+     *validated* here, so close-out never runs a multi-minute suite. Fail
+     posture mirrors the path-aware gate: `required` **hard-blocks** in an
+     interactive TTY (`failed_checks: ["contract_gate"]`) and **soft-warns**
+     headless / `--accept-suggestions`; `advisory` always soft-warns; `none`
+     skips. Fail-open in the non-block direction.
 8. **Wait for verification to terminate** (bounded by `--timeout`):
    - **API mode** — verification is already synchronous; this is a
      no-op flagged as `method: "api"`.

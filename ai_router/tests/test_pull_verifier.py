@@ -13,6 +13,9 @@ No metered API calls: a FakeBinding drives a scripted agentic loop.
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -1799,7 +1802,7 @@ class TestRunTestWiring:
 
         def fake_dispatch(cfg, args):
             calls.append((cfg, args))
-            return ("exit_code=0\n--- output ---\nTEST OK", False, False)
+            return ("exit_code=0\n--- output ---\nTEST OK", False, False, None)
 
         monkeypatch.setattr(pv, "_dispatch_run_test", fake_dispatch)
         verdict = _resp(
@@ -1830,7 +1833,7 @@ class TestRunTestWiring:
 
     def test_cage_error_recorded_as_error_probe(self, sandbox, monkeypatch):
         def fake_dispatch(cfg, args):
-            return ("ERROR: run_test cage: not a git repository", True, False)
+            return ("ERROR: run_test cage: not a git repository", True, False, None)
 
         monkeypatch.setattr(pv, "_dispatch_run_test", fake_dispatch)
         b = FakeBinding(
@@ -1858,3 +1861,366 @@ class TestRunTestWiring:
         assert cfg.resolve(None) == ("default", "cmd")
         assert cfg.resolve("unit") == ("pytest", "-q")
         assert cfg.resolve("missing") == ("default", "cmd")
+
+
+# ===========================================================================
+# Set 069 S2: get_diff tool (raw unified diff; offered only when configured;
+# dispatched to git directly, recorded as a real probe)
+# ===========================================================================
+
+
+def _make_git_repo(repo):
+    """A throwaway one-commit git repo for diff/cage tests."""
+    repo.mkdir(parents=True, exist_ok=True)
+
+    def _git(*args):
+        subprocess.run(
+            ["git", "-C", str(repo), *args], check=True, capture_output=True
+        )
+
+    _git("init", "-q")
+    _git("config", "user.email", "t@example.invalid")
+    _git("config", "user.name", "Test")
+    (repo / "hello.txt").write_text("hi\n", encoding="utf-8")
+    _git("add", "-A")
+    _git("commit", "-q", "-m", "init")
+    return repo
+
+
+class TestGetDiffWiring:
+    def test_not_offered_without_config(self, sandbox):
+        b = _ToolCapturingBinding(
+            queue=[_resp(tool_calls=[_tc("read_file", {"path": "a.py"})]),
+                   _VERDICT_OK]
+        )
+        pv.pull_route(sandbox, "review", binding=b, config=CONFIG)
+        assert all("get_diff" not in names for names in b.tools_seen)
+
+    def test_offered_and_dispatched(self, sandbox, monkeypatch):
+        def fake_dispatch(cfg):
+            return ("[changed paths]\nx.py\n[unified diff]\n+new", False, False)
+
+        monkeypatch.setattr(pv, "_dispatch_get_diff", fake_dispatch)
+        b = _ToolCapturingBinding(
+            queue=[_resp(tool_calls=[_tc("get_diff", {}, "g1")]), _VERDICT_OK]
+        )
+        diff_cfg = pv.DiffConfig(repo_root=str(sandbox), base_ref="HEAD")
+        result = pv.pull_route(
+            sandbox, "review", binding=b, config=CONFIG, diff_config=diff_cfg
+        )
+        assert "get_diff" in b.tools_seen[0]
+        assert result.ok is True
+        rec = result.trace.tool_calls[0]
+        assert rec.name == "get_diff" and rec.raw is True and rec.error is False
+
+    def test_dispatch_real_repo_shows_diff(self, tmp_path):
+        repo = _make_git_repo(tmp_path / "repo")
+        (repo / "hello.txt").write_text("hi\nthere\n", encoding="utf-8")
+        cfg = pv.DiffConfig(repo_root=str(repo), base_ref="HEAD")
+        content, is_error, _elided = pv._dispatch_get_diff(cfg)
+        assert is_error is False
+        assert "[changed paths]" in content and "hello.txt" in content
+        assert "[unified diff]" in content and "+there" in content
+
+    def test_dispatch_bad_ref_is_raw_error(self, tmp_path):
+        repo = _make_git_repo(tmp_path / "repo")
+        cfg = pv.DiffConfig(repo_root=str(repo), base_ref="no-such-ref-xyz")
+        content, is_error, _elided = pv._dispatch_get_diff(cfg)
+        assert is_error is True and content.startswith("ERROR: get_diff:")
+
+    def test_diff_config_range(self):
+        assert pv.DiffConfig("r", "BASE")._range() == ("BASE",)
+        assert pv.DiffConfig("r", "BASE", "HEAD")._range() == ("BASE..HEAD",)
+        assert pv.DiffConfig("r", "BASE", paths=("a.py",))._range() == (
+            "BASE", "--", "a.py",
+        )
+
+
+# ===========================================================================
+# Set 069 S2: run_test execution capture + evidence-protocol tagging
+# (orchestrator-applied tier; pristine-replay-backed; never agent-self-granted)
+# ===========================================================================
+
+
+def _exec(command_id="default", name="", argv=("pytest", "-q"),
+          exit_code=1, raw_output="FAILED test_x"):
+    return pv._Execution(
+        command_id=command_id, requested_name=name, argv=tuple(argv),
+        exit_code=exit_code, raw_output=raw_output,
+    )
+
+
+def _fake_replay(output, *, ran=True, error=None, removed=True, exit_code=1):
+    return SimpleNamespace(
+        ran=ran, error=error, worktree_removed=removed,
+        exit_code=exit_code, output=output,
+    )
+
+
+_CFG = pv.RunTestConfig(repo_root=".", ref="HEAD", command=("pytest", "-q"))
+
+
+def _crit(findings):
+    return pv.PullCritique(
+        provider="openai", model="gpt-5.4", verdict="ISSUES_FOUND",
+        summary="s", findings=tuple(findings),
+    )
+
+
+class TestRunTestConfigResolveId:
+    def test_resolve_id_default_named_and_unknown(self):
+        cfg = pv.RunTestConfig(
+            repo_root=".", ref="HEAD", command=("d", "cmd"),
+            commands={"unit": ("pytest",)},
+        )
+        assert cfg.resolve_id(None) == "default"
+        assert cfg.resolve_id("unit") == "unit"
+        # An UNKNOWN name falls back to the default COMMAND -> id "default", never
+        # the unmatched string (the false-commandId guard).
+        assert cfg.resolve_id("missing") == "default"
+
+
+class TestDispatchRunTestExecutionCapture:
+    def test_clean_run_captures_execution(self, tmp_path):
+        repo = _make_git_repo(tmp_path / "repo")
+        cfg = pv.RunTestConfig(
+            repo_root=str(repo), ref="HEAD",
+            command=(sys.executable, "-c", "print('hi'); raise SystemExit(0)"),
+        )
+        content, is_error, _elided, execution = pv._dispatch_run_test(cfg, {})
+        assert is_error is False
+        assert execution is not None
+        assert execution.command_id == "default"
+        assert execution.exit_code == 0
+        assert "hi" in execution.raw_output
+
+    def test_unknown_name_captures_resolved_default_id(self, tmp_path):
+        # GPT-5.4 S2 R1 finding 1: an UNKNOWN name silently runs the DEFAULT
+        # command; the captured command_id MUST be the resolved trusted id
+        # ("default"), NOT the model's unmatched string - else a false commandId
+        # could back a REPRODUCED claim.
+        repo = _make_git_repo(tmp_path / "repo")
+        cfg = pv.RunTestConfig(
+            repo_root=str(repo), ref="HEAD",
+            command=(sys.executable, "-c", "print('ran default')"),
+            commands={"unit": (sys.executable, "-c", "print('unit')")},
+        )
+        _c, _e, _el, execution = pv._dispatch_run_test(cfg, {"name": "missing"})
+        assert execution is not None
+        assert execution.command_id == "default"  # NOT "missing"
+        assert "ran default" in execution.raw_output
+
+    def test_cage_error_captures_no_execution(self, tmp_path):
+        # Not a git repo -> cage error -> no execution can back a reproduction.
+        cfg = pv.RunTestConfig(
+            repo_root=str(tmp_path), ref="HEAD", command=("echo", "x")
+        )
+        content, is_error, _elided, execution = pv._dispatch_run_test(cfg, {})
+        assert is_error is True and execution is None
+
+
+class TestStampEvidenceTiers:
+    def test_reproduced_conferred_on_matching_clean_replay(self, monkeypatch):
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay",
+            lambda cfg, ex: _fake_replay(ex.raw_output),  # replay matches
+        )
+        crit = _crit([pv.Finding(description="bug", severity="Major")])
+        payload = {"findings": [
+            {"description": "bug", "evidenceTier": "REPRODUCED",
+             "commandId": "default"}
+        ]}
+        out = pv._stamp_evidence_tiers(crit, payload, [_exec()], _CFG)
+        f = out.findings[0]
+        assert f.evidence_tier == pv.EVIDENCE_REPRODUCED
+        assert f.transcript is not None
+        assert f.transcript["entrypoint"]["kind"] == pv.ENTRYPOINT_TEST
+        # The stamped transcript is a VALID falsifier per the S1 protocol.
+        ok, reasons = __import__("evidence_protocol").validate_transcript(
+            f.transcript
+        )
+        assert ok, reasons
+
+    def test_reproduced_collapses_when_replay_mismatches(self, monkeypatch):
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay",
+            lambda cfg, ex: _fake_replay("DIFFERENT OUTPUT"),  # mismatch
+        )
+        crit = _crit([pv.Finding(description="bug")])
+        payload = {"findings": [
+            {"description": "bug", "evidenceTier": "REPRODUCED",
+             "commandId": "default"}
+        ]}
+        out = pv._stamp_evidence_tiers(crit, payload, [_exec()], _CFG)
+        # Collapsed to a read-claim: no tier field, no transcript.
+        assert out.findings[0].evidence_tier == ""
+        assert out.findings[0].transcript is None
+
+    def test_reproduced_collapses_when_no_execution(self, monkeypatch):
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay",
+            lambda cfg, ex: _fake_replay(ex.raw_output),
+        )
+        crit = _crit([pv.Finding(description="bug")])
+        payload = {"findings": [
+            {"description": "bug", "evidenceTier": "REPRODUCED",
+             "commandId": "default"}
+        ]}
+        out = pv._stamp_evidence_tiers(crit, payload, [], _CFG)  # no runs
+        assert out.findings[0].evidence_tier == ""
+
+    def test_reproduced_collapses_when_commandid_unknown(self, monkeypatch):
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay",
+            lambda cfg, ex: _fake_replay(ex.raw_output),
+        )
+        crit = _crit([pv.Finding(description="bug")])
+        payload = {"findings": [
+            {"description": "bug", "evidenceTier": "REPRODUCED",
+             "commandId": "nope"}  # not among the executions
+        ]}
+        out = pv._stamp_evidence_tiers(crit, payload, [_exec()], _CFG)
+        assert out.findings[0].evidence_tier == ""
+
+    def test_hypothesis_preserved(self):
+        crit = _crit([pv.Finding(description="maybe")])
+        payload = {"findings": [
+            {"description": "maybe", "evidenceTier": "HYPOTHESIS"}
+        ]}
+        out = pv._stamp_evidence_tiers(crit, payload, [], _CFG)
+        assert out.findings[0].evidence_tier == pv.EVIDENCE_HYPOTHESIS
+        assert out.findings[0].transcript is None
+
+    def test_untagged_stays_asserted_default(self):
+        crit = _crit([pv.Finding(description="read claim")])
+        payload = {"findings": [{"description": "read claim"}]}
+        out = pv._stamp_evidence_tiers(crit, payload, [], _CFG)
+        # No on-disk field -> byte-identical to a pre-069 entry.
+        assert out.findings[0].evidence_tier == ""
+        assert "evidenceTier" not in out.findings[0].to_dict()
+
+    def test_unknown_name_claim_collapses(self, monkeypatch):
+        # End of the finding-1 chain: dispatch captured command_id="default" (an
+        # unknown name ran the default), but the agent claims commandId="missing"
+        # -> no match -> collapse, even with a clean matching replay available.
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay",
+            lambda cfg, ex: _fake_replay(ex.raw_output),
+        )
+        crit = _crit([pv.Finding(description="bug")])
+        payload = {"findings": [
+            {"description": "bug", "evidenceTier": "REPRODUCED",
+             "commandId": "missing"}  # the unmatched name the model passed
+        ]}
+        out = pv._stamp_evidence_tiers(
+            crit, payload, [_exec(command_id="default")], _CFG
+        )
+        assert out.findings[0].evidence_tier == ""
+
+    def test_verdict_schema_evidence_fields_gated(self):
+        # GPT-5.4 S2 R1 finding 2: the read-only verdict schema must NOT advertise
+        # evidenceTier / commandId (byte-for-byte the pre-069 surface); they
+        # appear only when the run_test lane is active (allow_evidence=True).
+        ro = pv._verdict_tool_schema()
+        props = ro["parameters"]["properties"]["findings"]["items"]["properties"]
+        assert "evidenceTier" not in props and "commandId" not in props
+        ex = pv._verdict_tool_schema(allow_evidence=True)
+        eprops = ex["parameters"]["properties"]["findings"]["items"]["properties"]
+        assert "evidenceTier" in eprops and "commandId" in eprops
+
+    def test_no_config_loop_offers_pre069_verdict_schema(self, sandbox):
+        # The no-config loop's offered submit_verdict carries no evidence fields.
+        b = _ToolCapturingBinding(
+            queue=[_resp(tool_calls=[_tc("read_file", {"path": "a.py"})]),
+                   _VERDICT_OK]
+        )
+
+        class _SchemaCapturingBinding(_ToolCapturingBinding):
+            def request(self, *, force_verdict, **kw):
+                self.tool_schemas = kw["tools"]
+                return FakeBinding.request(self, force_verdict=force_verdict, **kw)
+
+        b2 = _SchemaCapturingBinding(
+            queue=[_resp(tool_calls=[_tc("read_file", {"path": "a.py"})]),
+                   _VERDICT_OK]
+        )
+        pv.pull_route(sandbox, "review", binding=b2, config=CONFIG)
+        verdict_schema = [
+            t for t in b2.tool_schemas if t["name"] == "submit_verdict"
+        ][0]
+        props = (
+            verdict_schema["parameters"]["properties"]["findings"]["items"]
+            ["properties"]
+        )
+        assert "evidenceTier" not in props
+
+    def test_agent_cannot_self_grant_without_run_test_config(
+        self, sandbox, monkeypatch
+    ):
+        # Even if the model PROPOSES REPRODUCED, with NO run_test_config the
+        # loop never stamps (no execution lane) -> the finding stays a read-claim.
+        verdict = _resp(tool_calls=[_tc("submit_verdict", {
+            "verdict": "ISSUES_FOUND", "summary": "s",
+            "findings": [{"description": "bug", "evidenceTier": "REPRODUCED",
+                          "commandId": "default"}],
+        }, "v1")])
+        b = FakeBinding(
+            queue=[_resp(tool_calls=[_tc("read_file", {"path": "a.py"})]),
+                   verdict]
+        )
+        result = pv.pull_route(sandbox, "review", binding=b, config=CONFIG)
+        assert result.ok
+        assert result.critique.findings[0].evidence_tier == ""
+
+
+class TestEvidenceTierEndToEnd:
+    def test_run_test_reproduced_flows_to_critique_entry(
+        self, sandbox, monkeypatch
+    ):
+        # A run_test that reproduces a defect + a matching pristine replay ->
+        # the critique entry carries evidenceTier=REPRODUCED + a valid transcript
+        # that the Set 066 artifact validator (S1-extended) accepts.
+        def fake_dispatch(cfg, args):
+            return ("exit_code=1\n--- output ---\nAssertionError", False, False,
+                    _exec(raw_output="AssertionError"))
+
+        monkeypatch.setattr(pv, "_dispatch_run_test", fake_dispatch)
+        monkeypatch.setattr(
+            pv, "_run_pristine_replay",
+            lambda cfg, ex: _fake_replay("AssertionError"),
+        )
+        verdict = _resp(tool_calls=[_tc("submit_verdict", {
+            "verdict": "ISSUES_FOUND", "summary": "a real bug",
+            "findings": [{"description": "off-by-one", "severity": "Major",
+                          "category": "correctness",
+                          "evidenceTier": "REPRODUCED", "commandId": "default"}],
+        }, "v1")])
+        b = FakeBinding(
+            queue=[_resp(tool_calls=[_tc("run_test", {}, "rt1")]), verdict]
+        )
+        rt_cfg = pv.RunTestConfig(
+            repo_root=str(sandbox), ref="HEAD", command=("pytest", "-q")
+        )
+        result = pv.pull_route(
+            sandbox, "review", binding=b, config=CONFIG, run_test_config=rt_cfg
+        )
+        assert result.ok
+        entry = result.critique.to_critique_entry()
+        f0 = entry["findings"][0]
+        assert f0["evidenceTier"] == "REPRODUCED"
+        assert f0["transcript"]["commandId"] == "default"
+
+        # The artifact built from this entry passes the real Set 066 validator.
+        from path_aware_critique import validate_path_aware_critique_artifact
+        artifact = {
+            "schemaVersion": 1,
+            "sessionSetName": "069-x",
+            "pathAwareCritique": "required",
+            "critiques": [
+                entry,
+                {"provider": "google", "model": "gemini-2.5-pro",
+                 "verdict": "VERIFIED", "summary": "ok", "findings": []},
+            ],
+        }
+        res = validate_path_aware_critique_artifact(artifact)
+        assert res.ok, res.reasons

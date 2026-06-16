@@ -181,3 +181,48 @@ Set 067 left these to Set 068; they are now built:
   path-aware critique (this adapter) + the contract-test gate are now the primary
   verification surface. Full strategy:
   [`../../docs/verification-surface-strategy.md`](../../docs/verification-surface-strategy.md).
+
+---
+
+## What Set 069 S2 added (the execution-evidence lanes in the producer)
+
+Set 068 shipped the `run_test` cage but only wired it into the *adapter*; the
+**automated producer still drove its critics read-only**, which is the gap the
+0.22.x release exposed (it missed two Major bugs the manual run reproduced by
+executing code). Set 069 S2 closes that gap by giving the automated critic a
+**constrained evidence-generation lane**, all additive — absent the new config a
+critique is byte-for-byte the read-only Set 067/068 loop:
+
+- **Trusted-command execution in `produce_path_aware_critique`.** Pass a
+  `RunTestConfig` (the operator-authored command surface + pinned ref + caps) and
+  each critic is offered the `run_test` tool: it may **trigger** an
+  operator-authored command id in the disposable-worktree cage — **never author
+  argv**, fresh checkout, hard caps. The CLI exposes this via `--run-test-cmd` /
+  `--run-test-named NAME=CMD` + `--exec-ref` (a shell-style string is
+  `shlex`-split into an argv; no shell is ever invoked).
+- **`get_diff` (diff-awareness).** Pass a `DiffConfig` (operator-pinned ref
+  range) and the critics get a read-only `get_diff` tool returning the **raw
+  unified diff + changed-path list** — never a model-summarized symbol map.
+  Dispatched to `git` directly (like `run_test`, outside the byte-equality guard:
+  the orchestrator runs `git` itself, so there is no model-touchable servant to
+  defend). CLI: `--diff-base` (+ optional `--diff-head`).
+- **Evidence-tiered findings (the S1 protocol, wired).** Findings from a
+  triggered run flow through `ai_router/evidence_protocol.py`: the agent may
+  *propose* `evidenceTier` + `commandId` on a finding, but **the orchestrator
+  applies the tag** — `REPRODUCED` is conferred only after the orchestrator
+  **replays the named command on a second pristine checkout** and the replay's
+  output hash matches (a re-runnable falsifier); a claim with no matching run, or
+  a non-deterministic replay, **collapses to a read-claim** (the agent can never
+  self-grant `REPRODUCED`). The transcript's entrypoint is always
+  `test_entrypoint` (a trusted operator-authored command), so the meta-oracle
+  rule holds by construction. A `REPRODUCED` entry carries its falsifier
+  transcript into `path-aware-critique.json`, which the Set 066 validator
+  (S1-extended) enforces.
+- **Blast-radius-budgeted loop depth.** When an execution lane is active and no
+  caps are pinned, the producer derives `PullCaps` from the set's blast radius
+  (`budget_caps_for_paths` over the disposition's `files_changed`): a high-blast
+  set gets the full configured budget, a low-blast set probes less — depth earned
+  by blast radius, not a magic constant.
+
+The Podman model-authored-probe lane (rung b) and the ceiling→floor ratchet
+(rungs 5–6) are later sessions; S2 ships the trusted-command lanes only.

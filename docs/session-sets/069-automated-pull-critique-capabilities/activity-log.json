@@ -1,7 +1,7 @@
 {
   "sessionSetName": "069-automated-pull-critique-capabilities",
   "createdDate": "2026-06-16T08:22:51.017923+00:00",
-  "totalSessions": 0,
+  "totalSessions": 6,
   "entries": [
     {
       "sessionNumber": 1,
@@ -13,6 +13,51 @@
       "routedApiCalls": [],
       "kind": "path_aware_critique",
       "choice": "required"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register-and-read",
+      "dateTime": "2026-06-16T05:22:24.799015-04:00",
+      "description": "Registered S2 (claude/opus-4-8/high). Read proposal, verification-surface-strategy context, pull_verifier.py, pull_critique.py, evidence_protocol.py (S1), run_test_sandbox.py, routed_gate.py, blast_radius.py, run-test-contract.md, S1 disposition + lessons.",
+      "status": "done",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "trusted-exec-wired",
+      "dateTime": "2026-06-16T05:38:20.200064-04:00",
+      "description": "pull_verifier: added DiffConfig + get_diff tool (raw unified diff, dispatched directly like run_test, outside byte-equality guard); _dispatch_run_test now returns an _Execution record for clean cage runs. pull_critique producer: threads run_test_config/diff_config/caps to pull_route; added CLI flags (--run-test-cmd/--run-test-named/--exec-ref/--exec-repo-root/--diff-base/--diff-head) + _build_exec_configs.",
+      "status": "done",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "deeper-probing",
+      "dateTime": "2026-06-16T05:38:20.201112-04:00",
+      "description": "Added budget_caps_for_paths: blast-radius-budgeted PullCaps (required=1.0x, advisory=0.6x, none=0.4x with turn/token floors), derived from the disposition files_changed when an execution lane is active and no caps pinned. Read-only path leaves caps=None (config default, unchanged).",
+      "status": "done",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "evidence-tiered-findings",
+      "dateTime": "2026-06-16T05:38:20.201112-04:00",
+      "description": "Wired triggered-run findings through the S1 evidence protocol: Finding gains evidence_tier + transcript (orchestrator-stamped, additive); submit_verdict schema lets the agent PROPOSE evidenceTier+commandId; _stamp_evidence_tiers confers REPRODUCED only via authoritative_tier on a pristine-replayed (_run_pristine_replay) transcript whose outputHash matches, else collapses to ASSERTED; HYPOTHESIS preserved. Meta-oracle holds by construction (test_entrypoint). +26 tests, full suite 1762 passed / 1 skip. routed_gate=REQUIRED. Updated ai_router/docs/pull-verifier.md.",
+      "status": "done",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "s2-verified",
+      "dateTime": "2026-06-16T05:51:51.826282-04:00",
+      "description": "Cross-provider verification (gpt-5-4, gated->REQUIRED). R1 FAIL with 3 REAL findings: (1) unknown run_test name captured as command_id could back a false REPRODUCED -> added RunTestConfig.resolve_id, capture resolved TRUSTED id; (2) submit_verdict schema always advertised evidenceTier/commandId, breaking read-only additivity -> gated behind allow_evidence=(run_test_config is not None); (3) test gap on the fallback path -> added real-cage + collapse + schema-gating tests (finding 8 doc was UNVERIFIED only because the doc edit post-dated R1 staging). R2 PASS, all 9 areas, no findings. Full suite 1767 passed/1 skip. ~/usr/bin/bash.473 metered (R1 /usr/bin/bash.276 + R2 /usr/bin/bash.197).",
+      "status": "done",
+      "routedApiCalls": []
     }
   ]
 }

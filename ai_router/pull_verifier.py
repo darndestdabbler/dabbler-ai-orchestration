@@ -41,9 +41,26 @@ import json
 import os
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
+
+try:  # package vs bare-import (mirrors the rest of ai_router)
+    from .evidence_protocol import (
+        ENTRYPOINT_TEST,
+        EVIDENCE_HYPOTHESIS,
+        EVIDENCE_REPRODUCED,
+        authoritative_tier,
+        hash_output,
+    )
+except ImportError:  # pragma: no cover - test/bare context
+    from evidence_protocol import (  # type: ignore
+        ENTRYPOINT_TEST,
+        EVIDENCE_HYPOTHESIS,
+        EVIDENCE_REPRODUCED,
+        authoritative_tier,
+        hash_output,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -54,11 +71,23 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 
 @dataclass(frozen=True)
 class Finding:
-    """One critique finding - the Set 066 ``$defs/Finding`` shape."""
+    """One critique finding - the Set 066 ``$defs/Finding`` shape.
+
+    Set 069 S2 adds the evidence-protocol fields ``evidence_tier`` and
+    ``transcript``. They are **orchestrator-stamped** post-hoc (never the agent's
+    self-report) by :func:`_stamp_evidence_tiers` and are purely additive: an
+    ASSERTED finding (the read-only default) carries neither field, so a read-only
+    critique entry is byte-for-byte the Set 067/068 shape. ``evidence_tier`` is
+    serialized as the on-disk ``evidenceTier`` key the Set 066 artifact validator
+    (S1-extended) checks, and ``transcript`` is the falsifier transcript a
+    REPRODUCED finding must carry.
+    """
 
     description: str
     severity: str = ""
     category: str = ""
+    evidence_tier: str = ""  # "" => default ASSERTED (no on-disk field)
+    transcript: Optional[dict] = None  # falsifier transcript for REPRODUCED
 
     def to_dict(self) -> dict:
         out: dict = {"description": self.description}
@@ -66,6 +95,12 @@ class Finding:
             out["severity"] = self.severity
         if self.category:
             out["category"] = self.category
+        # Evidence fields are emitted ONLY when set, so an ASSERTED finding stays
+        # byte-identical to a pre-069 entry (the field is additive).
+        if self.evidence_tier:
+            out["evidenceTier"] = self.evidence_tier
+        if self.transcript is not None:
+            out["transcript"] = self.transcript
         return out
 
 
@@ -532,6 +567,16 @@ SUBMIT_VERDICT_TOOL = "submit_verdict"
 # the Set 067 read-only loop.
 RUN_TEST_TOOL = "run_test"
 
+# Set 069 S2: raw diff-awareness. Like run_test, get_diff is NOT a member of
+# _CANONICAL: the diff RANGE is operator-pinned config (a DiffConfig), never
+# model-authored argv, and the orchestrator runs ``git`` itself with no
+# model-touchable servant seam in between - so there is no summarizing-servant
+# attack surface for the byte-equality guard to defend (the same posture as
+# run_test; see run-test-contract.md sec 1). It returns the RAW unified diff +
+# changed-path list, never a model-summarized "changed-symbol map" (proposal
+# rung 3). Offered ONLY when a DiffConfig is passed to pull_route().
+GET_DIFF_TOOL = "get_diff"
+
 
 @dataclass(frozen=True)
 class RunTestConfig:
@@ -555,6 +600,20 @@ class RunTestConfig:
         if name and self.commands and name in self.commands:
             return tuple(self.commands[name])
         return tuple(self.command or ())
+
+    def resolve_id(self, name: Optional[str]) -> str:
+        """Return the TRUSTED command id actually run for ``name``.
+
+        Mirrors :meth:`resolve`: a configured name selects that command; anything
+        else (unknown name / no name) falls back to the default command, whose id
+        is ``"default"``. This is the id the evidence transcript records - so a
+        model-supplied UNKNOWN name (which silently runs the default) can never be
+        recorded as if it were a configured command, which would let a false
+        ``commandId`` back a REPRODUCED claim (GPT-5.4 S2 verification, finding 1).
+        """
+        if name and self.commands and name in self.commands:
+            return name
+        return "default"
 
 
 def _run_test_tool_schema() -> dict:
@@ -584,8 +643,34 @@ def _run_test_tool_schema() -> dict:
     }
 
 
-def _dispatch_run_test(cfg: RunTestConfig, args: dict) -> Tuple[str, bool, bool]:
-    """Run the cage for one ``run_test`` call; return (raw_text, is_error, elided).
+@dataclass(frozen=True)
+class _Execution:
+    """A captured ``run_test`` execution, for orchestrator-side evidence tagging.
+
+    Records exactly the raw facts a REPRODUCED-grade transcript needs (the
+    operator-authored command id + resolved argv, the raw output, the exit code),
+    so :func:`_stamp_evidence_tiers` can build a falsifier transcript and replay
+    it on a fresh checkout. Captured ONLY for a clean cage run (``ran`` and no
+    cage ``error`` and no teardown leak) - a leaky/failed cage run cannot back a
+    reproduced claim.
+    """
+
+    command_id: str  # the stable trusted-command id (requested name or "default")
+    requested_name: str  # the model's optional name input ("" => default command)
+    argv: Tuple[str, ...]
+    exit_code: Optional[int]
+    raw_output: str
+
+
+def _dispatch_run_test(
+    cfg: RunTestConfig, args: dict
+) -> Tuple[str, bool, bool, Optional["_Execution"]]:
+    """Run the cage for one ``run_test`` call.
+
+    Returns ``(raw_text, is_error, elided, execution)``. ``execution`` is a
+    captured :class:`_Execution` for a clean cage run (so a REPRODUCED claim can
+    be replayed + transcript-backed by :func:`_stamp_evidence_tiers`), or ``None``
+    when the cage errored / leaked (which cannot back a reproduction).
 
     Dispatched OUTSIDE the deterministic-servant byte-equality guard (execution is
     non-re-derivable). The cage itself enforces the raw-result + disposable-CWD
@@ -598,11 +683,110 @@ def _dispatch_run_test(cfg: RunTestConfig, args: dict) -> Tuple[str, bool, bool]
         from run_test_sandbox import run_test_in_cage  # type: ignore
     name = args.get("name") if isinstance(args, dict) else None
     cmd = cfg.resolve(name)
+    # The TRUSTED id actually run (a configured name, else "default"). NOT the
+    # model's raw ``name`` - an unknown name silently runs the default, and
+    # recording the unknown string as the command_id would let a false commandId
+    # back a REPRODUCED claim (GPT-5.4 S2 verification, finding 1).
+    resolved_id = cfg.resolve_id(name)
     res = run_test_in_cage(cfg.repo_root, cfg.ref, cmd, caps=cfg.caps)
     content = res.render()
     is_error = content.startswith("ERROR: ")
     elided = "[... elided " in content
-    return content, is_error, elided
+    execution: Optional[_Execution] = None
+    # A failing FALSIFIER (non-zero exit) is a *successful* probe (ran=True,
+    # error=None); only a cage error / teardown leak disqualifies the run from
+    # backing a reproduction.
+    if res.ran and res.error is None and res.worktree_removed:
+        execution = _Execution(
+            command_id=resolved_id,
+            # requested_name reflects the TRUSTED selection actually made (a real
+            # configured name), never the model's unmatched string.
+            requested_name=resolved_id if resolved_id != "default" else "",
+            argv=tuple(cmd),
+            exit_code=res.exit_code,
+            raw_output=res.output,
+        )
+    return content, is_error, elided, execution
+
+
+@dataclass(frozen=True)
+class DiffConfig:
+    """Diff-awareness wiring for the ``get_diff`` tool (Set 069 S2).
+
+    The diff RANGE is operator-pinned, never model-authored: ``base_ref`` is the
+    "from" side; ``head_ref`` the "to" side (empty => the working tree, i.e.
+    ``git diff <base_ref>``); ``paths`` optionally limits the diff to a fixed
+    pathspec. The model can only TRIGGER ``get_diff()``; it supplies no arguments.
+    """
+
+    repo_root: str
+    base_ref: str
+    head_ref: str = ""
+    paths: Tuple[str, ...] = ()
+
+    def _range(self) -> Tuple[str, ...]:
+        rng = (
+            f"{self.base_ref}..{self.head_ref}"
+            if self.head_ref
+            else self.base_ref
+        )
+        tail = ("--", *self.paths) if self.paths else ()
+        return (rng, *tail)
+
+
+def _get_diff_tool_schema() -> dict:
+    return {
+        "name": GET_DIFF_TOOL,
+        "description": (
+            "Return the RAW unified diff of the change under review (the "
+            "operator-pinned ref range), preceded by the list of changed paths. "
+            "Read-only; you pass no arguments and cannot choose the range. This "
+            "is the raw git diff, never a summarized symbol map - read it to see "
+            "exactly what changed before forming a judgment."
+        ),
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }
+
+
+def _dispatch_get_diff(cfg: DiffConfig) -> Tuple[str, bool, bool]:
+    """Run ``git diff`` for the pinned range; return (raw_text, is_error, elided).
+
+    Dispatched OUTSIDE the byte-equality guard for the same reason as run_test:
+    the orchestrator runs ``git`` itself (no model-touchable servant), and the
+    range is operator-pinned config, so there is no summarizing-servant surface
+    to defend. Output is capped/elided via the shared subprocess primitive, so a
+    huge diff cannot blow the token budget in one turn.
+    """
+    try:
+        from .run_test_sandbox import run_subprocess_capped
+    except ImportError:  # pragma: no cover - test/bare context
+        from run_test_sandbox import run_subprocess_capped  # type: ignore
+    rng = cfg._range()
+    names = run_subprocess_capped(
+        ["git", "-C", cfg.repo_root, "diff", "--name-only", *rng],
+        timeout_seconds=30,
+        output_byte_cap=_RESULT_BYTE_CAP,
+    )
+    diff = run_subprocess_capped(
+        ["git", "-C", cfg.repo_root, "diff", *rng],
+        timeout_seconds=30,
+        output_byte_cap=_RESULT_BYTE_CAP,
+    )
+    if names.timed_out or diff.timed_out:
+        return "ERROR: get_diff: git diff timed out", True, False
+    # A non-zero git exit (e.g. a bad ref) is surfaced raw so the model can
+    # recover, mirroring the read-only servant's raw ERROR discipline.
+    if diff.exit_code not in (0, None) or names.exit_code not in (0, None):
+        err = (diff.stderr_text or names.stderr_text or "git diff failed").strip()
+        return f"ERROR: get_diff: {err}", True, False
+    body = (
+        "[changed paths]\n"
+        + (names.stdout_text or "(no changed paths)")
+        + "\n[unified diff]\n"
+        + (diff.stdout_text or "(empty diff)")
+    )
+    elided = names.stdout_elided or diff.stdout_elided
+    return body, False, elided
 
 
 # ---------------------------------------------------------------------------
@@ -741,7 +925,42 @@ def _probe_tool_schemas() -> List[dict]:
     ]
 
 
-def _verdict_tool_schema() -> dict:
+def _verdict_tool_schema(allow_evidence: bool = False) -> dict:
+    """Build the ``submit_verdict`` schema.
+
+    ``allow_evidence`` (Set 069 S2) gates the per-finding ``evidenceTier`` /
+    ``commandId`` proposal fields. They are offered ONLY when the run_test
+    execution lane is active (a ``RunTestConfig`` was passed), because only then
+    can the orchestrator replay a REPRODUCED claim. When False the schema is
+    byte-for-byte the Set 067/068 read-only shape, so the no-config agent-facing
+    surface is unchanged (GPT-5.4 S2 verification, finding 2).
+    """
+    finding_props: dict = {
+        "description": {"type": "string"},
+        "severity": {"type": "string"},
+        "category": {"type": "string"},
+    }
+    if allow_evidence:
+        # The agent may PROPOSE an evidence tier; it is advisory only. The
+        # orchestrator confers REPRODUCED solely by replaying the named command
+        # on a fresh checkout (you cannot self-grant it).
+        finding_props["evidenceTier"] = {
+            "type": "string",
+            "description": (
+                "optional: propose REPRODUCED (only if a run_test you triggered "
+                "reproduced this defect) or HYPOTHESIS (a flagged suspicion). "
+                "Omit for a read-claim. The orchestrator replays a REPRODUCED "
+                "claim and downgrades it to a read-claim if the replay does not "
+                "match - you cannot self-grant it."
+            ),
+        }
+        finding_props["commandId"] = {
+            "type": "string",
+            "description": (
+                "optional: the run_test command name (or 'default') that "
+                "reproduced this defect; required to back a REPRODUCED proposal."
+            ),
+        }
     return {
         "name": SUBMIT_VERDICT_TOOL,
         "description": (
@@ -764,11 +983,7 @@ def _verdict_tool_schema() -> dict:
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "properties": {
-                            "description": {"type": "string"},
-                            "severity": {"type": "string"},
-                            "category": {"type": "string"},
-                        },
+                        "properties": finding_props,
                         "required": ["description"],
                     },
                 },
@@ -834,6 +1049,148 @@ def _parse_verdict(provider: str, model: str, payload: dict) -> PullCritique:
         summary=summary,
         findings=tuple(findings),
     )
+
+
+# ---------------------------------------------------------------------------
+# Evidence-protocol tagging (Set 069 S2): findings from a TRIGGERED run flow
+# through the S1 protocol - the orchestrator stamps the tier, never the agent.
+# ---------------------------------------------------------------------------
+
+
+def _run_pristine_replay(
+    cfg: RunTestConfig, execution: "_Execution"
+) -> Optional[object]:
+    """Replay an execution on a SECOND pristine checkout (returns a RunTestResult).
+
+    The load-bearing trust step: the orchestrator (not the agent) re-runs the
+    same operator-authored command on a fresh detached worktree, so a REPRODUCED
+    finding becomes a re-runnable falsifier. Module-level so tests can monkeypatch
+    it without a real cage. Returns ``None`` on any cage import/run failure (a
+    missing replay collapses the claim to a read-claim).
+    """
+    try:
+        from .run_test_sandbox import run_test_in_cage
+    except ImportError:  # pragma: no cover - test/bare context
+        from run_test_sandbox import run_test_in_cage  # type: ignore
+    try:
+        return run_test_in_cage(
+            cfg.repo_root, cfg.ref, execution.argv, caps=cfg.caps
+        )
+    except Exception:  # pragma: no cover - defensive; a replay error => no tag
+        return None
+
+
+def _build_transcript(
+    cfg: RunTestConfig, execution: "_Execution"
+) -> Optional[dict]:
+    """Build a falsifier transcript for an execution + its pristine replay.
+
+    Returns the transcript dict (the S1 ``EvidenceTranscript`` shape) when the
+    replay ran cleanly, else ``None`` (a failed/leaky replay cannot back
+    REPRODUCED). The transcript is only ever ACCEPTED if
+    :func:`evidence_protocol.validate_transcript` agrees - in particular the
+    replay must reproduce the same ``outputHash`` (a deterministic falsifier); a
+    flaky command's replay will mismatch and the finding collapses to a
+    read-claim. The entrypoint is always ``test_entrypoint`` (a trusted
+    operator-authored command), satisfying the meta-oracle rule by construction.
+    """
+    replay = _run_pristine_replay(cfg, execution)
+    if (
+        replay is None
+        or not getattr(replay, "ran", False)
+        or getattr(replay, "error", "x") is not None
+        or not getattr(replay, "worktree_removed", False)
+    ):
+        return None
+    transcript: dict = {
+        "pinnedRef": cfg.ref,
+        "commandId": execution.command_id,
+        "pristineCheckout": True,
+        "exitCode": execution.exit_code,
+        "rawOutput": execution.raw_output,
+        "outputHash": hash_output(execution.raw_output),
+        "entrypoint": {
+            "kind": ENTRYPOINT_TEST,
+            "ref": " ".join(execution.argv),
+        },
+        "replay": {
+            "pristineCheckout": True,
+            "exitCode": replay.exit_code,
+            "outputHash": hash_output(replay.output),
+        },
+    }
+    if execution.requested_name:
+        transcript["args"] = {"name": execution.requested_name}
+    return transcript
+
+
+def _stamp_evidence_tiers(
+    critique: PullCritique,
+    payload: dict,
+    executions: List["_Execution"],
+    cfg: RunTestConfig,
+) -> PullCritique:
+    """Apply the S1 evidence protocol to a verdict's findings (orchestrator-side).
+
+    For each finding, read the agent's *proposed* ``evidenceTier`` / ``commandId``
+    from the raw ``submit_verdict`` payload (aligned by index with the parsed
+    findings - :func:`_parse_verdict` preserves order 1:1). Then:
+
+    - a proposed ``REPRODUCED`` is conferred ONLY by :func:`authoritative_tier`
+      on a transcript that replays clean (the orchestrator does the replay); if
+      the named command was never run, or the replay does not match, the claim
+      **collapses to a read-claim** (no field) - the agent can never self-grant
+      REPRODUCED;
+    - a proposed ``HYPOTHESIS`` is preserved (a flagged, agent-proposed
+      suspicion);
+    - anything else stays the ASSERTED default (no on-disk field), so a read-only
+      critique entry is byte-identical to the Set 067/068 shape.
+
+    ``cfg`` is the active :class:`RunTestConfig`, used to drive the pristine
+    replay (same repo / ref / caps the triggered run used).
+    """
+    raw_findings = payload.get("findings") if isinstance(payload, dict) else None
+    if not isinstance(raw_findings, list):
+        raw_findings = []
+    by_id: Dict[str, _Execution] = {}
+    for ex in executions:
+        by_id.setdefault(ex.command_id, ex)  # first run wins for a given id
+
+    new_findings: List[Finding] = []
+    for i, finding in enumerate(critique.findings):
+        proposed = None
+        command_id = None
+        if i < len(raw_findings) and isinstance(raw_findings[i], dict):
+            proposed = raw_findings[i].get("evidenceTier")
+            command_id = raw_findings[i].get("commandId")
+
+        if proposed == EVIDENCE_REPRODUCED:
+            ex: Optional[_Execution] = None
+            if isinstance(command_id, str) and command_id in by_id:
+                ex = by_id[command_id]
+            elif not command_id and len(executions) == 1:
+                # No command named, but exactly one run happened -> unambiguous.
+                ex = executions[0]
+            transcript = _build_transcript(cfg, ex) if ex else None
+            tier = authoritative_tier(EVIDENCE_REPRODUCED, transcript)
+            if tier == EVIDENCE_REPRODUCED:
+                new_findings.append(
+                    replace(
+                        finding,
+                        evidence_tier=EVIDENCE_REPRODUCED,
+                        transcript=transcript,
+                    )
+                )
+                continue
+            # Collapsed: no valid replayed transcript -> a read-claim (no field).
+            new_findings.append(finding)
+            continue
+        if proposed == EVIDENCE_HYPOTHESIS:
+            new_findings.append(replace(finding, evidence_tier=EVIDENCE_HYPOTHESIS))
+            continue
+        new_findings.append(finding)
+
+    return replace(critique, findings=tuple(new_findings))
 
 
 # ---------------------------------------------------------------------------
@@ -1505,6 +1862,7 @@ def pull_route(
     binding: Optional[ProviderBinding] = None,
     servant: Optional[DeterministicServant] = None,
     run_test_config: Optional[RunTestConfig] = None,
+    diff_config: Optional[DiffConfig] = None,
 ) -> PullResult:
     """Drive a capped, instrumented, sandbox-confined read-only tool loop.
 
@@ -1545,10 +1903,18 @@ def pull_route(
     tools = _probe_tool_schemas()
     if run_test_config is not None:
         tools.append(_run_test_tool_schema())
-    tools.append(_verdict_tool_schema())
+    if diff_config is not None:
+        tools.append(_get_diff_tool_schema())
+    # The evidence-proposal fields are offered ONLY when the run_test lane is
+    # active (the only lane that can back a REPRODUCED replay), so the no-config
+    # agent-facing surface is byte-for-byte the Set 067/068 read-only schema.
+    tools.append(_verdict_tool_schema(allow_evidence=run_test_config is not None))
     transcript: List[dict] = [{"role": "user", "text": instruction}]
     trace = PullTrace()
     critique: Optional[PullCritique] = None
+    # Set 069 S2: captured clean run_test executions, so a REPRODUCED claim can
+    # be replayed + transcript-backed by the orchestrator (never the agent).
+    executions: List[_Execution] = []
     # Running estimate of ONE more call's spend: the most recent turn's measured
     # tokens / cost. Used as an adaptive headroom reserve for the budget-aware
     # forced verdict below.
@@ -1654,6 +2020,13 @@ def pull_route(
         for vc in verdict_calls:
             try:
                 critique = _parse_verdict(provider_name, model, vc.input)
+                # Set 069 S2: evidence-tier the findings (orchestrator-applied).
+                # Only when an execution lane is active AND a verdict carries
+                # findings - so the read-only path is byte-for-byte unchanged.
+                if run_test_config is not None and critique.findings:
+                    critique = _stamp_evidence_tiers(
+                        critique, vc.input, executions, run_test_config
+                    )
                 trace.stop_reason = STOP_VERDICT
                 finalized = True
                 break
@@ -1698,9 +2071,31 @@ def pull_route(
             # 1). It is still recorded as a real probe (raw=True), so a verdict
             # informed by a run_test is correctly NOT a zero_tool_calls run.
             if tc.name == RUN_TEST_TOOL and run_test_config is not None:
-                content, is_error, elided = _dispatch_run_test(
+                content, is_error, elided, execution = _dispatch_run_test(
                     run_test_config, tc.input
                 )
+                if execution is not None:
+                    executions.append(execution)
+                trace.tool_calls.append(
+                    ToolCallRecord(
+                        turn=turn,
+                        name=tc.name,
+                        args=tc.input,
+                        raw=True,
+                        elided=elided,
+                        result_chars=len(content),
+                        error=is_error,
+                    )
+                )
+                results.append(
+                    {"id": tc.id, "name": tc.name, "content": content}
+                )
+                continue
+            # Set 069 S2: get_diff is dispatched directly (orchestrator runs git;
+            # no model-touchable servant, so NOT through the byte-equality guard -
+            # same posture as run_test). Recorded as a real probe.
+            if tc.name == GET_DIFF_TOOL and diff_config is not None:
+                content, is_error, elided = _dispatch_get_diff(diff_config)
                 trace.tool_calls.append(
                     ToolCallRecord(
                         turn=turn,

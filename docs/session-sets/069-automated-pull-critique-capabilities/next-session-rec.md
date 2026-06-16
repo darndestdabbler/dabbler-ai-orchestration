@@ -1,4 +1,4 @@
-*   **Engine**: Google Gemini
-*   **Model Tier**: 1.5 Pro
-*   **Effort**: Low
-*   **Why**: The task requires a high-capability model for a multi-turn, tool-using, code-reasoning agentic loop (read->run->read), which introduces significant rework risk for medium-tier models like Sonnet that may struggle with the complex logic. Among the top-tier capable models (Opus, GPT-4 class, Gemini 1.5 Pro), Gemini 1.5 Pro offers state-of-the-art reasoning and function-calling capabilities at the most competitive price point, directly satisfying the "cheapest-CAPABLE" requirement while minimizing prompt engineering and rework.
+*   **Engine**: `anthropic`
+*   **Model Tier**: `opus-4-8`
+*   **Effort**: `Medium`
+*   **Why**: The task requires complex reasoning for API design and modification of multiple existing modules, making rework risk the dominant cost factor over token price. Session 2's `R1 FAIL` with a high-tier model confirms that minimizing expensive engineering-led fix cycles is paramount. Claude 3 Opus (the current equivalent of the candidate `opus-4-8`) is selected for its state-of-the-art reasoning capabilities to maximize the probability of a correct first-pass implementation, which is the most effective way to lower total project cost for a non-experimental, core capability.

@@ -40,27 +40,54 @@ Load-bearing properties inherited from the adapter and the Set 066 contract:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 try:  # package vs bare-import (mirrors the rest of ai_router)
-    from .pull_verifier import PullResult, pull_route
+    from .pull_verifier import (
+        DiffConfig,
+        PullCaps,
+        PullResult,
+        RunTestConfig,
+        caps_from_config,
+        pull_route,
+    )
     from .path_aware_critique import (
+        PATH_AWARE_CRITIQUE_ADVISORY,
         PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME,
         PATH_AWARE_CRITIQUE_ARTIFACT_SCHEMA_VERSIONS,
+        PATH_AWARE_CRITIQUE_NONE,
+        PATH_AWARE_CRITIQUE_REQUIRED,
         read_path_aware_critique,
         validate_path_aware_critique_artifact,
     )
+    from .blast_radius import classify_paths
+    from .run_test_sandbox import run_test_caps_from_config
+    from .config import load_config
 except ImportError:  # pragma: no cover - test/bare context
-    from pull_verifier import PullResult, pull_route  # type: ignore
+    from pull_verifier import (  # type: ignore
+        DiffConfig,
+        PullCaps,
+        PullResult,
+        RunTestConfig,
+        caps_from_config,
+        pull_route,
+    )
     from path_aware_critique import (  # type: ignore
+        PATH_AWARE_CRITIQUE_ADVISORY,
         PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME,
         PATH_AWARE_CRITIQUE_ARTIFACT_SCHEMA_VERSIONS,
+        PATH_AWARE_CRITIQUE_NONE,
+        PATH_AWARE_CRITIQUE_REQUIRED,
         read_path_aware_critique,
         validate_path_aware_critique_artifact,
     )
+    from blast_radius import classify_paths  # type: ignore
+    from run_test_sandbox import run_test_caps_from_config  # type: ignore
+    from config import load_config  # type: ignore
 
 
 # The default provider roster: GPT-5.4 + Gemini-Pro - the exact pair the manual
@@ -260,6 +287,54 @@ def _default_sandbox_for(set_dir: Path) -> Path:
     return cur
 
 
+# Blast-radius budget factors (Set 069 S2): scale the loop budget to the set's
+# blast radius so a high-blast set gets the FULL configured budget and a
+# low-blast set probes less. Keyed off blast_radius.classify_paths' recommended
+# value (required => high blast, advisory => code but low blast, none => docs/
+# empty). This is the "turn/token caps per set, not a magic constant" lever the
+# proposal (rung 3) calls for - the deeper read->run->read loop costs more, so
+# its depth is earned by the change's blast radius rather than fixed.
+_BLAST_RADIUS_BUDGET_FACTOR = {
+    PATH_AWARE_CRITIQUE_REQUIRED: 1.0,
+    PATH_AWARE_CRITIQUE_ADVISORY: 0.6,
+    PATH_AWARE_CRITIQUE_NONE: 0.4,
+}
+# A loop needs a few turns to do anything useful even on a docs-only set.
+_MIN_BUDGETED_TURNS = 4
+# A token floor so a scaled budget never drops below a workable amount.
+_MIN_BUDGETED_TOKENS = 20_000
+
+
+def budget_caps_for_paths(
+    changed_paths: Sequence[str],
+    *,
+    base_caps: Optional[PullCaps] = None,
+    config: Optional[dict] = None,
+) -> PullCaps:
+    """Return :class:`PullCaps` scaled to the blast radius of ``changed_paths``.
+
+    ``base_caps`` is the configured ceiling (defaults to
+    :func:`caps_from_config`); the returned caps scale ``max_turns`` /
+    ``token_budget`` / ``cost_ceiling_usd`` down by a factor chosen from the
+    set's blast-radius classification, leaving ``max_output_tokens`` (the
+    per-call ceiling) intact. A high-blast set (``required``) gets the full
+    budget; a low-blast set probes less. Never raises; a non-string path is
+    ignored.
+    """
+    base = base_caps if base_caps is not None else caps_from_config(config)
+    paths = [str(p) for p in changed_paths if isinstance(p, str) and p.strip()]
+    recommended = classify_paths(paths).recommended if paths else PATH_AWARE_CRITIQUE_NONE
+    factor = _BLAST_RADIUS_BUDGET_FACTOR.get(recommended, 0.6)
+    return PullCaps(
+        max_turns=max(_MIN_BUDGETED_TURNS, int(round(base.max_turns * factor))),
+        max_output_tokens=base.max_output_tokens,
+        token_budget=max(
+            _MIN_BUDGETED_TOKENS, int(base.token_budget * factor)
+        ),
+        cost_ceiling_usd=base.cost_ceiling_usd * factor,
+    )
+
+
 def produce_path_aware_critique(
     session_set_dir: Union[str, Path],
     *,
@@ -269,6 +344,9 @@ def produce_path_aware_critique(
     level: Optional[str] = None,
     config: Optional[dict] = None,
     write: bool = True,
+    run_test_config: Optional[RunTestConfig] = None,
+    diff_config: Optional[DiffConfig] = None,
+    caps: Optional[PullCaps] = None,
     run_pull: Callable[..., PullResult] = pull_route,
 ) -> ProducerResult:
     """Run a multi-provider path-aware critique and assemble the Set 066 artifact.
@@ -298,6 +376,24 @@ def produce_path_aware_critique(
         When True (default) and the artifact is valid, writes it to
         ``<session_set_dir>/path-aware-critique.json`` (utf-8, L-064-3). When
         False, assembles and validates but does not touch disk (a dry run).
+    run_test_config:
+        Set 069 S2 - when provided, the critics are offered the ``run_test``
+        execution lane (the existing disposable-worktree cage): each critic may
+        TRIGGER the operator-authored command(s) it carries (no model-authored
+        argv), and a reproduced defect flows through the S1 evidence protocol
+        (orchestrator-replayed, transcript-backed). Absent it, the loop is
+        read-only - byte-for-byte the Set 067/068 behavior.
+    diff_config:
+        Set 069 S2 - when provided, the critics are offered the read-only
+        ``get_diff`` tool (raw unified diff + changed paths over the
+        operator-pinned ref range). Absent it, no diff tool is offered.
+    caps:
+        Per-run :class:`PullCaps`. Default ``None`` resolves the configured caps
+        in :func:`pull_route`; but when an execution lane is active (a
+        ``run_test_config`` or ``diff_config`` is passed) and no caps are given,
+        the producer derives **blast-radius-budgeted** caps from the set's
+        changed paths (:func:`budget_caps_for_paths`) so the deeper loop's depth
+        is earned by the change's blast radius, not a magic constant.
     run_pull:
         Injection seam for the per-provider adapter call. Defaults to
         :func:`pull_route`; tests pass a fake so no metered call is made.
@@ -320,6 +416,22 @@ def produce_path_aware_critique(
         # finding 2). An explicit sandbox_dir override still wins.
         sandbox_dir = _default_sandbox_for(set_dir)
 
+    # Set 069 S2: when an execution lane is active and the caller did not pin
+    # caps, budget the loop by the set's blast radius (files_changed from the
+    # disposition). This is the "deeper probing" depth lever - earned by blast
+    # radius, not a magic constant. The read-only path (no execution lane) leaves
+    # caps=None so pull_route resolves the configured ceiling, unchanged.
+    exec_enabled = run_test_config is not None or diff_config is not None
+    if caps is None and exec_enabled:
+        cfg_for_caps = config if config is not None else load_config(
+            os.environ.get("AI_ROUTER_CONFIG")
+        )
+        files = _read_disposition(set_dir).get("files_changed")
+        changed_paths = files if isinstance(files, list) else []
+        caps = budget_caps_for_paths(
+            changed_paths, base_caps=caps_from_config(cfg_for_caps)
+        )
+
     results: List[PullResult] = []
     critiques: List[dict] = []
     skipped: List[str] = []
@@ -333,6 +445,9 @@ def produce_path_aware_critique(
                 provider=provider,
                 model=model,
                 config=config,
+                caps=caps,
+                run_test_config=run_test_config,
+                diff_config=diff_config,
             )
         except Exception as exc:  # a provider failure must not abort the others
             skipped.append(f"{label}: run raised {type(exc).__name__}: {exc}")
@@ -444,6 +559,59 @@ def _parse_providers(specs: Optional[List[str]]) -> Tuple[Tuple[str, Optional[st
     return tuple(out)
 
 
+def _build_exec_configs(
+    args, repo_root: str, config: Optional[dict]
+) -> Tuple[Optional[RunTestConfig], Optional[DiffConfig]]:
+    """Build the optional ``RunTestConfig`` / ``DiffConfig`` from CLI flags.
+
+    Raises :class:`PullCritiqueError` on a misconfiguration (run_test requested
+    without a pinned ref, or a malformed ``NAME=CMD``). A shell-style command
+    string is ``shlex.split`` into an argv; no shell is ever invoked (the cage
+    runs ``shell=False``), so this only tokenizes an operator-authored command.
+    """
+    import shlex
+
+    run_test_config: Optional[RunTestConfig] = None
+    if args.run_test_cmd or args.run_test_named:
+        if not args.exec_ref:
+            raise PullCritiqueError(
+                "--run-test-cmd / --run-test-named requires --exec-ref (the "
+                "pinned ref the cage checks out)"
+            )
+        command = (
+            tuple(shlex.split(args.run_test_cmd)) if args.run_test_cmd else ()
+        )
+        commands: dict = {}
+        for spec in args.run_test_named or []:
+            if "=" not in spec:
+                raise PullCritiqueError(
+                    f"--run-test-named must be NAME=CMD, got {spec!r}"
+                )
+            name, cmd = spec.split("=", 1)
+            name = name.strip()
+            if not name:
+                raise PullCritiqueError(
+                    f"--run-test-named has an empty NAME: {spec!r}"
+                )
+            commands[name] = tuple(shlex.split(cmd))
+        run_test_config = RunTestConfig(
+            repo_root=repo_root,
+            ref=args.exec_ref,
+            command=command,
+            commands=commands or None,
+            caps=run_test_caps_from_config(config),
+        )
+
+    diff_config: Optional[DiffConfig] = None
+    if args.diff_base:
+        diff_config = DiffConfig(
+            repo_root=repo_root,
+            base_ref=args.diff_base,
+            head_ref=args.diff_head or "",
+        )
+    return run_test_config, diff_config
+
+
 def _main(argv: Optional[List[str]] = None) -> int:
     import argparse
     import sys
@@ -492,9 +660,79 @@ def _main(argv: Optional[List[str]] = None) -> int:
         action="store_true",
         help="assemble and validate but do not write the artifact",
     )
+    # Set 069 S2: opt-in execution + diff lanes.
+    parser.add_argument(
+        "--run-test-cmd",
+        default=None,
+        metavar="CMD",
+        help=(
+            "enable the run_test execution lane with this DEFAULT command "
+            "(a shell-style string shlex-split into an argv; NO shell is "
+            "invoked - shell=False). Requires --exec-ref. The model can only "
+            "TRIGGER this operator-authored command, never author one."
+        ),
+    )
+    parser.add_argument(
+        "--run-test-named",
+        action="append",
+        metavar="NAME=CMD",
+        help=(
+            "add a named operator-authored command the critic may SELECT by "
+            "name (repeatable). Same shlex/no-shell rules as --run-test-cmd."
+        ),
+    )
+    parser.add_argument(
+        "--exec-ref",
+        default=None,
+        help=(
+            "the pinned git ref the run_test cage checks out per run "
+            "(e.g. a commit SHA or HEAD). Required to enable run_test."
+        ),
+    )
+    parser.add_argument(
+        "--exec-repo-root",
+        default=None,
+        help=(
+            "repo root for run_test / get_diff (default: the resolved sandbox, "
+            "i.e. the git repo root containing the set dir)"
+        ),
+    )
+    parser.add_argument(
+        "--diff-base",
+        default=None,
+        help=(
+            "enable the read-only get_diff tool against this base ref "
+            "(the 'from' side of the diff)"
+        ),
+    )
+    parser.add_argument(
+        "--diff-head",
+        default="",
+        help="the 'to' side of get_diff (default: the working tree)",
+    )
     args = parser.parse_args(argv)
 
     providers = _parse_providers(args.provider)
+    # Resolve the repo root for the execution / diff lanes (default: the set's
+    # git repo root, the same surface the read-only review defaults to).
+    set_dir_resolved = Path(args.session_set_dir).resolve()
+    repo_root = (
+        args.exec_repo_root
+        or args.sandbox
+        or str(_default_sandbox_for(set_dir_resolved))
+    )
+    try:
+        cli_config = load_config(os.environ.get("AI_ROUTER_CONFIG"))
+    except Exception:  # pragma: no cover - config load is best-effort for caps
+        cli_config = None
+    try:
+        run_test_config, diff_config = _build_exec_configs(
+            args, repo_root, cli_config
+        )
+    except PullCritiqueError as exc:
+        print(f"ERROR: {_ascii(exc)}", file=sys.stderr)
+        return 2
+
     try:
         result = produce_path_aware_critique(
             args.session_set_dir,
@@ -502,6 +740,8 @@ def _main(argv: Optional[List[str]] = None) -> int:
             sandbox_dir=args.sandbox,
             level=args.level,
             write=not args.dry_run,
+            run_test_config=run_test_config,
+            diff_config=diff_config,
         )
     except PullCritiqueError as exc:
         # ASCII-sanitize the error path too: a non-ASCII set path / message must

@@ -294,7 +294,7 @@ last-pruned-set: (none)   generated: 2026-06-16
 ## Repo-Specific Lessons
 
 ## GPT-5.4 In The Pull-Verifier Loop Over-Probes And Times Out On Token Budget Before A Verdict
-<!-- lesson: id="L-067-1" added-set="067" last-used-set="068" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-067-1" added-set="067" last-used-set="069" status="active" scope="repo-specific" -->
 
 - **Context:** Driving `ai_router.pull_verifier.pull_route` (or the
   `pull_critique` producer) with the OpenAI binding (GPT-5.4) over a sandbox

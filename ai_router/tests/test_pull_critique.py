@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -58,7 +59,7 @@ def _fake_result(provider, model, *, ok=True, verdict="VERIFIED", summary="ok",
 
 def _runner(mapping):
     """Return a run_pull that yields a scripted PullResult per provider."""
-    def run_pull(sandbox, instruction, *, provider, model, config):
+    def run_pull(sandbox, instruction, *, provider, model, config, **kwargs):
         return mapping[provider]
     return run_pull
 
@@ -149,7 +150,7 @@ def test_failed_provider_run_is_skipped_not_fatal(tmp_path):
 def test_raising_provider_is_skipped(tmp_path):
     set_dir = _make_set(tmp_path)
 
-    def run_pull(sandbox, instruction, *, provider, model, config):
+    def run_pull(sandbox, instruction, *, provider, model, config, **kwargs):
         if provider == "google":
             raise RuntimeError("boom")
         return _fake_result("openai", "gpt-5.4")
@@ -307,8 +308,11 @@ def test_default_sandbox_is_repo_root_not_cwd(tmp_path, monkeypatch):
 
     captured = {}
 
-    def run_pull(sandbox, instruction, *, provider, model, config):
+    def run_pull(sandbox, instruction, *, provider, model, config, **kwargs):
         captured["sandbox"] = sandbox
+        captured["caps"] = kwargs.get("caps")
+        captured["run_test_config"] = kwargs.get("run_test_config")
+        captured["diff_config"] = kwargs.get("diff_config")
         return _fake_result(provider, "m")
 
     # cwd is some unrelated dir, NOT the repo.
@@ -392,3 +396,148 @@ def test_parse_providers():
         ("openai", "gpt-5.4"),
         ("google", None),
     )
+
+
+# --- Set 069 S2: blast-radius-budgeted caps ---------------------------------
+
+
+def _base_caps():
+    return pv.PullCaps(
+        max_turns=14, max_output_tokens=24000, token_budget=300_000,
+        cost_ceiling_usd=1.0,
+    )
+
+
+def test_budget_caps_high_blast_gets_full_budget():
+    # A shared-schema / cross-artifact change classifies as `required` -> 1.0x.
+    caps = pc.budget_caps_for_paths(
+        ["docs/path-aware-critique.schema.json", "ai_router/x.py"],
+        base_caps=_base_caps(),
+    )
+    assert caps.max_turns == 14
+    assert caps.token_budget == 300_000
+    assert caps.cost_ceiling_usd == 1.0
+    assert caps.max_output_tokens == 24000  # per-call ceiling untouched
+
+
+def test_budget_caps_low_blast_code_scaled_down():
+    # A single isolated code file -> `advisory` -> 0.6x.
+    caps = pc.budget_caps_for_paths(
+        ["ai_router/lonely_module.py"], base_caps=_base_caps()
+    )
+    assert caps.max_turns == round(14 * 0.6)
+    assert caps.token_budget == int(300_000 * 0.6)
+    assert caps.cost_ceiling_usd == pytest.approx(0.6)
+
+
+def test_budget_caps_docs_only_scaled_lowest_with_floors():
+    caps = pc.budget_caps_for_paths(
+        ["docs/notes.md"], base_caps=_base_caps()
+    )
+    # `none` -> 0.4x, but never below the workable floors.
+    assert caps.max_turns == max(4, round(14 * 0.4))
+    assert caps.token_budget == max(20_000, int(300_000 * 0.4))
+
+
+def test_budget_caps_empty_paths_does_not_crash():
+    caps = pc.budget_caps_for_paths([], base_caps=_base_caps())
+    assert caps.max_turns >= 4
+
+
+# --- Set 069 S2: producer threads exec/diff config + budgeted caps ----------
+
+
+def _capturing_runner():
+    captured = {}
+
+    def run_pull(sandbox, instruction, *, provider, model, config, **kwargs):
+        captured.setdefault("calls", []).append(kwargs)
+        return _fake_result(provider, "m")
+
+    return run_pull, captured
+
+
+def test_producer_threads_run_test_and_diff_config(tmp_path):
+    set_dir = _make_set(tmp_path)
+    run, captured = _capturing_runner()
+    rt = pv.RunTestConfig(repo_root=str(tmp_path), ref="HEAD",
+                          command=("pytest", "-q"))
+    diff = pv.DiffConfig(repo_root=str(tmp_path), base_ref="HEAD")
+    pc.produce_path_aware_critique(
+        set_dir, sandbox_dir=tmp_path, write=False, run_pull=run,
+        run_test_config=rt, diff_config=diff,
+    )
+    call = captured["calls"][0]
+    assert call["run_test_config"] is rt
+    assert call["diff_config"] is diff
+    # An execution lane is active + no caps pinned -> blast-radius-budgeted caps.
+    assert isinstance(call["caps"], pv.PullCaps)
+
+
+def test_producer_read_only_path_leaves_caps_none(tmp_path):
+    set_dir = _make_set(tmp_path)
+    run, captured = _capturing_runner()
+    pc.produce_path_aware_critique(
+        set_dir, sandbox_dir=tmp_path, write=False, run_pull=run,
+    )
+    call = captured["calls"][0]
+    # No execution lane -> caps stays None (pull_route resolves the config
+    # default), run_test_config / diff_config are None: read-only path unchanged.
+    assert call["caps"] is None
+    assert call["run_test_config"] is None
+    assert call["diff_config"] is None
+
+
+def test_producer_honors_explicit_caps(tmp_path):
+    set_dir = _make_set(tmp_path)
+    run, captured = _capturing_runner()
+    pinned = pv.PullCaps(max_turns=3)
+    rt = pv.RunTestConfig(repo_root=str(tmp_path), ref="HEAD",
+                          command=("pytest", "-q"))
+    pc.produce_path_aware_critique(
+        set_dir, sandbox_dir=tmp_path, write=False, run_pull=run,
+        run_test_config=rt, caps=pinned,
+    )
+    assert captured["calls"][0]["caps"] is pinned
+
+
+# --- Set 069 S2: CLI builds exec/diff configs from flags --------------------
+
+
+def test_build_exec_configs_run_test_requires_ref():
+    args = SimpleNamespace(
+        run_test_cmd="pytest -q", run_test_named=None, exec_ref=None,
+        diff_base=None, diff_head="",
+    )
+    with pytest.raises(pc.PullCritiqueError):
+        pc._build_exec_configs(args, repo_root=".", config=None)
+
+
+def test_build_exec_configs_builds_both():
+    args = SimpleNamespace(
+        run_test_cmd="pytest -q", run_test_named=["unit=python -m pytest x"],
+        exec_ref="HEAD", diff_base="main", diff_head="",
+    )
+    rt, diff = pc._build_exec_configs(args, repo_root="/r", config=None)
+    assert rt.repo_root == "/r" and rt.ref == "HEAD"
+    assert rt.command == ("pytest", "-q")
+    assert rt.commands == {"unit": ("python", "-m", "pytest", "x")}
+    assert diff.base_ref == "main"
+
+
+def test_build_exec_configs_rejects_bad_named():
+    args = SimpleNamespace(
+        run_test_cmd=None, run_test_named=["no-equals-sign"], exec_ref="HEAD",
+        diff_base=None, diff_head="",
+    )
+    with pytest.raises(pc.PullCritiqueError):
+        pc._build_exec_configs(args, repo_root=".", config=None)
+
+
+def test_build_exec_configs_none_when_no_flags():
+    args = SimpleNamespace(
+        run_test_cmd=None, run_test_named=None, exec_ref=None,
+        diff_base=None, diff_head="",
+    )
+    rt, diff = pc._build_exec_configs(args, repo_root=".", config=None)
+    assert rt is None and diff is None

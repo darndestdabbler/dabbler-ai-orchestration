@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "070-dual-surface-verification-telemetry",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-06-16T16:59:07.232131-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "I reviewed the shipped implementation and artifacts in ai_router/dual_surface_verify.py, ai_router/tests/test_dual_surface_s2.py, docs/dual-surface-comparison.schema.json, docs/dual-surface-comparison-schema-example.json, docs/session-sets/070-dual-surface-verification-telemetry/spec.md, change-log.md, the S2 verification notes, path-aware-critique.json, and the saved dual-surface-comparison.json. Most of the S2 code paths and their targeted tests line up, but I found two remaining cross-artifact problems in the delivered docs/artifacts: one load-bearing doc claim about the equal-arms scoring guard does not match the code, and the saved dogfood comparison artifact canonizes a malformed push parse as real findings without any artifact-level indication of parse failure.",
+      "findings": [
+        {
+          "description": "docs/session-sets/070-dual-surface-verification-telemetry/change-log.md claims the S3 equal-arms fix was that `_arms_held_equal` 'requires all four attestation booleans strictly true before either scorer treats an artifact as telemetry.' The code does not do that. In ai_router/dual_surface_verify.py, `_arms_held_equal()` explicitly says it does not trust `providerEqual` / `modelEqual` / `framingEqual` / `bothAdversarial`, and instead re-derives equality only from the raw provider/model triples plus `pushFraming`/`pullFraming`. That is a current-behavior mismatch in a load-bearing explanation of the guard that was supposedly shipped. Fix the change-log (and any sibling docs that repeat this) to describe the actual invariant: raw attestation is required and the booleans are ignored, not enforced.",
+          "severity": "Minor",
+          "category": "contract-drift"
+        },
+        {
+          "description": "The saved dogfood artifact at docs/session-sets/070-dual-surface-verification-telemetry/dual-surface-comparison.json is structurally valid, but its six `push-only` findings are plainly malformed parser fallout rather than trustworthy merged findings: every one has empty `severity` and `category`, and the descriptions start with fragments like `S FOUND`, `###`, and long markdown blocks from a raw verifier response. The parser used by the push arm (`parse_verification_response` in ai_router/verification.py) falls back to turning unstructured `ISSUES FOUND` text into issue descriptions, and `merge_findings` / `build_comparison_artifact` accept those dicts without any parse-quality guard. The set's own change-log acknowledges this artifact as the set's dogfood datapoint while only mentioning the weakness in prose. That leaves a raw artifact on disk that looks like normal comparison evidence but actually bakes parser failure into the findings array with no machine-readable warning. The producer path should refuse to persist a comparison artifact from an obviously malformed push parse, or record an explicit parse-failure/status field so downstream consumers cannot mistake garbled push output for real findings.",
+          "severity": "Major",
+          "category": "false-confidence"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the implementation of the dual-surface verification and telemetry features in `ai_router/dual_surface_verify.py` and its corresponding test file `ai_router/tests/test_dual_surface_s2.py`. The code and tests align with the detailed summary provided. I verified that the provenance merge logic is strictly key-based and not based on free-text descriptions. The comparison artifact validator correctly enforces cross-field invariants, and the scoring logic properly handles conditions like incomplete provenance and underpowered benchmarks.\n\nCrucially, I confirmed that the functions handling `activity-log.json` have been hardened against malformed data, specifically checking for non-list `entries` before iteration, which was a key bug fix mentioned in the summary. I also verified the claim regarding deferred technical debt by using `grep` to confirm that similar, un-hardened iteration patterns exist in the sibling files `ai_router/path_aware_critique.py` and `ai_router/dedicated_verification.py`. The implementation appears robust and the documentation accurate.",
+      "findings": []
+    }
+  ]
+}

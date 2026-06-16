@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "070-dual-surface-verification-telemetry",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-06-16T16:01:04.824501-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Reviewed the implementation and tests in ai_router/dual_surface_verify.py and ai_router/tests/test_dual_surface_s2.py, plus the comparison schema/example and the Set 070 spec/change-log/verification docs. Two load-bearing claims do not hold against the code on disk: the comparison validator/scorers do not enforce the equal-arms precondition they are documented as measuring, and the exported dualSurfaceMode writer remains mutable even though the docs describe the recorded mode as immutable once set.",
+      "findings": [
+        {
+          "description": "Major contract-drift/completeness: the comparison artifact is documented as a merge of a dual-surface run where provider/model/framing were held equal, but validate_comparison_artifact only checks that attestation is an object and never rejects attestation values showing inequality or missing equality fields. build_comparison_artifact copies run.attestation through unchanged, and both score_comparison and score_against_benchmark ignore attestation entirely, so a caller can build, validate, and score an artifact from require_equal=False or otherwise unequal arms. Ground truth: docs/dual-surface-comparison.schema.json describes the artifact as 'provider and adversarial framing held equal across arms', ai_router/dual_surface_verify.py:run_dual_surface computes providerEqual/modelEqual/framingEqual/bothAdversarial in attestation, but ai_router/dual_surface_verify.py:validate_comparison_artifact only enforces 'attestation is missing or not an object'. Fix: make the runtime validator require the expected attestation booleans to be present and true for scoreable artifacts (or split 'inspect-only unequal run' from 'comparison artifact' into distinct kinds), and add negative tests that an artifact with providerEqual/modelEqual/framingEqual/bothAdversarial false is rejected.",
+          "severity": "Major",
+          "category": "contract-drift"
+        },
+        {
+          "description": "Major contract-drift: the docs repeatedly say dualSurfaceMode is 'recorded once-at-set-start + immutable', but the exported writer does not enforce that invariant. ai_router/dual_surface_verify.py:record_dual_surface_mode always appends a new dual_surface_mode entry, ai_router/dual_surface_verify.py:read_dual_surface_mode returns the last valid entry, and ai_router/tests/test_dual_surface_s2.py:638-642 explicitly codifies overwrite behavior by calling record_dual_surface_mode twice and asserting the second value wins. That contradicts docs/session-sets/070-dual-surface-verification-telemetry/change-log.md:99-103, docs/session-sets/070-dual-surface-verification-telemetry/s2-close-reason.md:48-57, and disposition.json's delivered summary, all of which describe the recorded mode as immutable. Because this flag distinguishes sampled telemetry from operational opt-in, allowing later writes to replace the earlier durable choice undermines the provenance the docs claim. Fix: have record_dual_surface_mode refuse to write when a record already exists (leaving resolve_and_record as the public entry point), or narrow the docs and API surface so mutability is not promised.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have conducted a thorough review of the changes introduced in Set 070. My analysis focused on the primary implementation file, `ai_router/dual_surface_verify.py`, its extensive test suite in `ai_router/tests/test_dual_surface_s2.py`, and the associated documentation and schema files.\n\nI verified the key claims from the summary against the code on disk:\n1.  **Provenance Merge Logic:** The `merge_findings` function correctly implements the specified merge strategy, strictly relying on `defectKey` for merging and correctly handling unkeyed findings to maintain conservative, honest telemetry.\n2.  **Validator and Schema Parity:** The `validate_comparison_artifact` function maintains parity with the JSON schema and enforces additional, critical cross-field invariants that the schema language cannot express. The provided example artifact correctly validates against the Python implementation.\n3.  **Fair-Shake Scoring:** The scoring functions accurately calculate high-severity tallies, correctly flag results as an \"upper bound\" when provenance is incomplete, and enforce the non-pooling rule for 'sampled' versus 'opt-in' runs.\n4.  **Robustness and Hardening:** The functions interacting with `activity-log.json` have been significantly hardened. I confirmed that the readers and writers now gracefully handle malformed data, such as non-list `entries` or non-integer `stepNumber` values, preventing crashes. The corresponding tests in `test_dual_surface_s2.py` specifically cover these regression cases.\n\nThe implementation is robust, the test coverage is comprehensive, and the code adheres to all specified contracts and behaviors. No issues were found.",
+      "findings": []
+    }
+  ]
+}

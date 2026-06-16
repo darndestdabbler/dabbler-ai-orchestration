@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "kind": "dual_surface_comparison",
+  "sessionSetName": "070-dual-surface-verification-telemetry",
+  "comparedAt": "2026-06-16T20:12:51.577333+00:00",
+  "runTag": "opt-in",
+  "committedRef": "e0acc8c..WORKTREE",
+  "provider": "google",
+  "model": "gemini-2.5-pro",
+  "attestation": {
+    "providerEqual": true,
+    "modelEqual": true,
+    "framingEqual": true,
+    "pushFraming": {
+      "strength": "adversarial-devils-advocate",
+      "template": "verification.md"
+    },
+    "pullFraming": {
+      "strength": "adversarial-devils-advocate",
+      "template": "path-aware-critique.md"
+    },
+    "bothAdversarial": true,
+    "requestedProvider": "google",
+    "requestedModel": "gemini-2.5-pro",
+    "pushProvider": "google",
+    "pushModel": "gemini-2.5-pro",
+    "pullProvider": "google",
+    "pullModel": "gemini-2.5-pro"
+  },
+  "provenanceComplete": false,
+  "pushUnkeyed": 6,
+  "pullUnkeyed": 0,
+  "findings": [
+    {
+      "defectKey": "",
+      "provenance": "push-only",
+      "severity": "",
+      "category": "",
+      "surfaces": [
+        "push"
+      ],
+      "contributors": [
+        {
+          "surface": "push",
+          "description": "S FOUND\n\nThe response introduces a significant new feature for dual-surface verification, but the implementation contains several critical and major defects that undermine its core claims of correctness and reliable telemetry. The data integrity validator is incomplete, and a key function subverts the \"measurement, not assumption\" design principle it is meant to uphold.\n\n###"
+        }
+      ]
+    },
+    {
+      "defectKey": "",
+      "provenance": "push-only",
+      "severity": "",
+      "category": "",
+      "surfaces": [
+        "push"
+      ],
+      "contributors": [
+        {
+          "surface": "push",
+          "description": "Push Arm Falsifies Its Identity, Breaking the \"Equal-Held\" Invariant**\n\n- **Category:** Correctness\n- **Severity:** Critical\n- **Details:** The function `_default_run_push` in `ai_router/dual_surface_verify.py` is responsible for running the push arm and reporting back what provider and model were used. The entire dual-surface comparison relies on the principle that these parameters are measured from the actual execution, not assumed. However, the implementation simply returns the `provider` and `model` parameters that were passed into it, rather than reporting what the underlying `call_model` function actually used.\n\n  ```python\n  # ai_router/dual_surface_verify.py, line 377\n  def _default_run_push(...):\n      api: APIResult = call_model(...)\n      return _PushRaw(\n          content=api.content,\n          provider=provider,       # Incorrect: returns the requested provider\n          model=model,           # Incorrect: returns the requested model\n          input_tokens=api.input_tokens,\n          output_tokens=api.output_tokens,\n      )\n  ```\n\n  This breaks the \"measurement, not assumption\" invariant. If `call_model` had fallback logic, used a canonical model name (e.g., resolved `claude-3-opus` to `claude-3-opus-20240229`), or was misconfigured, `_default_run_push` would lie about the model it used. The downstream `attestation` would then be generated with false information, potentially claiming `modelEqual: true` when it was false. This flaw invalidates the central premise of the comparison: that surface is the only variable. The function should return the provider and model reported back from the `APIResult` object.\n\n###"
+        }
+      ]
+    },
+    {
+      "defectKey": "",
+      "provenance": "push-only",
+      "severity": "",
+      "category": "",
+      "surfaces": [
+        "push"
+      ],
+      "contributors": [
+        {
+          "surface": "push",
+          "description": "Validator Fails to Enforce Consistency of `provenanceComplete` Flag**\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:** The `validate_comparison_artifact` function in `ai_router/dual_surface_verify.py` is missing two critical cross-field consistency checks related to the `provenanceComplete` flag and the `pushUnkeyed`/`pullUnkeyed` counts.\n\n  1.  **Inconsistency with unkeyed counts:** The validator checks that if `provenanceComplete` is `true`, then `pushUnkeyed` and `pullUnkeyed` must both be zero. However, it fails to check the inverse. The logic in `merge_findings` implies that if `provenanceComplete` is `false`, at least one of the `...Unkeyed` counts *must* be non-zero. The validator permits an inconsistent state where `provenanceComplete: false`, `pushUnkeyed: 0`, and `pullUnkeyed: 0`.\n\n  2.  **Inconsistency with `findings` array:** The validator checks for unkeyed findings in the `findings` array if `provenanceComplete` is true. But it never cross-references the `pushUnkeyed` and `pullUnkeyed` counts against the actual number of unkeyed findings present in the `findings` array. An artifact could claim `pushUnkeyed: 5` but contain only one unkeyed push finding, and the validator would incorrectly accept it as valid.\n\n  These omissions allow a malformed or internally inconsistent artifact to pass validation, corrupting the integrity of the collected telemetry.\n\n###"
+        }
+      ]
+    },
+    {
+      "defectKey": "",
+      "provenance": "push-only",
+      "severity": "",
+      "category": "",
+      "surfaces": [
+        "push"
+      ],
+      "contributors": [
+        {
+          "surface": "push",
+          "description": "Framing Strength Classifier Can Be Fooled by Commented-Out Text**\n\n- **Category:** Correctness\n- **Severity:** Minor\n- **Details:** The `classify_framing_strength` function in `ai_router/dual_surface_verify.py` performs simple case-insensitive string searching for markers like `\"devil's advocate\"`. This logic does not account for the structure of the template file and will incorrectly match markers that are commented out (e.g., in Markdown `<!-- devil's advocate -->` or code `# devil's advocate`). This could lead to a weak prompt being misclassified as `adversarial`, causing the \"Framing gate\" in `run_dual_surface` to accept an invalid comparison. While an edge case, it undermines the claim that framing is robustly measured.\n\n###"
+        }
+      ]
+    },
+    {
+      "defectKey": "",
+      "provenance": "push-only",
+      "severity": "",
+      "category": "",
+      "surfaces": [
+        "push"
+      ],
+      "contributors": [
+        {
+          "surface": "push",
+          "description": "Unhandled Exception Path in Core Runner**\n\n- **Category:** Completeness\n- **Severity:** Minor\n- **Details:** In `ai_router/dual_surface_verify.py`, the `run_dual_surface` function calls `build_instruction` to prepare the prompt for the pull arm.\n  ```python\n  # ai_router/dual_surface_verify.py, line 498\n  pull_instruction = build_instruction(set_dir, template_text=pull_template)\n  ```\n  The `build_instruction` function can raise an exception if required files (e.g., `spec.md`) are missing from the `session_set_dir`. The `run_dual_surface` function does not handle this exception. Instead of failing gracefully with a `DualSurfaceError`, it will crash with an unhandled exception from a dependency, providing a poor user experience and making the failure mode less clear. The tests also appear to lack coverage for this scenario.\n\n###"
+        }
+      ]
+    },
+    {
+      "defectKey": "",
+      "provenance": "push-only",
+      "severity": "",
+      "category": "",
+      "surfaces": [
+        "push"
+      ],
+      "contributors": [
+        {
+          "surface": "push",
+          "description": "Redundant Data in `PullArmResult`**\n\n- **Category:** Correctness\n- **Severity:** Minor\n- **Details:** The `PullArmResult` dataclass in `ai_router/dual_surface_verify.py` stores redundant information. It has a `findings` field, which is a list of finding dictionaries, and a `critique` field, which is the full critique dictionary that *also contains* the same list of findings. Both fields are serialized by `to_dict()`, bloating the `DualSurfaceRun` artifact and creating a potential for data inconsistency if the object were ever made mutable. The `findings` field should be derived from the `critique` on-the-fly or removed in favor of accessing it via the `critique` object."
+        }
+      ]
+    }
+  ],
+  "notes": "Set 070 S3 dogfood: dual-surface mode run over this set's own diff. A deliberate opt-in (operational) run; the arms' findings carry no defectKey, so the merge over-splits to single-surface entries (provenanceComplete=False) -- a single self-referential datapoint, NOT powered benchmark telemetry."
+}

@@ -675,7 +675,15 @@ class MergedFinding:
 
     @property
     def surfaces(self) -> Tuple[str, ...]:
-        return tuple(c.surface for c in self.contributors)
+        # The DISTINCT surfaces that caught this defect, order-preserved. The full
+        # multiplicity (e.g. an intra-arm duplicate key contributing two push
+        # entries) is kept in ``contributors``; ``surfaces`` is the de-duplicated
+        # summary, so a both/single-surface finding never emits a duplicate label.
+        seen: List[str] = []
+        for c in self.contributors:
+            if c.surface not in seen:
+                seen.append(c.surface)
+        return tuple(seen)
 
     def to_dict(self) -> dict:
         return {
@@ -959,6 +967,18 @@ def _validate_merged_finding(finding: object, index: int) -> List[str]:
         contrib_surfaces = {
             c.get("surface") for c in contributors if isinstance(c, dict)
         }
+        # The ``surfaces`` summary must be DISTINCT and must match the distinct set
+        # of contributor surfaces - otherwise a hand-written (or buggy-producer)
+        # artifact could carry a duplicate or misattributed surface label that
+        # disagrees with the load-bearing ``contributors`` (L-066-1: enforce every
+        # schema-declared field, not just the load-bearing ones).
+        if isinstance(surfaces, list) and surfaces and all(s in _SURFACES for s in surfaces):
+            if len(surfaces) != len(set(surfaces)):
+                reasons.append(f"{where}.surfaces contains duplicate entries: {surfaces}")
+            elif set(surfaces) != {s for s in contrib_surfaces if s in _SURFACES}:
+                reasons.append(f"{where}.surfaces {sorted(set(surfaces))} does not match "
+                               "its contributors' distinct surfaces "
+                               f"{sorted(s for s in contrib_surfaces if s in _SURFACES)}")
         if provenance == PROVENANCE_BOTH and contrib_surfaces != set(_SURFACES):
             reasons.append(f"{where}.provenance is 'both' but its contributors do "
                            "not cover both surfaces")
@@ -1157,6 +1177,104 @@ RETIRE_INCONCLUSIVE = "inconclusive"
 RETIRE_PUSH_ADDS_UNIQUE = "push-adds-unique-high-severity"
 RETIRE_PUSH_NO_UNIQUE = "push-no-unique-high-severity"
 
+# The RAW per-arm attestation fields a scoreable artifact must carry. The schema/docs
+# describe a comparison artifact as a run whose provider, model, and adversarial
+# framing were held EQUAL across arms - the precondition that makes "surface is the
+# only variable" true and the disjoint tally valid as RETIRE evidence (L-069-2).
+# ``run_dual_surface(require_equal=True)`` (the default) refuses unequal arms up front,
+# but ``require_equal=False`` is an explicit inspection-only escape hatch that still
+# produces a structurally valid artifact. The structural validator cannot tell the two
+# apart; the SCORERS are the RETIRE-evidence boundary, so they re-derive equality and
+# reject an artifact whose arms were not held equal.
+# Equality is judged on the ACTUAL arm identities (push vs pull) - the
+# "surface is the only variable" invariant. ``requestedProvider`` / ``requestedModel``
+# are recorded for provenance but are NOT required to match: an artifact whose two arms
+# both honestly ran on the same provider/model is held-equal telemetry even if that
+# resolved value differs from the literal request string (the live runner additionally
+# pins to the request at production time; the scorer judges the recorded reality).
+_REQUIRED_ARM_IDENTITY_FIELDS = (
+    "pushProvider",
+    "pullProvider",
+    "pushModel",
+    "pullModel",
+)
+
+
+def _arms_held_equal(comparison: dict) -> Tuple[bool, Tuple[str, ...]]:
+    """True only when the RAW recorded arm identities/framing prove the arms equal.
+
+    Returns ``(held_equal, reasons)``. This guard does **not** trust the self-asserted
+    ``providerEqual`` / ``modelEqual`` / ``framingEqual`` / ``bothAdversarial`` booleans
+    (a hand-crafted artifact could set them true while the raw fields disagree, or omit
+    the raw fields entirely). Instead it requires the **actual** per-arm identities
+    (``pushProvider`` / ``pullProvider`` and ``pushModel`` / ``pullModel``) and each
+    arm's framing strength (``pushFraming`` / ``pullFraming``), then **re-derives**
+    equality from them - "measured, not assumed", the same discipline
+    ``run_dual_surface`` applies live. Equality is judged on the ACTUAL arms
+    (``pushProvider == pullProvider``, ``pushModel == pullModel``) - the
+    "surface is the only variable" invariant; ``requestedProvider`` / ``requestedModel``
+    are provenance-only and are **not** consulted by the scorer (the live runner pins to
+    the request at production time). A missing actual-arm field, a provider/model that
+    differs across the two arms, or a framing that differs across arms or is not
+    strong-adversarial means the artifact is inspection-only, not scoreable telemetry.
+    """
+    attestation = comparison.get("attestation")
+    if not isinstance(attestation, dict):
+        return False, ("attestation is missing or not an object",)
+    failures: List[str] = []
+    for name in _REQUIRED_ARM_IDENTITY_FIELDS:
+        val = attestation.get(name)
+        if not isinstance(val, str) or not val:
+            failures.append(f"attestation.{name} is missing or not a non-empty string")
+
+    def _framing_strength(key: str) -> Optional[str]:
+        block = attestation.get(key)
+        if not isinstance(block, dict):
+            return None
+        strength = block.get("strength")
+        return strength if isinstance(strength, str) and strength else None
+
+    push_fr = _framing_strength("pushFraming")
+    pull_fr = _framing_strength("pullFraming")
+    if push_fr is None:
+        failures.append("attestation.pushFraming.strength is missing")
+    if pull_fr is None:
+        failures.append("attestation.pullFraming.strength is missing")
+    if failures:
+        return False, (
+            "dual-surface arms cannot be verified as held equal - the raw per-arm "
+            "attestation is incomplete (" + "; ".join(failures) + "); a comparison "
+            "without measured arm identities is not valid RETIRE telemetry (L-069-2)",
+        )
+
+    # Re-derive equality from the ACTUAL arm identities (never trust the *Equal
+    # booleans, and judge push-vs-pull - "surface is the only variable" - not a match
+    # to the requested string, which is informational provenance).
+    if attestation["pushProvider"] != attestation["pullProvider"]:
+        failures.append(
+            f"providers differ across arms "
+            f"(push={attestation['pushProvider']}, pull={attestation['pullProvider']})"
+        )
+    if attestation["pushModel"] != attestation["pullModel"]:
+        failures.append(
+            f"models differ across arms "
+            f"(push={attestation['pushModel']}, pull={attestation['pullModel']})"
+        )
+    if push_fr != pull_fr:
+        failures.append(f"framings differ (push={push_fr}, pull={pull_fr})")
+    elif push_fr != FRAMING_ADVERSARIAL:
+        failures.append(
+            f"framing is not strong adversarial (got {push_fr!r}, "
+            f"expected {FRAMING_ADVERSARIAL!r})"
+        )
+    if failures:
+        return False, (
+            "dual-surface arms were not held equal at strong adversarial framing "
+            "(" + "; ".join(failures) + "); an inspection-only (require_equal=False) "
+            "run is not valid RETIRE telemetry (L-069-2)",
+        )
+    return True, ()
+
 
 @dataclass(frozen=True)
 class ComparisonScore:
@@ -1191,6 +1309,13 @@ def score_comparison(comparison: object) -> ComparisonScore:
             upper_bound=True,
             reasons=(f"comparison artifact is invalid ({result.code}): "
                      f"{'; '.join(result.reasons)}",),
+        )
+    held_equal, equal_reasons = _arms_held_equal(comparison)
+    if not held_equal:
+        return ComparisonScore(
+            ok=False, run_tag=result.run_tag, push_unique_high_sev=0,
+            pull_unique_high_sev=0, shared_high_sev=0, total_high_sev=0,
+            provenance_complete=False, upper_bound=True, reasons=equal_reasons,
         )
     push_unique = pull_unique = shared = total = 0
     for finding in comparison.get("findings", []):
@@ -1284,6 +1409,9 @@ def score_against_benchmark(
             f"comparison artifact is invalid ({result.code}): "
             f"{'; '.join(result.reasons)}"
         )
+    held_equal, equal_reasons = _arms_held_equal(comparison)
+    if not held_equal:
+        return _failed_benchmark_score(equal_reasons[0])
     reg = validate_benchmark_registration(registration)
     if not reg.ok:
         return _failed_benchmark_score(

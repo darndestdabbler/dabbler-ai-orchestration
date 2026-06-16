@@ -421,3 +421,73 @@ validators with L-066-1 parity). CLIs:
 > floor / ceiling / gated-routed, and how Set 069 made the ceiling *executable* —
 > is in [`../../docs/verification-surface-strategy.md`](../../docs/verification-surface-strategy.md)
 > § *Set 069 — the execution-backed evidence layer*.
+
+## What Set 070 added (the dual-surface mode + the steelman-push upgrade)
+
+Set 069 made the *pull* ceiling executable; Set 070 (`ai_router` **0.24.0**) gives
+the *push* surface a **fair shake** before any RETIRE decision and builds the
+head-to-head instrument that turns keep/demote/retire from faith into measurement.
+Two gaps the Set 065→069 program left: production push shipped at **weak** framing
+(weaker than the moderate Experiment A instrument that demoted it, and weaker than
+adversarial pull), so push had **never been measured at its strong best**; and
+nothing ran **both** surfaces head-to-head and recorded which surface uniquely
+caught which high-severity defect — the exact telemetry the strategy §5 RETIRE
+criterion needs. Full rationale and the L-069-2 directive:
+[`../../docs/verification-surface-strategy.md`](../../docs/verification-surface-strategy.md)
+§ 5.1–5.2.
+
+- **Steelman push (S1).** `prompt-templates/verification.md` upgraded to the
+  devil's-advocate framing pull already uses, **preserving** the machine contract
+  (`build_verification_prompt` placeholders + the `VERIFIED` / `ISSUES FOUND` /
+  `Issue N:` / Category / Severity grammar `parse_verification_response` reads). A
+  framing-pin regression (`test_verification_framing.py`) catches a silent
+  weakening. The standing gated per-session push now runs at its strongest form.
+- **`dual_surface_verify.run_dual_surface` (S1).** Runs the **push** arm (snippet-fed
+  `route`/`call_model` over the committed diff, repo-blind) and the **pull** arm
+  (`pull_route` repo-reading agentic loop, the same adapter this doc describes) over
+  the **same committed state**, with **provider, model, and framing held equal across
+  arms**. Equality is **measured** from each arm's actually-reported identity
+  (`UnequalArmsError` if they diverge), not assumed; framing is classified from each
+  template's **single-source body** (`classify_framing_strength` over the unfilled
+  template, with the pull instruction rendered from that same body via a new
+  `template_text` seam in `pull_critique.py`), so interpolation cannot spoof markers
+  and classify-vs-execute cannot drift. Both arms are injectable, so unit tests run
+  hermetically with no metered call. **S1 ships the two-arm runner only — no merge.**
+- **The provenance merge + comparison artifact (S2).** `merge_findings` labels each
+  finding `push-only` / `pull-only` / `both` — `both` **only** when both arms share a
+  non-empty explicit `defectKey`, **never** on free-text wording (Set 069 S6:
+  description ≠ identity). The **safe direction** is enforced: an unkeyed defect both
+  arms caught splits into two single-surface entries (conservative — it never *hides*
+  a push-unique catch, which would bias RETIRE toward retiring push), and the result
+  flags `provenanceComplete=false` + per-surface unkeyed counts.
+  `build_comparison_artifact` / `validate_comparison_artifact` write + check
+  `dual-surface-comparison.json`
+  ([`../../docs/dual-surface-comparison.schema.json`](../../docs/dual-surface-comparison.schema.json));
+  the pure-Python validator holds **L-066-1 parity** (closed key sets, int-not-bool
+  guards, typed optionals) plus the cross-field provenance invariants the schema
+  cannot express.
+- **The fair-shake scoring (S2).** `score_comparison` derives the
+  push-unique / pull-unique / shared **high-severity** tally (an *upper bound* when
+  provenance is incomplete). `score_against_benchmark` scores it over the Set 069
+  pre-registered seeded + holdout benchmark (ground truth = `defectKey` is a
+  registered case); **underpowered → `INCONCLUSIVE`** even when `push_unique > 0`,
+  unkeyed high-severity excluded, and **push is never retired here** (the verdict is a
+  recommendation toward the operator-confirmed decision).
+  `aggregate_retire_telemetry` **refuses to pool** `sampled` with `opt-in` runs.
+- **The recorded mode + CLI (S2).** `dualSurfaceMode` (`off` / `sampled` / `opt-in`)
+  is recorded **once at set start and immutable** in `activity-log.json` (a distinct
+  entry kind). `should_run_dual_surface` takes an **injected** draw (hermetic):
+  `off` never runs, `opt-in` only on explicit request, `sampled` fires below the
+  sample rate (tagged `sampled`); a deliberate opt-in under sampled mode is the
+  operational `opt-in` tag (never folded into unbiased telemetry). All readers
+  (`read_` / `has_` / `dual_surface_mode_record_unreadable`) **never raise** on a
+  corrupt or malformed log. CLI:
+  `python -m ai_router.dual_surface_verify record-mode | read-mode | score`.
+
+The **dual-surface mode** is **additive**: absent a recorded `dualSurfaceMode`
+(default `off`) and the opt-in run, `route`, `pull_route`, and
+`produce_path_aware_critique` are byte-for-byte unchanged. (The standing per-session
+push verifier is the one intended behavioral change in the set: `verification.md` now
+runs at strong adversarial framing — the steelman-push deliverable, by design.)
+As-built telemetry status (built + dogfooded over this set's own diff, but no powered
+benchmark datapoint yet) is in the strategy doc § 5.2.

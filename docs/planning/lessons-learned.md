@@ -148,7 +148,7 @@ last-pruned-set: (none)   generated: 2026-06-16
 - **Action for future sessions:** Never self-opine on which model is cheaper.
 
 ## Schema-Only Re-Verifies Need `max_tier` Pinned To Block Auto-Escalation
-<!-- lesson: id="L-064-7" last-used-set="069" status="active" scope="portable" -->
+<!-- lesson: id="L-064-7" last-used-set="070" status="active" scope="portable" -->
 
 - **Context:** Round 2 of cross-provider session verification when the
   Round 1 response was substantively correct but used non-standard
@@ -173,6 +173,18 @@ last-pruned-set: (none)   generated: 2026-06-16
   cannot cross-provider on its own. If the substantive re-verify is
   itself the goal, normal escalation is correct — only pin when the
   re-verify is wording-only.
+- **Symmetric failure (Set 070 S2 — the misapply).** The pin is
+  *directional*: it is only ever a **ceiling**, and it must never sit
+  **below** the Round-1 verifier's tier on a **substantive** re-verify.
+  In Set 070 S2 a Round-2 substantive re-verify (re-checking real fixes,
+  not wording) was launched with `max_tier=2` against a tier-3 GPT-5.4
+  Round-1 verifier. The pin dropped the call to a tier-2 model — which
+  happened to be **Anthropic**, so it both (a) silently broke the
+  cross-provider guarantee (the orchestrator was Claude) and (b) hit an
+  Anthropic `529`; the re-run **without** the pin stayed on GPT-5.4 and
+  succeeded. The rule: a substantive re-verify must stay on (or above)
+  the Round-1 verifier's tier — `max_tier` pinning is for wording-only
+  re-verifies, and even then only to the verifier's *own* tier, never lower.
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
 <!-- lesson: id="L-064-8" added-set="063" last-used-set="069" status="active" scope="portable" -->

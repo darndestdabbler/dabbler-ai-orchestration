@@ -151,7 +151,10 @@ executed in S6. The verification surface is now:
   trips on the session diff. The orchestrator runs it at Step 6 of
   [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md); the gate
   verdict (and its triggers) is logged whether or not the routed call runs, so a
-  skipped call is an auditable decision, not a silent omission.
+  skipped call is an auditable decision, not a silent omission. As of Set 070 the
+  push template it uses (`prompt-templates/verification.md`) runs at **strong
+  adversarial framing** (§5.2), so the retained gated layer is measured and
+  deployed at its strongest form.
 
 The execution substrate for the floor and for any test-running pull review is
 the Set 068 S1 **disposable-worktree `run_test` cage**
@@ -231,7 +234,8 @@ genuine devil's advocate: assume the work is flawed and try to prove it"*
 (**strong**). Operator field experience is that the strong framing **consistently
 lifts push's catch rate** — a cheap, prompt-only lever **orthogonal** to the
 "second provider buys nothing" finding (that finding is about provider *count*, not
-framing). Consequences, all forward commitments:
+framing). The three commitments below were forward intentions when the directive
+was written; **Set 070 built all three** (see §5.2):
 
 1. **Adversarial framing is the floor for push.** `verification.md` should be
    upgraded to the devil's-advocate framing pull already uses (a small `ai_router`
@@ -240,17 +244,80 @@ framing). Consequences, all forward commitments:
    a RETIRE decision must run push at the strong framing — comparing
    adversarial-pull against objective-push is confounded and would retire push on a
    hobbled measurement. The DEMOTE evidence tested push at *moderate* and deploys it
-   at *weak*; it has **never** been measured at *strong*.
-3. **The instrument is a dual-surface ("overdetermined") verification mode**
-   (proposed): at end of a sampled or opted-in session, run **both** push and pull
-   (both adversarial) over the same committed state, merge findings **with
-   provenance** (push-only / pull-only / both), and record the disjoint sets — that
-   push-unique-vs-pull-unique high-severity tally is exactly the telemetry the
-   RETIRE criterion above needs. Random sampling gives unbiased telemetry;
-   operator/orchestrator opt-in gives a high-assurance mode for complex
-   modernization work. This is the forward A/B the §2 evidence always pointed to;
-   it is the natural mechanism for the `070-pilot-harvester-telemetry` set to
-   collect the data, and may graduate into a standing `verificationMode` option.
+   at *weak*; it had **never** been measured at *strong*.
+3. **The instrument is a dual-surface ("overdetermined") verification mode**: at end
+   of a sampled or opted-in session, run **both** push and pull (both adversarial)
+   over the same committed state, merge findings **with provenance** (push-only /
+   pull-only / both), and record the disjoint sets — that push-unique-vs-pull-unique
+   high-severity tally is exactly the telemetry the RETIRE criterion above needs.
+   Random sampling gives unbiased telemetry; operator/orchestrator opt-in gives a
+   high-assurance mode for complex modernization work. This is the forward A/B the §2
+   evidence always pointed to, and a standing `verificationMode`-pattern option.
+
+### 5.2 Set 070 — the steelman-push upgrade and the dual-surface instrument (BUILT)
+
+Set 070 (`ai_router` **0.24.0**) shipped all three §5.1 commitments. The push surface
+is now measured at its adversarial best, and the head-to-head instrument exists:
+
+1. **Steelman push — shipped (S1).** `ai_router/prompt-templates/verification.md` was
+   upgraded from *"evaluate objectively"* (weak) to the devil's-advocate framing pull
+   already uses (*"assume the work is flawed and try to prove it; a rubber-stamp is a
+   failure"*, strong), preserving the machine contract `build_verification_prompt` /
+   `parse_verification_response` depend on. A regression
+   (`test_verification_framing.py`) pins the strong-framing language, so a future
+   silent weakening trips a test. The standing per-session push now runs at its
+   strongest form by default.
+2. **The dual-surface ("overdetermined") mode — shipped (S1 + S2).**
+   `ai_router/dual_surface_verify.py` runs the **push** arm (snippet-fed
+   `route`/`call_model` over the committed diff, repo-blind) and the **pull** arm
+   (`pull_route` repo-reading agentic loop) over the **same committed state**, with
+   **provider, model, and framing held equal across arms** (a steelman of each
+   surface, isolating *surface* as the only variable). Equality is **measured** from
+   each arm's actual reported identity, not assumed; framing is classified from each
+   template's single-source body so interpolation cannot spoof it. The two arms are
+   merged **with provenance**: a finding is `both` only when both arms share a
+   non-empty explicit `defectKey`, **never** on free-text wording (the Set 069 S6
+   floor-ratchet lesson that a description is not an identity). The **safe direction**
+   is enforced — an unkeyed defect both arms caught becomes two single-surface
+   entries (conservative over-split that never *hides* a push-unique catch, which
+   would bias RETIRE toward retiring push), and the artifact honestly flags
+   `provenanceComplete=false` with per-surface unkeyed counts. The merge is captured
+   as a validated `dual-surface-comparison.json`
+   ([`dual-surface-comparison.schema.json`](dual-surface-comparison.schema.json),
+   pure-Python validator at L-066-1 parity incl. cross-field provenance invariants).
+3. **The fair-shake telemetry — shipped (S2).** `score_comparison` derives the
+   push-unique / pull-unique / shared **high-severity** tally (reported as an *upper
+   bound* when provenance is incomplete); `score_against_benchmark` scores that tally
+   over the Set 069 pre-registered seeded + holdout benchmark (ground truth =
+   `defectKey` is a registered case) and is **honest under power**: too few real cases
+   forces an `INCONCLUSIVE` verdict even when `push_unique > 0`, unkeyed high-severity
+   findings are excluded from the real tally, and **the gated push layer is never
+   retired by this machinery** — it emits a recommendation toward the
+   operator-confirmed decision, not the decision. `aggregate_retire_telemetry`
+   **refuses to pool** `sampled` (unbiased) with `opt-in` (operational) runs.
+4. **The mode, recorded and triggered (S2).** `dualSurfaceMode`
+   (`off` / `sampled` / `opt-in`) follows the `verificationMode` / `pathAwareCritique`
+   pattern: recorded **once at set start and immutable** in `activity-log.json` (a
+   distinct entry kind, overloading neither existing enum). `should_run_dual_surface`
+   takes an **injected** random draw (hermetic, deterministic) — `off` never runs,
+   `opt-in` only on explicit request, `sampled` fires when the draw is below the
+   sample rate (tagged `sampled`), while a deliberate opt-in under sampled mode is the
+   operational `opt-in` tag (never folded into the unbiased telemetry). CLI:
+   `python -m ai_router.dual_surface_verify record-mode | read-mode | score`.
+
+**Telemetry status as of Set 070 (the honest number):** the instrument is built and
+**dogfooded over this set's own diff** (a recorded `dualSurfaceMode: opt-in` run, the
+operational high-assurance tag — see this set's `dual-surface-comparison.json`), but
+**no powered benchmark-scored datapoint exists yet.** The dogfood is a single
+self-referential run with no ground-truth defect labels, and the Set 069 seeded +
+holdout benchmark is not yet populated with real-workload cases, so
+`score_against_benchmark` is `INCONCLUSIVE` (underpowered, `real_cases = 0`) by
+construction. Powered telemetry — the data the §5 RETIRE decision actually reopens on
+— awaits the downstream **consumer-repo field pilots** (a complex modernization
+project and the Access Harvester) that adopt 0.24.0 and accumulate sampled runs
+against a populated benchmark. As of this set: **the measurement apparatus is ready;
+the measurement has not yet run at scale, so RETIRE stays closed and the §5 honesty
+caveats carry forward unchanged.**
 
 ---
 

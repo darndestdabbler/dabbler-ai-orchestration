@@ -20,6 +20,30 @@
     "pullUnkeyed",
     "findings"
   ],
+  "allOf": [
+    {
+      "$comment": "provenanceComplete=true requires both unkeyed counts to be 0 AND no finding may be unkeyed (defectKey == ''). Both halves are encoded here, matching validate_comparison_artifact exactly - a schema-only consumer rejects the same artifacts the runtime does.",
+      "if": {
+        "properties": { "provenanceComplete": { "const": true } },
+        "required": ["provenanceComplete"]
+      },
+      "then": {
+        "properties": {
+          "pushUnkeyed": { "const": 0 },
+          "pullUnkeyed": { "const": 0 },
+          "findings": {
+            "not": {
+              "contains": {
+                "type": "object",
+                "properties": { "defectKey": { "const": "" } },
+                "required": ["defectKey"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "properties": {
     "schemaVersion": { "type": "integer", "enum": [1] },
     "kind": { "type": "string", "const": "dual_surface_comparison" },
@@ -53,7 +77,7 @@
       "type": "object"
     },
     "provenanceComplete": {
-      "description": "True only when EVERY finding on both arms carried a stable defectKey. When false the push-only/pull-only tallies are an UPPER BOUND (an unkeyed defect both arms caught appears as two single-arm entries).",
+      "description": "True only when EVERY finding on both arms carried a stable defectKey. When false the push-only/pull-only tallies are an UPPER BOUND (an unkeyed defect both arms caught appears as two single-arm entries). When true, pushUnkeyed and pullUnkeyed MUST both be 0 AND no finding may be unkeyed (defectKey == '') - the top-level if/then encodes BOTH halves, matching the runtime validator.",
       "type": "boolean"
     },
     "pushUnkeyed": {
@@ -104,9 +128,10 @@
           "type": "string"
         },
         "surfaces": {
-          "description": "The surface(s) that contributed.",
+          "description": "The DISTINCT surface(s) that contributed (the de-duplicated summary of the contributors' surfaces). Full multiplicity is preserved in contributors.",
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
           "items": { "type": "string", "enum": ["push", "pull"] }
         },
         "contributors": {

@@ -11,7 +11,15 @@
     "providerEqual": true,
     "modelEqual": true,
     "framingEqual": true,
-    "bothAdversarial": true
+    "bothAdversarial": true,
+    "requestedProvider": "anthropic",
+    "pushProvider": "anthropic",
+    "pullProvider": "anthropic",
+    "requestedModel": "claude-sonnet-4-6",
+    "pushModel": "claude-sonnet-4-6",
+    "pullModel": "claude-sonnet-4-6",
+    "pushFraming": { "strength": "adversarial-devils-advocate", "template": "verification.md" },
+    "pullFraming": { "strength": "adversarial-devils-advocate", "template": "path-aware-critique.md" }
   },
   "provenanceComplete": true,
   "pushUnkeyed": 0,

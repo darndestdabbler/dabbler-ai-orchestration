@@ -167,6 +167,47 @@ class TestSchemaParity:
         assert res.ok and res.code == dsv.COMPARISON_OK
         assert res.run_tag == dsv.RUN_TAG_OPT_IN
 
+    def test_schema_if_then_rejects_complete_with_nonzero_count(self):
+        # PARITY (S3 path-aware dogfood, gpt-5.4): the JSON Schema's if/then now
+        # rejects provenanceComplete=true with a nonzero unkeyed count, matching the
+        # Python validator (a schema-only consumer no longer accepts what the runtime
+        # rejects). The cross-array 'no unkeyed finding' half stays runtime-only.
+        schema = _load(SCHEMA)
+        art = _load(EXAMPLE)
+        assert art["provenanceComplete"] is True
+        art["pushUnkeyed"] = 2  # nonzero while complete -> must fail under the schema
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(art, schema)
+        # ... and the Python validator agrees (parity).
+        assert not dsv.validate_comparison_artifact(art).ok
+
+    def test_schema_if_then_rejects_complete_with_unkeyed_finding(self):
+        # PARITY (R4 Major): the schema now forbids an unkeyed finding when
+        # provenanceComplete=true even with zero counts (not/contains over findings),
+        # matching the Python validator -- JSON Schema CAN express this cross-array half.
+        schema = _load(SCHEMA)
+        art = _load(EXAMPLE)
+        assert art["provenanceComplete"] is True  # counts stay 0
+        art["findings"].append({
+            "defectKey": "",  # unkeyed while complete -> must fail under the schema
+            "provenance": "push-only", "severity": "Minor", "category": "",
+            "surfaces": ["push"],
+            "contributors": [{"surface": "push", "description": "unkeyed"}],
+        })
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(art, schema)
+        assert not dsv.validate_comparison_artifact(art).ok
+
+    def test_schema_uniqueitems_rejects_duplicate_surfaces(self):
+        # PARITY: the schema's uniqueItems now rejects a duplicated surfaces entry,
+        # matching the Python validator's duplicate check.
+        schema = _load(SCHEMA)
+        art = _load(EXAMPLE)
+        art["findings"][0]["surfaces"] = ["push", "pull", "push"]
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(art, schema)
+        assert not dsv.validate_comparison_artifact(art).ok
+
     def test_schemaversion_float_and_bool_rejected_like_schema(self):
         for bad in (1.0, True):
             art = _load(EXAMPLE)
@@ -244,6 +285,41 @@ class TestProvenanceInvariants:
         art["findings"][2]["surfaces"] = ["push", "pull"]
         res = dsv.validate_comparison_artifact(art)
         assert not res.ok
+
+    def test_duplicate_surfaces_rejected(self):
+        # The validator must reject a duplicated surfaces label, even when the
+        # contributors cover the right set (S3 path-aware dogfood, gpt-5.4 Major).
+        art = _load(EXAMPLE)
+        art["findings"][0]["surfaces"] = ["push", "pull", "push"]  # dup push
+        res = dsv.validate_comparison_artifact(art)
+        assert not res.ok
+        assert any("surfaces" in r and "duplicate" in r for r in res.reasons), res.reasons
+
+    def test_surfaces_inconsistent_with_contributors_rejected(self):
+        # A push-only finding whose surfaces field claims pull (disagreeing with its
+        # single push contributor) must be rejected: the summary cannot drift from
+        # the load-bearing contributors.
+        art = _load(EXAMPLE)
+        # findings[2] is push-only with a single push contributor.
+        art["findings"][2]["surfaces"] = ["pull"]
+        res = dsv.validate_comparison_artifact(art)
+        assert not res.ok
+        assert any("surfaces" in r and "does not match" in r for r in res.reasons), res.reasons
+
+    def test_producer_emits_distinct_surfaces_on_intra_arm_dup_key(self):
+        # An intra-arm duplicate key keeps BOTH contributors but emits a DISTINCT
+        # surfaces summary (no duplicate push), and the result re-validates.
+        merge = dsv.merge_findings(
+            [_finding("push a", severity="Major", key="K"),
+             _finding("push b", severity="Major", key="K")],  # same key, same arm
+            [_finding("pull a", severity="Major", key="K")],
+        )
+        both = [f for f in merge.findings if f.provenance == "both"]
+        assert len(both) == 1
+        mf = both[0]
+        assert len(mf.contributors) == 3          # full multiplicity preserved
+        assert mf.surfaces == ("push", "pull")    # distinct summary, no dup push
+        assert mf.to_dict()["surfaces"] == ["push", "pull"]
 
     def test_provenance_complete_true_with_unkeyed_finding_rejected(self):
         art = _load(EXAMPLE)
@@ -344,7 +420,7 @@ class TestScoreComparison:
         run = dsv.DualSurfaceRun(
             session_set="s", committed_ref="r", sandbox_dir="/d",
             provider="anthropic", model="m", push=None, pull=None,
-            framing_equal=True, attestation={},
+            framing_equal=True, attestation=_equal_arms_attestation(),
         )
         art = dsv.build_comparison_artifact(
             run, merge, run_tag=dsv.RUN_TAG_SAMPLED,
@@ -383,7 +459,28 @@ def _registration(case_ids, *, min_power=10):
     }
 
 
-def _comparison_with(findings, *, run_tag=dsv.RUN_TAG_SAMPLED, complete=True):
+def _equal_arms_attestation():
+    """A held-equal attestation carrying the RAW per-arm identities + framing the
+    scorer re-derives equality from (not just the self-asserted booleans)."""
+    return {
+        "providerEqual": True,
+        "modelEqual": True,
+        "framingEqual": True,
+        "bothAdversarial": True,
+        "requestedProvider": "anthropic",
+        "pushProvider": "anthropic",
+        "pullProvider": "anthropic",
+        "requestedModel": "m",
+        "pushModel": "m",
+        "pullModel": "m",
+        "pushFraming": {"strength": dsv.FRAMING_ADVERSARIAL, "template": "verification.md"},
+        "pullFraming": {"strength": dsv.FRAMING_ADVERSARIAL, "template": "path-aware-critique.md"},
+    }
+
+
+def _comparison_with(
+    findings, *, run_tag=dsv.RUN_TAG_SAMPLED, complete=True, attestation=None
+):
     return {
         "schemaVersion": 1,
         "kind": "dual_surface_comparison",
@@ -393,7 +490,9 @@ def _comparison_with(findings, *, run_tag=dsv.RUN_TAG_SAMPLED, complete=True):
         "committedRef": "r",
         "provider": "anthropic",
         "model": "m",
-        "attestation": {},
+        # Default to a held-equal attestation so these fixtures exercise the
+        # valid-telemetry path; the negative tests pass an unequal attestation.
+        "attestation": _equal_arms_attestation() if attestation is None else attestation,
         "provenanceComplete": complete,
         "pushUnkeyed": 0,
         "pullUnkeyed": 0,
@@ -409,6 +508,105 @@ def _mf(key, provenance, severity):
         "defectKey": key, "provenance": provenance, "severity": severity,
         "category": "", "surfaces": surfaces, "contributors": contributors,
     }
+
+
+class TestEqualArmsGuardOnScoring:
+    """An inspection-only (require_equal=False) artifact is structurally valid but
+    must NOT be scored as telemetry: the scorers are the RETIRE-evidence boundary and
+    re-derive equality from the RAW recorded arm identities/framing - never trusting
+    the self-asserted *Equal booleans (Set 070 S3 path-aware dogfood, gpt-5.4 Major;
+    R3 sharpening: "measured, not assumed")."""
+
+    def test_booleans_only_attestation_rejected(self):
+        # The verifier's core point: an attestation carrying only the four booleans
+        # (no raw arm identities) is an unverified CLAIM and must NOT score.
+        comp = _comparison_with(
+            [_mf("c0", "push-only", "Major")],
+            attestation={
+                "providerEqual": True, "modelEqual": True,
+                "framingEqual": True, "bothAdversarial": True,
+            },
+        )
+        score = dsv.score_comparison(comp)
+        assert score.ok is False
+        assert any("raw per-arm attestation is incomplete" in r for r in score.reasons)
+
+    def test_lying_booleans_caught_by_raw_rederivation(self):
+        # providerEqual=true is ASSERTED, but the raw providers actually differ -> the
+        # re-derivation catches the lie (the booleans are never trusted).
+        att = _equal_arms_attestation()
+        att["pullProvider"] = "openai"   # raw disagreement; booleans still all true
+        comp = _comparison_with([_mf("c0", "push-only", "Major")], attestation=att)
+        score = dsv.score_comparison(comp)
+        assert score.ok is False
+        assert any("providers differ" in r for r in score.reasons)
+
+    def test_model_disagreement_rejected(self):
+        att = _equal_arms_attestation()
+        att["pushModel"] = "other-model"
+        comp = _comparison_with([_mf("c0", "push-only", "Major")], attestation=att)
+        assert dsv.score_comparison(comp).ok is False
+
+    def test_non_adversarial_framing_rejected(self):
+        att = _equal_arms_attestation()
+        att["pushFraming"] = {"strength": dsv.FRAMING_WEAK, "template": "x"}
+        att["pullFraming"] = {"strength": dsv.FRAMING_WEAK, "template": "y"}
+        comp = _comparison_with([_mf("c0", "push-only", "Major")], attestation=att)
+        score = dsv.score_comparison(comp)
+        assert score.ok is False
+        assert any("not strong adversarial" in r for r in score.reasons)
+
+    def test_differing_framing_rejected(self):
+        att = _equal_arms_attestation()
+        att["pullFraming"] = {"strength": dsv.FRAMING_MODERATE, "template": "y"}
+        comp = _comparison_with([_mf("c0", "push-only", "Major")], attestation=att)
+        score = dsv.score_comparison(comp)
+        assert score.ok is False
+        assert any("framings differ" in r for r in score.reasons)
+
+    def test_missing_framing_block_rejected(self):
+        att = _equal_arms_attestation()
+        del att["pushFraming"]
+        comp = _comparison_with([_mf("c0", "push-only", "Major")], attestation=att)
+        assert dsv.score_comparison(comp).ok is False
+
+    def test_score_against_benchmark_rejects_unequal_arms(self):
+        reg = _registration([f"c{i}" for i in range(10)], min_power=5)
+        att = _equal_arms_attestation()
+        att["pushProvider"] = "openai"  # raw provider disagreement
+        comp = _comparison_with([_mf("c0", "push-only", "Major")], attestation=att)
+        score = dsv.score_against_benchmark(comp, reg)
+        assert score.ok is False
+        assert score.verdict == dsv.RETIRE_INCONCLUSIVE
+        assert any("providers differ" in r for r in score.reasons)
+
+    def test_held_equal_artifact_still_scores(self):
+        # The held-equal fixture (raw identities present + agreeing + adversarial)
+        # re-derives as equal and scores ok.
+        reg = _registration([f"c{i}" for i in range(10)], min_power=5)
+        comp = _comparison_with([_mf("c0", "push-only", "Major")])
+        assert dsv.score_against_benchmark(comp, reg).ok is True
+        assert dsv.score_comparison(comp).ok is True
+
+    def test_scores_when_arms_agree_but_request_string_differs(self):
+        # R4 Issue 1: equality is judged on ACTUAL arm identities (push==pull), not a
+        # match to the requested string. Both arms ran on the same resolved provider/
+        # model that differs from the request -> still held-equal, still scoreable.
+        reg = _registration([f"c{i}" for i in range(10)], min_power=5)
+        att = _equal_arms_attestation()
+        att["requestedProvider"] = "google"        # request differs from the arms...
+        att["requestedModel"] = "requested-model"  # ...but push==pull (anthropic/m).
+        comp = _comparison_with([_mf("c0", "push-only", "Major")], attestation=att)
+        assert dsv.score_comparison(comp).ok is True
+        assert dsv.score_against_benchmark(comp, reg).ok is True
+
+    def test_missing_arm_identity_rejected(self):
+        att = _equal_arms_attestation()
+        del att["pushProvider"]
+        comp = _comparison_with([_mf("c0", "push-only", "Major")], attestation=att)
+        score = dsv.score_comparison(comp)
+        assert score.ok is False
+        assert any("incomplete" in r for r in score.reasons)
 
 
 class TestBenchmarkScore:

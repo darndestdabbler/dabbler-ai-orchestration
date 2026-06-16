@@ -105,6 +105,17 @@
       "description": "Cross-provider verification (gpt-5-4, routed_gate REQUIRED): R1 ISSUES x3 (provenanceComplete/count honesty; record-mode malformed-log crash; test adequacy)->fixed; R2 ISSUES x2 (L-069-1 incomplete class-fix: readers+stepNumber still TypeError on non-list entries)->hardened all readers; R3 VERIFIED. Full ai_router suite GREEN 2063/5. Lessons cited L-066-1/L-069-1/L-064-10/L-064-9/L-064-3. Deferred residual recorded: same non-list-entries pattern in path_aware_critique.py + dedicated_verification.py siblings. No release (S3).",
       "status": "complete",
       "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/dual-surface-mode",
+      "dateTime": "2026-06-16T20:10:58.209118+00:00",
+      "description": "Operator set dualSurfaceMode: opt-in.",
+      "status": "complete",
+      "routedApiCalls": [],
+      "kind": "dual_surface_mode",
+      "choice": "opt-in"
     }
   ]
 }

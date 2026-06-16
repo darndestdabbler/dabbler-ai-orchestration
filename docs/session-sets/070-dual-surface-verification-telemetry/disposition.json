@@ -28,7 +28,7 @@
     "model": "claude-opus-4-8",
     "effort": "medium",
     "reason": {
-      "code": "continue",
+      "code": "continue-current-trajectory",
       "specifics": "For Session 3 of 3 (FINAL: synthesis docs + PyPI release + change-log + next-set recommendation + DOGFOOD the dual-surface mode over this set's own diff + close). Routed analysis (s2-next-orchestrator.md) recommends claude/anthropic/opus-4-8 at medium effort: S3 requires high-fidelity prose synthesis (verification-surface-strategy.md + pull-verifier.md, cross-referenced -- L-065-1 echo-propagation risk), careful execution of the IRREVERSIBLE PyPI release (green-Test-on-the-tagged-SHA; verify tag commit == fixed SHA, the Set 068 lesson; operator pushes/approves the tag), and the live dogfood run of the new mode -- high-stakes, precision-sensitive work where opus-4-8's reasoning earns its cost, and it stays a different provider from the gpt-5-4 verifier. ORCHESTRATOR NOTE: opus-4-8 carried S1+S2; continuing it on the release/dogfood session is consistent. The operator decides; a non-anthropic orchestrator (codex/gpt-5-4 or gemini-pro) is defensible if a fresh perspective on the synthesis docs is preferred, but it would then coincide with the verifier provider."
     }
   },

@@ -5,6 +5,135 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-06-18 (Set 071 — the verifier materiality gate + nitpick-churn loop discipline)
+
+> Set 070 gave **both** reviewer surfaces their strongest devil's-advocate framing
+> (steelman push, L-069-2); the operator's field test confirmed it works **and**
+> surfaced its predicted side effect — strong framing with **no materiality bar**
+> manufactures **Minor / false-positive** findings, and the re-verify loop **churns
+> rounds on them** (the canonical case: three rounds on `pytest` vs `python -m pytest
+> -v`, a distinction with no behavioural difference, on correct work). Set 071 adds
+> the **calibration layer** — a materiality "so what?" gate in both templates, a
+> severity-anchored blocking classifier, the Minor-non-blocking re-verify loop
+> discipline, a cross-round issue ledger, and a merge-impact / plausible-path-to-harm
+> anti-laundering guardrail — **additively, never a framing weakening** (L-069-2 is a
+> hard constraint; the strong-framing pins stay green and `classify_framing_strength`
+> still returns `ADVERSARIAL` for both templates). The verdict grammar stays
+> **binary** (no third `VERIFIED_WITH_NITS` token — cross-provider-confirmed at S2);
+> blocking-ness is a derived, first-class predicate. No extension / Marketplace
+> change. Strategy synthesis: `docs/verification-surface-strategy.md` § 7; lesson
+> L-071-1.
+
+### Added
+
+- **The materiality + anti-nitpick layer in both reviewer templates (S1).**
+  `prompt-templates/verification.md` (push) and `prompt-templates/path-aware-critique.md`
+  (pull) gained the three-part "so what?" blocking test (exact requirement violated +
+  concrete impact + evidence), the anti-nitpick clause (semantic-equivalence-not-
+  textual-identity, with the `pytest` case named as a worthless finding; manufacturing
+  a Minor to dodge a rubber-stamp is itself a false-positive failure), the severity
+  anchor (Major = *would change a reasonable reviewer's merge decision*) +
+  plausible-path-to-harm escalation, and a non-blocking **`NITS`** output section. The
+  Set 070 `_ADVERSARIAL_MARKERS` phrases, the template placeholders, and the
+  `VERIFIED` / `ISSUES FOUND` tokens are preserved verbatim.
+- **The severity-anchored blocking classifier (`verification.py`, S2).**
+  `is_blocking_verdict(verdict, issues)` and `classify_blocking(verdict, issues)`
+  (→ `BlockingClassification`) derive the blocking decision from the **severity of the
+  findings given, not the bare verdict token**: a list with ≥1 Critical/Major (or any
+  unknown/missing-severity) finding blocks regardless of the token passed alongside it;
+  Minor-only / nits-only is recorded but non-blocking. The push parser
+  `parse_verification_response` **trusts a `VERIFIED` token and returns no findings**
+  (it does not re-mine a clean review's prose for a hidden Major — operator-adjudicated
+  in S2, to avoid reintroducing churn), so on the push surface the anti-laundering net
+  bites on the `ISSUES_FOUND` path; the pull surface passes structured
+  `pull_verifier.Finding` severities, where the net is always live.
+  `reconcile_issue_ledger(...)` (→ `LedgerReconciliation`) tracks prior blocker ids
+  RESOLVED/UNRESOLVED and flags resurrection for the no-reopen-under-fresh-wording
+  rule. `parse_nits(...)` reads the `NITS` section for observability only (nits never
+  enter the issues list). The classifier itself is **surface-agnostic** (one decision
+  over any severity-bearing findings).
+- **`VerificationResult` wiring (`__init__.py`, S2).** Gained `blocking`
+  (= `is_blocking_verdict`) and `nits` (= `parse_nits`) fields (defaulted, backward-
+  compatible), populated in `_run_verification`, so the re-verify loop reads
+  `result.verification.blocking` instead of the bare token. New symbols exported.
+- **The re-verify loop discipline (`docs/ai-led-session-workflow.md` Step 6, S2).**
+  New subsection *Materiality and the re-verify loop discipline (Set 071)*: Minor-only
+  ⇒ effectively VERIFIED, opens no round; a round continues only on new/unresolved
+  Critical/Major; the cross-round issue ledger; surface-agnostic; the 1–2-automatic /
+  3+-human bound unchanged (only narrows what counts as a round-justifying finding).
+  Wired into the Step-7 `ISSUES_FOUND` branch, the max-2-retries item, and the Mode-B
+  bounded-round item (L-065-1 echo discipline).
+- **Tests (`tests/test_blocking_classifier.py`, S1–S2).** The `is_blocking_verdict`
+  matrix, the `classify_blocking` partition, the **verbatim** three-round
+  `pytest`-vs-`python -m pytest -v` churn pinned as a regression that must classify
+  **non-blocking** end-to-end, verdict-grammar variants, severity-derived-not-token,
+  push-parser-trusts-VERIFIED-token, NITS-no-bleed, `parse_nits`, surface-agnostic
+  over `pull_verifier.Finding`, the `VerificationResult` wiring, and the
+  `reconcile_issue_ledger` tests. `test_verification_framing.py` extended with the
+  materiality-language presence checks and the `classify_framing_strength` == ADVERSARIAL
+  additivity proof for both edited templates.
+
+### Fixed
+
+- **`parse_verification_response` robustness (S2)**, surfaced by the churn fixture and
+  the verification loop: the `ISSUES FOUND` header self-matching as a spurious
+  severity-less finding; a markdown-bold `**Severity:** Minor` the old regex could not
+  read (so Minor was read as unknown → blocking — the exact churn this set kills); the
+  canonical underscored `ISSUES_FOUND` header not being stripped (L-069-1 class-
+  completion: `_` is not whitespace); a `VERDICT:`-prefixed verdict falling through to
+  `ISSUES_FOUND`; and a trailing `NITS` section bleeding into the last issue's
+  description. The `(verdict, issues)` public contract is unchanged.
+
+## [0.24.0] — 2026-06-16 (Set 070 — the dual-surface mode + the steelman-push upgrade)
+
+> *Changelog entry backfilled in Set 071 S3 — the 0.24.0 release (Set 070, tag
+> `v0.24.0` on `c71df65`) bumped the package version and wrote the set-level
+> `docs/session-sets/070-dual-surface-verification-telemetry/change-log.md` but did
+> not add this package-level section. Content reconstructed from that set change-log
+> and the strategy doc § 5.2.*
+>
+> The **push** (routed, snippet-fed) verification surface now gets a **fair shake**
+> before any RETIRE decision, and the framework has the systematic instrument that
+> turns keep/demote/retire from faith into measurement. Two honesty gaps Set 065→069
+> left: production push shipped at **weak** framing (weaker than the *moderate*
+> Experiment A instrument that demoted it, weaker than its *strong* pull counterpart),
+> so push had never been measured at its adversarial best; and nothing ran **both**
+> surfaces head-to-head recording which surface uniquely caught which high-severity
+> defect. The dual-surface mode is **additive** (absent a recorded `dualSurfaceMode`,
+> default `off`, `route` / `pull_route` / `produce_path_aware_critique` are byte-for-
+> byte unchanged) — the one intended behavioral change is the steelman-push upgrade.
+> No extension / Marketplace change. Rationale: `docs/verification-surface-strategy.md`
+> § 5.1–5.2 (operator directive 2026-06-16) and L-069-2.
+
+### Added
+
+- **Steelman push (S1).** `prompt-templates/verification.md` upgraded from *"evaluate
+  objectively"* (weak) to the devil's-advocate framing pull already uses (strong),
+  preserving the `build_verification_prompt` / `parse_verification_response` machine
+  contract. `test_verification_framing.py` pins the strong-framing phrases.
+- **The `contractGate`-seed fix (S1).** `start_session.py` gained
+  `--contract-gate {none,advisory,required}` + `_capture_contract_gate` (mirroring
+  `_capture_path_aware_critique`, delegating to the existing
+  `contract_gate.resolve_and_record_contract_gate`), closing the Set 069 S6 gap where
+  the `contractGate` seed was not recorded at set start.
+- **`dual_surface_verify.py` — the dual-surface ("overdetermined") mode (S1–S2).**
+  `run_dual_surface` runs the **push** arm (snippet-fed `route`/`call_model` over the
+  committed diff, repo-blind) and the **pull** arm (`pull_route` repo-reading agentic
+  loop) over the same committed state, **provider/model/framing held equal across
+  arms** (equality measured from each arm's reported identity; framing classified by
+  `dual_surface_verify.classify_framing_strength` over each template's single-source
+  body, which is rendered through a new `template_text` seam in `pull_critique.py`).
+  `merge_findings` labels each finding `push-only`/`pull-only`/
+  `both` (`both` only on a shared explicit `defectKey`, never free-text; unkeyed →
+  safe over-split + `provenanceComplete=false`). `build_comparison_artifact` /
+  `validate_comparison_artifact` write + check `dual-surface-comparison.json`
+  (`dual-surface-comparison.schema.json`; pure-Python validator at L-066-1 parity).
+  `score_comparison` / `score_against_benchmark` (Set 069 benchmark; underpowered →
+  `INCONCLUSIVE`; push never retired here) + `aggregate_retire_telemetry` (refuses to
+  pool `sampled` with `opt-in`). `dualSurfaceMode` (`off`/`sampled`/`opt-in`) recorded
+  once at set start + immutable; `should_run_dual_surface` takes an injected draw.
+  CLI: `python -m ai_router.dual_surface_verify record-mode | read-mode | score`.
+
 ## [0.23.0] — 2026-06-16 (Set 069 — the execution-backed evidence layer)
 
 > Carries the whole of Set 069 (S1–S6): the automated pull-critique producer is no

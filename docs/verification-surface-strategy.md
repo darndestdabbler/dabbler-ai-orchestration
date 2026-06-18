@@ -153,8 +153,11 @@ executed in S6. The verification surface is now:
   verdict (and its triggers) is logged whether or not the routed call runs, so a
   skipped call is an auditable decision, not a silent omission. As of Set 070 the
   push template it uses (`prompt-templates/verification.md`) runs at **strong
-  adversarial framing** (§5.2), so the retained gated layer is measured and
-  deployed at its strongest form.
+  adversarial framing** (§5.2), and as of Set 071 that strong framing ships with a
+  **materiality "so what?" gate** plus a **Minor-non-blocking re-verify loop
+  discipline** (§7) — the calibration layer the steelman-push framing needed so it
+  catches real defects without manufacturing nit-churn. So the retained gated layer
+  is measured and deployed at its strongest *and* best-calibrated form.
 
 The execution substrate for the floor and for any test-running pull review is
 the Set 068 S1 **disposable-worktree `run_test` cage**
@@ -423,3 +426,134 @@ Module map: `evidence_protocol.py` (S1) · `pull_critique.py` execution lanes +
 `podman/Containerfile` (S4) · `floor_ratchet.py` + `replacement_gate.py` (S5).
 As-built detail lives in
 [`ai_router/docs/pull-verifier.md`](../ai_router/docs/pull-verifier.md).
+
+---
+
+## 7. Set 071 — the materiality gate + the nitpick-churn loop discipline
+
+Set 070 gave **both** reviewer surfaces their strongest devil's-advocate framing
+(steelman push, **L-069-2**). The operator's field test of that framing (in the
+`kick-the-orchestrator-tires` repo) confirmed it works **and** surfaced its
+predicted side effect: strong framing with **no materiality bar** sometimes
+**manufactures a Minor / false-positive finding** rather than return clean — and
+the re-verify loop then **churns rounds on it**. The canonical observed instance
+was three consecutive remediation rounds spent on `pytest` vs `python -m pytest -v`,
+a distinction with **no behavioural difference**, on work that was correct. Strong
+framing is the *right* lever (it lifts the real-defect catch rate, §5.1); the
+missing piece was a **calibration layer** that stops it spinning on immaterial
+points — added **without** weakening the framing (L-069-2 is a hard constraint).
+Shipped in `ai_router` **0.25.0**.
+
+### 7.1 The three additive layers
+
+1. **A materiality "so what?" gate in both reviewer templates (S1).** Both
+   `prompt-templates/verification.md` (push) and `prompt-templates/path-aware-critique.md`
+   (pull) gained: the three-part blocking test (a blocker must state the **exact
+   requirement/claim violated**, the **concrete impact**, and the **evidence** — a
+   finding that cannot produce all three is a nit, not a blocker); an explicit
+   **anti-nitpick clause** (a correct+complete response *should* be VERIFIED;
+   manufacturing a Minor to avoid a rubber-stamp is **itself** a false-positive
+   failure; judge **semantic equivalence**, not textual identity, unless the exact
+   text *is* the contract — the `pytest` case is named as a worthless finding); the
+   **severity anchor** (Major = *would change a reasonable reviewer's merge
+   decision*) + a **plausible-path-to-harm escalation** (*to call it Minor you must
+   be confident there is no plausible path to a Major/Critical failure; when in
+   doubt, escalate*); and a non-blocking **`NITS`** output section so true-but-
+   immaterial observations have a home that does not trip the loop. The strong-
+   framing pins (`test_verification_framing.py`) stay green and
+   `dual_surface_verify.classify_framing_strength` still returns `ADVERSARIAL` for
+   both templates — the edits are provably additive, so the dual-surface
+   equal-framing gate (§5.2) is undisturbed.
+2. **A severity-anchored blocking classifier in `verification.py` (S2).**
+   `is_blocking_verdict(verdict, issues)` (and `classify_blocking(...)` for the
+   blocking-vs-nit partition + a log reason) derives the *blocking* decision from the
+   **severity of the findings it is given, NOT the bare verdict token**: given a
+   findings list, ≥1 Critical/Major (or any unknown/missing-severity) finding
+   **blocks regardless of the verdict token passed alongside it** — so a Major handed
+   to it under a `VERIFIED` token still blocks; a **Minor-only / nits-only** list is
+   recorded but **non-blocking** (effectively VERIFIED for the loop). The two
+   surfaces reach that classifier differently, and the difference is load-bearing:
+   the **pull** surface passes structured `pull_verifier.Finding` severities (always
+   populated, so the anti-laundering net is live there and for any direct caller),
+   while the **push** parser `parse_verification_response` **trusts a `VERIFIED`
+   token and returns no findings at all** (it deliberately does *not* re-scan a clean
+   review's prose for a hidden Major — that would reintroduce the churn this set
+   kills; operator-adjudicated in S2). So on the push surface the classifier's
+   "blocks regardless of token" guarantee bites on the **`ISSUES_FOUND` path**
+   (a mislabeled-severity or unparsed finding still blocks), **not** on a push
+   `VERIFIED` verdict, which is trusted. `parse_verification_response`'s `(verdict,
+   issues)` contract is unchanged; `parse_nits` reads the new `NITS` section for
+   observability only (nits never enter the issues list). The classifier itself is
+   **surface-agnostic** (one blocking decision over any severity-bearing findings),
+   and it is **wired** onto `VerificationResult` (`.blocking` / `.nits`) so the
+   re-verify loop reads `result.verification.blocking` rather than the bare token.
+3. **The re-verify loop discipline in the workflow doc (S2).**
+   `docs/ai-led-session-workflow.md` Step 6 gained *Materiality and the re-verify
+   loop discipline (Set 071)*: a Minor-only round opens **no** remediation round; a
+   round continues only on **new or unresolved Critical/Major**; and a **cross-round
+   issue ledger** (`reconcile_issue_ledger`) marks prior blockers RESOLVED/UNRESOLVED
+   and **refuses to resurrect a settled point under fresh wording** (the exact churn
+   pattern above) — keyed on a stable `issueId`, not free text. The existing **1–2
+   automatic / 3+ human** bound is unchanged; this only narrows *what counts as a
+   round-justifying finding*. Scope, stated precisely: the **blocking predicate** is
+   surface-agnostic (§7.1.2 — one decision over push *or* pull findings), while the
+   **Step-6 re-verify loop discipline** is wired into the routed `api` re-verify loop
+   and the Lightweight Mode-B verify→remediate loop (the two loops the workflow doc
+   names); because the predicate is surface-agnostic, the same blocking decision is
+   also available to a pull/path-aware critique loop.
+
+### 7.2 The anti-laundering guardrail (why Minor-non-blocking is safe)
+
+Making Minor non-blocking risks a real bug being mislabeled Minor and waved
+through — the shared failure mode the scoping consult (GPT-5.4 + Gemini-Pro,
+2026-06-18) flagged. Three mechanisms keep the demotion honest: (a) the **merge-
+impact anchor** forces Major to track *would-a-reviewer-change-their-merge-
+decision*, not surface polish; (b) the **plausible-path-to-harm escalation**
+makes Minor a claim of *no plausible path to a Major/Critical failure*, escalating
+when in doubt; (c) `is_blocking_verdict` treats a finding of **unknown/missing
+severity** and a **non-VERIFIED result that parsed to no findings** as **blocking** —
+a real defect that reaches the findings list cannot be laundered into a nit by an
+absent label.
+
+The honest scope of (c): it operates on the **findings list the classifier is
+given**. On the **pull** surface and for direct callers that list carries real
+severities, so the net catches a mislabeled Major. On the **push** surface, the
+guardrail is load-bearing on the `ISSUES_FOUND` path — but a push `VERIFIED` token is
+**trusted** (the parser returns no findings and does not re-mine prose for a hidden
+Major), so the push surface's protection against a *Major-emitted-under-VERIFIED* is
+the verifier's own materiality-gated judgment + the strong framing, **not** a
+post-hoc prose re-scan. This was the deliberate S2 trade-off (operator-adjudicated):
+re-scanning a clean VERIFIED review's prose for severity words reintroduced exactly
+the false-positive churn this set exists to remove, so the push surface trusts its
+token and the structured-severity net does the anti-laundering work where severities
+are actually present.
+
+### 7.3 The verdict grammar — binary, kept
+
+The scoping consult diverged on grammar: Gemini proposed a third verdict state
+(`VERIFIED_WITH_NITS`); GPT proposed **keeping the binary** `VERIFIED` /
+`ISSUES FOUND` grammar and making blocking-ness a derived predicate. Set 071's S2
+operator decision point routed a fresh cross-provider consult (GPT-5.4 + Gemini-Pro
+independently, then a fresh-Claude synthesis) — **unanimous binary** — and adopted
+the refinement that `is_blocking_verdict` be a first-class, fully-tested, documented
+contract artifact (the bare token is **not** sufficient to infer blocking). Binary
+preserves the machine contract `parse_verification_response` and the Set 070
+framing-pin test depend on, with no parser/envelope change. The churn fixture (the
+verbatim three-round `pytest`-vs-`python -m pytest -v` sequence) is pinned in
+`test_blocking_classifier.py` as a regression that must classify **non-blocking**.
+
+### 7.4 What this changes about the program
+
+Nothing is retired or demoted here — Set 071 is a **calibration** layer on the
+verification surfaces Sets 065–070 built. It removes the failure mode that would
+otherwise have made the strong-framing push (§5.2) and the path-aware ceiling (§3)
+noisy in practice: a verifier that keeps its strong adversarial framing — and so
+keeps catching the real cross-file/correctness defects — but no longer manufactures
+immaterial findings or churns re-verify rounds on nits, because a finding must clear
+a merge-impact materiality bar to block and a settled point can never be resurrected
+under fresh wording.
+
+Module map: `prompt-templates/verification.md` + `prompt-templates/path-aware-critique.md`
+(S1) · `verification.py` (`is_blocking_verdict` / `classify_blocking` / `parse_nits`
+/ `reconcile_issue_ledger`, S2) · `ai-led-session-workflow.md` Step 6 (S2) ·
+`tests/test_blocking_classifier.py` + `test_verification_framing.py` (S1–S2).

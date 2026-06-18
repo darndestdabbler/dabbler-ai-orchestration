@@ -491,3 +491,50 @@ push verifier is the one intended behavioral change in the set: `verification.md
 runs at strong adversarial framing — the steelman-push deliverable, by design.)
 As-built telemetry status (built + dogfooded over this set's own diff, but no powered
 benchmark datapoint yet) is in the strategy doc § 5.2.
+
+## What Set 071 added (the materiality gate + the nitpick-churn loop discipline)
+
+Set 070 gave both reviewer templates their strongest devil's-advocate framing; the
+field test confirmed it works **and** surfaced the predicted cost — strong framing
+with **no materiality bar** manufactures Minor / false-positive findings and the
+re-verify loop churns rounds on them (the canonical case: three rounds on `pytest`
+vs `python -m pytest -v`). Set 071 (`ai_router` **0.25.0**) adds the calibration
+layer — **additively, never a framing weakening** (L-069-2). Strategy synthesis:
+[`../../docs/verification-surface-strategy.md`](../../docs/verification-surface-strategy.md)
+§ 7.
+
+- **Materiality "so what?" gate in `path-aware-critique.md` (and `verification.md`),
+  S1.** A blocking finding must state the **exact requirement/claim violated**, the
+  **concrete impact**, and the **evidence**; if it cannot produce all three it is a
+  nit, not a blocker. The **anti-nitpick clause** names semantic-equivalence-not-
+  textual-identity (the `pytest` case is the worked example) and that manufacturing a
+  Minor to dodge a rubber-stamp is itself a false-positive failure. The **severity
+  anchor** (Major = *would change a reasonable reviewer's merge decision*) +
+  **plausible-path-to-harm** escalation keep it honest. A non-blocking **`NITS`**
+  subsection holds true-but-immaterial observations. The pull template keeps its
+  `VERDICT: VERIFIED | ISSUES_FOUND` + per-finding Severity/Category/Location
+  grammar; `classify_framing_strength` still returns `ADVERSARIAL` for it (additive
+  proof — the dual-surface equal-framing gate is undisturbed).
+- **The severity-anchored blocking classifier (`verification.py`), S2.**
+  `is_blocking_verdict(verdict, issues)` / `classify_blocking(...)` derive blocking
+  from the **severity of the findings given, not the bare verdict token**: a list with
+  ≥1 Critical/Major (or any unknown/missing-severity) finding blocks regardless of the
+  token passed alongside it; Minor-only is recorded but non-blocking. It is
+  **surface-agnostic** — the **pull** surface feeds it via `pull_verifier.Finding`
+  (whose `severity` is parsed structurally from `submit_verdict`, never by re-parsing
+  prose), so the anti-laundering net is always live on the pull surface; the **push**
+  parser `parse_verification_response` instead **trusts a `VERIFIED` token and returns
+  no findings** (operator-adjudicated in S2 — it does not re-mine clean prose for a
+  hidden Major, which would reintroduce churn), so on push the net bites on the
+  `ISSUES_FOUND` path. The **same** classifier governs both loops. `parse_nits` reads
+  the `NITS` section for observability only (nits never enter the findings list).
+- **The re-verify loop discipline (workflow Step 6), S2.** Minor-only opens no
+  remediation round; a round continues only on new/unresolved Critical/Major; a
+  cross-round **issue ledger** (`reconcile_issue_ledger`) refuses to resurrect a
+  settled point under fresh wording (keyed on a stable `issueId`). The 1–2-automatic
+  / 3+-human bound is unchanged.
+
+The materiality layer is **additive**: a path-aware critique still produces the same
+`path-aware-critique.json` artifact and severity-bearing findings; what changes is
+that the verifier no longer manufactures immaterial blockers, and the loop that
+consumes its findings no longer churns on Minor-only rounds.

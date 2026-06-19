@@ -400,7 +400,7 @@ last-pruned-set: (none)   generated: 2026-06-18
   another dogfood round.
 
 ## Strong Adversarial Framing Without A Materiality Bar Manufactures Minor-Finding Churn
-<!-- lesson: id="L-071-1" added-set="071" last-used-set="071" status="active" scope="portable" -->
+<!-- lesson: id="L-071-1" added-set="071" last-used-set="072" status="active" scope="portable" -->
 
 - **Context:** A verification surface running at its **strongest adversarial
   framing** (devil's advocate, "assume the work is flawed, a rubber-stamp is a

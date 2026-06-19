@@ -466,3 +466,322 @@ def test_cli_bad_cell_returns_nonzero(target):
     rc = voa.main(["run", "--target", str(target), "--base", "HEAD~1",
                    "--cell", "push:anthropic"])  # no pull row -> bad matrix
     assert rc == 2
+
+
+# ---------------------------------------------------------------------------
+# Session 3: the cross-run remediation aggregator
+# ---------------------------------------------------------------------------
+
+def _rem_finding(defect_key, contributors, *, severity="Major", category="correctness"):
+    """A per-run remediation-report finding (MergedFinding shape).
+
+    ``contributors`` is a list of ``(surface, description[, severity])`` tuples;
+    provenance/surfaces are derived to match the merge contract so the helper
+    produces a finding ``validate_remediation_report`` accepts.
+    """
+    contribs = []
+    surfaces = []
+    best_sev, best_rank = "", -1
+    for c in contributors:
+        surface, desc = c[0], c[1]
+        csev = c[2] if len(c) > 2 else severity
+        entry = {"surface": surface, "description": desc}
+        if csev:
+            entry["severity"] = csev
+        if category:
+            entry["category"] = category
+        contribs.append(entry)
+        if surface not in surfaces:
+            surfaces.append(surface)
+        rank = dsv._severity_rank(csev)
+        if rank > best_rank:
+            best_rank, best_sev = rank, csev
+    surf_set = set(surfaces)
+    if surf_set == {"push", "pull"}:
+        provenance = dsv.PROVENANCE_BOTH
+    elif surf_set == {"push"}:
+        provenance = dsv.PROVENANCE_PUSH_ONLY
+    else:
+        provenance = dsv.PROVENANCE_PULL_ONLY
+    return {
+        "defectKey": defect_key,
+        "provenance": provenance,
+        "severity": best_sev,
+        "category": category,
+        "surfaces": surfaces,
+        "contributors": contribs,
+    }
+
+
+def _rem_report(findings, *, target="built-target", committed_ref="A..B",
+                generated_at="t"):
+    push_unkeyed = sum(
+        1 for f in findings if not f["defectKey"]
+        for c in f["contributors"] if c["surface"] == "push"
+    )
+    pull_unkeyed = sum(
+        1 for f in findings if not f["defectKey"]
+        for c in f["contributors"] if c["surface"] == "pull"
+    )
+    return {
+        "schemaVersion": voa.REMEDIATION_REPORT_SCHEMA_VERSION_CURRENT,
+        "kind": voa.REMEDIATION_REPORT_KIND,
+        "target": target,
+        "committedRef": committed_ref,
+        "generatedAt": generated_at,
+        "provenanceComplete": push_unkeyed == 0 and pull_unkeyed == 0,
+        "pushUnkeyed": push_unkeyed,
+        "pullUnkeyed": pull_unkeyed,
+        "findings": findings,
+    }
+
+
+def test_rem_report_helper_is_valid():
+    """The fixtures themselves are valid remediation reports (sanity)."""
+    rep = _rem_report([_rem_finding("D1", [("push", "boom")])])
+    assert voa.validate_remediation_report(rep).ok
+
+
+def test_aggregate_corroborates_keyed_finding_across_runs():
+    """D1 caught push-only in run 0 and pull-only in run 1 -> ONE 'both' finding,
+    corroboration 2, severity = max across runs."""
+    run_a = _rem_report(
+        [_rem_finding("D1", [("push", "off-by-one in pager")], severity="Major")],
+        committed_ref="A..B", generated_at="run-a",
+    )
+    run_b = _rem_report(
+        [_rem_finding("D1", [("pull", "pager skips last row")], severity="Critical")],
+        committed_ref="A..C", generated_at="run-b",
+    )
+    backlog = voa.aggregate_remediation_reports([run_a, run_b], generated_at="agg-ts")
+    assert backlog["runCount"] == 2
+    assert len(backlog["findings"]) == 1
+    f = backlog["findings"][0]
+    assert f["defectKey"] == "D1"
+    assert f["provenance"] == dsv.PROVENANCE_BOTH
+    assert set(f["surfaces"]) == {"push", "pull"}
+    assert f["severity"] == "Critical"  # max across runs
+    assert f["corroboration"] == 2
+    assert {r["index"] for r in f["runs"]} == {0, 1}
+    assert {r["generatedAt"] for r in f["runs"]} == {"run-a", "run-b"}
+    assert backlog["provenanceComplete"] is True
+    # Round-trips through the validator and a real JSON cycle.
+    assert voa.validate_remediation_backlog(backlog).ok
+    assert voa.validate_remediation_backlog(json.loads(json.dumps(backlog))).ok
+
+
+def test_aggregate_single_run_finding_has_corroboration_one():
+    run_a = _rem_report([_rem_finding("D1", [("push", "boom")])])
+    backlog = voa.aggregate_remediation_reports([run_a], generated_at="agg")
+    assert backlog["findings"][0]["corroboration"] == 1
+    assert len(backlog["findings"][0]["runs"]) == 1
+
+
+def test_aggregate_severity_then_corroboration_ranked():
+    """Severity is primary; corroboration breaks ties (a 2-run Major outranks a
+    1-run Major; a Critical outranks both)."""
+    rep1 = _rem_report([
+        _rem_finding("Dmaj", [("push", "the major")], severity="Major"),
+        _rem_finding("Dcrit", [("push", "the critical")], severity="Critical"),
+    ])
+    rep2 = _rem_report([
+        _rem_finding("Dmaj", [("pull", "the major again")], severity="Major"),
+    ])
+    backlog = voa.aggregate_remediation_reports([rep1, rep2], generated_at="agg")
+    keys = [f["defectKey"] for f in backlog["findings"]]
+    # Critical first, then the corroboration-2 Major.
+    assert keys == ["Dcrit", "Dmaj"]
+    dmaj = next(f for f in backlog["findings"] if f["defectKey"] == "Dmaj")
+    assert dmaj["corroboration"] == 2
+
+
+def test_aggregate_unkeyed_never_corroborates():
+    """Two runs each report an unkeyed push finding -> two split entries, each
+    corroboration 1; provenance incomplete."""
+    rep1 = _rem_report([_rem_finding("", [("push", "same bug")])])
+    rep2 = _rem_report([_rem_finding("", [("push", "same bug")])])
+    backlog = voa.aggregate_remediation_reports([rep1, rep2], generated_at="agg")
+    assert backlog["provenanceComplete"] is False
+    assert len(backlog["findings"]) == 2
+    assert all(f["corroboration"] == 1 for f in backlog["findings"])
+    assert backlog["pushUnkeyed"] == 2
+    assert voa.validate_remediation_backlog(backlog).ok
+
+
+def test_aggregate_rejects_mixed_target():
+    rep1 = _rem_report([_rem_finding("D1", [("push", "x")])], target="harvester")
+    rep2 = _rem_report([_rem_finding("D2", [("push", "y")])], target="platform")
+    with pytest.raises(voa.MixedTargetError):
+        voa.aggregate_remediation_reports([rep1, rep2], generated_at="agg")
+
+
+def test_aggregate_rejects_empty_set():
+    with pytest.raises(voa.VerificationOnlyError):
+        voa.aggregate_remediation_reports([], generated_at="agg")
+
+
+def test_aggregate_rejects_missing_target():
+    bad = _rem_report([_rem_finding("D1", [("push", "x")])])
+    del bad["target"]
+    with pytest.raises(voa.VerificationOnlyError):
+        voa.aggregate_remediation_reports([bad], generated_at="agg")
+
+
+# --- backlog validator negative cases ------------------------------------
+
+def _good_backlog():
+    run_a = _rem_report(
+        [_rem_finding("D1", [("push", "a")], severity="Major")], generated_at="ra")
+    run_b = _rem_report(
+        [_rem_finding("D1", [("pull", "b")], severity="Major")], generated_at="rb")
+    return voa.aggregate_remediation_reports([run_a, run_b], generated_at="agg")
+
+
+def test_validate_backlog_rejects_non_object():
+    assert voa.validate_remediation_backlog(7).code == voa.REPORT_NOT_AN_OBJECT
+
+
+def test_validate_backlog_rejects_bad_schema():
+    b = _good_backlog()
+    b["schemaVersion"] = True  # bool must NOT pass an integer check (L-066-1)
+    assert voa.validate_remediation_backlog(b).code == voa.REPORT_BAD_SCHEMA_VERSION
+    b["schemaVersion"] = 99
+    assert voa.validate_remediation_backlog(b).code == voa.REPORT_BAD_SCHEMA_VERSION
+
+
+def test_validate_backlog_rejects_bad_kind():
+    b = _good_backlog()
+    b["kind"] = "remediation_report"
+    assert voa.validate_remediation_backlog(b).code == voa.REPORT_BAD_STRUCTURE
+
+
+def test_validate_backlog_rejects_run_count_mismatch():
+    b = _good_backlog()
+    b["runCount"] = 99
+    res = voa.validate_remediation_backlog(b)
+    assert res.ok is False
+    assert any("runCount" in r for r in res.reasons)
+
+
+def test_validate_backlog_rejects_corroboration_mismatch():
+    """corroboration is DERIVED (== number of annotated runs); a hand-edited
+    mismatch is rejected."""
+    b = _good_backlog()
+    b["findings"][0]["corroboration"] = 5  # but only 2 runs annotated
+    res = voa.validate_remediation_backlog(b)
+    assert res.ok is False
+    assert any("corroboration" in r and "does not match" in r for r in res.reasons)
+
+
+def test_validate_backlog_rejects_duplicate_run_refs():
+    """corroboration is the count of DISTINCT runs; a finding citing the same run
+    twice (to inflate the confidence signal) is rejected (gpt-5-4 S3 R1)."""
+    b = _good_backlog()
+    f = b["findings"][0]
+    # Duplicate run #0 and bump corroboration to match the (now padded) length.
+    f["runs"] = [f["runs"][0], dict(f["runs"][0])]
+    f["corroboration"] = 2
+    res = voa.validate_remediation_backlog(b)
+    assert res.ok is False
+    assert any("duplicate run indices" in r for r in res.reasons)
+
+
+def test_validate_backlog_rejects_stray_run_index():
+    """A finding cannot cite a run index that is not in the top-level runs roll-up."""
+    b = _good_backlog()
+    f = b["findings"][0]
+    f["runs"] = [{"index": 99, "committedRef": "x", "generatedAt": "y"}]
+    f["corroboration"] = 1
+    res = voa.validate_remediation_backlog(b)
+    assert res.ok is False
+    assert any("not in the top-level runs" in r for r in res.reasons)
+
+
+def test_validate_backlog_rejects_bad_run_ref():
+    b = _good_backlog()
+    b["runs"][0]["index"] = True  # bool, not a non-negative int
+    res = voa.validate_remediation_backlog(b)
+    assert res.ok is False
+    assert any("index" in r for r in res.reasons)
+
+
+def test_validate_backlog_rejects_unexpected_top_key():
+    b = _good_backlog()
+    b["surprise"] = 1
+    res = voa.validate_remediation_backlog(b)
+    assert res.ok is False
+    assert any("unexpected top-level" in r for r in res.reasons)
+
+
+def test_validate_backlog_rejects_provenance_inconsistency():
+    b = _good_backlog()
+    b["provenanceComplete"] = True
+    b["pushUnkeyed"] = 3  # nonzero despite provenanceComplete
+    res = voa.validate_remediation_backlog(b)
+    assert res.ok is False
+    assert any("provenanceComplete is true but" in r for r in res.reasons)
+
+
+def test_validate_backlog_reuses_merged_finding_invariants():
+    """A 'both' finding stripped of its pull contributor violates the shared
+    provenance invariant - the backlog validator catches it via the SAME
+    _validate_merged_finding the comparison artifact uses."""
+    b = _good_backlog()
+    f = b["findings"][0]
+    assert f["provenance"] == dsv.PROVENANCE_BOTH
+    # Drop the pull contributor but keep provenance 'both' + surfaces [push,pull].
+    f["contributors"] = [c for c in f["contributors"] if c["surface"] == "push"]
+    res = voa.validate_remediation_backlog(b)
+    assert res.ok is False
+
+
+# --- CLI aggregate -------------------------------------------------------
+
+def test_cli_aggregate_writes_backlog(tmp_path, capsys):
+    run_a = _rem_report(
+        [_rem_finding("D1", [("push", "a")], severity="Major")], generated_at="ra")
+    run_b = _rem_report(
+        [_rem_finding("D1", [("pull", "b")], severity="Critical")], generated_at="rb")
+    pa = tmp_path / "a.json"
+    pb = tmp_path / "b.json"
+    pa.write_text(json.dumps(run_a), encoding="utf-8")
+    pb.write_text(json.dumps(run_b), encoding="utf-8")
+    out = tmp_path / "backlog.json"
+    rc = voa.main(["aggregate", "--report", str(pa), "--report", str(pb),
+                   "--out", str(out)])
+    assert rc == 0
+    assert out.is_file()
+    backlog_md = tmp_path / voa.REMEDIATION_BACKLOG_MD_FILENAME
+    assert backlog_md.is_file()
+    assert voa.validate_remediation_backlog(
+        json.loads(out.read_text(encoding="utf-8"))
+    ).ok
+    # The .md content is ASCII (cp1252-safe).
+    backlog_md.read_text(encoding="utf-8").encode("ascii")
+    assert "[x]" in capsys.readouterr().out
+
+
+def test_cli_aggregate_rejects_mixed_target(tmp_path, capsys):
+    pa = tmp_path / "a.json"
+    pb = tmp_path / "b.json"
+    pa.write_text(json.dumps(
+        _rem_report([_rem_finding("D1", [("push", "x")])], target="harvester")),
+        encoding="utf-8")
+    pb.write_text(json.dumps(
+        _rem_report([_rem_finding("D2", [("push", "y")])], target="platform")),
+        encoding="utf-8")
+    rc = voa.main(["aggregate", "--report", str(pa), "--report", str(pb),
+                   "--out", str(tmp_path / "backlog.json")])
+    assert rc == 2
+
+
+def test_cli_aggregate_no_reports_returns_nonzero():
+    assert voa.main(["aggregate"]) == 2
+
+
+def test_cli_aggregate_rejects_invalid_report(tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text(json.dumps({"kind": "not-a-report"}), encoding="utf-8")
+    rc = voa.main(["aggregate", "--report", str(bad),
+                   "--out", str(tmp_path / "backlog.json")])
+    assert rc == 2

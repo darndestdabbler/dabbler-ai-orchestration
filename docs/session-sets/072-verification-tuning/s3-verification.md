@@ -1,0 +1,13 @@
+- **Major**
+  - **Issue:** `validate_remediation_backlog` violates **S3 / L-066-1 produce<->validate parity**, specifically the required **`provenanceComplete <-> unkeyed` consistency**. It only rejects the `provenanceComplete=True` + unkeyed case, but accepts the inverse malformed state (`provenanceComplete=False` while `pushUnkeyed==pullUnkeyed==0` and no unkeyed findings).
+  - **Impact:** A hand-edited backlog that the producer would never emit validates successfully, so downstream tooling can treat an exact-provenance backlog as incomplete. That breaks the validator's contract to reject malformed envelopes while accepting exactly producer-shaped output.
+  - **Location:** `ai_router/verification_only_app.py`, `validate_remediation_backlog()`: the only provenance checks are `if pc is True and unkeyed_present` and `if pc is True and ... pushUnkeyed/pullUnkeyed != 0`; there is no converse check. Tests only cover the `pc=True` / nonzero-unkeyed direction (`test_validate_backlog_rejects_provenance_inconsistency`).
+  - **Fix:** Derive/validate `provenanceComplete` both ways: reject `pc=False` when there are no unkeyed findings and both unkeyed counters are zero. Add a negative test for `provenanceComplete=False` with zero unkeyed counts and only keyed findings.
+
+- **Major**
+  - **Issue:** `validate_remediation_backlog` violates the **S3 corroboration requirement** that corroboration is the count of **distinct runs** surfacing a finding. It checks only `corroboration == len(findings[i].runs)`, so duplicated run refs pass validation.
+  - **Impact:** A malformed backlog can inflate corroboration/priority by repeating the same run ref multiple times, and the validator will still mark it valid. That undermines the core cross-run confidence signal a reviewer/fixer is meant to trust.
+  - **Location:** `ai_router/verification_only_app.py`, `validate_remediation_backlog()`: inside the findings loop, it validates each `runs[]` entry and compares `corr` only to `len(fruns)`, with no uniqueness or membership check against top-level `runs`. Producer semantics use distinct run indices (`grp.runs`), but validator does not enforce that. No test covers duplicate `findings[].runs`.
+  - **Fix:** Require `findings[i].runs` to reference distinct runs, ideally by unique `index` values that correspond to the top-level `runs` set, and validate `corroboration` against that distinct set. Add a negative test with duplicated run refs in one finding.
+
+ISSUES_FOUND

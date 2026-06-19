@@ -957,6 +957,416 @@ def render_remediation_markdown(report: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# The cross-run remediation backlog (S3): roll up MANY runs over ONE target
+# ---------------------------------------------------------------------------
+#
+# A per-run ``remediation-report`` consolidates the cells of ONE matrix run. As an
+# exploration accumulates many runs over the SAME built target - different
+# provider x surface configs, or the same config re-run as the diff evolves - the
+# end-of-exploration handoff is a single deduplicated fix-list across all of them.
+# That is the **remediation backlog**.
+#
+# The roll-up reuses the Set 070 provenance merge per stable finding key (so a
+# defect surfaced by several runs dedups to one entry, taking its MAX severity and
+# the UNION of the surfaces that ever caught it), and annotates each finding with
+# the RUNS that surfaced it. The cross-config corroboration count (how many
+# distinct runs caught it) is a confidence / priority signal a fixer reads
+# alongside severity: a Major that three independent configs all flagged is a
+# safer fix target than a Major one config flagged once.
+#
+# A guard refuses to roll up reports from DIFFERENT targets - a backlog spans one
+# target by construction, and silently mixing two targets' fix-lists would hand a
+# repo defects that are not in its own code.
+
+REMEDIATION_BACKLOG_KIND = "remediation_backlog"
+REMEDIATION_BACKLOG_SCHEMA_VERSIONS = (1,)
+REMEDIATION_BACKLOG_SCHEMA_VERSION_CURRENT = 1
+REMEDIATION_BACKLOG_JSON_FILENAME = "remediation-backlog.json"
+REMEDIATION_BACKLOG_MD_FILENAME = "remediation-backlog.md"
+
+_RUN_REF_KEYS = {"index", "committedRef", "generatedAt"}
+
+
+class MixedTargetError(VerificationOnlyError):
+    """The aggregator was handed remediation reports for more than one target."""
+
+
+def _run_ref(index: int, report: dict) -> dict:
+    """A compact, stable identity for one input run (the unit of corroboration)."""
+    return {
+        "index": index,
+        "committedRef": report.get("committedRef", "") if isinstance(report.get("committedRef"), str) else "",
+        "generatedAt": report.get("generatedAt", "") if isinstance(report.get("generatedAt"), str) else "",
+    }
+
+
+def _raw_from_contributor(contributor: dict, key: str) -> dict:
+    """Reconstruct a Set-066 raw finding dict (carrying its stable key) from a
+    remediation-report contributor, so the cross-run merge can re-run the SAME
+    :func:`merge_findings` provenance machinery over it."""
+    raw = {
+        "description": contributor.get("description", "") if isinstance(contributor.get("description"), str) else "",
+        "severity": contributor.get("severity", "") if isinstance(contributor.get("severity"), str) else "",
+        "category": contributor.get("category", "") if isinstance(contributor.get("category"), str) else "",
+    }
+    if key:
+        raw["defectKey"] = key
+    return raw
+
+
+def aggregate_remediation_reports(
+    reports: Sequence[dict], *, generated_at: str
+) -> dict:
+    """Roll up N per-run remediation reports over ONE target into a backlog. Never
+    silently mixes targets.
+
+    Each input is a ``remediation-report`` dict (the output of
+    :func:`build_remediation_report`). Findings are re-merged across runs **keyed by
+    stable finding key** via the Set 070 :func:`merge_findings` (reused per key, so
+    the provenance / max-severity / surface-union semantics are identical to the
+    per-run report - no re-implementation), each annotated with the runs that
+    surfaced it (the ``corroboration`` count = distinct runs). Unkeyed findings
+    never merge across runs - each stays its own single-run entry (the same safe
+    over-split as within a run; an unkeyed defect carries no identity to corroborate
+    on). Findings are ordered by descending severity, then descending corroboration
+    (priority), stable within a tie.
+
+    Raises :class:`VerificationOnlyError` on an empty set and
+    :class:`MixedTargetError` when the reports do not all share one target.
+    """
+    reports = list(reports)
+    if not reports:
+        raise VerificationOnlyError("aggregate_remediation_reports needs at least one report")
+
+    # Target guard: every report must name the SAME non-empty target.
+    targets: List[str] = []
+    for i, report in enumerate(reports):
+        if not isinstance(report, dict):
+            raise VerificationOnlyError(f"report[{i}] is not an object")
+        target = report.get("target")
+        if not _is_nonempty_str_local(target):
+            raise VerificationOnlyError(f"report[{i}] has a missing/empty target")
+        targets.append(target)
+    distinct = sorted(set(targets))
+    if len(distinct) > 1:
+        raise MixedTargetError(
+            "cannot aggregate remediation reports for different targets: "
+            f"{distinct} (a backlog spans exactly one target)"
+        )
+    target = distinct[0]
+
+    run_refs = [_run_ref(i, report) for i, report in enumerate(reports)]
+
+    # Group findings across runs. Keyed findings group by defectKey (cross-run
+    # merge); each unkeyed finding is its own group (never merges).
+    @dataclass
+    class _Group:
+        push: List[dict]
+        pull: List[dict]
+        runs: List[int]  # distinct run indices, in first-seen order
+
+    groups: "dict[object, _Group]" = {}
+    group_order: List[object] = []
+    unkeyed_seq = 0
+    push_unkeyed = 0
+    pull_unkeyed = 0
+
+    for run_idx, report in enumerate(reports):
+        findings = report.get("findings")
+        if not isinstance(findings, list):
+            continue
+        for finding in findings:
+            if not isinstance(finding, dict):
+                continue
+            raw_key = finding.get("defectKey")
+            key = raw_key.strip() if isinstance(raw_key, str) and raw_key.strip() else ""
+            contributors = finding.get("contributors")
+            contributors = contributors if isinstance(contributors, list) else []
+            if key:
+                gid: object = ("keyed", key)
+            else:
+                gid = ("unkeyed", unkeyed_seq)
+                unkeyed_seq += 1
+            if gid not in groups:
+                groups[gid] = _Group(push=[], pull=[], runs=[])
+                group_order.append(gid)
+            grp = groups[gid]
+            if run_idx not in grp.runs:
+                grp.runs.append(run_idx)
+            for contributor in contributors:
+                if not isinstance(contributor, dict):
+                    continue
+                surface = contributor.get("surface")
+                raw = _raw_from_contributor(contributor, key)
+                if surface == SURFACE_PUSH:
+                    grp.push.append(raw)
+                    if not key:
+                        push_unkeyed += 1
+                elif surface == SURFACE_PULL:
+                    grp.pull.append(raw)
+                    if not key:
+                        pull_unkeyed += 1
+
+    backlog_findings: List[dict] = []
+    for gid in group_order:
+        grp = groups[gid]
+        # Reuse merge_findings to canonicalize THIS group (one key, or one unkeyed
+        # finding): identical provenance / max-severity / union-surface semantics.
+        merged = merge_findings(grp.push, grp.pull)
+        if not merged.findings:
+            continue
+        finding_dict = merged.findings[0].to_dict()
+        finding_dict["corroboration"] = len(grp.runs)
+        finding_dict["runs"] = [run_refs[i] for i in grp.runs]
+        backlog_findings.append(finding_dict)
+
+    # Severity-ranked (primary), corroboration-ranked (secondary priority); stable
+    # within a tie (first-seen group order preserved).
+    backlog_findings.sort(
+        key=lambda f: (_severity_rank(f.get("severity")), f.get("corroboration", 0)),
+        reverse=True,
+    )
+
+    provenance_complete = push_unkeyed == 0 and pull_unkeyed == 0
+    return {
+        "schemaVersion": REMEDIATION_BACKLOG_SCHEMA_VERSION_CURRENT,
+        "kind": REMEDIATION_BACKLOG_KIND,
+        "target": target,
+        "generatedAt": generated_at,
+        "runCount": len(reports),
+        "runs": run_refs,
+        "provenanceComplete": provenance_complete,
+        "pushUnkeyed": push_unkeyed,
+        "pullUnkeyed": pull_unkeyed,
+        "findings": backlog_findings,
+    }
+
+
+_BACKLOG_TOP_KEYS = {
+    "schemaVersion", "kind", "target", "generatedAt", "runCount", "runs",
+    "provenanceComplete", "pushUnkeyed", "pullUnkeyed", "findings",
+}
+
+
+def _validate_run_ref(obj: object, where: str) -> List[str]:
+    reasons: List[str] = []
+    if not isinstance(obj, dict):
+        return [f"{where} is not an object"]
+    extra = sorted(set(obj) - _RUN_REF_KEYS)
+    if extra:
+        reasons.append(f"{where} has unexpected key(s): {extra}")
+    if not _is_nonneg_int(obj.get("index")):
+        reasons.append(f"{where}.index must be a non-negative integer")
+    for key in ("committedRef", "generatedAt"):
+        if not isinstance(obj.get(key), str):
+            reasons.append(f"{where}.{key} must be a string")
+    return reasons
+
+
+def validate_remediation_backlog(backlog: object) -> ReportValidationResult:
+    """Validate a ``remediation-backlog.json`` artifact. Never raises.
+
+    L-066-1 parity with :func:`aggregate_remediation_reports`: the closed envelope,
+    the int-not-bool schema version, ``runCount`` consistent with ``runs``, the
+    provenance-complete / unkeyed-count consistency, each finding validated by the
+    SHARED merged-finding validator (its core provenance invariants hold exactly as
+    for the per-run report) PLUS the backlog-only ``corroboration`` / ``runs``
+    annotation, with ``corroboration`` required to equal the number of runs that
+    surfaced the finding (the count is DERIVED, not free).
+    """
+    if not isinstance(backlog, dict):
+        return ReportValidationResult(
+            ok=False, code=REPORT_NOT_AN_OBJECT, reasons=("backlog is not an object",)
+        )
+    version = backlog.get("schemaVersion")
+    if not _is_int_not_bool(version) or version not in REMEDIATION_BACKLOG_SCHEMA_VERSIONS:
+        return ReportValidationResult(
+            ok=False, code=REPORT_BAD_SCHEMA_VERSION,
+            reasons=(f"schemaVersion must be one of "
+                     f"{list(REMEDIATION_BACKLOG_SCHEMA_VERSIONS)} (integer)",),
+        )
+    if backlog.get("kind") != REMEDIATION_BACKLOG_KIND:
+        return ReportValidationResult(
+            ok=False, code=REPORT_BAD_STRUCTURE,
+            reasons=(f"kind must be {REMEDIATION_BACKLOG_KIND!r}",),
+        )
+    if not _is_nonempty_str_local(backlog.get("target")):
+        return ReportValidationResult(
+            ok=False, code=REPORT_BAD_STRUCTURE, reasons=("target is missing or empty",)
+        )
+
+    reasons: List[str] = []
+    extra = sorted(set(backlog) - _BACKLOG_TOP_KEYS)
+    if extra:
+        reasons.append(f"unexpected top-level key(s): {extra}")
+    if not _is_nonempty_str_local(backlog.get("generatedAt")):
+        reasons.append("generatedAt is missing or empty")
+    if not isinstance(backlog.get("provenanceComplete"), bool):
+        reasons.append("provenanceComplete must be a boolean")
+    for key in ("pushUnkeyed", "pullUnkeyed"):
+        if not _is_nonneg_int(backlog.get(key)):
+            reasons.append(f"{key} must be a non-negative integer")
+
+    runs = backlog.get("runs")
+    if not isinstance(runs, list) or not runs:
+        reasons.append("runs must be a non-empty array")
+    else:
+        for i, run in enumerate(runs):
+            reasons.extend(_validate_run_ref(run, f"runs[{i}]"))
+    run_count = backlog.get("runCount")
+    if not _is_nonneg_int(run_count):
+        reasons.append("runCount must be a non-negative integer")
+    elif isinstance(runs, list) and run_count != len(runs):
+        reasons.append(f"runCount ({run_count}) does not match the number of runs "
+                       f"({len(runs)})")
+
+    findings = backlog.get("findings")
+    if not isinstance(findings, list):
+        reasons.append("findings must be an array")
+    else:
+        for i, finding in enumerate(findings):
+            # Validate the merged-finding CORE with the shared validator (so every
+            # provenance invariant holds), then the backlog-only annotation.
+            if isinstance(finding, dict):
+                core = {k: v for k, v in finding.items()
+                        if k not in ("corroboration", "runs")}
+                reasons.extend(_validate_merged_finding(core, i))
+                corr = finding.get("corroboration")
+                fruns = finding.get("runs")
+                if not (_is_int_not_bool(corr) and corr >= 1):
+                    reasons.append(f"findings[{i}].corroboration must be a positive integer")
+                if not isinstance(fruns, list) or not fruns:
+                    reasons.append(f"findings[{i}].runs must be a non-empty array")
+                else:
+                    for j, run in enumerate(fruns):
+                        reasons.extend(_validate_run_ref(run, f"findings[{i}].runs[{j}]"))
+                    # corroboration is the count of DISTINCT runs (the producer builds
+                    # finding.runs from distinct grp.run indices drawn from the
+                    # top-level runs). Enforce that producer-held invariant so a
+                    # hand-edited backlog cannot inflate the confidence signal by
+                    # repeating a run ref or citing a run that is not in the roll-up
+                    # (gpt-5-4 S3 R1; the Set-070 cross-field-invariant precedent).
+                    indices = [r.get("index") for r in fruns if isinstance(r, dict)]
+                    valid_indices = [x for x in indices if _is_nonneg_int(x)]
+                    distinct = set(valid_indices)
+                    if len(valid_indices) != len(distinct):
+                        reasons.append(f"findings[{i}].runs has duplicate run indices: "
+                                       f"{sorted(x for x in distinct if valid_indices.count(x) > 1)}")
+                    if isinstance(runs, list):
+                        top_indices = {
+                            r.get("index") for r in runs if isinstance(r, dict)
+                        }
+                        stray = sorted(x for x in distinct if x not in top_indices)
+                        if stray:
+                            reasons.append(f"findings[{i}].runs references run index(es) "
+                                           f"not in the top-level runs: {stray}")
+                    if _is_int_not_bool(corr) and corr != len(distinct):
+                        reasons.append(f"findings[{i}].corroboration ({corr}) does not "
+                                       "match the number of distinct annotated runs "
+                                       f"({len(distinct)})")
+            else:
+                reasons.extend(_validate_merged_finding(finding, i))
+        # provenanceComplete must be consistent with the findings + the unkeyed
+        # counts (same one-way checks the per-run report applies).
+        pc = backlog.get("provenanceComplete")
+        unkeyed_present = any(
+            isinstance(f, dict) and not f.get("defectKey") for f in findings
+        )
+        if pc is True and unkeyed_present:
+            reasons.append("provenanceComplete is true but at least one finding is "
+                           "unkeyed")
+    pc = backlog.get("provenanceComplete")
+    pu, qu = backlog.get("pushUnkeyed"), backlog.get("pullUnkeyed")
+    if pc is True and (
+        (_is_int_not_bool(pu) and pu != 0) or (_is_int_not_bool(qu) and qu != 0)
+    ):
+        reasons.append("provenanceComplete is true but pushUnkeyed/pullUnkeyed is "
+                       "nonzero")
+
+    if reasons:
+        return ReportValidationResult(
+            ok=False, code=REPORT_BAD_STRUCTURE, reasons=tuple(reasons)
+        )
+    return ReportValidationResult(ok=True, code=REPORT_OK)
+
+
+def render_remediation_backlog_markdown(backlog: dict) -> str:
+    """Render the remediation backlog as a human-readable, ASCII-only Markdown doc.
+
+    The end-of-exploration fix-list: each finding by descending severity (then
+    corroboration), showing the surfaces and runs that caught it - so a fixer reads
+    cross-config corroboration as a priority signal next to severity.
+    """
+    lines: List[str] = []
+    target = backlog.get("target", "(unknown)")
+    lines.append(f"# Remediation backlog - {target}")
+    lines.append("")
+    lines.append(f"- generated at: {backlog.get('generatedAt', '')}")
+    lines.append(f"- runs aggregated: {backlog.get('runCount')}")
+    pc = backlog.get("provenanceComplete")
+    lines.append(f"- provenance complete: {pc}")
+    if pc is not True:
+        lines.append(
+            f"- NOTE: provenance is incomplete "
+            f"(pushUnkeyed={backlog.get('pushUnkeyed')}, "
+            f"pullUnkeyed={backlog.get('pullUnkeyed')}); an unkeyed defect cannot "
+            "corroborate across runs, so it appears once per run that caught it."
+        )
+    findings = backlog.get("findings")
+    findings = findings if isinstance(findings, list) else []
+    lines.append(f"- findings: {len(findings)}")
+    lines.append("")
+    if not findings:
+        lines.append("No findings to remediate.")
+        return _ascii("\n".join(lines) + "\n")
+    for i, f in enumerate(findings, start=1):
+        if not isinstance(f, dict):
+            continue
+        sev = f.get("severity") or "(unspecified)"
+        prov = f.get("provenance", "")
+        cat = f.get("category") or "(uncategorized)"
+        key = f.get("defectKey") or "(unkeyed)"
+        corr = f.get("corroboration")
+        lines.append(f"## {i}. [{sev}] {cat} - {prov} (corroboration={corr})")
+        lines.append(f"- defect key: {key}")
+        surfaces = f.get("surfaces")
+        if isinstance(surfaces, list):
+            lines.append(f"- surfaces: {', '.join(str(s) for s in surfaces)}")
+        fruns = f.get("runs")
+        if isinstance(fruns, list):
+            refs = ", ".join(
+                f"#{r.get('index')}@{r.get('committedRef')}"
+                for r in fruns if isinstance(r, dict)
+            )
+            lines.append(f"- surfaced by runs: {refs}")
+        contributors = f.get("contributors")
+        if isinstance(contributors, list):
+            for c in contributors:
+                if not isinstance(c, dict):
+                    continue
+                surface = c.get("surface", "?")
+                desc = c.get("description", "")
+                lines.append(f"- ({surface}) {desc}")
+        lines.append("")
+    return _ascii("\n".join(lines) + "\n")
+
+
+def write_backlog(
+    backlog: dict, *, backlog_json_path: Path
+) -> Tuple[Path, Path]:
+    """Write the backlog json + md (the md next to the json). Returns both paths."""
+    backlog_json_path = Path(backlog_json_path)
+    backlog_json_path.write_text(
+        json.dumps(backlog, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    backlog_md_path = backlog_json_path.parent / REMEDIATION_BACKLOG_MD_FILENAME
+    backlog_md_path.write_text(
+        render_remediation_backlog_markdown(backlog), encoding="utf-8"
+    )
+    return backlog_json_path, backlog_md_path
+
+
+# ---------------------------------------------------------------------------
 # Writers + CLI
 # ---------------------------------------------------------------------------
 
@@ -1054,6 +1464,19 @@ def main(argv: Optional[List[str]] = None) -> int:
         help=f"path for the matrix report json (default: {MATRIX_REPORT_FILENAME})",
     )
 
+    p_agg = sub.add_parser(
+        "aggregate",
+        help="roll up N per-run remediation reports over one target into a backlog",
+    )
+    p_agg.add_argument(
+        "--report", action="append", metavar="PATH", dest="reports",
+        help="a per-run remediation-report.json (repeatable; all must share a target)",
+    )
+    p_agg.add_argument(
+        "--out", default=REMEDIATION_BACKLOG_JSON_FILENAME,
+        help=f"path for the backlog json (default: {REMEDIATION_BACKLOG_JSON_FILENAME})",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command == "run":
@@ -1091,6 +1514,37 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"    wrote {_ascii(rem_md)}")
         return 0
 
+    if args.command == "aggregate":
+        paths = args.reports or []
+        if not paths:
+            print("[ ] aggregate needs at least one --report")
+            return 2
+        reports: List[dict] = []
+        for p in paths:
+            try:
+                data = json.loads(Path(p).read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                print(f"[ ] could not read report {_ascii(p)}: {_ascii(exc)}")
+                return 2
+            res = validate_remediation_report(data)
+            if not res.ok:
+                print(f"[ ] {_ascii(p)} is not a valid remediation report "
+                      f"({_ascii(res.code)}): {_ascii('; '.join(res.reasons))}")
+                return 2
+            reports.append(data)
+        generated_at = datetime.now(timezone.utc).astimezone().isoformat()
+        try:
+            backlog = aggregate_remediation_reports(reports, generated_at=generated_at)
+        except VerificationOnlyError as exc:
+            print(f"[ ] could not aggregate: {_ascii(exc)}")
+            return 2
+        backlog_json, backlog_md = write_backlog(backlog, backlog_json_path=Path(args.out))
+        print(f"[x] target={_ascii(backlog['target'])} runs={backlog['runCount']} "
+              f"findings={len(backlog['findings'])}")
+        print(f"    wrote {_ascii(backlog_json)}")
+        print(f"    wrote {_ascii(backlog_md)}")
+        return 0
+
     return 2  # pragma: no cover - argparse requires a subcommand
 
 
@@ -1126,6 +1580,17 @@ __all__ = [
     "validate_remediation_report",
     "render_remediation_markdown",
     "write_reports",
+    # cross-run backlog (S3)
+    "REMEDIATION_BACKLOG_KIND",
+    "REMEDIATION_BACKLOG_SCHEMA_VERSIONS",
+    "REMEDIATION_BACKLOG_SCHEMA_VERSION_CURRENT",
+    "REMEDIATION_BACKLOG_JSON_FILENAME",
+    "REMEDIATION_BACKLOG_MD_FILENAME",
+    "MixedTargetError",
+    "aggregate_remediation_reports",
+    "validate_remediation_backlog",
+    "render_remediation_backlog_markdown",
+    "write_backlog",
     "main",
 ]
 

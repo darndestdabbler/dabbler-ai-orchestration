@@ -248,7 +248,7 @@ last-pruned-set: (none)   generated: 2026-06-18
   the same rule.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="071" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="072" status="active" scope="portable" -->
 
 - **Context:** Cross-provider verification of a heavily cross-referenced
   synthesis document — a proposal, design doc, or spec whose central
@@ -309,34 +309,18 @@ last-pruned-set: (none)   generated: 2026-06-18
   per-session routed verification had missed.
 
 ## A Bug Is A Bug CLASS — Fix Every Sibling Site, Not Just The Reported One
-<!-- lesson: id="L-069-1" added-set="069" last-used-set="072" status="active" scope="portable" -->
+<!-- lesson: id="L-069-1" added-set="069" last-used-set="072" status="promoted" scope="portable" -->
 
-- **Context:** Fixing a defect that is an instance of a *class* (a robustness gap
-  in one of several parallel readers/validators that all do the same thing). Set
-  068 fixed a `UnicodeError`-on-malformed-bytes crash in `contract_gate`'s JSON
-  readers by adding `UnicodeError` to their `(OSError, json.JSONDecodeError)`
-  guards — but the **sibling** module `path_aware_critique.py` had four readers of
-  the *same shape* that were never updated, leaving the same close-out crash
-  **latent** until Set 069 S3's probe-template dogfood drove one of them on
-  invalid UTF-8 and reproduced it.
-- **Failure or friction:** A point-fix at the reported site leaves the bug class
-  alive everywhere else it occurs. The fix *reads* complete ("we handle
-  UnicodeError now"), so the residual siblings are invisible until something
-  exercises them — often much later, on a path (like close-out) where the crash
-  is expensive.
-- **Lesson:** When a fix closes a *class* of defect, **grep the whole codebase for
-  the pattern** (here: `except (OSError, json.JSONDecodeError)` on a `utf-8`
-  read) and either fix every reachable sibling in the same pass or **explicitly
-  scope and record** which siblings are deferred and why (so the residual is a
-  decision, not an oversight). A built executable probe — a probe-template /
-  falsifier that drives the *public entrypoint* with the bad input — is the
-  durable way to find and then pin these: it both reproduces the class and becomes
-  the regression that keeps it fixed.
-- **Action for future sessions:** After a class-fix, run the pattern grep, triage
-  every hit by reachability (is it on a never-raising / close-out / gate path?),
-  fix the reachable ones, and name the deferred residual in the disposition. Where
-  practical, ship a probe template that drives the class so it cannot silently
-  re-open.
+- **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-19**
+  after application across Sets 068 (origin: the `contract_gate` `UnicodeError` fix),
+  069 (a probe-template dogfood reproduced the still-latent `path_aware_critique.py`
+  sibling class), and 072 (the four deferred sibling readers + `UnicodeError` folded
+  in across both modules). The durable rule — when a fix closes a *class* of defect,
+  grep the whole codebase for the pattern and either fix every reachable sibling in
+  the same pass or explicitly scope + record the deferred residual; ship a probe that
+  drives the public entrypoint where practical — now lives in the Convention.
+  Collapsed to this pointer to avoid duplicate guidance and relieve the active-lessons
+  ceiling.
 
 ## Measure A Verification Surface At Its Strongest Framing Before Demoting Or Retiring It
 <!-- lesson: id="L-069-2" added-set="069" last-used-set="072" status="active" scope="portable" -->
@@ -369,35 +353,18 @@ last-pruned-set: (none)   generated: 2026-06-18
   push-vs-pull result whose arms used unequal framing as evidence for retiring push.
 
 ## An Iterative Dogfood Keeps Its Own Gate Artifact "Pre-Fix" — Frame It As Evidence, Not A Clean Snapshot
-<!-- lesson: id="L-070-1" added-set="070" last-used-set="071" status="active" scope="portable" -->
+<!-- lesson: id="L-070-1" added-set="070" last-used-set="072" status="promoted" scope="portable" -->
 
-- **Context:** A set whose close-out runs an **iterative** multi-provider dogfood
-  (e.g. the end-of-set path-aware critique) that *keeps finding real defects* round
-  after round — each fix driving the next round (Set 070 S3: the path-aware critique
-  caught five real defects across four rounds that six rounds of single-shot
-  cross-provider verification's R1 had missed).
-- **Failure or friction:** Every time the dogfood drives a fix, the committed gate
-  artifact it produced now **predates** that fix, so a reviewer (correctly) flags it
-  as "stale / not the final tree." Chasing a clean post-fix re-run is a treadmill:
-  the next run finds the next thing, re-staling the artifact. Set 070 S3 burned ~3
-  extra verification rounds (R2/R3 each re-flagged the staleness) before recognizing
-  the pattern.
-- **Lesson:** A `required` path-aware-critique gate needs a **valid multi-provider
-  artifact**, not a clean-verdict one that post-dates every fix. Frame the iterative
-  dogfood honestly as **evidence** — preserve the round that caught the headline
-  defect, commit the **final round as the gate artifact**, and **adjudicate every
-  finding in the disposition** (fixed / false-positive / deferred-residual). The
-  authoritative per-session **VERIFIED** gate is the **cross-provider session
-  verification**, which is a *different* surface and need not post-date the
-  path-aware fixes. Converge the dogfood when a round drives **no new code change**
-  (only characterizations / false-positives / by-design), not when it finally
-  returns a clean verdict.
-- **Action for future sessions:** When an end-of-set dogfood enters a fix→re-run
-  loop, stop re-running it for a pristine snapshot. Keep the final run as the gate
-  artifact, record the lineage + per-finding adjudication in `disposition.json`, and
-  rely on the cross-provider verification rounds for the authoritative verdict. Only
-  a *new code defect* (not a doc-lag or an already-adjudicated item) justifies
-  another dogfood round.
+- **Promoted to `project-guidance.md` → Conventions → Workflow Expectations on
+  2026-06-19** after application across Sets 070 (origin: the path-aware critique
+  caught five real defects four single-shot rounds had missed), 071, and 072 (the S4
+  path-aware dogfood caught + fixed a real Major in the S3 aggregator, then converged
+  on no-new-code). The durable rule — commit the final dogfood round as the gate
+  artifact, adjudicate every finding in `disposition.json`, rely on the cross-provider
+  session verification (a different surface) for the authoritative `VERIFIED` verdict,
+  and converge the dogfood when a round drives no new code change — now lives in the
+  Convention. Collapsed to this pointer to avoid duplicate guidance and relieve the
+  active-lessons ceiling.
 
 ## Strong Adversarial Framing Without A Materiality Bar Manufactures Minor-Finding Churn
 <!-- lesson: id="L-071-1" added-set="071" last-used-set="072" status="active" scope="portable" -->

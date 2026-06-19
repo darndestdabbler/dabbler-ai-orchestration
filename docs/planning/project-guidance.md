@@ -105,6 +105,23 @@ validated — consider it, apply judgment).
   alone caught a duplicate-`surfaces` gap and two `provenanceComplete` schema↔validator
   parity gaps).
 
+- **A bug is a bug CLASS — fix every sibling site, not just the reported one.** When a
+  fix closes a *class* of defect (a robustness gap shared by several parallel
+  readers / validators / handlers that all do the same thing), **grep the whole
+  codebase for the pattern** and either fix every reachable sibling in the same pass
+  **or** explicitly scope and record which siblings are deferred and why — so a
+  residual is a *decision*, not an oversight. A point-fix at the reported site *reads*
+  complete while the class stays alive everywhere else, invisible until something
+  exercises it — often much later, on an expensive path like close-out. Triage each
+  hit by reachability (is it on a never-raising / close-out / gate path?), fix the
+  reachable ones, and name the deferred residual in the disposition; where practical
+  ship a probe / falsifier that drives the *public entrypoint* with the bad input, so
+  the class both reproduces and cannot silently re-open. Promoted from
+  `lessons-learned.md` (L-069-1) on 2026-06-19 after application across Sets 068
+  (origin: the `contract_gate` `UnicodeError` fix), 069 (a probe-template dogfood
+  reproduced the still-latent `path_aware_critique.py` sibling class), and 072 (the
+  four deferred sibling readers + `UnicodeError` folded in across both modules).
+
 > **TODO:** Add additional code style conventions (naming, formatting,
 > nullable, async suffix, file layout, etc.).
 
@@ -152,6 +169,19 @@ validated — consider it, apply judgment).
   artifact (Set 066). It is orthogonal to per-session routed verification, which
   it does not replace. Stage mechanics:
   `docs/ai-led-session-workflow.md` → *The end-of-set Path-Aware Critique stage*.
+- **An iterative end-of-set dogfood keeps its own gate artifact "pre-fix" — frame it
+  as evidence, not a clean snapshot.** When a `required` path-aware critique (or any
+  end-of-set dogfood) enters a fix→re-run loop because each round keeps catching real
+  defects, do **not** chase a pristine post-fix re-run — the next round re-stales it,
+  a treadmill. Commit the **final round as the gate artifact**, record the lineage +
+  **per-finding adjudication** (fixed / false-positive / deferred-residual) in
+  `disposition.json`, and rely on the **cross-provider session verification** — a
+  different surface — for the authoritative `VERIFIED` verdict. Converge the dogfood
+  when a round drives **no new code change** (only characterizations / false-positives
+  / by-design), not when it finally returns a clean verdict; only a *new code defect*
+  justifies another round. Promoted from `lessons-learned.md` (L-070-1) on 2026-06-19
+  after application across Sets 070 (origin), 071, and 072 (the S4 path-aware dogfood
+  caught + fixed a real Major in the S3 aggregator, then converged on no-new-code).
 - **Obey the spec's Session Set Configuration block at runtime.** Rules are
   conditional on the spec's `requiresUAT` and `requiresE2E` flags. Do not
   re-litigate those flags during a session — if a flag is wrong, surface it

@@ -1,0 +1,4 @@
+[x] target=dabbler-platform cells=2 skipped=0
+    wrote docs\session-sets\073-cross-target-verification-telemetry\platform-run\verification-matrix-report.json
+    wrote docs\session-sets\073-cross-target-verification-telemetry\platform-run\remediation-report.json
+    wrote docs\session-sets\073-cross-target-verification-telemetry\platform-run\remediation-report.md

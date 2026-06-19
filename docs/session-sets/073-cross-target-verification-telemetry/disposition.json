@@ -1,0 +1,34 @@
+{
+  "status": "completed",
+  "summary": "Set 073 Session 1 of 2 -- platform matrix run + cross-target telemetry record. Ran on claude-opus-4-8. An APPLICATION/TELEMETRY session: NO production code changed (ai_router untouched); it points the already-shipped Set 072 0.26.0 apparatus at a SECOND real built target and records telemetry. DELIVERED: (1) CHOSE a code-focused diff range in ../dabbler-platform -- 82a95ab..d66c449 ('crud-scaffolding-remediation Session 2: dabbler-crud-slice wrapper'), source-dominated (9 new .cs files: a new tools/Dabbler.CrudSlice CLI tool + its tests + 2 consuming src/ files; largest single-file diffs all .cs; no .db/.nupkg/pack-output/golden files dominant). Applied the Set 072 harvester lesson (avoid golden-output-dominated ranges the push arm elides). (2) RAN the matrix push:anthropic x {pull:openai, pull:google} (mirrors the harvester matrix exactly, incl. the load-bearing Gemini-pull-under-strong-framing cell), orchestrator anthropic/claude-opus-4-8, both arms strong adversarial-devils-advocate framing (L-069-2 held). 2 cells, 0 skipped -> platform-run/verification-matrix-report.json + remediation-report.{json,md}. RESULT (the load-bearing acceptance check): the Gemini-pull cell (pull=google/gemini-2.5-pro) returned VERIFIED -- a VERDICT, NOT silence. The Set 072 harvester Gemini-pull-not-silent result REPLICATES on a second independent target (N=2). HONEST NUANCE recorded for S2: 'non-silent' replicates, but Gemini-pull returned 0 findings while GPT-pull returned 2 Major contract-drift findings over the same repo, so the finding-YIELD gap is not refuted -- replication is of the verdict-not-silence property, not finding power. Per-cell telemetry present + complete; both validate_matrix_report (expected_target=dabbler-platform) + validate_remediation_report round-trip (report-ok). Cell A (pull=gpt-5.4): push ISSUES_FOUND 1 Major + pull ISSUES_FOUND 2 Major; Cell B (pull=gemini): both VERIFIED/0. Both diffs elided=true at ~61KB (push dispatch size budget); the harvester elision dropped golden-regen NOISE (push non-load-bearing) whereas the platform elision dropped real source (push a genuine reviewing surface -- it found a Major in Cell A). The 2 GPT-pull Majors are real repo-state contract-drift findings (missing docs/ai-led-session-workflow.md SSOT; platform-overview omits packaged Dabbler.Api.Querying) = genuine consumer-handoff value dabbler-platform can remediate without re-running verification. (3) CROSS-TARGET RECORD: ran the real S3 aggregator on the real, independently-produced platform report -> platform-run/remediation-backlog.{json,md} (runCount=1, 3 findings, all corroboration=1), validates report-ok; and demonstrated the MixedTargetError contrapositive (harvester+platform together correctly REFUSED). Authored cross-target-comparison.md (side-by-side telemetry table, the Gemini-pull replication observation + nuance, the diff-shape/push-blindness contrast, the per-cell findings + false-positive read, the aggregator exercise). KEY S2 INPUT: the Set 072 pull-template instruction-tension META-finding did NOT recur on platform (GPT-pull emitted substantive contract-drift instead) -> it is a single observation (N=1), so S2's conditional recurrence-gated pull-template fix does NOT fire (record + no release). VERIFICATION: routed_gate REQUIRED (blast-radius cross-artifact + breadth 10 files); routed session-verification to gpt-5-4 (cross-provider from the anthropic orchestrator), R1 ISSUES_FOUND with 1 finding ($0.122): the comparison note's SS4 over-stated the adjudication of the platform push-only Completeness finding ('normal'/'immaterial'). Classified MINOR (doc-accuracy, no merge-decision/code impact) -> per L-071-1 a Minor-only round is NON-BLOCKING / effectively VERIFIED; FIXED (rephrased SS4 item 1 + its SS4 echo per L-065-1 to leave materiality/triage to dabbler-platform) and NOT re-verified (a confirming re-verify of an overstatement-removal wording fix is the L-071-1 nit-churn the discipline forbids). s1-verification.md (raw R1, never edited) + s1-issues.json saved. Session 1 VERIFIED. Set remains in-progress (S2 = synthesis + conditional template-fix-or-noop + close).",
+  "files_changed": [
+    "docs/session-sets/073-cross-target-verification-telemetry/platform-run/verification-matrix-report.json",
+    "docs/session-sets/073-cross-target-verification-telemetry/platform-run/remediation-report.json",
+    "docs/session-sets/073-cross-target-verification-telemetry/platform-run/remediation-report.md",
+    "docs/session-sets/073-cross-target-verification-telemetry/platform-run/remediation-backlog.json",
+    "docs/session-sets/073-cross-target-verification-telemetry/platform-run/remediation-backlog.md",
+    "docs/session-sets/073-cross-target-verification-telemetry/platform-run/run-console.log",
+    "docs/session-sets/073-cross-target-verification-telemetry/cross-target-comparison.md",
+    "docs/session-sets/073-cross-target-verification-telemetry/s1-verification.md",
+    "docs/session-sets/073-cross-target-verification-telemetry/s1-issues.json",
+    "docs/session-sets/073-cross-target-verification-telemetry/disposition.json",
+    "docs/session-sets/073-cross-target-verification-telemetry/activity-log.json",
+    "docs/session-sets/073-cross-target-verification-telemetry/session-state.json",
+    "docs/session-sets/073-cross-target-verification-telemetry/session-events.jsonl"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": [],
+  "verification_verdict": "VERIFIED",
+  "lessons_cited": [
+    "L-072-1",
+    "L-069-2",
+    "L-066-1",
+    "L-067-1",
+    "L-071-1",
+    "L-065-1",
+    "L-064-9",
+    "L-064-10"
+  ]
+}

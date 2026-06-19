@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "cross-target-comparison.md (SS4 item 1) overstated the adjudication of the platform push-only Major Completeness finding, calling it 'A normal mid-session commit looks exactly like this' / 'immaterial-to-the-feature'. The artifacts establish only that a push-only Major repo-state/session-bookkeeping inconsistency exists (session-state.json in-progress while session-reviews/session-002.md says Verdict: Pass and router-metrics.jsonl already carries next-session routing) and that it is unrelated to the Dabbler.CrudSlice code path; they do NOT establish that it is a normal/immaterial condition. Risk: Session 2's synthesis could underweight a surfaced Major repo-state inconsistency as already-resolved/immaterial.",
+      "category": "Correctness",
+      "severity": "Minor",
+      "resolution_status": "fixed",
+      "resolution_notes": "Rephrased SS4 item 1 (and its echo in the SS4 false-positive read, per L-065-1 propagate-every-echo) to stay within evidence: the finding is a push-only Major repo-state/session-bookkeeping inconsistency and not a direct Dabbler.CrudSlice code defect, with overall materiality/triage explicitly LEFT to dabbler-platform (the consumer-handoff model) rather than declared 'normal' or 'immaterial'. Per the Set 071 materiality discipline (L-071-1) a Minor-only round is non-blocking (effectively VERIFIED); fixed because it improves the accuracy of an evidence note Session 2 builds its synthesis on, and NOT re-verified -- a confirming re-verify of a pure overstatement-removal wording fix is exactly the L-071-1 nit-churn the discipline forbids.",
+      "resolved_in_round": 1
+    }
+  ]
+}

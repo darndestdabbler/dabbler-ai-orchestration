@@ -34,16 +34,16 @@
     {
       "number": 3,
       "title": "Cross-run remediation aggregator",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-06-19T09:15:45.356342-04:00",
-      "completedAt": null,
+      "completedAt": "2026-06-19T09:34:42.890374-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
         "model": "claude-opus-4-8",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 4,

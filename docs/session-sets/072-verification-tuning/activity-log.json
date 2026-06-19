@@ -1,7 +1,7 @@
 {
   "sessionSetName": "072-verification-tuning",
   "createdDate": "2026-06-19T10:27:49.197965+00:00",
-  "totalSessions": 0,
+  "totalSessions": 4,
   "entries": [
     {
       "sessionNumber": 1,
@@ -10,7 +10,6 @@
       "dateTime": "2026-06-19T10:27:49.197965+00:00",
       "description": "Operator set pathAwareCritique: required.",
       "status": "complete",
-      "routedApiCalls": [],
       "kind": "path_aware_critique",
       "choice": "required"
     },
@@ -21,9 +20,40 @@
       "dateTime": "2026-06-19T10:27:49.197965+00:00",
       "description": "Operator set contractGate: advisory.",
       "status": "complete",
-      "routedApiCalls": [],
       "kind": "contract_gate",
       "choice": "advisory"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/register-and-read",
+      "dateTime": "2026-06-19T08:39:42.486384-04:00",
+      "description": "Registered S2 (claude/opus-4-8/high). Read spec, S1 disposition+deliverables, project-guidance, lessons-learned, authoring-guide, dual_surface_verify.py (run_dual_surface matrix seam, merge_findings, build/validate_comparison_artifact, _arms_held_equal, CellTelemetry inputs), pull_critique.py (produce_path_aware_critique, _default_sandbox_for, build_instruction/prompt_body_of, _FALLBACK_INSTRUCTION, _ascii), Finding/PullCritique shapes, router-config pull_verifier block.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/build-module",
+      "dateTime": "2026-06-19T08:47:36.187890-04:00",
+      "description": "Built ai_router/verification_only_app.py (net-new, thin orchestration; NO arm logic): MatrixRow/MatrixCell + pair_matrix_rows (push x pull cross-product); run_verification_matrix (one matrix-mode run_dual_surface call per cell, external target via sandbox_dir seam; per-cell failure -> SkippedCell, L-067-1); _measure_diff once per run via the runner _dispatch_get_diff; CellTelemetry stamping every confound; validate_matrix_report (L-066-1 parity, reuses dual_surface _validate_merged_finding); build_remediation_report (merge_findings across ALL cells -> deduped/severity-ranked, experiment metadata dropped) + validate_remediation_report + render_remediation_markdown (ASCII) + write_reports; CLI run subcommand. +17 hermetic tests, full suite GREEN 2202/5.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/schema-docs-and-config",
+      "dateTime": "2026-06-19T08:49:47.507556-04:00",
+      "description": "Authored docs/verification-matrix-report-schema.md + docs/remediation-report-schema.md (orchestrator-facing references; validator-wins parity note, the two-outputs-one-run + consumer-handoff + matrix-is-not-RETIRE-evidence framing). Added commentary-only verification_only block under pull_verifier in router-config.yaml (pure comments, NO behavioral knob, nothing reads it; documents shipped best-guess matrix defaults incl the Gemini-pull-strong-framing experiment cell; live default pull provider UNCHANGED). Config still loads (no new key). routed_gate REQUIRED (blast-radius/multi-module/breadth/build-ci-config; 5 files, modules ai_router+docs).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/cross-provider-verification",
+      "dateTime": "2026-06-19T09:04:59.737602-04:00",
+      "description": "Routed cross-provider session-verification to gpt-5-4 (cross-provider from anthropic orchestrator; routed_gate REQUIRED). R1 ISSUES_FOUND 2 Major (cost 0.229): (1) validate_matrix_report too loose - surfaces accepted any subset + no cell-vs-run-level confound consistency; (2) cell validator looser than the comparison sibling on provenanceComplete<->unkeyed. FIXED Finding 1 in full (surfaces EXACTLY [push,pull]; cross-field equality of each cell echoed orchestrator*/diff* vs run-level orchestrator/diffShape, Set-070 precedent; doc updated) + the legitimate part of Finding 2 (_validate_cell now applies the SAME one-way provenanceComplete<->unkeyed checks as validate_comparison_artifact). DECLINED the Finding-2 over-reach (converse + exact count recompute) with reasoning: spec says MIRROR validate_comparison_artifact (the sibling deliberately checks only one-way), a false provenanceComplete is conservative not corrupting, and the producer derives flag+counts from one merge so cannot emit inconsistency. +3 tests (20 total). R2 (cost 0.130) VERIFIED: both fixes confirmed, decline judged sound (no plausible path to harm beyond what the sibling tolerates). Suite GREEN 2205/5. NOTE: a concurrent chat session edited shared writers + repo-wide activity-logs mid-run (explains a transient test_change_verification_mode flake on the first full-suite pass; passed in isolation + on re-run); my staging is surgical (explicit paths only, never -A).",
+      "status": "complete"
     }
   ]
 }

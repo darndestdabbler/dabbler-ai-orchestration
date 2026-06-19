@@ -1,0 +1,5 @@
+VERIFIED
+
+- R1 Finding 1 fix verified: `_validate_telemetry` now rejects a missing surface and a duplicate, and `validate_matrix_report` now enforces per-cell echo consistency for `orchestrator.provider/model` and `diffShape.{bytes,lines,files,elided}` against the run-level values. Docs and tests were updated accordingly.
+- R1 Finding 2 partial fix verified: `_validate_cell` now applies the same one-way `provenanceComplete=true` consistency checks as `validate_comparison_artifact` (`no unkeyed finding` and `zero unkeyed counts`).
+- Decline on the converse/count-recompute portion is sound: I do not see a concrete plausible path to harm that exceeds what the canonical `validate_comparison_artifact` sibling already tolerates. A false `provenanceComplete=false` is conservative rather than corrupting, and exact count recompute is not required when the producer derives the flag and counts from the same `merge_findings` result.

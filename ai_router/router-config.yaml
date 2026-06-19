@@ -728,6 +728,22 @@ pull_verifier:
       memory: 512m             # cgroup-v2 only (ignored on rootless cgroups-v1)
       pids_limit: 256          # cgroup-v2 only
       cpus: "2"                # cgroup-v2 only
+  # Set 072: the verification-only application mode (verification_only_app.py).
+  # COMMENTARY ONLY -- there is NO behavioral knob here and NOTHING reads this
+  # block; it documents the shipped best-guess defaults so an operator sees them
+  # in one place. The mode reuses the pull_verifier caps / models / generation
+  # params above (each cell is a matrix-mode run_dual_surface call, which resolves
+  # its arms through the same executor block). Shipped best-guess matrix defaults:
+  #   - BOTH arms run strong adversarial framing (L-069-2 -- the matrix varies
+  #     PROVIDER, never framing; the framing gate stays on both arms).
+  #   - pull = a RELIABLE default (GPT-5.4); push = Anthropic or GPT.
+  #   - the first external run includes a Gemini-on-pull-under-strong-framing cell
+  #     (the load-bearing datapoint: is "Gemini-quiet-on-pull" a fixed framing
+  #     artifact now that both templates are strong adversarial?).
+  # The LIVE default pull provider in this file is UNCHANGED: the Gemini-pull cell
+  # is an experiment cell, not a default change -- that decision belongs to a later
+  # set on accumulated telemetry (spec non-goal). Cells are passed per-run on the
+  # CLI (`--cell push:anthropic --cell pull:google`), not configured here.
 
 # --- Contract-test / CDC gate (Set 068 S5) ---
 # The deterministic verification FLOOR: a per-set, opt-in contractGate

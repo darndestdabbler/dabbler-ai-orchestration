@@ -148,7 +148,7 @@ last-pruned-set: (none)   generated: 2026-06-18
 - **Action for future sessions:** Never self-opine on which model is cheaper.
 
 ## Schema-Only Re-Verifies Need `max_tier` Pinned To Block Auto-Escalation
-<!-- lesson: id="L-064-7" last-used-set="070" status="active" scope="portable" -->
+<!-- lesson: id="L-064-7" last-used-set="072" status="active" scope="portable" -->
 
 - **Context:** Round 2 of cross-provider session verification when the
   Round 1 response was substantively correct but used non-standard
@@ -467,7 +467,7 @@ last-pruned-set: (none)   generated: 2026-06-18
 ## Repo-Specific Lessons
 
 ## GPT-5.4 In The Pull-Verifier Loop Over-Probes And Times Out On Token Budget Before A Verdict
-<!-- lesson: id="L-067-1" added-set="067" last-used-set="069" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-067-1" added-set="067" last-used-set="072" status="active" scope="repo-specific" -->
 
 - **Context:** Driving `ai_router.pull_verifier.pull_route` (or the
   `pull_critique` producer) with the OpenAI binding (GPT-5.4) over a sandbox

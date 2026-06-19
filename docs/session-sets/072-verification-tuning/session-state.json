@@ -48,10 +48,15 @@
     {
       "number": 4,
       "title": "Synthesis + docs + release + dogfood + first external run + close",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-06-19T13:51:31.593211-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-4-8",
+        "effort": "high"
+      },
       "verificationVerdict": null
     }
   ]

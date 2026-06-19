@@ -5,8 +5,87 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-06-19 (Set 072 — the provider×surface matrix instrument + verification-only application mode)
+
+> Set 070 built the dual-surface instrument to **hold provider equal across arms** —
+> by design, to isolate *surface* as the only variable. An independent operator-run
+> field study (`kick-the-orchestrator-tires`, 18 push-vs-pull runs) found what that
+> design cannot measure: **provider and surface interact**, and the live default
+> pairing (`push = gpt-5-4` / `pull = gemini-2.5-pro`) is the study's *single weakest
+> pull configuration*. Set 072 adds the **opt-in matrix seam** (without weakening the
+> equal-arms steelman default), a **verification-only application mode** that points a
+> configured provider×surface matrix at an **already-built** target repo — emitting
+> per-cell telemetry **and** a consolidated fixer-facing remediation report as a
+> byproduct of real verification work — and a **cross-run aggregator** that rolls many
+> runs over one target into a single corroboration-annotated remediation backlog. It
+> also folds in the deferred **L-069-1** sibling-reader hardening.
+
+### Added
+
+- **Opt-in matrix-mode seam in `dual_surface_verify.run_dual_surface` (S1).** New
+  optional per-arm `push_provider` / `pull_provider` / `push_model` / `pull_model`
+  params. When any is set, `matrix_mode` is on: each arm resolves its provider/model
+  independently, the strong **adversarial framing gate stays on both arms** (L-069-2 —
+  the matrix varies *provider*, not framing), and the provider/model **equality refusal
+  is skipped** (divergence is recorded as intentional, not raised). With none set, the
+  equal-arms steelman default is **byte-for-byte unchanged** and still raises
+  `UnequalArmsError` on accidental divergence. The attestation gains
+  `mode` (`"equal-arms"` | `"matrix"`), `intentionalDivergence`, and
+  `requestedPush/PullProvider/Model`; `DualSurfaceRun.mode` threads through
+  `to_dict()` / `build_comparison_artifact`; `COMPARISON_SCHEMA_VERSIONS → (1, 2)`
+  (schema `1` still accepted; `2` requires `mode`). `_arms_held_equal` is
+  **strengthened** to reject a matrix artifact as RETIRE evidence (a matrix run is a
+  per-cell instrument, never the equal-arms RETIRE-telemetry path).
+- **`ai_router/verification_only_app.py` — the verification-only application mode
+  (S2).** A thin orchestration over `run_dual_surface` (matrix mode) — no arm logic of
+  its own — pointable at an **external** built target via the runner's `sandbox_dir`
+  seam. `run_verification_matrix(target_repo, *, base_ref, head_ref, matrix, …)` runs
+  one matrix-mode `run_dual_surface` call per `MatrixCell` (push×pull cross-product), a
+  failing cell recorded as a `SkippedCell` so one provider failure never aborts the
+  matrix (L-067-1). `CellTelemetry` stamps every confound this set does **not** vary —
+  orchestrator provider/model, push & pull provider/model, per-arm framing strength,
+  surfaces run, diff size/shape, and `push_broker` / `pull_broker = "none"` — so later
+  data stays comparable. Writes `verification-matrix-report.json` + a pure-Python
+  `validate_matrix_report` at **L-066-1 parity** (never raises; int-not-bool guards).
+- **The consolidated fixer-facing remediation report (S2).**
+  `build_remediation_report(report)` consolidates the run's per-cell findings via the
+  Set 070 `merge_findings` provenance merge (`push-only` / `pull-only` / `both`),
+  dedups by stable finding key, severity-ranks, and writes `remediation-report.json` +
+  `remediation-report.md` (file/location / impact / evidence / provenance retained;
+  experiment metadata dropped). This is the artifact a target repo remediates from
+  **without re-running verification** — the consumer-handoff model. `validate_remediation_report`
+  holds L-066-1 parity.
+- **The cross-run remediation aggregator (S3).**
+  `aggregate_remediation_reports(reports, *, generated_at)` rolls up N per-run
+  remediation reports over **one** target into `remediation-backlog.json` + `.md`,
+  re-running `merge_findings` across runs keyed by stable `defectKey` (max severity,
+  union provenance/surfaces). Each finding is annotated with **corroboration = the
+  count of *distinct* runs** that surfaced it (a cross-config confidence/priority
+  signal); an unkeyed finding is its own single-run group and never corroborates (safe
+  over-split). A `MixedTargetError` guard refuses to merge reports from different
+  targets. `validate_remediation_backlog` holds L-066-1 parity (distinct + member run
+  refs; `corroboration == distinct count`).
+- **CLI** `python -m ai_router.verification_only_app run --target … --base … --cell
+  push:anthropic --cell pull:google --out report.json` (writes both the matrix report
+  and the consolidated remediation report) and `… aggregate --report a.json --report
+  b.json --out backlog.json`. ASCII-only status; returns an int.
+- **Schema docs:** `docs/verification-matrix-report-schema.md`,
+  `docs/remediation-report-schema.md`, `docs/remediation-backlog-schema.md`.
+
 ### Changed
 
+- **L-069-1 sibling-reader hardening.** The proven non-list-`entries` guard
+  (`entries = log.get("entries"); if not isinstance(entries, list): return <no-record
+  default>`) now lands at all four unguarded sibling readers —
+  `read_path_aware_critique` / `has_path_aware_critique_record`
+  (`path_aware_critique.py`) and `read_verification_mode` /
+  `has_verification_mode_record` (`dedicated_verification.py`) — and `UnicodeError`
+  was added to the two `dedicated_verification.py` readers' `except`. The whole class
+  of malformed-activity-log close-out crashes (Set 068/069 lineage) is now closed
+  across every reader site.
+- **Commentary-only `verification_only:` block under `pull_verifier` in
+  `router-config.yaml`** documenting the shipped best-guess matrix defaults. **No new
+  behavioral knob; the live default pull provider is unchanged.**
 - **`routedApiCalls` is omitted from activity-log entries when empty.**
   `SessionLog.log_step` and the operator-choice capture writers
   (`path_aware_critique`, `contract_gate`, `dedicated_verification`,

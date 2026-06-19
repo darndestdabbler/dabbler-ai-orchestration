@@ -557,3 +557,142 @@ Module map: `prompt-templates/verification.md` + `prompt-templates/path-aware-cr
 (S1) · `verification.py` (`is_blocking_verdict` / `classify_blocking` / `parse_nits`
 / `reconcile_issue_ledger`, S2) · `ai-led-session-workflow.md` Step 6 (S2) ·
 `tests/test_blocking_classifier.py` + `test_verification_framing.py` (S1–S2).
+
+---
+
+## 8. Set 072 — the provider×surface matrix instrument + the verification-only application mode
+
+Set 070 built the dual-surface instrument to **hold provider equal across arms** (§5.2)
+— deliberately, so that *surface* is the only variable and the equal-arms artifact is
+clean RETIRE evidence. That design has a blind spot it was never meant to see: it cannot
+measure whether **provider and surface interact**. An independent operator-run field
+study (`../kick-the-orchestrator-tires/docs/study-findings.md`, 18 push-vs-pull runs
+across its sets 002–005) found exactly that interaction, and it is the strongest finding
+in the study:
+
+- **Push won on incisiveness — but only on small, snippet-fittable diffs**, and the
+  study flags it would likely **flip toward pull on a large diff** (its #1 caveat).
+- **Use both surfaces, always** — push/pull *disagreement* is itself diagnostic of which
+  arm had repo/spec context.
+- **Provider × surface interact (the headline).** Gemini: strong on push, *quiet on
+  pull*. GPT: reliable on both. Anthropic: highest ceiling, lowest reliability. The
+  study calls our live default (`push = gpt-5-4` / `pull = gemini-2.5-pro`) the **single
+  weakest pull configuration**.
+
+So the strategy must now record an honest correction: **surface is *not* fully orthogonal
+to provider.** §5.2's equal-arms mode held provider constant precisely to keep its RETIRE
+telemetry uncontaminated — that remains the right instrument for the RETIRE decision — but
+it cannot answer "which provider should run which surface," and the field study says the
+answer is non-trivial and our live default may be underweighting pull. Set 072 adds the
+instrument that *can* answer it, shipped in `ai_router` **0.26.0**.
+
+### 8.1 The opt-in matrix-mode seam (S1)
+
+`dual_surface_verify.run_dual_surface` gained optional per-arm `push_provider` /
+`pull_provider` / `push_model` / `pull_model` params. When any is set, `matrix_mode` is
+on: each arm resolves its provider/model independently, the **strong adversarial framing
+gate stays on both arms** (L-069-2 — the matrix varies *provider*, not framing), and the
+provider/model **equality refusal is skipped**, with the divergence recorded as
+*intentional* (`mode: "matrix"`, `intentionalDivergence: true`, plus the requested
+per-arm identities). With **no** per-arm params the equal-arms steelman default is
+**byte-for-byte unchanged** and still raises `UnequalArmsError` on accidental divergence.
+`COMPARISON_SCHEMA_VERSIONS → (1, 2)` (schema `1` still accepted; `2` requires `mode`).
+Crucially, `_arms_held_equal` was **strengthened** to reject a matrix artifact as RETIRE
+evidence: a matrix run is a *per-cell instrument*, never the equal-arms RETIRE-telemetry
+path (§5.2 stays the only RETIRE-evidence surface).
+
+### 8.2 The verification-only application mode (S2–S3)
+
+`ai_router/verification_only_app.py` is a **thin orchestration over `run_dual_surface`
+(matrix mode)** — no arm logic of its own — pointable at an **already-built external**
+target repo via the runner's `sandbox_dir` seam. The operator decision behind it: rather
+than burn tokens on another *synthetic* provider×surface study over toy diffs, point a
+systematic matrix at a **real built solution** (first target `../dabbler-access-harvester`).
+Its large cross-file diffs close the study's snippet caveat *for free*, every run does
+*useful* verification work, and the provider×surface telemetry falls out as a byproduct.
+Philosophy: **ship a best-guess-optimized verification process now; refine the defaults as
+real telemetry accumulates** — no synthetic confound-set gate.
+
+The honest read of an already-built target: this is a strong test of **cost / noise /
+false-positive rate / which surface surfaces residual hard-to-find issues**, and a *weak*
+test of raw finding power (full finding-power wants a greenfield build — a future track).
+The mode is built so the confounds it does **not** vary yet (orchestrator provider; a
+future push/pull broker) are **stamped into telemetry** now, keeping later data comparable.
+
+- **`run_verification_matrix`** runs one matrix-mode `run_dual_surface` call per
+  `MatrixCell` (push×pull cross-product); a failing cell is recorded as a `SkippedCell`
+  so one provider failure never aborts the matrix (the producer-skip discipline,
+  L-067-1). It writes **two distinct outputs of one run**:
+  1. `verification-matrix-report.json` — the **experimental, per-cell** artifact, with
+     `CellTelemetry` stamping every confound (orchestrator provider/model, push & pull
+     provider/model, per-arm framing strength, surfaces run, diff size/shape,
+     `push_broker` / `pull_broker = "none"`). `validate_matrix_report` holds L-066-1 parity.
+  2. `remediation-report.{json,md}` — the **fixer-facing, consolidated** artifact:
+     `build_remediation_report` merges the run's cell findings via the Set 070
+     `merge_findings` provenance merge (`push-only` / `pull-only` / `both`), dedups by
+     stable finding key, severity-ranks, and retains file/location / impact / evidence /
+     provenance while dropping the experiment metadata. This is the deliverable the
+     target repo remediates from **without re-running verification** (§8.4).
+- **The cross-run aggregator (S3).** `aggregate_remediation_reports` rolls up N per-run
+  remediation reports over **one** target (a `MixedTargetError` guard refuses a
+  mixed-target set) into `remediation-backlog.{json,md}` — the end-of-exploration handoff.
+  It re-runs `merge_findings` across runs keyed by stable `defectKey` (max severity, union
+  provenance/surfaces) and annotates each finding with **corroboration = the count of
+  *distinct* runs** that surfaced it — a finding caught by multiple provider×surface
+  configs carries that cross-config agreement as a confidence/priority signal. An unkeyed
+  finding is its own single-run group and **never corroborates** (safe over-split — it can
+  never inflate confidence). `validate_remediation_backlog` holds L-066-1 parity.
+
+### 8.3 Per-cell telemetry and the best-guess defaults
+
+This set **measures**; it changes **no** keep/demote/retire posture and **no** live
+`router-config.yaml` default pull provider (§5.1's RETIRE precondition still stands; the
+Gemini-pull cell is an *experiment cell*, not a default change). The shipped best-guess
+matrix defaults are documented commentary-only under `pull_verifier.verification_only:` in
+`router-config.yaml` (no new behavioral knob): both arms strong framing; pull = GPT
+reliable default; push = Anthropic or GPT; and **the first run includes a
+Gemini-on-pull-under-strong-framing cell** — the load-bearing first datapoint. The field
+study found Gemini *quiet on pull*, but it compared whatever framing each harness shipped;
+our pull template is now strong devil's-advocate (`classify_framing_strength →
+ADVERSARIAL`), so "Gemini-quiet-on-pull" may already be a fixed framing artifact. That is
+cheap to check, and **the load-bearing acceptance check for this set's first external run
+is that the Gemini-pull cell returns a verdict, not silence** (if it is silent, *that is
+the datapoint* — recorded, with the live-default pull-provider decision held).
+
+### 8.4 The consumer-handoff model
+
+The verification-only mode formalizes a division of labor between the canonical repo and a
+consumer target:
+
+> **Canonical runs the verification; the target remediates from the report and never
+> re-runs verification.** Canonical points the matrix at a built target, does the real
+> verification work, and emits the consolidated `remediation-report` (and, across many
+> runs, the `remediation-backlog`). The target repo (e.g. harvester) **consumes that
+> report for remediation directly** — it does not re-run the matrix, the dual-surface
+> runner, or the path-aware critique. Exploration produces a usable fix-list, not just
+> telemetry.
+
+This is what makes the cost honest: the tokens spent measuring provider×surface
+interaction are *also* the tokens that produced a real, deduplicated, severity-ranked,
+corroboration-annotated fix-list the target acts on.
+
+### 8.5 What this changes about §5 (and what it does not)
+
+Nothing is retired or demoted. The equal-arms dual-surface mode (§5.2) remains the
+**only** RETIRE-evidence surface — `_arms_held_equal` now actively refuses to let a matrix
+artifact masquerade as that evidence. What Set 072 adds is the **second instrument** the
+field study showed was missing: the equal-arms design isolates *surface* and is blind to
+*provider×surface interaction*; the matrix mode measures that interaction, on **real built
+diffs** rather than synthetic ones. The two are complementary, not competing — equal-arms
+answers "does push earn its keep," matrix answers "which provider should run which
+surface." Both honesty caveats of §5 carry forward unchanged: the RETIRE decision still
+waits on powered equal-arms telemetry, and the matrix defaults are *best-guess*, to be
+refined as real per-cell telemetry accumulates.
+
+Module map: `dual_surface_verify.py` (matrix seam + `_arms_held_equal` strengthening, S1)
+· `verification_only_app.py` (`run_verification_matrix` / `CellTelemetry` /
+`build_remediation_report` / `aggregate_remediation_reports` + validators + CLI, S2–S3) ·
+`path_aware_critique.py` + `dedicated_verification.py` (L-069-1 sibling-reader hardening,
+S1) · `docs/verification-matrix-report-schema.md` + `docs/remediation-report-schema.md` +
+`docs/remediation-backlog-schema.md`. As-built detail lives in
+[`../ai_router/docs/pull-verifier.md`](../ai_router/docs/pull-verifier.md).

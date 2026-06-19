@@ -538,3 +538,60 @@ The materiality layer is **additive**: a path-aware critique still produces the 
 `path-aware-critique.json` artifact and severity-bearing findings; what changes is
 that the verifier no longer manufactures immaterial blockers, and the loop that
 consumes its findings no longer churns on Minor-only rounds.
+
+## What Set 072 added (the provider×surface matrix + the verification-only application mode)
+
+Set 070's `dual_surface_verify.run_dual_surface` (above) **holds provider equal across
+arms** to isolate *surface*. An operator field study
+(`../../docs/study-findings.md`-style — see
+[`../../docs/verification-surface-strategy.md`](../../docs/verification-surface-strategy.md)
+§ 8) found that design's blind spot: **provider and surface interact**, and our live
+default pairing (`push = gpt-5-4` / `pull = gemini-2.5-pro`) is the study's *single weakest
+pull configuration*. Set 072 (`ai_router` **0.26.0**) adds the instrument that can measure
+that interaction — without weakening the equal-arms steelman default.
+
+- **Matrix-mode seam in `run_dual_surface` (S1).** Optional per-arm `push_provider` /
+  `pull_provider` / `push_model` / `pull_model`. Any one set turns on `matrix_mode`: each
+  arm resolves independently, the **strong adversarial framing gate stays on both arms**
+  (L-069-2), and only the provider/model **equality refusal** is skipped (divergence
+  recorded as `intentionalDivergence`, `mode: "matrix"`). No per-arm params → the
+  equal-arms default is byte-for-byte unchanged and still raises `UnequalArmsError`.
+  `_arms_held_equal` is **strengthened** to reject a matrix artifact as RETIRE evidence
+  (the equal-arms mode stays the only RETIRE-telemetry surface).
+- **`ai_router/verification_only_app.py` — the verification-only application mode
+  (S2).** A thin orchestration over `run_dual_surface` (matrix), pointable at an
+  **external** built target via the runner's `sandbox_dir` seam.
+  `run_verification_matrix` runs one matrix-mode call per `MatrixCell` (push×pull
+  cross-product; a failing cell → `SkippedCell`, never aborting the matrix — L-067-1) and
+  writes **two outputs of one run**: `verification-matrix-report.json` (per-cell,
+  experimental, with `CellTelemetry` stamping every confound — orchestrator/push/pull
+  provider+model, per-arm framing, surfaces, diff size/shape, `push_broker`/`pull_broker`)
+  and the consolidated fixer-facing `remediation-report.{json,md}`
+  (`build_remediation_report` merges cell findings via Set 070 `merge_findings`
+  provenance, dedups + severity-ranks; the artifact the target remediates from **without
+  re-running verification**). Both validators (`validate_matrix_report`,
+  `validate_remediation_report`) hold L-066-1 parity.
+- **The cross-run aggregator (S3).** `aggregate_remediation_reports` rolls N per-run
+  reports over **one** target (`MixedTargetError` guard) into
+  `remediation-backlog.{json,md}`, re-running `merge_findings` keyed by stable `defectKey`
+  (max severity) and annotating each finding with **corroboration = distinct-run count** —
+  cross-config agreement as a confidence/priority signal (unkeyed findings never
+  corroborate). `validate_remediation_backlog` holds L-066-1 parity.
+- **CLI.** `python -m ai_router.verification_only_app run --target … --base … --cell
+  push:anthropic --cell pull:google` (writes both reports) and `… aggregate --report
+  a.json --report b.json` (writes the backlog). ASCII-only; returns int. Commentary-only
+  `verification_only:` block under `pull_verifier:` in `router-config.yaml` documents the
+  best-guess defaults — **no behavioral knob; the live default pull provider is
+  unchanged**.
+- **L-069-1 sibling-reader hardening (S1).** The non-list-`entries` guard now lands at all
+  four sibling readers (`read_path_aware_critique` / `has_path_aware_critique_record` in
+  `path_aware_critique.py`; `read_verification_mode` / `has_verification_mode_record` in
+  `dedicated_verification.py`), with `UnicodeError` added to the two
+  `dedicated_verification.py` readers — closing the malformed-activity-log close-out crash
+  class across every reader.
+
+The matrix mode is **additive**: absent per-arm params, `run_dual_surface` is unchanged;
+absent a call to `verification_only_app`, nothing in the normal flow runs a matrix. The
+**consumer-handoff model** — canonical runs the verification and emits the remediation
+report; the target remediates from it and never re-runs verification — is recorded in the
+strategy doc § 8.4.

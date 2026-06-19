@@ -462,6 +462,42 @@ last-pruned-set: (none)   generated: 2026-06-18
   honestly per **L-070-1** (the dogfood that *is* a live demonstration of the
   discipline is itself evidence, not a clean-snapshot requirement).
 
+## An Equal-Arms A/B Isolates Its One Variable — And Is Structurally Blind To That Variable's Interactions
+
+<!-- lesson: id="L-072-1" added-set="072" last-used-set="072" status="active" scope="portable" -->
+
+- **Context:** A controlled comparison built to isolate **one** variable by holding
+  everything else equal — the Set 070 dual-surface verifier held *provider, model, and
+  framing* equal across the push and pull arms so that **surface** was the only thing that
+  varied, making the artifact clean RETIRE evidence (`_arms_held_equal`).
+- **Failure or friction:** That same control is a **blind spot**: an equal-arms design
+  *cannot* measure how the controlled variable **interacts** with the variable it isolates.
+  Holding provider constant to isolate surface means the instrument can answer "does push
+  earn its keep" but is **structurally unable** to answer "which provider should run which
+  surface." An independent operator field study
+  (`kick-the-orchestrator-tires`, 18 real push-vs-pull runs) found exactly the interaction
+  the instrument was blind to — **provider × surface interact** (Gemini strong on push but
+  quiet on pull; our live default `push=gpt-5-4`/`pull=gemini-2.5-pro` is the study's
+  *single weakest* pull config) — and it was the strongest finding in the study, invisible
+  to every equal-arms run we had done.
+- **Lesson:** When an A/B holds a variable constant to isolate another, **name the
+  interaction it cannot see** and decide whether that interaction matters. If it does, the
+  fix is a **second, complementary instrument** that varies the held variable (here: an
+  opt-in *matrix* mode with per-arm providers, the framing gate still held equal per
+  **L-069-2**, and `_arms_held_equal` strengthened so a matrix artifact can never
+  masquerade as the equal-arms RETIRE evidence) — **not** weakening the first instrument's
+  control. And measure the interaction on **real built targets**, not synthetic toy diffs:
+  a verification-only pass over an already-built solution closes the "small snippet-fittable
+  diff" confound *for free*, does useful verification work, and emits the interaction
+  telemetry as a byproduct (the produce↔validate parity of the new report artifact follows
+  **L-066-1**). Ship best-guess defaults now and refine as real per-cell telemetry
+  accumulates; do not gate the useful work behind a synthetic confound-set.
+- **Action for future sessions:** Before citing an equal-arms result as decisive, ask what
+  *interaction* the control made invisible. If a field signal (or first principles) says
+  that interaction is load-bearing, add a complementary matrix/interaction instrument
+  rather than relaxing the original control — and prefer measuring on real built targets so
+  the measurement is also useful work.
+
 ---
 
 ## Repo-Specific Lessons

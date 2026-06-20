@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "075-greenfield-finding-power-pilot",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Protocol + addendum + rubric + aggregation contract",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "Consumer enablement + deferred-repo record + close",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

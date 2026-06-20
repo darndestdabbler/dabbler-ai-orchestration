@@ -57,7 +57,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   2026-05-01 to avoid duplicate guidance drifting in two places.
 
 ## State The Suite Baseline And Release Contract Up Front In Verification Round 1
-<!-- lesson: id="L-064-10" added-set="062" last-used-set="073" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-10" added-set="062" last-used-set="075" status="archived" scope="portable" -->
 
 - **Promoted.** This lesson now lives at `project-guidance.md` →
   Conventions → Workflow Expectations: *"Open every session-verification
@@ -132,7 +132,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   ceiling.
 
 ## An Iterative Dogfood Keeps Its Own Gate Artifact "Pre-Fix" — Frame It As Evidence, Not A Clean Snapshot
-<!-- lesson: id="L-070-1" added-set="070" last-used-set="073" status="archived" scope="portable" -->
+<!-- lesson: id="L-070-1" added-set="070" last-used-set="075" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Workflow Expectations on
   2026-06-19** after application across Sets 070 (origin: the path-aware critique

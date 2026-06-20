@@ -1,0 +1,8 @@
+- `R2-A` — **RESOLVED** — `docs/greenfield-adjudication-rubric.md` “The Scoring Unit” now explicitly says `remediation-report.md` is verdict-only with surface-level provenance, `verification-matrix-report.json` supplies provider-specific arm provenance, and per-arm counts derive from explicit `armsCaught`.
+- `R2-B` — **RESOLVED** — `ai_router/prompt-templates/greenfield-matrix-addendum.md` step 6 now says copy the **contents** of `matrix-run/` directly into `<session>/`, matching the flat `<session>/` layout in `docs/session-sets/075-greenfield-finding-power-pilot/telemetry/README.md`.
+
+- **Issue → Major:** “Cell” is still defined inconsistently, so the documented invocation/provenance contract does not unambiguously tell operators whether a cell is a dual-surface `(push,pull)` pair or a single `surface:provider` token; that ambiguity can produce the wrong run shape or wrong arm-attribution lookup, undermining reproducible scoring.
+  **Location →** `docs/greenfield-matrix-protocol.md` §2 and §8; `docs/greenfield-adjudication-rubric.md` “The Scoring Unit”; `ai_router/prompt-templates/greenfield-matrix-addendum.md` step 2.
+  **Fix →** Normalize all docs to one canonical contract: either explicitly state that the three CLI `--cell` entries are **arm tokens** that expand into exactly two dual-surface report cells `[(push:anthropic,pull:openai), (push:anthropic,pull:google)]` and show that expected `verification-matrix-report.json` shape, or change every invocation example to the tool’s actual paired-cell syntax and stop defining `SURFACE:PROVIDER[:MODEL]` as a “cell”.
+
+ISSUES_FOUND

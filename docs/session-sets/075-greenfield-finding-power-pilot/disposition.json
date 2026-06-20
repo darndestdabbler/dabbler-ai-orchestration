@@ -1,0 +1,50 @@
+{
+  "status": "completed",
+  "summary": "Set 075 Session 1 of 2 -- protocol + addendum + rubric + telemetry/aggregation contract. Ran on claude-opus-4-8 (operator-started). A DOC-AUTHORING + protocol-rollout session: NO ai_router code changed, NO version bump, NO PyPI/Marketplace release (by design -- this set SETS UP a finding-power pilot; the matrix runs happen in consumer repos and a future canonical synthesis set produces the readout). DELIVERED: (1) docs/greenfield-matrix-protocol.md -- the canonical greenfield finding-power protocol (D1 Step-6 pre-remediation timing; D2 relative-yield-not-recall + per-arm TP/FP/precision/share-of-union/unique-TPs/cost-per-TP scoring against the adjudicated union; D3 record-then-remediate freeze; D4 doc-only exclusion; D5 committed telemetry layout + the required metadata.json contract; the two validity threats + mitigations -- diff-class stratification with platform-as-lead, and the fixed adjudication rubric; the 2-cell matrix roster + code-focused-range discipline; seeding-as-fast-follow; the cohort table; Non-goals). Authored via route(task_type=documentation, gemini-pro); the auto-verifier caught a cohort-table fidelity Major (paraphrased session-set names + DEFERRED->EXCLUDED), fixed. (2) ai_router/prompt-templates/greenfield-matrix-addendum.md -- the reusable per-session instruction block the consumer repos reference. (3) docs/greenfield-adjudication-rubric.md -- the FIXED rubric (TP/FP/duplicate/unclear definitions + the per-arm scoring table) that defeats adjudication drift (Threat 2). (4) telemetry/ skeleton: README.md (D5 layout + required metadata contract + cohort) and per-repo placeholders for dabbler-platform (lead) and dabbler-access-harvester (supporting); migration-orchestrator excluded (D4). CONFIRMED the audit table against the live sibling repos (platform >=0.1.0, harvester >=0.15.0, migration-orchestrator >=0.10.0) and that the shipped verification_only_app CLI matches the addendum command template. VERIFICATION: routed_gate REQUIRED (blast-radius cross-artifact + multi-module {ai_router, docs} + breadth 9 files); cross-provider session-verification by openai/gpt-5.4 (cross-provider from the anthropic orchestrator) converged over FOUR substantive rounds -- every round drove a real correctness fix, NOT nit-churn (L-071-1/L-070-1: convergence = no-new-change, reached at R4): R1 ISSUES_FOUND (2 Major: cohort fidelity already fixed pre-verify, + metadata could not represent the 3-arm roster; 1 Minor: Purpose overclaim) -> fixed via a matrixArms[] list + Purpose tightened; R2 confirmed those RESOLVED, raised 2 new (per-arm scoring not derivable from surface-level push-only/pull-only/both provenance; telemetry dir-shape inconsistency) -> fixed by splitting the two reports' jobs (consolidated report = provider-blind VERDICT; per-cell verification-matrix-report.json = arm PROVENANCE via mechanical lookup; explicit armsCaught lists) and flattening the copy target; R3 confirmed those RESOLVED, raised 1 Major ('cell' overloaded: CLI --cell arg = arm token vs (push,pull) matrix cell) -> fixed with a canonical Terminology block (roster entry / matrix cell / arm) propagated everywhere; R4 VERIFIED. No max_tier pin used -- all re-verifies were substantive, so the verifier stayed on its own tier-3 (L-064-7 applied as the do-NOT-pin case). s1-verification*.md saved raw, never edited. L-069-2 (both arms strong adversarial; matrix varies provider not framing) preserved across all four docs. Session 1 VERIFIED; non-final close (S2 remains). No dogfood this session -- the advisory pathAwareCritique dogfood + change-log + the routed next-SESSION-SET recommendation are S2 deliverables.",
+  "verification_method": "api",
+  "files_changed": [
+    "docs/greenfield-matrix-protocol.md",
+    "docs/greenfield-adjudication-rubric.md",
+    "ai_router/prompt-templates/greenfield-matrix-addendum.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/telemetry/README.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/telemetry/dabbler-platform/README.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/telemetry/dabbler-access-harvester/README.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/s1-verification.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/s1-verification-round-2.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/s1-verification-round-3.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/s1-verification-round-4.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/s1-next-session.md",
+    "docs/session-sets/075-greenfield-finding-power-pilot/activity-log.json",
+    "docs/session-sets/075-greenfield-finding-power-pilot/session-state.json",
+    "docs/session-sets/075-greenfield-finding-power-pilot/session-events.jsonl",
+    "docs/session-sets/075-greenfield-finding-power-pilot/disposition.json",
+    "docs/planning/lessons-learned.md",
+    "docs/planning/lessons-archive.md"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "gemini",
+    "provider": "google",
+    "model": "gemini-flash",
+    "effort": "low",
+    "reason": {
+      "code": "switch-due-to-cost",
+      "specifics": "Routed next-SESSION recommendation (route(task_type=analysis) -> google/gemini-pro, cross-provider from the claude orchestrator per L-064-6; saved raw to s1-next-session.md): S2 ('Consumer enablement + deferred-repo record + close') is mostly mechanical cross-repo file editing (bump dabbler-ai-router to >=0.26.0 + wire the addendum reference into CLAUDE.md/AGENTS.md/GEMINI.md in ../dabbler-platform and ../dabbler-access-harvester, record the migration-orchestrator deferral) plus one strategy-doc section (verification-surface-strategy.md SECTION 10), change-log.md, the routed next-SET rec, and the advisory dogfood -- not deep reasoning, so the cheapest-capable tier-1 google/gemini-flash @ low is the cost-optimal pick. OPERATOR CAVEAT: the routed rec optimizes for routed-call cost, but S2's load is careful cross-repo INSTRUCTION-FILE edits done by the orchestrator agent directly (not routed); a tier-1 agent may under-serve that, so the operator may prefer a tier-2 orchestrator (sonnet/normal or gemini-pro) and override at S2 start as usual. Cross-provider session-verification stays cross-provider regardless of the pick."
+    }
+  },
+  "blockers": [],
+  "verification_verdict": "VERIFIED",
+  "lessons_cited": [
+    "L-072-1",
+    "L-073-1",
+    "L-069-2",
+    "L-071-1",
+    "L-070-1",
+    "L-065-1",
+    "L-064-10",
+    "L-064-9",
+    "L-064-7",
+    "L-064-6",
+    "L-064-3"
+  ]
+}

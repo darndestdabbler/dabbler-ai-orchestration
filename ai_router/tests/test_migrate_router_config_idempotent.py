@@ -10,9 +10,9 @@ import migrate_router_config as mig  # type: ignore[import-not-found]
 _MINIMAL_RC = textwrap.dedent("""\
     providers:
       anthropic:
-        api_key_env: ANTHROPIC_API_KEY
+                api_key_env: DABBLER_ANTHROPIC_API_KEY
       google:
-        api_key_env: GEMINI_API_KEY
+                api_key_env: DABBLER_GEMINI_API_KEY
     routing:
       tier1_max_complexity: 30
       tier2_max_complexity: 65
@@ -25,7 +25,7 @@ _ALREADY_MIGRATED_RC = textwrap.dedent("""\
       anthropic:
         display_label: Anthropic
         enabled: true
-        api_key_env: ANTHROPIC_API_KEY
+        api_key_env: DABBLER_ANTHROPIC_API_KEY
     routing:
       outsourcing_mode: whenever-helpful
       tier1_max_complexity: 30

@@ -836,8 +836,8 @@ class TestAIStrategy:
 
         def _route(content, task_type, **kw):
             # Canonical phrasing from ai_router/providers.py — the actual
-            # exception raised when ANTHROPIC_API_KEY etc. is missing.
-            raise RuntimeError("Missing environment variable ANTHROPIC_API_KEY for Anthropic")
+            # exception raised when DABBLER_ANTHROPIC_API_KEY etc. is missing.
+            raise RuntimeError("Missing environment variable DABBLER_ANTHROPIC_API_KEY for Anthropic")
 
         self._install_route_stub(monkeypatch, _route)
         before_disk = (set_dir / "session-state.json").read_text(encoding="utf-8")
@@ -1039,14 +1039,14 @@ class TestAIStrategy:
         import migrate_session_state as _mss
 
         def _fake_probe(var_name):
-            if var_name == "ANTHROPIC_API_KEY":
+            if var_name == "DABBLER_ANTHROPIC_API_KEY":
                 return {"process": False, "user": True, "machine": False}
             return {"process": False, "user": False, "machine": False}
 
         monkeypatch.setattr(_mss, "_probe_env_var_scopes", _fake_probe)
 
         def _route(content, task_type, **kw):
-            raise RuntimeError("Missing environment variable ANTHROPIC_API_KEY for Anthropic")
+            raise RuntimeError("Missing environment variable DABBLER_ANTHROPIC_API_KEY for Anthropic")
 
         self._install_route_stub(monkeypatch, _route)
         r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
@@ -1054,7 +1054,7 @@ class TestAIStrategy:
         assert "User scope" in r.reason
         assert "not inherited" in r.reason or "restart" in r.reason.lower()
         # Negative control: the var name is echoed.
-        assert "ANTHROPIC_API_KEY" in r.reason
+        assert "DABBLER_ANTHROPIC_API_KEY" in r.reason
 
     def test_ai_strategy_unreadable_spec_routes_to_malformed(
         self, tmp_path, monkeypatch
@@ -1139,12 +1139,12 @@ class TestAIStrategy:
         )
 
         def _route(content, task_type, **kw):
-            raise RuntimeError("Missing environment variable OPENAI_API_KEY for OpenAI")
+            raise RuntimeError("Missing environment variable DABBLER_OPENAI_API_KEY for OpenAI")
 
         self._install_route_stub(monkeypatch, _route)
         r = migrate_one_set(str(set_dir), strategy=STRATEGY_AI, dry_run=True)
         assert r.action == ACTION_FAILED_AI_NO_CREDS
-        assert "OPENAI_API_KEY" in r.reason
+        assert "DABBLER_OPENAI_API_KEY" in r.reason
         assert "not set in Process, User, or Machine" in r.reason
 
     def test_ai_strategy_unauthorized_classified_as_no_creds(

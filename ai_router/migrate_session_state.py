@@ -417,7 +417,7 @@ def _probe_env_var_scopes(var_name: str) -> Dict[str, bool]:
     Python's ``os.environ`` is a snapshot taken at process launch and
     won't see User/Machine vars set AFTER Python started. This is the
     exact failure mode that motivated this probe: an operator sets
-    ANTHROPIC_API_KEY in System Properties -> Environment Variables
+    DABBLER_ANTHROPIC_API_KEY in System Properties -> Environment Variables
     (User scope), but Python was already running, so ``os.getenv``
     returns None and ai_router raises "Missing environment variable."
     The operator's intuition ("I set the key") is correct; the process
@@ -466,8 +466,8 @@ def _augment_no_creds_reason(underlying_error: str) -> str:
     """Augment the no-creds reason with scope-probe diagnostics.
 
     Parses the underlying error text for tokens that look like Dabbler
-    provider env-var names (``ANTHROPIC_API_KEY``, ``GEMINI_API_KEY``,
-    ``GOOGLE_API_KEY``, ``OPENAI_API_KEY``). For each one found, probes
+    provider env-var names (``DABBLER_ANTHROPIC_API_KEY``,
+    ``DABBLER_GEMINI_API_KEY``, ``DABBLER_OPENAI_API_KEY``). For each one found, probes
     Process / User / Machine scopes and, if the var is set in a
     persistent scope but NOT inherited by this Python process,
     appends an inheritance-trap note so the operator sees the right
@@ -650,7 +650,7 @@ def _resolve_titles_via_ai(
         # `"missing environment variable"` is added because that's the
         # exact phrasing emitted by ai_router's own providers (see
         # ai_router/providers.py: "Missing environment variable
-        # ANTHROPIC_API_KEY for Anthropic"). Without it, the migrator
+        # DABBLER_ANTHROPIC_API_KEY for Anthropic"). Without it, the migrator
         # would receive ai_router's most common missing-credential
         # error and route it through AiProviderError instead of
         # AiNoCredentialsError.
@@ -677,7 +677,8 @@ def _resolve_titles_via_ai(
             base = (
                 f"provider credentials not available: {exc}. Set the "
                 f"appropriate provider API key env var "
-                f"(ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY) "
+                f"(DABBLER_ANTHROPIC_API_KEY, DABBLER_OPENAI_API_KEY, "
+                f"DABBLER_GEMINI_API_KEY) "
                 f"and retry."
             )
             full_reason = base + ("\n\n" + scope_note if scope_note else "")

@@ -141,11 +141,13 @@ your provider's API spend; nothing in this extension is paywalled.
   **`Dabbler: Install ai-router`** command auto-detects or creates
   it for you)
 - **API keys** as environment variables:
-  - `ANTHROPIC_API_KEY` (Claude Sonnet, Opus)
-  - `GEMINI_API_KEY` (Gemini Flash, Pro)
-  - `OPENAI_API_KEY` (GPT-5.4, GPT-5.4 Mini)
+  - `DABBLER_ANTHROPIC_API_KEY` (Claude Sonnet, Opus)
+  - `DABBLER_GEMINI_API_KEY` (Gemini Flash, Pro)
+  - `DABBLER_OPENAI_API_KEY` (GPT-5.4, GPT-5.4 Mini)
   - All three are required so cross-provider verification has
     somewhere to route to.
+  - These variables hold the normal provider-issued keys from Anthropic,
+    Google, and OpenAI; Dabbler only prefixes the environment variable names.
 - **One orchestrator AI agent** installed as a VS Code extension
   (Claude Code, Codex/GitHub Copilot, or Gemini Code Assist — the
   framework is agent-agnostic and supports switching mid-set).

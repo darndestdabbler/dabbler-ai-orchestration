@@ -256,16 +256,16 @@ suite("gettingStartedDetection — providerKeyPresent (Set 060 S3, D6)", () => {
   });
 
   test("any ONE provider key satisfies the predicate", () => {
-    assert.strictEqual(providerKeyPresent({ ANTHROPIC_API_KEY: "sk-a" }), true);
-    assert.strictEqual(providerKeyPresent({ OPENAI_API_KEY: "sk-o" }), true);
-    assert.strictEqual(providerKeyPresent({ GEMINI_API_KEY: "g-key" }), true);
+    assert.strictEqual(providerKeyPresent({ DABBLER_ANTHROPIC_API_KEY: "sk-a" }), true);
+    assert.strictEqual(providerKeyPresent({ DABBLER_OPENAI_API_KEY: "sk-o" }), true);
+    assert.strictEqual(providerKeyPresent({ DABBLER_GEMINI_API_KEY: "g-key" }), true);
   });
 
   test("empty / whitespace-only values count as absent (cannot authenticate)", () => {
-    assert.strictEqual(providerKeyPresent({ ANTHROPIC_API_KEY: "" }), false);
-    assert.strictEqual(providerKeyPresent({ OPENAI_API_KEY: "   " }), false);
+    assert.strictEqual(providerKeyPresent({ DABBLER_ANTHROPIC_API_KEY: "" }), false);
+    assert.strictEqual(providerKeyPresent({ DABBLER_OPENAI_API_KEY: "   " }), false);
     assert.strictEqual(
-      providerKeyPresent({ GEMINI_API_KEY: undefined as unknown as string }),
+      providerKeyPresent({ DABBLER_GEMINI_API_KEY: undefined as unknown as string }),
       false,
     );
   });
@@ -279,13 +279,13 @@ suite("gettingStartedDetection — providerKeyPresent (Set 060 S3, D6)", () => {
 
   test("a real key alongside blanks still satisfies", () => {
     assert.strictEqual(
-      providerKeyPresent({ ANTHROPIC_API_KEY: " ", OPENAI_API_KEY: "sk-o" }),
+      providerKeyPresent({ DABBLER_ANTHROPIC_API_KEY: " ", DABBLER_OPENAI_API_KEY: "sk-o" }),
       true,
     );
   });
 
   test("computeGettingStarted carries the env signal into the payload (all modes)", () => {
-    const withKey = { GEMINI_API_KEY: "g" };
+    const withKey = { DABBLER_GEMINI_API_KEY: "g" };
     assert.strictEqual(
       computeGettingStarted(true, ROOT, false, new FakeFs(), withKey).providerKeyPresent,
       true,

@@ -25,7 +25,7 @@ providers:
   anthropic:
     display_label: Anthropic
     enabled: true
-    api_key_env: ANTHROPIC_API_KEY
+    api_key_env: DABBLER_ANTHROPIC_API_KEY
     base_url: https://api.anthropic.com/v1/messages
     api_version: "2023-06-01"
     rate_limit:
@@ -39,7 +39,7 @@ providers:
   google:
     display_label: Google
     enabled: true
-    api_key_env: GEMINI_API_KEY
+    api_key_env: DABBLER_GEMINI_API_KEY
     base_url: https://generativelanguage.googleapis.com/v1beta
     rate_limit:
       requests_per_minute: 60
@@ -52,7 +52,7 @@ providers:
   openai:
     display_label: OpenAI
     enabled: true
-    api_key_env: OPENAI_API_KEY
+    api_key_env: DABBLER_OPENAI_API_KEY
     base_url: https://api.openai.com/v1
     rate_limit:
       requests_per_minute: 60

@@ -142,9 +142,9 @@ export function detectCompletion(root: string, fsi: DetectionFs): CompletionStat
 // The provider keys the Full tier can route through. Any ONE of them
 // present satisfies D6 (the router needs at least one provider).
 const PROVIDER_KEY_VARS = [
-  "ANTHROPIC_API_KEY",
-  "OPENAI_API_KEY",
-  "GEMINI_API_KEY",
+  "DABBLER_ANTHROPIC_API_KEY",
+  "DABBLER_OPENAI_API_KEY",
+  "DABBLER_GEMINI_API_KEY",
 ] as const;
 
 /**

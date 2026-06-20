@@ -9,11 +9,11 @@ providers:
   anthropic:
     display_label: Anthropic
     enabled: true
-    api_key_env: ANTHROPIC_API_KEY
+    api_key_env: DABBLER_ANTHROPIC_API_KEY
     base_url: https://api.anthropic.com/v1/messages
   google:
     enabled: true
-    api_key_env: GEMINI_API_KEY
+    api_key_env: DABBLER_GEMINI_API_KEY
 routing:
   outsourcing_mode: whenever-helpful
 models:
@@ -233,7 +233,7 @@ suite("patch — no-op save (write-on-change)", () => {
       scope: "per-project",
       warnAtPercent: { value: 80, source: "shared" },
       providers: [
-        { id: "anthropic", displayLabel: "Anthropic", enabled: { value: true, source: "shared" }, apiKeyEnv: { value: "ANTHROPIC_API_KEY", source: "shared" } },
+        { id: "anthropic", displayLabel: "Anthropic", enabled: { value: true, source: "shared" }, apiKeyEnv: { value: "DABBLER_ANTHROPIC_API_KEY", source: "shared" } },
       ],
     });
     assert.strictEqual(result.routerConfigChanged, false, "router-config should not be marked changed on no-op");

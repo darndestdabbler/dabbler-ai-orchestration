@@ -162,12 +162,12 @@ User environment, so export the provider API keys explicitly before
 running the router (see **Running the router** above):
 
 ```bash
-export GEMINI_API_KEY=$(powershell -Command "[System.Environment]::GetEnvironmentVariable('GEMINI_API_KEY', 'User')" | tr -d '\r')
-export ANTHROPIC_API_KEY=$(powershell -Command "[System.Environment]::GetEnvironmentVariable('ANTHROPIC_API_KEY', 'User')" | tr -d '\r')
-export OPENAI_API_KEY=$(powershell -Command "[System.Environment]::GetEnvironmentVariable('OPENAI_API_KEY', 'User')" | tr -d '\r')
+export DABBLER_GEMINI_API_KEY=$(powershell -Command "[System.Environment]::GetEnvironmentVariable('DABBLER_GEMINI_API_KEY', 'User')" | tr -d '\r')
+export DABBLER_ANTHROPIC_API_KEY=$(powershell -Command "[System.Environment]::GetEnvironmentVariable('DABBLER_ANTHROPIC_API_KEY', 'User')" | tr -d '\r')
+export DABBLER_OPENAI_API_KEY=$(powershell -Command "[System.Environment]::GetEnvironmentVariable('DABBLER_OPENAI_API_KEY', 'User')" | tr -d '\r')
 .venv/Scripts/python.exe -c "
 import os
-missing = [k for k in ('ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY') if not os.environ.get(k)]
+missing = [k for k in ('DABBLER_ANTHROPIC_API_KEY', 'DABBLER_GEMINI_API_KEY', 'DABBLER_OPENAI_API_KEY') if not os.environ.get(k)]
 if missing:
     raise SystemExit(f'Missing environment variables: {missing}')
 print('API keys OK')

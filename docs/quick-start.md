@@ -203,9 +203,12 @@ Sessions on different sets can run in parallel using worktrees — see
   `ai_router/budget.yaml`, or manually create `ai_router/router-config.yaml`
   and `ai_router/budget.yaml` (see [`docs/budget-yaml-schema.md`](budget-yaml-schema.md)).
   The form is the recommended path.
-- [ ] **Provider API keys set** — `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, and
-  `OPENAI_API_KEY` must be in your environment for the cross-provider
-  verification step (`route(task_type="session-verification")`) to work.
+- [ ] **Provider API keys set** — `DABBLER_ANTHROPIC_API_KEY`,
+  `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` must be in your
+  environment for the cross-provider verification step
+  (`route(task_type="session-verification")`) to work. These hold the normal
+  provider-issued keys from Anthropic, Google, and OpenAI; only the environment
+  variable names are Dabbler-prefixed.
   Optional: `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` for completion notifications.
 - [ ] **Instruction file present** — your repo needs a provider-specific
   instruction file (`CLAUDE.md` for Claude Code, `AGENTS.md` for Codex,

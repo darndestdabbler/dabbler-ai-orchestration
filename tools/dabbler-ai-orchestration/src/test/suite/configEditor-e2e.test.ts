@@ -38,14 +38,14 @@ suite("configEditor end-to-end smoke", () => {
     const state: SectionState = {
       routerConfig: {
         providers: {
-          anthropic: { display_label: "Anthropic", enabled: true, api_key_env: "ANTHROPIC_API_KEY" },
-          google: { display_label: "Google", enabled: true, api_key_env: "GEMINI_API_KEY" },
+          anthropic: { display_label: "Anthropic", enabled: true, api_key_env: "DABBLER_ANTHROPIC_API_KEY" },
+          google: { display_label: "Google", enabled: true, api_key_env: "DABBLER_GEMINI_API_KEY" },
         },
         routing: { outsourcing_mode: "whenever-helpful" },
       },
       budget: { threshold_usd: 15, scope: "per-project", warn_at_percent: 80, verification_method: "api" },
       localOverrides: { notifications: { pushover: { enabled: true, api_key_env: "PUSHOVER_API_KEY", user_key_env: "PUSHOVER_USER_KEY" } } },
-      envVarPresence: { ANTHROPIC_API_KEY: true, GEMINI_API_KEY: true, PUSHOVER_API_KEY: false, PUSHOVER_USER_KEY: false },
+      envVarPresence: { DABBLER_ANTHROPIC_API_KEY: true, DABBLER_GEMINI_API_KEY: true, PUSHOVER_API_KEY: false, PUSHOVER_USER_KEY: false },
       localOverridesFileExists: true,
     };
     const s1 = renderRouting(state);
@@ -79,7 +79,7 @@ providers:
   anthropic:
     display_label: Anthropic
     enabled: true
-    api_key_env: ANTHROPIC_API_KEY
+    api_key_env: DABBLER_ANTHROPIC_API_KEY
 routing:
   outsourcing_mode: whenever-helpful
 `,

@@ -16503,9 +16503,9 @@ function detectCompletion(root, fsi) {
   };
 }
 var PROVIDER_KEY_VARS = [
-  "ANTHROPIC_API_KEY",
-  "OPENAI_API_KEY",
-  "GEMINI_API_KEY"
+  "DABBLER_ANTHROPIC_API_KEY",
+  "DABBLER_OPENAI_API_KEY",
+  "DABBLER_GEMINI_API_KEY"
 ];
 function providerKeyPresent(env8) {
   return PROVIDER_KEY_VARS.some((k2) => {
@@ -24730,9 +24730,9 @@ function checkApiKeys() {
   ch.appendLine("The ai_router reads API keys from environment variables at session start.");
   ch.appendLine("");
   ch.appendLine("Keys used (depending on configured providers):");
-  ch.appendLine("  ANTHROPIC_API_KEY  \u2014 Claude (claude.ai)");
-  ch.appendLine("  OPENAI_API_KEY     \u2014 OpenAI (GPT models)");
-  ch.appendLine("  GEMINI_API_KEY     \u2014 Google Gemini");
+  ch.appendLine("  DABBLER_ANTHROPIC_API_KEY  \u2014 Claude (claude.ai)");
+  ch.appendLine("  DABBLER_OPENAI_API_KEY     \u2014 OpenAI (GPT models)");
+  ch.appendLine("  DABBLER_GEMINI_API_KEY     \u2014 Google Gemini");
   ch.appendLine("");
   ch.appendLine("Export them in your shell profile (~/.bashrc, ~/.zshrc, or $PROFILE on Windows).");
   ch.appendLine("After editing, restart VS Code or open a new terminal.");
@@ -28156,7 +28156,7 @@ function switchToFullWarnings(routerConfigExists, env8) {
   const warnings = [];
   if (!providerKeyPresent(env8)) {
     warnings.push(
-      "No provider API key (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY) is visible to VS Code \u2014 Full-tier routing needs at least one. Set a key, then reload the window."
+      "No provider API key (DABBLER_ANTHROPIC_API_KEY / DABBLER_OPENAI_API_KEY / DABBLER_GEMINI_API_KEY) is visible to VS Code \u2014 Full-tier routing needs at least one. Set a key, then reload the window."
     );
   }
   if (!routerConfigExists) {

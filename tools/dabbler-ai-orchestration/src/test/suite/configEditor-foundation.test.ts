@@ -55,7 +55,7 @@ suite("configEditor-foundation — load-time validation", () => {
     fs.writeFileSync(rcPath, [
       "providers:",
       "  anthropic:",
-      "    api_key_env: ANTHROPIC_API_KEY",
+      "    api_key_env: DABBLER_ANTHROPIC_API_KEY",
     ].join("\n"), "utf8");
 
     fs.writeFileSync(budgetPath, "threshold_usd: 10\n", "utf8");
@@ -89,7 +89,7 @@ suite("configEditor-foundation — load-time validation", () => {
 
   test("validateBatch surfaces dangling model provider reference", () => {
     const routerConfig = {
-      providers: { anthropic: { api_key_env: "ANTHROPIC_API_KEY" } },
+      providers: { anthropic: { api_key_env: "DABBLER_ANTHROPIC_API_KEY" } },
       models: { "bad-model": { provider: "nonexistent" } },
     };
     const result = validateBatch({

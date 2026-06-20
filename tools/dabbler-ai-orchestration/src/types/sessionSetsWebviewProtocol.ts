@@ -120,7 +120,8 @@ export interface GettingStartedPayload {
   planPresent: boolean;         // D3 step 2
   sessionSetsPresent: boolean;  // D3 step 3
   // Set 060 Session 3 (spec D6): true iff at least one provider API key
-  // (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY) is present in
+  // (DABBLER_ANTHROPIC_API_KEY / DABBLER_OPENAI_API_KEY /
+  // DABBLER_GEMINI_API_KEY) is present in
   // the extension host's environment. When false AND the form's tier
   // radio is on Full, the webview renders the "set a key + reload
   // window" warning under the Build button. Computed host-side from

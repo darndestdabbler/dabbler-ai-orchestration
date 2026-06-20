@@ -5,6 +5,22 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.26.1] — 2026-06-20 (Set 074 — Dabbler-prefixed provider API key environment variables)
+
+### Changed
+
+- **Default provider API key environment variables are now Dabbler-prefixed.**
+  Built-in provider defaults moved from `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`,
+  and `OPENAI_API_KEY` to `DABBLER_ANTHROPIC_API_KEY`,
+  `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY`. The key values are
+  still the normal provider-issued Anthropic, Google, and OpenAI API keys;
+  only the environment variable names changed so provider-owned IDE extensions
+  cannot accidentally auto-detect and consume Dabbler's routing credentials.
+- Updated the shipped `router-config.yaml`, Windows user-env loading helper,
+  missing-credential diagnostics, CI dummy envs, VS Code extension Full-tier key
+  detection/warnings, current README/user docs, consumer-bootstrap templates,
+  cold-start fixtures, and tests to use the new default names.
+
 ## [0.26.0] — 2026-06-19 (Set 072 — the provider×surface matrix instrument + verification-only application mode)
 
 > Set 070 built the dual-surface instrument to **hold provider equal across arms** —

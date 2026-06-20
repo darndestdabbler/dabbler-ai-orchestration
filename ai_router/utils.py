@@ -188,7 +188,11 @@ class RateLimiter:
 # or host environment — this helper is for local developer convenience.
 # ======================================================================
 
-_REQUIRED_KEYS = ("ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY")
+_REQUIRED_KEYS = (
+    "DABBLER_ANTHROPIC_API_KEY",
+    "DABBLER_GEMINI_API_KEY",
+    "DABBLER_OPENAI_API_KEY",
+)
 
 
 def load_key(name: str) -> str | None:
@@ -205,7 +209,8 @@ def load_key(name: str) -> str | None:
 def load_api_keys() -> bool:
     """Load provider API keys from Windows user env into os.environ.
 
-    Loads ANTHROPIC_API_KEY, GEMINI_API_KEY, and OPENAI_API_KEY. Returns
+    Loads DABBLER_ANTHROPIC_API_KEY, DABBLER_GEMINI_API_KEY, and
+    DABBLER_OPENAI_API_KEY. Returns
     True if every key is present after loading. Prints a message for
     human-visible confirmation.
     """

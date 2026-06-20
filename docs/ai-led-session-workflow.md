@@ -825,9 +825,9 @@ Precedence (low → high): model-level `generation_params` →
 The router requires API keys as environment variables:
 
 ```
-ANTHROPIC_API_KEY   (for Claude Sonnet/Opus)
-GEMINI_API_KEY      (for Gemini Flash/Pro)
-OPENAI_API_KEY      (for GPT-5.4 and GPT-5.4 Mini)
+DABBLER_ANTHROPIC_API_KEY   (for Claude Sonnet/Opus)
+DABBLER_GEMINI_API_KEY      (for Gemini Flash/Pro)
+DABBLER_OPENAI_API_KEY      (for GPT-5.4 and GPT-5.4 Mini)
 PUSHOVER_API_KEY    (optional, for end-of-session phone notifications)
 PUSHOVER_USER_KEY   (optional, for end-of-session phone notifications)
 ```
@@ -836,6 +836,9 @@ On Windows, set these as User environment variables. The orchestrator
 instruction files include the commands to export them into the shell. The
 notification helper also falls back to the Windows User/Machine environment if
 the current process environment does not already contain the Pushover keys.
+The Dabbler-prefixed provider variables store the normal API key values issued
+by Anthropic, Google, and OpenAI; Dabbler does not distribute separate provider
+keys.
 
 ### 5. Create the Python Virtual Environment
 
@@ -1108,8 +1111,9 @@ Before doing anything else:
    `python -m ai_router.guidance_search --archive`)
 3. Read `docs/planning/session-set-authoring-guide.md`
 4. Then load keys from the environment and confirm all required keys
-   are present (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`,
-   and optionally `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` if
+  are present (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
+  `DABBLER_OPENAI_API_KEY`, and optionally `PUSHOVER_API_KEY` /
+  `PUSHOVER_USER_KEY` if
    notifications are configured)
 
 If keys are missing, stop and tell the human.

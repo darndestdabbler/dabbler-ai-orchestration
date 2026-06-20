@@ -11,7 +11,7 @@ _RC_WITH_COMMENTS = textwrap.dedent("""\
     providers:
       anthropic:
         # Anthropic provider — keep this comment
-        api_key_env: ANTHROPIC_API_KEY
+                api_key_env: DABBLER_ANTHROPIC_API_KEY
     routing:
       # Routing thresholds
       tier1_max_complexity: 30

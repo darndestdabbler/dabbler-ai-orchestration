@@ -28,7 +28,7 @@ import run_test_sandbox as rts
 CONFIG = {
     "providers": {
         "anthropic": {
-            "api_key_env": "ANTHROPIC_API_KEY",
+            "api_key_env": "DABBLER_ANTHROPIC_API_KEY",
             "base_url": "https://example.invalid/messages",
             "api_version": "2023-06-01",
             "timeout_seconds": 5,
@@ -1200,7 +1200,7 @@ class TestOpenAIWireTranslation:
         import httpx
 
         monkeypatch.setattr(httpx, "Client", _Client)
-        cfg = {"api_key_env": "OPENAI_API_KEY", "base_url": "https://x.invalid/v1"}
+        cfg = {"api_key_env": "DABBLER_OPENAI_API_KEY", "base_url": "https://x.invalid/v1"}
         b = pv.OpenAIBinding()
         # Turn 1.
         b.request(
@@ -1285,7 +1285,7 @@ class TestOpenAIWireTranslation:
         import httpx
 
         monkeypatch.setattr(httpx, "Client", _Client)
-        cfg = {"api_key_env": "OPENAI_API_KEY", "base_url": "https://x.invalid/v1"}
+        cfg = {"api_key_env": "DABBLER_OPENAI_API_KEY", "base_url": "https://x.invalid/v1"}
         b = pv.OpenAIBinding()
         tools = pv._all_tool_schemas()
         kw = dict(system="s", tools=tools, force_verdict=False, max_output_tokens=100, model="gpt-5.4", config=cfg)
@@ -1348,7 +1348,7 @@ class TestOpenAIWireTranslation:
                 force_verdict=False,
                 max_output_tokens=100,
                 model="gpt-5.4",
-                config={"api_key_env": "OPENAI_API_KEY"},
+                config={"api_key_env": "DABBLER_OPENAI_API_KEY"},
             )
         assert b._sent_upto == before  # cursor unchanged on failure
         assert b._response_id is None
@@ -1394,7 +1394,7 @@ class TestOpenAIWireTranslation:
                 force_verdict=False,
                 max_output_tokens=100,
                 model="gpt-5.4",
-                config={"api_key_env": "OPENAI_API_KEY"},
+                config={"api_key_env": "DABBLER_OPENAI_API_KEY"},
             )
         assert b._sent_upto == before  # cursor NOT advanced past a parse failure
         assert b._response_id is None
@@ -1564,7 +1564,7 @@ class TestGeminiWireTranslation:
             force_verdict=False,
             max_output_tokens=24000,
             model="gemini-3-pro",
-            config={"api_key_env": "GEMINI_API_KEY", "base_url": "https://g.invalid/v1beta"},
+            config={"api_key_env": "DABBLER_GEMINI_API_KEY", "base_url": "https://g.invalid/v1beta"},
             generation_params={"thinking_level": "high"},
         )
         thinking = captured["body"]["generationConfig"]["thinkingConfig"]
@@ -1613,7 +1613,7 @@ class TestGeminiWireTranslation:
             max_output_tokens=24000,
             model="gemini-2.5-pro",
             config={
-                "api_key_env": "GEMINI_API_KEY",
+                "api_key_env": "DABBLER_GEMINI_API_KEY",
                 "base_url": "https://g.invalid/v1beta",
             },
             generation_params={"thinking_budget": 8192},

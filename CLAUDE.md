@@ -159,7 +159,8 @@ consensus**.
 ## Engine-specific bootstrap (Claude Code)
 
 Claude Code inherits the Windows User environment, so the provider API
-keys (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`) are
+keys (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
+`DABBLER_OPENAI_API_KEY`) are
 normally already present — no export step is needed. If a routed call
 fails on a missing key, confirm it is set in the Windows User environment
 before retrying, then run the router as described in **Running the router**

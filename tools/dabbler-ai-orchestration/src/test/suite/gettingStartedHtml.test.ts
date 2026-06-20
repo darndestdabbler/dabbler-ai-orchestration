@@ -149,7 +149,7 @@ suite("gettingStartedHtml — D6 provider-key warning (Set 060 S3)", () => {
     const step2Idx = html.indexOf("2. Create or import a project plan");
     assert.ok(buildIdx < warnIdx && warnIdx < step2Idx, "warning not under the Build button");
     // The copy carries the two load-bearing instructions.
-    assert.ok(html.includes("ANTHROPIC_API_KEY"));
+    assert.ok(html.includes("DABBLER_ANTHROPIC_API_KEY"));
     assert.ok(html.includes("reload the VS Code window"));
   });
 

@@ -71,9 +71,9 @@ jobs:
     # validator just checks for env presence. Dummy values are
     # sufficient and avoid leaking real credentials through CI logs.
     env:
-      ANTHROPIC_API_KEY: ci-dummy-anthropic-key
-      GEMINI_API_KEY: ci-dummy-gemini-key
-      OPENAI_API_KEY: ci-dummy-openai-key
+      DABBLER_ANTHROPIC_API_KEY: ci-dummy-anthropic-key
+      DABBLER_GEMINI_API_KEY: ci-dummy-gemini-key
+      DABBLER_OPENAI_API_KEY: ci-dummy-openai-key
     steps:
       - uses: actions/checkout@v4
 
@@ -100,9 +100,9 @@ jobs:
     # electronLaunch.ts's harness_cli helper, and those CLIs import
     # config.load_config() at startup which validates the env is set.
     env:
-      ANTHROPIC_API_KEY: ci-dummy-anthropic-key
-      GEMINI_API_KEY: ci-dummy-gemini-key
-      OPENAI_API_KEY: ci-dummy-openai-key
+      DABBLER_ANTHROPIC_API_KEY: ci-dummy-anthropic-key
+      DABBLER_GEMINI_API_KEY: ci-dummy-gemini-key
+      DABBLER_OPENAI_API_KEY: ci-dummy-openai-key
     steps:
       - uses: actions/checkout@v4
 

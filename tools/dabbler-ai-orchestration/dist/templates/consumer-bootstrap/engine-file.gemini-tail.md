@@ -6,8 +6,9 @@ You are **Gemini Code Assist (Google)**; you read this `GEMINI.md`. Claude
 Code reads `CLAUDE.md`; Codex and GitHub Copilot read `AGENTS.md`. All three
 files share the body above — only this tail differs.
 
-- **API keys (Full tier):** ensure `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` /
-  `OPENAI_API_KEY` are exported in your shell or set in the OS user
+- **API keys (Full tier):** ensure `DABBLER_GEMINI_API_KEY` /
+  `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_OPENAI_API_KEY` are exported in your
+  shell or set in the OS user
   environment before running routed calls. (Lightweight tier makes no metered
   calls, so keys are not required to run sessions.)
 - **Run the router through the venv interpreter:**

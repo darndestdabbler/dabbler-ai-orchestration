@@ -63,10 +63,17 @@ can learn it.
 
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
-| `dabbler-ai-router` | `0.19.0` | **Published to PyPI 2026-06-14** (tag `v0.19.0`, release.yml run 27507297669, tagged commit `8cc4b3a`) — Set 064 (guidance lifecycle & pruning: cost reporter, per-lesson metadata + validator, citation-at-close keystone, active/archive split, ceilings/config, backlog-triage helper). Passed the green-Test release gate. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
+| `dabbler-ai-router` | `0.26.1` | **PyPI patch release prepared 2026-06-20** (tag `v0.26.1`) — Set 074 moved built-in provider API key env-var defaults to `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` to avoid collisions with provider-owned IDE extensions. The key values remain the normal provider-issued Anthropic, Google, and OpenAI API keys; only the environment variable names changed. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
 | `dabbler-ai-orchestration` VS Code extension | `0.33.0` | **Published to the Marketplace 2026-06-14** (tag `vsix-v0.33.0`, publish-vscode.yml run 27507297687, tagged commit `8cc4b3a`) — Set 064 D7 (consumer-bootstrap guidance-lifecycle starter templates); carries Set 063 too. Passed the green-Test gate. Last published before this: `0.31.0` (tag `vsix-v0.31.0`, run 27424322879, 2026-06-12). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
+
+- **`dabbler-ai-router 0.26.1`** — Set 074 emergency patch. Built-in provider
+  API-key env-var defaults moved to `DABBLER_ANTHROPIC_API_KEY`,
+  `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` so Dabbler routing does
+  not collide with provider-owned tools that auto-detect generic key names. The
+  stored key values are still the normal keys issued by Anthropic, Google, and
+  OpenAI. PyPI publish runs through tag `v0.26.1` and the green-Test gate.
 
 - **`dabbler-ai-router 0.19.0` + extension `0.33.0`** — Set 064, guidance
   lifecycle & pruning. The router gains the steady-state lifecycle (cost

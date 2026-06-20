@@ -119,7 +119,8 @@ deeper feature descriptions live at
    it, and materializes `ai_router/router-config.yaml` for tuning.
 
 Then **set API keys** as environment variables (one-time):
-`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY` — the
+`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
+`DABBLER_OPENAI_API_KEY` — the
 [Prerequisites](#prerequisites-tools-and-accounts) section below has
 the sign-up links and notes which providers are required.
 
@@ -197,15 +198,19 @@ The router calls all three providers and cross-provider verification
 needs at least two providers live to be meaningful. Expect to set up
 all three.
 
-- `ANTHROPIC_API_KEY` — [console.anthropic.com](https://console.anthropic.com/)
+- `DABBLER_ANTHROPIC_API_KEY` — [console.anthropic.com](https://console.anthropic.com/)
   (Settings → API Keys, requires billing).
-- `GEMINI_API_KEY` — [aistudio.google.com](https://aistudio.google.com/)
+- `DABBLER_GEMINI_API_KEY` — [aistudio.google.com](https://aistudio.google.com/)
   (Get API key in the left rail; free tier is generous).
-- `OPENAI_API_KEY` — [platform.openai.com](https://platform.openai.com/)
+- `DABBLER_OPENAI_API_KEY` — [platform.openai.com](https://platform.openai.com/)
   (create a project, add a payment method, mint a key).
 
-Set each as a Windows User environment variable; macOS / Linux export
-them in your shell profile. Optionally,
+Set each provider-issued key as a Windows User environment variable;
+macOS / Linux users can export them in their shell profile. Dabbler does not
+issue separate API keys: use the same keys you get from Anthropic, Google, and
+OpenAI, just under the `DABBLER_` environment variable names so the router does
+not collide with provider-owned tools that auto-detect generic API-key names.
+Optionally,
 [pushover.net](https://pushover.net/)'s `PUSHOVER_API_KEY` and
 `PUSHOVER_USER_KEY` enable end-of-session phone notifications — if
 unset, the orchestrator skips the notify and prints to console as

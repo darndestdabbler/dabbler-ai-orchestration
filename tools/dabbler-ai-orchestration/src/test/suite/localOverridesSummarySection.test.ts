@@ -31,14 +31,14 @@ suite("localOverridesSummarySection — rendering", () => {
 
   test("populated local-overrides: lists each override path side-by-side with shared value", () => {
     const { html } = render(baseState({
-      routerConfig: { providers: { google: { api_key_env: "GEMINI_API_KEY" } } },
+      routerConfig: { providers: { google: { api_key_env: "DABBLER_GEMINI_API_KEY" } } },
       localOverrides: {
         providers: { google: { api_key_env: "MY_PERSONAL_GEMINI_KEY" } },
       },
       localOverridesFileExists: true,
     }));
     assert.ok(html.includes("providers.google.api_key_env"), "override path should be listed");
-    assert.ok(html.includes("GEMINI_API_KEY"), "shared value should be shown");
+    assert.ok(html.includes("DABBLER_GEMINI_API_KEY"), "shared value should be shown");
     assert.ok(html.includes("MY_PERSONAL_GEMINI_KEY"), "local value should be shown");
   });
 

@@ -440,7 +440,7 @@ Remediation: run close-out through the workspace venv interpreter
 `.venv/bin/python …` on POSIX), or `pip install dabbler-ai-router` into
 the interpreter you are using. Only after the venv interpreter loads the
 router will a genuine missing-key error (`Missing environment variable
-ANTHROPIC_API_KEY …`) be trustworthy.
+DABBLER_ANTHROPIC_API_KEY ...`) be trustworthy.
 
 **Uncommitted files in working tree** — `check_working_tree_clean`
 fails with the list of dirty paths. The agent typically forgot to

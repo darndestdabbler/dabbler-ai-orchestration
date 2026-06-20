@@ -83,9 +83,9 @@ function checkApiKeys(): void {
   ch.appendLine("The ai_router reads API keys from environment variables at session start.");
   ch.appendLine("");
   ch.appendLine("Keys used (depending on configured providers):");
-  ch.appendLine("  ANTHROPIC_API_KEY  — Claude (claude.ai)");
-  ch.appendLine("  OPENAI_API_KEY     — OpenAI (GPT models)");
-  ch.appendLine("  GEMINI_API_KEY     — Google Gemini");
+  ch.appendLine("  DABBLER_ANTHROPIC_API_KEY  — Claude (claude.ai)");
+  ch.appendLine("  DABBLER_OPENAI_API_KEY     — OpenAI (GPT models)");
+  ch.appendLine("  DABBLER_GEMINI_API_KEY     — Google Gemini");
   ch.appendLine("");
   ch.appendLine("Export them in your shell profile (~/.bashrc, ~/.zshrc, or $PROFILE on Windows).");
   ch.appendLine("After editing, restart VS Code or open a new terminal.");

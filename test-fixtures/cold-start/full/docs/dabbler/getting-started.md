@@ -23,9 +23,11 @@ than the one that did the development work.
 
 The AI router requires that you have accounts with at least one API
 (should be a different provider from the one that you use for your
-sessions) and that your account keys are stored in environment
-variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or
-`GEMINI_API_KEY`). For more information on setting up the accounts
+sessions) and that your provider-issued account keys are stored in Dabbler-named
+environment variables (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY`, or
+`DABBLER_GEMINI_API_KEY`). These are the same keys you get from Anthropic,
+Google, or OpenAI; only the environment variable names are Dabbler-prefixed to
+avoid collisions with provider-owned tools. For more information on setting up the accounts
 and environment variables, see the tier model documentation:
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
 

@@ -6,13 +6,13 @@ const VALID_ROUTER_CONFIG = {
     anthropic: {
       display_label: "Anthropic (Claude)",
       enabled: true,
-      api_key_env: "ANTHROPIC_API_KEY",
+      api_key_env: "DABBLER_ANTHROPIC_API_KEY",
       base_url: "https://api.anthropic.com/v1/messages",
     },
     google: {
       display_label: "Google (Gemini)",
       enabled: true,
-      api_key_env: "GEMINI_API_KEY",
+      api_key_env: "DABBLER_GEMINI_API_KEY",
       base_url: "https://generativelanguage.googleapis.com/v1beta",
     },
   },
@@ -136,7 +136,7 @@ suite("schemaValidator — router-config.yaml: provider references", () => {
   test("rejects model referencing non-existent provider", () => {
     const routerConfig = {
       providers: {
-        anthropic: { api_key_env: "ANTHROPIC_API_KEY" },
+        anthropic: { api_key_env: "DABBLER_ANTHROPIC_API_KEY" },
       },
       models: {
         "my-model": { provider: "nonexistent" },
@@ -197,7 +197,7 @@ suite("schemaValidator — router-config.yaml: env var name shape", () => {
   test("accepts valid uppercase env var name", () => {
     const routerConfig = {
       providers: {
-        anthropic: { api_key_env: "ANTHROPIC_API_KEY" },
+        anthropic: { api_key_env: "DABBLER_ANTHROPIC_API_KEY" },
       },
     };
     const result = validateBatch({

@@ -177,7 +177,7 @@ suite("tierRewrite — rewriteSpecTier (D4 matrix)", () => {
 });
 
 suite("tierRewrite — switchToFullWarnings (D4 guardrails)", () => {
-  const KEYED = { ANTHROPIC_API_KEY: "sk-test" };
+  const KEYED = { DABBLER_ANTHROPIC_API_KEY: "sk-test" };
 
   test("no warnings when a provider key is visible and router config exists", () => {
     assert.deepStrictEqual(switchToFullWarnings(true, KEYED), []);
@@ -188,16 +188,16 @@ suite("tierRewrite — switchToFullWarnings (D4 guardrails)", () => {
     assert.strictEqual(warnings.length, 1);
     assert.ok(/provider API key/i.test(warnings[0]));
     for (const env of [
-      { ANTHROPIC_API_KEY: "a" },
-      { OPENAI_API_KEY: "b" },
-      { GEMINI_API_KEY: "c" },
+      { DABBLER_ANTHROPIC_API_KEY: "a" },
+      { DABBLER_OPENAI_API_KEY: "b" },
+      { DABBLER_GEMINI_API_KEY: "c" },
     ]) {
       assert.deepStrictEqual(switchToFullWarnings(true, env), [], JSON.stringify(env));
     }
   });
 
   test("whitespace-only key counts as absent (same posture as providerKeyPresent)", () => {
-    const warnings = switchToFullWarnings(true, { ANTHROPIC_API_KEY: "   " });
+    const warnings = switchToFullWarnings(true, { DABBLER_ANTHROPIC_API_KEY: "   " });
     assert.strictEqual(warnings.length, 1);
   });
 

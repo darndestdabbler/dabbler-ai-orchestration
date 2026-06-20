@@ -9,18 +9,18 @@ function baseState(over: Partial<SectionState> = {}): SectionState {
         anthropic: {
           display_label: "Anthropic (Claude)",
           enabled: true,
-          api_key_env: "ANTHROPIC_API_KEY",
+          api_key_env: "DABBLER_ANTHROPIC_API_KEY",
           base_url: "https://api.anthropic.com/v1/messages",
         },
         google: {
           enabled: false,
-          api_key_env: "GEMINI_API_KEY",
+          api_key_env: "DABBLER_GEMINI_API_KEY",
         },
       },
     },
     budget: null,
     localOverrides: null,
-    envVarPresence: { ANTHROPIC_API_KEY: true, GEMINI_API_KEY: false },
+    envVarPresence: { DABBLER_ANTHROPIC_API_KEY: true, DABBLER_GEMINI_API_KEY: false },
     localOverridesFileExists: false,
     ...over,
   };
@@ -77,7 +77,7 @@ suite("providersTableSection — rendering", () => {
       localOverrides: {
         providers: { anthropic: { api_key_env: "MY_PERSONAL_ANTHROPIC_KEY" } },
       },
-      envVarPresence: { ANTHROPIC_API_KEY: true, MY_PERSONAL_ANTHROPIC_KEY: false, GEMINI_API_KEY: false },
+      envVarPresence: { DABBLER_ANTHROPIC_API_KEY: true, MY_PERSONAL_ANTHROPIC_KEY: false, DABBLER_GEMINI_API_KEY: false },
     }));
     const anthropicRow = html.slice(
       html.indexOf('data-provider-id="anthropic"'),

@@ -40,9 +40,11 @@
   // so a key set afterwards is invisible until reload).
   var ENV_WARNING_TEXT =
     "The Full tier routes work through provider APIs, but no provider " +
-    "API key was found. Set at least one of ANTHROPIC_API_KEY, " +
-    "OPENAI_API_KEY, or GEMINI_API_KEY in your environment variables, " +
-    "then reload the VS Code window (keys set after launch are not " +
+    "API key was found. Use your normal Anthropic, Google, or OpenAI " +
+    "key value under at least one Dabbler environment variable: " +
+    "DABBLER_ANTHROPIC_API_KEY, DABBLER_OPENAI_API_KEY, or " +
+    "DABBLER_GEMINI_API_KEY. Then reload the VS Code window (keys set " +
+    "after launch are not " +
     "visible until you reload). The Lightweight tier needs no keys.";
 
   // D7 (Set 060 S3, carries verifier issue S060-S2-V1-001): the

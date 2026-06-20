@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "074-dabbler-provider-env-vars",
+  "status": "in-progress",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Session 1",
+      "status": "in-progress",
+      "startedAt": "2026-06-20T05:24:24.531721-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "github-copilot",
+        "provider": "openai",
+        "model": "github-copilot",
+        "effort": "medium"
+      },
+      "verificationVerdict": null
+    }
+  ]
+}

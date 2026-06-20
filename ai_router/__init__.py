@@ -59,7 +59,7 @@ the SessionLog class:
     log.log_step(session_number=1, step_number=1, ...)
 """
 
-__version__ = "0.26.0"
+__version__ = "0.26.1"
 
 from .config import load_config, resolve_generation_params
 from .models import estimate_complexity, pick_model

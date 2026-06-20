@@ -132,7 +132,7 @@ export function switchToFullWarnings(
   const warnings: string[] = [];
   if (!providerKeyPresent(env)) {
     warnings.push(
-      "No provider API key (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY) is visible to VS Code — Full-tier routing needs at least one. Set a key, then reload the window.",
+      "No provider API key (DABBLER_ANTHROPIC_API_KEY / DABBLER_OPENAI_API_KEY / DABBLER_GEMINI_API_KEY) is visible to VS Code — Full-tier routing needs at least one. Set a key, then reload the window.",
     );
   }
   if (!routerConfigExists) {

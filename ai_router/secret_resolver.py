@@ -10,9 +10,9 @@ Usage::
 
     from secret_resolver import resolve_secret
 
-    api_key = resolve_secret("ANTHROPIC_API_KEY")
+    api_key = resolve_secret("DABBLER_ANTHROPIC_API_KEY")
     if api_key is None:
-        raise EnvironmentError("ANTHROPIC_API_KEY not set")
+        raise EnvironmentError("DABBLER_ANTHROPIC_API_KEY not set")
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ _BACKENDS: dict[str, Callable[[str], str | None]] = {}
 def register_backend(name: str, fn: Callable[[str], str | None]) -> None:
     """Register a secret backend under *name*.
 
-    *fn* receives the secret name (e.g. ``"ANTHROPIC_API_KEY"``) and
+    *fn* receives the secret name (e.g. ``"DABBLER_ANTHROPIC_API_KEY"``) and
     returns its value, or ``None`` if the secret is absent.
     """
     _BACKENDS[name] = fn

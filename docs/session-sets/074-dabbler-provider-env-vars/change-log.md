@@ -15,8 +15,7 @@
 ## Session 1 of 1 - Rename provider env vars and release
 
 **Status:** VERIFIED (routed `session-verification`, gpt-5-4). PyPI patch
-release published; Marketplace patch prepared pending green `Test` workflow and
-`vsix-v0.33.1` tag push.
+release published; Marketplace/Open VSX patch release published.
 
 ### Delivered
 
@@ -72,7 +71,7 @@ release published; Marketplace patch prepared pending green `Test` workflow and
 ### Publish plan
 
 Router `0.26.1` was published to PyPI on 2026-06-20 via tag `v0.26.1` and
-release.yml run 27867506784. Push the extension follow-up commit to `master`,
-wait for the `Test` workflow to pass, then push tag `vsix-v0.33.1`. The
-tag-driven Marketplace workflow requires the green Test run for that commit
-before publishing the extension patch.
+release.yml run 27867506784. Extension `0.33.1` was published to the VS Code
+Marketplace and Open VSX on 2026-06-20 via tag `vsix-v0.33.1` and
+publish-vscode.yml run 27867766323 after the green Test run for commit
+`eed7d5d`.

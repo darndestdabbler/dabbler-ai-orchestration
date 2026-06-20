@@ -57,7 +57,7 @@
 ## Release path
 
 The router patch was published to PyPI on 2026-06-20 via tag `v0.26.1` and
-release.yml run 27867506784. Commit and push the extension follow-up, wait for
-the `Test` workflow to pass for that commit, then push tag `vsix-v0.33.1` so the
-tag-driven Marketplace workflow publishes the installed-extension patch through
-the green-Test gate.
+release.yml run 27867506784. The extension patch was published to the VS Code
+Marketplace and Open VSX on 2026-06-20 via tag `vsix-v0.33.1` and
+publish-vscode.yml run 27867766323 after the green-Test gate passed for commit
+`eed7d5d`.

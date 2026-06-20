@@ -64,7 +64,7 @@ can learn it.
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
 | `dabbler-ai-router` | `0.26.1` | **Published to PyPI 2026-06-20** (tag `v0.26.1`, release.yml run 27867506784, tagged commit `5a05490`) — Set 074 moved built-in provider API key env-var defaults to `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` to avoid collisions with provider-owned IDE extensions. The key values remain the normal provider-issued Anthropic, Google, and OpenAI API keys; only the environment variable names changed. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.33.1` | **Marketplace patch release prepared 2026-06-20** (tag target `vsix-v0.33.1`) — Set 074 follow-up carrying the extension-side Dabbler-prefixed provider-key copy/templates and changing `Dabbler: Update ai-router` to force-refresh PyPI installs with `pip install --upgrade --force-reinstall --no-cache-dir dabbler-ai-router`. Last Marketplace-published version before this patch: `0.33.0` (tag `vsix-v0.33.0`, publish-vscode.yml run 27507297687, 2026-06-14). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.33.1` | **Published to the Marketplace and Open VSX 2026-06-20** (tag `vsix-v0.33.1`, publish-vscode.yml run 27867766323, tagged commit `eed7d5d`) — Set 074 follow-up carrying the extension-side Dabbler-prefixed provider-key copy/templates and changing `Dabbler: Update ai-router` to force-refresh PyPI installs with `pip install --upgrade --force-reinstall --no-cache-dir dabbler-ai-router`. Last Marketplace-published version before this patch: `0.33.0` (tag `vsix-v0.33.0`, publish-vscode.yml run 27507297687, 2026-06-14). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
 
@@ -75,9 +75,10 @@ can learn it.
   provider-owned tools that auto-detect generic key names. The stored key values
   are still the normal keys issued by Anthropic, Google, and OpenAI. Router
   `0.26.1` was published to PyPI on 2026-06-20 via tag `v0.26.1` and release.yml
-  run 27867506784. Extension `0.33.1` is the required Marketplace patch carrying
-  the updated installed-extension copy/templates and a forced PyPI refresh for
-  `Dabbler: Update ai-router`.
+  run 27867506784. Extension `0.33.1` was published to the Marketplace and Open
+  VSX on 2026-06-20 via tag `vsix-v0.33.1` and publish-vscode.yml run
+  27867766323; it carries the updated installed-extension copy/templates and a
+  forced PyPI refresh for `Dabbler: Update ai-router`.
 
 - **`dabbler-ai-router 0.19.0` + extension `0.33.0`** — Set 064, guidance
   lifecycle & pruning. The router gains the steady-state lifecycle (cost

@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.33.1] — 2026-06-20 (Set 074 follow-up — provider env vars + forced router refresh)
+
+### Changed
+
+- Marketplace patch for the Set 074 provider API-key env-var rename. The
+  extension-side Full-tier key detection, warning copy, troubleshooting output,
+  consumer-bootstrap templates, and README now use `DABBLER_ANTHROPIC_API_KEY`,
+  `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY`, and clarify that the
+  values are the normal provider-issued Anthropic, Google, and OpenAI keys.
+- **`Dabbler: Update ai-router` now force-refreshes PyPI installs.** PyPI-backed
+  updates run `pip install --upgrade --force-reinstall --no-cache-dir
+  dabbler-ai-router`, so the command pulls the newly published Python source
+  files instead of accepting an already-satisfied or cached install. The GitHub
+  fallback path already re-pulls and recopies the sparse checkout.
+
 ## [0.33.0] — 2026-06-14 (Set 064 — guidance-lifecycle scaffold templates)
 
 > **Release note:** `0.32.0` (Set 063) was version-bumped but never tag-pushed

@@ -368,7 +368,7 @@ suite("aiRouterInstall — PyPI install (happy path)", () => {
     fs.rmSync(ws, { recursive: true, force: true });
   });
 
-  test("update mode passes -U and reads the install-method marker as the default source", async () => {
+  test("update mode force-refreshes PyPI installs and reads the install-method marker as the default source", async () => {
     const ws = makeTmpWorkspace();
     seedExistingVenv(ws);
     const marker = path.join(ws, INSTALL_METHOD_REL);
@@ -396,7 +396,15 @@ suite("aiRouterInstall — PyPI install (happy path)", () => {
 
     assert.strictEqual(outcome.ok, true, outcome.message);
     assert.strictEqual(presentedDefault, "pypi");
-    assert.deepStrictEqual(calls[0].args, ["-m", "pip", "install", "-U", PYPI_PACKAGE_NAME]);
+    assert.deepStrictEqual(calls[0].args, [
+      "-m",
+      "pip",
+      "install",
+      "--upgrade",
+      "--force-reinstall",
+      "--no-cache-dir",
+      PYPI_PACKAGE_NAME,
+    ]);
     fs.rmSync(ws, { recursive: true, force: true });
   });
 

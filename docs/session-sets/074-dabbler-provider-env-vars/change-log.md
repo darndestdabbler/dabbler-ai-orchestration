@@ -7,14 +7,16 @@
 > normal API keys issued by Anthropic, Google, and OpenAI; only the environment
 > variable names changed.
 >
-> **Release:** `dabbler-ai-router` `0.26.1`, PyPI tag `v0.26.1`.
+> **Release:** `dabbler-ai-router` `0.26.1`, PyPI tag `v0.26.1`; VS Code
+> extension `0.33.1`, Marketplace tag `vsix-v0.33.1`.
 
 ---
 
 ## Session 1 of 1 - Rename provider env vars and release
 
 **Status:** VERIFIED (routed `session-verification`, gpt-5-4). PyPI patch
-release prepared pending green `Test` workflow and `v0.26.1` tag push.
+release published; Marketplace patch prepared pending green `Test` workflow and
+`vsix-v0.33.1` tag push.
 
 ### Delivered
 
@@ -37,6 +39,11 @@ release prepared pending green `Test` workflow and `v0.26.1` tag push.
   now expect the Dabbler-prefixed defaults. `pyproject.toml` and
   `ai_router.__version__` are `0.26.1`, and `ai_router/CHANGELOG.md` records the
   patch release.
+- **Extension update forces a Python source refresh.** The `Dabbler: Update
+  ai-router` PyPI path now runs `pip install --upgrade --force-reinstall
+  --no-cache-dir dabbler-ai-router`, and extension `0.33.1` is prepared as the
+  Marketplace patch carrying the updated installed-extension source, templates,
+  README, and changelog.
 
 ### Verification
 
@@ -51,6 +58,8 @@ release prepared pending green `Test` workflow and `v0.26.1` tag push.
 - Playwright Layer 3: 18 passed.
 - Local Python package build: produced `dabbler_ai_router-0.26.1.tar.gz` and
   `dabbler_ai_router-0.26.1-py3-none-any.whl` successfully.
+- Follow-up extension recheck: `npx tsc --noEmit` passed; focused
+  `installAiRouter.test.ts` passed (39 tests).
 
 ### Residuals
 
@@ -62,6 +71,8 @@ release prepared pending green `Test` workflow and `v0.26.1` tag push.
 
 ### Publish plan
 
-Push the Set 074 commit to `master`, wait for the `Test` workflow to pass, then
-push tag `v0.26.1`. The tag-driven release workflow requires the green Test run
-for that commit before publishing the package to PyPI.
+Router `0.26.1` was published to PyPI on 2026-06-20 via tag `v0.26.1` and
+release.yml run 27867506784. Push the extension follow-up commit to `master`,
+wait for the `Test` workflow to pass, then push tag `vsix-v0.33.1`. The
+tag-driven Marketplace workflow requires the green Test run for that commit
+before publishing the extension patch.

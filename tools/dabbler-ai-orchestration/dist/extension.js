@@ -21642,9 +21642,9 @@ function venvPython(venvPath) {
 }
 async function runPyPiInstall(deps, opts) {
   opts.report(
-    opts.mode === "update" ? `Upgrading ${PYPI_PACKAGE_NAME} from PyPI\u2026` : `Installing ${PYPI_PACKAGE_NAME} from PyPI\u2026`
+    opts.mode === "update" ? `Force-refreshing ${PYPI_PACKAGE_NAME} from PyPI\u2026` : `Installing ${PYPI_PACKAGE_NAME} from PyPI\u2026`
   );
-  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "-U", PYPI_PACKAGE_NAME] : ["-m", "pip", "install", PYPI_PACKAGE_NAME];
+  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", PYPI_PACKAGE_NAME] : ["-m", "pip", "install", PYPI_PACKAGE_NAME];
   const venvPy = venvPython(opts.venvPath);
   const result = await deps.spawner(venvPy, pipArgs, {
     cwd: deps.workspaceRoot,

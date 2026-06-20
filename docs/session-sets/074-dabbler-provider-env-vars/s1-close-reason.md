@@ -2,7 +2,7 @@
 
 **Orchestrator:** github-copilot / openai / github-copilot / medium
 **Verdict:** VERIFIED (routed `session-verification`, gpt-5-4)
-**Release target:** `dabbler-ai-router` `0.26.1` / PyPI tag `v0.26.1`
+**Release target:** `dabbler-ai-router` `0.26.1` / PyPI tag `v0.26.1`; VS Code extension `0.33.1` / Marketplace tag `vsix-v0.33.1`
 
 ## Delivered
 
@@ -19,6 +19,10 @@
    the Dabbler-prefixed environment variable names.
 4. Bumped package metadata to `0.26.1` and added the `ai_router/CHANGELOG.md`
    patch-release entry.
+5. Added extension `0.33.1` as the Marketplace patch carrying the updated
+  installed-extension copy/templates and changed `Dabbler: Update ai-router` to
+  force-refresh PyPI installs with `pip install --upgrade --force-reinstall
+  --no-cache-dir dabbler-ai-router`.
 
 ## Verification
 
@@ -37,6 +41,8 @@
   setuptools package-data warnings appeared.
 - Final cleanup recheck: migrate router-config tests 9 passed; drift guard OK;
   template snapshot 22 passed.
+- Follow-up extension recheck: `npx tsc --noEmit` passed; focused
+  `installAiRouter.test.ts` passed (39 tests).
 
 ## Residual risks
 
@@ -50,7 +56,8 @@
 
 ## Release path
 
-Commit and push the Set 074 changes, wait for the `Test` workflow to pass for
-the pushed commit, then push tag `v0.26.1`. The release workflow verifies the tag
-matches `pyproject.toml`, builds the same `0.26.1` artifacts, requires the green
-`Test` run, and publishes to PyPI through OIDC trusted publishing.
+The router patch was published to PyPI on 2026-06-20 via tag `v0.26.1` and
+release.yml run 27867506784. Commit and push the extension follow-up, wait for
+the `Test` workflow to pass for that commit, then push tag `vsix-v0.33.1` so the
+tag-driven Marketplace workflow publishes the installed-extension patch through
+the green-Test gate.

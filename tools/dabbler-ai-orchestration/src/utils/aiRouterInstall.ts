@@ -210,8 +210,9 @@ export async function installAiRouter(deps: InstallDeps): Promise<InstallOutcome
  * Update ``ai_router`` in the workspace.
  *
  * Reads the install-method marker written by a prior install. PyPI installs
- * use ``pip install -U``; GitHub installs re-pull the sparse-checkout. When
- * no marker is present, falls back to a fresh install flow.
+ * force-refresh the package from PyPI; GitHub installs re-pull the
+ * sparse-checkout. When no marker is present, falls back to a fresh install
+ * flow.
  */
 export async function updateAiRouter(deps: InstallDeps): Promise<InstallOutcome> {
   return doInstall(deps, { mode: "update" });
@@ -401,12 +402,12 @@ async function runPyPiInstall(
 ): Promise<InstallOutcome> {
   opts.report(
     opts.mode === "update"
-      ? `Upgrading ${PYPI_PACKAGE_NAME} from PyPI…`
+      ? `Force-refreshing ${PYPI_PACKAGE_NAME} from PyPI…`
       : `Installing ${PYPI_PACKAGE_NAME} from PyPI…`,
   );
   const pipArgs =
     opts.mode === "update"
-      ? ["-m", "pip", "install", "-U", PYPI_PACKAGE_NAME]
+      ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", PYPI_PACKAGE_NAME]
       : ["-m", "pip", "install", PYPI_PACKAGE_NAME];
   const venvPy = venvPython(opts.venvPath);
   const result = await deps.spawner(venvPy, pipArgs, {

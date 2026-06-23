@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "076-local-only-closeout-mode",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -20,16 +20,16 @@
     {
       "number": 2,
       "title": "Session 2",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-06-23T13:36:08.990061-04:00",
-      "completedAt": null,
+      "completedAt": "2026-06-23T14:28:03.653984-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
         "model": "claude-opus-4-8",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

@@ -217,6 +217,56 @@ def _is_ignored_pattern(name: str) -> bool:
     return False
 
 
+def _has_remote(repo_root: str) -> bool:
+    """Return True if *repo_root* has at least one git remote configured.
+
+    ``git remote`` lists configured remote names one per line; empty
+    output (with a clean exit) means no remote is configured at all.
+    Used by :func:`check_pushed_to_remote` to distinguish a
+    deliberately remote-less repo (where the local-only marker waives
+    the push gate) from a repo that has a remote but a branch the
+    operator simply forgot to push.
+
+    Fails conservative: a non-zero ``git remote`` exit is treated as
+    "a remote may exist" (return True), so the local-only waiver
+    requires an *affirmative* no-remote determination and never fires on
+    an ambiguous probe. The waiver makes the gate pass; the failure-mode
+    bias must therefore protect against masking a real unpushed state,
+    not against a spurious block.
+    """
+    rc, out, _err = _run_git(["remote"], cwd=repo_root)
+    if rc != 0:
+        return True
+    return bool(out.strip())
+
+
+# ---------------------------------------------------------------------------
+# Local-only marker
+# ---------------------------------------------------------------------------
+
+# Repo-level marker that declares a repository deliberately remote-less.
+# It sits beside the extension's ``.dabbler/install-method`` marker, works
+# on Full and Lightweight tiers alike, and survives window reloads (unlike
+# volatile webview state). Only its *presence* matters — the file contents
+# are not interpreted. See ``ai_router/docs/close-out.md`` for the
+# sanctioned local-only close path.
+_LOCAL_ONLY_MARKER = os.path.join(".dabbler", "local-only")
+
+
+def is_local_only(repo_root: Optional[str]) -> bool:
+    """Return True if *repo_root* carries the ``.dabbler/local-only`` marker.
+
+    Pure filesystem check — no git invocation — so it is unit-testable
+    against a plain directory without a live git tree. Returns ``False``
+    for a falsy *repo_root* (e.g. when the repo root could not be
+    resolved) rather than raising, so callers can guard with a single
+    boolean expression.
+    """
+    if not repo_root:
+        return False
+    return os.path.isfile(os.path.join(repo_root, _LOCAL_ONLY_MARKER))
+
+
 # ---------------------------------------------------------------------------
 # check_working_tree_clean
 # ---------------------------------------------------------------------------
@@ -369,6 +419,21 @@ def check_pushed_to_remote(
     objects to the remote (it negotiates only). We rely on the
     orchestrator to perform the real push; the gate's job is to confirm
     the state will be acceptable when push happens.
+
+    Local-only repositories
+    -----------------------
+    A repo that is deliberately remote-less (no git remote, by operator
+    decision) carries the ``.dabbler/local-only`` marker (see
+    :func:`is_local_only`). When that marker is present **and no remote
+    is configured at all**, the missing-upstream case becomes a
+    *pass-with-note* rather than a configuration-error failure — the note
+    ("local-only repo: push gate waived ...") is surfaced in the passing
+    gate's remediation slot so the audit trail records why the gate
+    passed without a push. The waiver is gated on ``not _has_remote`` so
+    it can **never** mask a real "forgot to push to an existing remote"
+    miss: if any remote exists, the marker is ignored and the normal
+    missing-upstream / ahead-of-upstream failures apply unchanged. A repo
+    without the marker is unchanged in every case.
     """
     _ = disposition
     _ = allow_empty_commit
@@ -395,6 +460,17 @@ def check_pushed_to_remote(
         cwd=repo_root,
     )
     if rc != 0 or not upstream:
+        # Local-only waiver: a deliberately remote-less repo carrying the
+        # .dabbler/local-only marker passes-with-note instead of failing
+        # on the missing upstream. Gated on "no remote configured" so a
+        # repo that DOES have a remote (but an unpushed/untracked branch)
+        # still fails — the marker can never mask a real forgot-to-push.
+        if is_local_only(repo_root) and not _has_remote(repo_root):
+            return (
+                True,
+                "local-only repo: push gate waived "
+                "(.dabbler/local-only marker present, no remote configured)",
+            )
         return (
             False,
             f"branch {head_ref!r} has no upstream; "

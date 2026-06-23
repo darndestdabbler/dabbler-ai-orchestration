@@ -127,7 +127,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 - **Action for future sessions:** Never `print(result.content)` directly.
 
 ## Always Route `ai-assignment.md` And Next-Orchestrator / Next-Set Recommendations
-<!-- lesson: id="L-064-6" last-used-set="075" status="active" scope="portable" -->
+<!-- lesson: id="L-064-6" last-used-set="076" status="active" scope="portable" -->
 
 - **Context:** Authoring `ai-assignment.md` (Step 3.5) or next-orchestrator /
   next-session-set recommendations (Step 8).

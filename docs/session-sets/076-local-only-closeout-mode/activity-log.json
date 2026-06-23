@@ -1,0 +1,95 @@
+{
+  "sessionSetName": "076-local-only-closeout-mode",
+  "createdDate": "2026-06-23T13:59:47.939583+00:00",
+  "totalSessions": 2,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-06-23T13:59:47.940690+00:00",
+      "description": "Operator set pathAwareCritique: none.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "none"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/contract-gate",
+      "dateTime": "2026-06-23T13:59:47.943022+00:00",
+      "description": "Operator set contractGate: none.",
+      "status": "complete",
+      "kind": "contract_gate",
+      "choice": "none"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/ai-assignment",
+      "dateTime": "2026-06-23T10:02:03.215395-04:00",
+      "description": "Authored ai-assignment.md via routed analysis",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 2540,
+          "outputTokens": 582,
+          "costUsd": 0.008995000000000001
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/tests-green",
+      "dateTime": "2026-06-23T10:04:18.183172-04:00",
+      "description": "Routed generation of local-only gate unit tests",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "inputTokens": 1317,
+          "outputTokens": 1693,
+          "costUsd": 0.018576250000000002
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/verification",
+      "dateTime": "2026-06-23T10:13:32.855055-04:00",
+      "description": "Cross-provider session verification (gpt-5-4)",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 5021,
+          "outputTokens": 9156,
+          "costUsd": 0.14989249999999998
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/next-orchestrator-recommendation",
+      "dateTime": "2026-06-23T12:03:48.877097-04:00",
+      "description": "Routed next-orchestrator recommendation for Session 2 via gemini-pro; normalized to OpenAI/GitHub Copilot after Anthropic API blocker.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 391,
+          "outputTokens": 136,
+          "costUsd": 0.0018487500000000001
+        }
+      ]
+    }
+  ]
+}

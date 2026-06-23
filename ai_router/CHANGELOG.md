@@ -5,6 +5,52 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.26.2] — 2026-06-23 (Set 076 — local-only close-out mode)
+
+### Added
+
+- **`.dabbler/local-only` marker waives the close-out push gate for a
+  deliberately remote-less repo.** `gate_checks.check_pushed_to_remote` now
+  consults a repo-root marker file. When the marker is present **and no git
+  remote is configured**, the missing-upstream case becomes a
+  *pass-with-note* (`local-only repo: push gate waived ...`, surfaced in the
+  passing gate's `gate_results` remediation slot) instead of a
+  configuration-error failure — so a repo that is remote-less *by design*
+  closes cleanly without `--force` every session. The waiver is gated on
+  there being **no remote at all**, so it can never mask a real
+  "forgot to push to an existing remote" miss; with a remote present the
+  marker is ignored. A marker-absent repo is unchanged in every case. The
+  waiver is a branch inside the existing gate — no new `GATE_CHECKS` entry,
+  and the `gate_results` JSON shape is unchanged. New pure helper
+  `gate_checks.is_local_only(repo_root)` (presence-only; no git call).
+- **`ai_router.local_only` CLI** — a blessed, idempotent
+  `python -m ai_router.local_only --enable | --disable | --status` (with
+  optional `--reason` and `--repo-root`). `--enable` records an audit note
+  *inside the marker file* (timestamp, provenance, reason) so the audit trail
+  explains why a later close passes-with-note; `--status` reports whether the
+  marker is present and whether it would actually fire (it warns when a remote
+  is configured). Re-enabling is a no-op that preserves the original note.
+
+### Fixed
+
+- **`drift_guard` no longer false-positives on identifiers that contain a banned
+  tier label as a sub-token.** The stale-tier-framing scanner matched the banned
+  tier labels as bare substrings, so the legitimate Set 075 telemetry identifiers
+  `docs-only-excluded` and `targetClass=docs-only` tripped the guard and held the
+  default-branch `Test` workflow red (which blocks the release-publish gate). The
+  scanner now matches each banned label with identifier-boundary lookarounds: a
+  compound identifier is exempt, but a bare label (in prose or backtick-quoted) is
+  still caught, so the ban is not weakened.
+  (`ai_router/scripts/drift_guard.py`.)
+
+### Documentation
+
+- `ai_router/docs/close-out.md` gains *Section 6 — The sanctioned local-only
+  close path* (behavior matrix, CLI, and the contrast with incident-recovery
+  `--force`); Troubleshooting is renumbered to Section 7. The Step 8 close-out
+  pointer in `docs/ai-led-session-workflow.md` and the
+  `check_pushed_to_remote` docstring point at it.
+
 ## [0.26.1] — 2026-06-20 (Set 074 — Dabbler-prefixed provider API key environment variables)
 
 ### Changed

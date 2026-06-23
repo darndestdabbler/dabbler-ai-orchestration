@@ -1,0 +1,11 @@
+- Issue → **Major — Round-1 fix 1 is incomplete: the new boundary regex still exempts non-compound bare labels when `-` or `=` is merely adjacent, so the stale-tier ban remains bypassable.** Requirement: only **compound identifiers** like `docs-only-excluded` / `targetClass=docs-only` may be exempt; a bare banned label must still be caught. Concrete impact: `drift_guard` will miss stale framing such as `docs-only-`, `explorer-only-`, or `=docs-only`, allowing prohibited labels back into docs without tripping CI. Evidence: `_BANNED_RES` is `re.compile(r"(?<![\w=-])" + re.escape(p) + r"(?![\w=-])", re.IGNORECASE)`, so any immediate `-` or `=` on either side suppresses the match whether or not there is an actual surrounding identifier.
+  Location → `ai_router/scripts/drift_guard.py` (`_BANNED_RES`, `scan_stale_framing`); test coverage in `ai_router/tests/test_drift_guard.py` does not cover dangling-`-` / orphan-`=` cases.
+  Fix → Tighten the exemption so `-` / `=` only suppress a match when they are part of a real compound token, not when they are dangling punctuation or an orphan separator. Add regressions for `docs-only-`, `explorer-only-`, `=docs-only`, and the sentence-ending `docs-only.` case.
+
+- Issue → **Minor (non-blocking) — explicit regression coverage is still missing for the period-in-prose case called out in Round 1.** The implementation appears correct for `docs-only.` because `.` is outside the boundary class, but the new tests only cover spaced prose, not the exact punctuation edge that motivated the fix.
+  Location → `ai_router/tests/test_drift_guard.py`
+  Fix → Add a direct test with `docs-only.` / `explorer-only.` at sentence end.
+
+Round-1 fix 2 verifies cleanly: `_ascii_safe()` is applied to every echoed external string in `ai_router/local_only.py` (repo root, marker path, marker contents), and the marker file is still written/read as UTF-8. Round-1 fix 3 also verifies cleanly: the 0.26.2 changelog now documents the `drift_guard` repair without introducing a bare banned label.
+
+VERDICT: ISSUES_FOUND

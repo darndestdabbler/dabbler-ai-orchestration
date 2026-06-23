@@ -1,36 +1,36 @@
 {
   "status": "completed",
-  "summary": "Session 1 of 2 implemented the local-only push-gate signal for remote-less repositories. Added .dabbler/local-only marker detection via is_local_only(), added conservative remote detection so the waiver only fires after an affirmative no-remotes result, branched check_pushed_to_remote to pass with an audit note only for marker-present remote-less repos, and added focused pytest coverage for the helper and behavior matrix. Focused gate tests passed 31/31, and cross-provider verification returned VERIFIED after the Minor about _has_remote failure semantics was addressed.",
+  "summary": "Session 2 of 2 (final/release) shipped the operator affordance, docs, and patch release for local-only close-out mode. Added the blessed ai_router.local_only CLI (--enable/--disable/--status, idempotent, audit note written inside the .dabbler/local-only marker on enable, display-only ASCII-safe console output with the marker file kept UTF-8), reusing the Session-1 gate helpers. Added Section 6 'The sanctioned local-only close path' to ai_router/docs/close-out.md (Troubleshooting renumbered to 7, TOC updated), a Step 8 pointer in docs/ai-led-session-workflow.md, and a check_pushed_to_remote docstring pointer. Bumped dabbler-ai-router 0.26.1 -> 0.26.2 with a CHANGELOG entry; sdist+wheel build clean. Folded in a release-unblocking CI repair: a pre-existing Set 075 standing failure had the default-branch Test workflow red (the stale-tier-framing drift guard matched banned labels as bare substrings, false-positiving on the legitimate telemetry identifiers docs-only-excluded / targetClass=docs-only); the decision to fix it here vs. defer was taken via GPT-5.4 + Gemini Pro consensus, shipped as a separate clearly-labeled commit. Cross-provider session verification (gpt-5-4) converged VERIFIED over three rounds, each driving a real fix (R1: drift-guard over/under-broad + CLI ASCII contract untested + changelog gap; R2: boundary regex exempted dangling separators; R3: clean).",
   "files_changed": [
+    "ai_router/local_only.py",
+    "ai_router/tests/test_local_only_cli.py",
     "ai_router/gate_checks.py",
-    "ai_router/tests/test_gate_checks_local_only.py",
-    "docs/planning/lessons-learned.md",
-    "docs/proposals/2026-06-23-lightweight-tier-leak-and-local-only-closeout.md",
-    "docs/session-sets/076-local-only-closeout-mode/spec.md",
-    "docs/session-sets/076-local-only-closeout-mode/ai-assignment.md",
-    "docs/session-sets/076-local-only-closeout-mode/activity-log.json",
+    "ai_router/docs/close-out.md",
+    "docs/ai-led-session-workflow.md",
+    "ai_router/CHANGELOG.md",
+    "pyproject.toml",
+    "ai_router/scripts/drift_guard.py",
+    "ai_router/tests/test_drift_guard.py",
+    "docs/session-sets/076-local-only-closeout-mode/change-log.md",
+    "docs/session-sets/076-local-only-closeout-mode/disposition.json",
     "docs/session-sets/076-local-only-closeout-mode/session-state.json",
     "docs/session-sets/076-local-only-closeout-mode/session-events.jsonl",
-    "docs/session-sets/076-local-only-closeout-mode/s1-verification.md",
-    "docs/session-sets/076-local-only-closeout-mode/disposition.json"
+    "docs/session-sets/076-local-only-closeout-mode/activity-log.json",
+    "docs/session-sets/076-local-only-closeout-mode/ai-assignment.md",
+    "docs/session-sets/076-local-only-closeout-mode/s2-verification.md",
+    "docs/session-sets/076-local-only-closeout-mode/s2-verification-round-2.md",
+    "docs/session-sets/076-local-only-closeout-mode/s2-verification-round-3.md"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "github-copilot",
-    "provider": "openai",
-    "model": "gpt-4o",
-    "effort": "low",
-    "reason": {
-      "code": "switch-due-to-blocker",
-      "specifics": "Routed analysis recommended switching away from Anthropic for Session 2 after the Claude close-out chat hit an Anthropic API error; Session 2 is routine CLI, documentation, metadata, and release-check work that an OpenAI-backed Copilot handoff can handle at low effort."
-    }
-  },
-  "blockers": [
-    "Anthropic/Claude API error interrupted Session 1 close-out, so keeping Session 2 on the same provider risks another handoff interruption."
-  ],
   "verification_verdict": "VERIFIED",
+  "next_orchestrator": null,
+  "blockers": [],
   "lessons_cited": [
-    "L-064-6"
+    "L-064-12",
+    "L-069-1",
+    "L-070-1",
+    "L-071-1",
+    "L-064-3"
   ]
 }

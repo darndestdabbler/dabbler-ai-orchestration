@@ -434,6 +434,13 @@ def check_pushed_to_remote(
     miss: if any remote exists, the marker is ignored and the normal
     missing-upstream / ahead-of-upstream failures apply unchanged. A repo
     without the marker is unchanged in every case.
+
+    Set/clear the marker through the blessed CLI
+    (``python -m ai_router.local_only --enable | --disable | --status``),
+    which records an audit note inside the marker on enable. The sanctioned
+    local-only close path — and how it contrasts with incident-recovery
+    ``--force`` — is documented in ``ai_router/docs/close-out.md`` ->
+    *Section 6 — The sanctioned local-only close path*.
     """
     _ = disposition
     _ = allow_empty_commit

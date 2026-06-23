@@ -14,7 +14,8 @@ Contents:
 - [Section 3 — What the script does](#section-3--what-the-script-does)
 - [Section 4 — Common failures and remediation](#section-4--common-failures-and-remediation)
 - [Section 5 — Manual close-out flags](#section-5--manual-close-out-flags)
-- [Section 6 — Troubleshooting](#section-6--troubleshooting)
+- [Section 6 — The sanctioned local-only close path](#section-6--the-sanctioned-local-only-close-path)
+- [Section 7 — Troubleshooting](#section-7--troubleshooting)
 
 ---
 
@@ -677,7 +678,72 @@ The drift shapes the walk detects:
 
 ---
 
-## Section 6 — Troubleshooting
+## Section 6 — The sanctioned local-only close path
+
+A repository that is **deliberately remote-less** — no git remote, by
+operator decision, and never will have one — used to fail the
+`check_pushed_to_remote` gate on every close, forcing the operator to
+`--force` past it each session. That conflated a steady-state close with
+incident recovery. The local-only marker fixes that: it is a **sanctioned,
+non-incident** close path for a repo that has no actual problem.
+
+**The marker.** A repo opts in by carrying a marker file at
+`.dabbler/local-only` in its root (beside the extension's
+`.dabbler/install-method`). Only the marker's *presence* matters —
+`gate_checks.is_local_only(repo_root)` reads presence only and never parses
+the contents.
+
+**Behavior matrix** (a branch inside the existing missing-upstream case of
+`check_pushed_to_remote` — not a new gate, and the `GATE_CHECKS` order and
+`gate_results` JSON shape are unchanged):
+
+- **Marker present AND no git remote configured** → the gate
+  **passes-with-note**. The note (`local-only repo: push gate waived
+  (.dabbler/local-only marker present, no remote configured)`) is surfaced in
+  the passing gate's remediation slot, so the close-out audit trail records
+  *why* the push gate passed without a push.
+- **Marker present BUT a git remote exists** → the marker is **ignored**; the
+  normal missing-upstream / ahead-of-upstream failures apply unchanged. The
+  waiver can never mask a real "forgot to push to an existing remote" miss.
+- **Marker absent** → behavior is **unchanged** in every case.
+
+The other four gates (`working_tree_clean`, `activity_log_entry`,
+`next_orchestrator_present`, `change_log_fresh`) still apply unchanged on a
+local-only repo.
+
+**Managing the marker.** The marker is just a file, so an operator *could*
+create it by hand — but the blessed CLI removes the guesswork and records an
+audit note inside the marker file on enable (an `enabled_at` timestamp, the
+provenance, and an optional reason):
+
+```bash
+# Enable (idempotent; re-enable is a no-op that preserves the original note).
+# --reason is recorded inside the marker for the audit trail.
+.venv/Scripts/python.exe -m ai_router.local_only --enable --reason "<why>"
+
+# Disable (idempotent).
+.venv/Scripts/python.exe -m ai_router.local_only --disable
+
+# Status: reports presence AND whether the waiver would actually fire
+# (it warns when a git remote is configured, since the marker is ignored then).
+.venv/Scripts/python.exe -m ai_router.local_only --status
+```
+
+`--repo-root PATH` targets a specific tree on any action; the default is the
+git toplevel of the current directory (else the current directory).
+
+**Contrast with `--force` (Section 5).** `--force` is hard-scoped to
+**incident recovery** — it requires `AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1` plus a
+`--reason-file`, bypasses **all** gates, and stamps `forceClosed: true` /
+`[FORCED]` so the set stays visibly flagged. The local-only path is the
+opposite: a steady-state configuration for a repo that is remote-less by
+design. It affects **only** the `pushed_to_remote` gate, **only** when no
+remote is configured, and leaves no incident badge. Reach for local-only — not
+`--force` — when a repo is intentionally remote-less.
+
+---
+
+## Section 7 — Troubleshooting
 
 **Stranded sessions.** A session is "stranded" when `session-state.json`
 says `in-progress` but no further events have been written in a long

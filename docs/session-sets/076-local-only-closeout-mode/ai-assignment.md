@@ -48,8 +48,18 @@ $0.15
 | 5 | Verify session set, generate final artifacts, commit, and publish. | `Route` |
 
 ### Actuals (filled after the session)
-- **Actual orchestrator:** TBD
-- **Actual routed cost:** TBD
-- **Session verification:** TBD
+- **Actual orchestrator:** Claude Code (Opus 4.8, high effort). The S1
+  recommendation was to switch to GitHub Copilot / OpenAI to avoid a repeat of the
+  transient Anthropic API blocker; the operator launched the session on Claude and
+  the Anthropic API was healthy throughout, so the switch was unnecessary.
+- **Actual routed cost:** ~$0.53 (3 cross-provider session-verification rounds via
+  gpt-5-4: $0.271 + $0.155 + $0.105; plus a documentation-drafting route and a
+  GPT-5.4 + Gemini-Pro decision-consensus pair).
+- **Session verification:** VERIFIED by gpt-5-4, converged over three substantive
+  rounds (each drove a real fix: R1 — drift-guard breadth + CLI ASCII contract +
+  changelog gap; R2 — boundary regex exempted dangling separators; R3 — clean).
+- **Release:** `dabbler-ai-router` 0.26.2 (patch). A pre-existing Set 075
+  standing CI failure that blocked the publish gate was fixed in-session (decision
+  via GPT-5.4 + Gemini-Pro consensus) as a separate, clearly-labeled commit.
 
 **Next-session orchestrator recommendation:** N/A (final session)

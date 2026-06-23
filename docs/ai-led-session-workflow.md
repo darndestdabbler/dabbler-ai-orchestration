@@ -2186,6 +2186,17 @@ close-out failure for orchestrators new to the workflow. The
 incident-recovery use only — do not reach for it as a shortcut
 around authoring the disposition.
 
+**A deliberately remote-less repo is not an incident — use local-only,
+not `--force`.** When a repo has no git remote *by design* (and never
+will), the close-out push gate would otherwise fail every session. The
+sanctioned fix is the `.dabbler/local-only` marker, set with
+`python -m ai_router.local_only --enable`: while no remote is configured,
+`check_pushed_to_remote` passes-with-note instead of failing, and the
+other four gates still apply. The marker can never mask a real
+forgot-to-push (if a remote exists it is ignored). See
+`ai_router/docs/close-out.md` → *Section 6 — The sanctioned local-only
+close path* for the full behavior matrix and CLI.
+
 Notification ordering matters: the caller fires the session-complete
 Pushover notification (`send_session_complete_notification` in
 `ai_router/notifications.py`) **after** `close_session` returns

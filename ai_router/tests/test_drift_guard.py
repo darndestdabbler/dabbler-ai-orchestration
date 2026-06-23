@@ -43,6 +43,72 @@ def test_stale_framing_clean_doc_passes(tmp_path: Path):
     assert drift_guard.scan_stale_framing(tmp_path) == []
 
 
+def test_stale_framing_exempts_compound_identifier(tmp_path: Path):
+    # A banned label that is a SUB-TOKEN of a longer identifier is not framing.
+    # This is the Set 075 telemetry case: `docs-only-excluded` (trailing `-`) and
+    # `targetClass=docs-only` (leading `=`) are diffClass identifiers, not prose.
+    _write(
+        tmp_path / "docs" / "telemetry.md",
+        "Tag the run `diffClass=docs-only-excluded` and the shorthand "
+        "`targetClass=docs-only` is canonicalized into it.\n",
+    )
+    assert drift_guard.scan_stale_framing(tmp_path) == []
+
+
+def test_stale_framing_still_flags_bare_backtick_quoted_label(tmp_path: Path):
+    # The exemption is for COMPOUND identifiers only, not for backtick-quoting per
+    # se: a bare `docs-only` (or `explorer-only`) label is still caught, so the ban
+    # cannot be evaded simply by wrapping the label in backticks. (This mirrors the
+    # bootstrap README, which must use an allow-region to use the bare label.)
+    _write(
+        tmp_path / "docs" / "telemetry.md",
+        "Do not call the tier `docs-only` or `explorer-only`.\n",
+    )
+    violations = drift_guard.scan_stale_framing(tmp_path)
+    locations = {v.location for v in violations}
+    assert locations == {"docs/telemetry.md:1"}
+    details = " ".join(v.detail for v in violations)
+    assert "docs-only" in details and "explorer-only" in details
+
+
+def test_stale_framing_still_flags_prose_label(tmp_path: Path):
+    # The compound-identifier exemption does not defang a bare label in prose on
+    # the same line as an exempt identifier.
+    _write(
+        tmp_path / "docs" / "telemetry.md",
+        "The `docs-only-excluded` class is fine, but calling Lightweight "
+        "docs-only is banned framing.\n",
+    )
+    violations = drift_guard.scan_stale_framing(tmp_path)
+    assert len(violations) == 1
+    assert violations[0].location == "docs/telemetry.md:1"
+
+
+def test_stale_framing_flags_sentence_ending_label(tmp_path: Path):
+    # The period is not an identifier char, so a label ending a sentence is caught.
+    _write(tmp_path / "docs" / "g.md", "The tier is docs-only. Avoid explorer-only.\n")
+    locations = {v.location for v in drift_guard.scan_stale_framing(tmp_path)}
+    assert locations == {"docs/g.md:1"}
+
+
+def test_stale_framing_flags_dangling_separator_not_a_real_identifier(tmp_path: Path):
+    # A dangling `-` or `=` adjacent to a label is NOT a compound identifier (no
+    # extra word component), so the label must still trip the ban.
+    _write(
+        tmp_path / "docs" / "g.md",
+        "First docs-only- here.\nThen =docs-only here.\nAnd explorer-only- too.\n",
+    )
+    locations = {v.location for v in drift_guard.scan_stale_framing(tmp_path)}
+    assert locations == {"docs/g.md:1", "docs/g.md:2", "docs/g.md:3"}
+
+
+def test_stale_framing_exempts_keyvalue_compound_identifier(tmp_path: Path):
+    # A key=value with a real word key (e.g. `tier=docs-only`, like the Set 075
+    # `targetClass=docs-only`) IS a compound identifier and stays exempt.
+    _write(tmp_path / "docs" / "g.md", "Tag it `tier=docs-only` in the metadata.\n")
+    assert drift_guard.scan_stale_framing(tmp_path) == []
+
+
 # A file on the ALLOWED_MARKER_FILES allowlist may use the escape hatch.
 _ALLOWLISTED_REL = Path("docs") / "concepts" / "tier-model.md"
 

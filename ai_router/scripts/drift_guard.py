@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -94,6 +95,52 @@ BANNED_PHRASES: tuple[str, ...] = (
     "no pypi",
     "docs-only",
     "explorer-only",
+)
+
+# The ban targets a stale tier-framing *label* ("docs-only", "explorer-only"),
+# NOT a longer identifier that merely contains it as a sub-token. The Set 075
+# telemetry vocabulary uses `docs-only-excluded` and `targetClass=docs-only` as
+# legitimate diffClass identifiers; those must not trip the guard, while a bare
+# `docs-only` (even backtick-quoted, as documented deliberately under an
+# allow-region in the bootstrap README) still must.
+#
+# A label occurrence is exempt only when it is part of a *real compound
+# identifier* — i.e. the surrounding run of identifier characters (word chars
+# plus ``=`` / ``-``) contains an extra WORD component beyond the label itself.
+# So ``docs-only-excluded`` (extra word ``excluded``) and ``targetClass=docs-only``
+# (extra word ``targetClass``) are exempt, but a bare label is flagged whether it
+# stands alone, is backtick-quoted, ends a sentence (``docs-only.``), or is
+# adjacent only to a *dangling* separator (``docs-only-`` / ``=docs-only`` with no
+# further word) — a dangling ``-`` / ``=`` is not a compound identifier.
+_BANNED_LITERAL_RES: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(re.escape(p), re.IGNORECASE) for p in BANNED_PHRASES
+)
+
+# Characters that can extend an identifier token around a banned label.
+_IDENT_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_=-"
+)
+
+
+def _is_compound_identifier(raw: str, start: int, end: int) -> bool:
+    """True if the label at ``raw[start:end]`` is a sub-token of a longer id.
+
+    Expands left and right over identifier characters (word chars, ``=``, ``-``)
+    and reports whether the surrounding token carries an EXTRA word component
+    (an alphanumeric / underscore char outside the label span). A dangling ``-``
+    or ``=`` with no further word does not count — it is not a real identifier.
+    """
+    i = start
+    while i > 0 and raw[i - 1] in _IDENT_CHARS:
+        i -= 1
+    j = end
+    while j < len(raw) and raw[j] in _IDENT_CHARS:
+        j += 1
+    extra = raw[i:start] + raw[end:j]
+    return any(c.isalnum() or c == "_" for c in extra)
+_BANNED_RES: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(r"(?<![\w=-])" + re.escape(p) + r"(?![\w=-])", re.IGNORECASE)
+    for p in BANNED_PHRASES
 )
 
 ALLOW_BEGIN = "drift-guard:allow-begin"
@@ -163,6 +210,13 @@ def scan_stale_framing(repo_root: Path) -> list[Violation]:
     Lines inside an ``<!-- drift-guard:allow-begin -->`` /
     ``<!-- drift-guard:allow-end -->`` region are skipped, so the SSoT and the
     bundle README can document the ban without tripping it.
+
+    A banned phrase is exempt only when the occurrence is part of a real compound
+    identifier (one carrying an extra word component, e.g. ``docs-only-excluded``
+    or ``targetClass=docs-only``); a bare label is still caught whether it stands
+    alone, is backtick-quoted, ends a sentence (``docs-only.``), or sits beside a
+    dangling ``-`` / ``=`` separator. See :func:`_is_compound_identifier`. The ban
+    targets the tier-framing label, not code identifiers that share the substring.
     """
     violations: list[Violation] = []
     for path in iter_scanned_docs(repo_root):
@@ -197,9 +251,15 @@ def scan_stale_framing(repo_root: Path) -> list[Violation]:
                 continue
             if allowed:
                 continue
-            lowered = raw.lower()
-            for phrase in BANNED_PHRASES:
-                if phrase in lowered:
+            for phrase, rx in zip(BANNED_PHRASES, _BANNED_LITERAL_RES):
+                # Flag a banned label unless this occurrence is part of a real
+                # compound identifier (e.g. `docs-only-excluded` /
+                # `targetClass=docs-only`). A bare label -- prose, backtick-quoted,
+                # sentence-ending, or beside a dangling `-`/`=` -- still trips.
+                if any(
+                    not _is_compound_identifier(raw, m.start(), m.end())
+                    for m in rx.finditer(raw)
+                ):
                     violations.append(
                         Violation(
                             check="stale-framing",

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 5,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Explorer workflow-state derivation claimed to be wired to the wrong status field (liveSession?.status asserted to be null for completed sets, breaking TS/Python ladder parity on terminal sets, including the blank-verdict adjudication branch).",
+      "category": "correctness",
+      "severity": "Unspecified (treated as blocking per the anti-laundering rule)",
+      "issueId": "S077-S5-V1-001",
+      "issueType": "contingent-risk",
+      "verificationMethod": "Verifier (gpt-5-4) read the fileSystem.ts diff at the deriveWorkflowState call site; the in-session routed code review (sonnet) had independently raised the same claim.",
+      "suggestedTestOrCheck": "A readSessionSets fixture for a completed dedicated set with blank verification verdict and no issues envelope must derive closed-verified.",
+      "resolution_status": "fixed",
+      "resolution_notes": "The behavioral premise is false: liveSession is the normalized snapshot record, assigned (with sd.status) for every readable state file including complete sets - so the raw-status wiring was already the faithful Python mirror. But two independent reviewers misreading the same field name is a real clarity defect: the call site now binds an explicitly-named rawSetStatus local with a comment stating the parity contract, and the exact regression fixture the verifier requested (terminal blank-verdict/no-envelope set derives closed-verified through the real scan) was added and passes - locking the disputed branch with evidence rather than argument.",
+      "resolved_in_round": 2
+    },
+    {
+      "description": "validate_dedicated_verification accepts any earlier independent verification round on the set-terminal close, so a later same-(engine,provider) re-verification round does not by itself fail the close (claimed start-time/close-time asymmetry).",
+      "category": "correctness",
+      "severity": "Unspecified (treated as blocking per the anti-laundering rule)",
+      "issueId": "S077-S5-V1-002",
+      "issueType": "standards-departure",
+      "verificationMethod": "Verifier (gpt-5-4) read the validate_dedicated_verification success loop in the diff.",
+      "suggestedTestOrCheck": "work copilot/anthropic -> verification copilot/openai -> remediation -> verification copilot/anthropic at terminal close.",
+      "resolution_status": "advisory-disagreement",
+      "resolution_notes": "By-design under the locked Set 057 Q6 contract ('at least one completed cross-provider verification session'), which this set's spec explicitly extends additively ('the gate is extended, not weakened'); changing the gate to latest-round-must-be-independent would be a semantics change outside S5's scope. The scenario's front door is closed by the new M1 start-time guardrail on BOTH typed-start and handoff paths: a same-pair re-verification round refuses at start on dabbler-ai-router >= 0.27.0, so the sequence cannot be created through blessed writers. Escalated to the operator via the close-out disposition for a deliberate decision on whether a future set should strengthen the terminal-close check to the latest round.",
+      "resolved_in_round": null
+    },
+    {
+      "description": "The pending-verification banner's awaiting-verification notice said --engine <other-engine> --provider <other-provider>, contradicting the sanctioned same-engine/different-provider Mode-B path for Copilot-locked teams.",
+      "category": "correctness",
+      "severity": "Unspecified (treated as blocking per the anti-laundering rule)",
+      "issueId": "S077-S5-V1-003",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Verifier (gpt-5-4) read _mode_b_notice in the new pending_verification.py.",
+      "suggestedTestOrCheck": "Banner text for the awaiting-verification state names the differ-by-engine-or-provider rule with neutral placeholders.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Banner notice now uses neutral --engine <your-engine> --provider <your-provider> placeholders plus an explicit '(must differ from the work sessions by engine or provider)' clause; the close-gate corrective's command placeholders were aligned the same way for consistency.",
+      "resolved_in_round": 2
+    }
+  ]
+}

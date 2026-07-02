@@ -1,0 +1,3 @@
+VERIFIED
+
+Finding 3 is fixed: `_mode_b_notice()` now uses neutral placeholders (`--engine <your-engine> --provider <your-provider>`) and explicitly states the verifier identity may differ by engine **or** provider, which preserves the sanctioned same-engine/different-provider Mode-B path. The regression test locks the corrected behavior by asserting the new engine placeholder and differ-by rule text, and by asserting the old contradictory `<other-engine>` wording is absent.

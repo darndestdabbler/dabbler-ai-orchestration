@@ -19,3 +19,14 @@ files share the body above — only this tail differs.
 - **Cross-provider verification stays cross-provider.** When the active set is
   `tier: full`, end-of-session verification routes to a *different* provider
   than the one running the session — never back to your own model.
+- **Copilot-locked shop? Same engine, different provider is sanctioned
+  (Mode B).** A Lightweight `dedicated-sessions` verification session must
+  differ from the work sessions by engine **or by model provider**
+  (`dabbler-ai-router` >= 0.27.0). If every session runs under Copilot, open a
+  **second chat with the model picker on a different provider** than the one
+  that did the work, and declare it honestly:
+  `--engine copilot --provider openai` verifying work done under
+  `--engine copilot --provider anthropic`. `start_session --type verification`
+  refuses a same-engine+same-provider start, and the close-out gate fails it —
+  so always pass `--provider` on work sessions too, or the provider arm cannot
+  be confirmed and a different engine becomes the only accepted path.

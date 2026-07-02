@@ -29,6 +29,7 @@ import {
   SessionState,
   VerificationMarkerGlyph,
   VerificationMode,
+  WorkflowState,
 } from "../types";
 
 // Minimal structural view of a sessions[] ledger entry. `type` drives
@@ -273,4 +274,166 @@ export function verificationMarkerTooltipFor(
   if (glyph === VERIFICATION_MARKER_OUT_OF_BAND) return VERIFICATION_OUT_OF_BAND_TOOLTIP;
   if (glyph === VERIFICATION_MARKER_DEDICATED) return VERIFICATION_DEDICATED_TOOLTIP;
   return "";
+}
+
+// ---------------------------------------------------------------------------
+// Set 077 Session 5 (A7): the durable verificationMode record.
+//
+// Python's `dedicated_verification.read_verification_mode` has always
+// read the DURABLE record — the activity-log `verification_mode` /
+// `verification_mode_change` entries — while the Explorer read only the
+// spec-config seed. After a blessed A→B transition whose seed-alignment
+// failed, the two disagreed: the close gate followed the record, the
+// Explorer (kickoff/setup actions, `v?`/`v+` markers, `N/M+` fraction)
+// followed the stale seed. This is the TS mirror of the Python reader's
+// precedence: the LAST valid entry of either kind wins; a missing /
+// malformed log yields null and the caller falls back to the spec seed.
+// ---------------------------------------------------------------------------
+
+const VERIFICATION_MODE_RECORD_KINDS = new Set([
+  "verification_mode",
+  "verification_mode_change",
+]);
+
+export function durableVerificationModeFrom(
+  activityLog: unknown,
+): VerificationMode | null {
+  if (activityLog === null || typeof activityLog !== "object") return null;
+  const entries = (activityLog as { entries?: unknown }).entries;
+  if (!Array.isArray(entries)) return null;
+  let chosen: VerificationMode | null = null;
+  for (const entry of entries) {
+    if (entry === null || typeof entry !== "object") continue;
+    const e = entry as { kind?: unknown; choice?: unknown };
+    if (typeof e.kind !== "string" || !VERIFICATION_MODE_RECORD_KINDS.has(e.kind)) {
+      continue;
+    }
+    if (e.choice === "dedicated-sessions" || e.choice === "out-of-band-or-none") {
+      chosen = e.choice;
+    }
+  }
+  return chosen;
+}
+
+// ---------------------------------------------------------------------------
+// Set 077 Session 5 (Features 4–5): the seven-state workflow derivation.
+//
+// TS mirror of `dedicated_verification.derive_state` (Set 057 Q3 ladder,
+// including the Set 077 S5 blank-verdict adjudication), so the row
+// description's owed words and the Start-Next-Session auto-route derive
+// from the same ladder the Python close gate and `start_session` banner
+// use — gate and UI cannot disagree (critique M5). Pure function of
+// in-memory inputs; states are DERIVED, never persisted (Set 047 rule).
+// ---------------------------------------------------------------------------
+
+const TERMINAL_DISPOSITIONS = new Set([
+  "fixed",
+  "not-reproducible",
+  "accepted-risk",
+  "accepted-consequence",
+]);
+const HUMAN_STOP_DISPOSITIONS = new Set([
+  "escalate-human",
+  "needs-more-context",
+  "advisory-disagreement",
+]);
+const AUTOMATIC_ROUND_LIMIT = 3;
+
+function sessionTypeOf(entry: LedgerSessionLike): string {
+  const t = entry.type;
+  if (t === "verification" || t === "remediation" || t === "work") return t;
+  return "work";
+}
+
+function dispositionOf(issue: unknown): string | null {
+  if (issue === null || typeof issue !== "object") return null;
+  const status = (issue as { resolution_status?: unknown }).resolution_status;
+  return typeof status === "string" && status.length > 0 ? status : null;
+}
+
+export function deriveWorkflowState(
+  sessions: readonly LedgerSessionLike[] | null | undefined,
+  verificationMode: VerificationMode,
+  setStatus: string | null,
+  latestIssues: unknown,
+): WorkflowState {
+  const setTerminal = setStatus === "complete";
+  let issues: unknown[] = [];
+  if (latestIssues !== null && typeof latestIssues === "object") {
+    const raw = (latestIssues as { issues?: unknown }).issues;
+    if (Array.isArray(raw)) issues = raw;
+  }
+
+  // 1. Opt-out mode: the dedicated-session machine does not run.
+  if (verificationMode !== "dedicated-sessions") {
+    return setTerminal ? "closed-no-verification" : "work-in-progress";
+  }
+
+  const ledger = Array.isArray(sessions)
+    ? sessions.filter((s): s is LedgerSessionLike => s !== null && typeof s === "object")
+    : [];
+  if (ledger.length === 0) return "work-in-progress";
+
+  const latest = ledger[ledger.length - 1];
+  const latestType = sessionTypeOf(latest);
+  const latestStatus = latest.status;
+
+  // 2. Latest session in-flight: the type names the wait.
+  if (latestStatus === "in-progress") {
+    if (latestType === "verification") return "awaiting-verification";
+    if (latestType === "remediation") return "awaiting-remediation";
+    return "work-in-progress";
+  }
+
+  // 3. Latest session complete. Are all authored work sessions complete?
+  const workSessions = ledger.filter((s) => sessionTypeOf(s) === "work");
+  if (workSessions.some((s) => s.status !== "complete")) {
+    return "work-in-progress";
+  }
+
+  if (latestType === "work") return "awaiting-verification";
+
+  const humanStop = issues.some((i) => {
+    const d = dispositionOf(i);
+    return d !== null && HUMAN_STOP_DISPOSITIONS.has(d);
+  });
+  const openIssues = issues.filter((i) => dispositionOf(i) === null);
+
+  if (latestType === "verification") {
+    const rawVerdict = latest.verificationVerdict;
+    const verdict =
+      typeof rawVerdict === "string" ? rawVerdict.trim().toUpperCase() : "";
+    if (verdict === "VERIFIED") return "closed-verified";
+    if (issues.length === 0) {
+      // Set 077 S5 adjudication (mirrors the Python change): no
+      // findings envelope + no VERIFIED verdict is unconfirmable —
+      // pre-terminal it stops to a human; a terminally-closed set
+      // keeps the legacy closed-verified reading.
+      return setTerminal ? "closed-verified" : "awaiting-human";
+    }
+    if (openIssues.length === 0 && !humanStop) return "closed-verified";
+    const verificationRounds = ledger.filter(
+      (s) => sessionTypeOf(s) === "verification",
+    ).length;
+    if (humanStop || verificationRounds >= AUTOMATIC_ROUND_LIMIT) {
+      return "awaiting-human";
+    }
+    return "awaiting-remediation";
+  }
+
+  if (latestType === "remediation") {
+    if (humanStop || openIssues.length > 0) return "awaiting-human";
+    const anyFixed = issues.some((i) => dispositionOf(i) === "fixed");
+    const allTerminal =
+      issues.length > 0 &&
+      issues.every((i) => {
+        const d = dispositionOf(i);
+        return d !== null && TERMINAL_DISPOSITIONS.has(d);
+      });
+    if (anyFixed) return "awaiting-verification";
+    if (allTerminal) return "closed-dispositioned";
+    return "awaiting-human";
+  }
+
+  return "work-in-progress";
 }

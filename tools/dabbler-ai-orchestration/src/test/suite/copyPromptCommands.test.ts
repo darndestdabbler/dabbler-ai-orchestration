@@ -222,15 +222,30 @@ suite("copyPromptCommands — verification kickoff prompt (Set 062 S2, spec D2)"
     assert.ok(!out.includes("\\"), "paths must be slash-separated regardless of OS");
   });
 
-  test("demands a different engine and points at the per-session orchestrator blocks", () => {
+  test("demands engine OR provider difference and points at the orchestrator blocks", () => {
+    // Set 077 S5 (A6): the cross-provider property is engine OR model
+    // provider — the single-engine (Copilot model picker) pattern is
+    // sanctioned, so the prompt must not demand a different engine
+    // unconditionally.
     const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(/DIFFERENT engine/i.test(out));
+    assert.ok(/ENGINE or by model\s*\nPROVIDER|ENGINE or by model PROVIDER/i.test(out));
+    assert.ok(out.includes("--provider"));
     assert.ok(out.includes("docs/session-sets/062-fixture/session-state.json"));
   });
 
-  test("chains remediation via --type remediation --handoff", () => {
+  test("points at the remediation hand-off instead of inlining its command (A9)", () => {
+    // Set 077 S5 rewrite: prompts are pointers — the kickoff names the
+    // hand-off and defers its mechanics to the workflow doc's Mode B
+    // section rather than embedding a second command line that can
+    // drift from the doc.
     const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(out.includes("--type remediation --handoff --handoff-verdict ISSUES_FOUND"));
+    assert.ok(/hand-off/i.test(out));
+    assert.ok(out.includes("docs/ai-led-session-workflow.md"));
+  });
+
+  test("surfaces the minimum router version (critique M6 version-skew)", () => {
+    const out = buildVerificationKickoffPrompt(lwDedicated());
+    assert.ok(out.includes("dabbler-ai-router >= 0.27.0"));
   });
 
   test("references the spec and activity log by path (L1)", () => {

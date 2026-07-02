@@ -482,6 +482,101 @@ def _capture_contract_gate(
         pass
 
 
+def _print_pending_verification_banner(session_set_dir: str) -> None:
+    """Set 077 (Feature 4): loud, ADVISORY owed-verification banner.
+
+    Fires on work-session starts, both tiers, no-router-aware (the
+    derivation reads no router config). Printed to stderr like every
+    other lifecycle advisory; never blocks and never changes the exit
+    status — any failure inside the scan is swallowed.
+    """
+    try:
+        try:
+            from pending_verification import (  # type: ignore[import-not-found]
+                format_banner,
+                pending_verification_notices,
+            )
+        except ImportError:
+            from .pending_verification import (  # type: ignore[no-redef]
+                format_banner,
+                pending_verification_notices,
+            )
+        banner = format_banner(pending_verification_notices(session_set_dir))
+        if banner:
+            print(banner, file=sys.stderr)
+    except Exception:
+        pass
+
+
+def _refuse_same_pair_verification(
+    session_set_dir: str,
+    engine: str,
+    provider: Optional[str],
+) -> Optional[str]:
+    """Set 077 S5 (Critique-2 M1): the start-time cross-provider guardrail.
+
+    Returns the refusal message when the declared ``(engine, provider)``
+    identity could not possibly satisfy the Mode-B close gate against the
+    work sessions as currently recorded — the cross-provider property is
+    enforced where the operator can still fix it (before any write), not
+    only at close. Returns ``None`` (allow) otherwise.
+
+    The check mirrors the close gate's acceptance predicate exactly
+    (``dedicated_verification.cross_provider_satisfied``) so it can never
+    refuse a start whose close would pass. It stays silent (allows) when
+    there is no recorded work-session identity to compare against — the
+    close gate's fail-closed no-baseline posture covers that case with
+    its own corrective — and it never blocks on an internal error (the
+    guardrail narrows honest mistakes; it must not add a failure mode).
+    """
+    try:
+        try:
+            from dedicated_verification import (  # type: ignore[import-not-found]
+                cross_provider_satisfied,
+                work_session_pairs,
+            )
+            from progress import normalize_to_v4_shape  # type: ignore[import-not-found]
+        except ImportError:
+            from .dedicated_verification import (  # type: ignore[no-redef]
+                cross_provider_satisfied,
+                work_session_pairs,
+            )
+            from .progress import normalize_to_v4_shape  # type: ignore[no-redef]
+
+        state = read_session_state(session_set_dir)
+        if not isinstance(state, dict):
+            return None
+        normalized = normalize_to_v4_shape(
+            state, os.path.join(session_set_dir, "spec.md")
+        )
+        sessions = normalized.get("sessions") or []
+        pairs = work_session_pairs(sessions)
+        # No baseline to compare against -> allow (close gate owns that).
+        if not any(e is not None or p is not None for e, p in pairs):
+            return None
+        if cross_provider_satisfied(engine, provider, pairs):
+            return None
+    except Exception:
+        return None
+    provider_label = provider if provider is not None else "<not declared>"
+    return (
+        "refused -- the declared verification identity (engine="
+        f"{engine!r}, provider={provider_label!r}) does not differ from "
+        "the work sessions by engine or by provider, so the Mode-B "
+        "close-out gate could never pass it. Cross-provider review is the "
+        "point of a dedicated verification session. Fix: run it on a "
+        "different engine, or keep the engine and switch the model "
+        "provider — the sanctioned single-engine pattern for a "
+        "Copilot-locked shop is a second Copilot chat with the model "
+        "picker on another provider, declared as: --engine copilot "
+        "--provider openai (verifying work done under --engine copilot "
+        "--provider anthropic). Declare the true provider with "
+        "--provider; if the work sessions' providers were never "
+        "recorded, record them on the per-session orchestrator blocks "
+        "first."
+    )
+
+
 def _log_session_start(
     session_set_dir: str,
     session_number: int,
@@ -820,6 +915,13 @@ def _run_under_lock(args: argparse.Namespace) -> int:
         provider=args.provider,
     )
 
+    # Set 077 (Feature 4): pending-verification banner — an owed /
+    # unfinished verification (this set, a stalled Mode-B sibling, or
+    # the most recently completed set) is named out loud at the next
+    # session start. Advisory only: stderr, never blocks, never changes
+    # the exit status; fires on both tiers with no router config.
+    _print_pending_verification_banner(session_set_dir)
+
     # Set 053: schema-drift advisory riding the session lifecycle. Because
     # every orchestrator (Claude, Copilot, Codex, human) runs start_session
     # at every boundary on every host, this reaches everyone without an
@@ -862,6 +964,18 @@ def _run_typed_session(
     fail-loud contract refuses (no plan, session in flight), or
     ``EXIT_USAGE`` for a bad session_type.
     """
+    # Set 077 S5 (Critique-2 M1): fail loud BEFORE any write when the
+    # declared (engine, provider) pair cannot possibly satisfy the
+    # cross-provider close gate. Verification sessions only — a
+    # remediation session legitimately runs on the work engine.
+    if session_type == "verification":
+        refusal = _refuse_same_pair_verification(
+            session_set_dir, args.engine, args.provider
+        )
+        if refusal is not None:
+            print(f"start_session: {refusal}", file=sys.stderr)
+            return EXIT_BOUNDARY
+
     try:
         _path, new_number = register_typed_session_start(
             session_set=session_set_dir,
@@ -901,6 +1015,19 @@ def _run_typed_session(
     # case where a set's very first start is itself a typed session.
     _capture_verification_mode(
         session_set_dir, new_number, getattr(args, "verification_mode", None)
+    )
+
+    # Set 077 S5 (S1 review, bundle C): the typed path must seed the same
+    # once-at-set-start policies the work path does — a set whose FIRST
+    # boundary call is a typed session otherwise never records
+    # pathAwareCritique / contractGate and the Set 066/070 close gates
+    # silently no-op. Both captures are idempotent (no-op once a durable
+    # record exists) and best-effort.
+    _capture_path_aware_critique(
+        session_set_dir, new_number, getattr(args, "path_aware_critique", None)
+    )
+    _capture_contract_gate(
+        session_set_dir, new_number, getattr(args, "contract_gate", None)
     )
 
     _log_session_start(
@@ -945,6 +1072,17 @@ def _run_typed_handoff(
     ``EXIT_BOUNDARY`` when the writer's fail-loud contract refuses (no
     plan, no/!=1 in-flight typed session).
     """
+    # Set 077 S5 (Critique-2 M1): the remediation->re-verification handoff
+    # opens a verification session too — same start-time guardrail as the
+    # plain typed start, before any write.
+    if followon_type == "verification":
+        refusal = _refuse_same_pair_verification(
+            session_set_dir, args.engine, args.provider
+        )
+        if refusal is not None:
+            print(f"start_session: {refusal}", file=sys.stderr)
+            return EXIT_BOUNDARY
+
     try:
         _path, closed_number, new_number = register_typed_session_handoff(
             session_set=session_set_dir,
@@ -971,6 +1109,20 @@ def _run_typed_handoff(
         "docs/ai-led-session-workflow.md -> Lightweight dedicated "
         "verification (NOT a spec.md heading).",
         file=sys.stderr,
+    )
+
+    # Set 077 S5 (S1 review, bundle C): the handoff path skipped ALL
+    # three once-at-set-start policy captures (the plain typed path at
+    # least captured verificationMode). All idempotent + best-effort —
+    # no-ops on any set that recorded its policies at its first start.
+    _capture_verification_mode(
+        session_set_dir, new_number, getattr(args, "verification_mode", None)
+    )
+    _capture_path_aware_critique(
+        session_set_dir, new_number, getattr(args, "path_aware_critique", None)
+    )
+    _capture_contract_gate(
+        session_set_dir, new_number, getattr(args, "contract_gate", None)
     )
 
     _log_session_start(

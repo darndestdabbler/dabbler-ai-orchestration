@@ -78,6 +78,21 @@ export type VerificationMode = "out-of-band-or-none" | "dedicated-sessions";
 // terminal rows, note-bearing rows, verified rows — quiet is success).
 export type VerificationMarkerGlyph = "v?" | "v+" | "";
 
+// Set 077 Session 5 (Features 4–5): the Set 057 seven-state workflow
+// state, derived (never persisted — Set 047 rule) by
+// `deriveWorkflowState` in utils/tierLegibility.ts — the TS mirror of
+// Python's `dedicated_verification.derive_state`, so the Explorer's
+// owed-state words and copy-action auto-route follow the same ladder
+// the close gate and the start_session banner use.
+export type WorkflowState =
+  | "work-in-progress"
+  | "awaiting-verification"
+  | "awaiting-remediation"
+  | "awaiting-human"
+  | "closed-verified"
+  | "closed-dispositioned"
+  | "closed-no-verification";
+
 // Set 062 Session 1 (spec D1): the persisted outcome of a completed
 // `type: "verification"` session, lifted off the sessions[] ledger so
 // the fraction tooltip can surface it ("Verification: VERIFIED
@@ -272,6 +287,14 @@ export interface SessionSet {
   // tier — the manual-spec-edit drift the write-through cache cannot
   // cover). Derived at scan time, never persisted per-set.
   workspaceTierMarker: SessionSetTier | null;
+  // Set 077 Session 5 (Features 4–5): the derived seven-state workflow
+  // state, computed at scan time ONLY for Lightweight
+  // `dedicated-sessions` rows (null / absent everywhere else — the
+  // ladder is inert outside Mode B). Drives the row description's
+  // "verification owed" / "remediation owed" words and the
+  // Start-Next-Session copy-action auto-route. Optional so
+  // fixture-shaped records without the field read as "not derived".
+  workflowState?: WorkflowState | null;
 }
 
 // Set 052 S2: reconciled with the on-disk schema the router actually

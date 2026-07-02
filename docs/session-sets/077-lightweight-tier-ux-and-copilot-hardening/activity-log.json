@@ -523,6 +523,108 @@
           "costUsd": 0.0051
         }
       ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 1,
+      "stepKey": "session-005/s5.gate",
+      "dateTime": "2026-07-02T12:05:07.617824-04:00",
+      "description": "Session 5 registered (start_session, claude-code/anthropic/claude-fable-5). Read guidance docs + spec + S1 findings. Implemented Feature-5 gate work in ai_router: cross_provider_satisfied/work_session_pairs shared predicate (A6 engine-or-provider, missing data fails the provider arm closed), validator rewritten onto it with M5 legacy-posture corrective + quoted as_posix set-dir; start-time same-(engine,provider) refusal in both typed-start and handoff paths (M1); bundle-C _capture_* policy calls added to both typed paths; bundle-E robustness (_write_json_atomic shared by envelope seeder + minimal-log creation; derive_state blank-verdict+no-envelope pre-terminal ambiguity now AWAITING_HUMAN, terminal keeps legacy closed-verified). Affected suites green pre-new-tests (135 passed).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 2,
+      "stepKey": "session-005/s5.banner",
+      "dateTime": "2026-07-02T12:28:59.785664-04:00",
+      "description": "Feature 4: new ai_router/pending_verification.py (owed-state notices derived from derive_workflow_state + the S4 external-verification parser; WAIVED latest round = durable opt-out, bare absence always nags; most-recent-completed-sibling scan; MAX_NOTICES cap; side-effect-free readers) + loud advisory ASCII banner wired into start_session work path. Tests: per-state unit coverage + CLI integration incl. --no-router (banner fires with zero router config).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "costUsd": 0.0705
+        }
+      ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "session-005/s5.drift",
+      "dateTime": "2026-07-02T12:28:59.785664-04:00",
+      "description": "A7: Explorer mode derivation now prefers the durable activity-log record. TS mirrors added to tierLegibility.ts (durableVerificationModeFrom last-valid-record-wins; deriveWorkflowState seven-state ladder incl. the S5 blank-verdict adjudication); fileSystem.ts scan applies record over spec seed and derives workflowState for Mode-B rows (readLatestIssuesEnvelope mirror). Layer-2 fixtures incl. the failed-seed-alignment drift case (record dedicated-sessions vs stale out-of-band seed).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 4,
+      "stepKey": "session-005/s5.autoroute",
+      "dateTime": "2026-07-02T12:28:59.785664-04:00",
+      "description": "Feature 5 UI: Start Next Session copy action auto-routes by derived state (verification kickoff / remediation handoff; awaiting-human deliberately not auto-routed); kickoff prompt rewritten pointer-style per A9 (+ dabbler-ai-router >= 0.27.0 version-skew line, critique M6); new buildRemediationHandoffPrompt; row description gains 'verification owed'/'remediation owed' words; progressText gains the plusFraction '+' (S1 bundle B). Set 062 kickoff tests updated to the new contract. tsc clean; mocha 1093 passing.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "costUsd": 0.0563
+        }
+      ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "session-005/s5.docs",
+      "dateTime": "2026-07-02T12:28:59.785664-04:00",
+      "description": "Docs: workflow doc Mode B section documents the engine-or-provider gate, the sanctioned single-engine Copilot model-picker pattern, the M1 start-time refusal, legacy null-provider posture (M5), and the new owed-state surfaces (banner + Explorer words + auto-route); every different-engine echo updated (L-065-1). Consumer AGENTS.md tail template gains the Copilot-locked pattern bullet; cold-start goldens regenerated (AGENTS.md x2 tiers) and dist recompiled (dist-in-sync clean).",
+      "status": "complete",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "session-005/code-review",
+      "dateTime": "2026-07-02T12:38:26.421573-04:00",
+      "description": "Routed code-review over the S5 diff (sonnet, auto-verified by gemini-pro; raw in s5-code-review.md). Adjudication: [Critical] TS setTerminal claim REJECTED (false premise - liveSession.status is populated for parsed complete sets; raw-status mirror is the faithful one) but surfaced a real adjacent gap, fixed: cancelled Mode-B rows no longer show owed words (terminal suppression in verificationOwedText + regression test). [Major] unconditional --handoff fix REJECTED (would fail loud in the common awaiting-remediation case); remediation prompt prose tightened to resume-vs-open guidance instead. [Major] TS/Py remediation-divergence claim refuted by the auto-verifier and confirmed false against code. [Minor] banner-before-refusal REJECTED (typed dispatch returns before the banner call). [Minor] round-1 filename collision DEFERRED (mirror fidelity; sanctioned writer never emits -round-1). Verifier's banner-I/O note ACCEPTED-AS-IS (one small JSON read per sibling once per session boundary; same walk precedent as summarize_drift). Post-fix: tsc clean, mocha 1094 passing, dist recompiled.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "taskType": "code-review",
+          "costUsd": 0.3029
+        }
+      ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "session-005/verification",
+      "dateTime": "2026-07-02T13:07:11.225125-04:00",
+      "description": "Full pass green (pytest 2372/5/0 after fixing the new module's guarded bare import; tsc clean; mocha 1095; Playwright 19/19 serial). Routed gate: REQUIRED (blast-radius + multi-module + breadth; verdict logged). Cross-provider session verification (gpt-5.4): round 1 token-less, three unspecified-severity findings treated blocking (L-071-1) - banner <other-engine> wording fixed (+text-locking test), TS status-wiring claim refuted with a clarity refactor + the verifier-requested terminal-branch fixture, close-gate any-historical-round claim dispositioned advisory-disagreement (locked Set 057 semantics; M1 guardrail closes the front door; escalated to operator in disposition). Round 2 (narrow): findings 1-2 verified; one Major that was an evidence gap (untracked file invisible to git diff - L-064-9 class). Round 3 (file source supplied directly): VERIFIED. s5-issues.json persisted with dispositions.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.361
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.0803
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.008
+        },
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "costUsd": 0.002
+        }
+      ]
     }
   ]
 }

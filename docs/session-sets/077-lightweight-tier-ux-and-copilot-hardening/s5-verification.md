@@ -1,0 +1,11 @@
+1. **Issue** → Explorer workflow-state derivation is wired to the wrong status field, so the TS ladder is not actually parity with Python on terminal sets. A completed Mode-B set that relies on `set_status == "complete"` (including the new blank-verdict/no-envelope adjudication) will be misderived in the UI.  
+   **Location** → `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts`, the `deriveWorkflowState(...)` call passes `liveSession?.status ?? null`.  
+   **Fix** → Pass the top-level session-set status from `session-state.json` (`state` / parsed `status`) into `deriveWorkflowState`, not the live-session status. Add a `readSessionSets()` fixture for a completed dedicated set with blank verification verdict and no issues envelope to lock the terminal branch.
+
+2. **Issue** → The close gate still accepts any earlier independent verification round, so a later same-`(engine, provider)` re-verification can close successfully. That breaks the claimed start-time/close-time symmetry and makes the mixed-version warning false for remediation loops.  
+   **Location** → `ai_router/dedicated_verification.py`, `validate_dedicated_verification()`, the `for vs in verification_sessions:` success loop returns `ok=True` on the first historical passing verification session.  
+   **Fix** → Validate the closing/latest verification round for set-terminal closes (or at minimum the most recent verification after the last remediation), not any historical verification session. Add a regression test for: work `copilot/anthropic` → verification `copilot/openai` → remediation → verification `copilot/anthropic`, which must fail.
+
+3. **Issue** → The new pending-verification banner still tells operators to run verification with `--engine <other-engine>`, which contradicts the sanctioned same-engine/different-provider Mode-B path and gives Copilot-locked teams the wrong “exact next action.”  
+   **Location** → `ai_router/pending_verification.py`, `_mode_b_notice()` in the `STATE_AWAITING_VERIFICATION` branch.  
+   **Fix** → Change the banner text to a neutral command (`--engine <your-engine> --provider <your-provider>`) plus “must differ by engine or provider,” or inline the sanctioned `--engine copilot --provider <other-provider>` pattern.

@@ -298,15 +298,61 @@ export function buildStartNextSessionPrompt(set: SessionSet): string {
   return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
 
-// Set 062 Session 2 (spec D2): the dedicated-verification kickoff
-// prompt for Lightweight `dedicated-sessions` sets. Pointer-style per
-// L1 — references the workflow doc's Mode B section and the blessed
-// `start_session --type …` CLI surface; embeds NO doc bodies or rule
-// text that could go stale. The generic start-next-session prompt is
-// deliberately NOT reused: the dedicated flow is typed-session +
-// different-engine, not a spec session. The prompt never instructs the
-// UI (or the operator) to append sessions by hand — the agent's own
-// `start_session --type verification` is the only session creator.
+// Set 077 S5 (Feature 5, A9): the derived-state router behind the
+// "Start Next Session" copy action. Exported + pure so Layer-2 tests
+// drive it without the command plumbing. The status-bar message names
+// WHAT was copied — an operator who expected a work prompt must see the
+// reroute, not discover it mid-paste.
+export function resolveStartNextSessionPrompt(set: SessionSet): {
+  prompt: string;
+  message: string;
+} {
+  if (set.workflowState === "awaiting-verification") {
+    return {
+      prompt: buildVerificationKickoffPrompt(set),
+      message: `Copied: Verification kickoff (verification owed) for ${set.name}`,
+    };
+  }
+  if (set.workflowState === "awaiting-remediation") {
+    return {
+      prompt: buildRemediationHandoffPrompt(set),
+      message: `Copied: Remediation handoff (remediation owed) for ${set.name}`,
+    };
+  }
+  return {
+    prompt: buildStartNextSessionPrompt(set),
+    message: `Copied: Start the next session of ${set.name}`,
+  };
+}
+
+// Set 077 S5 (Feature 5, A9): the minimum dabbler-ai-router version the
+// Mode-B guardrail + owed-state banner ship in. Surfaced in the typed
+// Mode-B prompts so a mixed-version workspace (new extension, old
+// router) fails LOUD where the work happens instead of silently
+// skipping the start-time cross-provider refusal (critique M6).
+export const MODE_B_MIN_ROUTER_VERSION = "0.27.0";
+
+function modeBVersionLine(): string {
+  return (
+    `This flow expects dabbler-ai-router >= ${MODE_B_MIN_ROUTER_VERSION} ` +
+    `(the start-time cross-provider guardrail and the owed-verification ` +
+    `banner ship there). Check with \`python -m pip show dabbler-ai-router\` ` +
+    `and upgrade first if older — an older router accepts a same-provider ` +
+    `verification session silently and the close-out gate then refuses it.`
+  );
+}
+
+// Set 062 Session 2 (spec D2), REWRITTEN Set 077 S5 (Feature 5 with A9):
+// the dedicated-verification kickoff prompt for Lightweight
+// `dedicated-sessions` sets, now pointer-style per the Feature-3
+// standard — it points at the canonical Mode B procedure and names the
+// required output, instead of inlining a six-step script that drifts
+// from the doc it paraphrases. The one command line kept inline is the
+// entry point itself (the M1 start-time guardrail fires there). The
+// generic start-next-session prompt is deliberately NOT reused: the
+// dedicated flow is typed-session + cross-provider, not a spec session,
+// and the agent's own `start_session --type verification` is the only
+// session creator (never hand-edit the state file).
 export function buildVerificationKickoffPrompt(set: SessionSet): string {
   const slug = sanitizeSlugForPrompt(set.name);
   // The set-dir path is spliced into backtick-delimited command lines,
@@ -316,32 +362,57 @@ export function buildVerificationKickoffPrompt(set: SessionSet): string {
   const activityRel = relFromRoot(set.root, set.activityPath);
   const stateRel = relFromRoot(set.root, set.statePath);
   return (
-    `Run the dedicated cross-provider verification flow for the Lightweight\n` +
+    `Run the dedicated cross-provider verification round for the Lightweight\n` +
     `session set \`${slug}\` (verificationMode: dedicated-sessions).\n` +
     `\n` +
-    `1. Read the "Mode B — dedicated-sessions" part of Step 6 in\n` +
-    `   docs/ai-led-session-workflow.md — it is the authoritative procedure\n` +
-    `   for typed verification/remediation sessions, including the\n` +
-    `   bounded-round rules and the hand-off close.\n` +
-    `2. Confirm you are a DIFFERENT engine from the one that ran this set's\n` +
-    `   work sessions: read the per-session \`orchestrator\` blocks in\n` +
-    `   ${stateRel}. Cross-provider review is the point; the close-out gate\n` +
-    `   enforces it.\n` +
-    `3. Open the typed verification session through the blessed writer\n` +
-    `   (never hand-edit the state file), running Python through the\n` +
-    `   workspace venv:\n` +
-    `   \`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type verification --engine <your-engine> --provider <your-provider>\`\n` +
-    `4. Review the completed work sessions against the spec and the\n` +
-    `   activity log, then record the verdict per the workflow doc.\n` +
-    `   Files to read (relative to repo root):\n` +
-    `     - ${specRel}\n` +
-    `     - ${activityRel}\n` +
-    `     - ${stateRel}\n` +
-    `5. If findings require remediation, seed the structured findings\n` +
-    `   envelope and chain the hand-off close in one atomic write:\n` +
-    `   \`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type remediation --handoff --handoff-verdict ISSUES_FOUND --engine <work-engine> --provider <work-provider>\`\n` +
-    `6. Follow the workflow doc's bounded-round rules for any further\n` +
-    `   verify/remediate rounds and for when to stop to a human.\n`
+    `Authoritative procedure: docs/ai-led-session-workflow.md -> Step 6 ->\n` +
+    `"Mode B — dedicated-sessions" (typed sessions, bounded rounds, hand-off\n` +
+    `close). Follow it — do not improvise the flow from this prompt.\n` +
+    `${modeBVersionLine()}\n` +
+    `\n` +
+    `You must differ from this set's work sessions by ENGINE or by model\n` +
+    `PROVIDER (read the per-session \`orchestrator\` blocks in ${stateRel}).\n` +
+    `Single-engine shop? Use a second chat with the model picker on another\n` +
+    `provider, and declare it honestly via --provider — start_session\n` +
+    `refuses a same-engine+same-provider verification at start.\n` +
+    `\n` +
+    `Open the typed session through the blessed writer (workspace venv);\n` +
+    `never hand-edit the state file:\n` +
+    `\`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type verification --engine <your-engine> --provider <your-provider>\`\n` +
+    `\n` +
+    `Required output: review the completed work sessions against ${specRel}\n` +
+    `and ${activityRel}, then record your verdict (VERIFIED / ISSUES_FOUND\n` +
+    `with severities) on the session record; on findings, seed the\n` +
+    `sN-issues.json envelope and chain the remediation hand-off — both per\n` +
+    `the workflow doc's Mode B section.\n`
+  );
+}
+
+// Set 077 S5 (Feature 5): the remediation handoff prompt — the copy
+// action's target when a Mode-B set derives to `awaiting-remediation`
+// (a verification round returned ISSUES_FOUND). Pointer-style like the
+// kickoff above.
+export function buildRemediationHandoffPrompt(set: SessionSet): string {
+  const slug = sanitizeSlugForPrompt(set.name);
+  const setDirRel = sanitizeSlugForPrompt(relFromRoot(set.root, set.dir));
+  return (
+    `Run the remediation round for the Lightweight session set \`${slug}\`\n` +
+    `— its dedicated verification returned ISSUES_FOUND.\n` +
+    `\n` +
+    `Authoritative procedure: docs/ai-led-session-workflow.md -> Step 6 ->\n` +
+    `"Mode B — dedicated-sessions" (remediate -> re-verify, bounded rounds).\n` +
+    `${modeBVersionLine()}\n` +
+    `\n` +
+    `Read the LATEST sN-issues*.json findings envelope in ${setDirRel}.\n` +
+    `If a remediation session is already in flight, resume it — do NOT\n` +
+    `open another. Otherwise open it through the blessed writer\n` +
+    `(workspace venv); never hand-edit the state file:\n` +
+    `\`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type remediation --engine <work-engine> --provider <work-provider>\`\n` +
+    `\n` +
+    `Required output: confirm each finding reproduces, resolve it, and\n` +
+    `record a resolution_status on every issue in the envelope (the enum\n` +
+    `and the human-stop rules are in the workflow doc); if anything was\n` +
+    `fixed, hand off back to a re-verification round per the doc.\n`
   );
 }
 
@@ -409,8 +480,14 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
       "dabbler.copyStartNextSessionPrompt",
       async (item: SetItem) => {
         if (!item?.set) return;
-        const prompt = buildStartNextSessionPrompt(item.set);
-        await copyToClipboard(prompt, `Copied: Start the next session of ${item.set.name}`);
+        // Set 077 S5 (Feature 5, A9): auto-route by derived state. When
+        // a Mode-B set owes its verification (or a remediation round),
+        // "Start Next Session" yields the typed-session kickoff instead
+        // of a work-session prompt — the owed state is one copy action
+        // away, and a work prompt that start_session would refuse is
+        // never handed out.
+        const { prompt, message } = resolveStartNextSessionPrompt(item.set);
+        await copyToClipboard(prompt, message);
       },
     ),
     vscode.commands.registerCommand(

@@ -15626,6 +15626,123 @@ function verificationMarkerTooltipFor(glyph) {
     return VERIFICATION_DEDICATED_TOOLTIP;
   return "";
 }
+var VERIFICATION_MODE_RECORD_KINDS = /* @__PURE__ */ new Set([
+  "verification_mode",
+  "verification_mode_change"
+]);
+function durableVerificationModeFrom(activityLog) {
+  if (activityLog === null || typeof activityLog !== "object")
+    return null;
+  const entries = activityLog.entries;
+  if (!Array.isArray(entries))
+    return null;
+  let chosen = null;
+  for (const entry of entries) {
+    if (entry === null || typeof entry !== "object")
+      continue;
+    const e = entry;
+    if (typeof e.kind !== "string" || !VERIFICATION_MODE_RECORD_KINDS.has(e.kind)) {
+      continue;
+    }
+    if (e.choice === "dedicated-sessions" || e.choice === "out-of-band-or-none") {
+      chosen = e.choice;
+    }
+  }
+  return chosen;
+}
+var TERMINAL_DISPOSITIONS = /* @__PURE__ */ new Set([
+  "fixed",
+  "not-reproducible",
+  "accepted-risk",
+  "accepted-consequence"
+]);
+var HUMAN_STOP_DISPOSITIONS = /* @__PURE__ */ new Set([
+  "escalate-human",
+  "needs-more-context",
+  "advisory-disagreement"
+]);
+var AUTOMATIC_ROUND_LIMIT = 3;
+function sessionTypeOf(entry) {
+  const t2 = entry.type;
+  if (t2 === "verification" || t2 === "remediation" || t2 === "work")
+    return t2;
+  return "work";
+}
+function dispositionOf(issue) {
+  if (issue === null || typeof issue !== "object")
+    return null;
+  const status = issue.resolution_status;
+  return typeof status === "string" && status.length > 0 ? status : null;
+}
+function deriveWorkflowState(sessions, verificationMode, setStatus, latestIssues) {
+  const setTerminal = setStatus === "complete";
+  let issues = [];
+  if (latestIssues !== null && typeof latestIssues === "object") {
+    const raw = latestIssues.issues;
+    if (Array.isArray(raw))
+      issues = raw;
+  }
+  if (verificationMode !== "dedicated-sessions") {
+    return setTerminal ? "closed-no-verification" : "work-in-progress";
+  }
+  const ledger = Array.isArray(sessions) ? sessions.filter((s) => s !== null && typeof s === "object") : [];
+  if (ledger.length === 0)
+    return "work-in-progress";
+  const latest = ledger[ledger.length - 1];
+  const latestType = sessionTypeOf(latest);
+  const latestStatus = latest.status;
+  if (latestStatus === "in-progress") {
+    if (latestType === "verification")
+      return "awaiting-verification";
+    if (latestType === "remediation")
+      return "awaiting-remediation";
+    return "work-in-progress";
+  }
+  const workSessions = ledger.filter((s) => sessionTypeOf(s) === "work");
+  if (workSessions.some((s) => s.status !== "complete")) {
+    return "work-in-progress";
+  }
+  if (latestType === "work")
+    return "awaiting-verification";
+  const humanStop = issues.some((i2) => {
+    const d = dispositionOf(i2);
+    return d !== null && HUMAN_STOP_DISPOSITIONS.has(d);
+  });
+  const openIssues = issues.filter((i2) => dispositionOf(i2) === null);
+  if (latestType === "verification") {
+    const rawVerdict = latest.verificationVerdict;
+    const verdict = typeof rawVerdict === "string" ? rawVerdict.trim().toUpperCase() : "";
+    if (verdict === "VERIFIED")
+      return "closed-verified";
+    if (issues.length === 0) {
+      return setTerminal ? "closed-verified" : "awaiting-human";
+    }
+    if (openIssues.length === 0 && !humanStop)
+      return "closed-verified";
+    const verificationRounds = ledger.filter(
+      (s) => sessionTypeOf(s) === "verification"
+    ).length;
+    if (humanStop || verificationRounds >= AUTOMATIC_ROUND_LIMIT) {
+      return "awaiting-human";
+    }
+    return "awaiting-remediation";
+  }
+  if (latestType === "remediation") {
+    if (humanStop || openIssues.length > 0)
+      return "awaiting-human";
+    const anyFixed = issues.some((i2) => dispositionOf(i2) === "fixed");
+    const allTerminal = issues.length > 0 && issues.every((i2) => {
+      const d = dispositionOf(i2);
+      return d !== null && TERMINAL_DISPOSITIONS.has(d);
+    });
+    if (anyFixed)
+      return "awaiting-verification";
+    if (allTerminal)
+      return "closed-dispositioned";
+    return "awaiting-human";
+  }
+  return "work-in-progress";
+}
 
 // src/utils/tierMarkerStore.ts
 var fs4 = __toESM(require("fs"));
@@ -16366,6 +16483,37 @@ function parseUatChecklist(checklistPath) {
   }
   return { totalItems: items.length, pendingItems: pending, e2eRefs: Array.from(e2eRefs) };
 }
+var ISSUES_FILE_RE = /^s(\d+)-issues(?:-round-(\d+))?\.json$/;
+function readLatestIssuesEnvelope(dir) {
+  let names;
+  try {
+    names = fs5.readdirSync(dir);
+  } catch {
+    return null;
+  }
+  let bestKey = null;
+  let bestPayload = null;
+  for (const name of names) {
+    const m = ISSUES_FILE_RE.exec(name);
+    if (!m)
+      continue;
+    const key = [
+      parseInt(m[1], 10),
+      m[2] ? parseInt(m[2], 10) : 1
+    ];
+    let payload;
+    try {
+      payload = JSON.parse(fs5.readFileSync(path6.join(dir, name), "utf8"));
+    } catch {
+      continue;
+    }
+    if (bestKey === null || key[0] > bestKey[0] || key[0] === bestKey[0] && key[1] > bestKey[1]) {
+      bestKey = key;
+      bestPayload = payload;
+    }
+  }
+  return bestPayload;
+}
 function readSessionSets(root) {
   const sessionSetsDir = path6.join(root, SESSION_SETS_REL);
   if (!fs5.existsSync(sessionSetsDir))
@@ -16413,9 +16561,11 @@ function readSessionSets(root) {
     let ledgerSessions = null;
     let schemaVersionOnDisk = null;
     const eventsPath = path6.join(dir, "session-events.jsonl");
+    let activityLogParsed = null;
     if (fs5.existsSync(activityPath)) {
       try {
         const data = JSON.parse(fs5.readFileSync(activityPath, "utf8"));
+        activityLogParsed = data;
         if (typeof data.totalSessions === "number")
           totalSessions = data.totalSessions;
         for (const e of data.entries ?? []) {
@@ -16500,6 +16650,9 @@ function readSessionSets(root) {
       }
     }
     const config = parseSessionSetConfig(specPath);
+    const durableMode = durableVerificationModeFrom(activityLogParsed);
+    if (durableMode !== null)
+      config.verificationMode = durableMode;
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
     const plusFraction = shouldRenderPlusFraction(
@@ -16520,6 +16673,16 @@ function readSessionSets(root) {
       externalVerificationNoteExists,
       state
     );
+    let workflowState = null;
+    if (config.tier === "lightweight" && config.verificationMode === "dedicated-sessions") {
+      const rawSetStatus = liveSession?.status ?? null;
+      workflowState = deriveWorkflowState(
+        ledgerSessions,
+        config.verificationMode,
+        rawSetStatus,
+        readLatestIssuesEnvelope(dir)
+      );
+    }
     sets.push({
       name: entry.name,
       dir,
@@ -16551,7 +16714,8 @@ function readSessionSets(root) {
       externalVerificationNoteExists,
       completedVerification,
       verificationMarker: verificationMarker2,
-      workspaceTierMarker
+      workspaceTierMarker,
+      workflowState
     });
   }
   deriveBlockedByPrereqs(sets);
@@ -16675,6 +16839,15 @@ var ICON_FILES = {
   "not-started": "not-started.svg",
   cancelled: "cancelled.svg"
 };
+function verificationOwedText(set) {
+  if (set.state === "cancelled")
+    return "";
+  if (set.workflowState === "awaiting-verification")
+    return "verification owed";
+  if (set.workflowState === "awaiting-remediation")
+    return "remediation owed";
+  return "";
+}
 function touchedDate(set) {
   if (!set.lastTouched)
     return "";
@@ -23413,6 +23586,9 @@ function descriptionFor(set) {
   if (set.state === "in-progress" && set.liveSession?.currentSession != null) {
     bits.push(`session ${set.liveSession.currentSession} in flight`);
   }
+  const owed = verificationOwedText(set);
+  if (owed)
+    bits.push(owed);
   const extras = [
     touchedDate(set),
     uatBadge(set),
@@ -25032,38 +25208,79 @@ function sanitizeSlugForPrompt(slug) {
 function buildStartNextSessionPrompt(set) {
   return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
+function resolveStartNextSessionPrompt(set) {
+  if (set.workflowState === "awaiting-verification") {
+    return {
+      prompt: buildVerificationKickoffPrompt(set),
+      message: `Copied: Verification kickoff (verification owed) for ${set.name}`
+    };
+  }
+  if (set.workflowState === "awaiting-remediation") {
+    return {
+      prompt: buildRemediationHandoffPrompt(set),
+      message: `Copied: Remediation handoff (remediation owed) for ${set.name}`
+    };
+  }
+  return {
+    prompt: buildStartNextSessionPrompt(set),
+    message: `Copied: Start the next session of ${set.name}`
+  };
+}
+var MODE_B_MIN_ROUTER_VERSION = "0.27.0";
+function modeBVersionLine() {
+  return `This flow expects dabbler-ai-router >= ${MODE_B_MIN_ROUTER_VERSION} (the start-time cross-provider guardrail and the owed-verification banner ship there). Check with \`python -m pip show dabbler-ai-router\` and upgrade first if older \u2014 an older router accepts a same-provider verification session silently and the close-out gate then refuses it.`;
+}
 function buildVerificationKickoffPrompt(set) {
   const slug = sanitizeSlugForPrompt(set.name);
   const setDirRel = sanitizeSlugForPrompt(relFromRoot(set.root, set.dir));
   const specRel = relFromRoot(set.root, set.specPath);
   const activityRel = relFromRoot(set.root, set.activityPath);
   const stateRel = relFromRoot(set.root, set.statePath);
-  return `Run the dedicated cross-provider verification flow for the Lightweight
+  return `Run the dedicated cross-provider verification round for the Lightweight
 session set \`${slug}\` (verificationMode: dedicated-sessions).
 
-1. Read the "Mode B \u2014 dedicated-sessions" part of Step 6 in
-   docs/ai-led-session-workflow.md \u2014 it is the authoritative procedure
-   for typed verification/remediation sessions, including the
-   bounded-round rules and the hand-off close.
-2. Confirm you are a DIFFERENT engine from the one that ran this set's
-   work sessions: read the per-session \`orchestrator\` blocks in
-   ${stateRel}. Cross-provider review is the point; the close-out gate
-   enforces it.
-3. Open the typed verification session through the blessed writer
-   (never hand-edit the state file), running Python through the
-   workspace venv:
-   \`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type verification --engine <your-engine> --provider <your-provider>\`
-4. Review the completed work sessions against the spec and the
-   activity log, then record the verdict per the workflow doc.
-   Files to read (relative to repo root):
-     - ${specRel}
-     - ${activityRel}
-     - ${stateRel}
-5. If findings require remediation, seed the structured findings
-   envelope and chain the hand-off close in one atomic write:
-   \`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type remediation --handoff --handoff-verdict ISSUES_FOUND --engine <work-engine> --provider <work-provider>\`
-6. Follow the workflow doc's bounded-round rules for any further
-   verify/remediate rounds and for when to stop to a human.
+Authoritative procedure: docs/ai-led-session-workflow.md -> Step 6 ->
+"Mode B \u2014 dedicated-sessions" (typed sessions, bounded rounds, hand-off
+close). Follow it \u2014 do not improvise the flow from this prompt.
+${modeBVersionLine()}
+
+You must differ from this set's work sessions by ENGINE or by model
+PROVIDER (read the per-session \`orchestrator\` blocks in ${stateRel}).
+Single-engine shop? Use a second chat with the model picker on another
+provider, and declare it honestly via --provider \u2014 start_session
+refuses a same-engine+same-provider verification at start.
+
+Open the typed session through the blessed writer (workspace venv);
+never hand-edit the state file:
+\`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type verification --engine <your-engine> --provider <your-provider>\`
+
+Required output: review the completed work sessions against ${specRel}
+and ${activityRel}, then record your verdict (VERIFIED / ISSUES_FOUND
+with severities) on the session record; on findings, seed the
+sN-issues.json envelope and chain the remediation hand-off \u2014 both per
+the workflow doc's Mode B section.
+`;
+}
+function buildRemediationHandoffPrompt(set) {
+  const slug = sanitizeSlugForPrompt(set.name);
+  const setDirRel = sanitizeSlugForPrompt(relFromRoot(set.root, set.dir));
+  return `Run the remediation round for the Lightweight session set \`${slug}\`
+\u2014 its dedicated verification returned ISSUES_FOUND.
+
+Authoritative procedure: docs/ai-led-session-workflow.md -> Step 6 ->
+"Mode B \u2014 dedicated-sessions" (remediate -> re-verify, bounded rounds).
+${modeBVersionLine()}
+
+Read the LATEST sN-issues*.json findings envelope in ${setDirRel}.
+If a remediation session is already in flight, resume it \u2014 do NOT
+open another. Otherwise open it through the blessed writer
+(workspace venv); never hand-edit the state file:
+\`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type remediation --engine <work-engine> --provider <work-provider>\`
+
+Required output: confirm each finding reproduces, resolve it, and
+record a resolution_status on every issue in the envelope (the enum
+and the human-stop rules are in the workflow doc); if anything was
+fixed, hand off back to a re-verification round per the doc.
 `;
 }
 function buildStartNextParallelSessionPrompt(set) {
@@ -25124,8 +25341,8 @@ function registerCopyPromptCommands(context) {
       async (item) => {
         if (!item?.set)
           return;
-        const prompt = buildStartNextSessionPrompt(item.set);
-        await copyToClipboard(prompt, `Copied: Start the next session of ${item.set.name}`);
+        const { prompt, message } = resolveStartNextSessionPrompt(item.set);
+        await copyToClipboard(prompt, message);
       }
     ),
     vscode16.commands.registerCommand(

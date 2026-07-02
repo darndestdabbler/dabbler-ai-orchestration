@@ -1633,7 +1633,7 @@ How verification happens is governed by one durable, opt-in choice,
 | `verificationMode` | What it means |
 |---|---|
 | `out-of-band-or-none` (**default**) | Mode A below: copyable review prompts pasted into a second assistant, verdict recorded by hand in `external-verification.md`. Preserves the pre-Set-057 flow. |
-| `dedicated-sessions` | Mode B below: a structured, blessed **verification session** on a different engine, an optional **remediation session** when issues are found, a bounded re-verification loop, and a content-aware close-out gate. |
+| `dedicated-sessions` | Mode B below: a structured, blessed **verification session** on a different engine **or a different model provider** (Set 077), an optional **remediation session** when issues are found, a bounded re-verification loop, and a content-aware close-out gate. |
 
 **Capturing the choice (once, at set start).** The durable record is a
 single `activity-log.json` entry (`kind: "verification_mode"`), written
@@ -1799,8 +1799,8 @@ typed session is:
 
 **The flow.**
 
-1. **Start the verification session — on a different engine.** After the
-   work sessions are complete, run:
+1. **Start the verification session — on a different engine or a
+   different model provider.** After the work sessions are complete, run:
 
    ```
    python -m ai_router.start_session --session-set-dir docs/session-sets/<slug> \
@@ -1810,15 +1810,35 @@ typed session is:
    The blessed writer (`register_typed_session_start`) appends a
    `type: verification` entry, marks it in-progress, and grows the runtime
    `totalSessions` by one (Q1: structured files only — `spec.md` is never
-   touched). The engine **must differ** from the implementation sessions'
-   engine; the close-out gate enforces this (the whole feature exists to
-   keep verification cross-provider).
+   touched). The verification session **must differ from every
+   implementation session by engine or by model provider** (Set 077 —
+   cross-provider means *provider*, not IDE); the close-out gate enforces
+   this, and `start_session --type verification` **refuses at start**
+   (before any write) when the declared `(engine, provider)` pair could
+   not possibly pass that gate, printing the sanctioned pattern below.
+
+   **The sanctioned single-engine pattern (Copilot-locked shops).** A
+   team whose every session runs under one IDE engine satisfies the
+   cross-provider property by switching the *model provider*: open a
+   **second chat with the model picker set to a different provider**
+   than the one that did the work, and declare it honestly —
+   `--engine copilot --provider openai` verifying work done under
+   `--engine copilot --provider anthropic`. Same engine + same provider
+   still fails. **Missing data fails closed:** a verification session
+   with no recorded `--provider` cannot satisfy the provider arm, and
+   work sessions recorded without `--provider` (all pre-Set-077 history)
+   cannot anchor it either — for those legacy baselines the
+   engine-difference arm is the only accepted path, so either verify on
+   a different engine or record providers on the work sessions'
+   per-session orchestrator blocks. Requires `dabbler-ai-router`
+   >= 0.27.0 (older routers accept the doomed start silently and only
+   the close gate catches it).
 
 2. **Verify.** The verifier reviews the work and returns a verdict.
    - **VERIFIED** → there is nothing to remediate. Close the set: commit,
      then run `close_session` (Lightweight: `--no-router`). The Q6 gate
-     (below) confirms a different-engine verification session is what is
-     being closed, and the set finalizes.
+     (below) confirms a cross-provider (engine- or provider-differing)
+     verification session is what is being closed, and the set finalizes.
    - **ISSUES_FOUND** → seed the findings envelope and hand off to a
      remediation session (step 3).
 
@@ -1872,7 +1892,9 @@ typed session is:
 5. **Re-verify only after real changes, and keep later rounds narrow.**
    - If **anything was `fixed`**, hand off back to a new verification
      session (`start_session --type verification --handoff --engine
-     <other-engine>`, backed by `register_typed_session_handoff`) to
+     <other-engine> --provider <other-provider>`, backed by
+     `register_typed_session_handoff`; the same engine-or-provider rule
+     and start-time refusal apply to the handoff) to
      re-verify the fixes. Re-verification rounds **stay narrow** — they
      confirm the specific fixes and look for regressions they introduce,
      not a fresh full review.
@@ -1927,14 +1949,39 @@ session type is latest**: `closed-verified` is reached from a *verification*
 session, `closed-dispositioned` from a *remediation* session — they are not
 the same path under two names.
 
-**Close-out gate (Set 057 Q6).** When `verificationMode ==
-dedicated-sessions`, `close_session` runs the content-aware close-time
-validator on the **set-terminal** close (the close that finalizes the
-set). If it cannot confirm a *different-engine* verification session ran,
-the gate:
+**Owed states are said out loud (Set 077).** Two surfaces derive from the
+same ladder so they can never disagree with the gate:
+
+- `start_session` prints a loud, **advisory** ASCII `PENDING VERIFICATION`
+  banner at every work-session start (both tiers, no router config
+  needed) when the set being started or a stalled Mode-B sibling derives
+  to an `awaiting-*` state, or when the most recently completed set in
+  the repo has no recorded verification — all session verdicts null and
+  no recognizable work-scoped verdict in `external-verification.md`. A
+  latest-round `WAIVED` (with its required reason) is a durable opt-out
+  and is never nagged; bare absence always is. The banner names the exact
+  next action and never blocks the start.
+- The Session Set Explorer's row description carries the words
+  `verification owed` / `remediation owed`, and the row's **Start Next
+  Session** copy action auto-routes to the verification-kickoff or
+  remediation-handoff prompt in those states instead of handing out a
+  work-session prompt that `start_session` would refuse. The Explorer
+  derives `verificationMode` from the durable activity-log record first
+  (spec seed only as fallback), so a blessed A→B transition whose
+  seed-alignment failed no longer leaves the UI contradicting the gate.
+
+**Close-out gate (Set 057 Q6; extended Set 077).** When
+`verificationMode == dedicated-sessions`, `close_session` runs the
+content-aware close-time validator on the **set-terminal** close (the
+close that finalizes the set). If it cannot confirm a verification
+session ran that **differs from every implementation session by engine
+or by model provider** (missing identity data fails closed — see the
+sanctioned single-engine pattern in step 1 above), the gate:
 
 - **hard-blocks in an interactive TTY** — refuses the close, prints the
-  corrective action (run a verification session on another engine), and
+  corrective action (run a verification session on another engine or
+  provider; the message names both remedies, including re-attributing
+  providers when the work sessions never recorded them), and
   exits `gate_failed`; and
 - **soft-warns in non-TTY / headless** (or under `--accept-suggestions`)
   — prints a warning and proceeds.

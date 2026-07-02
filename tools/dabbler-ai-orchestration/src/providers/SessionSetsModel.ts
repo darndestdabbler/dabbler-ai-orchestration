@@ -153,8 +153,14 @@ export function progressText(set: SessionSet): string {
   //     really reached terminal state" cue.
   //   * `0/N · session 1 in flight` on rows where session N has
   //     started but not yet closed.
+  // Set 077 Session 5 (S1 bundle B): the `+` suffix mirrors
+  // `fractionFor` in CustomSessionSetsView — a Lightweight
+  // dedicated-sessions set whose typed sessions are still pending
+  // renders `N/M+` on BOTH fraction surfaces, so this text no longer
+  // contradicts the row's fraction column.
+  const plus = set.plusFraction ? "+" : "";
   const base = set.totalSessions && set.totalSessions > 0
-    ? `${set.sessionsCompleted}/${set.totalSessions}`
+    ? `${set.sessionsCompleted}/${set.totalSessions}${plus}`
     : set.sessionsCompleted > 0
       ? `${set.sessionsCompleted} complete`
       : "";
@@ -168,6 +174,27 @@ export function progressText(set: SessionSet): string {
     return base ? `${base} · ${annotation}` : annotation;
   }
   return base;
+}
+
+// Set 077 Session 5 (Feature 5, A9): the owed-state WORDS for the row
+// description — the derived workflow state said out loud instead of
+// compressed into the `v+` glyph (which drops after the first completed
+// verification round, exactly when "remediation owed" matters most).
+// Pure function of the derived state; empty everywhere the ladder is
+// quiet. `awaiting-human` deliberately stays out of this surface: it
+// has no auto-routable next prompt (a human decides), and its signal
+// remains the marker/tooltip channel.
+export function verificationOwedText(set: SessionSet): string {
+  // Terminal-row suppression (the same rule every Set 061/062 marker
+  // follows): a cancelled set's owed verification is not actionable —
+  // and "cancelled" is non-terminal to the derivation ladder (only
+  // "complete" is), so without this guard an abandoned Mode-B set
+  // would nag "verification owed" forever. (S5 code-review
+  // adjudication catch.)
+  if (set.state === "cancelled") return "";
+  if (set.workflowState === "awaiting-verification") return "verification owed";
+  if (set.workflowState === "awaiting-remediation") return "remediation owed";
+  return "";
 }
 
 export function touchedDate(set: SessionSet): string {

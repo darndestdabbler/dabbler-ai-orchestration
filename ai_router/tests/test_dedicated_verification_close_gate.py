@@ -190,3 +190,63 @@ def test_out_of_band_mode_does_not_fire_gate(tmp_path, monkeypatch):
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     outcome = run(_ns(d))
     assert outcome.result == "succeeded"
+
+
+# ---------------------------------------------------------------------------
+# Set 077 S5 (A6): engine-OR-provider difference through the close gate.
+# ---------------------------------------------------------------------------
+
+
+def _verif_pair(num, status, engine, provider):
+    e = _verif(num, status, engine=engine)
+    e["orchestrator"] = {"engine": engine, "provider": provider}
+    return e
+
+
+def test_terminal_same_engine_different_provider_passes_in_tty(tmp_path, monkeypatch):
+    # The Copilot-locked pattern: work under copilot+anthropic, verification
+    # under copilot+openai (model picker). Same engine, provider differs ->
+    # the extended gate passes even in an interactive TTY.
+    d = _make_set(
+        tmp_path,
+        sessions=[
+            _work(1, "complete", engine="copilot"),  # provider: anthropic
+            _verif_pair(2, "in-progress", "copilot", "openai"),
+        ],
+        total=2,
+    )
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    outcome = run(_ns(d))
+    assert outcome.result == "succeeded"
+
+
+def test_terminal_same_engine_same_provider_still_hard_blocks_in_tty(tmp_path, monkeypatch):
+    # A6 is extended, not weakened: same engine + same provider still fails.
+    d = _make_set(
+        tmp_path,
+        sessions=[
+            _work(1, "complete", engine="copilot"),  # provider: anthropic
+            _verif_pair(2, "in-progress", "copilot", "anthropic"),
+        ],
+        total=2,
+    )
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    outcome = run(_ns(d))
+    assert outcome.result == "gate_failed"
+    assert "closeout_failed" in outcome.events_emitted
+
+
+def test_terminal_same_engine_no_provider_recorded_hard_blocks_in_tty(tmp_path, monkeypatch):
+    # Missing data fails the provider arm closed: a verification session
+    # with no recorded provider cannot satisfy it.
+    d = _make_set(
+        tmp_path,
+        sessions=[
+            _work(1, "complete", engine="copilot"),
+            _verif_pair(2, "in-progress", "copilot", None),
+        ],
+        total=2,
+    )
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    outcome = run(_ns(d))
+    assert outcome.result == "gate_failed"

@@ -48,6 +48,7 @@ import {
   uatBadge,
   verdictFractionTooltip,
   verificationMarker,
+  verificationOwedText,
   verificationTooltip,
 } from "./SessionSetsModel";
 // Set 034: the per-row orchestrator-tracking accordion (gauges + model
@@ -160,6 +161,12 @@ function descriptionFor(set: SessionSet): string {
   if (set.state === "in-progress" && set.liveSession?.currentSession != null) {
     bits.push(`session ${set.liveSession.currentSession} in flight`);
   }
+  // Set 077 S5 (Feature 5, A9): the owed state in WORDS — "verification
+  // owed" / "remediation owed" — not only the `v+` glyph (which drops
+  // after the first completed verification round, exactly when the
+  // remediation debt matters most).
+  const owed = verificationOwedText(set);
+  if (owed) bits.push(owed);
   const extras = [
     touchedDate(set),
     uatBadge(set),

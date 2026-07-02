@@ -8,6 +8,8 @@ import { readProgress, SessionStateInvariantError, normalizeToV4Shape } from "./
 import {
   LedgerSessionLike,
   completedVerificationInfo,
+  deriveWorkflowState,
+  durableVerificationModeFrom,
   shouldRenderPlusFraction,
   verificationMarkerFor,
 } from "./tierLegibility";
@@ -21,6 +23,7 @@ import {
   UnsatisfiedPrerequisite,
   UatSummary,
   LiveSession,
+  WorkflowState,
 } from "../types";
 
 export const SESSION_SETS_REL = path.join("docs", "session-sets");
@@ -435,6 +438,49 @@ export function parseUatChecklist(checklistPath: string): UatSummary | null {
   return { totalItems: items.length, pendingItems: pending, e2eRefs: Array.from(e2eRefs) };
 }
 
+// Set 077 Session 5 (Features 4–5): the most recent sN-issues*.json
+// envelope in a set directory, or null. TS mirror of Python's
+// `dedicated_verification.read_latest_issues_envelope`: "most recent" =
+// highest (sessionNumber, round) pair; round 1 files carry no -round-
+// suffix; malformed/unreadable files are skipped. Feeds the derived
+// workflow state (awaiting-remediation vs awaiting-human need the
+// issue dispositions).
+const ISSUES_FILE_RE = /^s(\d+)-issues(?:-round-(\d+))?\.json$/;
+
+export function readLatestIssuesEnvelope(dir: string): unknown | null {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return null;
+  }
+  let bestKey: [number, number] | null = null;
+  let bestPayload: unknown = null;
+  for (const name of names) {
+    const m = ISSUES_FILE_RE.exec(name);
+    if (!m) continue;
+    const key: [number, number] = [
+      parseInt(m[1], 10),
+      m[2] ? parseInt(m[2], 10) : 1,
+    ];
+    let payload: unknown;
+    try {
+      payload = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+    } catch {
+      continue;
+    }
+    if (
+      bestKey === null ||
+      key[0] > bestKey[0] ||
+      (key[0] === bestKey[0] && key[1] > bestKey[1])
+    ) {
+      bestKey = key;
+      bestPayload = payload;
+    }
+  }
+  return bestPayload;
+}
+
 export function readSessionSets(root: string): SessionSet[] {
   const sessionSetsDir = path.join(root, SESSION_SETS_REL);
   if (!fs.existsSync(sessionSetsDir)) return [];
@@ -544,12 +590,18 @@ export function readSessionSets(root: string): SessionSet[] {
     // and the per-entry `dateTime` for the `lastTouched` display, which
     // is more granular than the state-file's session-boundary timestamps
     // while a session is mid-flight.
+    // Set 077 Session 5 (A7): the parsed log is also the home of the
+    // DURABLE verificationMode record (`verification_mode` /
+    // `verification_mode_change` entries), captured here so the config
+    // resolution below can prefer it over the spec seed.
+    let activityLogParsed: unknown = null;
     if (fs.existsSync(activityPath)) {
       try {
         const data = JSON.parse(fs.readFileSync(activityPath, "utf8")) as {
           totalSessions?: number;
           entries?: Array<{ sessionNumber?: number; dateTime?: string }>;
         };
+        activityLogParsed = data;
         if (typeof data.totalSessions === "number") totalSessions = data.totalSessions;  // noqa: D13 - activity-log.json carrier field, not session-state
         for (const e of data.entries ?? []) {
           if (e.dateTime && (!lastTouched || e.dateTime > lastTouched)) lastTouched = e.dateTime;
@@ -757,6 +809,18 @@ export function readSessionSets(root: string): SessionSet[] {
     }
 
     const config = parseSessionSetConfig(specPath);
+    // Set 077 Session 5 (A7): the durable activity-log record outranks
+    // the spec-config seed. Python's `read_verification_mode` (which
+    // the Q6 close gate and the S4 gate stand-down key off) has always
+    // preferred the record; the Explorer read only the seed, so a
+    // blessed A→B transition whose seed-alignment failed left the
+    // kickoff/setup actions and the `v?`/`v+`/`N/M+` markers
+    // contradicting the gate. With the record applied here, every
+    // downstream consumer of `config.verificationMode` (ActionRegistry
+    // gates, tierLegibility predicates, the workflow-state derivation
+    // below) reads the same effective mode the gate does (critique M5).
+    const durableMode = durableVerificationModeFrom(activityLogParsed);
+    if (durableMode !== null) config.verificationMode = durableMode;
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
     // Set 061 Session 1 (spec D1): derived, never persisted.
@@ -783,6 +847,32 @@ export function readSessionSets(root: string): SessionSet[] {
       externalVerificationNoteExists,
       state,
     );
+    // Set 077 Session 5 (Features 4–5): derived only where the ladder
+    // is live — Lightweight Mode-B rows. The issues-envelope read is
+    // scoped the same way so Full/Mode-A rows pay no extra I/O.
+    //
+    // The ladder's set-terminal input is the RAW set-level status from
+    // the parsed state file (Python parity: derive_state compares
+    // set_status == "complete"), NOT the canonicalized bucket `state`
+    // (whose mid-set-complete downgrade / cancelled mapping would
+    // diverge from Python). `liveSession.status` carries exactly that
+    // raw `sd.status` for every readable state file — despite the
+    // record's name it is the normalized snapshot, populated for
+    // complete sets too, not an in-flight-only tracker (two reviewers
+    // misread this; hence the explicit local).
+    let workflowState: WorkflowState | null = null;
+    if (
+      config.tier === "lightweight" &&
+      config.verificationMode === "dedicated-sessions"
+    ) {
+      const rawSetStatus = liveSession?.status ?? null;
+      workflowState = deriveWorkflowState(
+        ledgerSessions as LedgerSessionLike[] | null,
+        config.verificationMode,
+        rawSetStatus,
+        readLatestIssuesEnvelope(dir),
+      );
+    }
 
     sets.push({
       name: entry.name,
@@ -816,6 +906,7 @@ export function readSessionSets(root: string): SessionSet[] {
       completedVerification,
       verificationMarker,
       workspaceTierMarker,
+      workflowState,
     });
   }
 

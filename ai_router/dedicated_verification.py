@@ -323,9 +323,9 @@ def resolve_and_record_verification_mode(
             "totalSessions": 0,
             "entries": [],
         }
-        with log_path.open("w", encoding="utf-8") as f:
-            json.dump(minimal, f, indent=2)
-            f.write("\n")
+        # Set 077 S5 (S1 bundle E): atomic — a partial minimal log would
+        # poison every later reader of the durable record's home.
+        _write_json_atomic(log_path, minimal)
     record_verification_mode(
         session_set_dir, chosen, session_number=session_number
     )
@@ -392,21 +392,35 @@ def record_verification_mode(
     _write_activity_log_atomic(log_path, log)
 
 
-def _write_activity_log_atomic(log_path: Path, log: dict) -> None:
-    """Atomic temp-file-rename write of ``activity-log.json``."""
-    log_dir = log_path.parent
-    fd, tmp_path = tempfile.mkstemp(suffix=".activity-log.tmp", dir=str(log_dir))
+def _write_json_atomic(path: Path, payload: dict) -> None:
+    """Atomic temp-file-rename JSON write (Set 077 S5, S1 bundle E).
+
+    Shared by every writer in this module. The atomicity matters most for
+    :func:`seed_issues_envelope`: its ``FileExistsError`` never-overwrite
+    guard means a partially-written (crashed mid-write) envelope would be
+    permanently entombed — the corrupt stub blocks every retry. Writing
+    to a temp file and ``os.replace``-ing means the target either does
+    not exist or is complete.
+    """
+    fd, tmp_path = tempfile.mkstemp(
+        suffix=f".{path.name}.tmp", dir=str(path.parent)
+    )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as tmp_f:
-            json.dump(log, tmp_f, indent=2)
+            json.dump(payload, tmp_f, indent=2)
             tmp_f.write("\n")
-        os.replace(tmp_path, log_path)
+        os.replace(tmp_path, path)
     except Exception:
         try:
             os.unlink(tmp_path)
         except OSError:
             pass
         raise
+
+
+def _write_activity_log_atomic(log_path: Path, log: dict) -> None:
+    """Atomic temp-file-rename write of ``activity-log.json``."""
+    _write_json_atomic(log_path, log)
 
 
 # ---------------------------------------------------------------------------
@@ -733,9 +747,11 @@ def seed_issues_envelope(
         "verificationVerdict": verification_verdict,
         "issues": list(issues),
     }
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(envelope, f, indent=2)
-        f.write("\n")
+    # Set 077 S5 (S1 bundle E [Critical]): atomic write. A partial
+    # envelope would be entombed forever by the FileExistsError guard
+    # above — the never-overwrite invariant assumes every existing file
+    # is complete, so the write itself must guarantee completeness.
+    _write_json_atomic(path, envelope)
     return str(path)
 
 
@@ -816,6 +832,73 @@ def _engine_provider(entry: dict) -> tuple:
     return (orch.get("engine"), orch.get("provider"))
 
 
+def work_session_pairs(sessions: List[dict]) -> List[tuple]:
+    """Return each ``work`` session's recorded ``(engine, provider)`` pair.
+
+    Set 077 S5 (A6): the baseline the cross-provider predicate compares
+    a verification session against. One tuple per work session, in
+    ledger order; unrecorded fields stay ``None`` (omit-null on disk
+    reads back as absent). Sessions whose ``type`` is verification /
+    remediation are excluded — they are not the work being verified.
+    """
+    return [
+        _engine_provider(s)
+        for s in sessions
+        if isinstance(s, dict) and _session_type(s) == SESSION_TYPE_WORK
+    ]
+
+
+def cross_provider_satisfied(
+    v_engine: Optional[str],
+    v_provider: Optional[str],
+    work_pairs: List[tuple],
+) -> bool:
+    """True when ``(v_engine, v_provider)`` differs from every work pair
+    by engine **or by provider** (Set 077 S5, A6).
+
+    The Set 057 gate accepted only an engine difference, so a
+    Copilot-locked shop (every session ``--engine copilot``) could never
+    pass even when the underlying model *provider* differed. The
+    extension is additive, never weakening:
+
+    * **Engine arm (legacy, unchanged):** a recorded ``v_engine`` that
+      appears in no work session's recorded engine set passes outright.
+      Work sessions with no recorded engine do not join that set — the
+      pre-077 posture, preserved so no previously-passing configuration
+      starts failing.
+    * **Provider arm (new, strict):** otherwise the pair must differ
+      from **every** work session pairwise — by engine (both recorded,
+      unequal) or by provider (both recorded, unequal). **Missing data
+      fails the pair closed**: a verification session with no recorded
+      provider cannot satisfy this arm, and a work session with neither
+      field recorded can never be confirmed different (mirroring the
+      existing no-work-engine-baseline posture).
+
+    Same engine + same provider therefore still fails. Callers must
+    check the no-baseline case themselves (no work session with any
+    recorded identity) — this predicate returns ``False`` there, but
+    the corrective message differs.
+    """
+    work_engines = {e for e, _p in work_pairs if e is not None}
+    # Engine arm — legacy set-based comparison, unchanged semantics.
+    if (
+        v_engine is not None
+        and work_engines
+        and v_engine not in work_engines
+    ):
+        return True
+    # Provider arm — pairwise, fail-closed on missing data.
+    if v_provider is None:
+        return False
+    for w_engine, w_provider in work_pairs:
+        if v_engine is not None and w_engine is not None and v_engine != w_engine:
+            continue  # this pair differs by engine
+        if w_provider is not None and w_provider != v_provider:
+            continue  # this pair differs by provider
+        return False  # same or unconfirmable pair — fail closed
+    return bool(work_pairs)
+
+
 def validate_dedicated_verification(
     session_set_dir: str | Path,
     *,
@@ -860,11 +943,16 @@ def validate_dedicated_verification(
 
     set_dir = Path(session_set_dir)
     state_path = set_dir / "session-state.json"
+    # Set 077 S5 (S1 bundle E): quote + as_posix() the set-dir path so
+    # the corrective's command line survives spaces and Windows
+    # backslashes when pasted.
+    set_dir_arg = f'"{Path(session_set_dir).as_posix()}"'
     corrective = (
-        "Run a dedicated verification session on a different engine: "
-        "`python -m ai_router.start_session --session-set-dir "
-        f"{session_set_dir} --type verification --engine <other-engine> "
-        "--provider <other-provider>`, then re-run close_session."
+        "Run a dedicated verification session that differs from the work "
+        "sessions by engine or provider: `python -m "
+        "ai_router.start_session --session-set-dir "
+        f"{set_dir_arg} --type verification --engine <your-engine> "
+        "--provider <your-provider>`, then re-run close_session."
     )
     if not state_path.is_file():
         return DedicatedVerificationResult(
@@ -915,65 +1003,91 @@ def validate_dedicated_verification(
             corrective=corrective,
         )
 
-    work_engines = {
-        _engine_provider(s)[0]
-        for s in sessions
-        if isinstance(s, dict) and _session_type(s) == SESSION_TYPE_WORK
-    }
-    work_engines.discard(None)
+    work_pairs = work_session_pairs(sessions)
 
-    # Fail CLOSED when there is no implementation-engine baseline to compare
-    # against: without it, "the verification engine is not among the work
-    # engines" is vacuously true and would report cross-provider satisfied
-    # when it cannot actually be confirmed (S2 verifier Major #1). The
-    # Lightweight tier writes a per-session orchestrator block by hand, so a
-    # baseline is expected; its absence is an honest "unconfirmable", not a
-    # pass.
-    if not work_engines:
+    # Fail CLOSED when there is no implementation-identity baseline to
+    # compare against: without it, "the verification identity is not among
+    # the work identities" is vacuously true and would report cross-provider
+    # satisfied when it cannot actually be confirmed (S2 verifier Major #1).
+    # The Lightweight tier writes a per-session orchestrator block by hand,
+    # so a baseline is expected; its absence is an honest "unconfirmable",
+    # not a pass. Set 077 S5 (A6): the baseline is now engine OR provider —
+    # a work session recording only a provider still anchors the check.
+    if not any(e is not None or p is not None for e, p in work_pairs):
         return DedicatedVerificationResult(
             applicable=True,
             ok=False,
             reason=(
                 "a verification session ran, but no implementation-session "
-                "engine is recorded, so it cannot be confirmed to be on a "
-                "different engine."
+                "engine or provider is recorded, so it cannot be confirmed "
+                "to be independent of the work sessions."
             ),
             corrective=(
-                "Record the orchestrator engine on the implementation "
-                "sessions (the per-session orchestrator block) so the "
-                "cross-provider check has a baseline, then re-run "
-                "close_session."
+                "Record the orchestrator engine (and provider) on the "
+                "implementation sessions (the per-session orchestrator "
+                "block) so the cross-provider check has a baseline, then "
+                "re-run close_session."
             ),
         )
 
     for vs in verification_sessions:
-        v_engine, _v_provider = _engine_provider(vs)
-        if v_engine is None:
-            # Cannot confirm cross-provider without a recorded engine.
+        v_engine, v_provider = _engine_provider(vs)
+        if v_engine is None and v_provider is None:
+            # Cannot confirm cross-provider without any recorded identity.
             continue
-        if v_engine not in work_engines:
+        if cross_provider_satisfied(v_engine, v_provider, work_pairs):
+            work_engines = {e for e, _p in work_pairs if e is not None}
+            arm = (
+                "engine"
+                if v_engine is not None and v_engine not in work_engines
+                else "provider"
+            )
             return DedicatedVerificationResult(
                 applicable=True,
                 ok=True,
                 reason=(
-                    f"a completed verification session (engine={v_engine!r}) "
-                    "ran on a different engine than the implementation "
-                    "sessions."
+                    f"a completed verification session (engine={v_engine!r}, "
+                    f"provider={v_provider!r}) differs from every "
+                    f"implementation session by {arm}."
                 ),
             )
 
+    # Set 077 S5 (A6 + Critique-2 M5): the corrective names both remedies.
+    # Legacy posture is explicit — work sessions recorded without
+    # --provider cannot satisfy the provider arm, so for them the
+    # engine-difference arm is the only path; the same-engine Copilot
+    # model-picker pattern applies only to sets whose work sessions carry
+    # provider data.
+    work_providers_recorded = any(p is not None for _e, p in work_pairs)
+    provider_hint = (
+        ""
+        if work_providers_recorded
+        else (
+            " Note: this set's work sessions carry no recorded provider, "
+            "so the same-engine different-provider pattern cannot be "
+            "confirmed for them — either verify on a different engine, or "
+            "record the provider on the work sessions' per-session "
+            "orchestrator blocks (going forward, pass --provider to "
+            "start_session) and re-run close_session."
+        )
+    )
     return DedicatedVerificationResult(
         applicable=True,
         ok=False,
         reason=(
-            "a verification session ran, but it cannot be confirmed to be "
-            "on a different engine than the implementation sessions "
-            "(missing orchestrator engine, or same engine as work "
-            "sessions)."
+            "a verification session ran, but it cannot be confirmed to "
+            "differ from the implementation sessions by engine or by "
+            "provider (missing orchestrator identity, or same "
+            "engine+provider as the work sessions)."
         ),
         corrective=(
-            "Re-run the verification session on an engine different from the "
-            "implementation sessions, with --engine/--provider recorded."
+            "Re-run the verification session so it differs from the "
+            "implementation sessions by engine or by provider — e.g. a "
+            "different engine, or the same engine driving a different "
+            "model provider (Copilot model picker: --engine copilot "
+            "--provider openai verifying work done under --engine copilot "
+            "--provider anthropic) — with --engine/--provider recorded."
+            + provider_hint
         ),
     )
 
@@ -1069,8 +1183,23 @@ def derive_state(
 
     if latest_type == SESSION_TYPE_VERIFICATION:
         verdict = str(latest.get("verificationVerdict") or "").strip().upper()
-        if verdict == "VERIFIED" or not issues:
+        if verdict == "VERIFIED":
             return STATE_CLOSED_VERIFIED
+        if not issues:
+            # Set 077 S5 (S1 bundle E adjudication): a completed
+            # verification round with NO findings envelope and NO
+            # VERIFIED verdict is unconfirmable — a blank verdict could
+            # be "clean but never recorded" or "never actually reviewed";
+            # a non-VERIFIED verdict with no envelope is incoherent
+            # (issues claimed, none seeded). Pre-terminal, surface it to
+            # a human rather than guessing clean. On a set that already
+            # closed terminally, keep the legacy closed-verified reading:
+            # the Q6 close gate vouched at close time, and re-deriving a
+            # nag onto a closed set would make the S5 banner chase sets
+            # the operator already finished.
+            if set_terminal:
+                return STATE_CLOSED_VERIFIED
+            return STATE_AWAITING_HUMAN
         if not open_issues and not human_stop:
             # Every finding already terminally dispositioned at the
             # verification boundary (e.g. all accepted/not-reproducible).
@@ -1163,6 +1292,8 @@ __all__ = [
     "seed_issues_envelope",
     "read_latest_issues_envelope",
     "validate_dedicated_verification",
+    "cross_provider_satisfied",
+    "work_session_pairs",
     "derive_state",
     "derive_workflow_state",
 ]

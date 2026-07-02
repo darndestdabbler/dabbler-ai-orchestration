@@ -153,14 +153,14 @@ High
 | 5.   | Full pass (Layer 3 included); verify; close | `direct:shell`, `session-verification` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium
+- Total routed cost: $0.92 (test-generation gemini-pro $0.13 across two calls; code-review sonnet $0.30 + gemini-pro auto-verify $0.04; session-verification gpt-5.4 rounds 1–3 $0.36 + $0.08 + $0.008; S6-recommendation analysis gemini-pro $0.002)
+- Deviations from recommendation: ran at effort=medium (recommendation said high) — fourth consecutive session where medium plus routed review + multi-round cross-provider verification supplied the depth. Bundle E secondary items landed in full.
+- Notes for next-session calibration: the layered-review pattern held again but with a twist — BOTH the code-review and verification round 1 tripped over the same misleading field name (liveSession on complete sets); the durable fix was clarity-plus-fixture, not code change. Verification round 2's one Major was an evidence-bundle gap, not a code gap: the fixed file was UNTRACKED so `git diff` omitted it (L-064-9's class) — when re-verifying fixes in new files, paste the file source, not the diff. Round-1 verdict arrived token-less again; rounds now open with a mandatory-token instruction, keep that. Routed gate: REQUIRED (blast-radius + multi-module + breadth).
 
 **Next-session orchestrator recommendation (Session 6):**
 Claude Code claude-fable-5 @ effort=medium
-Rationale: The main AI task in Session 6 is the path-aware critique, a holistic analysis of the entire set's changes, which is a core strength for Claude.
+Rationale: The main AI task in Session 6 is the path-aware critique, a holistic analysis of the entire set's changes, which is a core strength for Claude. (Confirmed at S5 close by routed analysis — gemini-pro: medium has sufficed for all five sessions; the critique's large-context demands justify the standing engine; no reason to deviate.)
 
 ---
 

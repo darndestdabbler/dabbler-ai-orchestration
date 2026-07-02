@@ -7,7 +7,13 @@
 
 import * as assert from "assert";
 import * as path from "path";
-import { asTier, scaffoldConsumerRepo } from "../../commands/gitScaffold";
+import * as os from "os";
+import * as vscode from "vscode";
+import {
+  asTier,
+  buildProjectStructureNoPrompt,
+  scaffoldConsumerRepo,
+} from "../../commands/gitScaffold";
 import { FileOps } from "../../utils/aiRouterInstall";
 import {
   TIER_MARKER_REL,
@@ -253,5 +259,65 @@ suite("scaffoldConsumerRepo — durable tier/verification-mode markers", () => {
     });
     assert.strictEqual(store.get("/repo/.dabbler/tier"), "lightweight\n");
     assert.ok(result.written.includes(TIER_MARKER_REL));
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 077 Session 3 (A10, Critique-2 M7) — the Python pre-flight is the
+// FIRST, side-effect-free step of the scaffold: a missing interpreter
+// fails friendly BEFORE git init, the durable markers, and the template
+// writes, so the target folder stays byte-empty. The regression drives
+// the real buildProjectStructureNoPrompt under the vscode stub with the
+// pythonPath setting pointed at a nonexistent absolute interpreter.
+// ---------------------------------------------------------------------
+
+suite("gitScaffold — Python pre-flight leaves no artifacts (Set 077 S3, M7)", () => {
+  test("missing interpreter: friendly error, undefined result, EMPTY folder", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-preflight-"));
+    const missingInterpreter = path.join(tmpDir, "definitely", "missing", "python.exe");
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const ws = vscode.workspace as any;
+    const win = vscode.window as any;
+    const savedGetConfiguration = ws.getConfiguration;
+    const savedShowError = win.showErrorMessage;
+    const errors: string[] = [];
+    ws.getConfiguration = () => ({
+      inspect: (key: string) =>
+        key === "pythonPath" ? { globalValue: missingInterpreter } : undefined,
+      get: (_k: string, dflt: unknown) => dflt,
+    });
+    win.showErrorMessage = async (msg: string) => {
+      errors.push(msg);
+      return undefined;
+    };
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    try {
+      const fakeContext = {
+        extensionPath: path.resolve(__dirname, "../../.."),
+      } as unknown as import("vscode").ExtensionContext;
+      const result = await buildProjectStructureNoPrompt(
+        fakeContext,
+        tmpDir,
+        "lightweight",
+        undefined,
+        "dedicated-sessions",
+      );
+      assert.strictEqual(result, undefined, "scaffold must not run");
+      // The friendly explainer fired (not a raw ENOENT).
+      assert.strictEqual(errors.length, 1);
+      assert.ok(errors[0].includes("python.org"));
+      assert.ok(errors[0].includes("NOT"), "must break the missing-keys mis-diagnosis");
+      // NO durable write of any kind: no .git, no .dabbler markers, no
+      // rendered docs — the folder is exactly as it was.
+      assert.deepStrictEqual(
+        fs.readdirSync(tmpDir),
+        [],
+        "pre-flight failure must leave no setup artifacts",
+      );
+    } finally {
+      ws.getConfiguration = savedGetConfiguration;
+      win.showErrorMessage = savedShowError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

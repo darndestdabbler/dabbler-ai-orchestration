@@ -16064,6 +16064,10 @@ function readTierMarker(root, ops = nodeMarkerFileOps) {
 function writeTierMarker(root, tier, ops = nodeMarkerFileOps) {
   writeMarkerWord(root, TIER_MARKER_REL, tier, ops);
 }
+function readVerificationModeMarker(root, ops = nodeMarkerFileOps) {
+  const word = readMarkerWord(root, VERIFICATION_MODE_MARKER_REL, ops);
+  return word === "dedicated-sessions" || word === "out-of-band-or-none" ? word : null;
+}
 function writeVerificationModeMarker(root, mode, ops = nodeMarkerFileOps) {
   writeMarkerWord(root, VERIFICATION_MODE_MARKER_REL, mode, ops);
 }
@@ -17000,17 +17004,21 @@ function selectExplorerMode(hasFolder, hasAnySets) {
     return "no-folder";
   return hasAnySets ? "list" : "getting-started";
 }
-function computeGettingStarted(hasFolder, root, hasAnySets, fsi, env8 = {}, resolveTierSeed) {
+function computeGettingStarted(hasFolder, root, hasAnySets, fsi, env8 = {}, resolveTierSeed, resolveVerificationModeSeed, resolvePythonPresent) {
   const mode = selectExplorerMode(hasFolder, hasAnySets);
   const completion = mode === "getting-started" && root ? detectCompletion(root, fsi) : { structureBuilt: false, planPresent: false, sessionSetsPresent: false };
   const tierSeed = mode === "getting-started" && root && resolveTierSeed ? resolveTierSeed(root) : null;
+  const verificationModeSeed = mode === "getting-started" && root && resolveVerificationModeSeed ? resolveVerificationModeSeed(root) : null;
+  const pythonPresent = mode === "getting-started" && root && resolvePythonPresent ? resolvePythonPresent(root) : true;
   const rootId = mode === "getting-started" && root ? root : null;
   return {
     mode,
     ...completion,
     providerKeyPresent: providerKeyPresent(env8),
     tierSeed,
-    rootId
+    rootId,
+    verificationModeSeed,
+    pythonPresent
   };
 }
 var nodeDetectionFs = {
@@ -17036,6 +17044,144 @@ var nodeDetectionFs = {
     }
   }
 };
+
+// src/utils/pythonInterpreter.ts
+var fs7 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
+var vscode3 = __toESM(require("vscode"));
+var realExists = (p2) => {
+  try {
+    return fs7.statSync(p2).isFile();
+  } catch {
+    return false;
+  }
+};
+function venvInterpreterCandidate(workspaceRoot2) {
+  return process.platform === "win32" ? path8.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path8.join(workspaceRoot2, ".venv", "bin", "python");
+}
+function detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2 = realExists) {
+  if (!workspaceRoot2)
+    return null;
+  const venvRoot = path8.join(workspaceRoot2, ".venv");
+  if (!fileExists2(path8.join(venvRoot, "pyvenv.cfg")))
+    return null;
+  const interp = venvInterpreterCandidate(workspaceRoot2);
+  return fileExists2(interp) ? interp : null;
+}
+function explicitPythonPathSetting() {
+  const inspected = vscode3.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath");
+  if (!inspected)
+    return void 0;
+  const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
+  const trimmed2 = (value ?? "").trim();
+  return trimmed2 === "" ? void 0 : trimmed2;
+}
+function normalizeExplicit(value, workspaceRoot2) {
+  if (path8.isAbsolute(value))
+    return value;
+  if (value.includes(path8.sep) || value.includes("/")) {
+    return path8.resolve(workspaceRoot2, value);
+  }
+  return value;
+}
+function resolveExplicitPythonPath(workspaceRoot2) {
+  const explicit = explicitPythonPathSetting();
+  return explicit ? normalizeExplicit(explicit, workspaceRoot2) : "python";
+}
+function resolvePythonInterpreter(workspaceRoot2, fileExists2 = realExists) {
+  const explicit = explicitPythonPathSetting();
+  if (explicit)
+    return normalizeExplicit(explicit, workspaceRoot2);
+  return detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2) ?? "python";
+}
+function findCommandOnPath(cmd, env8 = process.env, fileExists2 = realExists, platform = process.platform) {
+  const rawPath = env8.PATH ?? env8.Path ?? "";
+  if (!rawPath)
+    return null;
+  const isWin = platform === "win32";
+  const p2 = isWin ? path8.win32 : path8.posix;
+  const delimiter = isWin ? ";" : ":";
+  for (const dir of rawPath.split(delimiter)) {
+    const entry = dir.trim();
+    if (!entry)
+      continue;
+    if (isWin && /\\Microsoft\\WindowsApps\\?$/i.test(entry))
+      continue;
+    const candidates = isWin ? /\.[^\\/.]+$/.test(cmd) ? [p2.join(entry, cmd)] : [p2.join(entry, `${cmd}.exe`)] : [p2.join(entry, cmd)];
+    for (const candidate of candidates) {
+      if (fileExists2(candidate))
+        return candidate;
+    }
+  }
+  return null;
+}
+function resolveBootstrapPythonCore(explicitSetting, workspaceRoot2, env8 = process.env, fileExists2 = realExists, platform = process.platform) {
+  const p2 = platform === "win32" ? path8.win32 : path8.posix;
+  if (explicitSetting) {
+    const normalized = normalizeExplicit(explicitSetting, workspaceRoot2);
+    if (p2.isAbsolute(normalized)) {
+      return fileExists2(normalized) ? normalized : null;
+    }
+    return findCommandOnPath(normalized, env8, fileExists2, platform) !== null ? normalized : null;
+  }
+  const commands27 = platform === "win32" ? ["python"] : ["python3", "python"];
+  for (const cmd of commands27) {
+    if (findCommandOnPath(cmd, env8, fileExists2, platform) !== null)
+      return cmd;
+  }
+  return null;
+}
+function resolveScaffoldBootstrapPython(workspaceRoot2, fileExists2 = realExists) {
+  return resolveBootstrapPythonCore(
+    explicitPythonPathSetting(),
+    workspaceRoot2,
+    process.env,
+    fileExists2
+  );
+}
+function probePythonPresenceCore(explicitSetting, workspaceRoot2, env8 = process.env, fileExists2 = realExists, platform = process.platform) {
+  if (explicitSetting) {
+    return resolveBootstrapPythonCore(
+      explicitSetting,
+      workspaceRoot2,
+      env8,
+      fileExists2,
+      platform
+    ) !== null;
+  }
+  if (detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2) !== null) {
+    return true;
+  }
+  return resolveBootstrapPythonCore(
+    void 0,
+    workspaceRoot2,
+    env8,
+    fileExists2,
+    platform
+  ) !== null;
+}
+function interpreterResolves(pythonPath, env8 = process.env, fileExists2 = realExists, platform = process.platform) {
+  if (!pythonPath)
+    return false;
+  const p2 = platform === "win32" ? path8.win32 : path8.posix;
+  if (p2.isAbsolute(pythonPath))
+    return fileExists2(pythonPath);
+  if (pythonPath.includes("\\") || pythonPath.includes("/")) {
+    return fileExists2(path8.resolve(pythonPath));
+  }
+  return findCommandOnPath(pythonPath, env8, fileExists2, platform) !== null;
+}
+function probePythonPresence(workspaceRoot2, fileExists2 = realExists) {
+  return probePythonPresenceCore(
+    explicitPythonPathSetting(),
+    workspaceRoot2,
+    process.env,
+    fileExists2
+  );
+}
+function describeMissingPython(actionLabel) {
+  return `${actionLabel} needs a Python interpreter, but none was found \u2014 no Python is installed, or it is not on PATH. This is a missing Python installation, NOT an extension or API-key problem. Install Python from https://www.python.org/downloads/ (tick "Add python.exe to PATH"; avoid the Microsoft Store build), or point the 'dabblerSessionSets.pythonPath' setting at an installed interpreter, then reload the VS Code window and try again.`;
+}
 
 // src/commands/gettingStartedActions.ts
 var vscode8 = __toESM(require("vscode"));
@@ -22012,52 +22158,6 @@ var fs8 = __toESM(require("fs"));
 var os = __toESM(require("os"));
 var path9 = __toESM(require("path"));
 var vscode4 = __toESM(require("vscode"));
-
-// src/utils/pythonInterpreter.ts
-var fs7 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
-var vscode3 = __toESM(require("vscode"));
-var realExists = (p2) => fs7.existsSync(p2);
-function venvInterpreterCandidate(workspaceRoot2) {
-  return process.platform === "win32" ? path8.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path8.join(workspaceRoot2, ".venv", "bin", "python");
-}
-function detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2 = realExists) {
-  if (!workspaceRoot2)
-    return null;
-  const venvRoot = path8.join(workspaceRoot2, ".venv");
-  if (!fileExists2(path8.join(venvRoot, "pyvenv.cfg")))
-    return null;
-  const interp = venvInterpreterCandidate(workspaceRoot2);
-  return fileExists2(interp) ? interp : null;
-}
-function explicitPythonPathSetting() {
-  const inspected = vscode3.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath");
-  if (!inspected)
-    return void 0;
-  const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
-  const trimmed2 = (value ?? "").trim();
-  return trimmed2 === "" ? void 0 : trimmed2;
-}
-function normalizeExplicit(value, workspaceRoot2) {
-  if (path8.isAbsolute(value))
-    return value;
-  if (value.includes(path8.sep) || value.includes("/")) {
-    return path8.resolve(workspaceRoot2, value);
-  }
-  return value;
-}
-function resolveExplicitPythonPath(workspaceRoot2) {
-  const explicit = explicitPythonPathSetting();
-  return explicit ? normalizeExplicit(explicit, workspaceRoot2) : "python";
-}
-function resolvePythonInterpreter(workspaceRoot2, fileExists2 = realExists) {
-  const explicit = explicitPythonPathSetting();
-  if (explicit)
-    return normalizeExplicit(explicit, workspaceRoot2);
-  return detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2) ?? "python";
-}
-
-// src/commands/installAiRouterCommands.ts
 function registerInstallAiRouterCommands(context) {
   context.subscriptions.push(
     vscode4.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
@@ -22458,7 +22558,7 @@ function renderStructureBootstrap(bundle, ctx) {
   }
   return { files };
 }
-function structureOnlyContext(repoName, tier, created) {
+function structureOnlyContext(repoName, tier, created, verificationMode = DEFAULT_VERIFICATION_MODE) {
   return {
     repoName,
     setTitle: "(no starter set \u2014 created via the Getting Started decomposition prompt)",
@@ -22466,7 +22566,7 @@ function structureOnlyContext(repoName, tier, created) {
     slug: "000-placeholder-unused",
     created,
     tier,
-    verificationMode: DEFAULT_VERIFICATION_MODE,
+    verificationMode,
     totalSessions: 1
   };
 }
@@ -22665,7 +22765,13 @@ function makeScaffoldInstallPrompts() {
     promptGitHubRef: async () => ""
   };
 }
-async function buildProjectStructureNoPrompt(context, projectDir, tier, budget) {
+async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, verificationMode) {
+  if (!probePythonPresence(projectDir)) {
+    vscode5.window.showErrorMessage(
+      describeMissingPython("Build project structure")
+    );
+    return void 0;
+  }
   try {
     const git = esm_default(projectDir);
     const isRepo = await git.checkIsRepo().catch(() => false);
@@ -22683,8 +22789,13 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget) 
     );
     return void 0;
   }
-  const ctx = structureOnlyContext(path12.basename(projectDir), tier, isoDate());
-  const pythonPath = resolveExplicitPythonPath(projectDir);
+  const ctx = structureOnlyContext(
+    path12.basename(projectDir),
+    tier,
+    isoDate(),
+    verificationMode
+  );
+  const pythonPath = resolveScaffoldBootstrapPython(projectDir) ?? resolveExplicitPythonPath(projectDir);
   const result = await vscode5.window.withProgress(
     {
       location: vscode5.ProgressLocation.Notification,
@@ -22834,7 +22945,7 @@ var fs11 = __toESM(require("fs"));
 var path14 = __toESM(require("path"));
 var PLAN_PATH = path14.join("docs", "planning", "project-plan.md");
 var PLAN_REL_POSIX = "docs/planning/project-plan.md";
-function sampleContext(tier) {
+function sampleContext(tier, verificationMode = "out-of-band-or-none") {
   return {
     repoName: "example-app",
     setTitle: "Example feature",
@@ -22842,7 +22953,7 @@ function sampleContext(tier) {
     slug: "001-example-feature",
     created: "2026-01-01",
     tier,
-    verificationMode: "out-of-band-or-none",
+    verificationMode,
     totalSessions: 3
   };
 }
@@ -22856,10 +22967,16 @@ var PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator as
 `;
 function buildSessionGenPrompt(bundle, options = {}) {
   const exemplarTier = options.tier ?? "full";
-  const ctx = sampleContext(exemplarTier);
+  const exemplarMode = exemplarTier === "lightweight" && options.verificationMode ? options.verificationMode : "out-of-band-or-none";
+  const ctx = sampleContext(exemplarTier, exemplarMode);
   const exampleSpec = renderSpec(bundle, ctx);
   const exampleState = renderSessionState(bundle, ctx);
   const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
+  const modeGuidance = exemplarTier === "lightweight" && exemplarMode === "dedicated-sessions" ? `- **Verification mode.** The operator selected **dedicated verification sessions**
+  for this project \u2014 author each Lightweight set with \`verificationMode:
+  dedicated-sessions\` unless the project plan explicitly calls for a different mode
+  on a specific set.
+` : "";
   let tierGuidance;
   if (options.tier && options.tierSource !== "inference") {
     tierGuidance = `- **Tier.** The operator selected the **${options.tier}** tier for this
@@ -22930,7 +23047,7 @@ ${exampleState}
 - Both tiers run the same Python lifecycle (\`start_session\` / \`close_session\`), state
   handling, and close-out. Lightweight is router-off, not Python-off \u2014 pick \`tier:
   lightweight\` when the project opts out of metered API calls.
-${tierGuidance}${parallelGuidance}
+${tierGuidance}${modeGuidance}${parallelGuidance}
 ---
 
 ## The project plan (read it from the workspace)
@@ -22966,10 +23083,13 @@ async function copySessionSetGenPrompt(context, options = {}) {
     return false;
   }
   const durable = options.tier === void 0 ? resolveDurableTier(root) : null;
+  const resolvedTier = options.tier ?? durable?.tier;
+  const durableMode = options.verificationMode === void 0 && resolvedTier === "lightweight" ? readVerificationModeMarker(root) : null;
   const resolved = {
     parallel: options.parallel,
-    tier: options.tier ?? durable?.tier,
-    tierSource: options.tier ? "form" : durable?.source
+    tier: resolvedTier,
+    tierSource: options.tier ? "form" : durable?.source,
+    verificationMode: options.verificationMode ?? durableMode ?? void 0
   };
   const prompt = buildSessionGenPrompt(bundle, resolved);
   await vscode7.env.clipboard.writeText(prompt);
@@ -22988,6 +23108,23 @@ function registerSessionGenPromptCommand(context) {
 }
 
 // src/commands/gettingStartedActions.ts
+function asVerificationModeRider(value) {
+  if (value === void 0 || value === null)
+    return void 0;
+  if (typeof value === "string") {
+    const v = value.toLowerCase();
+    if (v === "dedicated-sessions" || v === "out-of-band-or-none")
+      return v;
+  }
+  throw new Error(
+    `Unrecognized verificationMode value ${JSON.stringify(value)} \u2014 expected "dedicated-sessions" or "out-of-band-or-none".`
+  );
+}
+function resolveVerificationMode(msg, tier) {
+  if (tier !== "lightweight")
+    return void 0;
+  return asVerificationModeRider(msg.verificationMode) ?? DEFAULT_VERIFICATION_MODE;
+}
 function asBudgetChoice(msg, tier) {
   if (tier !== "full")
     return void 0;
@@ -23007,14 +23144,16 @@ async function routeGettingStartedAction(msg, handlers) {
       return true;
     case "build-structure": {
       let tier;
+      let verificationMode;
       try {
         tier = asTier(msg.tier) ?? "full";
+        verificationMode = resolveVerificationMode(msg, tier);
       } catch (err) {
         vscode8.window.showErrorMessage(
           `Build project structure was rejected: ${err instanceof Error ? err.message : String(err)}`
         );
         console.warn(
-          `[gettingStarted] rejected build-structure with malformed tier rider: ${err instanceof Error ? err.message : String(err)}`
+          `[gettingStarted] rejected build-structure with malformed rider: ${err instanceof Error ? err.message : String(err)}`
         );
         return false;
       }
@@ -23025,7 +23164,7 @@ async function routeGettingStartedAction(msg, handlers) {
         );
         return false;
       }
-      await handlers.buildStructure(tier, budget);
+      await handlers.buildStructure(tier, budget, verificationMode);
       return true;
     }
     case "import-plan":
@@ -23036,18 +23175,20 @@ async function routeGettingStartedAction(msg, handlers) {
       return true;
     case "build-session-sets": {
       let genTier;
+      let genMode;
       try {
         genTier = asTier(msg.tier) ?? "full";
+        genMode = resolveVerificationMode(msg, genTier);
       } catch (err) {
         vscode8.window.showErrorMessage(
           `Copy session-set prompt was rejected: ${err instanceof Error ? err.message : String(err)}`
         );
         console.warn(
-          `[gettingStarted] rejected build-session-sets with malformed tier rider: ${err instanceof Error ? err.message : String(err)}`
+          `[gettingStarted] rejected build-session-sets with malformed rider: ${err instanceof Error ? err.message : String(err)}`
         );
         return false;
       }
-      await handlers.buildSessionSets(msg.parallel === true, genTier);
+      await handlers.buildSessionSets(msg.parallel === true, genTier, genMode);
       return true;
     }
     default:
@@ -23079,10 +23220,16 @@ function makeGettingStartedHandlers(context) {
     // — pick, scaffold there, then open the folder so the form's live
     // state tracks the scaffolded root. Set 063 S2 (D1): the narrowed
     // budget pick rides through to the scaffold's budget.yaml write.
-    async buildStructure(tier, budget) {
+    async buildStructure(tier, budget, verificationMode) {
       const openRoot = vscode8.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (openRoot) {
-        await buildProjectStructureNoPrompt(context, openRoot, tier, budget);
+        await buildProjectStructureNoPrompt(
+          context,
+          openRoot,
+          tier,
+          budget,
+          verificationMode
+        );
         return;
       }
       const picked = await vscode8.window.showOpenDialog({
@@ -23094,7 +23241,15 @@ function makeGettingStartedHandlers(context) {
       });
       if (!picked?.[0])
         return;
-      await buildProjectStructureNoPrompt(context, picked[0].fsPath, tier, budget);
+      const result = await buildProjectStructureNoPrompt(
+        context,
+        picked[0].fsPath,
+        tier,
+        budget,
+        verificationMode
+      );
+      if (!result)
+        return;
       await vscode8.commands.executeCommand("vscode.openFolder", picked[0]);
     },
     // Step 2: file picker → docs/planning/project-plan.md.
@@ -23106,9 +23261,10 @@ function makeGettingStartedHandlers(context) {
       await copyPlanningPrompt();
     },
     // Step 3 (D4): copy the decomposition prompt, honoring the parallel
-    // checkbox and the tier radio in the prompt text (S4).
-    async buildSessionSets(parallel, tier) {
-      await copySessionSetGenPrompt(context, { parallel, tier });
+    // checkbox, the tier radio, and (Set 077 S3) the Lightweight
+    // verification-mode pick in the prompt text.
+    async buildSessionSets(parallel, tier, verificationMode) {
+      await copySessionSetGenPrompt(context, { parallel, tier, verificationMode });
     }
   };
 }
@@ -23138,10 +23294,56 @@ function materializeBundledDoc(context) {
   fs12.copyFileSync(src, dst);
   return dst;
 }
+function tierCalloutMarkdown(tier) {
+  const label = tier === "lightweight" ? "Lightweight" : "Full";
+  const other = tier === "lightweight" ? "Full" : "Lightweight";
+  return `> **Your project is set up for the ${label} tier** (recorded in \`.dabbler/tier\`). Step 1's tier descriptions below cover both options for reference \u2014 the **${other}-tier** setup notes do not apply to this project. To change tiers, right-click a session set in the Session Set Explorer and use **Switch Tier\u2026**.
+`;
+}
+function renderTierAwareGettingStarted(docText, tier) {
+  const callout = tierCalloutMarkdown(tier);
+  const lines = docText.split("\n");
+  let inFence = false;
+  let h1Idx = -1;
+  for (let i2 = 0; i2 < lines.length; i2++) {
+    if (/^\s*(```|~~~)/.test(lines[i2])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence && /^#\s/.test(lines[i2])) {
+      h1Idx = i2;
+      break;
+    }
+  }
+  if (h1Idx === -1)
+    return `${callout}
+${docText}`;
+  lines.splice(h1Idx + 1, 0, "", callout.trimEnd());
+  return lines.join("\n");
+}
 async function openGettingStartedDoc(context) {
   try {
     const root = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const docPath = workspaceGettingStartedDoc(root) ?? materializeBundledDoc(context);
+    const workspaceDoc = workspaceGettingStartedDoc(root);
+    const durable = root ? resolveDurableTier(root) : null;
+    let docPath;
+    if (durable) {
+      const src = workspaceDoc ?? path15.join(
+        resolveBundledTemplateDir(context.extensionPath),
+        GETTING_STARTED_TEMPLATE_FILENAME
+      );
+      const text = fs12.readFileSync(src, "utf8");
+      const dstDir = context.globalStorageUri.fsPath;
+      fs12.mkdirSync(dstDir, { recursive: true });
+      docPath = path15.join(dstDir, "getting-started.md");
+      fs12.writeFileSync(
+        docPath,
+        renderTierAwareGettingStarted(text, durable.tier),
+        "utf8"
+      );
+    } else {
+      docPath = workspaceDoc ?? materializeBundledDoc(context);
+    }
     await vscode9.commands.executeCommand(
       "markdown.showPreview",
       vscode9.Uri.file(docPath)
@@ -23504,7 +23706,13 @@ var CustomSessionSetsView = class {
       // `.dabbler/tier` marker first, router-config inference second.
       // Runs only in "getting-started" mode (computeGettingStarted gates
       // the thunk), so list-mode snapshots pay nothing.
-      (root) => resolveDurableTier(root)?.tier ?? null
+      (root) => resolveDurableTier(root)?.tier ?? null,
+      // Set 077 S3 (Feature 2): the durable verification-mode seed —
+      // the `.dabbler/verification-mode` marker (no inference rung).
+      (root) => readVerificationModeMarker(root),
+      // Set 077 S3 (A10): the Python-presence probe (explicit setting →
+      // workspace venv → PATH scan). Same getting-started-only gating.
+      (root) => probePythonPresence(root)
     );
   }
   buildBuckets(all) {
@@ -28555,6 +28763,13 @@ function parseChangeWriterOutput(stdout) {
   return { ok: obj.ok, code: obj.code, reason: obj.reason };
 }
 function runChangeWriter(pythonPath, setDir, cwd) {
+  if (!interpreterResolves(pythonPath)) {
+    return Promise.resolve({
+      ok: false,
+      code: "python-not-found",
+      reason: describeMissingPython("Set Up Dedicated Verification")
+    });
+  }
   return new Promise((resolve5) => {
     const child = cp7.spawn(pythonPath, buildChangeWriterArgs(setDir), {
       cwd,

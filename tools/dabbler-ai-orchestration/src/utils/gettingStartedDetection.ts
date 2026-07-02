@@ -207,6 +207,13 @@ export function selectExplorerMode(hasFolder: boolean, hasAnySets: boolean): Exp
  * chain in utils/tierMarkerStore.ts). Injected as a thunk — like the fs
  * probe it runs ONLY in "getting-started" mode, the one mode that
  * renders the form the seed feeds.
+ *
+ * `resolveVerificationModeSeed` (Set 077 S3, Feature 2) resolves the
+ * durable `.dabbler/verification-mode` marker the same way (no
+ * inference rung — marker or null). `resolvePythonPresent` (A10) is the
+ * host's Python-presence probe. Both are gated to "getting-started"
+ * mode like the other probes; `pythonPresent` defaults to true (quiet)
+ * when the probe is absent or the mode renders no form.
  */
 export function computeGettingStarted(
   hasFolder: boolean,
@@ -215,6 +222,10 @@ export function computeGettingStarted(
   fsi: DetectionFs,
   env: Record<string, string | undefined> = {},
   resolveTierSeed?: (root: string) => "full" | "lightweight" | null,
+  resolveVerificationModeSeed?: (
+    root: string,
+  ) => "dedicated-sessions" | "out-of-band-or-none" | null,
+  resolvePythonPresent?: (root: string) => boolean,
 ): GettingStartedPayload {
   const mode = selectExplorerMode(hasFolder, hasAnySets);
   const completion =
@@ -225,6 +236,14 @@ export function computeGettingStarted(
     mode === "getting-started" && root && resolveTierSeed
       ? resolveTierSeed(root)
       : null;
+  const verificationModeSeed =
+    mode === "getting-started" && root && resolveVerificationModeSeed
+      ? resolveVerificationModeSeed(root)
+      : null;
+  const pythonPresent =
+    mode === "getting-started" && root && resolvePythonPresent
+      ? resolvePythonPresent(root)
+      : true;
   // S077-S2-V1-001: the root the form (and seed) belongs to, so the
   // webview can scope its persisted state per root.
   const rootId = mode === "getting-started" && root ? root : null;
@@ -234,6 +253,8 @@ export function computeGettingStarted(
     providerKeyPresent: providerKeyPresent(env),
     tierSeed,
     rootId,
+    verificationModeSeed,
+    pythonPresent,
   };
 }
 

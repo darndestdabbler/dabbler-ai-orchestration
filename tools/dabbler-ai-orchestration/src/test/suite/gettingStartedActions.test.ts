@@ -21,6 +21,8 @@ import * as path from "path";
 import {
   GettingStartedHandlers,
   asBudgetChoice,
+  asVerificationModeRider,
+  resolveVerificationMode,
   routeGettingStartedAction,
 } from "../../commands/gettingStartedActions";
 import { BudgetChoice } from "../../utils/budgetYaml";
@@ -596,5 +598,218 @@ suite("planImport handlers (Set 060 S2)", () => {
       fs.rmSync(src, { force: true });
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 077 Session 3 (Feature 2) — the three-way choice's verification-
+// mode rider: narrowing, tier gating, and dispatch threading. Cases
+// generated via routed test-generation (gemini-pro) and adapted to the
+// suite's recorder pattern.
+// ---------------------------------------------------------------------
+
+suite("verification-mode rider — narrowing (Set 077 S3)", () => {
+  test("asVerificationModeRider: absent returns undefined", () => {
+    assert.strictEqual(asVerificationModeRider(undefined), undefined);
+    assert.strictEqual(asVerificationModeRider(null), undefined);
+  });
+
+  test("asVerificationModeRider: valid values pass, case-insensitively", () => {
+    assert.strictEqual(
+      asVerificationModeRider("dedicated-sessions"),
+      "dedicated-sessions",
+    );
+    assert.strictEqual(
+      asVerificationModeRider("DEDICATED-SESSIONS"),
+      "dedicated-sessions",
+    );
+    assert.strictEqual(
+      asVerificationModeRider("out-of-band-or-none"),
+      "out-of-band-or-none",
+    );
+  });
+
+  test("asVerificationModeRider: present-but-unrecognized fails loud", () => {
+    assert.throws(() => asVerificationModeRider("invalid-mode"));
+    assert.throws(() => asVerificationModeRider(123));
+    assert.throws(() => asVerificationModeRider({}));
+  });
+
+  test("resolveVerificationMode: Full drops the rider outright", () => {
+    const msg = {
+      type: "gettingStartedAction",
+      action: "build-structure",
+      verificationMode: "dedicated-sessions",
+    } as GettingStartedActionMsg;
+    assert.strictEqual(resolveVerificationMode(msg, "full"), undefined);
+  });
+
+  test("resolveVerificationMode: Lightweight defaults, honors, and rejects", () => {
+    const bare = {
+      type: "gettingStartedAction",
+      action: "build-structure",
+    } as GettingStartedActionMsg;
+    assert.strictEqual(
+      resolveVerificationMode(bare, "lightweight"),
+      "out-of-band-or-none",
+    );
+    const dedicated = {
+      ...bare,
+      verificationMode: "dedicated-sessions",
+    } as GettingStartedActionMsg;
+    assert.strictEqual(
+      resolveVerificationMode(dedicated, "lightweight"),
+      "dedicated-sessions",
+    );
+    const malformed = {
+      ...bare,
+      verificationMode: "invalid-mode",
+    } as unknown as GettingStartedActionMsg;
+    assert.throws(() => resolveVerificationMode(malformed, "lightweight"));
+  });
+});
+
+suite("verification-mode rider — dispatch threading (Set 077 S3)", () => {
+  interface ModeCallLog {
+    buildStructure: Array<{
+      tier: "full" | "lightweight";
+      budget: BudgetChoice | undefined;
+      verificationMode: string | undefined;
+    }>;
+    buildSessionSets: Array<{
+      parallel: boolean;
+      tier: "full" | "lightweight";
+      verificationMode: string | undefined;
+    }>;
+  }
+
+  function modeRecordingHandlers(): {
+    handlers: GettingStartedHandlers;
+    calls: ModeCallLog;
+  } {
+    const calls: ModeCallLog = { buildStructure: [], buildSessionSets: [] };
+    const handlers: GettingStartedHandlers = {
+      openFolder: async () => undefined,
+      buildStructure: async (tier, budget, verificationMode) => {
+        calls.buildStructure.push({ tier, budget, verificationMode });
+      },
+      importPlan: async () => undefined,
+      copyPlanPrompt: async () => undefined,
+      buildSessionSets: async (parallel, tier, verificationMode) => {
+        calls.buildSessionSets.push({ parallel, tier, verificationMode });
+      },
+    };
+    return { handlers, calls };
+  }
+
+  test("build-structure threads the Lightweight dedicated-sessions pick", async () => {
+    const { handlers, calls } = modeRecordingHandlers();
+    const handled = await routeGettingStartedAction(
+      {
+        type: "gettingStartedAction",
+        action: "build-structure",
+        tier: "lightweight",
+        verificationMode: "dedicated-sessions",
+      },
+      handlers,
+    );
+    assert.strictEqual(handled, true);
+    assert.deepStrictEqual(calls.buildStructure, [
+      {
+        tier: "lightweight",
+        budget: undefined,
+        verificationMode: "dedicated-sessions",
+      },
+    ]);
+  });
+
+  test("build-structure without a rider defaults the Lightweight mode", async () => {
+    const { handlers, calls } = modeRecordingHandlers();
+    await routeGettingStartedAction(
+      {
+        type: "gettingStartedAction",
+        action: "build-structure",
+        tier: "lightweight",
+      },
+      handlers,
+    );
+    assert.deepStrictEqual(calls.buildStructure, [
+      {
+        tier: "lightweight",
+        budget: undefined,
+        verificationMode: "out-of-band-or-none",
+      },
+    ]);
+  });
+
+  test("a malformed mode rider rejects the action — NO handler runs", async () => {
+    const { handlers, calls } = modeRecordingHandlers();
+    const handled = await routeGettingStartedAction(
+      {
+        type: "gettingStartedAction",
+        action: "build-structure",
+        tier: "lightweight",
+        verificationMode: "invalid-mode",
+      } as unknown as GettingStartedActionMsg,
+      handlers,
+    );
+    assert.strictEqual(handled, false);
+    assert.deepStrictEqual(calls.buildStructure, []);
+  });
+
+  test("build-session-sets threads the mode alongside parallel + tier", async () => {
+    const { handlers, calls } = modeRecordingHandlers();
+    const handled = await routeGettingStartedAction(
+      {
+        type: "gettingStartedAction",
+        action: "build-session-sets",
+        parallel: false,
+        tier: "lightweight",
+        verificationMode: "dedicated-sessions",
+      },
+      handlers,
+    );
+    assert.strictEqual(handled, true);
+    assert.deepStrictEqual(calls.buildSessionSets, [
+      {
+        parallel: false,
+        tier: "lightweight",
+        verificationMode: "dedicated-sessions",
+      },
+    ]);
+  });
+
+  test("build-session-sets on Full carries NO mode even when the rider is present", async () => {
+    const { handlers, calls } = modeRecordingHandlers();
+    await routeGettingStartedAction(
+      {
+        type: "gettingStartedAction",
+        action: "build-session-sets",
+        parallel: true,
+        tier: "full",
+        verificationMode: "dedicated-sessions",
+      },
+      handlers,
+    );
+    assert.deepStrictEqual(calls.buildSessionSets, [
+      { parallel: true, tier: "full", verificationMode: undefined },
+    ]);
+  });
+});
+
+suite("structureOnlyContext — verificationMode threading (Set 077 S3, A11)", () => {
+  test("defaults to out-of-band-or-none when omitted", () => {
+    const ctx = structureOnlyContext("repo", "lightweight", "2026-07-02");
+    assert.strictEqual(ctx.verificationMode, "out-of-band-or-none");
+  });
+
+  test("carries an explicit dedicated-sessions pick (hardcode replaced)", () => {
+    const ctx = structureOnlyContext(
+      "repo",
+      "lightweight",
+      "2026-07-02",
+      "dedicated-sessions",
+    );
+    assert.strictEqual(ctx.verificationMode, "dedicated-sessions");
   });
 });

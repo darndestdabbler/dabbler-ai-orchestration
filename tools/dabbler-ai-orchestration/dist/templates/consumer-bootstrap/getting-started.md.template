@@ -129,7 +129,9 @@ be installed on every machine, even though the venv is created for you.
 - Install Python from <https://www.python.org/downloads/> (tick *Add
   python.exe to PATH*). Avoid the Microsoft Store build — its app-
   execution-alias redirection causes separate virtual-environment
-  headaches.
+  headaches. The extension's Python check also deliberately skips that
+  alias, so the "Python was not found" warning can appear even when
+  typing `python` in a terminal seems to do something.
 - If Python is installed but not on `PATH`, point the
   `dabblerSessionSets.pythonPath` setting at the interpreter
   (e.g. `C:\Python311\python.exe`); the scaffold uses it to build

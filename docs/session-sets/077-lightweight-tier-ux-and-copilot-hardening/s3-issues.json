@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The Python pre-flight probe and the scaffold bootstrap disagreed on what counts as an interpreter: probePythonPresenceCore accepted python3 on POSIX PATH, but buildProjectStructureNoPrompt still resolved its bootstrap via resolveExplicitPythonPath, whose default is bare 'python'. On a python3-only Linux/macOS host the warning is suppressed and the pre-flight passes, git init runs (a durable write), and the scaffold then dies at venv creation with the exact late spawn failure A10/M7 exist to prevent.",
+      "category": "correctness",
+      "severity": "Major",
+      "issueId": "S077-S3-V1-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Verifier (gpt-5-4) read the session diff of src/utils/pythonInterpreter.ts (the ['python3','python'] probe list) against src/commands/gitScaffold.ts (resolveExplicitPythonPath after the pre-flight) and the unchanged resolveExplicitPythonPath default asserted in src/test/suite/pythonInterpreter.test.ts.",
+      "suggestedTestOrCheck": "A python3-only POSIX fixture: the probe reports present AND the bootstrap resolution names python3 (never bare python).",
+      "resolution_status": "fixed",
+      "resolution_notes": "resolveBootstrapPythonCore (pure) + resolveScaffoldBootstrapPython (host) define the ONE interpreter list the scaffold spawns — explicit setting decides alone (missing => null), else python3-then-python on POSIX, python-only on win32 (the py launcher stays deliberately excluded, documented). probePythonPresenceCore's explicit and PATH rungs delegate to it, so probe and spawn cannot disagree; buildProjectStructureNoPrompt spawns the resolved bootstrap (legacy resolver kept only as a race fallback). Five regression tests added, including the python3-only probe+bootstrap agreement case.",
+      "resolved_in_round": 2
+    }
+  ]
+}

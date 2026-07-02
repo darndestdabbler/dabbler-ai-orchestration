@@ -89,14 +89,14 @@ Moderate
 | 5.   | Full pass; verify; close | `direct:shell`, `session-verification` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium
+- Total routed cost: $1.38 (test-generation gemini-pro $0.10; documentation review gemini-pro $0.02 + gpt-5.4-mini auto-verify $0.03; code-review opus $0.61 + gpt-5.4 auto-verify $0.31; session-verification gpt-5.4 rounds 1–2 $0.26 + $0.06; S4-recommendation analysis gemini-pro $0.003)
+- Deviations from recommendation: the original set-start recommendation for S3 was Codex CLI; the S2-close routed analysis revised it to Claude Code claude-fable-5 @ medium (context continuity on the S2-reworked webview/scaffold surfaces + the ordering-sensitive pre-flight), and the session ran as revised.
+- Notes for next-session calibration: routed test-generation output again needed adaptation (missing param types, one omitted platform arg) BUT the adaptation pass surfaced a real production defect (the PATH probe was process-platform-locked; now parameter-driven) — treat routed test-gen as a review surface, not just a generator. The cross-provider layers each caught a distinct real Major the layer below missed: code-review auto-verify (directory-as-interpreter passes an exists-probe) and verification round 1 (probe counts python3 but the scaffold bootstrap spawned bare python) — keep both layers funded for the remaining scaffold-path sessions. Routed gate: REQUIRED (blast-radius + multi-module + breadth).
 
 **Next-session orchestrator recommendation (Session 4):**
 Claude Code claude-fable-5 @ effort=high
-Rationale: Session 4 combines writing canonical documentation with modifying core Python router logic, playing to Claude's dual strengths in prose generation and complex code comprehension.
+Rationale: Session 4 combines writing canonical documentation with modifying core Python router logic, playing to Claude's dual strengths in prose generation and complex code comprehension. (Confirmed at S3 close by routed analysis — gemini-pro: the close-out-path work mix is the canonical case the standing recommendation was selected for.)
 
 ---
 

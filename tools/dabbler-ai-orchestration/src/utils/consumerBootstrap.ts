@@ -466,8 +466,22 @@ export function renderStructureBootstrap(
  * set-specific fields are deterministic placeholders — they feed no
  * rendered output (the structure templates consume ``{{REPO_NAME}}``
  * only) but keep the context type honest for the shared writer.
+ *
+ * Set 077 S3 (Feature 2, closing the A11 hardcode): ``verificationMode``
+ * carries the operator's three-way-choice pick into the context — the
+ * scaffold's durable ``.dabbler/verification-mode`` marker is written
+ * from it. Callers without a pick omit it and the documented default
+ * applies.
  */
-export function structureOnlyContext(repoName: string, tier: Tier, created: string): BootstrapContext {
+export function structureOnlyContext(
+  repoName: string,
+  tier: Tier,
+  created: string,
+  // The closed union, not `string` (S3 code-review Minor 3): the whole
+  // point of the fail-loud rider narrowing is that nothing wider can
+  // reach the durable marker write.
+  verificationMode: "dedicated-sessions" | "out-of-band-or-none" = DEFAULT_VERIFICATION_MODE,
+): BootstrapContext {
   return {
     repoName,
     setTitle: "(no starter set — created via the Getting Started decomposition prompt)",
@@ -475,7 +489,7 @@ export function structureOnlyContext(repoName: string, tier: Tier, created: stri
     slug: "000-placeholder-unused",
     created,
     tier,
-    verificationMode: DEFAULT_VERIFICATION_MODE,
+    verificationMode,
     totalSessions: 1,
   };
 }

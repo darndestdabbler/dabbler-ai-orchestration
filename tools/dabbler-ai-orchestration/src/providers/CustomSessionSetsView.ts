@@ -86,7 +86,11 @@ import {
   nodeDetectionFs,
 } from "../utils/gettingStartedDetection";
 // Set 077 Session 2 (Feature 1): the durable tier-marker store.
-import { resolveDurableTier } from "../utils/tierMarkerStore";
+import {
+  readVerificationModeMarker,
+  resolveDurableTier,
+} from "../utils/tierMarkerStore";
+import { probePythonPresence } from "../utils/pythonInterpreter";
 // Set 060 Session 2: the form's action handlers (D4/D5/D7).
 import {
   GettingStartedHandlers,
@@ -568,6 +572,12 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // Runs only in "getting-started" mode (computeGettingStarted gates
       // the thunk), so list-mode snapshots pay nothing.
       (root) => resolveDurableTier(root)?.tier ?? null,
+      // Set 077 S3 (Feature 2): the durable verification-mode seed —
+      // the `.dabbler/verification-mode` marker (no inference rung).
+      (root) => readVerificationModeMarker(root),
+      // Set 077 S3 (A10): the Python-presence probe (explicit setting →
+      // workspace venv → PATH scan). Same getting-started-only gating.
+      (root) => probePythonPresence(root),
     );
   }
 

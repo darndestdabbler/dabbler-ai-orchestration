@@ -302,6 +302,105 @@
           "costUsd": 0.0209
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/three-way",
+      "dateTime": "2026-07-02T06:07:03.879536-04:00",
+      "description": "Three-way setup choice implemented: Lightweight-only verificationMode block in step 1 (verificationModeBlockHtml, mirror of the Full-only budget block); gsState gains verificationMode/modeDirty/lastModeSeed with marker-seed semantics mirroring the S2 tier contract (restoreGsState 4th param); build-structure and build-session-sets riders narrowed fail-loud in routeGettingStartedAction (asVerificationModeRider/resolveVerificationMode); threaded through structureOnlyContext (A11 hardcode replaced) into the scaffold marker write and into buildSessionGenPrompt (exemplar renders operator mode on Lightweight + dedicated-sessions guidance line; palette path reads the .dabbler/verification-mode marker).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/python-warning",
+      "dateTime": "2026-07-02T06:07:03.879536-04:00",
+      "description": "A10: pythonPresent host probe (probePythonPresenceCore: explicit setting -> workspace venv -> PATH scan skipping the WindowsApps Store alias) carried on GettingStartedPayload and rendered as a prominent tier-independent step-1 warning (pythonWarningHtml); scaffold pre-flight is the first side-effect-free step of buildProjectStructureNoPrompt (before git init and every durable write) failing friendly via describeMissingPython; setupVerification.runChangeWriter gains the interpreterResolves pre-spawn check (S1 bundle A fold).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/template",
+      "dateTime": "2026-07-02T06:31:12.912070-04:00",
+      "description": "Troubleshooting appendix verified via routed documentation review (gemini-pro, $0.016): remedies across the form warning / pre-flight explainer / appendix are consistent; one GAP accepted and landed (appendix now explains that the extension Python check deliberately skips the Microsoft Store WindowsApps alias, so the warning can fire even when typing python seems to work). Cold-start goldens regenerated for the 2-line appendix change (x2 tiers); dist recompiled; drift guard green (25 passed incl. dist-in-sync and stale-framing over the new form copy).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "documentation",
+          "costUsd": 0.0161
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/tier-aware-doc",
+      "dateTime": "2026-07-02T06:31:12.912070-04:00",
+      "description": "Critique M6: the auto-opened getting-started doc now leads with the recorded-tier callout when the workspace carries a durable tier resolution (renderTierAwareGettingStarted/tierCalloutMarkdown, pure + unit-tested; materialized into globalStorage so neither the workspace copy nor the bundle is mutated; no durable signal => doc opens as-is).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/tests",
+      "dateTime": "2026-07-02T06:31:12.912070-04:00",
+      "description": "Layer-2 suites extended via routed test-generation (gemini-pro, $0.097, adapted; adaptation caught a real portability defect: the PATH probe now follows its platform PARAMETER for join/delimiter semantics so win32 fixtures pin on POSIX CI). New/updated suites: verification-mode block + python warning + restoreGsState mode-seed matrix, probe family, rider narrowing + dispatch threading, gen-prompt mode truth, detection thunk gating, tier-aware doc, and the M7 no-artifacts-on-failure scaffold pre-flight regression. Layer-3: new rendering-only scenario (lightweight+dedicated markers => Lightweight radio checked, verification block visible w/ dedicated checked, no budget block, python warning present-hidden). mocha 1023/0, tsc clean, pytest 2268/5/0.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "costUsd": 0.0965
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-003/review",
+      "dateTime": "2026-07-02T06:46:07.838264-04:00",
+      "description": "Routed code-review over the session diff (opus $0.60, gpt-5.4 auto-verify ISSUES_FOUND; raw in s3-code-review.md). Adjudicated: FIXED Major 1 (picked-folder path no longer opens/reloads on a pre-flight refusal), FIXED verifier Major (probe default now requires a regular FILE, so a directory-valued pythonPath fails the pre-flight before any durable write; real-tmpdir regression test), FIXED Minor 3 (structureOnlyContext narrows to the closed union), FIXED Minor 8 (fence-aware H1 detection + test); DOCUMENTED Minor 6 (py-launcher/PATHEXT coupled limitation is deliberate probe/spawn consistency) and Minor 7 (no-relative-links constraint of the globalStorage materialization); REFUTED Minor 4 (webview assets ship with the host, so the newer-webview/older-host rider-version window does not exist in this architecture); Minor 2 subsumed by Major 1 fix (no reload on the failure path, the toast persists); DEFERRED Minor 5 (sync fs probe per snapshot \u2014 perf-only, matches the S1 deferral of the async-scan architecture change). Suites after fixes: mocha 1025/0, tsc clean, Playwright form specs re-run green, dist recompiled, drift guard green.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "opus",
+          "taskType": "code-review",
+          "costUsd": 0.605
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-003/verification",
+      "dateTime": "2026-07-02T06:54:55.202909-04:00",
+      "description": "Routed gate: REQUIRED (blast-radius + multi-module + breadth; verdict logged). Cross-provider session verification round 1 (gpt-5.4, $0.26, raw in s3-verification.md): ISSUES FOUND -- one Major (S077-S3-V1-001): the probe counted python3 on POSIX while the scaffold bootstrap still spawned bare python, so a python3-only host could pass pre-flight, git-init, then die at venv creation. Fixed: resolveBootstrapPythonCore/resolveScaffoldBootstrapPython give the pre-flight and the spawn ONE shared interpreter list (python3-then-python on POSIX, python-only on win32, explicit setting decides alone); buildProjectStructureNoPrompt spawns the resolved bootstrap; five regression tests added (mocha 1030/0, tsc clean, dist recompiled, drift guard green). Round 2 narrow re-verify (gpt-5.4, $0.06, raw in s3-verification-round-2.md): VERIFIED, no fix-introduced regressions, no nits.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.326
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-003/close",
+      "dateTime": "2026-07-02T06:54:55.203436-04:00",
+      "description": "ai-assignment S3 actuals filled; S4 recommendation confirmed by routed analysis (gemini-pro, $0.003): Claude Code claude-fable-5 @ effort=high. Disposition authored; commit + push + close_session + notification follow.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "costUsd": 0.0032
+        }
+      ]
     }
   ]
 }

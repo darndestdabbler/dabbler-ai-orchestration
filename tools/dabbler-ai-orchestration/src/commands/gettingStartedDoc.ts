@@ -25,8 +25,10 @@ import * as path from "path";
 import {
   GETTING_STARTED_REL_PATH,
   GETTING_STARTED_TEMPLATE_FILENAME,
+  Tier,
   resolveBundledTemplateDir,
 } from "../utils/consumerBootstrap";
+import { resolveDurableTier } from "../utils/tierMarkerStore";
 
 /** Absolute path of the workspace copy, or undefined when absent. */
 export function workspaceGettingStartedDoc(
@@ -59,15 +61,100 @@ function materializeBundledDoc(context: vscode.ExtensionContext): string {
 }
 
 /**
+ * Set 077 S3 (critique M6): the tier callout the auto-opened doc leads
+ * with once the workspace carries a durable tier choice. The doc body
+ * necessarily describes BOTH tiers (it teaches the choice), which is
+ * exactly the "still says Full" perception on a Lightweight pick — the
+ * callout names the recorded choice up front so the operator reads the
+ * two-tier copy as reference, not as their configuration.
+ */
+export function tierCalloutMarkdown(tier: Tier): string {
+  const label = tier === "lightweight" ? "Lightweight" : "Full";
+  const other = tier === "lightweight" ? "Full" : "Lightweight";
+  return (
+    `> **Your project is set up for the ${label} tier** (recorded in ` +
+    "`.dabbler/tier`). Step 1's tier descriptions below cover both " +
+    `options for reference — the **${other}-tier** setup notes do not ` +
+    "apply to this project. To change tiers, right-click a session set " +
+    "in the Session Set Explorer and use **Switch Tier…**.\n"
+  );
+}
+
+/**
+ * Insert the tier callout directly under the doc's H1 (or at the top
+ * when no H1 is found). Fence-aware (S3 code-review Minor 8): a `# `
+ * shell comment inside a ``` code block must not be mistaken for the
+ * heading — the doc teaches CLI usage. Pure so the Layer-2 suite pins
+ * the placement and the copy without a host.
+ */
+export function renderTierAwareGettingStarted(
+  docText: string,
+  tier: Tier,
+): string {
+  const callout = tierCalloutMarkdown(tier);
+  const lines = docText.split("\n");
+  let inFence = false;
+  let h1Idx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) {
+      inFence = !inFence;
+      continue;
+    }
+    if (!inFence && /^#\s/.test(lines[i])) {
+      h1Idx = i;
+      break;
+    }
+  }
+  if (h1Idx === -1) return `${callout}\n${docText}`;
+  lines.splice(h1Idx + 1, 0, "", callout.trimEnd());
+  return lines.join("\n");
+}
+
+/**
  * Open the Getting Started instructions in a markdown preview beside
  * the form. Fail-open — never throws.
+ *
+ * Set 077 S3 (critique M6): when the workspace carries a durable tier
+ * resolution (`.dabbler/tier` marker → router-config inference), the
+ * preview leads with the recorded-choice callout — materialized into
+ * globalStorage so neither the workspace copy nor the bundled template
+ * is mutated. With no durable signal (a fresh folder, mid-choice) the
+ * doc opens as-is.
+ *
+ * Constraints of the globalStorage materialization (S3 code-review
+ * Minor 7): the doc template must stay free of RELATIVE links/assets
+ * (it is — external https links only; same constraint the pre-existing
+ * bundled-copy path imposes), and the single storage file is rewritten
+ * on every open, so a stale copy from another window's workspace never
+ * outlives the next open.
  */
 export async function openGettingStartedDoc(
   context: vscode.ExtensionContext,
 ): Promise<void> {
   try {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const docPath = workspaceGettingStartedDoc(root) ?? materializeBundledDoc(context);
+    const workspaceDoc = workspaceGettingStartedDoc(root);
+    const durable = root ? resolveDurableTier(root) : null;
+    let docPath: string;
+    if (durable) {
+      const src =
+        workspaceDoc ??
+        path.join(
+          resolveBundledTemplateDir(context.extensionPath),
+          GETTING_STARTED_TEMPLATE_FILENAME,
+        );
+      const text = fs.readFileSync(src, "utf8");
+      const dstDir = context.globalStorageUri.fsPath;
+      fs.mkdirSync(dstDir, { recursive: true });
+      docPath = path.join(dstDir, "getting-started.md");
+      fs.writeFileSync(
+        docPath,
+        renderTierAwareGettingStarted(text, durable.tier),
+        "utf8",
+      );
+    } else {
+      docPath = workspaceDoc ?? materializeBundledDoc(context);
+    }
     await vscode.commands.executeCommand(
       "markdown.showPreview",
       vscode.Uri.file(docPath),

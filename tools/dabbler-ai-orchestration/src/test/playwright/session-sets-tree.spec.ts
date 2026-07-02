@@ -157,6 +157,59 @@ test("Getting Started form renders when no session sets exist (webview path)", a
   }
 });
 
+test("Getting Started form renders the Lightweight three-way choice from durable markers (Set 077 S3)", async () => {
+  // Rendering-only smoke (the set's requiresE2E: false posture — form
+  // ACTIONS stay Layer-2-covered): a workspace whose durable markers
+  // say lightweight + dedicated-sessions must paint, on first render
+  // with no interaction, (1) the Lightweight radio checked from the
+  // tier seed, (2) the Lightweight-only verification-mode block with
+  // the dedicated radio checked from the mode seed, (3) NO Full-only
+  // budget block (omitted, not hidden), and (4) the A10 python-warning
+  // element present in the DOM (hidden here — CI runners have Python).
+  const per: PerTest = {};
+  try {
+    per.tmpPath = makeTmpDir("dabbler-pw-threeway");
+    const seed = makeSet(per.tmpPath, "seed-to-remove", 2);
+    const repoRoot = seed.repo_root;
+    fs.rmSync(seed.set_dir, { recursive: true, force: true });
+    const dabblerDir = path.join(repoRoot, ".dabbler");
+    fs.mkdirSync(dabblerDir, { recursive: true });
+    fs.writeFileSync(path.join(dabblerDir, "tier"), "lightweight\n", "utf8");
+    fs.writeFileSync(
+      path.join(dabblerDir, "verification-mode"),
+      "dedicated-sessions\n",
+      "utf8",
+    );
+
+    per.launch = await launchVSCode(repoRoot);
+    const inner = await openSessionSetsView(per.launch.page);
+
+    await expect(inner.locator(".getting-started")).toBeVisible({
+      timeout: 30_000,
+    });
+    // (1) the tier seed checked the Lightweight radio.
+    await expect(
+      inner.locator('input[name="gs-tier"][value="lightweight"]'),
+    ).toBeChecked();
+    // (2) the verification-mode block rendered, dedicated checked.
+    await expect(inner.locator("[data-gs-verification-mode]")).toBeVisible();
+    await expect(
+      inner.locator(
+        'input[name="gs-verification-mode"][value="dedicated-sessions"]',
+      ),
+    ).toBeChecked();
+    // (3) Lightweight renders no budget block.
+    expect(await inner.locator("[data-gs-budget]").count()).toBe(0);
+    // (4) the python warning element exists; visibility follows the
+    // host probe (the runner has Python, so it must be hidden).
+    const pythonWarning = inner.locator('[data-gs-warning="python"]');
+    expect(await pythonWarning.count()).toBe(1);
+    await expect(pythonWarning).toBeHidden();
+  } finally {
+    await teardown(per);
+  }
+});
+
 // ---------------------------------------------------------------------
 // Set 033 Session 2: orchestrator-block driven accordion rendering.
 // Replaces the pre-Set-033 marker-seeded scenarios — the per-set

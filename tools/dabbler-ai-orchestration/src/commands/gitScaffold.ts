@@ -8,7 +8,12 @@ import {
   ROUTER_CONFIG_REL,
 } from "../utils/aiRouterInstall";
 import { makeSpawner, makeFileOps } from "./installAiRouterCommands";
-import { resolveExplicitPythonPath } from "../utils/pythonInterpreter";
+import {
+  describeMissingPython,
+  probePythonPresence,
+  resolveExplicitPythonPath,
+  resolveScaffoldBootstrapPython,
+} from "../utils/pythonInterpreter";
 import {
   BootstrapContext,
   TemplateBundle,
@@ -323,13 +328,33 @@ function makeScaffoldInstallPrompts() {
  * NTE pick; the scaffold writes ``ai_router/budget.yaml`` (no-clobber)
  * when present. The Command-Palette `setupNewProject` flow has no budget
  * input and leaves it unset — no file is written on that path.
+ *
+ * Set 077 S3 (Feature 2): ``verificationMode`` carries the form's
+ * Lightweight verification-mode pick into the scaffold context (the
+ * durable ``.dabbler/verification-mode`` marker + the templated docs).
+ * Callers without a pick (the Command Palette) leave it unset and the
+ * documented default applies.
  */
 export async function buildProjectStructureNoPrompt(
   context: vscode.ExtensionContext,
   projectDir: string,
   tier: Tier,
   budget?: BudgetChoice,
+  verificationMode?: VerificationMode,
 ): Promise<ScaffoldResult | undefined> {
+  // Set 077 S3 (A10, Critique-2 M7): the Python pre-flight is the FIRST,
+  // side-effect-free step — it runs before git init, the marker writes,
+  // and the template rendering, so a missing base interpreter fails
+  // friendly and leaves NO setup artifacts behind (instead of the venv
+  // creation dying later with `spawn python ENOENT` buried in a warning
+  // summary after the durable writes already landed).
+  if (!probePythonPresence(projectDir)) {
+    vscode.window.showErrorMessage(
+      describeMissingPython("Build project structure"),
+    );
+    return undefined;
+  }
+
   // git init, silently when needed. The folder is the operator's chosen
   // project folder and the repo-layout standard expects a git repo;
   // surfacing a modal here would re-create the dead-end flow UAT
@@ -353,8 +378,22 @@ export async function buildProjectStructureNoPrompt(
     return undefined;
   }
 
-  const ctx = structureOnlyContext(path.basename(projectDir), tier, isoDate());
-  const pythonPath = resolveExplicitPythonPath(projectDir);
+  const ctx = structureOnlyContext(
+    path.basename(projectDir),
+    tier,
+    isoDate(),
+    verificationMode,
+  );
+  // S3 verification round 1 (Major 1): spawn the SAME interpreter the
+  // pre-flight validated — on a python3-only POSIX host the probe
+  // passes on `python3`, so the bootstrap must invoke `python3`, not
+  // the legacy bare-`python` default (which would recreate the exact
+  // post-durable-write ENOENT the pre-flight exists to prevent). The
+  // legacy resolver remains only as a race fallback (interpreter
+  // removed between probe and spawn) — ensureVenv still fails loud.
+  const pythonPath =
+    resolveScaffoldBootstrapPython(projectDir) ??
+    resolveExplicitPythonPath(projectDir);
   const result = await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,

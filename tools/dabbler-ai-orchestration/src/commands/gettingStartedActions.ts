@@ -22,7 +22,8 @@
 import * as vscode from "vscode";
 import { GettingStartedActionMsg } from "../types/sessionSetsWebviewProtocol";
 import { asTier, buildProjectStructureNoPrompt } from "./gitScaffold";
-import { Tier } from "../utils/consumerBootstrap";
+import { DEFAULT_VERIFICATION_MODE, Tier } from "../utils/consumerBootstrap";
+import { VerificationMode } from "../types";
 import {
   BudgetChoice,
   asBudgetUsd,
@@ -33,10 +34,53 @@ import { copySessionSetGenPrompt } from "../wizard/sessionGenPrompt";
 
 export interface GettingStartedHandlers {
   openFolder(): Promise<void>;
-  buildStructure(tier: Tier, budget?: BudgetChoice): Promise<void>;
+  buildStructure(
+    tier: Tier,
+    budget?: BudgetChoice,
+    verificationMode?: VerificationMode,
+  ): Promise<void>;
   importPlan(): Promise<void>;
   copyPlanPrompt(): Promise<void>;
-  buildSessionSets(parallel: boolean, tier: Tier): Promise<void>;
+  buildSessionSets(
+    parallel: boolean,
+    tier: Tier,
+    verificationMode?: VerificationMode,
+  ): Promise<void>;
+}
+
+/**
+ * Set 077 S3 (Feature 2): narrow the untrusted verification-mode rider.
+ * Same posture as {@link asTier}: absent (undefined / null) returns
+ * undefined so callers apply their documented default; a PRESENT-but-
+ * unrecognized value throws (fail-loud — a hostile/buggy webview must
+ * not silently seed the default over an operator's choice).
+ */
+export function asVerificationModeRider(
+  value: unknown,
+): VerificationMode | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") {
+    const v = value.toLowerCase();
+    if (v === "dedicated-sessions" || v === "out-of-band-or-none") return v;
+  }
+  throw new Error(
+    `Unrecognized verificationMode value ${JSON.stringify(value)} — expected ` +
+      `"dedicated-sessions" or "out-of-band-or-none".`,
+  );
+}
+
+/**
+ * Resolve the effective verification mode for a Lightweight action:
+ * the rider when present, the documented default otherwise. Full drops
+ * the rider outright — the field is inert on Full (same posture as the
+ * budget riders on Lightweight).
+ */
+export function resolveVerificationMode(
+  msg: GettingStartedActionMsg,
+  tier: Tier,
+): VerificationMode | undefined {
+  if (tier !== "lightweight") return undefined;
+  return asVerificationModeRider(msg.verificationMode) ?? DEFAULT_VERIFICATION_MODE;
 }
 
 /**
@@ -84,8 +128,13 @@ export async function routeGettingStartedAction(
       // silently scaffolding Full. The Set 063 budget riders narrow
       // alongside (Full only; see asBudgetChoice).
       let tier: Tier;
+      let verificationMode: VerificationMode | undefined;
       try {
         tier = asTier(msg.tier) ?? "full";
+        // Set 077 S3 (Feature 2): the Lightweight verification-mode
+        // rider narrows alongside — absent defaults, unrecognized
+        // rejects loud (same fail posture as the tier rider).
+        verificationMode = resolveVerificationMode(msg, tier);
       } catch (err) {
         // Operator-visible (S2 verifier): a rejected action must not
         // look like a silent no-op from the form.
@@ -93,7 +142,7 @@ export async function routeGettingStartedAction(
           `Build project structure was rejected: ${err instanceof Error ? err.message : String(err)}`,
         );
         console.warn(
-          `[gettingStarted] rejected build-structure with malformed tier rider: ${err instanceof Error ? err.message : String(err)}`,
+          `[gettingStarted] rejected build-structure with malformed rider: ${err instanceof Error ? err.message : String(err)}`,
         );
         return false;
       }
@@ -111,7 +160,7 @@ export async function routeGettingStartedAction(
         );
         return false;
       }
-      await handlers.buildStructure(tier, budget);
+      await handlers.buildStructure(tier, budget, verificationMode);
       return true;
     }
     case "import-plan":
@@ -126,18 +175,20 @@ export async function routeGettingStartedAction(
       // steers the planner to the operator's tier. Set 077 S2 (A11):
       // malformed rider ⇒ reject, same as build-structure.
       let genTier: Tier;
+      let genMode: VerificationMode | undefined;
       try {
         genTier = asTier(msg.tier) ?? "full";
+        genMode = resolveVerificationMode(msg, genTier);
       } catch (err) {
         vscode.window.showErrorMessage(
           `Copy session-set prompt was rejected: ${err instanceof Error ? err.message : String(err)}`,
         );
         console.warn(
-          `[gettingStarted] rejected build-session-sets with malformed tier rider: ${err instanceof Error ? err.message : String(err)}`,
+          `[gettingStarted] rejected build-session-sets with malformed rider: ${err instanceof Error ? err.message : String(err)}`,
         );
         return false;
       }
-      await handlers.buildSessionSets(msg.parallel === true, genTier);
+      await handlers.buildSessionSets(msg.parallel === true, genTier, genMode);
       return true;
     }
     default:
@@ -173,10 +224,20 @@ export function makeGettingStartedHandlers(
     // — pick, scaffold there, then open the folder so the form's live
     // state tracks the scaffolded root. Set 063 S2 (D1): the narrowed
     // budget pick rides through to the scaffold's budget.yaml write.
-    async buildStructure(tier: Tier, budget?: BudgetChoice): Promise<void> {
+    async buildStructure(
+      tier: Tier,
+      budget?: BudgetChoice,
+      verificationMode?: VerificationMode,
+    ): Promise<void> {
       const openRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (openRoot) {
-        await buildProjectStructureNoPrompt(context, openRoot, tier, budget);
+        await buildProjectStructureNoPrompt(
+          context,
+          openRoot,
+          tier,
+          budget,
+          verificationMode,
+        );
         return;
       }
       const picked = await vscode.window.showOpenDialog({
@@ -187,7 +248,19 @@ export function makeGettingStartedHandlers(
         title: "Select the folder to build the project structure into",
       });
       if (!picked?.[0]) return;
-      await buildProjectStructureNoPrompt(context, picked[0].fsPath, tier, budget);
+      const result = await buildProjectStructureNoPrompt(
+        context,
+        picked[0].fsPath,
+        tier,
+        budget,
+        verificationMode,
+      );
+      // S3 code-review Major 1: only open the picked folder when the
+      // scaffold actually ran. vscode.openFolder reloads the extension
+      // host, and toasts do not survive a reload — opening after a
+      // pre-flight refusal would land the operator in an empty folder
+      // with the missing-Python explainer already discarded.
+      if (!result) return;
       await vscode.commands.executeCommand("vscode.openFolder", picked[0]);
     },
 
@@ -202,9 +275,14 @@ export function makeGettingStartedHandlers(
     },
 
     // Step 3 (D4): copy the decomposition prompt, honoring the parallel
-    // checkbox and the tier radio in the prompt text (S4).
-    async buildSessionSets(parallel: boolean, tier: Tier): Promise<void> {
-      await copySessionSetGenPrompt(context, { parallel, tier });
+    // checkbox, the tier radio, and (Set 077 S3) the Lightweight
+    // verification-mode pick in the prompt text.
+    async buildSessionSets(
+      parallel: boolean,
+      tier: Tier,
+      verificationMode?: VerificationMode,
+    ): Promise<void> {
+      await copySessionSetGenPrompt(context, { parallel, tier, verificationMode });
     },
   };
 }

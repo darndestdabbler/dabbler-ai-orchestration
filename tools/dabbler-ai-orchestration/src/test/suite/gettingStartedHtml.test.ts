@@ -31,6 +31,8 @@ interface GsControls {
   parallel: boolean;
   budget?: string;
   zeroMethod?: string | null;
+  // Set 077 S3: the Lightweight verification-mode pick.
+  verificationMode?: string | null;
 }
 
 const gsHtml = requireFromPackageRoot(
@@ -61,11 +63,20 @@ const gsHtml = requireFromPackageRoot(
   BUDGET_LABEL_TEXT: string;
   BUDGET_HELP_TEXT: string;
   BUDGET_ZERO_CHOICE_TEXT: string;
+  // Set 077 S3: the Lightweight-only verification-mode block + the A10
+  // missing-Python warning.
+  verificationModeBlockHtml(controls: GsControls): string;
+  pythonWarningHtml(visible: boolean): string;
+  PYTHON_WARNING_TEXT: string;
+  VERIFICATION_MODE_LABEL_TEXT: string;
   // Set 077 S2 (A1/A11): pure teardown-restore narrowing for gsState.
+  // S3 adds the 4th param (the verification-mode marker seed) and the
+  // mode fields, mirroring the tier contract.
   restoreGsState(
     persisted?: unknown,
     tierSeed?: unknown,
     rootId?: unknown,
+    modeSeed?: unknown,
   ): {
     tier: "full" | "lightweight";
     parallel: boolean;
@@ -73,6 +84,9 @@ const gsHtml = requireFromPackageRoot(
     zeroMethod: string | null;
     tierDirty: boolean;
     lastSeed: "full" | "lightweight" | null;
+    verificationMode: "dedicated-sessions" | "out-of-band-or-none";
+    modeDirty: boolean;
+    lastModeSeed: "dedicated-sessions" | "out-of-band-or-none" | null;
     rootId: string | null;
   };
 };
@@ -82,6 +96,7 @@ function gs(overrides: Partial<{
   planPresent: boolean;
   sessionSetsPresent: boolean;
   providerKeyPresent: boolean;
+  pythonPresent: boolean;
 }> = {}) {
   return {
     mode: "getting-started",
@@ -377,6 +392,10 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
     zeroMethod: null,
     tierDirty: false,
     lastSeed: null,
+    // Set 077 S3: the verification-mode family joins the state shape.
+    verificationMode: "out-of-band-or-none",
+    modeDirty: false,
+    lastModeSeed: null,
     rootId: null,
   };
 
@@ -396,6 +415,10 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
       zeroMethod: "skipped",
       tierDirty: true,
       lastSeed: "full",
+      // Set 077 S3: the verification-mode family round-trips too.
+      verificationMode: "dedicated-sessions",
+      modeDirty: true,
+      lastModeSeed: "out-of-band-or-none",
       rootId: "/repo-a",
     };
     assert.deepStrictEqual(gsHtml.restoreGsState(persisted, null), persisted);
@@ -514,5 +537,196 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
     const html = gsHtml.renderGettingStarted(gs(), restored);
     assert.ok(/value="lightweight" checked/.test(html));
     assert.ok(!/value="full" checked/.test(html));
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 077 Session 3 — the three-way setup choice's Lightweight-only
+// verification-mode block, the A10 missing-Python warning, and the
+// verification-mode seed semantics in restoreGsState. Cases generated
+// via routed test-generation (gemini-pro) and adapted to the suite's
+// helpers.
+// ---------------------------------------------------------------------
+
+suite("gettingStartedHtml — verification-mode block (Set 077 S3)", () => {
+  test("returns empty string for the Full tier (block omitted, not hidden)", () => {
+    assert.strictEqual(gsHtml.verificationModeBlockHtml(FULL), "");
+    const html = gsHtml.renderGettingStarted(gs(), FULL);
+    assert.ok(!html.includes("data-gs-verification-mode"));
+  });
+
+  test("renders both radios on Lightweight with the default checked", () => {
+    const html = gsHtml.verificationModeBlockHtml(LIGHT);
+    assert.ok(html.includes("data-gs-verification-mode"));
+    assert.ok(html.includes(gsHtml.VERIFICATION_MODE_LABEL_TEXT));
+    assert.ok(/value="out-of-band-or-none" checked/.test(html));
+    assert.ok(html.includes('value="dedicated-sessions"'));
+    assert.ok(!/value="dedicated-sessions" checked/.test(html));
+  });
+
+  test("checks dedicated-sessions when the controls say so", () => {
+    const html = gsHtml.verificationModeBlockHtml({
+      ...LIGHT,
+      verificationMode: "dedicated-sessions",
+    });
+    assert.ok(/value="dedicated-sessions" checked/.test(html));
+    assert.ok(!/value="out-of-band-or-none" checked/.test(html));
+  });
+
+  test("budget block and verification block are mutually exclusive by tier", () => {
+    const light = gsHtml.renderGettingStarted(gs(), LIGHT);
+    assert.ok(light.includes("data-gs-verification-mode"));
+    assert.ok(!light.includes("data-gs-budget"));
+    const full = gsHtml.renderGettingStarted(gs(), FULL);
+    assert.ok(full.includes("data-gs-budget"));
+    assert.ok(!full.includes("data-gs-verification-mode"));
+  });
+});
+
+suite("gettingStartedHtml — A10 missing-Python warning (Set 077 S3)", () => {
+  test("pythonWarningHtml renders role=alert and flips hidden on visible", () => {
+    const visible = gsHtml.pythonWarningHtml(true);
+    assert.ok(visible.includes('data-gs-warning="python"'));
+    assert.ok(visible.includes('role="alert"'));
+    assert.ok(!/\shidden[\s>]/.test(visible));
+    const hidden = gsHtml.pythonWarningHtml(false);
+    assert.ok(/\shidden>/.test(hidden));
+    assert.ok(hidden.includes("python.org"));
+  });
+
+  test("warning VISIBLE when pythonPresent is false — on BOTH tiers", () => {
+    for (const controls of [FULL, LIGHT]) {
+      const html = gsHtml.renderGettingStarted(
+        gs({ pythonPresent: false }),
+        controls,
+      );
+      assert.strictEqual(
+        isVisible(html, 'data-gs-warning="python"'),
+        true,
+        `warning not visible on ${controls.tier}`,
+      );
+    }
+  });
+
+  test("warning hidden when pythonPresent is true", () => {
+    const html = gsHtml.renderGettingStarted(gs({ pythonPresent: true }), FULL);
+    assert.strictEqual(isVisible(html, 'data-gs-warning="python"'), false);
+  });
+
+  test("warning hidden when pythonPresent is ABSENT (older host fails quiet)", () => {
+    const html = gsHtml.renderGettingStarted(gs(), FULL);
+    assert.strictEqual(isVisible(html, 'data-gs-warning="python"'), false);
+  });
+
+  test("warning leads step 1 (renders before the tier radios)", () => {
+    const html = gsHtml.renderGettingStarted(gs({ pythonPresent: false }), FULL);
+    const warnIdx = html.indexOf('data-gs-warning="python"');
+    const radioIdx = html.indexOf('name="gs-tier"');
+    assert.ok(warnIdx !== -1 && warnIdx < radioIdx, "warning does not lead step 1");
+  });
+});
+
+suite("gettingStartedHtml — restoreGsState verification-mode seed (Set 077 S3)", () => {
+  test("unknown persisted verificationMode narrows to the default", () => {
+    const state = gsHtml.restoreGsState({ verificationMode: "invalid-mode" }, null);
+    assert.strictEqual(state.verificationMode, "out-of-band-or-none");
+    assert.strictEqual(state.modeDirty, false);
+    assert.strictEqual(state.lastModeSeed, null);
+  });
+
+  test("a valid mode seed overrides an UNTOUCHED persisted mode", () => {
+    const state = gsHtml.restoreGsState(
+      { verificationMode: "out-of-band-or-none", modeDirty: false },
+      null,
+      null,
+      "dedicated-sessions",
+    );
+    assert.strictEqual(state.verificationMode, "dedicated-sessions");
+    assert.strictEqual(state.modeDirty, false);
+    assert.strictEqual(state.lastModeSeed, "dedicated-sessions");
+  });
+
+  test("a post-seed explicit flip survives the SAME seed (modeDirty)", () => {
+    const state = gsHtml.restoreGsState(
+      {
+        verificationMode: "dedicated-sessions",
+        modeDirty: true,
+        lastModeSeed: "out-of-band-or-none",
+      },
+      null,
+      null,
+      "out-of-band-or-none",
+    );
+    assert.strictEqual(state.verificationMode, "dedicated-sessions");
+    assert.strictEqual(state.modeDirty, true);
+    assert.strictEqual(state.lastModeSeed, "out-of-band-or-none");
+  });
+
+  test("a CHANGED seed re-applies over a dirty flip and clears the flag", () => {
+    const state = gsHtml.restoreGsState(
+      {
+        verificationMode: "out-of-band-or-none",
+        modeDirty: true,
+        lastModeSeed: "dedicated-sessions",
+      },
+      null,
+      null,
+      "out-of-band-or-none",
+    );
+    assert.strictEqual(state.verificationMode, "out-of-band-or-none");
+    assert.strictEqual(state.modeDirty, false);
+    assert.strictEqual(state.lastModeSeed, "out-of-band-or-none");
+  });
+
+  test("modeDirty clears whenever the mode equals the seed", () => {
+    const state = gsHtml.restoreGsState(
+      { verificationMode: "dedicated-sessions", modeDirty: true },
+      null,
+      null,
+      "dedicated-sessions",
+    );
+    assert.strictEqual(state.verificationMode, "dedicated-sessions");
+    assert.strictEqual(state.modeDirty, false);
+    assert.strictEqual(state.lastModeSeed, "dedicated-sessions");
+  });
+
+  test("cross-root discard resets the mode fields too (S077-S2-V1-001 parity)", () => {
+    const state = gsHtml.restoreGsState(
+      {
+        rootId: "/repo-a",
+        verificationMode: "dedicated-sessions",
+        modeDirty: true,
+        lastModeSeed: "out-of-band-or-none",
+      },
+      null,
+      "/repo-b",
+      null,
+    );
+    assert.strictEqual(state.verificationMode, "out-of-band-or-none");
+    assert.strictEqual(state.modeDirty, false);
+    assert.strictEqual(state.lastModeSeed, null);
+  });
+
+  test("an absent or junk mode seed leaves the persisted mode untouched", () => {
+    for (const seed of [null, undefined, "junk"]) {
+      const state = gsHtml.restoreGsState(
+        { verificationMode: "dedicated-sessions" },
+        null,
+        null,
+        seed,
+      );
+      assert.strictEqual(state.verificationMode, "dedicated-sessions");
+    }
+  });
+
+  test("regression: the tier seed still applies alongside the mode seed", () => {
+    const state = gsHtml.restoreGsState(
+      { tier: "full", tierDirty: false },
+      "lightweight",
+      null,
+      "dedicated-sessions",
+    );
+    assert.strictEqual(state.tier, "lightweight");
+    assert.strictEqual(state.verificationMode, "dedicated-sessions");
   });
 });

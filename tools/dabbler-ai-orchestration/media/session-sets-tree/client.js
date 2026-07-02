@@ -69,16 +69,20 @@
     persistedState ? persistedState.gsState : undefined,
     null,
     null,
+    null,
   );
-  // The (rootId, tierSeed) pair last applied this script-lifetime.
-  // Sentinels (not null) so the first getting-started snapshot always
-  // seeds; a later snapshot whose rootId OR seed differs re-runs the
-  // restore — the once-per-load boolean missed a mid-life root switch
-  // (S077-S2-V1-001) and a rootId-only key missed a same-root seed
-  // change, e.g. the marker written by a scaffold action while the
-  // webview stays alive (S077-S2-V1-002, round 2).
+  // The (rootId, tierSeed, verificationModeSeed) tuple last applied this
+  // script-lifetime. Sentinels (not null) so the first getting-started
+  // snapshot always seeds; a later snapshot whose rootId OR either seed
+  // differs re-runs the restore — the once-per-load boolean missed a
+  // mid-life root switch (S077-S2-V1-001) and a rootId-only key missed a
+  // same-root seed change, e.g. the marker written by a scaffold action
+  // while the webview stays alive (S077-S2-V1-002, round 2). Set 077 S3:
+  // the verification-mode marker seed joins the tuple with identical
+  // semantics.
   let lastSeedRootId = { unseeded: true };
   let lastSeedValue = { unseeded: true };
+  let lastSeedMode = { unseeded: true };
   // Merge-preserving write (S2 review, Minor 2): never clobber other
   // keys a future consumer may persist alongside gsState.
   function persistGsState() {
@@ -92,6 +96,9 @@
           zeroMethod: gsState.zeroMethod,
           tierDirty: gsState.tierDirty,
           lastSeed: gsState.lastSeed,
+          verificationMode: gsState.verificationMode,
+          modeDirty: gsState.modeDirty,
+          lastModeSeed: gsState.lastModeSeed,
           rootId: gsState.rootId,
         },
       }),
@@ -177,11 +184,19 @@
       // persisted state entirely.
       if (
         gs.mode === "getting-started" &&
-        (lastSeedRootId !== gs.rootId || lastSeedValue !== gs.tierSeed)
+        (lastSeedRootId !== gs.rootId ||
+          lastSeedValue !== gs.tierSeed ||
+          lastSeedMode !== gs.verificationModeSeed)
       ) {
         lastSeedRootId = gs.rootId;
         lastSeedValue = gs.tierSeed;
-        gsState = gsHtml.restoreGsState(gsState, gs.tierSeed, gs.rootId);
+        lastSeedMode = gs.verificationModeSeed;
+        gsState = gsHtml.restoreGsState(
+          gsState,
+          gs.tierSeed,
+          gs.rootId,
+          gs.verificationModeSeed,
+        );
         persistGsState();
       }
       root.innerHTML =
@@ -261,6 +276,23 @@
         showBudgetError(null);
       });
     });
+    // Set 077 S3 (Feature 2): the Lightweight-only verification-mode
+    // radios. A flip is explicit operator intent (modeDirty), so later
+    // marker seeds never silently revert it — the same contract as the
+    // tier radio's tierDirty. No re-render needed: block visibility
+    // depends only on the tier, and the radios update themselves.
+    Array.from(root.querySelectorAll('input[name="gs-verification-mode"]')).forEach(function (input) {
+      input.addEventListener("change", function () {
+        if (input.checked) {
+          gsState.verificationMode =
+            input.value === "dedicated-sessions"
+              ? "dedicated-sessions"
+              : "out-of-band-or-none";
+          gsState.modeDirty = true;
+        }
+        persistGsState();
+      });
+    });
     Array.from(root.querySelectorAll("[data-gs-action]")).forEach(function (btn) {
       btn.addEventListener("click", function (ev) {
         ev.stopPropagation();
@@ -281,14 +313,25 @@
             }
             msg.budgetUsd = check.budgetUsd;
             if (check.budgetUsd === 0) msg.zeroBudgetMethod = check.zeroMethod;
+          } else {
+            // Set 077 S3 (Feature 2): the verification-mode pick rides
+            // the Lightweight build so the scaffold seeds the durable
+            // marker + generated docs with the operator's choice. Full
+            // posts no mode rider (the field is inert on Full).
+            msg.verificationMode = gsState.verificationMode;
           }
         }
         if (action === "build-session-sets") {
           msg.parallel = gsState.parallel;
           // Set 060 S4: the tier radio also rides build-session-sets so
           // the copied decomposition prompt steers the planner to the
-          // operator's tier.
+          // operator's tier. Set 077 S3: on Lightweight the
+          // verification-mode pick rides too, so the decomposition
+          // prompt's exemplar declares the operator's mode.
           msg.tier = gsState.tier;
+          if (gsState.tier === "lightweight") {
+            msg.verificationMode = gsState.verificationMode;
+          }
         }
         btn.disabled = true;
         vscode.postMessage(msg);

@@ -225,3 +225,45 @@ suite("buildSessionGenPrompt — tier truth (Set 077 S2)", () => {
     assert.ok(!p.includes("No tier choice is recorded"));
   });
 });
+
+// ---------------------------------------------------------------------
+// Set 077 Session 3 (Feature 2) — the decomposition prompt's
+// verification-mode truth: the exemplar declares the operator's pick on
+// Lightweight, the guidance steers only when a non-default pick exists,
+// and Full ignores the rider (the field is inert there). Cases generated
+// via routed test-generation (gemini-pro) and adapted.
+// ---------------------------------------------------------------------
+
+suite("buildSessionGenPrompt — verification-mode truth (Set 077 S3)", () => {
+  test("lightweight + dedicated-sessions: exemplar declares it and guidance steers", () => {
+    const prompt = buildSessionGenPrompt(bundle, {
+      tier: "lightweight",
+      verificationMode: "dedicated-sessions",
+    });
+    assert.ok(prompt.includes("verificationMode: dedicated-sessions"));
+    assert.ok(
+      prompt.includes("The operator selected **dedicated verification sessions**"),
+    );
+  });
+
+  test("lightweight without a pick: exemplar keeps the default, no mode guidance", () => {
+    const prompt = buildSessionGenPrompt(bundle, { tier: "lightweight" });
+    assert.ok(prompt.includes("verificationMode: out-of-band-or-none"));
+    assert.ok(!prompt.includes("verificationMode: dedicated-sessions"));
+    assert.ok(
+      !prompt.includes("The operator selected **dedicated verification sessions**"),
+    );
+  });
+
+  test("full ignores a verificationMode option — exemplar keeps the default", () => {
+    const prompt = buildSessionGenPrompt(bundle, {
+      tier: "full",
+      verificationMode: "dedicated-sessions",
+    });
+    assert.ok(prompt.includes("verificationMode: out-of-band-or-none"));
+    assert.ok(!prompt.includes("verificationMode: dedicated-sessions"));
+    assert.ok(
+      !prompt.includes("The operator selected **dedicated verification sessions**"),
+    );
+  });
+});

@@ -202,6 +202,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       providerKeyPresent: false,
       tierSeed: null,
       rootId: null,
+      verificationModeSeed: null,
+      pythonPresent: true,
     });
   });
 
@@ -217,6 +219,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       providerKeyPresent: false,
       tierSeed: null,
       rootId: null,
+      verificationModeSeed: null,
+      pythonPresent: true,
     });
   });
 
@@ -230,6 +234,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       providerKeyPresent: false,
       tierSeed: null,
       rootId: ROOT,
+      verificationModeSeed: null,
+      pythonPresent: true,
     });
   });
 
@@ -243,6 +249,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       providerKeyPresent: false,
       tierSeed: null,
       rootId: ROOT,
+      verificationModeSeed: null,
+      pythonPresent: true,
     });
   });
 
@@ -256,6 +264,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       providerKeyPresent: false,
       tierSeed: null,
       rootId: null,
+      verificationModeSeed: null,
+      pythonPresent: true,
     });
   });
 });
@@ -361,5 +371,93 @@ suite("gettingStartedDetection — tierSeed (Set 077 S2)", () => {
   test("resolver omitted (legacy callers) yields null", () => {
     const p = computeGettingStarted(true, ROOT, false, new FakeFs());
     assert.strictEqual(p.tierSeed, null);
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 077 Session 3 — the verification-mode seed + Python-presence
+// probe thunks on computeGettingStarted: getting-started-mode-gated,
+// quiet defaults everywhere else. Cases generated via routed
+// test-generation (gemini-pro) and adapted.
+// ---------------------------------------------------------------------
+
+suite("computeGettingStarted — S3 thunks (mode seed + pythonPresent)", () => {
+  function countingThunks() {
+    const calls = { modeSeed: 0, python: 0 };
+    return {
+      calls,
+      modeSeed: () => {
+        calls.modeSeed++;
+        return "dedicated-sessions" as const;
+      },
+      python: () => {
+        calls.python++;
+        return false;
+      },
+    };
+  }
+
+  test("getting-started mode: thunks run and their values flow through", () => {
+    const t = countingThunks();
+    const p = computeGettingStarted(
+      true,
+      ROOT,
+      false,
+      fullyScaffolded(),
+      {},
+      () => "lightweight",
+      t.modeSeed,
+      t.python,
+    );
+    assert.strictEqual(p.mode, "getting-started");
+    assert.strictEqual(t.calls.modeSeed, 1);
+    assert.strictEqual(t.calls.python, 1);
+    assert.strictEqual(p.verificationModeSeed, "dedicated-sessions");
+    assert.strictEqual(p.pythonPresent, false);
+  });
+
+  test("list mode: thunks never run; quiet defaults ship", () => {
+    const t = countingThunks();
+    const p = computeGettingStarted(
+      true,
+      ROOT,
+      true,
+      fullyScaffolded(),
+      {},
+      () => "lightweight",
+      t.modeSeed,
+      t.python,
+    );
+    assert.strictEqual(p.mode, "list");
+    assert.strictEqual(t.calls.modeSeed, 0);
+    assert.strictEqual(t.calls.python, 0);
+    assert.strictEqual(p.verificationModeSeed, null);
+    assert.strictEqual(p.pythonPresent, true);
+  });
+
+  test("no-folder mode: thunks never run; quiet defaults ship", () => {
+    const t = countingThunks();
+    const p = computeGettingStarted(
+      false,
+      undefined,
+      false,
+      fullyScaffolded(),
+      {},
+      () => "lightweight",
+      t.modeSeed,
+      t.python,
+    );
+    assert.strictEqual(p.mode, "no-folder");
+    assert.strictEqual(t.calls.modeSeed, 0);
+    assert.strictEqual(t.calls.python, 0);
+    assert.strictEqual(p.verificationModeSeed, null);
+    assert.strictEqual(p.pythonPresent, true);
+  });
+
+  test("omitted thunks yield the quiet defaults in getting-started mode", () => {
+    const p = computeGettingStarted(true, ROOT, false, fullyScaffolded());
+    assert.strictEqual(p.mode, "getting-started");
+    assert.strictEqual(p.verificationModeSeed, null);
+    assert.strictEqual(p.pythonPresent, true);
   });
 });

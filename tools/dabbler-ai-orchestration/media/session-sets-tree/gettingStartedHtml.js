@@ -69,6 +69,39 @@
     "A $0 budget still needs a verification rule. Choose whether to " +
     "check each session in another engine or skip verification.";
 
+  // Set 077 S3 (Feature 2): the Lightweight-only verification-mode step
+  // inside step 1 — the mirror image of the Full-only budget block. The
+  // two radios map onto the existing spec-level `verificationMode` field
+  // (no new schema): the default keeps the copyable-review-prompt flow;
+  // dedicated sessions opt in to typed verification sessions on a
+  // different engine or provider. Together with the tier radios this is
+  // the operator's three-way setup choice (Full / Lightweight+dedicated /
+  // Lightweight+out-of-band).
+  var VERIFICATION_MODE_LABEL_TEXT = "Verification (per session set)";
+  var VERIFICATION_MODE_OUT_OF_BAND_TEXT =
+    "Out-of-band or none — copy a review prompt into a second AI " +
+    "assistant and record its verdict by hand (the default).";
+  var VERIFICATION_MODE_DEDICATED_TEXT =
+    "Dedicated verification sessions — structured verification sessions " +
+    "run on a different AI engine or provider, with a close-out gate.";
+
+  // Set 077 S3 (A10): the missing-Python warning at the top of step 1.
+  // BOTH tiers need a base interpreter (Lightweight is router-off, not
+  // Python-off), so unlike the D6 key warning this one does not key on
+  // the tier radio — only on the host's `pythonPresent` probe. The copy
+  // carries the same three remedies as the Getting Started doc's
+  // Troubleshooting appendix and ends with the reload instruction (the
+  // host environment is captured at launch, so a PATH change after an
+  // install is invisible until reload).
+  var PYTHON_WARNING_TEXT =
+    "Python was not found on this machine. Build project structure " +
+    "creates a virtual environment, which still needs a base Python " +
+    "install. Install Python from python.org (tick \"Add python.exe to " +
+    "PATH\"; avoid the Microsoft Store build), or set the " +
+    "dabblerSessionSets.pythonPath setting to an installed interpreter. " +
+    "Then reload the VS Code window (changes made after launch are not " +
+    "visible until you reload).";
+
   /**
    * Parse the raw budget input. Required dollar amount: numeric and
    * >= 0; empty / non-numeric / negative are rejected with the inline
@@ -134,10 +167,17 @@
    *   - Whenever the tier ends up equal to the seed, the flag clears —
    *     the durable truth caught up, nothing is owed protection.
    *
+   * Set 077 S3 (Feature 2): `verificationMode` — the Lightweight
+   * three-way choice's second dimension — joins the persisted family
+   * with the SAME seed semantics, mirrored field-for-field (`modeSeed`
+   * is the host's durable `.dabbler/verification-mode` marker;
+   * `modeDirty` / `lastModeSeed` protect a post-seed explicit flip
+   * against the same seed value only).
+   *
    * Pure so the Layer-2 suite replays teardown/re-init without a
    * webview.
    */
-  function restoreGsState(persisted, tierSeed, rootId) {
+  function restoreGsState(persisted, tierSeed, rootId, modeSeed) {
     var p = persisted && typeof persisted === "object" ? persisted : {};
     var persistedRootId = typeof p.rootId === "string" ? p.rootId : null;
     if (
@@ -161,6 +201,17 @@
         p.lastSeed === "full" || p.lastSeed === "lightweight"
           ? p.lastSeed
           : null,
+      verificationMode:
+        p.verificationMode === "dedicated-sessions" ||
+        p.verificationMode === "out-of-band-or-none"
+          ? p.verificationMode
+          : "out-of-band-or-none",
+      modeDirty: p.modeDirty === true,
+      lastModeSeed:
+        p.lastModeSeed === "dedicated-sessions" ||
+        p.lastModeSeed === "out-of-band-or-none"
+          ? p.lastModeSeed
+          : null,
       rootId: typeof rootId === "string" ? rootId : persistedRootId,
     };
     if (tierSeed === "full" || tierSeed === "lightweight") {
@@ -171,6 +222,18 @@
       }
       if (state.tier === tierSeed) state.tierDirty = false;
       state.lastSeed = tierSeed;
+    }
+    if (
+      modeSeed === "dedicated-sessions" ||
+      modeSeed === "out-of-band-or-none"
+    ) {
+      var modeSeedChanged = state.lastModeSeed !== modeSeed;
+      if (!state.modeDirty || modeSeedChanged) {
+        state.verificationMode = modeSeed;
+        state.modeDirty = false;
+      }
+      if (state.verificationMode === modeSeed) state.modeDirty = false;
+      state.lastModeSeed = modeSeed;
     }
     return state;
   }
@@ -251,6 +314,49 @@
     );
   }
 
+  /**
+   * Set 077 S3 (Feature 2): the Lightweight-only verification-mode block
+   * inside step 1 — the mirror image of {@link budgetBlockHtml}: on FULL
+   * the block is OMITTED from the DOM entirely (tier flips re-render the
+   * form surface, so there is no visibility flip to manage). The default
+   * radio is out-of-band-or-none, matching the spec-level default.
+   */
+  function verificationModeBlockHtml(controls) {
+    if (controls.tier !== "lightweight") return "";
+    var dedicatedChecked =
+      controls.verificationMode === "dedicated-sessions" ? " checked" : "";
+    var outOfBandChecked = dedicatedChecked ? "" : " checked";
+    return (
+      '<div class="gs-verification-mode" data-gs-verification-mode>' +
+        '<div class="gs-verification-mode-label">' +
+          escHtml(VERIFICATION_MODE_LABEL_TEXT) +
+        "</div>" +
+        '<label class="gs-radio"><input type="radio" name="gs-verification-mode"' +
+          ' value="out-of-band-or-none"' + outOfBandChecked + "> " +
+          escHtml(VERIFICATION_MODE_OUT_OF_BAND_TEXT) + "</label>" +
+        '<label class="gs-radio"><input type="radio" name="gs-verification-mode"' +
+          ' value="dedicated-sessions"' + dedicatedChecked + "> " +
+          escHtml(VERIFICATION_MODE_DEDICATED_TEXT) + "</label>" +
+      "</div>"
+    );
+  }
+
+  /**
+   * The A10 missing-Python warning element (Set 077 S3). Like the D6
+   * warning it is rendered hidden (not omitted) so the DOM structure is
+   * stable across renders; unlike D6 it is tier-independent — both tiers
+   * need a base interpreter. `visible` = (gs.pythonPresent === false).
+   */
+  function pythonWarningHtml(visible) {
+    return (
+      '<div class="gs-warning" data-gs-warning="python" role="alert"' +
+      (visible ? "" : " hidden") +
+      ">" +
+      escHtml(PYTHON_WARNING_TEXT) +
+      "</div>"
+    );
+  }
+
   // No workspace folder open (D5). A single CTA to open / create a
   // project folder (showOpenDialog -> vscode.openFolder host-side).
   function renderNoFolder() {
@@ -302,15 +408,22 @@
     var parallelChecked = controls.parallel ? " checked" : "";
     var envWarningVisible =
       controls.tier !== "lightweight" && gs.providerKeyPresent === false;
+    // Set 077 S3 (A10): the missing-Python warning leads step 1 — it is
+    // the prerequisite everything below it depends on. `pythonPresent`
+    // absent from the payload (an older host) reads as "present" so the
+    // warning fails quiet, never falsely loud.
+    var pythonWarningVisible = gs.pythonPresent === false;
     var step1 = gsStep(
       1,
       "Build project structure",
       gs.structureBuilt,
+      pythonWarningHtml(pythonWarningVisible) +
       '<div class="gs-radio-group" role="radiogroup" aria-label="Project tier">' +
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="full"' + fullChecked + '> Full</label>' +
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="lightweight"' + lightChecked + '> Lightweight</label>' +
       '</div>' +
       budgetBlockHtml(controls) +
+      verificationModeBlockHtml(controls) +
       '<button class="gs-button" type="button" data-gs-action="build-structure">' +
         'Build project structure' +
       '</button>' +
@@ -358,6 +471,8 @@
     envWarningHtml: envWarningHtml,
     worktreeNoteHtml: worktreeNoteHtml,
     budgetBlockHtml: budgetBlockHtml,
+    verificationModeBlockHtml: verificationModeBlockHtml,
+    pythonWarningHtml: pythonWarningHtml,
     parseBudgetInput: parseBudgetInput,
     validateBudgetControls: validateBudgetControls,
     ENV_WARNING_TEXT: ENV_WARNING_TEXT,
@@ -365,5 +480,9 @@
     BUDGET_LABEL_TEXT: BUDGET_LABEL_TEXT,
     BUDGET_HELP_TEXT: BUDGET_HELP_TEXT,
     BUDGET_ZERO_CHOICE_TEXT: BUDGET_ZERO_CHOICE_TEXT,
+    VERIFICATION_MODE_LABEL_TEXT: VERIFICATION_MODE_LABEL_TEXT,
+    VERIFICATION_MODE_OUT_OF_BAND_TEXT: VERIFICATION_MODE_OUT_OF_BAND_TEXT,
+    VERIFICATION_MODE_DEDICATED_TEXT: VERIFICATION_MODE_DEDICATED_TEXT,
+    PYTHON_WARNING_TEXT: PYTHON_WARNING_TEXT,
   };
 });

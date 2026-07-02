@@ -143,6 +143,19 @@ export interface GettingStartedPayload {
   // when the same webview survives a root switch. Same gating as
   // tierSeed: populated only in "getting-started" mode.
   rootId: string | null;
+  // Set 077 S3 (Feature 2): the durable verification-mode seed — the
+  // `.dabbler/verification-mode` marker (no inference rung; absence is
+  // null). Seeds the Lightweight-only verification-mode radios with the
+  // same (rootId, seed) application semantics as tierSeed. Populated
+  // only in "getting-started" mode.
+  verificationModeSeed: "dedicated-sessions" | "out-of-band-or-none" | null;
+  // Set 077 S3 (A10): the host's Python-presence probe — false when no
+  // interpreter resolves (no explicit pythonPath setting, no workspace
+  // venv, nothing usable on PATH). Drives the prominent step-1 warning;
+  // tier-independent (Lightweight is router-off, not Python-off).
+  // Probed only in "getting-started" mode (true elsewhere — the value
+  // renders nowhere else, and true keeps the warning quiet).
+  pythonPresent: boolean;
 }
 
 export interface SnapshotPayload {
@@ -273,6 +286,12 @@ export interface GettingStartedActionMsg {
   // utils/budgetYaml.ts (asBudgetUsd / asZeroBudgetMethod).
   budgetUsd?: number;
   zeroBudgetMethod?: "manual-via-other-engine" | "skipped";
+  // Set 077 S3 (Feature 2): the Lightweight verification-mode pick.
+  // Rides build-structure (seeds the durable `.dabbler/verification-mode`
+  // marker + the scaffold context) and build-session-sets (steers the
+  // decomposition prompt's exemplar). The webview omits it on Full (the
+  // field is inert there); untrusted — the host narrows before use.
+  verificationMode?: "dedicated-sessions" | "out-of-band-or-none";
 }
 
 export type WebviewToHost =

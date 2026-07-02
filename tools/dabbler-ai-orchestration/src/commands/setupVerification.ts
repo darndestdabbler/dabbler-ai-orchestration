@@ -34,7 +34,11 @@ import {
   inspectActivityLog,
   rewriteSpecVerificationMode,
 } from "../utils/verificationModeRewrite";
-import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
+import {
+  describeMissingPython,
+  interpreterResolves,
+  resolvePythonInterpreter,
+} from "../utils/pythonInterpreter";
 import {
   describeAiRouterImportFailure,
   isAiRouterNotInstalled,
@@ -174,6 +178,17 @@ function runChangeWriter(
   setDir: string,
   cwd: string,
 ): Promise<ChangeWriterResult> {
+  // Set 077 S3 (A10 family, S1 bundle A hardening): pre-check the
+  // interpreter before spawning. A missing base Python resolves to the
+  // same inform-and-change-nothing branch as a spawn error, but with the
+  // friendly missing-Python explainer instead of a raw ENOENT message.
+  if (!interpreterResolves(pythonPath)) {
+    return Promise.resolve({
+      ok: false,
+      code: "python-not-found",
+      reason: describeMissingPython("Set Up Dedicated Verification"),
+    });
+  }
   return new Promise((resolve) => {
     const child = cp.spawn(pythonPath, buildChangeWriterArgs(setDir), {
       cwd,

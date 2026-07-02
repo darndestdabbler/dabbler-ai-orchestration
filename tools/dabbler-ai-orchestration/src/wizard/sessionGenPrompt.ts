@@ -10,7 +10,11 @@ import {
   renderSpec,
   resolveBundledTemplateDir,
 } from "../utils/consumerBootstrap";
-import { resolveDurableTier } from "../utils/tierMarkerStore";
+import {
+  readVerificationModeMarker,
+  resolveDurableTier,
+} from "../utils/tierMarkerStore";
+import { VerificationMode } from "../types";
 
 const PLAN_PATH = path.join("docs", "planning", "project-plan.md");
 
@@ -27,7 +31,10 @@ const PLAN_REL_POSIX = "docs/planning/project-plan.md";
  * overridden by {@link SessionGenPromptOptions.tier} (Set 060 S4) so a
  * Lightweight operator's exemplars steer the planner to Lightweight sets.
  */
-function sampleContext(tier: Tier): BootstrapContext {
+function sampleContext(
+  tier: Tier,
+  verificationMode: VerificationMode = "out-of-band-or-none",
+): BootstrapContext {
   return {
     repoName: "example-app",
     setTitle: "Example feature",
@@ -35,7 +42,7 @@ function sampleContext(tier: Tier): BootstrapContext {
     slug: "001-example-feature",
     created: "2026-01-01",
     tier,
-    verificationMode: "out-of-band-or-none",
+    verificationMode,
     totalSessions: 3,
   };
 }
@@ -93,6 +100,17 @@ export interface SessionGenPromptOptions {
   tier?: Tier;
   /** How {@link tier} was resolved; ignored when ``tier`` is absent. */
   tierSource?: SessionGenTierSource;
+  /**
+   * Set 077 S3 (Feature 2): the operator's Lightweight verification-mode
+   * pick — the three-way choice's second dimension. When the tier is
+   * Lightweight, the worked exemplar's ``verificationMode:`` renders
+   * this value and a guidance line steers the planner to declare it on
+   * each generated set. Ignored on Full (the field is inert there; the
+   * exemplar keeps the documented default). Resolution mirrors ``tier``:
+   * the form rider wins; the riderless palette path falls back to the
+   * durable ``.dabbler/verification-mode`` marker.
+   */
+  verificationMode?: VerificationMode;
 }
 
 const PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator asked for parallel session sets
@@ -112,10 +130,30 @@ export function buildSessionGenPrompt(
   // tier-less render is no longer a silent Full steer — the guidance
   // below names the exemplar's tier as illustrative-only in that case.
   const exemplarTier: Tier = options.tier ?? "full";
-  const ctx = sampleContext(exemplarTier);
+  // Set 077 S3 (Feature 2): the exemplar's verificationMode renders the
+  // operator's pick on Lightweight only — the field is inert on Full,
+  // so a Full exemplar always shows the documented default.
+  const exemplarMode: VerificationMode =
+    exemplarTier === "lightweight" && options.verificationMode
+      ? options.verificationMode
+      : "out-of-band-or-none";
+  const ctx = sampleContext(exemplarTier, exemplarMode);
   const exampleSpec = renderSpec(bundle, ctx);
   const exampleState = renderSessionState(bundle, ctx);
   const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
+  // Set 077 S3 (Feature 2): when the operator chose dedicated
+  // verification sessions, say so — otherwise the planner has no reason
+  // to deviate from the schema default the hard-requirements block
+  // names. The default pick emits no extra line (the exemplar already
+  // shows it).
+  const modeGuidance =
+    exemplarTier === "lightweight" && exemplarMode === "dedicated-sessions"
+      ? `- **Verification mode.** The operator selected **dedicated verification sessions**
+  for this project — author each Lightweight set with \`verificationMode:
+  dedicated-sessions\` unless the project plan explicitly calls for a different mode
+  on a specific set.
+`
+      : "";
   // Set 077 S2 (A1): the guidance line claims only what the resolution
   // source supports. "The operator selected" is emitted ONLY for a
   // recorded choice (form radio or durable marker); an inferred tier is
@@ -192,7 +230,7 @@ ${exampleState}
 - Both tiers run the same Python lifecycle (\`start_session\` / \`close_session\`), state
   handling, and close-out. Lightweight is router-off, not Python-off — pick \`tier:
   lightweight\` when the project opts out of metered API calls.
-${tierGuidance}${parallelGuidance}
+${tierGuidance}${modeGuidance}${parallelGuidance}
 ---
 
 ## The project plan (read it from the workspace)
@@ -259,10 +297,22 @@ export async function copySessionSetGenPrompt(
   // durable resolution therefore fills only the riderless path (the
   // bare palette command), which pre-077 always rendered Full.
   const durable = options.tier === undefined ? resolveDurableTier(root) : null;
+  // Set 077 S3 (Feature 2): the verification mode resolves the same way
+  // — a present form rider wins (the radios are themselves seeded from
+  // the durable marker on every webview load); the riderless palette
+  // path reads the `.dabbler/verification-mode` marker directly. Only
+  // meaningful when the resolved tier is Lightweight; buildSessionGen-
+  // Prompt ignores it otherwise.
+  const resolvedTier = options.tier ?? durable?.tier;
+  const durableMode =
+    options.verificationMode === undefined && resolvedTier === "lightweight"
+      ? readVerificationModeMarker(root)
+      : null;
   const resolved: SessionGenPromptOptions = {
     parallel: options.parallel,
-    tier: options.tier ?? durable?.tier,
+    tier: resolvedTier,
     tierSource: options.tier ? "form" : durable?.source,
+    verificationMode: options.verificationMode ?? durableMode ?? undefined,
   };
 
   const prompt = buildSessionGenPrompt(bundle, resolved);

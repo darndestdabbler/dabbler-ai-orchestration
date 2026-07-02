@@ -1,0 +1,12 @@
+- **M1 — ADDRESSED:** The revised architecture explicitly says “**A first-class transport seam, selected by profile at startup — not a per-model `transport:` key**” and routes `copilot-cli` calls through a startup-selected transport plus seat-local catalog resolution.
+- **M2 — PARTIALLY:** The spec upgrades the return type to `TransportResult` with `usage_authoritative`, `finish_reason_known`, `raw_stderr`, and `transport_metadata`, and separately says “**partial output is discarded**,” but it still does not put `raw_stdout`, explicit content-completeness, or discard-state on the result contract itself.
+- **M3 — ADDRESSED:** It now requires a seat-local `copilot-catalog.lock` containing “**CLI version, model IDs, each entry's reported underlying provider/source, capture date**” and says every run “**fails closed to `verification unavailable` on drift, missing provenance, or a same-provider-only catalog**.”
+- **M4 — ADDRESSED:** The S1 gate now stops the set unless the CLI provides “**noninteractive headless mode with auth-suppression flags and documented exit behavior**,” “**stable structured output (JSON or equivalent) with deterministic separation of content from warnings/metadata**,” and machine-readable provider provenance.
+- **M5 — ADDRESSED:** The revised spec adds “**A CLI-specific invocation state machine**” with enforced noninteractive flags, spawn/first-byte/total timeouts, auth re-probe + stop, quota/catalog-drift fail-fast behavior, “**no automatic retry after any content has been emitted**,” and partial-output discard.
+- **M6 — ADDRESSED:** Under “**Honest non-accounting**” it records only `transport`, `local_invocations`, `attempts`, and `billed_usage_unavailable: true`, and states the profile is “**excluded from every cost-keyed guard and escalation heuristic**.”
+- **M7 — ADDRESSED:** The spec replaces shared picker strings with a seat-local generated lockfile, saying “**Config references logical roles/aliases; the lockfile binds them per seat**,” with regeneration/validation against actual target-team seats built into S1/UAT.
+
+**Final verdict:** SOUND-WITH-CHANGES
+
+**Nits**
+- Add `raw_stdout` plus explicit `content_complete` / `partial_output_discarded` fields to `TransportResult`, or state why the S1 structured-output gate and discard policy make them unnecessary.

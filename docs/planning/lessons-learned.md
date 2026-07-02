@@ -79,7 +79,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 | L-070-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (iterative dogfood is evidence) |
 
 ## Truncation Detection: `stop_reason` Alone Is Not Sufficient
-<!-- lesson: id="L-064-1" last-used-set="067" status="active" scope="portable" -->
+<!-- lesson: id="L-064-1" last-used-set="077" status="active" scope="portable" -->
 
 - **Context:** Any routed call whose response is consumed programmatically —
   code generation, test generation, structured data emission.
@@ -110,7 +110,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 - **Action for future sessions:** Trust the guard for cheap routed work.
 
 ## Persist Routed Output To Disk Before Display Or Logging
-<!-- lesson: id="L-064-3" last-used-set="075" status="active" scope="portable" -->
+<!-- lesson: id="L-064-3" last-used-set="077" status="active" scope="portable" -->
 
 - **Context:** Any routed call on Windows where the default console code page
   is `cp1252`.
@@ -139,7 +139,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 - **Action for future sessions:** Never self-opine on which model is cheaper.
 
 ## Schema-Only Re-Verifies Need `max_tier` Pinned To Block Auto-Escalation
-<!-- lesson: id="L-064-7" last-used-set="075" status="active" scope="portable" -->
+<!-- lesson: id="L-064-7" last-used-set="077" status="active" scope="portable" -->
 
 - **Context:** Round 2 of cross-provider session verification when the
   Round 1 response was substantively correct but used non-standard
@@ -198,7 +198,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   code before routing verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="075" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="077" status="active" scope="portable" -->
 
 - **Context:** Building a cross-provider verification prompt whose
   evidence bundle includes `git diff` / `git diff --stat` output

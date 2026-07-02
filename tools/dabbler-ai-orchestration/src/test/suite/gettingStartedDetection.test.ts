@@ -200,6 +200,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       planPresent: false,
       sessionSetsPresent: false,
       providerKeyPresent: false,
+      tierSeed: null,
+      rootId: null,
     });
   });
 
@@ -213,6 +215,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       planPresent: false,
       sessionSetsPresent: false,
       providerKeyPresent: false,
+      tierSeed: null,
+      rootId: null,
     });
   });
 
@@ -224,6 +228,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       planPresent: true,
       sessionSetsPresent: true,
       providerKeyPresent: false,
+      tierSeed: null,
+      rootId: ROOT,
     });
   });
 
@@ -235,6 +241,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       planPresent: false,
       sessionSetsPresent: false,
       providerKeyPresent: false,
+      tierSeed: null,
+      rootId: ROOT,
     });
   });
 
@@ -246,6 +254,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       planPresent: false,
       sessionSetsPresent: false,
       providerKeyPresent: false,
+      tierSeed: null,
+      rootId: null,
     });
   });
 });
@@ -301,5 +311,55 @@ suite("gettingStartedDetection — providerKeyPresent (Set 060 S3, D6)", () => {
       computeGettingStarted(true, ROOT, false, new FakeFs()).providerKeyPresent,
       false,
     );
+  });
+});
+
+// Set 077 Session 2 (Feature 1, A1): the durable tier seed rides the
+// payload so the webview can re-seed the form's tier radio after a
+// teardown. The resolver is a thunk gated on getting-started mode —
+// the one mode that renders the form — so list/no-folder snapshots
+// never pay the marker probe.
+suite("gettingStartedDetection — tierSeed (Set 077 S2)", () => {
+  test("getting-started mode calls the resolver and carries its value", () => {
+    const calls: string[] = [];
+    const p = computeGettingStarted(true, ROOT, false, new FakeFs(), {}, (root) => {
+      calls.push(root);
+      return "lightweight";
+    });
+    assert.strictEqual(p.tierSeed, "lightweight");
+    assert.deepStrictEqual(calls, [ROOT]);
+  });
+
+  test("resolver returning null carries null (rootId still rides)", () => {
+    const p = computeGettingStarted(true, ROOT, false, new FakeFs(), {}, () => null);
+    assert.strictEqual(p.tierSeed, null);
+    // S077-S2-V1-001: the root identity ships whenever the form renders,
+    // so the webview can scope its persisted state per root.
+    assert.strictEqual(p.rootId, ROOT);
+  });
+
+  test("list mode never calls the resolver", () => {
+    let called = false;
+    const p = computeGettingStarted(true, ROOT, true, new FakeFs(), {}, () => {
+      called = true;
+      return "full";
+    });
+    assert.strictEqual(called, false);
+    assert.strictEqual(p.tierSeed, null);
+  });
+
+  test("no-folder mode never calls the resolver", () => {
+    let called = false;
+    const p = computeGettingStarted(false, ROOT, false, new FakeFs(), {}, () => {
+      called = true;
+      return "full";
+    });
+    assert.strictEqual(called, false);
+    assert.strictEqual(p.tierSeed, null);
+  });
+
+  test("resolver omitted (legacy callers) yields null", () => {
+    const p = computeGettingStarted(true, ROOT, false, new FakeFs());
+    assert.strictEqual(p.tierSeed, null);
   });
 });

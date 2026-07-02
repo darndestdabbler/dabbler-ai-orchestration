@@ -264,6 +264,14 @@ export interface SessionSet {
   // from (tier, verificationMode, ledger, note presence, row state).
   // Never persisted.
   verificationMarker: VerificationMarkerGlyph;
+  // Set 077 Session 2 (Feature 1): the workspace's durable tier-choice
+  // marker (`.dabbler/tier` under the set's root), or null when absent /
+  // unreadable. Read ONCE per root by `readSessionSets` and carried on
+  // every set from that root so the renderer can surface the
+  // tier-mismatch advisory (marker disagrees with the spec's declared
+  // tier — the manual-spec-edit drift the write-through cache cannot
+  // cover). Derived at scan time, never persisted per-set.
+  workspaceTierMarker: SessionSetTier | null;
 }
 
 // Set 052 S2: reconciled with the on-disk schema the router actually

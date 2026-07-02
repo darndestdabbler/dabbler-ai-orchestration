@@ -136,6 +136,7 @@ function fakeSet(
     externalVerificationNoteExists: false,
     completedVerification: null,
     verificationMarker: "",
+    workspaceTierMarker: null,
   };
 }
 

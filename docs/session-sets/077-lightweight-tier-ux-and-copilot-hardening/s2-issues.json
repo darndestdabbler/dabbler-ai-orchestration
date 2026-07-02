@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The webview tier seed is applied only once globally (a single tierSeedApplied boolean) and the persisted gsState carries no workspace identity, so form state (tier/parallel/budget/zeroMethod) from one repo root can bleed into another root when the same webview stays alive across a root switch, and the second root never gets its own durable tierSeed.",
+      "category": "correctness",
+      "severity": "Unspecified (treated as blocking per the anti-laundering rule)",
+      "issueId": "S077-S2-V1-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Verifier (gpt-5-4) read the session diff of media/session-sets-tree/client.js (gsState init, tierSeedApplied, first-snapshot seed block).",
+      "suggestedTestOrCheck": "restoreGsState with a persisted state carrying a different rootId resets to defaults; the seed block re-applies when the snapshot's rootId changes.",
+      "resolution_status": "fixed",
+      "resolution_notes": "GettingStartedPayload gains rootId (the detection root, getting-started mode only); the persisted gsState records rootId and restoreGsState discards persisted state whose rootId differs from the incoming one; client.js replaces the tierSeedApplied boolean with a last-applied-rootId comparison so a mid-life root switch re-seeds. Layer-2 tests cover the root-mismatch reset and the payload rootId gating.",
+      "resolved_in_round": 2
+    },
+    {
+      "description": "tierDirty is a sticky bit with no reset path: once the operator flips the radio, the persisted true survives indefinitely, so a LATER sanctioned marker change (re-scaffold / Switch Tier) can never re-seed the form - the intended semantics are 'flipped after the last seed', not 'flipped ever'.",
+      "category": "correctness",
+      "severity": "Unspecified (treated as blocking per the anti-laundering rule)",
+      "issueId": "S077-S2-V1-002",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Verifier (gpt-5-4) read the session diff of client.js (radio change handler) and gettingStartedHtml.js (restoreGsState precedence).",
+      "suggestedTestOrCheck": "A dirty persisted state whose recorded lastSeed differs from the incoming seed (the marker changed since the flip) re-applies the seed and clears dirty; a dirty state whose lastSeed equals the incoming seed keeps the flip; seed equal to the current tier clears dirty.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Persisted gsState records lastSeed (the durable seed last seen). restoreGsState now applies the seed when the state is not dirty OR the incoming seed differs from lastSeed (a sanctioned marker change outranks an old flip), clears dirty whenever the tier equals the seed, and always records the new lastSeed. Layer-2 tests cover the three transitions. Round 2 found the wiring residual (client.js re-ran the restore only on a rootId change, missing same-root seed changes while the webview stays alive); round 3 verified the completion: the seed block keys on the last-applied (rootId, tierSeed) tuple.",
+      "resolved_in_round": 3
+    }
+  ]
+}

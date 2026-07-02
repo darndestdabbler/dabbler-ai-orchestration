@@ -232,6 +232,7 @@ function fakeCompletedSet(): SessionSet {
     externalVerificationNoteExists: false,
     completedVerification: null,
     verificationMarker: "v?",
+    workspaceTierMarker: null,
   };
 }
 

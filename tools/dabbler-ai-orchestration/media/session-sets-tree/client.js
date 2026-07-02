@@ -36,19 +36,67 @@
   // re-renders for the session so a watcher tick doesn't snap a
   // user-collapsed bucket back open.
   const bucketCollapsed = {};
-  // Set 060 Session 2: the Getting Started form's control state. Kept
-  // here (like bucketCollapsed) so a snapshot re-render — which happens
-  // after every action and on every watcher tick — doesn't snap the
-  // tier radio back to Full or untick the parallel checkbox. Set 063
-  // S2: `budget` (raw input string) and `zeroMethod` (the $0 zero-rule
-  // radio pick) ride along for the same reason.
-  const gsState = { tier: "full", parallel: false, budget: "", zeroMethod: null };
   // Set 060 Session 3: the Getting Started surface HTML builders moved
   // to gettingStartedHtml.js (a UMD-lite module loaded as a second
   // <script> before this file) so the rendering — including the D6
   // provider-key warning and the D7 worktree note — is unit-testable
   // without a webview. This file keeps the wiring only.
   const gsHtml = window.DabblerGettingStartedHtml;
+  // Set 060 Session 2: the Getting Started form's control state. Kept
+  // here (like bucketCollapsed) so a snapshot re-render — which happens
+  // after every action and on every watcher tick — doesn't snap the
+  // tier radio back to Full or untick the parallel checkbox. Set 063
+  // S2: `budget` (raw input string) and `zeroMethod` (the $0 zero-rule
+  // radio pick) ride along for the same reason.
+  //
+  // Set 077 S2 (A1/A11): the state now also survives webview TEARDOWN —
+  // hiding the view, collapsing the sidebar, or reloading the window
+  // re-runs this script, and the in-memory object alone re-checked the
+  // Full radio (and re-showed the Full-tier key warning) over a
+  // Lightweight pick. `vscode.getState()`/`setState()` round-trips the
+  // whole control state (tier AND the same-family budget / zeroMethod /
+  // parallel fields); `persistGsState()` runs after every mutation. The
+  // host's durable tier seed (`.dabbler/tier` marker → router-config
+  // inference) is applied ONCE per script load when the first
+  // getting-started snapshot arrives — it outranks an UNTOUCHED
+  // persisted radio (Feature 1 precedence: marker → inference →
+  // volatile UI) but never a radio the operator explicitly flipped
+  // after the last seed (`tierDirty`, S2 review Major 1).
+  // Restoration/narrowing is the pure `gsHtml.restoreGsState` so the
+  // contract is unit-tested at Layer 2.
+  const persistedState = vscode.getState();
+  let gsState = gsHtml.restoreGsState(
+    persistedState ? persistedState.gsState : undefined,
+    null,
+    null,
+  );
+  // The (rootId, tierSeed) pair last applied this script-lifetime.
+  // Sentinels (not null) so the first getting-started snapshot always
+  // seeds; a later snapshot whose rootId OR seed differs re-runs the
+  // restore — the once-per-load boolean missed a mid-life root switch
+  // (S077-S2-V1-001) and a rootId-only key missed a same-root seed
+  // change, e.g. the marker written by a scaffold action while the
+  // webview stays alive (S077-S2-V1-002, round 2).
+  let lastSeedRootId = { unseeded: true };
+  let lastSeedValue = { unseeded: true };
+  // Merge-preserving write (S2 review, Minor 2): never clobber other
+  // keys a future consumer may persist alongside gsState.
+  function persistGsState() {
+    var prior = vscode.getState();
+    vscode.setState(
+      Object.assign({}, prior && typeof prior === "object" ? prior : {}, {
+        gsState: {
+          tier: gsState.tier,
+          parallel: gsState.parallel,
+          budget: gsState.budget,
+          zeroMethod: gsState.zeroMethod,
+          tierDirty: gsState.tierDirty,
+          lastSeed: gsState.lastSeed,
+          rootId: gsState.rootId,
+        },
+      }),
+    );
+  }
 
   // ----- Escape helpers (defense-in-depth) -----
   function escHtml(s) {
@@ -117,6 +165,25 @@
     // the rest of the adoption-bootstrap path.
     var gs = lastSnapshot.gettingStarted;
     if (gs && gs.mode !== "list") {
+      // Set 077 S2 (A1): the host's durable tier seed rides the
+      // snapshot. Applied once per (script load, root) — before the
+      // first form paint, and again if the detection root changes
+      // mid-life (S077-S2-V1-001). All precedence lives in the pure
+      // restoreGsState: the seed outranks an UNTOUCHED persisted radio
+      // (the Set 076 leak), a post-seed explicit flip survives the
+      // SAME seed (tierDirty, S2 review Major 1), and a CHANGED seed —
+      // a newer sanctioned choice — re-applies and clears the flag
+      // (S077-S2-V1-002). A root switch discards the other root's
+      // persisted state entirely.
+      if (
+        gs.mode === "getting-started" &&
+        (lastSeedRootId !== gs.rootId || lastSeedValue !== gs.tierSeed)
+      ) {
+        lastSeedRootId = gs.rootId;
+        lastSeedValue = gs.tierSeed;
+        gsState = gsHtml.restoreGsState(gsState, gs.tierSeed, gs.rootId);
+        persistGsState();
+      }
       root.innerHTML =
         gs.mode === "no-folder"
           ? gsHtml.renderNoFolder()
@@ -155,7 +222,12 @@
   function wireGettingStarted() {
     Array.from(root.querySelectorAll('input[name="gs-tier"]')).forEach(function (input) {
       input.addEventListener("change", function () {
-        if (input.checked) gsState.tier = input.value === "lightweight" ? "lightweight" : "full";
+        if (input.checked) {
+          gsState.tier = input.value === "lightweight" ? "lightweight" : "full";
+          // Explicit operator intent: later seeds must not revert it.
+          gsState.tierDirty = true;
+        }
+        persistGsState();
         // Set 063 S2 (R1 Minor fix): the budget block is OMITTED from
         // the Lightweight render (not hidden), so a tier flip
         // re-renders the form surface locally. gsState carries every
@@ -166,6 +238,7 @@
     Array.from(root.querySelectorAll('input[name="gs-parallel"]')).forEach(function (input) {
       input.addEventListener("change", function () {
         gsState.parallel = !!input.checked;
+        persistGsState();
         syncWorktreeNote();
       });
     });
@@ -176,6 +249,7 @@
     Array.from(root.querySelectorAll('input[name="gs-budget"]')).forEach(function (input) {
       input.addEventListener("input", function () {
         gsState.budget = input.value;
+        persistGsState();
         syncBudgetBlock();
         showBudgetError(null);
       });
@@ -183,6 +257,7 @@
     Array.from(root.querySelectorAll('input[name="gs-zero-method"]')).forEach(function (input) {
       input.addEventListener("change", function () {
         if (input.checked) gsState.zeroMethod = input.value;
+        persistGsState();
         showBudgetError(null);
       });
     });

@@ -20,6 +20,13 @@ import {
   structureOnlyContext,
 } from "../utils/consumerBootstrap";
 import { BudgetChoice, BudgetWriteOutcome, writeBudgetYaml } from "../utils/budgetYaml";
+import {
+  TIER_MARKER_REL,
+  VERIFICATION_MODE_MARKER_REL,
+  writeTierMarker,
+  writeVerificationModeMarker,
+} from "../utils/tierMarkerStore";
+import { VerificationMode } from "../types";
 
 // ---------- pure scaffolding core (tested without VS Code) ----------
 
@@ -99,6 +106,25 @@ export async function scaffoldConsumerRepo(
     written.push(rel);
   }
 
+  // Set 077 S2 (Feature 1, A1 + Critique-2 M1/M2): persist the operator's
+  // tier + verification-mode choice as durable markers, written by the
+  // same path that shapes the scaffold. Deliberately OUTSIDE the
+  // no-clobber loop above — the markers are write-through caches of the
+  // latest sanctioned choice, so a re-scaffold with a different tier
+  // updates them even though the scaffold artifacts themselves are kept.
+  writeTierMarker(deps.projectDir, deps.ctx.tier, deps.fileOps);
+  // Narrow, never cast (S2 review, Minor 4): an unrecognized
+  // ctx.verificationMode would round-trip to null on read, silently
+  // dropping the choice the marker exists to preserve. ctx values come
+  // from internal callers, so normalize to the default rather than
+  // throwing on a caller bug.
+  const markerMode: VerificationMode =
+    deps.ctx.verificationMode === "dedicated-sessions"
+      ? "dedicated-sessions"
+      : "out-of-band-or-none";
+  writeVerificationModeMarker(deps.projectDir, markerMode, deps.fileOps);
+  written.push(TIER_MARKER_REL, VERIFICATION_MODE_MARKER_REL);
+
   report(
     deps.ctx.tier === "full"
       ? "Installing dabbler-ai-router (venv + router config)…"
@@ -150,9 +176,29 @@ async function pickDirectory(): Promise<string | undefined> {
   return picked?.[0]?.fsPath;
 }
 
-/** Narrow an untrusted value (e.g. a wizard command arg) to a Tier. */
+/**
+ * Narrow an untrusted value (e.g. a wizard command arg or a webview
+ * message rider) to a Tier.
+ *
+ * Set 077 S2 (A11): case-insensitive, and FAIL-LOUD on unknown values —
+ * the pre-077 exact-match narrowing let callers' `?? "full"` fallbacks
+ * silently convert a typo'd or case-variant tier into a Full scaffold.
+ * Absent input (undefined / null) still returns undefined so callers
+ * can apply their documented defaults (the radio's checked default, the
+ * palette's tier prompt); a PRESENT-but-unrecognized value throws. The
+ * throw is confined to the scaffold/form narrowing paths, which catch
+ * it early and operator-visibly (error toast / rejected form action) —
+ * no close-path or Explorer reader consumes this function.
+ */
 export function asTier(value: unknown): Tier | undefined {
-  return value === "full" || value === "lightweight" ? value : undefined;
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") {
+    const v = value.toLowerCase();
+    if (v === "full" || v === "lightweight") return v;
+  }
+  throw new Error(
+    `Unrecognized tier value ${JSON.stringify(value)} — expected "full" or "lightweight".`,
+  );
 }
 
 // Set 061 S3 (spec D4): exported so the `Switch Tier…` row action reuses
@@ -211,8 +257,19 @@ export function registerGitScaffoldCommand(context: vscode.ExtensionContext): vo
       if (!projectDir) return;
 
       // Tier: the single declarative switch. Honor a preselection
-      // (programmatic callers); otherwise prompt.
-      const tier = asTier(arg?.tier) ?? (await promptTier());
+      // (programmatic callers); otherwise prompt. Set 077 S2 (A11): an
+      // unrecognized preselection fails loud (error toast) instead of
+      // silently scaffolding Full.
+      let preselected: Tier | undefined;
+      try {
+        preselected = asTier(arg?.tier);
+      } catch (err) {
+        vscode.window.showErrorMessage(
+          `Could not set up the project: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return;
+      }
+      const tier = preselected ?? (await promptTier());
       if (!tier) return;
 
       await buildProjectStructureNoPrompt(context, projectDir, tier);

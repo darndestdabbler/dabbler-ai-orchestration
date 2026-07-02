@@ -10,6 +10,7 @@ import {
   renderSpec,
   resolveBundledTemplateDir,
 } from "../utils/consumerBootstrap";
+import { resolveDurableTier } from "../utils/tierMarkerStore";
 
 const PLAN_PATH = path.join("docs", "planning", "project-plan.md");
 
@@ -57,6 +58,14 @@ function sampleContext(tier: Tier): BootstrapContext {
  * Pure so the test suite can assert the prompt carries the canonical,
  * expanded shape (and never the retired schemaVersion-2 / bare-slug form).
  */
+/**
+ * Set 077 S2 (Feature 1, A1): where the resolved tier came from, so the
+ * prompt's guidance line can only claim what is actually true — a
+ * marker/form tier is "the operator selected"; an inferred tier is
+ * hedged; an unknown tier never masquerades as a selection.
+ */
+export type SessionGenTierSource = "form" | "marker" | "inference";
+
 export interface SessionGenPromptOptions {
   /**
    * Set 060 S2 (spec D4/D7): when the operator checks "Create parallel
@@ -68,14 +77,22 @@ export interface SessionGenPromptOptions {
    */
   parallel?: boolean;
   /**
-   * Set 060 S4 (operator UAT feedback): the tier the operator selected
-   * in the Getting Started form's radio. When set, the worked exemplars
-   * render with that tier and the prompt tells the planner to author new
-   * sets on it unless the plan says otherwise. Absent (the bare
-   * ``dabbler.generateSessionSetPrompt`` palette command, which has no
-   * radio) the exemplars stay Full and the guidance stays generic.
+   * The tier the exemplars and guidance render with. Set 077 S2
+   * (Feature 1): the form's rider, when present, wins — the radio is
+   * itself durable-seeded from the ``.dabbler/tier`` marker on every
+   * webview load, so the rider already embodies the marker-first
+   * precedence plus any explicit later flip. When no rider reached the
+   * caller (the bare palette command), {@link copySessionSetGenPrompt}
+   * resolves the durable chain (marker → router-config inference).
+   * Absent only when neither yields a value (an unscaffolded repo via
+   * the palette) — in that case the exemplars render Full FOR
+   * ILLUSTRATION and the guidance says so explicitly instead of
+   * silently steering the planner to Full (the pre-077 ``?? "full"``
+   * leak, A1).
    */
   tier?: Tier;
+  /** How {@link tier} was resolved; ignored when ``tier`` is absent. */
+  tierSource?: SessionGenTierSource;
 }
 
 const PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator asked for parallel session sets
@@ -91,17 +108,38 @@ export function buildSessionGenPrompt(
   bundle: TemplateBundle,
   options: SessionGenPromptOptions = {},
 ): string {
+  // Set 077 S2 (A1): a worked exemplar needs SOME concrete tier, but the
+  // tier-less render is no longer a silent Full steer — the guidance
+  // below names the exemplar's tier as illustrative-only in that case.
   const exemplarTier: Tier = options.tier ?? "full";
   const ctx = sampleContext(exemplarTier);
   const exampleSpec = renderSpec(bundle, ctx);
   const exampleState = renderSessionState(bundle, ctx);
   const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
-  const tierGuidance = options.tier
-    ? `- **Tier.** The operator selected the **${options.tier}** tier in the Getting Started
-  form — author each new set with \`tier: ${options.tier}\` unless the project plan
+  // Set 077 S2 (A1): the guidance line claims only what the resolution
+  // source supports. "The operator selected" is emitted ONLY for a
+  // recorded choice (form radio or durable marker); an inferred tier is
+  // hedged; no recorded choice at all is stated outright so the planner
+  // never fabricates a selection rationale.
+  let tierGuidance: string;
+  if (options.tier && options.tierSource !== "inference") {
+    tierGuidance = `- **Tier.** The operator selected the **${options.tier}** tier for this
+  project — author each new set with \`tier: ${options.tier}\` unless the project plan
   explicitly calls for a different tier on a specific set.
-`
-    : "";
+`;
+  } else if (options.tier) {
+    tierGuidance = `- **Tier.** This workspace is set up for the **${options.tier}** tier
+  (inferred from the workspace's router configuration) — author each new set with
+  \`tier: ${options.tier}\` unless the project plan explicitly calls for a different
+  tier on a specific set.
+`;
+  } else {
+    tierGuidance = `- **Tier.** No tier choice is recorded in this workspace. The worked
+  example above uses \`tier: full\` for illustration only — do NOT treat it as the
+  operator's selection. Choose each set's tier (\`full\` | \`lightweight\`) from the
+  project plan, per the tier-model SSoT linked above.
+`;
+  }
 
   return `You are a session-set architect for an AI-led software development workflow (the Dabbler session-set workflow).
 
@@ -209,7 +247,25 @@ export async function copySessionSetGenPrompt(
     return false;
   }
 
-  const prompt = buildSessionGenPrompt(bundle, options);
+  // Set 077 S2 (Feature 1, A1): the pre-077 code trusted the volatile
+  // radio alone, so a webview reload silently rendered Full exemplars
+  // over a scaffolded Lightweight choice (the Set 076 incident). The
+  // radio itself is now durable-seeded on every webview load (client.js
+  // applies the `.dabbler/tier` marker before the first paint), so a
+  // PRESENT rider already embodies the marker-first precedence plus any
+  // explicit later flip — contradicting it here would silently discard
+  // fresh operator intent (S2 review, Major 1) or let a weaker
+  // inference outrank an explicit pick (S2 review, Minor 3). The
+  // durable resolution therefore fills only the riderless path (the
+  // bare palette command), which pre-077 always rendered Full.
+  const durable = options.tier === undefined ? resolveDurableTier(root) : null;
+  const resolved: SessionGenPromptOptions = {
+    parallel: options.parallel,
+    tier: options.tier ?? durable?.tier,
+    tierSource: options.tier ? "form" : durable?.source,
+  };
+
+  const prompt = buildSessionGenPrompt(bundle, resolved);
 
   await vscode.env.clipboard.writeText(prompt);
   void vscode.window.showInformationMessage(

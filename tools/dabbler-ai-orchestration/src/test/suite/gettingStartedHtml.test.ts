@@ -61,6 +61,20 @@ const gsHtml = requireFromPackageRoot(
   BUDGET_LABEL_TEXT: string;
   BUDGET_HELP_TEXT: string;
   BUDGET_ZERO_CHOICE_TEXT: string;
+  // Set 077 S2 (A1/A11): pure teardown-restore narrowing for gsState.
+  restoreGsState(
+    persisted?: unknown,
+    tierSeed?: unknown,
+    rootId?: unknown,
+  ): {
+    tier: "full" | "lightweight";
+    parallel: boolean;
+    budget: string;
+    zeroMethod: string | null;
+    tierDirty: boolean;
+    lastSeed: "full" | "lightweight" | null;
+    rootId: string | null;
+  };
 };
 
 function gs(overrides: Partial<{
@@ -345,5 +359,160 @@ suite("gettingStartedHtml — parseBudgetInput / validateBudgetControls (Set 063
       });
       assert.strictEqual(r.ok, false, budget);
     }
+  });
+});
+
+// Set 077 Session 2 (Feature 1, A1/A11): the form's control state now
+// survives webview teardown via vscode.setState()/getState();
+// restoreGsState is the pure narrowing that turns whatever came back —
+// possibly undefined, stale, or malformed — into a well-formed gsState,
+// with the host's durable tier seed outranking the persisted radio per
+// the read-precedence contract (marker → inference → volatile UI).
+// Routed test-generation (gemini-pro) drafted this suite; adapted here.
+suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
+  const defaults = {
+    tier: "full",
+    parallel: false,
+    budget: "",
+    zeroMethod: null,
+    tierDirty: false,
+    lastSeed: null,
+    rootId: null,
+  };
+
+  test("returns defaults for absent or junk persisted input", () => {
+    assert.deepStrictEqual(gsHtml.restoreGsState(undefined, null), defaults);
+    assert.deepStrictEqual(gsHtml.restoreGsState(null, null), defaults);
+    assert.deepStrictEqual(gsHtml.restoreGsState("foo", null), defaults);
+    assert.deepStrictEqual(gsHtml.restoreGsState(42, null), defaults);
+    assert.deepStrictEqual(gsHtml.restoreGsState({}, null), defaults);
+  });
+
+  test("round-trips a valid persisted state (simulated teardown/re-init)", () => {
+    const persisted = {
+      tier: "lightweight",
+      parallel: true,
+      budget: "25",
+      zeroMethod: "skipped",
+      tierDirty: true,
+      lastSeed: "full",
+      rootId: "/repo-a",
+    };
+    assert.deepStrictEqual(gsHtml.restoreGsState(persisted, null), persisted);
+  });
+
+  test("malformed fields fall back individually, valid siblings survive", () => {
+    assert.deepStrictEqual(
+      gsHtml.restoreGsState({ tier: "ful", parallel: true }, null),
+      { ...defaults, parallel: true },
+    );
+    assert.deepStrictEqual(
+      gsHtml.restoreGsState({ tier: "lightweight", parallel: "yes" }, null),
+      { ...defaults, tier: "lightweight" },
+    );
+    assert.deepStrictEqual(
+      gsHtml.restoreGsState({ budget: 123 }, null),
+      defaults,
+    );
+    assert.deepStrictEqual(
+      gsHtml.restoreGsState({ zeroMethod: "unknown-method" }, null),
+      defaults,
+    );
+  });
+
+  test("the durable tier seed outranks an UNTOUCHED persisted radio value", () => {
+    assert.strictEqual(
+      gsHtml.restoreGsState({ tier: "full" }, "lightweight").tier,
+      "lightweight",
+    );
+    assert.strictEqual(
+      gsHtml.restoreGsState({ tier: "lightweight" }, "full").tier,
+      "full",
+    );
+  });
+
+  test("a DIRTY persisted radio (explicit operator flip) beats the SAME seed (S2 review, Major 1)", () => {
+    // Operator scaffolded full (marker=full, lastSeed=full), then
+    // deliberately flipped the radio to lightweight without rebuilding.
+    // The unchanged seed must not silently revert the flip on reload.
+    const restored = gsHtml.restoreGsState(
+      { tier: "lightweight", tierDirty: true, lastSeed: "full" },
+      "full",
+    );
+    assert.strictEqual(restored.tier, "lightweight");
+    assert.strictEqual(restored.tierDirty, true);
+    // A malformed dirty flag reads false — the seed applies as usual.
+    assert.strictEqual(
+      gsHtml.restoreGsState(
+        { tier: "lightweight", tierDirty: "yes", lastSeed: "full" },
+        "full",
+      ).tier,
+      "full",
+    );
+  });
+
+  test("a CHANGED seed (newer sanctioned choice) overrides a dirty flip and clears it (S077-S2-V1-002)", () => {
+    // Flip happened against a full marker; a later sanctioned change
+    // (re-scaffold / Switch Tier) moved the marker — dirty must not be
+    // a forever bit.
+    const restored = gsHtml.restoreGsState(
+      { tier: "full", tierDirty: true, lastSeed: "full" },
+      "lightweight",
+    );
+    assert.strictEqual(restored.tier, "lightweight");
+    assert.strictEqual(restored.tierDirty, false);
+    assert.strictEqual(restored.lastSeed, "lightweight");
+  });
+
+  test("a seed equal to the current tier clears the dirty flag (caught up)", () => {
+    const restored = gsHtml.restoreGsState(
+      { tier: "lightweight", tierDirty: true, lastSeed: "full" },
+      "lightweight",
+    );
+    assert.strictEqual(restored.tier, "lightweight");
+    assert.strictEqual(restored.tierDirty, false);
+  });
+
+  test("persisted state from ANOTHER root is discarded before seeding (S077-S2-V1-001)", () => {
+    // Repo A's lightweight pick must not drive repo B's form; B's own
+    // durable seed (or the defaults) win instead.
+    const restored = gsHtml.restoreGsState(
+      { tier: "lightweight", parallel: true, budget: "25", rootId: "/repo-a" },
+      "full",
+      "/repo-b",
+    );
+    assert.deepStrictEqual(restored, {
+      ...defaults,
+      tier: "full",
+      lastSeed: "full",
+      rootId: "/repo-b",
+    });
+    // Same root: state survives and records the root.
+    const same = gsHtml.restoreGsState(
+      { tier: "lightweight", parallel: true, rootId: "/repo-a" },
+      null,
+      "/repo-a",
+    );
+    assert.strictEqual(same.tier, "lightweight");
+    assert.strictEqual(same.parallel, true);
+    assert.strictEqual(same.rootId, "/repo-a");
+  });
+
+  test("an absent or junk seed leaves the persisted tier untouched", () => {
+    assert.strictEqual(gsHtml.restoreGsState({ tier: "lightweight" }, null).tier, "lightweight");
+    assert.strictEqual(gsHtml.restoreGsState({ tier: "lightweight" }, undefined).tier, "lightweight");
+    assert.strictEqual(gsHtml.restoreGsState({ tier: "lightweight" }, "junk").tier, "lightweight");
+  });
+
+  test("Set 076 replay: a Lightweight pick never snaps back to Full", () => {
+    // The reported leak: hide/re-expand or reload re-ran client.js and
+    // the in-memory default re-checked Full. Post-fix, both the
+    // persisted state AND the scaffold-written seed say lightweight.
+    const restored = gsHtml.restoreGsState({ tier: "lightweight" }, "lightweight");
+    assert.strictEqual(restored.tier, "lightweight");
+    // And the re-rendered form actually checks the Lightweight radio.
+    const html = gsHtml.renderGettingStarted(gs(), restored);
+    assert.ok(/value="lightweight" checked/.test(html));
+    assert.ok(!/value="full" checked/.test(html));
   });
 });

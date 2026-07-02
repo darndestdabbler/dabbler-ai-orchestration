@@ -8,6 +8,8 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
 import { buildSessionGenPrompt } from "../../wizard/sessionGenPrompt";
+import { scaffoldConsumerRepo } from "../../commands/gitScaffold";
+import { resolveDurableTier } from "../../utils/tierMarkerStore";
 import {
   TemplateBundle,
   loadTemplateBundle,
@@ -131,5 +133,95 @@ suite("Getting Started instructions doc (Set 060 S3, D8)", () => {
   test("explains the parallel worktree model (D7 companion copy)", () => {
     assert.ok(doc.includes("git worktrees"));
     assert.ok(doc.includes("merged back to the main branch"));
+  });
+});
+
+// Set 077 Session 2 (Feature 1, A1): the prompt's tier guidance claims
+// only what its resolution source supports, and the tier-less render is
+// no longer a silent Full steer. Routed test-generation (gemini-pro)
+// drafted this suite; adapted to the shipped wording.
+suite("buildSessionGenPrompt — tier truth (Set 077 S2)", () => {
+  test("form/marker source: operator-selected wording + matching exemplar", () => {
+    for (const source of ["form", "marker"] as const) {
+      const p = buildSessionGenPrompt(bundle, {
+        tier: "lightweight",
+        tierSource: source,
+      });
+      assert.ok(
+        p.includes("The operator selected the **lightweight** tier"),
+        `${source}: missing selected wording`,
+      );
+      assert.ok(p.includes("`tier: lightweight`"));
+      assert.ok(
+        /tier:\s*lightweight/.test(p),
+        `${source}: exemplar must render lightweight`,
+      );
+    }
+  });
+
+  test("inference source: hedged wording, never claims a selection", () => {
+    const p = buildSessionGenPrompt(bundle, {
+      tier: "full",
+      tierSource: "inference",
+    });
+    assert.ok(p.includes("inferred from the workspace's router configuration"));
+    assert.ok(!p.includes("The operator selected"));
+  });
+
+  test("no tier at all: names the illustration honestly, never fabricates a selection", () => {
+    const p = buildSessionGenPrompt(bundle, {});
+    assert.ok(p.includes("No tier choice is recorded in this workspace"));
+    assert.ok(p.includes("for illustration only"));
+    assert.ok(!p.includes("The operator selected"));
+  });
+
+  test("Set 076 regression replay: Lightweight scaffold ⇒ lightweight prompt", async () => {
+    // The reported incident chain: scaffold Lightweight, lose the
+    // volatile radio (reload), copy the decomposition prompt — pre-077
+    // it rendered Full exemplars with no tier guidance. Post-077 the
+    // scaffold writes .dabbler/tier, the resolver reads it back, and
+    // the prompt renders the truth.
+    const store = new Map<string, string>();
+    const norm = (p: string) => p.split(path.sep).join("/");
+    const ops = {
+      exists: (p: string) => store.has(norm(p)),
+      readFile: (p: string) => {
+        const c = store.get(norm(p));
+        if (c === undefined) throw new Error(`ENOENT: ${p}`);
+        return c;
+      },
+      writeFile: (p: string, c: string) => void store.set(norm(p), c),
+      mkdirp: () => {},
+      copyDir: () => {},
+      removeRecursive: (p: string) => void store.delete(norm(p)),
+      mkdtemp: (prefix: string) => `/tmp/${prefix}0`,
+    };
+    await scaffoldConsumerRepo({
+      projectDir: "/repo",
+      ctx: {
+        repoName: "demo",
+        setTitle: "Demo",
+        purpose: "Replay the Set 076 tier leak.",
+        slug: "001-demo",
+        created: "2026-07-02",
+        tier: "lightweight",
+        verificationMode: "out-of-band-or-none",
+        totalSessions: 1,
+      },
+      bundle,
+      fileOps: ops,
+      installRouter: async () => ({ ok: true, message: "installed" }),
+    });
+
+    const durable = resolveDurableTier("/repo", ops);
+    assert.deepStrictEqual(durable, { tier: "lightweight", source: "marker" });
+
+    const p = buildSessionGenPrompt(bundle, {
+      tier: durable!.tier,
+      tierSource: durable!.source,
+    });
+    assert.ok(/tier:\s*lightweight/.test(p), "exemplar must carry tier: lightweight");
+    assert.ok(p.includes("The operator selected the **lightweight** tier"));
+    assert.ok(!p.includes("No tier choice is recorded"));
   });
 });

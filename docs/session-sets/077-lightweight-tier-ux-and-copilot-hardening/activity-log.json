@@ -207,6 +207,101 @@
           "costUsd": 0.124115
         }
       ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/register-and-guidance",
+      "dateTime": "2026-07-02T03:27:58.145884-04:00",
+      "description": "Registered session 2 start (start_session CLI); read project-guidance, lessons-learned (active tier), authoring guide, spec, S1 findings; confirmed API keys present.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/persistence",
+      "dateTime": "2026-07-02T03:54:32.847035-04:00",
+      "description": "Webview state persistence: vscode.setState/getState round-trip for gsState (tier/parallel/budget/zeroMethod) via pure restoreGsState in gettingStartedHtml.js; one-shot durable tier seed applied from snapshot payload; retainContextWhenHidden evaluated and deliberately not enabled (documented at the registration site).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/marker-helper",
+      "dateTime": "2026-07-02T03:54:32.847035-04:00",
+      "description": "Durable markers: new utils/tierMarkerStore.ts owning .dabbler/tier + .dabbler/verification-mode (write-through), tolerant readers, resolveDurableTier precedence (marker -> router-config inference -> null), repoRootForSpecPath; scaffoldConsumerRepo writes both markers on every scaffold.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/prompt-truth",
+      "dateTime": "2026-07-02T03:54:32.847035-04:00",
+      "description": "Prompt truth: copySessionSetGenPrompt resolves marker-first; buildSessionGenPrompt ?? \"full\" fallback removed; guidance worded by tier source (selected / inferred / none-recorded) so no fabricated selection rationale; asTier case-insensitive + fail-loud with operator-visible rejection at all three callsites.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/advisory-switchtier",
+      "dateTime": "2026-07-02T03:54:32.847035-04:00",
+      "description": "Tier-mismatch tree advisory (t! marker + tooltip through the existing tier-marker channel, workspaceTierMarker read once per root); switchTier guardrail + marker write-through anchored on repoRootForSpecPath(set.specPath) (A11 path-coupling fix); client.js innerHTML audit: all dynamic sinks escape via escHtml/escAttr, no unescaped set-name sink found.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/tests-and-review",
+      "dateTime": "2026-07-02T04:12:50.102515-04:00",
+      "description": "Layer-2 suites authored via routed test-generation (gemini-pro, $0.06) and adapted: tierMarkerStore round-trips/precedence, restoreGsState teardown replay incl. Set 076 regression, asTier fail-loud contract, scaffold marker writes, prompt tier-truth matrix, mismatch advisory matrix + readSessionSets fixtures. Routed code-review over the session diff (opus, $0.57, gpt-5.4 auto-verify): 1 Major + 4 Minor + 2 verifier Majors adjudicated -- tierDirty seed guard, merge-preserving setState, rider-first prompt resolution, verificationMode narrowing, operator-visible webview rejections, advisory comment/wording fixes; 2 findings refuted with evidence (no third terminal state; written[] already all-posix). Raw review saved as s2-code-review.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "inputTokens": 6467,
+          "outputTokens": 5076,
+          "costUsd": 0.0588
+        },
+        {
+          "model": "opus",
+          "taskType": "code-review",
+          "inputTokens": 41740,
+          "outputTokens": 14506,
+          "costUsd": 0.5714
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/verification",
+      "dateTime": "2026-07-02T04:41:13.848108-04:00",
+      "description": "Routed gate: REQUIRED (blast-radius + breadth; verdict recorded). Cross-provider verification (gpt-5.4): round 1 ISSUES_FOUND (S077-S2-V1-001 cross-root state bleed; S077-S2-V1-002 sticky tierDirty) -- both fixed (rootId payload+scoping, lastSeed semantics); round 2 confirmed 001 + found the 002 wiring residual (same-root seed change); round 3 VERIFIED the (rootId,tierSeed) tuple completion. Raw rounds saved as s2-verification*.md; structured findings in s2-issues.json. Suites at close: pytest 2268/5/0, tsc clean, mocha 962/0, Playwright 18/18 locally (documented palette-timing flake on loaded runs, all pass on re-run).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 28187,
+          "outputTokens": 18000,
+          "costUsd": 0.3405
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 7883,
+          "outputTokens": 6240,
+          "costUsd": 0.1133
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 2286,
+          "outputTokens": 1014,
+          "costUsd": 0.0209
+        }
+      ]
     }
   ]
 }

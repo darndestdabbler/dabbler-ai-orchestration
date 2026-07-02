@@ -201,6 +201,12 @@ export function selectExplorerMode(hasFolder: boolean, hasAnySets: boolean): Exp
  * passes `process.env`. Unlike the fs probe it is mode-independent —
  * an env lookup is free and the value only renders on the form surface
  * anyway.
+ *
+ * `resolveTierSeed` (Set 077 S2, Feature 1 A1) resolves the workspace's
+ * durable tier (the `.dabbler/tier` marker → router-config inference
+ * chain in utils/tierMarkerStore.ts). Injected as a thunk — like the fs
+ * probe it runs ONLY in "getting-started" mode, the one mode that
+ * renders the form the seed feeds.
  */
 export function computeGettingStarted(
   hasFolder: boolean,
@@ -208,13 +214,27 @@ export function computeGettingStarted(
   hasAnySets: boolean,
   fsi: DetectionFs,
   env: Record<string, string | undefined> = {},
+  resolveTierSeed?: (root: string) => "full" | "lightweight" | null,
 ): GettingStartedPayload {
   const mode = selectExplorerMode(hasFolder, hasAnySets);
   const completion =
     mode === "getting-started" && root
       ? detectCompletion(root, fsi)
       : { structureBuilt: false, planPresent: false, sessionSetsPresent: false };
-  return { mode, ...completion, providerKeyPresent: providerKeyPresent(env) };
+  const tierSeed =
+    mode === "getting-started" && root && resolveTierSeed
+      ? resolveTierSeed(root)
+      : null;
+  // S077-S2-V1-001: the root the form (and seed) belongs to, so the
+  // webview can scope its persisted state per root.
+  const rootId = mode === "getting-started" && root ? root : null;
+  return {
+    mode,
+    ...completion,
+    providerKeyPresent: providerKeyPresent(env),
+    tierSeed,
+    rootId,
+  };
 }
 
 /**

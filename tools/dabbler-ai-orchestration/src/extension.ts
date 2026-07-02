@@ -117,6 +117,15 @@ export function activate(context: vscode.ExtensionContext): void {
   // session-state.json) covers every signal the view needs.
   const provider = new CustomSessionSetsView(context, scanState);
   context.subscriptions.push({ dispose: () => provider.dispose() });
+  // Set 077 S2 (Feature 1, A1): `retainContextWhenHidden` was evaluated
+  // here as belt-and-braces for the Getting Started tier-leak fix and
+  // deliberately NOT enabled. The webview persists its form state via
+  // `vscode.setState()` and re-seeds the tier from the durable
+  // `.dabbler/tier` marker on every load (client.js / tierMarkerStore),
+  // which covers BOTH teardown cases — hide/re-expand AND window reload —
+  // whereas retainContextWhenHidden covers only the hide case, at a
+  // standing memory cost VS Code's own guidance says to avoid when
+  // getState/setState suffices.
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(CustomSessionSetsView.viewType, provider),
   );

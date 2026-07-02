@@ -213,7 +213,15 @@ set starts from a fully green suite). Extension `0.33.1`, `dabbler-ai-router`
   lightweight), then to the volatile radio: the session-set decomposition
   prompt (`copySessionSetGenPrompt` → `buildSessionGenPrompt`), the Getting
   Started form's own state after reload, and any completion/summary message
-  that names the selected tier.
+  that names the selected tier. **(S2 review, refined)** The precedence is
+  enforced where the radio is *initialized* (the durable seed applied on
+  every webview load), with two truth-preserving refinements from the S2
+  routed review: (1) a radio the operator *explicitly flipped after* the
+  last seed (`tierDirty`) is fresh intent and is never silently reverted by
+  a later seed; (2) the decomposition-prompt path trusts a present form
+  rider — which now embodies the marker-first precedence by construction —
+  and resolves the durable chain only on the riderless palette path, so a
+  weaker router-config inference can never outrank an explicit live pick.
 - `buildSessionGenPrompt` renders the worked exemplar and the
   "author each set with `tier: lightweight`" guidance from the true tier and
   **never** invites the planner to fabricate a "per the operator's selection"

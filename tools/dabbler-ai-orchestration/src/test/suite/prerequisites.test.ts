@@ -466,6 +466,7 @@ suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
       externalVerificationNoteExists: false,
       completedVerification: null,
       verificationMarker: "",
+      workspaceTierMarker: null,
       ...over,
     };
   }

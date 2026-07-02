@@ -127,6 +127,22 @@ export interface GettingStartedPayload {
   // window" warning under the Build button. Computed host-side from
   // `process.env` (which merges Windows System + User vars at launch).
   providerKeyPresent: boolean;
+  // Set 077 Session 2 (Feature 1, A1): the workspace's durable tier
+  // resolution — the `.dabbler/tier` marker first, then the
+  // router-config inference (see utils/tierMarkerStore.ts) — or null
+  // when the workspace carries no durable signal. The webview applies
+  // it ONCE per script load, before the first form paint, so a webview
+  // teardown/reload can never re-check the Full radio over a scaffolded
+  // Lightweight choice. Only populated in "getting-started" mode (the
+  // one mode that renders the form); null otherwise.
+  tierSeed: "full" | "lightweight" | null;
+  // Set 077 S2 (verification round 1, S077-S2-V1-001): the detection
+  // root the seed (and the whole form) belongs to. The webview persists
+  // it alongside gsState and discards persisted state whose root
+  // differs, so form state from one repo can never bleed into another
+  // when the same webview survives a root switch. Same gating as
+  // tierSeed: populated only in "getting-started" mode.
+  rootId: string | null;
 }
 
 export interface SnapshotPayload {

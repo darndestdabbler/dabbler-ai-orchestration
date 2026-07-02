@@ -51,6 +51,7 @@ function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
     externalVerificationNoteExists: false,
     completedVerification: null,
     verificationMarker: "",
+    workspaceTierMarker: null,
     ...over,
   };
 }

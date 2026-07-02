@@ -57,6 +57,7 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
     externalVerificationNoteExists: false,
     completedVerification: null,
     verificationMarker: "",
+    workspaceTierMarker: null,
   };
 }
 

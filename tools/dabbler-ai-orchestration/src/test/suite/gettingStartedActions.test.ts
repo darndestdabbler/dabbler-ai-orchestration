@@ -114,7 +114,7 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     assert.strictEqual(calls.buildSessionSets.length, 1);
   });
 
-  test("forwards a valid tier rider and defaults invalid / missing tiers to full", async () => {
+  test("forwards a valid tier rider; absent defaults to full; unknown is REJECTED (Set 077 A11)", async () => {
     const { handlers, calls } = recordingHandlers();
     // Budget rider present throughout: tier narrowing is the concern
     // here, and Full without a budget is rejected since the R1 fix.
@@ -128,14 +128,16 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
         } as GettingStartedActionMsg,
         handlers,
       );
-    await post("lightweight");
-    await post("full");
-    await post(undefined);
-    await post("FULL");      // case-sensitive narrowing
-    await post(42);
+    assert.strictEqual(await post("lightweight"), true);
+    assert.strictEqual(await post("full"), true);
+    assert.strictEqual(await post(undefined), true);   // absent -> the radio default
+    assert.strictEqual(await post("FULL"), true);      // Set 077: case-insensitive, accepted
+    // Set 077 (A11): a present-but-unrecognized rider is rejected loud —
+    // no handler call, action reports unhandled — never a silent Full.
+    assert.strictEqual(await post(42), false);
+    assert.strictEqual(await post("lite"), false);
     assert.deepStrictEqual(calls.buildStructure, [
       "lightweight",
-      "full",
       "full",
       "full",
       "full",
@@ -167,13 +169,14 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
         { type: "gettingStartedAction", action: "build-session-sets", tier } as GettingStartedActionMsg,
         handlers,
       );
-    await post("lightweight");
-    await post("full");
-    await post(undefined);
-    await post("LIGHTWEIGHT"); // case-sensitive narrowing
+    assert.strictEqual(await post("lightweight"), true);
+    assert.strictEqual(await post("full"), true);
+    assert.strictEqual(await post(undefined), true);
+    assert.strictEqual(await post("LIGHTWEIGHT"), true); // Set 077: case-insensitive
+    assert.strictEqual(await post("lite"), false);       // Set 077 (A11): rejected
     assert.deepStrictEqual(
       calls.buildSessionSets.map((c) => c.tier),
-      ["lightweight", "full", "full", "full"],
+      ["lightweight", "full", "full", "lightweight"],
     );
   });
 
@@ -330,9 +333,11 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
       structureOnly: true,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Eight since Set 064 D7: the three docs/planning/ guidance-lifecycle
-    // starters join the five Set-060 structure artifacts.
-    assert.strictEqual(result.written.length, 8);
+    // Eight artifacts since Set 064 D7 (the three docs/planning/
+    // guidance-lifecycle starters joined the five Set-060 structure
+    // artifacts), plus the two Set 077 S2 durable markers
+    // (.dabbler/tier + .dabbler/verification-mode).
+    assert.strictEqual(result.written.length, 10);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
@@ -382,7 +387,7 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 7);
+    assert.strictEqual(result.written.length, 9); // 7 artifacts + 2 markers
   });
 });
 

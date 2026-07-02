@@ -57,14 +57,14 @@ Moderate
 | 5.   | Full pass; verify; close | `direct:shell`, `session-verification` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium
+- Total routed cost: $1.41 (test-generation gemini-pro $0.06; code-review opus $0.57 + gpt-5.4 auto-verify $0.31; S3-recommendation analysis gemini-pro $0.002; session-verification gpt-5.4 rounds 1–3 $0.34 + $0.11 + $0.02)
+- Deviations from recommendation: ran at effort=medium (recommendation said high) — medium proved sufficient; the routed code-review + three verification rounds provided the depth the higher effort was meant to buy.
+- Notes for next-session calibration: routed test-generation output needed moderate adaptation (invented APIs, wrong state enums) — budget integration time or inline the contracts harder in the prompt. The code-review's Major (seed-clobbers-deliberate-flip) and the verifier's two findings (root-scoped state, sticky tierDirty) were all in the NEW webview-state semantics — the surface the spec called highest-risk; keep review+verification budget concentrated there in S3's form work. Routed gate: REQUIRED (blast-radius + breadth).
 
 **Next-session orchestrator recommendation (Session 3):**
-Codex CLI gpt-5.4 @ effort=medium
-Rationale: Session 3 involves adding well-defined UI elements and supporting logic, which aligns well with Codex's strengths in targeted code and test generation.
+Claude Code claude-fable-5 @ effort=medium
+Rationale: Routed analysis (gemini-pro, at S2 close) revised the original Codex recommendation: context continuity on the exact webview + scaffold surfaces S2 just reworked, and the ordering-sensitive pre-flight logic (fail before any durable write) benefits from the proven S2 workflow of direct implementation plus routed high-capability review.
 
 ---
 

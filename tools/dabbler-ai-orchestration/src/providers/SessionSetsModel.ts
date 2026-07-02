@@ -2,7 +2,10 @@ import * as vscode from "vscode";
 import { SessionSet, SessionState } from "../types";
 import {
   PLUS_FRACTION_TOOLTIP,
+  TIER_MISMATCH_MARKER,
   tierMarkerFor,
+  tierMismatch,
+  tierMismatchTooltipFor,
   tierTooltipFor,
   verificationMarkerTooltipFor,
 } from "../utils/tierLegibility";
@@ -51,12 +54,31 @@ export function hasSubCurrentSets(allSets: SessionSet[]): boolean {
 // functions of the SessionSet so the renderer and tests share one
 // source. Full rows get no marker (Full is the default and the
 // majority; marking the exception keeps rows quiet).
+//
+// Set 077 Session 2 (Feature 1): the same slot carries the
+// tier-mismatch advisory ("t!") when the workspace's durable
+// `.dabbler/tier` marker disagrees with the set's declared tier on a
+// non-terminal row. Two ways to get there: a manual spec edit (drift —
+// the advisory's target) or a sanctioned per-set tier override (the
+// decomposition prompt allows a plan to pick a different tier for a
+// specific set). The marker slot stays quiet-styled and the tooltip
+// names both readings, closing with "if intentional, no action is
+// needed" — an advisory, never a nag.
 export function tierMarker(set: SessionSet): string {
-  return tierMarkerFor(set.config?.tier ?? "full");
+  const specTier = set.config?.tier ?? "full";
+  if (tierMismatch(specTier, set.workspaceTierMarker, set.state)) {
+    return TIER_MISMATCH_MARKER;
+  }
+  return tierMarkerFor(specTier);
 }
 
 export function tierTooltip(set: SessionSet): string {
-  return tierTooltipFor(set.config?.tier ?? "full");
+  const specTier = set.config?.tier ?? "full";
+  if (tierMismatch(specTier, set.workspaceTierMarker, set.state)) {
+    // Narrowed non-null by the predicate above.
+    return tierMismatchTooltipFor(specTier, set.workspaceTierMarker as NonNullable<typeof set.workspaceTierMarker>);
+  }
+  return tierTooltipFor(specTier);
 }
 
 // Set 061 Session 1 (spec D1): hover text for the `N/M+` fraction.

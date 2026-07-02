@@ -19,7 +19,10 @@ import {
   shouldRenderPlusFraction,
   TIER_MARKER,
   TIER_MARKER_TOOLTIP,
+  TIER_MISMATCH_MARKER,
   tierMarkerFor,
+  tierMismatch,
+  tierMismatchTooltipFor,
   tierTooltipFor,
 } from "../../utils/tierLegibility";
 import {
@@ -373,6 +376,164 @@ suite("readSessionSets — plusFraction derivation (Set 061 S1)", () => {
     const sets = readSessionSets(root);
     assert.strictEqual(sets.length, 1);
     assert.strictEqual(sets[0].plusFraction, false);
+    fs.rmSync(root, { recursive: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Set 077 Session 2 (Feature 1): the tier-mismatch advisory — the
+// `.dabbler/tier` write-through marker vs. a set's declared spec tier.
+// Routed test-generation (gemini-pro) drafted these; adapted to the
+// shipped SessionState values and tooltip copy.
+// ---------------------------------------------------------------------------
+
+suite("tierMismatch — predicate matrix (Set 077 S2)", () => {
+  const nonTerminal = ["in-progress", "not-started"] as const;
+  const terminal = ["complete", "cancelled"] as const;
+
+  test("no workspace marker ⇒ never a mismatch", () => {
+    for (const state of [...nonTerminal, ...terminal]) {
+      assert.strictEqual(tierMismatch("full", null, state), false);
+      assert.strictEqual(tierMismatch("lightweight", null, state), false);
+    }
+  });
+
+  test("agreement ⇒ no mismatch", () => {
+    for (const state of nonTerminal) {
+      assert.strictEqual(tierMismatch("full", "full", state), false);
+      assert.strictEqual(tierMismatch("lightweight", "lightweight", state), false);
+    }
+  });
+
+  test("disagreement on a non-terminal row ⇒ mismatch (both directions)", () => {
+    for (const state of nonTerminal) {
+      assert.strictEqual(tierMismatch("full", "lightweight", state), true);
+      assert.strictEqual(tierMismatch("lightweight", "full", state), true);
+    }
+  });
+
+  test("terminal rows stay quiet even on disagreement", () => {
+    for (const state of terminal) {
+      assert.strictEqual(tierMismatch("full", "lightweight", state), false);
+      assert.strictEqual(tierMismatch("lightweight", "full", state), false);
+    }
+  });
+
+  test("tooltip names both tiers, the marker file, and the remedy", () => {
+    const tip = tierMismatchTooltipFor("full", "lightweight");
+    assert.ok(tip.includes("tier: full"));
+    assert.ok(tip.includes("lightweight"));
+    assert.ok(tip.includes(".dabbler/tier"));
+    assert.ok(tip.includes("Switch Tier"));
+    const other = tierMismatchTooltipFor("lightweight", "full");
+    assert.ok(other.includes("tier: lightweight"));
+    assert.ok(other.includes("full"));
+  });
+});
+
+suite("SessionSetsModel tierMarker/tierTooltip — mismatch advisory (Set 077 S2)", () => {
+  test("mismatched non-terminal row renders 't!' + the mismatch tooltip", () => {
+    const s = set({
+      state: "not-started",
+      config: { tier: "full" } as SessionSet["config"],
+      workspaceTierMarker: "lightweight",
+    });
+    assert.strictEqual(tierMarker(s), TIER_MISMATCH_MARKER);
+    assert.ok(tierTooltip(s).includes("Tier mismatch"));
+  });
+
+  test("a matching Lightweight row keeps the quiet 'lw' marker", () => {
+    const s = set({
+      state: "not-started",
+      config: { tier: "lightweight" } as SessionSet["config"],
+      workspaceTierMarker: "lightweight",
+    });
+    assert.strictEqual(tierMarker(s), TIER_MARKER);
+    assert.strictEqual(tierTooltip(s), TIER_MARKER_TOOLTIP);
+  });
+
+  test("a mismatched Lightweight row upgrades 'lw' to the advisory", () => {
+    const s = set({
+      state: "in-progress",
+      config: { tier: "lightweight" } as SessionSet["config"],
+      workspaceTierMarker: "full",
+    });
+    assert.strictEqual(tierMarker(s), TIER_MISMATCH_MARKER);
+  });
+
+  test("terminal rows fall back to the quiet treatment", () => {
+    const s = set({
+      state: "complete",
+      config: { tier: "full" } as SessionSet["config"],
+      workspaceTierMarker: "lightweight",
+    });
+    assert.strictEqual(tierMarker(s), "");
+    assert.strictEqual(tierTooltip(s), "");
+  });
+
+  test("no marker on disk (null) keeps pre-077 behavior exactly", () => {
+    const full = set({
+      state: "not-started",
+      config: { tier: "full" } as SessionSet["config"],
+      workspaceTierMarker: null,
+    });
+    assert.strictEqual(tierMarker(full), "");
+    const lw = set({
+      state: "not-started",
+      config: { tier: "lightweight" } as SessionSet["config"],
+      workspaceTierMarker: null,
+    });
+    assert.strictEqual(tierMarker(lw), TIER_MARKER);
+  });
+});
+
+suite("readSessionSets — workspaceTierMarker derivation (Set 077 S2)", () => {
+  function writeSpec(root: string, slug: string, tier: string): void {
+    const dir = path.join(root, "docs", "session-sets", slug);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "spec.md"),
+      `# Spec\n\n## Session Set Configuration\n\`\`\`yaml\ntier: ${tier}\n\`\`\`\n\n### Session 1 of 1: Only\n`,
+    );
+  }
+
+  test("marker present ⇒ carried on every set from that root; mismatch renders the advisory", () => {
+    const root = makeTmpDir();
+    fs.mkdirSync(path.join(root, ".dabbler"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".dabbler", "tier"), "lightweight\n");
+    writeSpec(root, "001-agrees", "lightweight");
+    writeSpec(root, "002-drifted", "full");
+    const sets = readSessionSets(root);
+    assert.strictEqual(sets.length, 2);
+    for (const s of sets) {
+      assert.strictEqual(s.workspaceTierMarker, "lightweight");
+    }
+    const agrees = sets.find((s) => s.name === "001-agrees")!;
+    const drifted = sets.find((s) => s.name === "002-drifted")!;
+    assert.strictEqual(tierMarker(agrees), TIER_MARKER);
+    assert.strictEqual(tierMarker(drifted), TIER_MISMATCH_MARKER);
+    assert.ok(tierTooltip(drifted).includes(".dabbler/tier"));
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("no marker on disk ⇒ null on every set (no advisory possible)", () => {
+    const root = makeTmpDir();
+    writeSpec(root, "001-plain", "full");
+    const sets = readSessionSets(root);
+    assert.strictEqual(sets.length, 1);
+    assert.strictEqual(sets[0].workspaceTierMarker, null);
+    assert.strictEqual(tierMarker(sets[0]), "");
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a corrupt marker reads as null — the Explorer never goes loud on junk", () => {
+    const root = makeTmpDir();
+    fs.mkdirSync(path.join(root, ".dabbler"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".dabbler", "tier"), "garbage\n");
+    writeSpec(root, "001-plain", "full");
+    const sets = readSessionSets(root);
+    assert.strictEqual(sets[0].workspaceTierMarker, null);
+    assert.strictEqual(tierMarker(sets[0]), "");
     fs.rmSync(root, { recursive: true });
   });
 });

@@ -109,6 +109,73 @@
   }
 
   /**
+   * Set 077 S2 (A1/A11): narrow a persisted Getting Started control
+   * state — whatever `vscode.getState()` returned across a webview
+   * teardown — back to a well-formed `gsState`. Untrusted input: every
+   * field is validated and unrecognized values fall back to the
+   * defaults (Full radio, unchecked parallel, empty budget, no zero
+   * pick). `tierSeed` is the host's durable tier resolution (the
+   * `.dabbler/tier` marker → router-config inference chain) and
+   * `rootId` is the workspace root that resolution belongs to.
+   * Semantics (Set 077 S2 review Major 1 + verification round 1):
+   *
+   *   - Persisted state belonging to a DIFFERENT root is discarded
+   *     outright (S077-S2-V1-001: one repo's form state must never
+   *     bleed into another).
+   *   - A present seed wins over an UNTOUCHED persisted radio — the
+   *     Set 076 leak is the untouched default snapping back to Full.
+   *   - `tierDirty` (the operator explicitly flipped the radio after
+   *     the last seed) protects that flip — but ONLY against the SAME
+   *     seed value it was flipped away from (`lastSeed`). A seed that
+   *     has CHANGED since the flip is a newer sanctioned choice
+   *     (re-scaffold / Switch Tier…) and re-applies, clearing the flag
+   *     (S077-S2-V1-002: dirty means "flipped after the last seed",
+   *     never "flipped ever").
+   *   - Whenever the tier ends up equal to the seed, the flag clears —
+   *     the durable truth caught up, nothing is owed protection.
+   *
+   * Pure so the Layer-2 suite replays teardown/re-init without a
+   * webview.
+   */
+  function restoreGsState(persisted, tierSeed, rootId) {
+    var p = persisted && typeof persisted === "object" ? persisted : {};
+    var persistedRootId = typeof p.rootId === "string" ? p.rootId : null;
+    if (
+      typeof rootId === "string" &&
+      persistedRootId !== null &&
+      persistedRootId !== rootId
+    ) {
+      p = {}; // another root's state — start clean (S077-S2-V1-001)
+      persistedRootId = null;
+    }
+    var state = {
+      tier: p.tier === "lightweight" || p.tier === "full" ? p.tier : "full",
+      parallel: p.parallel === true,
+      budget: typeof p.budget === "string" ? p.budget : "",
+      zeroMethod:
+        p.zeroMethod === "manual-via-other-engine" || p.zeroMethod === "skipped"
+          ? p.zeroMethod
+          : null,
+      tierDirty: p.tierDirty === true,
+      lastSeed:
+        p.lastSeed === "full" || p.lastSeed === "lightweight"
+          ? p.lastSeed
+          : null,
+      rootId: typeof rootId === "string" ? rootId : persistedRootId,
+    };
+    if (tierSeed === "full" || tierSeed === "lightweight") {
+      var seedChanged = state.lastSeed !== tierSeed;
+      if (!state.tierDirty || seedChanged) {
+        state.tier = tierSeed;
+        state.tierDirty = false;
+      }
+      if (state.tier === tierSeed) state.tierDirty = false;
+      state.lastSeed = tierSeed;
+    }
+    return state;
+  }
+
+  /**
    * The D6 warning element. `visible` = (tier === "full" &&
    * !gs.providerKeyPresent); rendered hidden (not omitted) so the
    * structure is stable across renders (visibility recomputes on the
@@ -286,6 +353,7 @@
   return {
     renderNoFolder: renderNoFolder,
     renderGettingStarted: renderGettingStarted,
+    restoreGsState: restoreGsState,
     gsStep: gsStep,
     envWarningHtml: envWarningHtml,
     worktreeNoteHtml: worktreeNoteHtml,

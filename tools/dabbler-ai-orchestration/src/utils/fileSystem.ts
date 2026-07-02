@@ -11,6 +11,7 @@ import {
   shouldRenderPlusFraction,
   verificationMarkerFor,
 } from "./tierLegibility";
+import { readTierMarker } from "./tierMarkerStore";
 import {
   SessionSet,
   SessionState,
@@ -439,6 +440,11 @@ export function readSessionSets(root: string): SessionSet[] {
   if (!fs.existsSync(sessionSetsDir)) return [];
   const entries = fs.readdirSync(sessionSetsDir, { withFileTypes: true });
   const sets: SessionSet[] = [];
+  // Set 077 Session 2 (Feature 1): the workspace's durable tier-choice
+  // marker, read ONCE per root and carried on every set so the renderer
+  // can surface the tier-mismatch advisory. Tolerant reader — missing /
+  // unreadable / unknown values read as null (no advisory).
+  const workspaceTierMarker = readTierMarker(root);
 
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith("_")) continue;
@@ -809,6 +815,7 @@ export function readSessionSets(root: string): SessionSet[] {
       externalVerificationNoteExists,
       completedVerification,
       verificationMarker,
+      workspaceTierMarker,
     });
   }
 

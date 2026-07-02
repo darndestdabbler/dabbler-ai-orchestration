@@ -85,6 +85,8 @@ import {
   computeGettingStarted,
   nodeDetectionFs,
 } from "../utils/gettingStartedDetection";
+// Set 077 Session 2 (Feature 1): the durable tier-marker store.
+import { resolveDurableTier } from "../utils/tierMarkerStore";
 // Set 060 Session 2: the form's action handlers (D4/D5/D7).
 import {
   GettingStartedHandlers,
@@ -561,6 +563,11 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // Windows System + User environment, captured at launch — hence
       // the warning's "reload the window" instruction.
       process.env,
+      // Set 077 S2 (Feature 1, A1): the durable tier seed for the form —
+      // `.dabbler/tier` marker first, router-config inference second.
+      // Runs only in "getting-started" mode (computeGettingStarted gates
+      // the thunk), so list-mode snapshots pay nothing.
+      (root) => resolveDurableTier(root)?.tier ?? null,
     );
   }
 

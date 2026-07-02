@@ -92,6 +92,50 @@ export function tierTooltipFor(tier: SessionSetTier): string {
 }
 
 // ---------------------------------------------------------------------------
+// Set 077 Session 2 — the tier-mismatch advisory (Feature 1).
+//
+// The `.dabbler/tier` marker is a write-through cache of the operator's
+// latest sanctioned tier choice (scaffold / Switch Tier…). Sanctioned
+// tier-CHANGING paths cannot drift from it by construction; a manual
+// spec edit can, and a sanctioned per-set override (a plan that
+// deliberately picks a different tier for one set) legitimately
+// disagrees with it. The advisory cannot tell those apart, so its
+// tooltip names both and closes with "if intentional, no action is
+// needed". When the marker exists and disagrees with a set's declared
+// tier, the row's tier-marker slot carries this advisory glyph instead
+// of the quiet "lw" — same channel, explanatory tooltip. Terminal rows
+// (complete / cancelled) stay quiet: the blocked-marker suppression
+// rule — a closed set's configuration is no longer actionable.
+// ---------------------------------------------------------------------------
+
+export const TIER_MISMATCH_MARKER = "t!";
+
+// True when the row should render the mismatch advisory. Tolerant of
+// undefined (cast-fixture / legacy-shaped records): no marker, no
+// advisory.
+export function tierMismatch(
+  specTier: SessionSetTier,
+  workspaceTierMarker: SessionSetTier | null | undefined,
+  rowState: SessionState,
+): boolean {
+  if (workspaceTierMarker == null) return false;
+  if (rowState === "complete" || rowState === "cancelled") return false;
+  return workspaceTierMarker !== specTier;
+}
+
+export function tierMismatchTooltipFor(
+  specTier: SessionSetTier,
+  workspaceTierMarker: SessionSetTier,
+): string {
+  return (
+    `Tier mismatch: this set's spec declares tier: ${specTier}, but the ` +
+    `workspace's recorded tier choice is ${workspaceTierMarker} ` +
+    `(.dabbler/tier). If the spec is wrong, use "Switch Tier…" on this ` +
+    `row; if the difference is intentional, no action is needed.`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Set 062 Session 1 — the verification-posture marker (spec D1).
 //
 // Two glyphs, both Lightweight-only, both quiet (the `lw` treatment:

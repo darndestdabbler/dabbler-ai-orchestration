@@ -78,9 +78,25 @@ export async function routeGettingStartedAction(
       return true;
     case "build-structure": {
       // Untrusted tier rider: narrow, defaulting to "full" (the radio's
-      // checked default) when absent or unrecognized. The Set 063 budget
-      // riders narrow alongside (Full only; see asBudgetChoice).
-      const tier = asTier(msg.tier) ?? "full";
+      // checked default) only when ABSENT. Set 077 S2 (A11): a present-
+      // but-unrecognized value now fails loud — the action is rejected
+      // (same posture as the unknown-action default below) instead of
+      // silently scaffolding Full. The Set 063 budget riders narrow
+      // alongside (Full only; see asBudgetChoice).
+      let tier: Tier;
+      try {
+        tier = asTier(msg.tier) ?? "full";
+      } catch (err) {
+        // Operator-visible (S2 verifier): a rejected action must not
+        // look like a silent no-op from the form.
+        vscode.window.showErrorMessage(
+          `Build project structure was rejected: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        console.warn(
+          `[gettingStarted] rejected build-structure with malformed tier rider: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return false;
+      }
       const budget = asBudgetChoice(msg, tier);
       if (tier === "full" && !budget) {
         // S2 verifier R1 Major (fail-closed): D1 makes the budget
@@ -104,12 +120,26 @@ export async function routeGettingStartedAction(
     case "copy-plan-prompt":
       await handlers.copyPlanPrompt();
       return true;
-    case "build-session-sets":
+    case "build-session-sets": {
       // Set 060 S4: the tier radio rides this action too (same untrusted
       // narrowing as build-structure) so the copied decomposition prompt
-      // steers the planner to the operator's tier.
-      await handlers.buildSessionSets(msg.parallel === true, asTier(msg.tier) ?? "full");
+      // steers the planner to the operator's tier. Set 077 S2 (A11):
+      // malformed rider ⇒ reject, same as build-structure.
+      let genTier: Tier;
+      try {
+        genTier = asTier(msg.tier) ?? "full";
+      } catch (err) {
+        vscode.window.showErrorMessage(
+          `Copy session-set prompt was rejected: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        console.warn(
+          `[gettingStarted] rejected build-session-sets with malformed tier rider: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        return false;
+      }
+      await handlers.buildSessionSets(msg.parallel === true, genTier);
       return true;
+    }
     default:
       console.warn(
         `[gettingStarted] ignored unknown form action "${String((msg as { action?: unknown })?.action)}"`,

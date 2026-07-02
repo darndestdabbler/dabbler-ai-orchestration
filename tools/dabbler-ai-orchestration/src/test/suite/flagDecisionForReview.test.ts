@@ -41,6 +41,7 @@ function ssStub(over: Partial<SessionSet> = {}): SessionSet {
     externalVerificationNoteExists: false,
     completedVerification: null,
     verificationMarker: "",
+    workspaceTierMarker: null,
     ...over,
   };
 }

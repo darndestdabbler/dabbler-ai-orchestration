@@ -138,6 +138,9 @@ suite("consumerBootstrap — spec.md render", () => {
       lessonsLearnedTemplate: crlf(bundle.lessonsLearnedTemplate),
       projectGuidanceTemplate: crlf(bundle.projectGuidanceTemplate),
       lessonsArchiveTemplate: crlf(bundle.lessonsArchiveTemplate),
+      crossProviderVerificationTemplate: crlf(
+        bundle.crossProviderVerificationTemplate,
+      ),
     };
     const spec = renderSpec(crlfBundle, ctx({ totalSessions: 3 }));
     const headers = (spec.match(/### Session \d+ of 3:/g) || []).map((h) =>
@@ -199,13 +202,15 @@ suite("consumerBootstrap — engine files", () => {
 });
 
 suite("consumerBootstrap — full render", () => {
-  test("produces the ten artifacts at canonical relative paths", () => {
+  test("produces the eleven artifacts at canonical relative paths", () => {
     const { files } = renderConsumerBootstrap(bundle, ctx());
     const keys = Object.keys(files).sort();
     assert.deepStrictEqual(keys, [
       "AGENTS.md",
       "CLAUDE.md",
       "GEMINI.md",
+      // Set 077 S4 (Feature 3): the engine-facing verification doc.
+      "docs/dabbler/cross-provider-verification.md",
       // Set 060 S3 (D8): the static Getting Started teaching doc.
       "docs/dabbler/getting-started.md",
       "docs/dabbler/start-here.md",
@@ -261,7 +266,7 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
     );
   });
 
-  test("the REAL packaged dist bundle exists with all ten files", () => {
+  test("the REAL packaged dist bundle exists with all twelve files", () => {
     // Pins the actual build artifact the .vsix ships (esbuild copyTemplateBundle
     // writes it; it is committed alongside dist/extension.js). A broken copy
     // step or a missing packaged bundle fails here, not on a user's machine.
@@ -279,6 +284,8 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
       "lessons-learned.md.template",
       "project-guidance.md.template",
       "lessons-archive.md.template",
+      // Set 077 S4 (Feature 3): engine-facing verification instructions.
+      "cross-provider-verification.md.template",
     ];
     for (const f of required) {
       assert.ok(
@@ -288,7 +295,7 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
     }
     // And it must actually render.
     const { files } = renderConsumerBootstrap(loadTemplateBundle(distDir), ctx());
-    assert.strictEqual(Object.keys(files).length, 10);
+    assert.strictEqual(Object.keys(files).length, 11);
   });
 
   test("loadTemplateBundle reads a bundle laid out at the packaged path", () => {

@@ -10,6 +10,33 @@ interface SetItem extends vscode.TreeItem {
 
 const FILE_NAME = "external-verification.md";
 
+/**
+ * Set 077 S4 (A2): minimal seeded header for a fresh artifact — set,
+ * date, round, verdict-pending — replacing the Set 048 §3.8 empty file.
+ * The reviewing engine replaces the PENDING line with its real verdict
+ * (or appends later rounds). ``PENDING`` is deliberately not a token
+ * the ai_router parser recognizes, so a templated-but-unfilled file
+ * still soft-warns at close exactly like an empty one. The extension
+ * never parses verdicts itself — ``ai_router.external_verification``
+ * is the single parser.
+ */
+export function buildExternalVerificationTemplate(
+  setName: string,
+  date: string,
+): string {
+  return (
+    `# External Verification — ${setName}\n` +
+    `\n` +
+    `> Out-of-band verification record for this session set. Reviewing\n` +
+    `> engines append one dated round section each; the latest round wins.\n` +
+    `> Instructions + verdict grammar: docs/dabbler/cross-provider-verification.md\n` +
+    `\n` +
+    `## Round 1 — ${date}\n` +
+    `\n` +
+    `Verdict: PENDING\n`
+  );
+}
+
 async function pickSet(sets: SessionSet[]): Promise<SessionSet | undefined> {
   if (sets.length === 0) {
     vscode.window.showInformationMessage(
@@ -34,12 +61,17 @@ async function pickSet(sets: SessionSet[]): Promise<SessionSet | undefined> {
 
 async function openOrCreate(set: SessionSet): Promise<void> {
   const filePath = path.join(set.dir, FILE_NAME);
-  // Per §3.8 the file is intentionally free-form — no templated
-  // header. Create-if-missing with an empty file so the editor opens
-  // on an untouched canvas.
+  // Set 077 S4 (A2): create-if-missing seeds the minimal round header
+  // instead of the Set 048 empty canvas — an empty templateless file
+  // was exactly the artifact path-aware engines "forgot" to fill.
+  // Existing files are never touched (append-only artifact).
   if (!fs.existsSync(filePath)) {
+    const template = buildExternalVerificationTemplate(
+      set.name,
+      new Date().toISOString().slice(0, 10),
+    );
     try {
-      fs.writeFileSync(filePath, "", { encoding: "utf-8", flag: "wx" });
+      fs.writeFileSync(filePath, template, { encoding: "utf-8", flag: "wx" });
     } catch (err) {
       // EEXIST is a benign race (another process / a parallel save
       // already created it); fall through to open. Any other error is

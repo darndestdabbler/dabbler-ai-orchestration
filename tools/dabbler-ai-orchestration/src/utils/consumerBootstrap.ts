@@ -82,6 +82,15 @@ export interface TemplateBundle {
   lessonsLearnedTemplate: string;
   projectGuidanceTemplate: string;
   lessonsArchiveTemplate: string;
+  /**
+   * Set 077 S4 (Feature 3): the canonical engine-facing out-of-band
+   * verification instructions, rendered to
+   * {@link CROSS_PROVIDER_VERIFICATION_REL_PATH}. Also ensure-written
+   * idempotently by the extension before any Evaluate pointer prompt is
+   * emitted (critique M2 — the installed base gets the doc without a
+   * re-bootstrap).
+   */
+  crossProviderVerificationTemplate: string;
 }
 
 /** Filenames inside ``docs/templates/consumer-bootstrap/``. */
@@ -97,6 +106,7 @@ const BUNDLE_FILES = {
   lessonsLearnedTemplate: "lessons-learned.md.template",
   projectGuidanceTemplate: "project-guidance.md.template",
   lessonsArchiveTemplate: "lessons-archive.md.template",
+  crossProviderVerificationTemplate: "cross-provider-verification.md.template",
 } as const;
 
 /**
@@ -140,6 +150,9 @@ export function loadTemplateBundle(bundleDir: string): TemplateBundle {
     lessonsLearnedTemplate: read(BUNDLE_FILES.lessonsLearnedTemplate),
     projectGuidanceTemplate: read(BUNDLE_FILES.projectGuidanceTemplate),
     lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate),
+    crossProviderVerificationTemplate: read(
+      BUNDLE_FILES.crossProviderVerificationTemplate,
+    ),
   };
 }
 
@@ -359,6 +372,28 @@ export const GETTING_STARTED_REL_PATH = path.posix.join(
 );
 
 /**
+ * Set 077 S4 (Feature 3): relative output path of the canonical
+ * engine-facing cross-provider verification instructions. Written by both
+ * scaffold paths AND ensure-written/refreshed idempotently by the
+ * extension before any Evaluate pointer prompt is emitted (see
+ * ``ensureCrossProviderVerificationDoc`` in copyPromptCommands.ts), so
+ * consumer repos bootstrapped before Set 077 receive it on first use.
+ */
+export const CROSS_PROVIDER_VERIFICATION_REL_PATH = path.posix.join(
+  "docs",
+  "dabbler",
+  "cross-provider-verification.md",
+);
+
+/** Render the canonical cross-provider verification instruction doc. */
+export function renderCrossProviderVerification(
+  bundle: TemplateBundle,
+  ctx: BootstrapContext,
+): string {
+  return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
+}
+
+/**
  * Set 064 (D7): output paths of the guidance-lifecycle starters. Repo-level
  * ``docs/planning/`` files — part of a fresh repo's structure, so both the
  * full scaffold and the structure-only scaffold emit them. The scaffold's
@@ -397,6 +432,12 @@ export function renderConsumerBootstrap(
     "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
     [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
     [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 077 S4 (Feature 3): the engine-facing verification doc the
+    // Evaluate pointer prompts reference.
+    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
+      bundle,
+      ctx,
+    ),
     [specRelPath(ctx)]: renderSpec(bundle, ctx),
     [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
     // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
@@ -443,6 +484,12 @@ export function renderStructureBootstrap(
     // with the structure scaffold too, so the editor-open path can
     // prefer the workspace copy once the structure is built.
     [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 077 S4 (Feature 3): the verification instruction doc is repo
+    // structure — the Lightweight review flow depends on it.
+    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
+      bundle,
+      ctx,
+    ),
     // Set 064 (D7): the guidance-lifecycle starters are repo structure too,
     // so a fresh repo built via "Build project structure" starts the
     // lifecycle with docs/planning/ in place.

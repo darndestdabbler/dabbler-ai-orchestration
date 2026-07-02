@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 4,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Underscore-based Markdown emphasis is not normalized by the external-verification parser, so otherwise valid reviewer output like '__Verdict:__ VERIFIED', 'Verdict: __ISSUES_FOUND__', or '__Scope:__ specification' parses as no-recognizable-verdict/scope and incorrectly re-triggers the soft gate.",
+      "category": "correctness",
+      "severity": "unspecified (blocking per anti-laundering rule)",
+      "issueId": "S077-S4-V1-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Verifier (gpt-5-4) read _strip_markdown in ai_router/external_verification.py in the session diff: '*' and backticks are removed everywhere but underscores only at line edges, so inner '__'/'_' emphasis around the Verdict:/Scope: keys or tokens breaks the regexes.",
+      "suggestedTestOrCheck": "Parse '__Verdict:__ VERIFIED', 'Verdict: __ISSUES_FOUND__', '_Scope:_ specification' and assert recognition, plus ISSUES_FOUND internal underscore survival.",
+      "resolution_status": "fixed",
+      "resolution_notes": "_strip_markdown now removes any underscore NOT between two alphanumerics (regex _UNDERSCORE_EMPHASIS_RE), stripping emphasis while preserving ISSUES_FOUND's internal underscore. Regression test test_underscore_emphasis_variants_parse covers all three shapes.",
+      "resolved_in_round": 2
+    },
+    {
+      "description": "The WAIVED continuation was looser than the documented grammar: 'Verdict: WAIVED' followed by a BLANK line and then 'Reason: ...' was accepted, though the doc requires the reason on the same line or the immediately-following line only.",
+      "category": "correctness",
+      "severity": "unspecified (blocking per anti-laundering rule)",
+      "issueId": "S077-S4-V1-002",
+      "issueType": "standards-departure",
+      "verificationMethod": "Verifier (gpt-5-4) compared _parse_round_body's WAIVED continuation loop (skips blank lines) against the grammar documented in cross-provider-verification.md.template ('immediately following').",
+      "suggestedTestOrCheck": "Parse 'Verdict: WAIVED\n\nReason: x' and assert the waiver is NOT recognized.",
+      "resolution_status": "fixed",
+      "resolution_notes": "The continuation now inspects strictly the next physical line (no blank-line skipping), matching the documented grammar; malformed waivers fall back to the soft-warn path. Regression test test_waived_reason_after_blank_line_is_rejected.",
+      "resolved_in_round": 2
+    }
+  ]
+}

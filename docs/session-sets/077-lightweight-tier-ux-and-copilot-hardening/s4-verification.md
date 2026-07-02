@@ -1,0 +1,7 @@
+- **Issue** → Underscore-based Markdown emphasis is not normalized, so otherwise valid reviewer output like `__Verdict:__ VERIFIED`, `Verdict: __ISSUES_FOUND__`, or `__Scope:__ specification` is parsed as “no recognizable verdict/scope” and incorrectly re-triggers the soft gate.
+  **Location** → `ai_router/external_verification.py`, `_strip_markdown()`
+  **Fix** → Strip paired `_` / `__` emphasis around labels and verdict tokens the same way `*` is stripped, while preserving the internal underscore in `ISSUES_FOUND` (e.g. regex-normalize emphasis-wrapped `Verdict:`, `Scope:`, and verdict tokens before matching).
+
+- **Issue** → The `WAIVED` continuation is looser than the documented grammar: `Verdict: WAIVED` followed by a blank line and then `Reason: ...` is currently accepted, even though the reason is supposed to be on the same line or the immediately following line only.
+  **Location** → `ai_router/external_verification.py`, `_parse_round_body()` WAIVED branch
+  **Fix** → When a `WAIVED` line has no inline reason, inspect only the next physical line for `Reason:` (or stop on the first following line, even if blank) so malformed waivers fall back to the intended soft-warning path.

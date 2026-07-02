@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 4,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "A malformed later WAIVED (reason-less) did not null out an earlier verdict in the same round, so the round could still resolve to VERIFIED/ISSUES_FOUND \u2014 the opposite of the reviewer's final (waive) intent \u2014 instead of the soft-warn/no-verdict outcome.",
+      "category": "correctness",
+      "severity": "unspecified (blocking per anti-laundering rule)",
+      "issueId": "S077-S4-V2-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Verifier (gpt-5-4) traced _parse_round_body's WAIVED branch in the round-1 fix delta: 'if not reason: continue' left the prior verdict variable standing.",
+      "suggestedTestOrCheck": "A round with an earlier valid verdict and a later malformed WAIVED (incl. the blank-line-separated Reason: case) must parse to verdict None.",
+      "resolution_status": "fixed",
+      "resolution_notes": "The malformed-WAIVED branch now nulls verdict and waive_reason before continuing, so the reviewer's last (malformed) verdict attempt fails toward the louder no-verdict posture. Regression test test_later_malformed_waived_nulls_an_earlier_verdict.",
+      "resolved_in_round": 3
+    }
+  ]
+}

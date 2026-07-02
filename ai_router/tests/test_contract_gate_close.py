@@ -84,6 +84,13 @@ def _make_set(tmp_path, *, sessions, total, level=REQUIRED, tier="full",
     (d / "activity-log.json").write_text(
         json.dumps({"entries": []}, indent=2), encoding="utf-8"
     )
+    # Set 077 S4 (A3): the external-verification soft gate now keys off
+    # the RESOLVED tier, so lightweight-parameterized fixtures receive
+    # it too. Seed a recorded verdict to keep it quiet — these tests
+    # exercise the contract gate, not the soft gate.
+    (d / "external-verification.md").write_text(
+        "## Round 1 — 2026-07-02\n\nVerdict: VERIFIED\n", encoding="utf-8"
+    )
     if level is not None:
         cg.record_contract_gate(d, level)
     if manifest is not None:

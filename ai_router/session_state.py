@@ -48,6 +48,7 @@ import logging
 import os
 import re
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -642,6 +643,23 @@ def register_session_start(
     if isinstance(existing, dict):
         prior_completed = compute_effective_completed_sessions(session_set)
 
+    # Set 077 S4 (S1 bundle F): the WRITER refuses to re-open a session
+    # already in completedSessions. The start_session CLI has always
+    # refused this; API callers (tests, consumer tooling importing the
+    # helper directly) reached _build_sessions_array, whose
+    # in-progress-wins precedence silently DEMOTED the completed session
+    # back to in-progress — erasing its completedAt / verdict from the
+    # derived view.
+    if session_number in prior_completed:
+        raise SessionStateInvariantError(
+            4,
+            f"register_session_start refused: session {session_number} is "
+            f"already in completedSessions {sorted(set(prior_completed))!r}. "
+            "Re-opening a closed session would erase its close-out record; "
+            "start the next session instead, or use close_session --repair "
+            "for drift recovery.",
+        )
+
     # Set 030 Session 2: build the v3 sessions[] ledger first; the
     # legacy triple is derived from it. The session count is the
     # caller's ``total_sessions``, falling back to the existing state's
@@ -870,9 +888,10 @@ def register_session_start(
             "orchestrator": orchestrator_block,
         }
         path = _state_path(session_set)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
-            f.write("\n")
+        # Set 077 S4 (S1 bundle F): boundary writes are atomic — a
+        # reader racing this write sees the old file or the new one,
+        # never a truncated partial.
+        _atomic_write_json(path, state)
     else:
         # Set 047 Session 4 canonical v4 write. The orchestrator
         # block lives on the in-progress session record. Prior-
@@ -905,9 +924,8 @@ def register_session_start(
                     state[passthrough_key] = existing[passthrough_key]
 
         path = _state_path(session_set)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
-            f.write("\n")
+        # Set 077 S4 (S1 bundle F): atomic boundary write.
+        _atomic_write_json(path, state)
 
     # Propagate to activity-log.json. Historically, activity-log.json was
     # created with totalSessions=0 by the SessionLog constructor and was
@@ -1095,9 +1113,8 @@ def register_typed_session_start(
             state[passthrough_key] = existing[passthrough_key]
 
     path = _state_path(session_set)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
-        f.write("\n")
+    # Set 077 S4 (S1 bundle F): atomic boundary write.
+    _atomic_write_json(path, state)
     return path, new_number
 
 
@@ -1313,9 +1330,8 @@ def register_typed_session_handoff(
             state[passthrough_key] = existing[passthrough_key]
 
     path = _state_path(session_set)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(state, f, indent=2)
-        f.write("\n")
+    # Set 077 S4 (S1 bundle F): atomic boundary write.
+    _atomic_write_json(path, state)
     return path, closing_number, new_number
 
 
@@ -1333,8 +1349,9 @@ def _propagate_total_sessions(session_set: str, total: int) -> None:
     if current > 0:
         return  # trust the existing value
     data["totalSessions"] = total
-    with open(log_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    # Set 077 S4 (S1 bundle F): atomic write — the activity log is
+    # read by the Explorer and the guidance/gate readers mid-session.
+    _atomic_write_json(log_path, data)
 
 
 def compute_effective_completed_sessions(session_set_dir: str) -> List[int]:
@@ -1705,9 +1722,8 @@ def _flip_state_to_closed(
     # that reaches ``_flip_state_to_closed`` gets the implicit
     # release via the status flip off ``in-progress`` and the
     # absence of any in-progress session in ``sessions[]``.
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(new_state, f, indent=2)
-        f.write("\n")
+    # Set 077 S4 (S1 bundle F): atomic boundary write.
+    _atomic_write_json(path, new_state)
 
     # On the last session, finalize activity-log totalSessions from
     # unique sessionNumbers if it's still missing or zero. Catches the
@@ -1898,9 +1914,13 @@ def _finalize_total_sessions_from_entries(session_set: str) -> None:
     }
     if not sessions:
         return
-    data["totalSessions"] = len(sessions)
-    with open(log_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+    # Set 077 S4 (S1 bundle F): ``max``, not ``len`` — a log whose
+    # entries cover sessions {1, 3} (session 2 logged nothing) has 3
+    # sessions, not 2. ``len`` under-counted whenever a session left
+    # no entries.
+    data["totalSessions"] = max(sessions)
+    # Atomic write, same rationale as _propagate_total_sessions.
+    _atomic_write_json(log_path, data)
 
 
 def _migrate_v1_to_v2_inplace(state: dict) -> dict:
@@ -1987,7 +2007,14 @@ def read_raw_session_state(session_set_dir: str) -> Optional[dict]:
     try:
         with open(path, "r", encoding="utf-8") as f:
             state = json.load(f)
-    except Exception:
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeError):
+        # Set 077 S4 (S1 bundle F): narrowed from a blanket Exception.
+        # FileNotFoundError covers the isfile/open race; JSONDecodeError
+        # and UnicodeError (the L-069-1 sibling class) cover corrupt
+        # content — all legitimately "no usable state". A
+        # PermissionError (held file, ACL problem) now PROPAGATES:
+        # silently treating an unreadable-but-present file as absent
+        # invited writers to clobber real state.
         return None
     if not isinstance(state, dict):
         return None
@@ -2040,6 +2067,13 @@ def _atomic_write_json(path: str, payload: dict) -> None:
     truncates the same path mid-stream, writer A's ``os.replace`` moves
     a partial file. Per-call uniqueness avoids that without needing a
     cross-process lock.
+
+    Windows ``PermissionError`` retry (Set 077 S4, S1 bundle F): on
+    Windows, ``os.replace`` over a destination another process holds
+    open (an editor, an AV scan, a concurrent reader) raises
+    ``PermissionError`` even though the operation would succeed a
+    moment later. Retry up to 3 times at 50 ms so atomicity does not
+    trade for held-file failures; the final attempt's error propagates.
     """
     directory = os.path.dirname(path) or "."
     base = os.path.basename(path)
@@ -2052,7 +2086,14 @@ def _atomic_write_json(path: str, payload: dict) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
             f.write("\n")
-        os.replace(tmp_path, path)
+        for attempt in range(3):
+            try:
+                os.replace(tmp_path, path)
+                break
+            except PermissionError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.05)
     except BaseException:
         # On any failure (write error, KeyboardInterrupt during the
         # critical section), best-effort remove the temp file so the
@@ -2258,6 +2299,40 @@ def _change_log_mtime_iso(session_set_dir: str) -> Optional[str]:
     return datetime.fromtimestamp(mtime).astimezone().isoformat()
 
 
+def _activity_log_has_entries(session_set_dir: str) -> bool:
+    """Return False ONLY for a cleanly-parsed activity log with zero entries.
+
+    Set 077 S4 (A12) helper for :func:`_backfill_payload`'s in-progress
+    inference. The modern authoring flow creates ``{"entries": []}`` up
+    front, so an *empty* entries list means "authored, not started" —
+    not "in progress". Everything else returns True so the legacy
+    file-presence inference is preserved conservatively:
+
+    * entries present (with or without ``dateTime`` fields) → True;
+    * unreadable / malformed JSON → True (file presence stays the
+      in-progress signal — we cannot prove the log is empty);
+    * unexpected shape (non-dict without a list, ``entries`` not a
+      list) → True, same reasoning.
+
+    Both documented log shapes are handled: the canonical dict with an
+    ``entries`` list, and the legacy bare-list form.
+    """
+    log_path = os.path.join(session_set_dir, "activity-log.json")
+    try:
+        with open(log_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        return True
+    if isinstance(data, dict):
+        entries = data.get("entries")
+        if isinstance(entries, list):
+            return len(entries) > 0
+        return True
+    if isinstance(data, list):
+        return len(data) > 0
+    return True
+
+
 def _backfill_payload(session_set_dir: str) -> dict:
     """Choose the right ``session-state.json`` shape for an existing folder.
 
@@ -2318,6 +2393,21 @@ def _backfill_payload(session_set_dir: str) -> dict:
         return base
 
     if os.path.isfile(os.path.join(session_set_dir, "activity-log.json")):
+        # Set 077 S4 (A12): an activity log whose ``entries`` list is
+        # EMPTY is not evidence of progress — the modern authoring flow
+        # (quick-start) creates ``{"entries": []}`` up front, so any
+        # router entry point that lazy-synthesizes a state file for a
+        # freshly-authored set (e.g. bare ``route()`` →
+        # ``is_no_router_mode`` → ``find_active_session_set``) was
+        # materializing a bogus in-progress state and the Explorer
+        # showed a set in flight nobody started (reproduced live,
+        # 2026-07-02). Disambiguate on entries length: empty ⇒
+        # not-started. The legacy inference is preserved for logs with
+        # entries — including entries without ``dateTime`` — and for
+        # unreadable / malformed / unexpected-shape logs (file presence
+        # stays the conservative in-progress signal there).
+        if not _activity_log_has_entries(session_set_dir):
+            return base
         # Round-A fix (Set 030 Session 3): same as the change-log
         # branch above — only escalate to in-progress when sessions[]
         # is populated. Without it, rule 1 and rule 6 would reject
@@ -2510,15 +2600,26 @@ def backfill_session_state_files(
 
     Callers that need the affected paths (e.g., the CLI's per-line
     output, audit tooling for the lazy-synth fallback) should use
-    :func:`_planned_backfill_paths` before invoking this function — the
-    plan list before a write is the same as the list of folders this
-    function actually wrote, since synthesis only fails on I/O errors
-    that propagate out.
+    :func:`_planned_backfill_paths` before invoking this function.
+    Set 077 S4: the return value counts files actually WRITTEN — a
+    folder whose state file materialized between the plan walk and the
+    write (a concurrent lazy-synth) is skipped and not counted, so the
+    plan list can exceed the returned count under races.
     """
     paths = _planned_backfill_paths(base_dir)
+    written = 0
     for sub in paths:
+        # Set 077 S4 (S1 bundle F, TOCTOU): re-check inside the loop —
+        # a concurrent lazy-synth (read_status on another process) may
+        # have materialized the file between the plan walk and this
+        # write, possibly with MORE information than our inference
+        # (e.g. a real register_session_start landed). Existing files
+        # are left untouched, same as the plan-time rule.
+        if os.path.isfile(_state_path(sub)):
+            continue
         _atomic_write_json(_state_path(sub), _backfill_payload(sub))
-    return len(paths)
+        written += 1
+    return written
 
 
 # ---------------------------------------------------------------------------

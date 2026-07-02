@@ -123,17 +123,18 @@ suite("scaffoldConsumerRepo — file writes", () => {
       fileOps: ops,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Ten artifacts since Set 064 D7 (the three docs/planning/
-    // guidance-lifecycle starters joined the seven Set-060 artifacts),
-    // plus the two Set 077 S2 durable markers (.dabbler/tier +
-    // .dabbler/verification-mode).
-    assert.strictEqual(result.written.length, 12);
+    // Eleven artifacts: the seven Set-060 artifacts, the three Set 064
+    // D7 docs/planning/ guidance-lifecycle starters, and the Set 077 S4
+    // cross-provider verification doc — plus the two Set 077 S2 durable
+    // markers (.dabbler/tier + .dabbler/verification-mode).
+    assert.strictEqual(result.written.length, 13);
     assert.strictEqual(result.skipped.length, 0);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
     assert.ok(store.has("/repo/docs/dabbler/start-here.md"));
     assert.ok(store.has("/repo/docs/dabbler/getting-started.md"));
+    assert.ok(store.has("/repo/docs/dabbler/cross-provider-verification.md"));
     assert.ok(store.has("/repo/docs/planning/lessons-learned.md"));
     assert.ok(store.has("/repo/docs/planning/project-guidance.md"));
     assert.ok(store.has("/repo/docs/planning/lessons-archive.md"));
@@ -152,7 +153,7 @@ suite("scaffoldConsumerRepo — file writes", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 11); // 9 artifacts + 2 markers
+    assert.strictEqual(result.written.length, 12); // 10 artifacts + 2 markers
   });
 });
 
@@ -204,7 +205,7 @@ suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
     });
     assert.strictEqual(result.installOk, false);
     assert.strictEqual(result.installMessage, "pip failed");
-    assert.strictEqual(result.written.length, 12); // artifacts + markers still written
+    assert.strictEqual(result.written.length, 13); // artifacts + markers still written
   });
 });
 

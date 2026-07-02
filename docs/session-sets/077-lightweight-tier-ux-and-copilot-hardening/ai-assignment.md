@@ -121,14 +121,14 @@ Moderate
 | 5.   | Full pass; verify; close | `direct:shell`, `session-verification` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium
+- Total routed cost: $1.06 (documentation review gemini-pro $0.016 + gpt-5.4-mini auto-verify; test-generation gemini-pro $0.033; code-review opus $0.55 + gpt-5.4 auto-verify; session-verification gpt-5.4 rounds 1–4 $0.34 + $0.08 + $0.04 + $0.002; S5-recommendation analysis gemini-pro $0.005)
+- Deviations from recommendation: ran at effort=medium (recommendation said high) — third consecutive session where medium plus routed review + multi-round cross-provider verification supplied the depth. Bundle F (spec: "defer-with-reason allowed") was landed in full rather than deferred.
+- Notes for next-session calibration: the review/verify layers again each caught a distinct real defect class the layer below missed — the code-review auto-verify found the spec-review-prompt gate-laundering hole (fixed via the Scope: specification round marker), and verification rounds 1–2 caught three parser-grammar edges (underscore emphasis, WAIVED reason adjacency, malformed-WAIVED nulling). Keep verification budget concentrated on NEW grammar/contract surfaces. Routed test-gen again doubled as a review surface (its fake one-file bundle fixture exposed the loadTemplateBundle all-files contract). Routed gate: REQUIRED (blast-radius + multi-module + breadth).
 
 **Next-session orchestrator recommendation (Session 5):**
 Claude Code claude-fable-5 @ effort=high
-Rationale: Session 5 modifies tightly-coupled logic across the Python backend and TypeScript frontend, requiring the deep cross-stack reasoning at which Claude excels.
+Rationale: Session 5 modifies tightly-coupled logic across the Python backend and TypeScript frontend, requiring the deep cross-stack reasoning at which Claude excels. (Confirmed at S4 close by routed analysis — gemini-pro: the cross-stack state-consistency mix is the canonical case for the standing recommendation, with three sessions of track record.)
 
 ---
 

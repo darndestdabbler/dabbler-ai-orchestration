@@ -265,3 +265,232 @@ suite("copyPromptCommands — verification kickoff prompt (Set 062 S2, spec D2)"
     assert.ok(!out.includes("``"));
   });
 });
+
+// ---------------------------------------------------------------------------
+// Set 077 S4 — pointer-style Evaluate prompts (Feature 3, A2/A9)
+// ---------------------------------------------------------------------------
+// Adapted from routed test-generation (gemini-pro, S4): import paths,
+// TDD-ui setup/teardown, and the ensure-write sandbox (which must copy
+// the REAL bundle — loadTemplateBundle reads every bundle file, so a
+// one-file fake fails to load) were corrected during integration.
+
+import * as fs from "fs";
+import * as os from "os";
+import {
+  ensureCrossProviderVerificationDoc,
+  __forTests as copyPromptForTests,
+} from "../../commands/copyPromptCommands";
+import { buildExternalVerificationTemplate } from "../../commands/externalVerification";
+import {
+  CROSS_PROVIDER_VERIFICATION_REL_PATH,
+  resolveBundledTemplateDir,
+} from "../../utils/consumerBootstrap";
+
+suite("copyPromptCommands — pointer-style Evaluate prompts (Set 077 S4)", () => {
+  type TrailerCtx = {
+    readReviewCriteria: (root: string, kind: "spec" | "session" | "set") => string | null;
+    fileExists: (p: string) => boolean;
+  };
+  const builders: Array<
+    [string, (s: SessionSet, c: TrailerCtx) => string]
+  > = [
+    ["spec", buildSpecReviewPrompt],
+    ["session", buildSessionAccomplishmentsPrompt],
+    ["set", buildSetAccomplishmentsPrompt],
+  ];
+
+  for (const [kind, build] of builders) {
+    test(`${kind} prompt OPENS with the canonical-doc pointer + missing-doc fallback`, () => {
+      const out = build(fakeSet("077-pointer"), noCriteria);
+      assert.ok(
+        out.startsWith("Cross-provider review request (out-of-band verification)."),
+        `${kind}: must open with the review-request line`,
+      );
+      assert.ok(
+        out.includes("docs/dabbler/cross-provider-verification.md"),
+        `${kind}: must point at the canonical instruction doc`,
+      );
+      assert.ok(
+        out.includes("If that file is missing"),
+        `${kind}: must carry the one-line missing-doc fallback`,
+      );
+      // The fallback names the full verdict grammar.
+      assert.ok(out.includes("VERIFIED"), kind);
+      assert.ok(out.includes("ISSUES_FOUND"), kind);
+      assert.ok(out.includes("WAIVED"), kind);
+    });
+
+    test(`${kind} prompt CLOSES with the mandatory write-the-artifact instruction`, () => {
+      const out = build(fakeSet("077-pointer"), noCriteria);
+      assert.ok(
+        out
+          .trimEnd()
+          .endsWith("A verdict that exists only in this chat does not count."),
+        `${kind}: must close on the artifact instruction`,
+      );
+      assert.ok(
+        out.includes("docs/session-sets/077-pointer/external-verification.md"),
+        `${kind}: the artifact path must be spelled out relative to repo root`,
+      );
+      assert.ok(
+        out.includes("append-only"),
+        `${kind}: append-only discipline must be stated`,
+      );
+    });
+
+    test(`${kind} prompt scope marker: only the spec review instructs Scope: specification`, () => {
+      const out = build(fakeSet("077-pointer"), noCriteria);
+      if (kind === "spec") {
+        assert.ok(
+          out.includes("Scope: specification"),
+          "spec review must instruct the parser-visible scope marker",
+        );
+      } else {
+        assert.ok(
+          !out.includes("Scope: specification"),
+          `${kind}: work reviews must not be spec-scoped`,
+        );
+      }
+    });
+
+    test(`${kind} prompt preserves the operator-criteria trailer between opener and close`, () => {
+      const out = build(
+        fakeSet("077-pointer"),
+        withCriteria("Repo-specific check: the frobnicator must frob."),
+      );
+      const criteriaIdx = out.indexOf("Repo-specific check");
+      const closeIdx = out.indexOf("Non-negotiable final step");
+      assert.ok(criteriaIdx > 0, `${kind}: criteria embedded`);
+      assert.ok(closeIdx > criteriaIdx, `${kind}: close comes after the trailer`);
+    });
+  }
+});
+
+suite("copyPromptCommands — review-criteria size guard (Set 077 S4)", () => {
+  const trailerFn = copyPromptForTests.reviewCriteriaTrailer;
+
+  test("short criteria are embedded verbatim (no truncation note)", () => {
+    const trailer = trailerFn("/repo", "spec", withCriteria("short and sweet"));
+    assert.ok(trailer.includes("short and sweet"));
+    assert.ok(!trailer.includes("truncated at"));
+  });
+
+  test("criteria beyond 8000 chars are truncated with a pointer note", () => {
+    const long = "A".repeat(9000);
+    const trailer = trailerFn("/repo", "set", withCriteria(long));
+    assert.ok(trailer.includes("[... truncated at 8000 characters"));
+    assert.ok(
+      trailer.includes("read docs/review-criteria/set.md for the rest"),
+      "truncation note must point at the on-disk file",
+    );
+    assert.ok(
+      trailer.length < 8000 + 400,
+      `trailer should be bounded; got ${trailer.length}`,
+    );
+  });
+});
+
+suite("copyPromptCommands — ensureCrossProviderVerificationDoc (Set 077 S4)", () => {
+  let sandbox: string;
+  let extensionPath: string;
+  let workspaceRoot: string;
+
+  function realBundleDir(): string {
+    const extRoot = path.resolve(__dirname, "../../..");
+    const candidates = [
+      path.resolve(extRoot, "../../docs/templates/consumer-bootstrap"),
+      resolveBundledTemplateDir(extRoot),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(path.join(c, "cross-provider-verification.md.template"))) {
+        return c;
+      }
+    }
+    throw new Error("could not locate the consumer-bootstrap bundle");
+  }
+
+  setup(() => {
+    sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-xpv-"));
+    extensionPath = path.join(sandbox, "ext");
+    workspaceRoot = path.join(sandbox, "my-workspace");
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    // loadTemplateBundle reads EVERY bundle file, so the fake packaged
+    // layout must carry the whole real bundle, not just one template.
+    const bundleDir = resolveBundledTemplateDir(extensionPath);
+    fs.mkdirSync(bundleDir, { recursive: true });
+    const src = realBundleDir();
+    for (const f of fs.readdirSync(src)) {
+      if (f.endsWith(".template") || f.endsWith(".md")) {
+        fs.copyFileSync(path.join(src, f), path.join(bundleDir, f));
+      }
+    }
+  });
+
+  teardown(() => {
+    fs.rmSync(sandbox, { recursive: true, force: true });
+  });
+
+  function targetPath(): string {
+    return path.join(
+      workspaceRoot,
+      ...CROSS_PROVIDER_VERIFICATION_REL_PATH.split("/"),
+    );
+  }
+
+  test("creates the doc (with the repo name substituted) when missing", () => {
+    assert.strictEqual(fs.existsSync(targetPath()), false);
+    const ok = ensureCrossProviderVerificationDoc(extensionPath, workspaceRoot);
+    assert.strictEqual(ok, true);
+    const content = fs.readFileSync(targetPath(), "utf8");
+    assert.ok(content.includes("my-workspace"), "repo name substituted");
+    assert.ok(
+      content.includes("Verdict grammar"),
+      "canonical content present",
+    );
+  });
+
+  test("refreshes a stale/hand-edited copy back to the bundled content", () => {
+    fs.mkdirSync(path.dirname(targetPath()), { recursive: true });
+    fs.writeFileSync(targetPath(), "old stale hand-edited content", "utf8");
+    const ok = ensureCrossProviderVerificationDoc(extensionPath, workspaceRoot);
+    assert.strictEqual(ok, true);
+    const content = fs.readFileSync(targetPath(), "utf8");
+    assert.ok(!content.includes("old stale hand-edited content"));
+    assert.ok(content.includes("cross-provider-verification.md.template"));
+  });
+
+  test("an identical up-to-date copy is left as-is (idempotent)", () => {
+    assert.strictEqual(
+      ensureCrossProviderVerificationDoc(extensionPath, workspaceRoot),
+      true,
+    );
+    const before = fs.readFileSync(targetPath(), "utf8");
+    assert.strictEqual(
+      ensureCrossProviderVerificationDoc(extensionPath, workspaceRoot),
+      true,
+    );
+    assert.strictEqual(fs.readFileSync(targetPath(), "utf8"), before);
+  });
+
+  test("returns false (never throws) when the bundle dir is missing", () => {
+    fs.rmSync(path.join(extensionPath, "dist"), { recursive: true, force: true });
+    assert.strictEqual(
+      ensureCrossProviderVerificationDoc(extensionPath, workspaceRoot),
+      false,
+    );
+  });
+});
+
+suite("externalVerification — seeded template (Set 077 S4, A2)", () => {
+  test("carries set name, dated Round 1 header, and a PENDING verdict", () => {
+    const t = buildExternalVerificationTemplate("077-my-set", "2026-07-02");
+    assert.ok(t.includes("# External Verification — 077-my-set"));
+    assert.ok(t.includes("## Round 1 — 2026-07-02"));
+    assert.ok(t.includes("Verdict: PENDING"));
+  });
+
+  test("points the reviewing engine at the canonical instruction doc", () => {
+    const t = buildExternalVerificationTemplate("077-my-set", "2026-07-02");
+    assert.ok(t.includes("docs/dabbler/cross-provider-verification.md"));
+  });
+});

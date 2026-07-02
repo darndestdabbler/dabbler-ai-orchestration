@@ -232,6 +232,103 @@ class TestBackfillBranches:
         assert state["startedAt"] == "2026-04-30T06:00:00-04:00"
         assert state["completedAt"] is None
 
+    def test_empty_entries_log_classifies_not_started(
+        self, base_dir: Path
+    ) -> None:
+        """Set 077 S4 (A12) regression — the authored-today/started-tomorrow
+        flow. The modern quick-start authoring flow creates
+        ``{"entries": []}`` up front; lazy synthesis must read that as
+        not-started, not in-progress (the pre-fix behavior materialized a
+        bogus in-progress state the moment any router entry point resolved
+        the active set)."""
+        d = _make_set(base_dir, "004-authored-today")
+        log = {
+            "sessionSetName": "004-authored-today",
+            "createdDate": "2026-07-02T05:00:00-04:00",
+            "totalSessions": 4,
+            "entries": [],
+        }
+        (d / "activity-log.json").write_text(json.dumps(log), encoding="utf-8")
+
+        backfill_session_state_files(str(base_dir))
+
+        state = read_session_state(str(d))
+        assert state is not None
+        assert state["status"] == NOT_STARTED_STATUS
+
+    def test_empty_bare_list_log_classifies_not_started(
+        self, base_dir: Path
+    ) -> None:
+        """The legacy bare-list log shape gets the same empty ⇒ not-started
+        disambiguation."""
+        d = _make_set(base_dir, "005-bare-list-empty")
+        (d / "activity-log.json").write_text("[]", encoding="utf-8")
+
+        backfill_session_state_files(str(base_dir))
+
+        state = read_session_state(str(d))
+        assert state is not None
+        assert state["status"] == NOT_STARTED_STATUS
+
+    def test_entries_without_datetime_still_classify_in_progress(
+        self, base_dir: Path
+    ) -> None:
+        """Legacy inference preserved (S1 bundle F nuance): entries that
+        lack ``dateTime`` cannot backfill startedAt but ARE progress
+        evidence — the set must still classify in-progress."""
+        d = _make_set(base_dir, "006-legacy-no-datetime")
+        log = {
+            "entries": [
+                {
+                    "sessionNumber": 1,
+                    "stepNumber": 1,
+                    "description": "old entry with no dateTime",
+                    "status": "complete",
+                }
+            ]
+        }
+        (d / "activity-log.json").write_text(json.dumps(log), encoding="utf-8")
+
+        backfill_session_state_files(str(base_dir))
+
+        state = read_session_state(str(d))
+        assert state is not None
+        assert state["status"] == IN_PROGRESS_STATUS
+        assert state["startedAt"] is None
+
+    def test_malformed_log_stays_in_progress_conservatively(
+        self, base_dir: Path
+    ) -> None:
+        """An unreadable/malformed activity log cannot prove emptiness, so
+        file presence keeps the conservative in-progress inference."""
+        d = _make_set(base_dir, "007-malformed-log")
+        (d / "activity-log.json").write_text("{not json", encoding="utf-8")
+
+        backfill_session_state_files(str(base_dir))
+
+        state = read_session_state(str(d))
+        assert state is not None
+        assert state["status"] == IN_PROGRESS_STATUS
+
+    def test_ensure_session_state_file_lazy_synth_reads_not_started(
+        self, base_dir: Path
+    ) -> None:
+        """The production A12 path: ``read_status`` → lazy synth →
+        ``ensure_session_state_file`` on a freshly-authored set must
+        materialize (and report) not-started."""
+        d = _make_set(base_dir, "008-lazy-synth")
+        (d / "activity-log.json").write_text(
+            json.dumps({"entries": []}), encoding="utf-8"
+        )
+
+        status = session_state.read_status(str(d))
+
+        assert status == NOT_STARTED_STATUS
+        data = json.loads(
+            (d / SESSION_STATE_FILENAME).read_text(encoding="utf-8")
+        )
+        assert data["status"] == NOT_STARTED_STATUS
+
     def test_complete_branch_change_log_present(
         self, base_dir: Path
     ) -> None:

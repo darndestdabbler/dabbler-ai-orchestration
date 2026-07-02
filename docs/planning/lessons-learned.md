@@ -269,7 +269,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   push-vs-pull result whose arms used unequal framing as evidence for retiring push.
 
 ## Strong Adversarial Framing Without A Materiality Bar Manufactures Minor-Finding Churn
-<!-- lesson: id="L-071-1" added-set="071" last-used-set="075" status="active" scope="portable" -->
+<!-- lesson: id="L-071-1" added-set="071" last-used-set="077" status="active" scope="portable" -->
 
 - **Context:** A verification surface running at its **strongest adversarial
   framing** (devil's advocate, "assume the work is flawed, a rubber-stamp is a

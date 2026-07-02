@@ -25,6 +25,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import { SessionSet } from "../types";
+import {
+  CROSS_PROVIDER_VERIFICATION_REL_PATH,
+  loadTemplateBundle,
+  renderCrossProviderVerification,
+  resolveBundledTemplateDir,
+  structureOnlyContext,
+} from "../utils/consumerBootstrap";
 
 interface SetItem extends vscode.TreeItem {
   set: SessionSet;
@@ -33,6 +40,13 @@ interface SetItem extends vscode.TreeItem {
 type ReviewKind = "spec" | "session" | "set";
 
 const REVIEW_CRITERIA_DIRNAME = "review-criteria";
+
+// Set 077 S4 (S1 bundle A Minor): ceiling on the embedded operator
+// review-criteria text. The §3.9 carve-out embeds the file's content
+// verbatim; an accidentally huge file (a pasted transcript, a binary
+// renamed .md) would otherwise dominate the prompt and push the
+// load-bearing instructions out of the reviewer's attention.
+const REVIEW_CRITERIA_MAX_CHARS = 8000;
 
 interface BuildContext {
   readReviewCriteria: (root: string, kind: ReviewKind) => string | null;
@@ -78,7 +92,114 @@ function reviewCriteriaTrailer(
       `  Create \`${hintPath}\` to embed repo-specific criteria here.`
     );
   }
-  return `Operator review criteria (from docs/${REVIEW_CRITERIA_DIRNAME}/${kind}.md):\n\n${content.trimEnd()}`;
+  // Set 077 S4: size guard — truncate an oversized criteria file rather
+  // than letting it crowd out the prompt's load-bearing instructions.
+  let body = content.trimEnd();
+  if (body.length > REVIEW_CRITERIA_MAX_CHARS) {
+    body =
+      body.slice(0, REVIEW_CRITERIA_MAX_CHARS) +
+      `\n\n[... truncated at ${REVIEW_CRITERIA_MAX_CHARS} characters — ` +
+      `read docs/${REVIEW_CRITERIA_DIRNAME}/${kind}.md for the rest]`;
+  }
+  return `Operator review criteria (from docs/${REVIEW_CRITERIA_DIRNAME}/${kind}.md):\n\n${body}`;
+}
+
+/**
+ * Pointer opener shared by the three Evaluate prompts (Set 077 S4,
+ * Feature 3 — "prompts are pointers"). Names the canonical in-repo
+ * instruction doc first and carries the one-line fallback for the
+ * pathological missing-doc case (critique M2).
+ */
+function verificationPointerOpener(): string {
+  return (
+    `Cross-provider review request (out-of-band verification).\n` +
+    `\n` +
+    `First read \`${CROSS_PROVIDER_VERIFICATION_REL_PATH}\` (repo root) — ` +
+    `it carries the review stance, the verdict grammar, and the required ` +
+    `output artifact. If that file is missing, use this fallback: review ` +
+    `adversarially with a materiality bar, and record exactly one verdict ` +
+    `token — VERIFIED, ISSUES_FOUND (findings tagged [Critical]/[Major]/` +
+    `[Minor]), or WAIVED — <one-line reason>.`
+  );
+}
+
+/**
+ * The mandatory write-the-artifact close shared by the three Evaluate
+ * prompts (Set 077 S4, A2): the reviewing engine itself writes the
+ * verdict file — a verdict that exists only in the chat does not count
+ * and the close-out gate will warn on it.
+ *
+ * A ``spec`` review runs BEFORE the work exists, so its round must
+ * carry a parser-visible ``Scope: specification`` line — the close-out
+ * gate deliberately refuses to read a spec-only verdict as evidence
+ * the WORK was reviewed (S4 code-review finding: without the scope
+ * marker, a pre-work spec review could silently satisfy the gate).
+ */
+function verificationArtifactClose(
+  set: SessionSet,
+  kind: ReviewKind,
+): string {
+  const artifactRel = relFromRoot(
+    set.root,
+    path.join(set.dir, "external-verification.md"),
+  );
+  const scopeLine =
+    kind === "spec"
+      ? ` Because this is a pre-work SPECIFICATION review, put the line ` +
+        `\`Scope: specification\` directly under your round header — a ` +
+        `spec-only verdict must not read as work verification.`
+      : "";
+  return (
+    `Non-negotiable final step: YOU (the reviewing engine) must write ` +
+    `your verdict as a new dated round section appended to ` +
+    `\`${artifactRel}\` (UTF-8, append-only — never rewrite earlier ` +
+    `rounds).${scopeLine} A verdict that exists only in this chat does ` +
+    `not count.`
+  );
+}
+
+/**
+ * Idempotently write/refresh the canonical cross-provider verification
+ * doc into the workspace BEFORE a pointer prompt is emitted (Set 077
+ * S4, critique M2). Consumer repos bootstrapped before Set 077 get the
+ * doc on first use after upgrading the extension — no re-bootstrap.
+ * The doc follows the start-here.md generated-never-hand-edited
+ * pattern, so refreshing a stale copy to the bundled content is
+ * correct by contract. Returns true when the doc is present (written
+ * or already current); false on any failure — the prompt's fallback
+ * line covers that case, so failures are non-fatal by design.
+ */
+export function ensureCrossProviderVerificationDoc(
+  extensionPath: string,
+  root: string,
+): boolean {
+  try {
+    const bundle = loadTemplateBundle(resolveBundledTemplateDir(extensionPath));
+    const ctx = structureOnlyContext(
+      path.basename(root),
+      "lightweight",
+      new Date().toISOString().slice(0, 10),
+    );
+    const rendered = renderCrossProviderVerification(bundle, ctx);
+    const target = path.join(
+      root,
+      ...CROSS_PROVIDER_VERIFICATION_REL_PATH.split("/"),
+    );
+    let existing: string | null = null;
+    try {
+      existing = fs.readFileSync(target, "utf8");
+    } catch {
+      existing = null;
+    }
+    if (existing !== null && existing.replace(/\r\n/g, "\n") === rendered) {
+      return true;
+    }
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, rendered, { encoding: "utf8" });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function buildSpecReviewPrompt(
@@ -86,15 +207,17 @@ export function buildSpecReviewPrompt(
   ctx: BuildContext = defaultBuildContext,
 ): string {
   const specRel = relFromRoot(set.root, set.specPath);
+  const opener = verificationPointerOpener();
   const instructions =
-    `Review the session-set specification for scope clarity, feasibility,\n` +
-    `and internal consistency. Flag any session whose stated scope cannot\n` +
-    `realistically be completed by one orchestrator in a single sitting, or\n` +
-    `whose deliverables are ambiguous. Note whether the prerequisites and\n` +
-    `non-goals are explicit.`;
+    `Scope: review the session-set specification for scope clarity,\n` +
+    `feasibility, and internal consistency. Flag any session whose stated\n` +
+    `scope cannot realistically be completed by one orchestrator in a\n` +
+    `single sitting, or whose deliverables are ambiguous. Note whether the\n` +
+    `prerequisites and non-goals are explicit.`;
   const files = `Files to read (relative to repo root):\n  - ${specRel}`;
   const trailer = reviewCriteriaTrailer(set.root, "spec", ctx);
-  return `${instructions}\n\n${files}\n\n${trailer}\n`;
+  const close = verificationArtifactClose(set, "spec");
+  return `${opener}\n\n${instructions}\n\n${files}\n\n${trailer}\n\n${close}\n`;
 }
 
 export function buildSessionAccomplishmentsPrompt(
@@ -105,12 +228,13 @@ export function buildSessionAccomplishmentsPrompt(
   const changeLogPresent = ctx.fileExists(set.changeLogPath);
   const changeLogRel = relFromRoot(set.root, set.changeLogPath);
   const specRel = relFromRoot(set.root, set.specPath);
+  const opener = verificationPointerOpener();
   const instructions =
-    `Review the most recent session of this set against its declared scope.\n` +
-    `Read the spec for the session's promised deliverables, then cross-check\n` +
-    `against the activity log entries and any change-log additions. Flag\n` +
-    `scope creep, missing deliverables, or commits that look unrelated to\n` +
-    `the stated session goal.`;
+    `Scope: review the most recent session of this set against its\n` +
+    `declared scope. Read the spec for the session's promised\n` +
+    `deliverables, then cross-check against the activity log entries and\n` +
+    `any change-log additions. Flag scope creep, missing deliverables, or\n` +
+    `commits that look unrelated to the stated session goal.`;
   const fileLines: string[] = [`  - ${specRel}`, `  - ${activityRel}`];
   if (changeLogPresent) {
     fileLines.push(`  - ${changeLogRel}`);
@@ -122,7 +246,8 @@ export function buildSessionAccomplishmentsPrompt(
     `  - \`git log --oneline <prev-session-ref>..HEAD\`\n` +
     `  - \`git diff <prev-session-ref>..HEAD\``;
   const trailer = reviewCriteriaTrailer(set.root, "session", ctx);
-  return `${instructions}\n\n${files}\n\n${gitCommands}\n\n${trailer}\n`;
+  const close = verificationArtifactClose(set, "session");
+  return `${opener}\n\n${instructions}\n\n${files}\n\n${gitCommands}\n\n${trailer}\n\n${close}\n`;
 }
 
 export function buildSetAccomplishmentsPrompt(
@@ -138,10 +263,11 @@ export function buildSetAccomplishmentsPrompt(
   const changeLogPresent = ctx.fileExists(set.changeLogPath);
   const changeLogRel = relFromRoot(set.root, set.changeLogPath);
   const specRel = relFromRoot(set.root, set.specPath);
+  const opener = verificationPointerOpener();
   const instructions =
-    `Review the entire completed session set against its declared scope.\n` +
-    `Confirm every promised deliverable shipped, flag any non-goals that\n` +
-    `crept into scope, and assess whether the set's stated outcome\n` +
+    `Scope: review the entire completed session set against its declared\n` +
+    `scope. Confirm every promised deliverable shipped, flag any non-goals\n` +
+    `that crept into scope, and assess whether the set's stated outcome\n` +
     `(version bump, doc revision, registry release) was actually achieved.`;
   const fileLines: string[] = [`  - ${specRel}`];
   if (changeLogPresent) {
@@ -154,7 +280,8 @@ export function buildSetAccomplishmentsPrompt(
     `  - \`git log --oneline <set-start-ref>..HEAD\`\n` +
     `  - \`git diff <set-start-ref>..HEAD\``;
   const trailer = reviewCriteriaTrailer(set.root, "set", ctx);
-  return `${instructions}\n\n${files}\n\n${gitCommands}\n\n${trailer}\n`;
+  const close = verificationArtifactClose(set, "set");
+  return `${opener}\n\n${instructions}\n\n${files}\n\n${gitCommands}\n\n${trailer}\n\n${close}\n`;
 }
 
 // Defense-in-depth: a backtick inside the slug would break the
@@ -244,6 +371,12 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
       "dabbler.copySpecReviewPrompt",
       async (item: SetItem) => {
         if (!item?.set) return;
+        // Set 077 S4 (critique M2): the pointer prompt must never
+        // dangle — refresh the canonical doc into the workspace first.
+        ensureCrossProviderVerificationDoc(
+          context.extensionPath,
+          item.set.root,
+        );
         const prompt = buildSpecReviewPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Spec-review prompt for ${item.set.name}`);
       },
@@ -252,6 +385,10 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
       "dabbler.copySessionAccomplishmentsPrompt",
       async (item: SetItem) => {
         if (!item?.set) return;
+        ensureCrossProviderVerificationDoc(
+          context.extensionPath,
+          item.set.root,
+        );
         const prompt = buildSessionAccomplishmentsPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Session-accomplishments prompt for ${item.set.name}`);
       },
@@ -260,6 +397,10 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
       "dabbler.copySetAccomplishmentsPrompt",
       async (item: SetItem) => {
         if (!item?.set) return;
+        ensureCrossProviderVerificationDoc(
+          context.extensionPath,
+          item.set.root,
+        );
         const prompt = buildSetAccomplishmentsPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Set-accomplishments prompt for ${item.set.name}`);
       },

@@ -48,10 +48,15 @@
     {
       "number": 4,
       "title": "Out-of-band self-completing verification (Features 3\u20134)",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-02T07:17:02.887158-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "medium"
+      },
       "verificationVerdict": null
     },
     {

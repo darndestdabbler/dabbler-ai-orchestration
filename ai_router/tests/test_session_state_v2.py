@@ -277,7 +277,22 @@ class TestRegisterSessionStartV2:
 
 
 class TestMarkSessionCompleteV2:
-    def test_writes_closed_lifecycle_state(self, session_set_dir):
+    def test_writes_closed_lifecycle_state(self, session_set_dir, monkeypatch):
+        # This test asserts the snapshot flip mechanics, not gate
+        # enforcement (covered separately in
+        # test_mark_session_complete_gate.py) — stub the gate to
+        # all-pass rather than using force=True. Set 077 S4: the
+        # previous force=True mid-set close was a fixture bug — force's
+        # documented semantic is "the SET is done", so it promoted
+        # session 2 to complete, and the writer's new re-open refusal
+        # (S1 bundle F) correctly rejects re-starting it.
+        import close_session as _cs
+
+        monkeypatch.setattr(
+            _cs,
+            "run_gate_checks",
+            lambda *_a, **_kw: [],
+        )
         # Register sessions 1 and 2 to mirror a real boundary write —
         # without session 1 already closed, the v3 invariant rule 4
         # would reject session 2 as complete-before-1.
@@ -292,7 +307,7 @@ class TestMarkSessionCompleteV2:
         # the SET to complete on the last session; for this mid-set
         # close we need change-log to be absent.
         mark_session_complete(
-            session_set_dir, verification_verdict="VERIFIED", force=True,
+            session_set_dir, verification_verdict="VERIFIED",
         )
         register_session_start(
             session_set=session_set_dir,
@@ -307,11 +322,8 @@ class TestMarkSessionCompleteV2:
             os.path.join(session_set_dir, "change-log.md"), "w", encoding="utf-8",
         ) as f:
             f.write("# Test change log\n")
-        # force=True bypasses the gate — this test asserts the snapshot
-        # flip mechanics, not gate enforcement (covered separately in
-        # test_mark_session_complete_gate.py).
         mark_session_complete(
-            session_set_dir, verification_verdict="VERIFIED", force=True,
+            session_set_dir, verification_verdict="VERIFIED",
         )
         path = os.path.join(session_set_dir, SESSION_STATE_FILENAME)
         with open(path, encoding="utf-8") as f:

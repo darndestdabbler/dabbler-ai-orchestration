@@ -22362,7 +22362,8 @@ var BUNDLE_FILES = {
   geminiTail: "engine-file.gemini-tail.md",
   lessonsLearnedTemplate: "lessons-learned.md.template",
   projectGuidanceTemplate: "project-guidance.md.template",
-  lessonsArchiveTemplate: "lessons-archive.md.template"
+  lessonsArchiveTemplate: "lessons-archive.md.template",
+  crossProviderVerificationTemplate: "cross-provider-verification.md.template"
 };
 var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
 function resolveBundledTemplateDir(extensionPath) {
@@ -22381,7 +22382,10 @@ function loadTemplateBundle(bundleDir) {
     geminiTail: read(BUNDLE_FILES.geminiTail),
     lessonsLearnedTemplate: read(BUNDLE_FILES.lessonsLearnedTemplate),
     projectGuidanceTemplate: read(BUNDLE_FILES.projectGuidanceTemplate),
-    lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate)
+    lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate),
+    crossProviderVerificationTemplate: read(
+      BUNDLE_FILES.crossProviderVerificationTemplate
+    )
   };
 }
 function padSessionNumber(n) {
@@ -22497,6 +22501,14 @@ var GETTING_STARTED_REL_PATH = path10.posix.join(
   "dabbler",
   "getting-started.md"
 );
+var CROSS_PROVIDER_VERIFICATION_REL_PATH = path10.posix.join(
+  "docs",
+  "dabbler",
+  "cross-provider-verification.md"
+);
+function renderCrossProviderVerification(bundle, ctx) {
+  return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
+}
 var LESSONS_LEARNED_REL_PATH = path10.posix.join("docs", "planning", "lessons-learned.md");
 var PROJECT_GUIDANCE_REL_PATH = path10.posix.join("docs", "planning", "project-guidance.md");
 var LESSONS_ARCHIVE_REL_PATH = path10.posix.join("docs", "planning", "lessons-archive.md");
@@ -22514,6 +22526,12 @@ function renderConsumerBootstrap(bundle, ctx) {
     "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
     [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
     [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 077 S4 (Feature 3): the engine-facing verification doc the
+    // Evaluate pointer prompts reference.
+    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
+      bundle,
+      ctx
+    ),
     [specRelPath(ctx)]: renderSpec(bundle, ctx),
     [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
     // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
@@ -22541,6 +22559,12 @@ function renderStructureBootstrap(bundle, ctx) {
     // with the structure scaffold too, so the editor-open path can
     // prefer the workspace copy once the structure is built.
     [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 077 S4 (Feature 3): the verification instruction doc is repo
+    // structure — the Lightweight review flow depends on it.
+    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
+      bundle,
+      ctx
+    ),
     // Set 064 (D7): the guidance-lifecycle starters are repo structure too,
     // so a fresh repo built via "Build project structure" starts the
     // lifecycle with docs/planning/ in place.
@@ -24827,6 +24851,7 @@ var fs16 = __toESM(require("fs"));
 var path19 = __toESM(require("path"));
 var vscode16 = __toESM(require("vscode"));
 var REVIEW_CRITERIA_DIRNAME = "review-criteria";
+var REVIEW_CRITERIA_MAX_CHARS = 8e3;
 var defaultBuildContext = {
   readReviewCriteria: defaultReadReviewCriteria,
   fileExists: defaultFileExists
@@ -24856,25 +24881,79 @@ function reviewCriteriaTrailer(root, kind, ctx) {
   No \`${hintPath}\` present. Default review instructions above apply.
   Create \`${hintPath}\` to embed repo-specific criteria here.`;
   }
+  let body = content.trimEnd();
+  if (body.length > REVIEW_CRITERIA_MAX_CHARS) {
+    body = body.slice(0, REVIEW_CRITERIA_MAX_CHARS) + `
+
+[... truncated at ${REVIEW_CRITERIA_MAX_CHARS} characters \u2014 read docs/${REVIEW_CRITERIA_DIRNAME}/${kind}.md for the rest]`;
+  }
   return `Operator review criteria (from docs/${REVIEW_CRITERIA_DIRNAME}/${kind}.md):
 
-${content.trimEnd()}`;
+${body}`;
+}
+function verificationPointerOpener() {
+  return `Cross-provider review request (out-of-band verification).
+
+First read \`${CROSS_PROVIDER_VERIFICATION_REL_PATH}\` (repo root) \u2014 it carries the review stance, the verdict grammar, and the required output artifact. If that file is missing, use this fallback: review adversarially with a materiality bar, and record exactly one verdict token \u2014 VERIFIED, ISSUES_FOUND (findings tagged [Critical]/[Major]/[Minor]), or WAIVED \u2014 <one-line reason>.`;
+}
+function verificationArtifactClose(set, kind) {
+  const artifactRel = relFromRoot(
+    set.root,
+    path19.join(set.dir, "external-verification.md")
+  );
+  const scopeLine = kind === "spec" ? ` Because this is a pre-work SPECIFICATION review, put the line \`Scope: specification\` directly under your round header \u2014 a spec-only verdict must not read as work verification.` : "";
+  return `Non-negotiable final step: YOU (the reviewing engine) must write your verdict as a new dated round section appended to \`${artifactRel}\` (UTF-8, append-only \u2014 never rewrite earlier rounds).${scopeLine} A verdict that exists only in this chat does not count.`;
+}
+function ensureCrossProviderVerificationDoc(extensionPath, root) {
+  try {
+    const bundle = loadTemplateBundle(resolveBundledTemplateDir(extensionPath));
+    const ctx = structureOnlyContext(
+      path19.basename(root),
+      "lightweight",
+      (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
+    );
+    const rendered = renderCrossProviderVerification(bundle, ctx);
+    const target = path19.join(
+      root,
+      ...CROSS_PROVIDER_VERIFICATION_REL_PATH.split("/")
+    );
+    let existing = null;
+    try {
+      existing = fs16.readFileSync(target, "utf8");
+    } catch {
+      existing = null;
+    }
+    if (existing !== null && existing.replace(/\r\n/g, "\n") === rendered) {
+      return true;
+    }
+    fs16.mkdirSync(path19.dirname(target), { recursive: true });
+    fs16.writeFileSync(target, rendered, { encoding: "utf8" });
+    return true;
+  } catch {
+    return false;
+  }
 }
 function buildSpecReviewPrompt(set, ctx = defaultBuildContext) {
   const specRel = relFromRoot(set.root, set.specPath);
-  const instructions = `Review the session-set specification for scope clarity, feasibility,
-and internal consistency. Flag any session whose stated scope cannot
-realistically be completed by one orchestrator in a single sitting, or
-whose deliverables are ambiguous. Note whether the prerequisites and
-non-goals are explicit.`;
+  const opener = verificationPointerOpener();
+  const instructions = `Scope: review the session-set specification for scope clarity,
+feasibility, and internal consistency. Flag any session whose stated
+scope cannot realistically be completed by one orchestrator in a
+single sitting, or whose deliverables are ambiguous. Note whether the
+prerequisites and non-goals are explicit.`;
   const files = `Files to read (relative to repo root):
   - ${specRel}`;
   const trailer = reviewCriteriaTrailer(set.root, "spec", ctx);
-  return `${instructions}
+  const close = verificationArtifactClose(set, "spec");
+  return `${opener}
+
+${instructions}
 
 ${files}
 
 ${trailer}
+
+${close}
 `;
 }
 function buildSessionAccomplishmentsPrompt(set, ctx = defaultBuildContext) {
@@ -24882,11 +24961,12 @@ function buildSessionAccomplishmentsPrompt(set, ctx = defaultBuildContext) {
   const changeLogPresent = ctx.fileExists(set.changeLogPath);
   const changeLogRel = relFromRoot(set.root, set.changeLogPath);
   const specRel = relFromRoot(set.root, set.specPath);
-  const instructions = `Review the most recent session of this set against its declared scope.
-Read the spec for the session's promised deliverables, then cross-check
-against the activity log entries and any change-log additions. Flag
-scope creep, missing deliverables, or commits that look unrelated to
-the stated session goal.`;
+  const opener = verificationPointerOpener();
+  const instructions = `Scope: review the most recent session of this set against its
+declared scope. Read the spec for the session's promised
+deliverables, then cross-check against the activity log entries and
+any change-log additions. Flag scope creep, missing deliverables, or
+commits that look unrelated to the stated session goal.`;
   const fileLines = [`  - ${specRel}`, `  - ${activityRel}`];
   if (changeLogPresent) {
     fileLines.push(`  - ${changeLogRel}`);
@@ -24898,22 +24978,28 @@ ${fileLines.join("\n")}`;
   - \`git log --oneline <prev-session-ref>..HEAD\`
   - \`git diff <prev-session-ref>..HEAD\``;
   const trailer = reviewCriteriaTrailer(set.root, "session", ctx);
-  return `${instructions}
+  const close = verificationArtifactClose(set, "session");
+  return `${opener}
+
+${instructions}
 
 ${files}
 
 ${gitCommands}
 
 ${trailer}
+
+${close}
 `;
 }
 function buildSetAccomplishmentsPrompt(set, ctx = defaultBuildContext) {
   const changeLogPresent = ctx.fileExists(set.changeLogPath);
   const changeLogRel = relFromRoot(set.root, set.changeLogPath);
   const specRel = relFromRoot(set.root, set.specPath);
-  const instructions = `Review the entire completed session set against its declared scope.
-Confirm every promised deliverable shipped, flag any non-goals that
-crept into scope, and assess whether the set's stated outcome
+  const opener = verificationPointerOpener();
+  const instructions = `Scope: review the entire completed session set against its declared
+scope. Confirm every promised deliverable shipped, flag any non-goals
+that crept into scope, and assess whether the set's stated outcome
 (version bump, doc revision, registry release) was actually achieved.`;
   const fileLines = [`  - ${specRel}`];
   if (changeLogPresent) {
@@ -24926,13 +25012,18 @@ ${fileLines.join("\n")}`;
   - \`git log --oneline <set-start-ref>..HEAD\`
   - \`git diff <set-start-ref>..HEAD\``;
   const trailer = reviewCriteriaTrailer(set.root, "set", ctx);
-  return `${instructions}
+  const close = verificationArtifactClose(set, "set");
+  return `${opener}
+
+${instructions}
 
 ${files}
 
 ${gitCommands}
 
 ${trailer}
+
+${close}
 `;
 }
 function sanitizeSlugForPrompt(slug) {
@@ -24994,6 +25085,10 @@ function registerCopyPromptCommands(context) {
       async (item) => {
         if (!item?.set)
           return;
+        ensureCrossProviderVerificationDoc(
+          context.extensionPath,
+          item.set.root
+        );
         const prompt = buildSpecReviewPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Spec-review prompt for ${item.set.name}`);
       }
@@ -25003,6 +25098,10 @@ function registerCopyPromptCommands(context) {
       async (item) => {
         if (!item?.set)
           return;
+        ensureCrossProviderVerificationDoc(
+          context.extensionPath,
+          item.set.root
+        );
         const prompt = buildSessionAccomplishmentsPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Session-accomplishments prompt for ${item.set.name}`);
       }
@@ -25012,6 +25111,10 @@ function registerCopyPromptCommands(context) {
       async (item) => {
         if (!item?.set)
           return;
+        ensureCrossProviderVerificationDoc(
+          context.extensionPath,
+          item.set.root
+        );
         const prompt = buildSetAccomplishmentsPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Set-accomplishments prompt for ${item.set.name}`);
       }
@@ -28201,6 +28304,18 @@ var vscode25 = __toESM(require("vscode"));
 var fs28 = __toESM(require("fs"));
 var path30 = __toESM(require("path"));
 var FILE_NAME = "external-verification.md";
+function buildExternalVerificationTemplate(setName, date) {
+  return `# External Verification \u2014 ${setName}
+
+> Out-of-band verification record for this session set. Reviewing
+> engines append one dated round section each; the latest round wins.
+> Instructions + verdict grammar: docs/dabbler/cross-provider-verification.md
+
+## Round 1 \u2014 ${date}
+
+Verdict: PENDING
+`;
+}
 async function pickSet2(sets) {
   if (sets.length === 0) {
     vscode25.window.showInformationMessage(
@@ -28226,8 +28341,12 @@ async function pickSet2(sets) {
 async function openOrCreate(set) {
   const filePath = path30.join(set.dir, FILE_NAME);
   if (!fs28.existsSync(filePath)) {
+    const template = buildExternalVerificationTemplate(
+      set.name,
+      (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
+    );
     try {
-      fs28.writeFileSync(filePath, "", { encoding: "utf-8", flag: "wx" });
+      fs28.writeFileSync(filePath, template, { encoding: "utf-8", flag: "wx" });
     } catch (err) {
       const e = err;
       if (e?.code !== "EEXIST") {

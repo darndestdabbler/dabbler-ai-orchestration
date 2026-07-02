@@ -335,16 +335,18 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
       structureOnly: true,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Eight artifacts since Set 064 D7 (the three docs/planning/
-    // guidance-lifecycle starters joined the five Set-060 structure
-    // artifacts), plus the two Set 077 S2 durable markers
-    // (.dabbler/tier + .dabbler/verification-mode).
-    assert.strictEqual(result.written.length, 10);
+    // Nine artifacts: the five Set-060 structure artifacts, the three
+    // Set 064 D7 docs/planning/ guidance-lifecycle starters, and the
+    // Set 077 S4 cross-provider verification doc — plus the two
+    // Set 077 S2 durable markers (.dabbler/tier +
+    // .dabbler/verification-mode).
+    assert.strictEqual(result.written.length, 11);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
     assert.ok(store.has("/repo/docs/dabbler/start-here.md"));
     assert.ok(store.has("/repo/docs/dabbler/getting-started.md"));
+    assert.ok(store.has("/repo/docs/dabbler/cross-provider-verification.md"));
     assert.ok(store.has("/repo/docs/planning/lessons-learned.md"));
     assert.ok(store.has("/repo/docs/planning/project-guidance.md"));
     assert.ok(store.has("/repo/docs/planning/lessons-archive.md"));
@@ -389,12 +391,12 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 9); // 7 artifacts + 2 markers
+    assert.strictEqual(result.written.length, 10); // 8 artifacts + 2 markers
   });
 });
 
 suite("renderStructureBootstrap (Set 060 S2)", () => {
-  test("renders the eight structure files, fully token-substituted", () => {
+  test("renders the nine structure files, fully token-substituted", () => {
     const { files } = renderStructureBootstrap(
       bundle,
       structureOnlyContext("my-app", "full", "2026-06-10"),
@@ -405,6 +407,8 @@ suite("renderStructureBootstrap (Set 060 S2)", () => {
         "AGENTS.md",
         "CLAUDE.md",
         "GEMINI.md",
+        // Set 077 S4 (Feature 3): the engine-facing verification doc.
+        "docs/dabbler/cross-provider-verification.md",
         // Set 060 S3 (D8): the static Getting Started teaching doc.
         "docs/dabbler/getting-started.md",
         "docs/dabbler/start-here.md",

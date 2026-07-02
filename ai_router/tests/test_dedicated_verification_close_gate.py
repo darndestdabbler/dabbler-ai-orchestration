@@ -49,6 +49,13 @@ def _make_set(tmp_path, *, sessions, total, mode=D):
     (d / "activity-log.json").write_text(
         json.dumps({"entries": []}, indent=2), encoding="utf-8"
     )
+    # Set 077 S4 (A3): the external-verification soft gate now keys off
+    # the RESOLVED tier, so this lightweight fixture receives it too.
+    # Seed a recorded verdict to keep it quiet — these tests exercise
+    # the dedicated-verification gate, not the soft gate.
+    (d / "external-verification.md").write_text(
+        "## Round 1 — 2026-07-02\n\nVerdict: VERIFIED\n", encoding="utf-8"
+    )
     if mode is not None:
         dv.record_verification_mode(d, mode)
     write_disposition(

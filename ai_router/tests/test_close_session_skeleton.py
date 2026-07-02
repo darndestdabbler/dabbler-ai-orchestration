@@ -775,6 +775,10 @@ def test_result_to_exit_code_table_complete():
         "gate_failed": 1,
         "invalid_invocation": 2,
         "lock_contention": 3,
+        # Set 077 S4: operator declined the interactive external-
+        # verification soft gate — its own code, distinct from both
+        # usage errors (2) and deterministic gate failures (1).
+        "aborted_at_soft_gate": 4,
         "repair_drift": 5,
     }
     assert RESULT_TO_EXIT_CODE == expected

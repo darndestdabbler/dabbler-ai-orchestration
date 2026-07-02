@@ -190,32 +190,225 @@ def test_no_router_tty_abort_emits_closeout_failed_event(
     )
 
 
-# ---------- external-verification.md present skips the gate ----------
+# ---------- external-verification.md content-awareness (Set 077 A4) ----------
 
 
-def test_no_router_with_ext_verify_present_does_not_fire_soft_gate(
+def test_no_router_with_verified_artifact_does_not_fire_soft_gate(
     started_set: str, monkeypatch
 ):
-    """When the artifact exists, the soft gate is silent."""
+    """A file with a recognizable VERIFIED verdict passes the gate silently."""
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     Path(started_set, "external-verification.md").write_text(
-        "operator's manual verification notes\n", encoding="utf-8"
+        "## Round 1 — 2026-07-02\n\nVerdict: VERIFIED\n", encoding="utf-8"
     )
 
     def prompt_fn_should_not_be_called(_p):
-        pytest.fail("prompt_fn called despite external-verification.md present")
+        pytest.fail("prompt_fn called despite a recorded VERIFIED verdict")
 
     args = _ns(started_set, no_router=True)
     outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
     assert outcome.result == "succeeded"
+    assert "VERIFIED" in " ".join(outcome.messages)
+
+
+def test_no_router_with_verdictless_artifact_fires_soft_gate(
+    started_set: str, monkeypatch
+):
+    """Set 077 A4: a present-but-verdict-less file gets the same soft gate
+    as absence (previously an empty file passed the presence-only check)."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    Path(started_set, "external-verification.md").write_text(
+        "operator's manual verification notes, no verdict recorded\n",
+        encoding="utf-8",
+    )
+    args = _ns(started_set, no_router=True)
+    outcome = run(args, prompt_fn=lambda _p: "n")
+    assert outcome.result == "aborted_at_soft_gate"
+
+
+def test_no_router_with_empty_artifact_fires_soft_gate(
+    started_set: str, monkeypatch, capsys
+):
+    """Set 077 A4: an empty file no longer passes the gate."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    Path(started_set, "external-verification.md").write_text(
+        "", encoding="utf-8"
+    )
+    args = _ns(started_set, no_router=True)
+    outcome = run(args)
+    assert outcome.result == "succeeded"  # soft: non-TTY warns + proceeds
+    captured = capsys.readouterr()
+    assert "no recognizable verdict" in captured.err
+
+
+def test_no_router_with_waived_verdict_passes_and_records_reason(
+    started_set: str, monkeypatch
+):
+    """A WAIVED verdict (with its required reason) satisfies the gate."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    Path(started_set, "external-verification.md").write_text(
+        "## Round 1 — 2026-07-02\n\n"
+        "Verdict: WAIVED — solo project, no second provider available\n",
+        encoding="utf-8",
+    )
+
+    def prompt_fn_should_not_be_called(_p):
+        pytest.fail("prompt_fn called despite a recorded WAIVED verdict")
+
+    args = _ns(started_set, no_router=True)
+    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
+    assert outcome.result == "succeeded"
+    joined = " ".join(outcome.messages)
+    assert "WAIVED" in joined
+    assert "solo project" in joined
+
+
+def test_no_router_with_issues_found_passes_with_outstanding_note(
+    started_set: str, monkeypatch
+):
+    """ISSUES_FOUND is a recorded verdict — the gate passes soft, but the
+    outstanding-remediation note is voiced."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    Path(started_set, "external-verification.md").write_text(
+        "## Round 1 — 2026-07-02\n\n"
+        "Verdict: ISSUES_FOUND\n\n- [Major] the frobnicator regressed\n",
+        encoding="utf-8",
+    )
+
+    def prompt_fn_should_not_be_called(_p):
+        pytest.fail("prompt_fn called despite a recorded verdict")
+
+    args = _ns(started_set, no_router=True)
+    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
+    assert outcome.result == "succeeded"
+    assert "ISSUES_FOUND" in " ".join(outcome.messages)
+    assert "still owed" in " ".join(outcome.messages)
+
+
+def test_latest_round_wins_over_earlier_issues_found(
+    started_set: str, monkeypatch
+):
+    """Round semantics: a later VERIFIED round supersedes an earlier
+    ISSUES_FOUND round."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    Path(started_set, "external-verification.md").write_text(
+        "## Round 1 — 2026-07-01\n\nVerdict: ISSUES_FOUND\n\n"
+        "- [Major] missing regression test\n\n"
+        "## Round 2 — 2026-07-02\n\nVerdict: VERIFIED\n",
+        encoding="utf-8",
+    )
+
+    def prompt_fn_should_not_be_called(_p):
+        pytest.fail("prompt_fn called despite the latest round being VERIFIED")
+
+    args = _ns(started_set, no_router=True)
+    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
+    assert outcome.result == "succeeded"
+    joined = " ".join(outcome.messages)
+    assert "VERIFIED (round 2)" in joined
+    assert "still owed" not in joined
+
+
+def test_spec_scoped_verdict_does_not_satisfy_the_gate(
+    started_set: str, monkeypatch, capsys
+):
+    """S4 code-review fix: a pre-work SPECIFICATION review's verdict must
+    not read as work verification — the soft gate still warns."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    Path(started_set, "external-verification.md").write_text(
+        "## Round 1 — 2026-07-02\n\n"
+        "Scope: specification\n\n"
+        "Verdict: VERIFIED\n",
+        encoding="utf-8",
+    )
+    args = _ns(started_set, no_router=True)
+    outcome = run(args)
+    assert outcome.result == "succeeded"  # soft posture unchanged
+    captured = capsys.readouterr()
+    assert "only a specification review" in captured.err
+
+
+def test_work_round_after_spec_round_satisfies_the_gate(
+    started_set: str, monkeypatch
+):
+    """A later work-review round supersedes the spec-scoped one."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    Path(started_set, "external-verification.md").write_text(
+        "## Round 1 — 2026-07-01\n\nScope: specification\n\nVerdict: VERIFIED\n\n"
+        "## Round 2 — 2026-07-02\n\nVerdict: VERIFIED\n",
+        encoding="utf-8",
+    )
+
+    def prompt_fn_should_not_be_called(_p):
+        pytest.fail("prompt_fn called despite a work-review verdict")
+
+    args = _ns(started_set, no_router=True)
+    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
+    assert outcome.result == "succeeded"
+    assert "VERIFIED (round 2)" in " ".join(outcome.messages)
+
+
+# ---------- resolved-mode keying (Set 077 A3) ----------
+
+
+def test_spec_lightweight_without_cli_flag_fires_soft_gate(
+    started_set: str, monkeypatch, capsys
+):
+    """Set 077 A3 regression: a spec-declared Lightweight set gets the soft
+    gate WITHOUT the raw --no-router CLI flag (previously the gate keyed
+    off args.no_router only and this branch was dead)."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    args = _ns(started_set)  # no no_router override — spec.md decides
+    outcome = run(args)
+    assert outcome.result == "succeeded"
+    assert outcome.verification_method == "manual"
+    captured = capsys.readouterr()
+    assert "external-verification.md missing" in captured.err
+
+
+# ---------- dedicated-sessions stand-down (Set 077 A8) ----------
+
+
+def test_dedicated_mode_stands_down_external_verification_gate(
+    started_set: str, monkeypatch, capsys
+):
+    """When the recorded verificationMode is dedicated-sessions, the
+    external-verification gate stands down — the typed-session gate is
+    the authority, and only one corrective is voiced (A8)."""
+    import json as _json
+
+    from dedicated_verification import record_verification_mode
+
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    # record_verification_mode requires an existing activity log.
+    Path(started_set, "activity-log.json").write_text(
+        _json.dumps({"entries": []}), encoding="utf-8"
+    )
+    record_verification_mode(started_set, "dedicated-sessions")
+
+    args = _ns(started_set, no_router=True)
+    outcome = run(args)
+    joined = " ".join(outcome.messages)
+    assert "stood down" in joined
+    assert "external-verification.md missing" not in joined
+    captured = capsys.readouterr()
+    assert "external-verification.md missing" not in captured.err
 
 
 # ---------- full-tier (no --no-router) is unaffected ----------
 
 
 def test_full_tier_does_not_fire_soft_gate(started_set: str, monkeypatch):
-    """Without --no-router, the soft gate never fires (full tier ignores it)."""
+    """A genuinely full-tier set (spec tier: full, no CLI flag, no env var)
+    never fires the soft gate."""
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    # The shared fixture's spec declares tier: lightweight (most tests
+    # here want that); this test needs a real full-tier spec.
+    Path(started_set, "spec.md").write_text(
+        "# spec\n\n## Session Set Configuration\n\n"
+        "```yaml\ntier: full\nrequiresUAT: false\n```\n",
+        encoding="utf-8",
+    )
 
     def prompt_fn_should_not_be_called(_p):
         pytest.fail("prompt_fn called despite full-tier invocation")

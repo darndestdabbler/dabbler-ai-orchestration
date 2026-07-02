@@ -401,6 +401,128 @@
           "costUsd": 0.0032
         }
       ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-004/gates",
+      "dateTime": "2026-07-02T07:52:37.814615-04:00",
+      "description": "A3 closed: close_session.run() resolves Lightweight mode once (_resolve_no_router_for_run; CLI > env > spec, cache-immune) and threads it through all three no_router branches. A4: soft gate is content-aware via the new ai_router/external_verification.py parser (round semantics, latest round wins, WAIVED+reason token; empty/verdict-less file soft-warns like absence). A8: gate stands down when read_verification_mode says dedicated-sessions. Mechanical hardening: RESULT_TO_EXIT_CODE['aborted_at_soft_gate']=4, TOCTOU _is_already_closed re-check inside the lock, close_is_terminal computed once for the dv/pac/contract gate chain, corrective guidance printed before the interactive [y/N]. Parser unit tests (21) + reworked no-router close tests (19).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "session-004/lazy-synth",
+      "dateTime": "2026-07-02T07:52:37.814615-04:00",
+      "description": "A12 closed: _backfill_payload disambiguates on activity-log entries length via _activity_log_has_entries (cleanly-parsed empty entries => not-started; entries present incl. no-dateTime legacy, malformed, or unexpected shapes preserve the conservative in-progress inference). Regression tests replay the authored-today/started-tomorrow flow through backfill and the read_status lazy-synth path.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "session-004/session-state-robustness",
+      "dateTime": "2026-07-02T07:52:37.814615-04:00",
+      "description": "S1 bundle F landed (not deferred): four boundary writers + _propagate_total_sessions/_finalize_total_sessions_from_entries routed through _atomic_write_json with a Windows os.replace PermissionError retry (3x50ms); read_raw_session_state narrowed to (FileNotFoundError, JSONDecodeError, UnicodeError) so PermissionError propagates; register_session_start refuses re-opening a session already in completedSessions; backfill_session_state_files re-checks existence inside its loop (TOCTOU); _finalize uses max(sessions) not len(sessions). 7 new regression tests; one v2 fixture corrected (it abused force=True for a mid-set close).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/canonical-doc",
+      "dateTime": "2026-07-02T07:54:19.602353-04:00",
+      "description": "Authored docs/templates/consumer-bootstrap/cross-provider-verification.md.template (engine-facing: inputs, devil's-advocate stance with materiality bar, VERIFIED/ISSUES_FOUND(+severities)/WAIVED(+required reason) grammar in lockstep with the parser, required write-the-artifact output, Copilot second-chat/model-picker recipe). Wired into TemplateBundle + renderConsumerBootstrap + renderStructureBootstrap (renders to docs/dabbler/cross-provider-verification.md); extension ensure-writes/refreshes it idempotently before each Evaluate prompt (ensureCrossProviderVerificationDoc, critique M2 - installed base needs no re-bootstrap). Routed documentation review (gemini-pro $0.016 + gpt-5-4-mini auto-verify): no material findings against the doc (the one flagged omission was in the reviewer's own summary; the doc carries the git-status caveat verbatim). Cold-start goldens regenerated; dist recompiled; drift guard green.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "documentation",
+          "costUsd": 0.0155
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "session-004/prompts",
+      "dateTime": "2026-07-02T07:54:19.602353-04:00",
+      "description": "The three Evaluate prompts rewritten pointer-style (A2/A9): shared opener points at docs/dabbler/cross-provider-verification.md with the one-line missing-doc fallback; bodies shrunk to a Scope paragraph; operator-criteria trailer preserved with a new 8000-char size guard (S1 bundle A Minor); shared non-negotiable close names the exact external-verification.md path the reviewing engine itself must write. openExternalVerificationDoc now seeds a minimal round header (set, date, Round 1, Verdict: PENDING - deliberately unrecognized by the parser so an unfilled template still soft-warns).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "session-004/tests",
+      "dateTime": "2026-07-02T08:00:10.359769-04:00",
+      "description": "Layer-2 coverage extended via routed test-generation (gemini-pro, $0.033, adapted): pointer-opener/artifact-close/trailer-order tests for all three Evaluate prompts, the 8000-char criteria size guard, ensureCrossProviderVerificationDoc sandbox tests (create/refresh/idempotent/missing-bundle), and the seeded external-verification template. Adaptation again treated routed test-gen as a review surface: the generated ensure-write fixture faked a one-file bundle (loadTemplateBundle reads every file, so it would return false) and used BDD beforeEach in the TDD-ui suite; both corrected. Unit suite 1047 passing. Python-side tests hand-authored earlier in-session (21 parser + 5 A12 + 7 robustness + reworked no-router/gate fixtures).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "costUsd": 0.033
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "session-004/review",
+      "dateTime": "2026-07-02T08:18:10.475766-04:00",
+      "description": "Routed code-review over the session diff (opus $0.55, raw in s4-code-review.md; gpt-5.4 auto-verify ISSUES_FOUND). Adjudication: the auto-verifier's Major is REAL and fixed - the spec-review prompt (pre-work) wrote the same artifact the soft gate accepts, so a spec-only VERIFIED round could launder the gate; fix = parser-visible 'Scope: specification' round marker (parser exposes scope; gate soft-warns when the latest round is spec-scoped; spec-review prompt instructs the marker; canonical doc documents it; 8 new tests). The auto-verifier also refuted opus's Critical (prior_completed IS initialized above the hunk) and its PermissionError Major (spec-mandated by-design) - both confirmed against code, no action. Opus Minors applied: stale main() comment corrected (run() resolves per-set deterministically, manual lockstep note), resolution moved below the repair/idempotency short-circuits, backfill return-contract docstring updated, WAIVED Reason-adjacency documented in the template. Deferred-with-reason: max() outlier inflation (entries already int-filtered; garbage-in, same class as the len undercount), ensure-write working-tree side effect (idempotent by content-compare; surfacing it is S6 UAT material), read-vs-parse factoring suggestion (distinct missing/unreadable/no-verdict messaging is intentional).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "opus",
+          "taskType": "code-review",
+          "costUsd": 0.5461
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "session-004/verification",
+      "dateTime": "2026-07-02T08:37:13.159012-04:00",
+      "description": "Routed gate: REQUIRED (blast-radius + multi-module + breadth; verdict logged). Cross-provider session verification (gpt-5.4): round 1 ISSUES_FOUND - two real parser defects (underscore-emphasis variants unparsed; WAIVED reason accepted across a blank line, looser than the documented grammar), both fixed with regression tests (s4-issues.json). Round 2 (narrow) found one consequence-edge: a later malformed WAIVED left an earlier verdict standing - fixed (nulls the round verdict, fail-toward-louder; s4-issues-round-2.json). Round 3 clean in substance ('No issues found') but token-less; round 4 was the L-064-7 schema-only restatement with max_tier pinned to the verifier's own tier: VERIFIED. Suites at close: pytest 2314/5/0, tsc clean, mocha 1050 passing, Playwright 19/19 local serial.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.3397
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.0835
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.0356
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.0023
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "session-004/close",
+      "dateTime": "2026-07-02T08:41:52.022747-04:00",
+      "description": "ai-assignment S4 actuals filled; S5 recommendation confirmed by routed analysis (gemini-pro, $0.005): Claude Code claude-fable-5 @ effort=high. Lessons cited via cite_lessons (L-064-3, L-064-7, L-064-9, L-071-1). Final full pytest 2317/5/0. Disposition authored; commit + push + close_session + notification follow.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "costUsd": 0.0051
+        }
+      ]
     }
   ]
 }

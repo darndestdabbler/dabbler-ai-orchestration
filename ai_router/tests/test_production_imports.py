@@ -42,6 +42,9 @@ SET_048_MODULES = frozenset(
         "spec_config",
         "suggestion_disposition",
         "migrate_lightweight_to_canonical_v4",
+        # Set 077 S4: the external-verification verdict parser is
+        # consumed on the same pip-installed Lightweight close path.
+        "external_verification",
     )
 )
 

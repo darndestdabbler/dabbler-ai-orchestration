@@ -23,14 +23,18 @@
 > carry explicit start gates so code work and the 0.28.0 release cannot
 > outrun Set 077's 0.27.0).
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
-> **Target:** operator asked for weekend delivery (by 2026-07-06). Per
-> Critique-1 M1 the full set plus Set 077's remaining four sessions is
-> tight for one weekend, so the plan names a **minimum shippable weekend
-> target** — S1 (go/no-go contract pin) + S2 (adapter, config-off by
-> default) — with S3–S5 following as 077 completes; if everything lands,
-> the whole set closes in the same window, but the release is never
-> deadline-forced (mission-critical week starts 2026-07-06; a rushed bad
-> 0.28.0 is worse than a held one — rollback is a named deliverable).
+> **Target:** weekend delivery (by 2026-07-06). Critique-1 M1 called the
+> timeline infeasible; the **operator corrected that premise on
+> 2026-07-02** from months of demonstrated cadence — roughly 3–4 sessions
+> on 2026-07-02, 1 on 2026-07-03, 4–5 on 2026-07-04, and the remainder on
+> 2026-07-05 — which comfortably covers Set 077's remaining four sessions
+> plus this set's five. Scheduling is the operator's call; sessions run
+> in order at that cadence without scope-cutting for calendar reasons.
+> The safeguards M1 motivated are retained **on their own merits, not as
+> deadline hedges**: the S1 contract pin stays a hard go/no-go, `v0.28.0`
+> never precedes 077's `v0.27.0`, and the release gates on quality and
+> ordering — never on the calendar in either direction (rollback is a
+> named deliverable regardless).
 
 ---
 

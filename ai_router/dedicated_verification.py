@@ -534,7 +534,9 @@ def change_verification_mode(
         try:
             with log_path.open("r", encoding="utf-8") as f:
                 loaded = json.load(f)
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, UnicodeError):
+            # Set 077 S1: UnicodeError sibling-site closure (L-069-1) —
+            # invalid UTF-8 must refuse the gate, not raise out of it.
             loaded = None
         if not isinstance(loaded, dict) or not isinstance(
             loaded.get("entries", []), list
@@ -762,7 +764,8 @@ def read_latest_issues_envelope(session_set_dir: str | Path) -> Optional[dict]:
         try:
             with child.open("r", encoding="utf-8") as f:
                 payload = json.load(f)
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, UnicodeError):
+            # Set 077 S1: UnicodeError sibling-site closure (L-069-1).
             continue
         key = (session, rnd)
         if best_key is None or key > best_key:
@@ -873,7 +876,9 @@ def validate_dedicated_verification(
     try:
         with state_path.open("r", encoding="utf-8") as f:
             raw = json.load(f)
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeError):
+        # Set 077 S1: UnicodeError sibling-site closure (L-069-1) — an
+        # invalid-UTF-8 state file is "unconfirmable", never a raise.
         return DedicatedVerificationResult(
             applicable=True,
             ok=False,

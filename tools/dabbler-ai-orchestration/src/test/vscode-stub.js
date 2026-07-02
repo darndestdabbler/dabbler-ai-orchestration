@@ -26,6 +26,10 @@ const vscodeStub = {
   RelativePattern: class RelativePattern {
     constructor(base, pattern) { this.base = base; this.pattern = pattern; }
   },
+  // Set 077 S1: ConfigEditorPanel.createOrShow reads ViewColumn.One at
+  // call time; without the enum the panel-lifecycle test dies on a
+  // TypeError before reaching its assertions.
+  ViewColumn: { One: 1, Two: 2, Three: 3, Active: -1, Beside: -2 },
   EventEmitter: class EventEmitter {
     constructor() { this._listeners = []; }
     get event() { return (l) => { this._listeners.push(l); return { dispose: () => {} }; }; }
@@ -116,6 +120,27 @@ const vscodeStub = {
     // workspace folder open; without this symbol activate() would throw before
     // reaching the command registrations.
     registerWebviewViewProvider: () => ({ dispose: () => {} }),
+    // Set 077 S1: minimal WebviewPanel fake for the ConfigEditorPanel
+    // lifecycle test — settable webview.html, message/dispose hooks, and
+    // a dispose() that fires onDidDispose so currentPanel clears.
+    createWebviewPanel: () => {
+      const disposeHandlers = [];
+      return {
+        webview: {
+          html: "",
+          cspSource: "vscode-resource:",
+          onDidReceiveMessage: () => ({ dispose: () => {} }),
+          postMessage: async () => true,
+          asWebviewUri: (uri) => uri,
+        },
+        reveal: () => {},
+        onDidDispose: (fn) => {
+          disposeHandlers.push(fn);
+          return { dispose: () => {} };
+        },
+        dispose: () => { for (const fn of disposeHandlers) fn(); },
+      };
+    },
   },
   commands: {
     registerCommand: () => ({ dispose: () => {} }),

@@ -138,11 +138,12 @@ set starts from a fully green suite). Extension `0.33.1`, `dabbler-ai-router`
 > canonical-doc ensure-write for existing consumers, `switchTier`
 > assignment, S4 de-scoping, record-over-seed shared precedence, tier-aware
 > auto-opened doc) are folded into the features and sessions below.
-> **Named limitation:** the second, non-Anthropic critique leg
-> (`task_type: architecture`) failed twice on provider read-timeouts on
-> 2026-07-02 and is **owed** — S1 re-runs it as part of its routed review
-> and folds any material findings before implementation begins (the
-> orchestrator-provider-critiques-itself asymmetry is real; L-064-6).
+> **Named limitation — discharged in S1:** the second, non-Anthropic
+> critique leg (`task_type: architecture`) failed twice on provider
+> read-timeouts on 2026-07-02 and was owed; S1 ran it (GPT-5.4, saved raw
+> as `planning-critique-2-architecture.md`, verdict SOUND-WITH-CHANGES)
+> and folded its material findings M1–M7 into the features and sessions
+> below (marked "Critique-2 Mn, folded in S1").
 
 ### Architecture decisions locked for this set
 
@@ -194,6 +195,17 @@ set starts from a fully green suite). Extension `0.33.1`, `dabbler-ai-router`
 - Persist the operator's tier choice at scaffold time as a durable marker
   (`.dabbler/tier`, beside the existing `.dabbler/install-method`), written
   by the same path that shapes the scaffold.
+- **(Critique-2 M1, folded in S1)** The three-way choice needs a durable home
+  for its second dimension too: a sibling `.dabbler/verification-mode` marker
+  (one word, `dedicated-sessions` | `out-of-band-or-none`), written by the
+  same scaffold path and owned by the same S2 read-precedence helper, so S3
+  consumes a stable two-field contract instead of adding a second ad-hoc
+  channel.
+- **(Critique-2 M2, folded in S1)** The marker is a write-through cache, not
+  a one-shot seed: every sanctioned tier-changing path (`switchTier`, the
+  scaffold) updates it in the same write, so the marker cannot drift from a
+  sanctioned switch. Manual spec edits remain covered by the mismatch
+  advisory below.
 - `asTier` narrowing becomes case-insensitive and **fails loud on unknown
   values instead of silently defaulting to `"full"`** (A11).
 - Every downstream consumer of "the tier" reads the marker first, then falls
@@ -274,6 +286,11 @@ set starts from a fully green suite). Extension `0.33.1`, `dabbler-ai-router`
 - Copy on the form must follow the tier-model SSoT
   (`docs/concepts/tier-model.md`) — link, don't paraphrase; the drift guard
   stays green.
+- **(Critique-2 M7, folded in S1)** The Python pre-flight is the first
+  side-effect-free step of the scaffold path: it runs **before any durable
+  write** (tier / verification-mode markers, generated docs), and a
+  regression test asserts interpreter failure leaves no setup artifacts
+  behind.
 
 ## Feature 3: Out-of-band verification that completes itself (A2, A3, A4, A8, A9)
 
@@ -306,7 +323,13 @@ set starts from a fully green suite). Extension `0.33.1`, `dabbler-ai-router`
 - **Gate correctness** —
   - key the external-verification gate off the resolved runtime mode
     (`is_no_router_mode()` / the cached resolution), not the raw
-    `args.no_router` flag (A3);
+    `args.no_router` flag (A3). **(S1 review, enlarged)** The root cause is
+    that `close_session.main()` computes `resolve_no_router_mode(...)` and
+    discards the return value, so **all three** `getattr(args, "no_router")`
+    branches in `run()` (soft gate, manual attestation, `method="manual"`)
+    are dead for spec/env-activated Lightweight sets — capture the resolved
+    value once and thread it through every branch, and stop swallowing
+    resolution errors silently;
   - make it content-aware but still soft: empty file or no recognizable
     verdict line ⇒ same soft prompt/warn as absence today (A4);
   - when the set's recorded `verificationMode` is `dedicated-sessions`, the
@@ -326,6 +349,14 @@ set starts from a fully green suite). Extension `0.33.1`, `dabbler-ai-router`
 - Verdict-line grammar shared with the Mode-B artifacts where sensible;
   parser lives in `ai_router` with unit tests; the extension never parses
   verdicts itself.
+- **(Critique-2 M3/M4, folded in S1)** The parser has **round semantics,
+  not presence semantics**: it parses the dated round sections, the
+  **latest round wins**, and it returns `(round, verdict,
+  outstanding-remediation)` — the soft gate and the S5 pending-verification
+  banner both consume this single parsed result. The verdict grammar gains
+  an explicit **`WAIVED`** token (with a required one-line reason) so a
+  deliberate "no verification for this set" is a durable, parseable record
+  rather than an absence the banner must guess about.
 - All writes UTF-8; ASCII-only console output (project convention).
 
 ## Feature 4: The next session notices unfinished verification (A5)
@@ -351,6 +382,10 @@ set starts from a fully green suite). Extension `0.33.1`, `dabbler-ai-router`
   the existing readers — no new persisted state (Set 047 derive rule).
 - Unit tests per state (owed / in-flight / verified / opt-out) on both
   tiers; a no-router fixture proves the banner fires without router config.
+- **(Critique-2 M3, folded in S1)** The `opt-out` state derives from the
+  Feature-3 `WAIVED` verdict record in `external-verification.md` (latest
+  round), not from guessed absence — the banner never nags a set whose
+  latest round is `WAIVED` and never suppresses on bare absence.
 
 ## Feature 5: Mode B reachable, visible, and Copilot-fit (A6, A7, A9)
 
@@ -391,6 +426,24 @@ set starts from a fully green suite). Extension `0.33.1`, `dabbler-ai-router`
 - Gate change is additive and fully covered in
   `test_dedicated_verification_close_gate.py` (new provider-differs cases,
   same-engine-same-provider still-fails case).
+- **(Critique-2 M5, folded in S1)** Legacy posture is explicit: work
+  sessions recorded before this set (or without `--provider`) cannot
+  satisfy the provider arm — the engine-difference arm remains the fallback
+  for them, and the gate's corrective message names both remedies (engine
+  difference, or re-running the work sessions' `start_session` with
+  `--provider` to re-attribute). The advertised same-engine Copilot path is
+  documented as applying to sets whose work sessions carry provider data.
+- **(S1 review, bundle C)** `_run_typed_session` / `_run_typed_handoff`
+  skip `_capture_path_aware_critique` and `_capture_contract_gate` (and the
+  handoff path skips `_capture_verification_mode` too) — a set whose first
+  boundary call is a typed session never seeds those policies and the Set
+  066/070 close gates silently no-op. S5 adds the missing capture calls
+  (idempotent; no-ops when a record exists).
+- **(Critique-2 M6, folded in S1)** Version-skew posture: the extension
+  surfaces that auto-route/banner behavior needs `dabbler-ai-router` >=
+  0.27.0 (graceful message, not silent disagreement) and S6's UAT walks one
+  mixed-version case (new extension + old router) to confirm the failure is
+  loud.
 - Marker precedence (record > seed) unit-tested at Layer 2 against fixture
   activity logs, including the failed-seed-alignment drift case.
 
@@ -459,12 +512,18 @@ verified and closed.
    `retainContextWhenHidden` on the view registration as belt-and-braces.
 2. Write the durable tier marker at scaffold time; add the shared
    read-precedence helper (marker → router-config inference → volatile UI).
+   The helper owns both marker fields (`.dabbler/tier` +
+   `.dabbler/verification-mode`, Critique-2 M1) so S3's three-way choice
+   lands on a stable contract.
 3. Re-point `copySessionSetGenPrompt` / `buildSessionGenPrompt` at the
    helper; remove the `?? "full"` fallback and the fabricated-rationale
    invitation; make `asTier` case-insensitive and loud on unknowns.
 4. Add the tier-mismatch tree advisory (marker vs. active spec); fix the
    `switchTier` guardrail path coupling (probe the same path the write
-   targets — A11) with a Layer-2 test.
+   targets — A11) with a Layer-2 test; `switchTier` also write-throughs the
+   tier marker on a successful switch (Critique-2 M2). While in `client.js`,
+   audit its DOM rendering for unescaped-innerHTML sinks fed by set names
+   (S1 review, bundle B hardening).
 5. Layer-2 tests: state survives simulated teardown/re-render; marker
    precedence; prompt regression (Lightweight workspace ⇒
    `tier: lightweight` exemplar + guidance line); refresh UAT-matrix
@@ -496,8 +555,9 @@ regression tests lock it; suites green.
    when Lightweight).
 2. Add the `pythonPresent` host probe + step-1 warning (D6-probe pattern);
    add the `buildProjectStructureNoPrompt` pre-flight with the friendly
-   interpreter-failure explainer; copy links to the tier-model SSoT and the
-   Troubleshooting doc.
+   interpreter-failure explainer — ordered **before any durable write**
+   with a no-artifacts-on-failure regression test (Critique-2 M7); copy
+   links to the tier-model SSoT and the Troubleshooting doc.
 3. Verify the Troubleshooting appendix (landed at the set-authoring
    commit) renders correctly; extend it if the form work exposes gaps;
    confirm `dist-in-sync` and the full drift guard stay green.
@@ -532,13 +592,33 @@ build; drift guard green.
 2. Rewrite the three Evaluate prompts pointer-style with the mandatory
    write-the-artifact close and the missing-doc fallback line; template
    `external-verification.md` on create.
-3. Fix gate keying to the resolved runtime mode (A3); add the soft
-   content-awareness (A4); stand the gate down under recorded
-   `dedicated-sessions` via `read_verification_mode` (A8/M5);
-   verdict-line parser + tests in `ai_router`.
+3. Fix gate keying to the resolved runtime mode (A3 — capture
+   `resolve_no_router_mode`'s return in `main()` and thread it through all
+   three `no_router` branches; see the enlarged Feature-3 gate-correctness
+   item); add the soft content-awareness (A4); stand the gate down under
+   recorded `dedicated-sessions` via `read_verification_mode` (A8/M5);
+   verdict-line parser (round semantics + `WAIVED` token, Critique-2
+   M3/M4) + tests in `ai_router`. While in `close_session`, land the S1
+   review's mechanical hardening: map `"aborted_at_soft_gate"` in
+   `RESULT_TO_EXIT_CODE` (+ docstring), re-check `_is_already_closed`
+   inside the lock (TOCTOU), compute `_close_is_terminal` once for the
+   gate chain, and print the corrective guidance before the interactive
+   `[y/N]` soft-gate prompt.
 4. Fix the lazy-synth misclassification (A12): empty-`entries[]` activity
    log ⇒ not-started, with the authored-today regression test.
-5. Full pass; verify; close.
+5. **(S1 review, bundle F — secondary; defer-with-reason allowed if the
+   session runs long)** `session_state.py` robustness class: route the four
+   boundary writers (+ `_propagate_total_sessions` /
+   `_finalize_total_sessions_from_entries`) through `_atomic_write_json`
+   **together with** a Windows `os.replace` PermissionError retry (3×50ms)
+   so atomicity does not trade for held-file failures; narrow
+   `read_raw_session_state` to `(FileNotFoundError, json.JSONDecodeError)`
+   (let `PermissionError` propagate); add the writer-level refuse for
+   re-starting a session already in `completedSessions` (the CLI already
+   refuses; the API writer must too); re-check state-file existence inside
+   `backfill_session_state_files`'s loop (TOCTOU); `_finalize` uses
+   `max(sessions)` not `len(sessions)`.
+6. Full pass; verify; close.
 
 **Creates:** canonical verification doc + template + ensure-write; verdict
 parser + tests
@@ -558,11 +638,13 @@ authored-but-unstarted set reads not-started everywhere (A12 closed).
 
 **Steps:**
 1. Extend `validate_dedicated_verification` to engine-or-provider
-   difference (missing provider fails the provider arm closed); keep
+   difference (missing provider fails the provider arm closed, with the
+   legacy-baseline corrective message — Critique-2 M5); keep
    same-engine+same-provider failing; add the start-time
    same-`(engine,provider)` refusal in `start_session --type verification`
-   (M1); extend `test_dedicated_verification_close_gate.py` + start-time
-   tests.
+   (M1); add the missing `_capture_*` policy calls to the typed-session
+   start paths (S1 review, bundle C); extend
+   `test_dedicated_verification_close_gate.py` + start-time tests.
 2. Explorer mode derivation prefers the durable activity-log record over
    the spec seed (A7) with Layer-2 fixture coverage including the drift
    case — the TS mirror of the `read_verification_mode` precedence S4's
@@ -571,10 +653,20 @@ authored-but-unstarted set reads not-started everywhere (A12 closed).
    per-state unit tests on both tiers, incl. a no-router fixture.
 4. Auto-route the Start Next Session copy action by derived state
    (verification/remediation kickoff, pointer-style per Feature 3);
-   row description gains the words `verification owed` / `remediation owed`.
+   row description gains the words `verification owed` / `remediation owed`;
+   `SessionSetsModel.progressText` gains the `plusFraction` `+` suffix so it
+   stops contradicting `fractionFor` (S1 review, bundle B).
 5. Doc the single-engine (Copilot model picker) cross-provider pattern in
    the workflow doc Mode B section + consumer `AGENTS.md` tail template.
-   Full pass (Layer 3 included — Explorer rendering changed); verify;
+6. **(S1 review, bundle E — secondary)** `dedicated_verification.py`
+   robustness: extract `_write_json_atomic` and route
+   `seed_issues_envelope` + the Gate-3 minimal-log creation through it
+   (non-atomic writes; the envelope one is unrecoverable because the
+   `FileExistsError` guard entombs a corrupt stub); make the `corrective`
+   strings quote/`as_posix()` the set-dir path; adjudicate the
+   `derive_state` blank-verdict + no-issues ⇒ `CLOSED_VERIFIED` ambiguity
+   (candidate: `AWAITING_HUMAN` with a missing-verdict reason).
+7. Full pass (Layer 3 included — Explorer rendering changed); verify;
    close.
 
 **Creates:** gate + guardrail + banner + Explorer tests; workflow-doc +
@@ -601,7 +693,9 @@ action away in every owed state.
    `make-uat-workspace` matrix walk + fresh-scaffold walks of all three
    setup choices + one Copilot-persona Lightweight out-of-band round-trip
    (prompt → engine writes artifact → gate → next-session banner) + the
-   Mode-B single-engine gate pass. Operator attests.
+   Mode-B single-engine gate pass + one mixed-version case (new extension,
+   pre-0.27.0 router — the skew must fail loud, Critique-2 M6). Operator
+   attests.
 3. Run the required end-of-set path-aware critique (≥2 providers) over the
    set's changes; adjudicate findings per the workflow; save
    `path-aware-critique.json`.

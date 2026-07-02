@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The inline discoverRoots() fix is not fully correct: it treats darwin as inherently case-insensitive, but macOS can use case-sensitive APFS/HFS volumes. On those systems /repo/Project and /repo/project are distinct roots and the new key still collapses one of them, so the findings artifact overstates the item as fixed.",
+      "category": "correctness",
+      "severity": "Medium",
+      "issueId": "S077-S1-V1-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Verifier (gpt-5-4) read the staged diff of tools/dabbler-ai-orchestration/src/utils/fileSystem.ts and reasoned from the platform-proxy branch (process.platform === 'win32' || 'darwin').",
+      "suggestedTestOrCheck": "Dedup two case-variant references on a case-insensitive volume collapses to one root; two genuinely distinct case-variant dirs on a case-sensitive volume stay distinct.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Replaced the OS-name proxy with fs.realpathSync.native as the dedup key (falls back to the resolved path when realpath fails; the existsSync check filters nonexistent targets). Case variants collapse only where the volume itself is case-insensitive; symlinked duplicates dedupe as a bonus. tsc clean; mocha 910 passing.",
+      "resolved_in_round": 2
+    }
+  ]
+}

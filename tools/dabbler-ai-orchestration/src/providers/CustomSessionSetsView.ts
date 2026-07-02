@@ -26,6 +26,7 @@
 // would have rendered the block; each in-progress row now ships
 // name / fraction / description only.
 
+import * as crypto from "crypto";
 import * as vscode from "vscode";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { SessionSet } from "../types";
@@ -672,7 +673,9 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     const gsHtmlUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "gettingStartedHtml.js"),
     );
-    const nonce = String(Math.floor(Math.random() * 1e16));
+    // Set 077 S1: CSP nonces must come from a CSPRNG — Math.random() is
+    // predictable, which voids the script-src nonce guarantee.
+    const nonce = crypto.randomBytes(16).toString("hex");
     // Set 034 + Set 036 S6: the per-row accordion that injected inline
     // SVG via innerHTML is gone. Only the tree shell (rows + bucket
     // headers + context menu) renders now, but the CSP keeps

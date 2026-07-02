@@ -114,3 +114,64 @@ testing — an AI engine will eventually produce what you need;
 however, *verify* the output — with other AI engines and with your
 own inspection — so that the AI engine produces a usable solution
 that meets your expectations without overengineering.
+
+## Troubleshooting
+
+### Python must be installed first
+
+**Build project structure** creates a *virtual environment* (`.venv/`),
+not a standalone Python. A virtual environment still depends on a base
+Python interpreter being installed on the machine — `.venv/pyvenv.cfg`
+points back at it (e.g. `home = C:\Python311`), and the venv borrows
+that install's runtime and standard library. So Python **does** need to
+be installed on every machine, even though the venv is created for you.
+
+- Install Python from <https://www.python.org/downloads/> (tick *Add
+  python.exe to PATH*). Avoid the Microsoft Store build — its app-
+  execution-alias redirection causes separate virtual-environment
+  headaches.
+- If Python is installed but not on `PATH`, point the
+  `dabblerSessionSets.pythonPath` setting at the interpreter
+  (e.g. `C:\Python311\python.exe`); the scaffold uses it to build
+  the venv.
+
+### `.venv\Scripts\` has the `.exe` files but no `activate` scripts
+
+On managed / corporate laptops, endpoint-security software (antivirus,
+EDR, DLP) often **quarantines freshly-written, unsigned script files** —
+exactly `Activate.ps1`, `activate`, `activate.bat`, and
+`deactivate.bat`. The `python.exe` / `pip.exe` files are code-signed by
+the Python Software Foundation, so they pass; the generated activate
+scripts get stripped right after the venv is created. This is why the
+same scaffold works on a personal machine but loses the activate scripts
+on a work machine.
+
+**This does not break anything.** Nothing in this workflow needs
+`activate`. The extension and the AI router always call the interpreter
+by its full path (`.venv\Scripts\python.exe -m …`). The `activate`
+scripts are only a terminal convenience for shortening `python`. As long
+as `python.exe` and `pip.exe` landed in `.venv\Scripts\`, the install and
+the router work normally.
+
+To confirm it's the security software, check the endpoint's quarantine
+log for `Activate.ps1` / `activate.bat` under the `.venv\Scripts\` path
+right after building. If you need the activate scripts back, ask IT to
+allow-list the project's `.venv\Scripts\` directory.
+
+### `.venv\Scripts\activate` fails with "running scripts is disabled"
+
+On a fresh Windows install, PowerShell's default execution policy
+(`Restricted`) blocks `Activate.ps1`:
+
+```
+.venv\Scripts\Activate.ps1 cannot be loaded because running scripts
+is disabled on this system.
+```
+
+Either skip activation entirely and call Python by full path
+(`.venv\Scripts\python.exe -m …`), or allow local scripts for your user
+account (no admin needed):
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```

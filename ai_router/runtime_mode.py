@@ -183,7 +183,15 @@ def is_no_router_mode() -> bool:
     try:
         # Avoid hard-coded import of find_active_session_set — that
         # module is heavy and may not be available in test contexts.
-        from session_state import find_active_session_set
+        # Set 077 S1: bare-then-relative, matching every other lazy
+        # import — the bare-only form raised ModuleNotFoundError under
+        # pip-install mode, so the lazy path always returned False there.
+        try:
+            from session_state import find_active_session_set
+        except ImportError:
+            from .session_state import (  # type: ignore[no-redef]
+                find_active_session_set,
+            )
 
         active = find_active_session_set()
         if active:

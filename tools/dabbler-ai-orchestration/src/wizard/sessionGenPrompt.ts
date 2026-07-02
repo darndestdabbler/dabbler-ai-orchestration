@@ -185,7 +185,7 @@ export async function copySessionSetGenPrompt(
 ): Promise<boolean> {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode.window.showErrorMessage("No workspace folder is open.");
+    void vscode.window.showErrorMessage("No workspace folder is open.");
     return false;
   }
 
@@ -203,7 +203,7 @@ export async function copySessionSetGenPrompt(
   try {
     bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
   } catch (err) {
-    vscode.window.showErrorMessage(
+    void vscode.window.showErrorMessage(
       `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`,
     );
     return false;
@@ -212,7 +212,7 @@ export async function copySessionSetGenPrompt(
   const prompt = buildSessionGenPrompt(bundle, options);
 
   await vscode.env.clipboard.writeText(prompt);
-  vscode.window.showInformationMessage(
+  void vscode.window.showInformationMessage(
     "Session-set generation prompt copied to clipboard. " +
     "Paste it into your AI assistant. When you receive the specs, save each one to " +
     "docs/session-sets/<NNN-slug>/spec.md (alongside its session-state.json).\n\n" +

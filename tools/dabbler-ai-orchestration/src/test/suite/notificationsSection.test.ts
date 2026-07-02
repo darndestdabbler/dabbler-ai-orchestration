@@ -21,10 +21,13 @@ suite("notificationsSection — rendering", () => {
     assert.ok(html.includes('id="s5-pushover-user-key-env"'));
   });
 
-  test('test-notification button is disabled with "wired in Set 026 Session 7" label', () => {
+  // Set 026 Session 7 wired the button (the pre-wiring assertion expected
+  // a disabled placeholder); Set 077 S1 caught the stale expectation — the
+  // suite is not part of the CI mocha subset, so the drift sat unnoticed.
+  test("test-notification button is rendered enabled (wired in Set 026 Session 7)", () => {
     const { html } = render(baseState());
-    assert.ok(/id="s5-test-notification"[^>]*disabled/.test(html));
-    assert.ok(html.includes("Session 7"));
+    assert.ok(html.includes('id="s5-test-notification"'));
+    assert.ok(!/id="s5-test-notification"[^>]*disabled/.test(html));
   });
 
   test("env var inputs default to PUSHOVER_API_KEY / PUSHOVER_USER_KEY", () => {

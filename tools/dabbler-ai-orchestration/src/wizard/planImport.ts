@@ -84,7 +84,14 @@ export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promis
 
   const destPath = path.join(root, PLAN_DEST);
   const destDir = path.dirname(destPath);
-  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+  try {
+    if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+  } catch (err) {
+    void ui.showErrorMessage(
+      `Failed to create ${destDir}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
 
   if (fs.existsSync(destPath)) {
     const overwrite = await ui.showWarningMessage(
@@ -95,7 +102,14 @@ export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promis
     if (overwrite !== "Overwrite") return false;
   }
 
-  fs.copyFileSync(picked[0].fsPath, destPath);
+  try {
+    fs.copyFileSync(picked[0].fsPath, destPath);
+  } catch (err) {
+    void ui.showErrorMessage(
+      `Failed to write ${PLAN_DEST}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
   void ui.executeCommand("vscode.open", vscode.Uri.file(destPath));
   void ui.showInformationMessage(
     `Plan imported to ${PLAN_DEST}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`

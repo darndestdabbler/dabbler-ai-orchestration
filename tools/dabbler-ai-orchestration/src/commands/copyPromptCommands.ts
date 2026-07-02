@@ -45,11 +45,8 @@ const defaultBuildContext: BuildContext = {
 };
 
 function defaultFileExists(filePath: string): boolean {
-  try {
-    return fs.existsSync(filePath);
-  } catch {
-    return false;
-  }
+  // fs.existsSync never throws — it swallows errors and returns false.
+  return fs.existsSync(filePath);
 }
 
 function defaultReadReviewCriteria(root: string, kind: ReviewKind): string | null {
@@ -206,7 +203,7 @@ export function buildVerificationKickoffPrompt(set: SessionSet): string {
     `3. Open the typed verification session through the blessed writer\n` +
     `   (never hand-edit the state file), running Python through the\n` +
     `   workspace venv:\n` +
-    `   \`python -m ai_router.start_session --session-set-dir ${setDirRel} --type verification --engine <your-engine> --provider <your-provider>\`\n` +
+    `   \`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type verification --engine <your-engine> --provider <your-provider>\`\n` +
     `4. Review the completed work sessions against the spec and the\n` +
     `   activity log, then record the verdict per the workflow doc.\n` +
     `   Files to read (relative to repo root):\n` +
@@ -215,7 +212,7 @@ export function buildVerificationKickoffPrompt(set: SessionSet): string {
     `     - ${stateRel}\n` +
     `5. If findings require remediation, seed the structured findings\n` +
     `   envelope and chain the hand-off close in one atomic write:\n` +
-    `   \`python -m ai_router.start_session --session-set-dir ${setDirRel} --type remediation --handoff --handoff-verdict ISSUES_FOUND --engine <work-engine> --provider <work-provider>\`\n` +
+    `   \`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type remediation --handoff --handoff-verdict ISSUES_FOUND --engine <work-engine> --provider <work-provider>\`\n` +
     `6. Follow the workflow doc's bounded-round rules for any further\n` +
     `   verify/remediate rounds and for when to stop to a human.\n`
   );

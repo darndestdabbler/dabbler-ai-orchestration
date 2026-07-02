@@ -210,9 +210,11 @@ suite("copyPromptCommands — verification kickoff prompt (Set 062 S2, spec D2)"
 
   test("instructs the blessed typed-session writer with the set's real directory", () => {
     const out = buildVerificationKickoffPrompt(lwDedicated());
+    // Set 077 S1: the set-dir is quoted so pasted commands survive
+    // workspace paths containing spaces.
     assert.ok(
       out.includes(
-        "python -m ai_router.start_session --session-set-dir docs/session-sets/062-fixture --type verification",
+        'python -m ai_router.start_session --session-set-dir "docs/session-sets/062-fixture" --type verification',
       ),
       `kickoff must use the blessed writer; got: ${out}`,
     );

@@ -43,7 +43,19 @@ export function discoverRoots(): string[] {
   const add = (p: string | undefined) => {
     if (!p) return;
     const canonical = path.resolve(p);
-    const key = canonical.toLowerCase();
+    // Set 077 S1 (verifier round 2): dedup on the filesystem's own
+    // canonical form, not an OS-name proxy — realpath collapses case
+    // variants only where the volume itself is case-insensitive (so
+    // case-sensitive APFS/Linux keep distinct roots distinct), and
+    // resolves symlinked duplicates as a bonus. Fall back to the
+    // resolved path when realpath fails (nonexistent target — filtered
+    // by the existsSync check below).
+    let key: string;
+    try {
+      key = fs.realpathSync.native(canonical);
+    } catch {
+      key = canonical;
+    }
     if (seen.has(key) || !fs.existsSync(canonical)) return;
     seen.set(key, canonical);
     order.push(canonical);
@@ -181,9 +193,10 @@ export function countDistinctCloseoutSessions(eventsPath: string): number {
       };
       if (
         event.event_type === "closeout_succeeded" &&
-        typeof event.session_number === "number"
+        Number.isInteger(event.session_number) &&
+        (event.session_number as number) > 0
       ) {
-        seen.add(event.session_number);
+        seen.add(event.session_number as number);
       }
     } catch {
       // skip malformed lines — append-only ledger may carry partial writes
@@ -414,7 +427,7 @@ export function parseUatChecklist(checklistPath: string): UatSummary | null {
   let pending = 0;
   for (const it of items) {
     const r = (it["Result"] ?? it["result"] ?? "") as string;
-    if (r === "" || r === null || /^pending$/i.test(String(r))) pending++;
+    if (r === "" || /^pending$/i.test(String(r))) pending++;
     const ref = it["E2ETestReference"] || it["e2eTestReference"];
     if (ref) e2eRefs.add(String(ref));
   }
@@ -624,9 +637,9 @@ export function readSessionSets(root: string): SessionSet[] {
           (!Array.isArray(rawSd.completedSessions) ||  // noqa: D13 - v2-compat ledger-merge for synthesizer input
             (rawSd.completedSessions as unknown[]).length === 0)  // noqa: D13 - v2-compat ledger-merge for synthesizer input
         ) {
-          const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
-          if (ledgerSessions.length > 0) {
-            preNormalizeSd = { ...rawSd, completedSessions: ledgerSessions };
+          const closedLedgerSessions = readClosedSessionsFromLedger(eventsPath);
+          if (closedLedgerSessions.length > 0) {
+            preNormalizeSd = { ...rawSd, completedSessions: closedLedgerSessions };
           }
         }
 

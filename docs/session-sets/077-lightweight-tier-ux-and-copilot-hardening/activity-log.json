@@ -2,5 +2,211 @@
   "sessionSetName": "077-lightweight-tier-ux-and-copilot-hardening",
   "createdDate": "2026-07-02T00:00:00-04:00",
   "totalSessions": 6,
-  "entries": []
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-02T06:30:42.479777+00:00",
+      "description": "Operator set pathAwareCritique: required.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "required"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/contract-gate",
+      "dateTime": "2026-07-02T06:30:42.479777+00:00",
+      "description": "Operator set contractGate: none.",
+      "status": "complete",
+      "kind": "contract_gate",
+      "choice": "none"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 0,
+      "stepKey": "s1.ai-assignment",
+      "dateTime": "2026-07-02T02:32:55.039069-04:00",
+      "description": "Authored ai-assignment.md via routed analysis (Step 3.5)",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 4745,
+          "outputTokens": 2252,
+          "costUsd": 0.028451
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "s1.baseline",
+      "dateTime": "2026-07-02T02:37:49.561537-04:00",
+      "description": "Three-layer baseline: L1 pytest 2268 passed/5 skipped/0 failed; L2 tsc --noEmit clean, mocha 906 passing/4 failing (2 = golden drift from set-authoring commit, fixed inline by UPDATE_GOLDEN regen; 2 = standing local-only failures never run in CI: configEditor-foundation ViewColumn stub gap, notificationsSection stale disabled-button assertion) -> post-fix CI spec pair 22 passing/0 failing; L3 playwright running. Master Test run 28569747256 (set-authoring commit) was RED on the golden drift; inline fix restores green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.review-routed/a-wizard-prompts",
+      "dateTime": "2026-07-02T02:43:01.605919-04:00",
+      "description": "Routed code-review bundle a-wizard-prompts",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "taskType": "code-review",
+          "inputTokens": 15427,
+          "outputTokens": 9083,
+          "costUsd": 0.20852350000000003
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.review-routed/b-providers-utils",
+      "dateTime": "2026-07-02T02:47:31.880899-04:00",
+      "description": "Routed code-review bundle b-providers-utils",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "taskType": "code-review",
+          "inputTokens": 31148,
+          "outputTokens": 12208,
+          "costUsd": 0.32160150000000004
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.review-routed/c-start-runtime",
+      "dateTime": "2026-07-02T02:50:55.052404-04:00",
+      "description": "Routed code-review bundle c-start-runtime",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "taskType": "code-review",
+          "inputTokens": 14724,
+          "outputTokens": 9146,
+          "costUsd": 0.2057545
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.review-routed/d-close",
+      "dateTime": "2026-07-02T02:54:57.233487-04:00",
+      "description": "Routed code-review bundle d-close",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "taskType": "code-review",
+          "inputTokens": 25092,
+          "outputTokens": 9917,
+          "costUsd": 0.2671535
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.review-routed/e-dedicated-verification",
+      "dateTime": "2026-07-02T02:58:51.296833-04:00",
+      "description": "Routed code-review bundle e-dedicated-verification",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "taskType": "code-review",
+          "inputTokens": 13547,
+          "outputTokens": 9470,
+          "costUsd": 0.20803475
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.review-routed/f-session-state",
+      "dateTime": "2026-07-02T03:04:06.460556-04:00",
+      "description": "Routed code-review bundle f-session-state",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "taskType": "code-review",
+          "inputTokens": 33576,
+          "outputTokens": 13955,
+          "costUsd": 0.36371800000000004
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "s1.triage",
+      "dateTime": "2026-07-02T03:06:31.806311-04:00",
+      "description": "Triage complete: A1-A12 all confirmed against code (A1 rationale-fabrication leg re-characterized: tierGuidance is gated, so the palette path emits Full exemplars with NO tier guidance rather than a fabricated rationale). orchestrator.provider hard-confirmed persisted omit-null at all 3 writers; --provider optional. Critique-2 (GPT-5.4, SOUND-WITH-CHANGES) M1-M7 folded into spec. Routed bundles A-F triaged: 2 false positives refuted by orchestrator (plan-less TypeError - ProgressView.total_sessions is always int; unreadable-record warning fires only on existing corrupt file), 2 refuted by auto-verifier (ui-abstraction hardening item; repair Case-4 redundancy). Inline fixes: UnicodeError sibling closure x3 in dedicated_verification (L-069-1), runtime_mode lazy-import pattern, CSP nonce CSPRNG, planImport fs guards, kickoff prompt path quoting, fileSystem minors (case-sensitive dedup key, integer guard, dead null check, shadow rename), sessionGenPrompt void x3, copyPromptCommands dead try-catch. Fold-forward: close_session hardening -> S4; session_state atomic-write class -> S4 step 5; dedicated_verification atomic writes + derive_state ambiguity -> S5 step 6; progressText plusFraction -> S5; typed-session capture gaps -> S5.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "s1.findings-artifact",
+      "dateTime": "2026-07-02T03:08:16.563033-04:00",
+      "description": "Wrote s1-review-findings.md (baseline, A1-A12 triage with evidence, provider hard-confirm, critique-2 fold table, bundle A-F classification: 13 inline fixes / 10 fold-forward items / 4 refuted / 7 deferred-with-reason); spec.md amended in place for every fold (marked Critique-2 Mn / S1 review bundle X).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "s1.build-test",
+      "dateTime": "2026-07-02T03:11:06.466934-04:00",
+      "description": "Post-fix full pass: pytest 2268 passed/5 skipped/0 failed; npx tsc --noEmit clean; mocha 910 passing/0 failing; Playwright CI-green at baseline commit (local parallel flake documented, all specs pass serially). routed_gate on the session diff: REQUIRED (blast-radius, multi-module, breadth) -> Step 6 routed verification runs.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "s1.verification",
+      "dateTime": "2026-07-02T03:12:46.331341-04:00",
+      "description": "Cross-provider session verification: verdict=ISSUES_FOUND, 1 issue(s), blocking=True",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 10540,
+          "outputTokens": 5978,
+          "costUsd": 0.11602
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "s1.verification-round-2",
+      "dateTime": "2026-07-02T03:16:02.394978-04:00",
+      "description": "Round-2 narrow re-verify of S077-S1-V1-001 (realpath dedup): verdict=VERIFIED, blocking=False",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 1082,
+          "outputTokens": 8094,
+          "costUsd": 0.124115
+        }
+      ]
+    }
+  ]
 }

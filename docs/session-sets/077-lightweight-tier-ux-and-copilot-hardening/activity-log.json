@@ -625,6 +625,81 @@
           "costUsd": 0.002
         }
       ]
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 1,
+      "stepKey": "session-006/start",
+      "dateTime": "2026-07-03T15:48:38.621195-04:00",
+      "description": "Session 6 registered via start_session (claude-code/anthropic/claude-fable-5/medium). Required reading done (project-guidance, lessons-learned, authoring guide, session-state schema, workflow doc). Committed the stranded S5 close-out state writes as Close Set 077 session 5 (ba3a0d3). Kicked off the full three-layer baseline.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 2,
+      "stepKey": "session-006/baseline",
+      "dateTime": "2026-07-03T15:55:25.143197-04:00",
+      "description": "Full three-layer pass green pre-release: pytest 2372 passed / 5 skipped / 0 failed; npx tsc --noEmit clean; mocha 1095 passing; Playwright 19/19. No test pins version strings, so the 0.27.0/0.34.0 bumps do not invalidate the run.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 3,
+      "stepKey": "session-006/versions",
+      "dateTime": "2026-07-03T15:55:25.143197-04:00",
+      "description": "Version bumps applied: pyproject 0.26.2 -> 0.27.0; ai_router.__version__ 0.26.1 (stale, missed at 0.26.2) -> 0.27.0; extension package.json + lockfile 0.33.1 -> 0.34.0; router-config.yaml metadata.pricing_reviewed refreshed to 2026-07-03 after web-verifying Opus 4.8 $5/$25, Sonnet 4.6 $3/$15, GPT-5.4 $2.50/$15 against published pricing (Gemini 2.5 prices unchanged/stable).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 4,
+      "stepKey": "session-006/uat-checklist",
+      "dateTime": "2026-07-03T15:58:35.045904-04:00",
+      "description": "Ad-hoc per-set UAT checklist authored via route(uat-plan-generation) (opus $0.30, auto-verified by gpt-5.4): 14 operator-walk items covering the make-uat-workspace matrix sweep, three fresh-scaffold setup-choice walks, tier-leak stress (tierDirty), Python warning + no-artifacts pre-flight, the Copilot-persona out-of-band round-trip (banner-before -> engine writes artifact -> gate -> banner-clears), Mode-B single-engine gate pass + same-pair refusal, version-skew loud failure, and owed-state auto-routing. Verifier issue 1 (empty Passes/Feedback/Result keys) fixed mechanically; issue 2 (Python warning repeated per scaffold walk) dismissed: the pythonPresent probe is computed once before any tier choice, dedicated walks 6-7 cover it - flagged for operator adjudication at the walk. Ad-hoc floor validated: every non-judgment item carries ProgrammaticVerification.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "opus",
+          "taskType": "uat-plan-generation",
+          "costUsd": 0.300745
+        },
+        {
+          "model": "gemini-pro",
+          "taskType": "documentation",
+          "costUsd": 0.0233225
+        }
+      ]
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 5,
+      "stepKey": "session-006/critique",
+      "dateTime": "2026-07-03T16:03:15.676273-04:00",
+      "description": "Required end-of-set path-aware critique run via ai_router.pull_critique (defaults per L-067-1: openai gpt-5.4 + google gemini-2.5-pro, natural full-repo sandbox, diff base 6fc81da^). Both arms converged with substantive summaries and ZERO findings; artifact path-aware-critique.json written, level=required, >=2 distinct providers satisfied. No remediation loop needed (L-070-1 converges on no-new-code trivially).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 6,
+      "stepKey": "session-006/uat-fixture-gap",
+      "dateTime": "2026-07-03T16:08:49.693147-04:00",
+      "description": "UAT authoring surfaced a fixture gap: the uat-matrix had no remediation-owed row, so checklist walks 1/14 would dead-end. Added fixture 007-echo-the-greeting (Mode B, verification round ISSUES_FOUND with open s3-issues.json finding, remediation session in flight - the post-handoff shape) + README row + uatMatrixFixtures.test.ts pinning row (16 passing; corrected my initial plusFraction expectation: the + drops once a typed session grows the count, the 006 rule). Amended checklist walks 1/10/14 to concrete fixture rows and added the optional WAIVED no-nag banner check to walk 10. Drift guard 25/25; mocha 1096 passing; tsc clean. Local VSIX 0.34.0 built and installed; make-uat-workspace smoke-ran clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 7,
+      "stepKey": "session-006/verification",
+      "dateTime": "2026-07-03T16:10:48.454480-04:00",
+      "description": "Routed gate: REQUIRED (blast-radius + multi-module + breadth + build-ci-config; verdict logged). Cross-provider session verification (gpt-5.4, round 1): VERIFIED - version bumps, CHANGELOGs incl. coordinated rollback note, repository-reference pending-release update, UAT checklist, fixture 007 row, and critique artifact all confirmed against the conventions block. Raw output saved to s6-verification.md (never edited).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.13803
+        }
+      ]
     }
   ]
 }

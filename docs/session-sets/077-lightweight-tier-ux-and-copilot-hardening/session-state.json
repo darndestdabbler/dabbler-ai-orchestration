@@ -76,10 +76,15 @@
     {
       "number": 6,
       "title": "UAT, path-aware critique, and coordinated release",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-03T15:46:52.250518-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "medium"
+      },
       "verificationVerdict": null
     }
   ]

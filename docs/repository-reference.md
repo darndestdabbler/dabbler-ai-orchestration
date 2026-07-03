@@ -63,10 +63,37 @@ can learn it.
 
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
-| `dabbler-ai-router` | `0.26.1` | **Published to PyPI 2026-06-20** (tag `v0.26.1`, release.yml run 27867506784, tagged commit `5a05490`) — Set 074 moved built-in provider API key env-var defaults to `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` to avoid collisions with provider-owned IDE extensions. The key values remain the normal provider-issued Anthropic, Google, and OpenAI API keys; only the environment variable names changed. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.33.1` | **Published to the Marketplace and Open VSX 2026-06-20** (tag `vsix-v0.33.1`, publish-vscode.yml run 27867766323, tagged commit `eed7d5d`) — Set 074 follow-up carrying the extension-side Dabbler-prefixed provider-key copy/templates and changing `Dabbler: Update ai-router` to force-refresh PyPI installs with `pip install --upgrade --force-reinstall --no-cache-dir dabbler-ai-router`. Last Marketplace-published version before this patch: `0.33.0` (tag `vsix-v0.33.0`, publish-vscode.yml run 27507297687, 2026-06-14). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-router` | `0.27.0` | **Publish pending the operator's `v0.27.0` tag push through the green-Test gate** (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness). Last published: `0.26.2` to PyPI 2026-06-23 (tag `v0.26.2`, release.yml run 28048321482, tagged commit `024ad34`) — Set 076 local-only close-out mode. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.34.0` | **Publish pending the operator's `vsix-v0.34.0` tag push through the green-Test gate, after per-set UAT attestation on the local VSIX** (Set 077 — tier-leak fix + durable markers, three-way setup choice, Python prerequisite check, self-completing Evaluate prompts + canonical verification doc, owed-state auto-routing and row wording, record-over-seed mode derivation). **Operator prerequisite: renew `VSCE_PAT` (expired 2026-05-28) before the tag push**; staff can sideload the UAT-approved local VSIX if renewal lags. Last published: `0.33.1` to the Marketplace and Open VSX 2026-06-20 (tag `vsix-v0.33.1`, publish-vscode.yml run 27867766323, tagged commit `eed7d5d`). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
+
+- **`dabbler-ai-router 0.27.0` + extension `0.34.0`** — Set 077,
+  lightweight-tier UX and Copilot hardening. The coordinated release for the
+  Copilot-locked team's mission-critical adoption week (2026-07-06): the
+  Getting Started tier leak is closed with webview state persistence plus
+  durable `.dabbler/tier` / `.dabbler/verification-mode` markers read
+  marker-first by every downstream surface; the form gains the three-way
+  setup choice and the Python prerequisite warning with a
+  no-artifacts-on-failure pre-flight; out-of-band verification completes
+  itself (canonical `docs/dabbler/cross-provider-verification.md`
+  ensure-written into workspaces, pointer-style Evaluate prompts whose
+  reviewing engine writes `external-verification.md`, round-aware parser
+  with the `WAIVED` opt-out, soft gate keyed to the resolved runtime mode);
+  Mode B is Copilot-fit (close gate passes on engine **or provider**
+  difference, start-time same-pair refusal, owed states surfaced as a
+  `start_session` banner, Explorer `verification owed` / `remediation owed`
+  wording, and kickoff/remediation auto-routing). Rollback pair if a
+  hotfix-grade defect surfaces during the adoption week: extension `0.33.1`
+  + router `0.26.2`. **Publish pending the operator tag pushes (`v0.27.0`,
+  `vsix-v0.34.0`) through the green-Test gate; record the run ids here
+  post-publish.**
+
+- **`dabbler-ai-router 0.26.2`** — Set 076, local-only close-out mode
+  (`.dabbler/local-only` marker + `ai_router.local_only` CLI waive the
+  close-out push gate for deliberately remote-less repos). PyPI-only;
+  extension untouched. Published 2026-06-23 (tag `v0.26.2`, release.yml run
+  28048321482, tagged commit `024ad34`).
 
 - **`dabbler-ai-router 0.26.1` + extension `0.33.1`** — Set 074 emergency
   patch. Built-in provider API-key env-var defaults moved to

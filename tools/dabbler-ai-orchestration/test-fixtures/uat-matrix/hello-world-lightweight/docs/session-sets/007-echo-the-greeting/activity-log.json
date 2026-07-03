@@ -1,0 +1,54 @@
+{
+  "sessionSetName": "007-echo-the-greeting",
+  "createdDate": "2026-06-11T09:00:00-04:00",
+  "totalSessions": 2,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/verification-mode",
+      "dateTime": "2026-06-11T09:00:30-04:00",
+      "description": "Operator set verificationMode: dedicated-sessions.",
+      "status": "complete",
+      "routedApiCalls": [],
+      "kind": "verification_mode",
+      "choice": "dedicated-sessions"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/flag",
+      "dateTime": "2026-06-11T09:30:00-04:00",
+      "description": "--echo parsed; greeting printed twice.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/compose",
+      "dateTime": "2026-06-11T10:30:00-04:00",
+      "description": "Echo applies after tone transforms; README updated.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/verification",
+      "dateTime": "2026-06-11T13:35:00-04:00",
+      "description": "Dedicated verification session (same engine, different model provider) reviewed both work sessions: ISSUES_FOUND — one open finding seeded to s3-issues.json.",
+      "status": "completed",
+      "routedApiCalls": []
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "session-004/handoff",
+      "dateTime": "2026-06-11T14:00:00-04:00",
+      "description": "Hand-off close opened remediation session 4 (blessed writer); finding S007-V1-001 open.",
+      "status": "in-progress",
+      "routedApiCalls": []
+    }
+  ]
+}

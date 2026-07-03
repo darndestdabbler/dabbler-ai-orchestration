@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "--echo prints the second line before the tone transform is applied, so `--echo --shout` emits one shouted and one plain line.",
+      "category": "correctness",
+      "severity": "Major",
+      "issueId": "S007-V1-001",
+      "issueType": "deterministic-defect",
+      "verificationMethod": "Verifier ran `node hello.js --echo --shout` and compared the two output lines.",
+      "suggestedTestOrCheck": "Assert both emitted lines are identical for every tone-flag combination."
+    }
+  ]
+}

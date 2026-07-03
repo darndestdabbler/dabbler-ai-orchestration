@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "077-lightweight-tier-ux-and-copilot-hardening",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-07-03T16:02:37.222891-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "VERIFIED",
+      "summary": "Reviewed the Set 077 implementation across the Python gate/writer surfaces (`ai_router/dedicated_verification.py`, `start_session.py`, `pending_verification.py`, `external_verification.py`, `close_session.py`), the new and updated Python tests, and the TypeScript Explorer/prompt plumbing (`types.ts`, `tierLegibility.ts`, `fileSystem.ts`, `SessionSetsModel.ts`, `CustomSessionSetsView.ts`, `copyPromptCommands.ts` plus its tests). I specifically checked the load-bearing claims around engine-or-provider verification, the start-time same-pair refusal, pending-verification banner derivation, durable-vs-seed verificationMode handling, workflow-state mirroring, and the rerouted copy prompts. The code and tests I read were internally consistent on those points, and I did not find a blocking correctness or contract-drift defect that would change the merge decision.",
+      "findings": []
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the changes for the lightweight tier user experience and Copilot verification hardening. The review focused on the new cross-provider verification logic, the start-time guardrails, the pending verification-owed banner, and the associated robustness fixes and UI/doc updates.\n\nMy review process involved:\n1.  Inspecting `ai_router/dedicated_verification.py`, particularly the new `cross_provider_satisfied` function, to confirm it correctly implements the \"engine OR provider\" difference rule and correctly fails closed on missing data, which it does.\n2.  Verifying the corresponding start-time guardrail in `ai_router/start_session.py` (`_refuse_same_pair_verification`) to ensure its logic mirrors the close gate. The implementation correctly uses `cross_provider_satisfied` and fires on both the plain typed-start and handoff paths, preventing sessions that are guaranteed to fail.\n3.  Analyzing the new `ai_router/pending_verification.py` module to ensure the \"verification owed\" banner logic is sound, advisory-only, and correctly respects `WAIVED` verdicts as a durable opt-out. The logic correctly scans the current set, in-progress siblings, and the most recently completed sibling.\n4.  Checking the TypeScript implementation in `tools/dabbler-ai-orchestration/src/utils/tierLegibility.ts` (`deriveWorkflowState`) for drift against its Python counterpart in `dedicated_verification.py`, particularly the adjudication of a blank/unconfirmed verification verdict, and found them to be consistent.\n5.  Examining the associated test suites (`test_cross_provider_gate_extension.py`, `test_pending_verification.py`) to confirm they adequately cover the new logic and its edge cases, including same-identity refusal, different-provider allowance, and the legacy no-provider-recorded corrective hint. The tests are comprehensive.\n6.  Reading the documentation changes in `docs/ai-led-session-workflow.md` to ensure they accurately reflect the new verification behavior for users. The documentation correctly describes the engine-or-provider gate and the sanctioned Copilot model-picker pattern.\n\nThe changes appear correct, complete, and internally consistent. The logic for the cross-provider gate is sound, the new UI features are correctly wired to the backend state derivation, and the robustness improvements address plausible failure modes. The documentation accurately describes the new user-facing behaviors. No significant issues were found.",
+      "findings": []
+    }
+  ]
+}

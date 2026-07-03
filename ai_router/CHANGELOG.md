@@ -5,6 +5,86 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-07-03 (Set 077 — lightweight-tier UX and Copilot hardening)
+
+### Added
+
+- **Pending-verification banner at work-session start.** When a set owes
+  verification (Mode B `awaiting-*` states, or out-of-band with no recorded
+  verdict), `start_session` now prints a loud, non-blocking ASCII banner
+  naming the exact next verification or remediation action. The banner is
+  advisory on both tiers (no router config needed), and a latest-round
+  `WAIVED` record is honored as a durable opt-out — waived sets are never
+  nagged. (`ai_router/pending_verification.py`.)
+- **External-verification verdict parser with round semantics and a `WAIVED`
+  token.** The new `ai_router.external_verification` parser reads the dated
+  round sections of `external-verification.md`; the latest round's verdict
+  wins, and it returns the round, verdict, and outstanding-remediation view
+  consumed by both the soft gate and the pending-verification banner. A
+  `WAIVED` verdict (with a required one-line reason) durably records a
+  deliberate "no verification for this set" decision.
+- **Start-time guardrail for dedicated verification sessions.**
+  `start_session --type verification` (and the `--handoff` path) now refuses
+  at start — fail-loud, before any write — when the declared
+  `(engine, provider)` pair matches every work session's pair and could not
+  possibly pass the close gate. The corrective prints the sanctioned
+  single-engine model-picker pattern inline.
+
+### Changed
+
+- **Mode B close gate now accepts provider-only difference.**
+  `validate_dedicated_verification` passes when the verification session's
+  `orchestrator` differs from every work session by engine **or by model
+  provider** — a Copilot-locked shop passes by switching the model picker
+  (`--engine copilot --provider openai` verifying work done under
+  `--engine copilot --provider anthropic`). Same engine + same provider
+  still fails, and missing identity data fails closed: a verification
+  session with no recorded `--provider` cannot satisfy the provider arm,
+  and pre-0.27.0 work sessions without provider data fall back to the
+  engine-difference arm. The corrective message names both remedies.
+- **External-verification soft gate is keyed to the resolved runtime mode.**
+  The gate now fires for spec- or env-activated Lightweight sets (not only
+  the raw `--no-router` flag), is content-aware but still soft (an empty or
+  verdict-less file warns the same as an absent one), and stands down
+  entirely when the set's recorded `verificationMode` is
+  `dedicated-sessions` — the typed-session gate is the authority there, so
+  the redundant double-gate is gone.
+- **Typed-session start paths now seed the set-start policy captures.**
+  Starting or handing off a typed session now records the path-aware
+  critique, contract-gate, and verification-mode policies (idempotently)
+  when no record exists yet, so a set whose first boundary call is a typed
+  session no longer silently disarms the Set 066/070 close gates.
+
+### Fixed
+
+- **`close_session` mechanics hardened.** `aborted_at_soft_gate` is mapped
+  in `RESULT_TO_EXIT_CODE`; the already-closed check is re-run inside the
+  lock (TOCTOU); the terminal-close predicate is computed once for the gate
+  chain; and corrective guidance prints before the interactive `[y/N]`
+  soft-gate prompt instead of after.
+- **`session_state` writes are atomic and more robust.** The boundary
+  writers route through atomic writes with a Windows `os.replace`
+  `PermissionError` retry; `read_raw_session_state` no longer swallows
+  `PermissionError`; the API writer refuses to re-start a session already
+  in `completedSessions` (the CLI already did); and finalization uses
+  `max(sessions)` instead of `len(sessions)`.
+- **`dedicated_verification` robustness.** A shared `_write_json_atomic`
+  helper protects `seed_issues_envelope` (whose never-overwrite guard would
+  otherwise entomb a partial write forever) and the minimal-activity-log
+  creation; corrective strings quote the set-dir path; and a completed
+  verification round with no findings envelope and no verdict now derives
+  `awaiting-human` pre-terminally instead of silently reading as verified.
+- **Freshly-authored sets no longer misclassify as in-progress.** The lazy
+  state synthesis (`ensure_session_state_file` / `_backfill_payload`) now
+  treats an activity log with an empty `entries: []` as not-started; only a
+  log with entries infers in-progress. This closes the A12 defect where any
+  router entry point materialized a bogus in-progress state file for an
+  authored-but-unstarted set.
+
+> **Rollback:** if a hotfix-grade defect surfaces during the
+> mission-critical week, pin back to the coordinated pair — extension
+> `0.33.1` + `dabbler-ai-router==0.26.2` (both remain published).
+
 ## [0.26.2] — 2026-06-23 (Set 076 — local-only close-out mode)
 
 ### Added

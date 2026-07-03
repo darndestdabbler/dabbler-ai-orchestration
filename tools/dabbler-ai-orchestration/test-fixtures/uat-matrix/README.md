@@ -46,6 +46,7 @@ re-walk any affected UAT checklist rows.
 | `004-add-a-farewell` | Mode B (`dedicated-sessions`), session 2 of 2 in flight | `1/2+` fraction (denominator can still grow); no `v+` yet (work still open) |
 | `005-shout-the-greeting` | Mode B, both work sessions complete, no typed session yet (top-level still in-progress; counts come from `session-events.jsonl`) | `2/2+` AND `v+` together — the actionable "verification owed" moment; `Verification Kickoff` copy action |
 | `006-whisper-mode` | Mode B, complete with an appended `type: verification` session (verdict `VERIFIED`) | No marker (quiet is success); fraction `3/3` shows the runtime-grown count; fraction tooltip carries "Verification: VERIFIED (session 3)" |
+| `007-echo-the-greeting` | Mode B, both work sessions complete, verification session 3 complete (`ISSUES_FOUND`, one open finding in `s3-issues.json`), remediation session 4 in flight (Set 077) | Row description reads `remediation owed` in words; `Start Next Session` copy action reroutes to the remediation hand-off prompt (the status-bar message names the reroute); fraction `3/4` with no `+` — a typed session already grew the count |
 
 ## Refreshing the matrix
 

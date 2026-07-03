@@ -17,6 +17,7 @@ import * as os from "os";
 import * as path from "path";
 import { SessionSet } from "../../types";
 import { applicableActions } from "../../providers/ActionRegistry";
+import { resolveStartNextSessionPrompt } from "../../commands/copyPromptCommands";
 import { readSessionSets } from "../../utils/fileSystem";
 
 const EXT_ROOT = path.resolve(__dirname, "../../..");
@@ -103,7 +104,7 @@ suite("uat-matrix fixtures — hello-world-full (Set 062 S4)", () => {
 suite("uat-matrix fixtures — hello-world-lightweight (Set 062 S4)", () => {
   const sets = byName(readSessionSets(LW_ROOT));
 
-  test("all six fixture sets are discovered", () => {
+  test("all seven fixture sets are discovered", () => {
     assert.deepStrictEqual(
       [...sets.keys()].sort(),
       [
@@ -113,6 +114,7 @@ suite("uat-matrix fixtures — hello-world-lightweight (Set 062 S4)", () => {
         "004-add-a-farewell",
         "005-shout-the-greeting",
         "006-whisper-mode",
+        "007-echo-the-greeting",
       ],
     );
   });
@@ -177,6 +179,21 @@ suite("uat-matrix fixtures — hello-world-lightweight (Set 062 S4)", () => {
     assert.strictEqual(s.plusFraction, true);
     assert.strictEqual(s.verificationMarker, "v+");
     assert.ok(actionIds(s).includes("dabbler.copyVerificationKickoffPrompt"));
+  });
+
+  test("007 Mode B remediation in flight: remediation owed; Start Next Session reroutes (Set 077 S6)", () => {
+    const s = sets.get("007-echo-the-greeting")!;
+    assert.strictEqual(s.config.verificationMode, "dedicated-sessions");
+    assert.strictEqual(s.state, "in-progress");
+    assert.strictEqual(s.totalSessions, 4);
+    assert.strictEqual(s.sessionsCompleted, 3);
+    // A typed session already grew the denominator, so the
+    // can-still-grow `+` suffix is gone (the 006 rule).
+    assert.strictEqual(s.plusFraction, false);
+    assert.strictEqual(s.workflowState, "awaiting-remediation");
+    const routed = resolveStartNextSessionPrompt(s);
+    assert.ok(routed.message.includes("remediation owed"));
+    assert.ok(routed.prompt !== `Start the next session of \`${s.name}\`.`);
   });
 
   test("006 Mode B verified: quiet, 3/3 runtime-grown count, verdict surfaced", () => {

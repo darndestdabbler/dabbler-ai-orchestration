@@ -5,6 +5,78 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-07-03 (Set 077 — lightweight-tier UX and Copilot hardening)
+
+### Added
+
+- **Three-way setup choice for tier and verification mode.** The Getting
+  Started form's tier step now offers Full, Lightweight + dedicated
+  verification sessions, and Lightweight + out-of-band/none. The choice
+  maps onto existing schema fields only (`tier` + `verificationMode`), is
+  persisted in durable `.dabbler/tier` and `.dabbler/verification-mode`
+  markers written by the scaffold path, and threads through the generated
+  decomposition prompt so generated specs actually declare it.
+- **Python prerequisite check at setup.** The form probes for a resolvable
+  Python interpreter (the D6-probe pattern) and shows a prominent step-1
+  warning with install guidance when none is found; the Build action runs a
+  pre-flight interpreter check **before any durable write**, so a missing
+  interpreter fails with the friendly explainer instead of a
+  `spawn python ENOENT` buried in a warning summary — and leaves no setup
+  artifacts behind.
+- **Canonical cross-provider verification instructions in every workspace.**
+  The engine-facing `docs/dabbler/cross-provider-verification.md` (review
+  stance, verdict grammar incl. `WAIVED`, the required output artifact, and
+  the Copilot-locked second-chat/model-picker recipe) is ensure-written
+  idempotently before any pointer prompt is emitted, so existing consumer
+  repos get it on first use after upgrading — no re-bootstrap.
+
+### Changed
+
+- **The Evaluate prompts now complete themselves.** The spec / session / set
+  review prompts open with a pointer to the canonical verification doc and
+  close with the one non-negotiable instruction: the reviewing engine itself
+  writes the verdict to `external-verification.md` (path spelled out, with a
+  missing-doc fallback line). `openExternalVerificationDoc` seeds a
+  templated header (set, date, round, verdict-pending) instead of an empty
+  file.
+- **Start Next Session auto-routes in owed states.** When a Mode-B set
+  derives to awaiting-verification / awaiting-remediation, the row's copy
+  action yields the verification kickoff or remediation handoff prompt
+  (pointer-style) instead of a work-session prompt `start_session` would
+  refuse; the row description says `verification owed` / `remediation owed`
+  in words. Typed prompts carry the required `dabbler-ai-router >= 0.27.0`
+  version line so a mixed-version workspace fails loud, not silently.
+- **The Explorer reads the durable verification-mode record.** Mode
+  derivation prefers the activity-log `verification_mode` /
+  `verification_mode_change` record over the spec seed (the same precedence
+  the Python close gate uses), so a blessed A→B transition whose
+  seed-alignment failed no longer leaves the UI contradicting the gate.
+- **The auto-opened getting-started doc is tier-aware.** A Lightweight
+  operator is no longer greeted with Full-first content — the doc leads
+  with the durable tier choice.
+
+### Fixed
+
+- **The Getting Started tier leak.** The form state (tier, budget,
+  zeroMethod) now survives webview teardown via `setState()`/`getState()`,
+  so hiding, re-expanding, or reloading never re-checks the Full radio or
+  re-shows the Full-tier warning over a Lightweight pick; the operator's
+  choice persists as the durable `.dabbler/tier` marker; every downstream
+  consumer (decomposition prompt, form reload, summary copy) reads
+  marker-first; `switchTier` write-throughs the marker; and a marker-vs-spec
+  mismatch surfaces as a tree advisory. `buildSessionGenPrompt` no longer
+  falls back to `"full"` or invites a fabricated "per the operator's
+  selection" rationale.
+- **`asTier` fails loud on unknown values** (case-insensitive) instead of
+  silently narrowing to `"full"`.
+- **Explorer progress text no longer contradicts the fraction.**
+  `progressText` carries the same `+` suffix as the rendered `N/M+`
+  fraction on sets with appended typed sessions.
+
+> **Rollback:** if a hotfix-grade defect surfaces during the
+> mission-critical week, pin back to the coordinated pair — extension
+> `0.33.1` + `dabbler-ai-router==0.26.2` (both remain published).
+
 ## [0.33.1] — 2026-06-20 (Set 074 follow-up — provider env vars + forced router refresh)
 
 ### Changed

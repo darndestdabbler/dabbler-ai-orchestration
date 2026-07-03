@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "007-echo-the-greeting",
+  "status": "in-progress",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Echo flag",
+      "status": "complete",
+      "startedAt": "2026-06-11T09:00:00-04:00",
+      "completedAt": "2026-06-11T09:45:00-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "medium"
+      },
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "Compose with tone flags",
+      "status": "complete",
+      "startedAt": "2026-06-11T10:00:00-04:00",
+      "completedAt": "2026-06-11T10:50:00-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "medium"
+      },
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "Verification round 1",
+      "status": "complete",
+      "type": "verification",
+      "startedAt": "2026-06-11T13:00:00-04:00",
+      "completedAt": "2026-06-11T13:40:00-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "openai"
+      },
+      "verificationVerdict": "ISSUES_FOUND"
+    },
+    {
+      "number": 4,
+      "title": "Remediation round 1",
+      "status": "in-progress",
+      "type": "remediation",
+      "startedAt": "2026-06-11T14:00:00-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "medium"
+      },
+      "verificationVerdict": null
+    }
+  ]
+}

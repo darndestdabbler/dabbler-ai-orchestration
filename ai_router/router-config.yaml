@@ -17,7 +17,7 @@
 #                         this, config.py prints a warning at load
 #                         time (does not block execution).
 metadata:
-  pricing_reviewed: "2026-06-01"
+  pricing_reviewed: "2026-07-03"
   review_frequency_days: 30
 
 # --- Provider Configuration ---

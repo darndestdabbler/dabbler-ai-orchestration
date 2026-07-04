@@ -32,10 +32,10 @@ Moderate
 | 5.   | Full pass; verify; close | `direct:shell`, `session-verification` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium (as recommended)
+- Total routed cost: $0.80 (test-generation gemini-pro $0.09; code-review opus $0.33 + gpt-5-4 auto-verify $0.18; session-verification gpt-5-4 $0.19)
+- Deviations from recommendation: none on routing. One code-review verifier Major was adjudicated against empirical evidence (explicit-`.cmd` probe semantics — see `s1-close-reason.md`); its comment/test substance was fixed in-session, recorded via `record_adjudication`.
+- Notes for next-session calibration: Session 2 must decide how an explicit `dabblerSessionSets.copilotCliPath` reaches the refresh spawn — `copilot_catalog` exposes `--binary` (default `copilot`); mind cmd.exe argument parsing if the binary is ever a `.cmd` (BatBadBut). The `transportProfileSeed` host resolver is deliberately unwired; S2 creates the durable source alongside the `transport.profile` template write.
 
 **Next-session orchestrator recommendation (Session 2):**
 Claude Code claude-fable-5 @ effort=high

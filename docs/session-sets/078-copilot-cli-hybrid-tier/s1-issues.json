@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Mandatory target-team-seat and enterprise-availability checks were not done, but spec.md was amended to say Sessions 2-5 proceed as scoped. The spec is explicit that S1 must validate the six-point contract on the operator's seat AND a representative target-team seat before Sessions 2-5 are allowed to proceed, and that a failed/incomplete gate stops the set. Only the operator's single personal seat was probed; the target-team seat and GitHub Models enterprise availability are both recorded as unchecked. Proceeding to Sessions 2-5 (which build real code and eventually cut a release) on single-seat evidence, without an explicit operator decision to accept that risk or to arrange the second seat, changes the go/no-go outcome the spec calls for.",
+      "category": "Completeness",
+      "severity": "Major",
+      "resolution_status": "accepted-risk",
+      "resolved_in_round": 1,
+      "resolution_notes": "Escalated to the operator via AskUserQuestion. Operator response (2026-07-04, verbatim): \"We don't need that artificial hurdle here. I am giving authority to override any and all requirements by AI engines for proceeding to a next stage. We are complicating this too much.\" Recorded as an explicit operator override, not an orchestrator self-authorization. Sessions 2-5 proceed on single-seat evidence; the target-team-seat and GitHub Models enterprise checks are dropped as a gate, not merely deferred."
+    },
+    {
+      "description": "Gate point 3 (machine-readable underlying-provider provenance per catalog entry) and gate point 6 (rate/concurrency characterization) are labeled PARTIAL/FAIL and PARTIAL respectively in s1-cli-contract.md's own per-point analysis, but the rollup verdict and spec.md amendment reclassify them as satisfied by substitute mechanisms without operator sign-off, then declare an overall GO-WITH-OPEN-ITEMS verdict that does not appear anywhere in the spec's own vocabulary (which is framed as a binary pass/stop-with-pivot).",
+      "category": "Correctness",
+      "severity": "Major",
+      "resolution_status": "accepted-risk",
+      "resolved_in_round": 1,
+      "resolution_notes": "Escalated to the operator alongside the first finding; covered by the same override (2026-07-04): the operator authorized overriding AI-invented process gates for this set. The per-point evidence in s1-cli-contract.md (provenance via prefix heuristic + per-seat probing; concurrency untested, serialized default adopted) stands as written; the GO-WITH-OPEN-ITEMS verdict is now operator-ratified rather than orchestrator-self-authorized."
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "sessionSetName": "078-copilot-cli-hybrid-tier",
+  "createdDate": "2026-07-04T09:58:16.337525+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-04T09:58:16.337525+00:00",
+      "description": "Operator set pathAwareCritique: required.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "required"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/contract-gate",
+      "dateTime": "2026-07-04T09:58:16.337525+00:00",
+      "description": "Operator set contractGate: none.",
+      "status": "complete",
+      "kind": "contract_gate",
+      "choice": "none"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/cli-contract-probe",
+      "dateTime": "2026-07-04T06:08:27.054348-04:00",
+      "description": "Probed installed GitHub Copilot CLI (v1.0.62, silently auto-updated to 1.0.68 mid-probe) against the six-point go/no-go gate on the operator personal seat: headless -p/--allow-all-tools mode confirmed; --output-format json JSONL stdout vs plain stderr+exit-1 confirmed deterministic; >=2 provider-distinct dispatchable models confirmed (claude-sonnet-4.6/gpt-5.4/gemini-3.1-pro-preview, exceeding the floor of 2); usage visibility characterized as premiumRequests-count-only, no cost/balance; rate behavior clean over 5 sequential calls, concurrency untested (default stays serialized). Two items left open rather than failed: auth-failure error shape could not be non-destructively reproduced (empty COPILOT_HOME and a bad COPILOT_GITHUB_TOKEN both still succeeded); the target-team second seat was not available (operator personal account has no orgs). GitHub Models enterprise availability unchecked for the same reason. Saved s1-cli-contract.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/github-models-pivot-check",
+      "dateTime": "2026-07-04T06:08:27.054348-04:00",
+      "description": "Checked GitHub Models API pivot availability: gh models extension not installed by default; operator account is personal with no organizations (gh api user -q .type -> User; user/orgs empty), so there is no enterprise-policy surface to probe from this seat. Recorded as unchecked, deferred to operator/target-team context per spec.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/design-adjudication",
+      "dateTime": "2026-07-04T06:08:27.054348-04:00",
+      "description": "Routed task_type=architecture design adjudication over the S1 evidence (route() call, model gemini-2.5-pro per router selection). Locked: TOML lockfile schema (per-seat, per-model provider+enablement+provenance-source+premium-request-weight, fail-closed on version drift / missing provenance / same-provider-only / seat mismatch); late-bound role/alias resolver with cross-role provider-diversity enforcement; timeouts spawn=10s/first-byte=30s/total=300s; retryable-error taxonomy (invalid-model deterministic non-retryable; auth-class conservative substring heuristic, unvalidated; quota/rate class deferred to S2; unclassifiable non-zero exit treated as auth-class-or-worse, never silently retryable); breaker default 200 invocations/session (~100 gen+verify tasks); guard-exclusion list (cost/spend/price/quota-balance guards must skip under billed_usage_unavailable=true; hard invocation breaker, timeouts, retry policy, and lockfile/provider-diversity guards stay active; recommended new count-keyed premium-request-counter guard). Saved s1-design-adjudication.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/verification-round-1",
+      "dateTime": "2026-07-04T06:13:11.182342-04:00",
+      "description": "Routed cross-provider session verification (gpt-5.4, task_type=session-verification) over the full S1 diff (spec.md amendment + s1-cli-contract.md + s1-design-adjudication.md). Verdict: ISSUES_FOUND, 2 Major findings: (1) Sessions 2-5 were declared to proceed as scoped without the spec-mandated target-team-seat and GitHub-Models-enterprise checks, which only the operator can arrange/authorize; (2) gate points 3 (provenance) and 6 (concurrency), self-labeled PARTIAL/FAIL in the per-point evidence, were reclassified as satisfied via an unsanctioned GO-WITH-OPEN-ITEMS verdict not present in the spec vocabulary. Both findings are substantively correct. Saved s1-verification.md (raw) and s1-issues.json. Escalating both to the operator via AskUserQuestion rather than resolving unilaterally, since the missing evidence (second seat) is something only the operator can supply, and the proceed/stop decision materially gates whether Sessions 2-5 (real code, eventual release) start.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/operator-override",
+      "dateTime": "2026-07-04T06:17:09.623575-04:00",
+      "description": "Presented the two verifier Major findings to the operator via AskUserQuestion (proceed-now-close-gap-before-release vs. stop-and-wait-for-second-seat vs. operator-probes-team-seat-now). Operator response (verbatim): \"We do not need that artificial hurdle here. I am giving authority to override any and all requirements by AI engines for proceeding to a next stage. We are complicating this too much.\" Recorded as an explicit, durable operator override (not an orchestrator self-authorization) in s1-issues.json (both findings resolution_status=accepted-risk) and spec.md. The target-team-seat and GitHub Models enterprise checks are dropped as a gate for this set; Sessions 2-5 proceed on single-seat evidence.",
+      "status": "complete"
+    }
+  ]
+}

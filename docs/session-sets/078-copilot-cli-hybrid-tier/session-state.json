@@ -1,15 +1,20 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "078-copilot-cli-hybrid-tier",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "CLI contract discovery and design lock (go/no-go)",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-04T05:58:16.330002-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "effort": "medium"
+      },
       "verificationVerdict": null
     },
     {

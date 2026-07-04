@@ -213,7 +213,10 @@ already-in-flight floor for the mission-critical week (Critique-1 M3).
 - `ai_router/cli_transport.py`: the `Transport` interface + Copilot CLI
   implementation (injected spawner; the invocation state machine above;
   `TransportResult` contract; spawn/first-byte/total timeouts; exit-code
-  → error-class mapping per the S1-pinned contract).
+  → error-class mapping per the S1-pinned contract). Every invocation
+  passes `--no-auto-update` (S1 finding: the CLI silently self-updates
+  mid-run outside CI env vars, which would otherwise invalidate the
+  lockfile's pinned-CLI-version contract between calls).
 - `ai_router/copilot_catalog.py`: discovery command + lockfile
   read/validate (CLI version pin, provenance fields, drift detection,
   fail-closed posture).
@@ -322,6 +325,114 @@ already-in-flight floor for the mission-critical week (Critique-1 M3).
 design locked — or the set stopped loudly with a pivot recommendation.
 **Progress keys:** `s1.contract`, `s1.team-seat`, `s1.design-lock`,
 `s1.closed`
+
+#### Session 1 result: GO-WITH-OPEN-ITEMS (2026-07-04)
+
+Evidence gathered against the installed GitHub Copilot CLI (v1.0.62,
+**silently auto-updated to v1.0.68 mid-probe** — auto-update is NOT
+suppressed by default outside CI env vars, so the transport must always
+pass `--no-auto-update`, a design-lock addition this probe surfaced) on
+the **operator's personal seat only**. Full evidence and per-gate-point
+verdicts: [`s1-cli-contract.md`](s1-cli-contract.md). Full design
+adjudication (routed, `task_type: architecture`):
+[`s1-design-adjudication.md`](s1-design-adjudication.md).
+
+- **Gate points 1, 2, 4, 5 — PASS.** Headless mode (`-p`/`--allow-all-tools`)
+  works; `--output-format json` gives deterministic JSONL-on-stdout vs.
+  plain-text-stderr+exit-1 separation; three provider families
+  (`claude-sonnet-4.6`/Anthropic, `gpt-5.4`/OpenAI,
+  `gemini-3.1-pro-preview`/Google) all confirmed dispatchable, exceeding
+  the >=2 floor; usage visibility characterized as
+  `result.usage.premiumRequests` (a per-call count) and nothing else —
+  no token cost, no dollar figure, no remaining balance, confirming the
+  honest-non-accounting premise directly.
+- **Gate point 3 (provenance) — satisfied by a weaker-than-envisioned
+  mechanism, not absent.** The CLI has no discovery/list-models command
+  and no first-party `provider` field; provenance is derived from the
+  model-name prefix convention (`claude-*`/`gpt-*`/`gemini-*`) and each
+  entry's dispatchability is independently confirmed by invoking it. The
+  lockfile schema (below) stores `provider` explicitly with a recorded
+  `provider_source: name-prefix-heuristic` rather than assuming a
+  first-party field exists.
+- **Gate point 6 (rate/concurrency) — satisfied by adopting the spec's own
+  conservative default**, not by proof: 5 sequential calls were clean;
+  concurrency was not tested (deliberately, to avoid burning further
+  premium-request quota); serialized execution ships as designed, with no
+  change needed.
+- **Two items are open, not failed, and do not block S2+:**
+  **GAP-1** auth-failure error shape is unconfirmed (two non-destructive
+  attempts — empty `COPILOT_HOME`, an invalid `COPILOT_GITHUB_TOKEN` —
+  both still succeeded rather than reproducing a failure; deferred to
+  S2's fake-spawner suite, contained meanwhile by treating any
+  unclassifiable non-zero exit as auth-class-or-worse, never retryable).
+  **GAP-2** quota/rate-exhaustion shape is unconfirmed (never triggered;
+  shipped non-retryable pending S2). **GAP-3** the representative
+  target-team seat was not checked — the operator's only available
+  account is personal with no organizations, so it is explicitly not that
+  seat (operator arranges access per the original step 2 wording); this
+  also leaves GitHub Models enterprise availability unchecked (no org
+  surface from this seat).
+- **No pivot to GitHub Models is warranted.** The CLI contract is
+  fundamentally workable on the evidence gathered.
+- **Operator override (2026-07-04).** Cross-provider session
+  verification (GPT-5.4) flagged, correctly, that this verdict was
+  self-authorized by the orchestrator rather than sanctioned by the
+  spec's own binary pass/stop gate language, and that Sessions 2-5 were
+  being greenlit without the two-seat evidence the spec calls for. Put
+  to the operator directly; the operator's verbatim response: *"We
+  don't need that artificial hurdle here. I am giving authority to
+  override any and all requirements by AI engines for proceeding to a
+  next stage. We are complicating this too much."* This is recorded as
+  an explicit operator override, not an orchestrator judgment call — see
+  `s1-issues.json` (both findings, `resolution_status: accepted-risk`)
+  and `s1-verification.md`. Sessions 2-5 proceed as scoped on
+  single-seat evidence; the target-team-seat and GitHub Models
+  enterprise checks are **dropped as a gate**, not merely deferred.
+
+**Design lock (from `s1-design-adjudication.md`), binding for S2-S3:**
+
+- **Lockfile** (`ai_router/copilot-catalog.lock`, TOML): `[meta]` carries
+  `cli_name`/`cli_version`/`cli_version_pin_required`/`seat_id`/
+  `seat_label`/`source`/`probed_at`; each `[[models]]` entry carries
+  `id`/`provider`/`provider_source`/`enablement`
+  (`confirmed`|`unconfirmed`|`blocked` — only `confirmed` is routable)/
+  `confirmed_on_cli_version`/`premium_request_weight`/`echoed_model`.
+  Loader fail-closed rules: CLI version drift; missing/unknown
+  provenance on a confirmed entry; fewer than 2 distinct providers among
+  confirmed entries; seat-id mismatch.
+- **Roles** are late-bound aliases in `router-config.yaml` under
+  `transports.copilot-cli.roles` (`generator`, `verifier`), each an
+  ordered `prefer` list plus `require_provider_in`; a
+  `cross_role_provider_diversity` constraint forces the verifier to a
+  different provider family than the generator, fail-closed if none
+  exists. Same YAML resolves to different concrete models per seat's
+  lock — the lock is model-truth, the config is intent.
+- **Timeouts:** spawn **10s**, first-byte **30s**, total **300s**
+  (reasoned off observed ~1.3-2.9s API / ~3.4-4.9s full-session durations
+  on trivial prompts; first-byte is where a missing `--allow-all-tools`
+  interactive hang or an auth stall manifests as a killable failure
+  instead of an indefinite block).
+- **Retryable-error classes:** `invalid-model` (exit 1 + stderr substring
+  `from --model flag is not available`) — confirmed, deterministic,
+  non-retryable. `auth-class` — conservative substring heuristic
+  (`auth`/`login`/`credential`/`unauthorized`/`authentication`/`401`/
+  `403`/`not logged in`), non-retryable, positive-match unvalidated
+  (GAP-1). `quota/rate-class` — no confirmed shape (GAP-2), non-retryable
+  today. `generic/unknown` — fail-closed. **Load-bearing rule:** any
+  unclassifiable non-zero exit is auth-class-or-worse, never silently
+  retryable.
+- **Breaker default:** `transport.max_invocations_per_session = 200`
+  (~100 generate+verify tasks; counts every spawn; framed as a safety
+  breaker, not a budget).
+- **Guard-exclusion list** (gated on `billed_usage_unavailable: true`,
+  every skip logged loudly, never silent): dollar/spend-budget guards,
+  token-cost guards, provider price-table estimators, and
+  remaining-quota/balance preflight guards must skip. The hard invocation
+  breaker, timeout guards, retry/backoff policy, and lockfile/
+  provider-diversity guards stay active (not cost-keyed — more important
+  here, not less). A new count-keyed `premiumRequests` counter guard
+  (warn/stop at N) is recommended as an addition, not a repurposed
+  cost guard.
 
 ### Session 2 of 5: Transport layer and catalog lockfile
 

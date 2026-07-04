@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "079-copilot-seat-onboarding-and-verification-copy",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Copilot CLI presence probe + Full-tier sub-choice UI",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "Wire the happy path (sequencing, subprocess, progress, config write)",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "Failure matrix, honest failure UX, and E2E judgment",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 4,
+      "title": "Simplify verification-mode copy (Feature 2)",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 5,
+      "title": "Docs, UAT, and release",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

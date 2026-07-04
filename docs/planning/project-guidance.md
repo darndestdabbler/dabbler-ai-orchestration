@@ -69,6 +69,37 @@ when-NOT-to triggers live in
 framework; the multi-orchestrator-planning part is not yet experimentally
 validated — consider it, apply judgment).
 
+### UAT is written for a stranger and pre-verified by automation
+
+Human UAT time is the most expensive verification resource in the workflow,
+and a confusing walk destroys its evidentiary value: when a step is ambiguous,
+the operator cannot tell a product bug from their own misreading, so the
+attestation proves nothing. Therefore (operator-set bar, 2026-07-04, after
+suspending the Set 077 UAT over instruction quality):
+
+- **Write UAT steps for a reader with zero session context, at a low reading
+  level.** Name the exact button labels, menu paths, file paths, and expected
+  on-screen text. Never assume the human shares the orchestrator's context or
+  can fill gaps ("no shared brain").
+- **Any step automation can verify must be verified by automation (Playwright
+  / Layer 3) BEFORE the checklist is offered to the human.** The human walk
+  should contain only what automation genuinely cannot check. Untested
+  instructions are not known to be followable.
+- The intended direction is a DSL for human-action steps that compiles to
+  Playwright tests (operator prototype: `D:\Projects\dabbler-uat-dsl`); a
+  dedicated session set will evaluate it. Until then, apply the two rules
+  above manually to every checklist.
+
+### Prefer removal over addition when fixing
+
+When considering any fix, first look for something to **remove** — a state, a
+branch, a surface — rather than something to add. If addition is unavoidable,
+add the simplest thing that works. Banners, warnings, and conditional logic
+accrete one plausible fix at a time, and every increment multiplies failure
+modes and UAT surface (operator directive, 2026-07-04). Reviews and critiques
+should explicitly challenge additive fixes and record why a removal-based
+alternative was not possible.
+
 ---
 
 ## Conventions

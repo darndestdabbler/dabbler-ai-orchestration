@@ -700,6 +700,30 @@
           "costUsd": 0.13803
         }
       ]
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 8,
+      "stepKey": "session-006/push-ci",
+      "dateTime": "2026-07-03T16:11:49.192402-04:00",
+      "description": "S6 work committed (51fc437) and pushed; Test workflow run 28681416103 in progress (drift guards + template snapshot already green). Session pauses at the operator gates per Step 10: UAT walk + attestation on the local VSIX 0.34.0, VSCE_PAT renewal, and the v0.27.0 / vsix-v0.34.0 tag pushes. close_session deferred to the post-attestation turn.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 9,
+      "stepKey": "session-006/uat-kit",
+      "dateTime": "2026-07-03T16:24:54.088735-04:00",
+      "description": "Test workflow run 28681416103 GREEN on 51fc437 (all matrix jobs). Built the operator UAT starter kit at C:/temp/uat-077 (Set 062 precedent): regenerated uat-matrix workspace (incl. the new 007 remediation-owed row), four empty scaffold-walk folders, pre-baked oob-roundtrip repo (banner->artifact->gate walk 8-10) and modeb-gate repo (walks 11-12) each git-committed for one-command reset, modeb-gate-oldrouter copy + a 0.26.2 PyPI venv for the walk-13 skew contrast, and README-UAT-WALK.md mapping all 14 walks to exact commands. Smoke-tested: same-pair refusal (exit 3, no writes), copilot/openai start accepted, pending-verification banner names 001-greeting-core, 0.26.2 accepts the doomed start silently. FOUND AND FIXED during smoke: the repo venv (copied from the c:/Users clone) had its editable dabbler-ai-router install pointing at the STALE c:/Users/denmi/source/repos/dabbler-ai-orchestration checkout (stuck at 6fc81da) - out-of-repo invocations (incl. extension pythonPath-pinned row actions) silently ran pre-S1 code; repointed d:/Projects venv to its own repo (0.27.0) and restored the c:/Users venv to its own checkout. Lessons-learned candidate for Step 9.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 10,
+      "stepKey": "session-006/uat-suspended",
+      "dateTime": "2026-07-04T03:48:03.498550-04:00",
+      "description": "OPERATOR DECISION (2026-07-04): UAT suspended mid-walk over instruction quality - steps required guessing, could not distinguish product bugs from misread instructions, written above the needed reading level with shared-context assumptions. Set 077 stays OPEN (session 6 not closed); deferred until after Set 078 and a dedicated UAT-improvement set (candidate input: operator UAT DSL at D:/Projects/dabbler-uat-dsl; goal: everything Playwright-testable is Playwright-tested BEFORE human UAT). Then 077 UAT is revisited and 078 UAT run under the improved experience. Release gates remain open: UAT attestation, VSCE_PAT renewal, tag pushes v0.27.0 + vsix-v0.34.0, Marketplace publish (0.34.0 VSIX sideloadable meanwhile). Two operator directives captured as durable guidance in docs/planning/project-guidance.md (UAT-for-a-stranger + prefer-removal-over-addition) and pre-authoring notes in docs/planning/uat-improvement-notes.md.",
+      "status": "complete"
     }
   ]
 }

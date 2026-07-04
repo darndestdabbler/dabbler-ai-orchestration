@@ -5,6 +5,91 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-07-04 (Set 078 — Copilot CLI hybrid tier)
+
+### Added
+
+- **`copilot-cli` transport profile.** A new `transport.profile` field in
+  `router-config.yaml` (`api` | `copilot-cli`, default `api`) selects *how*
+  every routed call is dispatched, independent of *which* model is picked.
+  Under `copilot-cli`, `ai_router/cli_transport.py`'s `Transport` interface
+  dispatches every call through the GitHub Copilot CLI's headless mode via an
+  injected-spawner invocation state machine: enforced noninteractive flags
+  (incl. `--no-auto-update`, since the CLI silently self-updates mid-run
+  otherwise), spawn/first-byte/total timeouts (10s/30s/300s), typed error
+  classes (`invalid-model`, `auth-class`, `quota-class`, `generic-unknown`,
+  each non-retryable), no retry after any content has been emitted, and
+  discarded (never patched-together) partial output. The `api` profile's
+  dispatch path is unchanged and regression-tested identical.
+- **Seat-local Copilot model catalog.** `ai_router/copilot_catalog.py` +
+  `python -m ai_router.copilot_catalog --refresh` discover the seat's
+  dispatchable models and write `ai_router/copilot-catalog.lock` (not
+  checked in as picker strings): CLI version, each model's asserted
+  provider (a name-prefix heuristic — `claude-*`/`gpt-*`/`gemini-*` — since
+  the CLI has no first-party provenance field or discovery command),
+  enablement state, and capture metadata. Every routed call validates the
+  lockfile against the live CLI and fails closed on version drift, missing
+  provenance, or fewer than two distinct providers among confirmed entries.
+- **Catalog-role resolution for `route()`/`verify()`.** Under the
+  `copilot-cli` profile, generator and verifier model choices resolve
+  through late-bound role aliases (`transports.copilot-cli.roles`) against
+  the seat's lockfile; the verifier role enforces
+  `cross_role_provider_diversity` and fails closed to a non-blocking,
+  operator-visible `verdict="verification_unavailable"` rather than ever
+  silently verifying same-provider.
+- **Honest seat accounting.** New additive `record_call` metrics fields —
+  `transport`, `local_invocations`, `attempts`, `billed_usage_unavailable`
+  — null on every historical line; `cost_report` renders a separate
+  "Recorded copilot-cli calls (unbilled)" count instead of folding `$0.00`
+  copilot-cli records into total cost. Dollar/token-cost/price-table/
+  quota-preflight guards are excluded under `billed_usage_unavailable:
+  true` (every skip logged); a hard, non-cost-keyed circuit breaker
+  (`transport.max_invocations_per_session`, default 200) caps local
+  invocations per process.
+
+### Fixed (live-dogfood defects the hermetic fake-spawner suite could not see)
+
+- The lockfile's TOML writer/loader silently produced an unparseable
+  `cli_version` when the real CLI's multi-line `--version` banner was
+  stored verbatim (an unescaped literal newline inside a quoted TOML
+  string) — now only the first line is kept.
+- `_success_result()` read `content`/`model`/`outputTokens` directly off the
+  assistant-message envelope, but the real CLI nests every message-type
+  payload field under a `data` key — every real dispatch silently returned
+  `content=""` as a false success. Fixed by unwrapping the `data` key before
+  field extraction. A required end-of-set path-aware critique (Session 5)
+  found one remaining gap in this fix: an assistant-message event with the
+  `data` key **absent entirely** still defaulted to an empty-dict success
+  instead of failing closed. `data` is now required to be present (a
+  missing key raises the same malformed/generic-unknown classification as
+  every other unexpected wire shape).
+- `default_spawner` used `Popen(text=True)` with no explicit encoding, so
+  stdout/stderr decoded as `cp1252` on Windows; the real CLI's UTF-8 JSONL
+  routinely contains bytes `cp1252` cannot decode (e.g. an em dash in
+  ordinary model prose), crashing the reader thread mid-stream and
+  misclassifying the resulting hang as a "total-timeout" instead of a local
+  decode bug. Fixed with `encoding="utf-8", errors="replace"` explicit.
+
+### Rollback
+
+If a hotfix-grade defect surfaces in the `copilot-cli` profile, the escape
+is entirely config-level — no code rollback needed:
+
+1. Set `transport.profile: api` in `router-config.yaml` (or delete the
+   `transport:` block entirely — `api` is the default).
+2. Ignore or delete `ai_router/copilot-catalog.lock` — it is seat-local,
+   safe to discard and regenerate later.
+3. To roll back the package itself, pin to the last version without the
+   `copilot-cli` transport surface at all: `pip install
+   dabbler-ai-router==0.27.0`. **Note:** as of this writing `0.27.0` is
+   itself still publish-pending (see `docs/repository-reference.md`); this
+   step is only reachable once `0.27.0` has actually published. Until then,
+   step 1 (`transport.profile: api`) is the available escape.
+
+Every consumer keeps working under the `api` profile with zero data loss —
+the lockfile and the profile flag are the only new moving parts, and both
+are seat-local/config-only, never data migrations.
+
 ## [0.27.0] — 2026-07-03 (Set 077 — lightweight-tier UX and Copilot hardening)
 
 ### Added

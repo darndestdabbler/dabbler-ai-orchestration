@@ -1,0 +1,25 @@
+{
+  "sessionNumber": 5,
+  "source": "path-aware-critique.json (Session 5, required, providers: openai/gpt-5.4, google/gemini-2.5-pro)",
+  "issues": [
+    {
+      "id": "S5-PAC-1",
+      "provider": "openai",
+      "severity": "Major",
+      "category": "correctness",
+      "summary": "An assistant.message event with no \"data\" key at all defaulted to an empty dict via .get(\"data\", {}) and was returned as ok=True/content=\"\" -- a structurally malformed wire shape treated as a legitimate empty success, recreating the same silent-false-success class Session 4's live dogfood fixed for the wrong-shaped-data case.",
+      "resolution_status": "fixed",
+      "resolution": "ai_router/cli_transport.py::_success_result now requires the \"data\" key be present on an assistant.message event before treating it as a payload dict; an absent key raises TypeError, which the existing except clause classifies as generic-unknown (malformed), matching the module's own never-trust-unexpected-shape convention. ai_router/tests/test_cli_transport.py's test_missing_data_key_defaults_to_empty_dict_success renamed to test_missing_data_key_is_malformed_not_empty_success and updated to assert the malformed/generic-unknown classification instead of a masked success. Full suite re-run green after the fix (see activity log).",
+      "note": "This exact question was already raised as Issue 6 (Suggestion severity) in Session 4's own code review (s4-code-review.md) and adjudicated no-fix at the time ('matches the module's own existing absent-vs-malformed convention', per disposition.json's Session 4 summary). The Session 5 path-aware critique re-raised it independently at Major severity with a concrete failure scenario and evidence. Two independent reviewing surfaces (a routed code-review pass in S4, an independent multi-provider pull-verifier pass in S5) flagging the same real gap is strong signal it is genuine rather than manufactured; the S4 adjudication is superseded by this fix, not treated as still-settled."
+    },
+    {
+      "id": "S5-PAC-2",
+      "provider": "google",
+      "severity": "Major",
+      "category": "false-confidence",
+      "summary": "Confirmed, via its own grep, that a prior code-review finding citing a _read_and_process_stdout method and a self._session_id attribute was fabricated (neither exists in ai_router/cli_transport.py).",
+      "resolution_status": "no_change_needed",
+      "resolution": "Not a new finding against this session's code -- it independently re-confirms a fabrication that Session 4 had already caught, named, and discarded in its own disposition ('1 discarded as fabricated ... confirmed by grep'). No code or doc under this session's control needed a change; s4-code-review.md is a raw verification artifact and is never edited after being written (project-guidance.md convention). Recorded here for completeness since the path-aware critique surfaced it, not because it identifies anything unresolved."
+    }
+  ]
+}

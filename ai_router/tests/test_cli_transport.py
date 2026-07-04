@@ -433,10 +433,13 @@ def test_missing_content_field_defaults_to_empty_string_success():
     assert result.content == ""
 
 
-def test_missing_data_key_defaults_to_empty_dict_success():
+def test_missing_data_key_is_malformed_not_empty_success():
     # An assistant.message event with no "data" key at all (distinct from a
-    # present-but-incomplete data dict, covered above) must default to an
-    # empty payload, not raise or misclassify as malformed.
+    # present-but-incomplete data dict, covered above) is a structurally
+    # malformed wire shape -- the real CLI always wraps message payload
+    # fields under "data" -- and must fail closed as generic-unknown, not
+    # be silently accepted as a legitimate empty response (S5 path-aware
+    # critique finding).
     stdout_lines = [
         '{"type": "assistant.message"}\n',
         '{"type": "result", "usage": {}}\n',
@@ -445,10 +448,8 @@ def test_missing_data_key_defaults_to_empty_dict_success():
     result = cli_transport.CopilotCliTransport(spawner=spawner).dispatch(
         model_id="m", system_prompt="", user_message="u"
     )
-    assert result.ok
-    assert result.content == ""
-    assert result.output_tokens == 0
-    assert result.transport_metadata["echoed_model"] is None
+    assert not result.ok
+    assert result.transport_metadata["error_class"] == cli_transport.ERROR_CLASS_GENERIC
 
 
 def test_malformed_usage_shape_is_generic_error():

@@ -2487,6 +2487,21 @@ longer needed.
 
 On Windows, use `.venv/Scripts/python.exe` to run Python.
 
+#### Full tier via the GitHub Copilot CLI (Set 078)
+
+Full-tier projects normally dispatch every call over a direct provider
+HTTPS API (`transport.profile: api` in `router-config.yaml`, the default).
+Shops whose staff hold only a GitHub Copilot seat — no `DABBLER_*` provider
+key is possible under corporate policy — can instead set
+`transport.profile: copilot-cli`, which routes every call through the
+Copilot CLI's headless mode while every other Full-tier mechanic (task
+typing, tiering, cross-provider verification, metrics) stays unchanged. It
+is an *indirect* Full tier with explicitly degraded guarantees (asserted,
+not confirmed, provider provenance; no locally meterable billing) — see
+[`docs/concepts/tier-model.md`](concepts/tier-model.md) → *The Full tier
+seat-profile option* for the full trade-off, activation steps, and evidence
+basis before adopting it.
+
 ### Task Types
 
 | Task Type | Base Complexity | Typical Model |

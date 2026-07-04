@@ -187,6 +187,58 @@ to change.
 
 ---
 
+## The Full tier seat-profile option (Copilot-only shops)
+
+For organizations that cannot hold direct provider API keys (`DABBLER_*` env
+vars) under corporate policy but do have GitHub Copilot subscriptions, Full
+offers a **seat profile** (Set 078): `route()`/`verify()` keep every part of
+Full — task typing, tiering, cross-provider verification, metrics — but
+dispatch each call through the GitHub Copilot CLI's headless mode instead of
+a direct provider HTTPS API. This gives a Copilot-seat-only shop an
+*indirect* Full tier: work generated under one underlying model provider,
+independently verified under a different one, inside a single subscription.
+
+This is presented honestly as **Full-compatible with explicitly degraded
+guarantees** — never as byte-equivalent to the direct-API Full tier:
+
+- **Provider provenance is asserted, not confirmed.** The Copilot CLI has no
+  model-discovery command or first-party `provider` field, so provenance is
+  derived from a model-name-prefix heuristic (`claude-*` / `gpt-*` /
+  `gemini-*`) recorded in a seat-local catalog, not read off an API.
+- **Seat billing is not locally meterable.** The only usage signal is a
+  per-call count (`result.usage.premiumRequests`) — no token cost, no dollar
+  figure, no remaining balance. Cost-keyed guards (dollar/token budgets,
+  price-table estimators, quota/balance preflights) are excluded under this
+  profile and the skip is always logged; a hard, non-cost-keyed circuit
+  breaker (`transport.max_invocations_per_session`, default 200) caps seat
+  burn instead.
+
+**Activation:** set `transport.profile: copilot-cli` in
+`ai_router/router-config.yaml` (default is `api`, the unchanged direct-HTTPS
+path). Each seat must then build its own local model catalog — run `python -m
+ai_router.copilot_catalog --refresh` to discover the seat's dispatchable
+models and write `ai_router/copilot-catalog.lock`; every routed call
+validates the lockfile against the live CLI and fails closed on version
+drift, missing provenance, or fewer than two distinct providers among
+confirmed entries.
+
+**Evidence basis:** validated end-to-end (design lock, live dogfood, UAT
+attestation) on a single operator's personal Copilot seat. A second,
+representative target-team seat and a GitHub Models enterprise-availability
+check were never completed and were dropped as a gate requirement by an
+explicit, recorded operator override rather than proven — see
+`docs/session-sets/078-copilot-cli-hybrid-tier/s1-cli-contract.md`.
+
+**Choose this profile when:** staff are corporate-policy-locked to Copilot
+seats only, no `DABBLER_*` key is possible, and Full's cross-provider
+verification guarantee (even in its degraded, seat-asserted form) is worth
+more than the honest gaps above. Otherwise, a keyed shop should use the
+direct-API `api` profile (the default), and a Copilot-locked shop that does
+not need Full's guarantees should consider Lightweight's Mode B
+(`dedicated-sessions`) provider-picker pattern instead.
+
+---
+
 ## See also
 
 - [`ai_router/runtime_mode.py`](../../ai_router/runtime_mode.py) — the
@@ -200,3 +252,7 @@ to change.
   the extension's Getting Started form.
 - [`docs/templates/consumer-bootstrap/`](../templates/consumer-bootstrap/) —
   the canonical templates every creation path renders.
+- [`ai_router/cli_transport.py`](../../ai_router/cli_transport.py) and
+  [`ai_router/copilot_catalog.py`](../../ai_router/copilot_catalog.py) — the
+  Copilot CLI seat-profile transport and catalog-discovery implementation
+  (Set 078).

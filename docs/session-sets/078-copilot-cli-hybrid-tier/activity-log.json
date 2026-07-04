@@ -196,6 +196,62 @@
       "dateTime": "2026-07-04T12:41:48.773151-04:00",
       "description": "Operator walked all 7 items of 078-copilot-cli-hybrid-tier-uat-checklist.json on their own seat and attested all 7 PASS (catalog discovery; one real routed call through copilot-cli; one cross-provider verification through copilot-cli; drift refusal induced; unavailable-model probe failure induced; invocation-breaker trip induced; api-profile regression confirmation). The saved checklist file was found with 14 entries -- the 7 real, fully-filled walks (all Passes:true) plus 7 duplicate stub rows with empty HumanAction text (all Passes:false), an apparent tool/editor artifact, not a second attestation round. Flagged to the operator directly; operator confirmed all 7 walks passed and the duplicate blank rows were not a real second result. Cleaned the checklist file back to the 7 real entries. router-config.yaml confirmed fully reverted to shipping defaults (transport.profile: api, max_invocations_per_session: 200) after the operator's walk -- zero net diff other than one cosmetic whitespace difference, restored to match exactly. Full suite re-confirmed green post-walk: 2482 passed, 5 skipped, same single pre-existing drift_guard failure (077+078 both in-progress, expected).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 1,
+      "stepKey": "session-005/docs",
+      "dateTime": "2026-07-04T12:58:58.829623-04:00",
+      "description": "Authored the tier-model SSoT seat-profile clause (docs/concepts/tier-model.md), a workflow-doc pointer (docs/ai-led-session-workflow.md, AI Router Details), a consumer engine-tail pointer (docs/templates/consumer-bootstrap/engine-file.agents-tail.md), the repository-reference.md version-walk entry + release-status row, and the ai_router/CHANGELOG.md 0.28.0 section with a config-only rollback recipe. Drafted via route(task_type=documentation, gemini-pro); the auto-verifier (gpt-5-4-mini) found 2 real defects (a broken relative link in the agents-tail.md draft that would have resolved to a nonexistent docs/docs/... path -- fixed using the shared-body templates own full-GitHub-URL convention since this file is rendered into other repos; a format-contract miss in the response shape) and 1 false positive (claiming the router-config.yaml path should not be under ai_router/ -- confirmed by grep that ai_router/router-config.yaml is the actual, only location). Also bumped pyproject.toml to 0.28.0 (preparation only -- no tag pushed).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 2,
+      "stepKey": "session-005/full-suite",
+      "dateTime": "2026-07-04T13:03:40.313397-04:00",
+      "description": "Full ai_router pytest suite: 2482 passed, 5 skipped, 1 failed on first run -- test_real_repo_passes_all_drift_checks flagged a NEW self-caused dist-in-sync violation (tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/engine-file.agents-tail.md stale vs. this session own edit to the canonical template) alongside the pre-existing one-active-set violation (077+078 both in-progress by explicit operator direction). Fixed by running npm run compile in tools/dabbler-ai-orchestration to recopy the consumer-bootstrap template bundle into dist/. Re-ran test_drift_guard.py: back to the single pre-existing one-active-set failure only (2482 passed, 5 skipped overall, same as S2-S4 baseline).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "session-005/path-aware-critique",
+      "dateTime": "2026-07-04T13:11:05.817247-04:00",
+      "description": "Ran the required end-of-set path-aware critique via the automated pull-verifier producer (python -m ai_router.pull_critique docs/session-sets/078-copilot-cli-hybrid-tier), the default openai+google provider pair, over the natural full sandbox (no scoping-down). Both providers returned ISSUES_FOUND. openai/gpt-5.4 found a real Major: an assistant.message event with no data key at all defaulted via .get(\"data\", {}) to an empty-dict success instead of failing closed as malformed, recreating the same silent-false-success class the S4 live dogfood fixed for the wrong-shaped-data case -- this exact question had been raised as a Suggestion in S4 code review and adjudicated no-fix at the time, but two independent reviewing surfaces catching it is strong signal it is real; fixed in ai_router/cli_transport.py (require the data key present before treating it as a payload dict) with the regression test renamed and updated (test_missing_data_key_is_malformed_not_empty_success). google/gemini-2.5-pro found no new issue against this session -- it independently re-confirmed (via its own grep) a code-review fabrication S4 had already caught and discarded; recorded as no_change_needed. Adjudication saved in s5-issues.json. Artifact saved raw and unedited at path-aware-critique.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 4,
+      "stepKey": "session-005/fix-verify",
+      "dateTime": "2026-07-04T13:13:40.641872-04:00",
+      "description": "Re-ran full ai_router pytest suite after the cli_transport.py fix: 2482 passed, 5 skipped, same single pre-existing one-active-set drift_guard failure (077+078 both in-progress by explicit operator direction). No regressions from the fix.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "session-005/release-ordering-check",
+      "dateTime": "2026-07-04T13:13:59.430191-04:00",
+      "description": "Release-ordering check (spec invariant: v0.28.0 tag never pushed before 077 v0.27.0 is released). Confirmed: no v0.27.0 or v0.28.0 git tags exist; Set 077 session-state.json still reads status=in-progress, Session 6 of 6 (UAT, path-aware critique, and coordinated release) incomplete. Per precedent (Sets 058 and 063 both closed their session-set with status=complete while their own release entries read publish pending the operator tag push -- set-closure and PyPI/Marketplace publish are decoupled, and the tag push is always an operator-authorized action outside the AI-led session boundary), this session prepares the release (pyproject.toml bumped to 0.28.0, dated CHANGELOG section, repository-reference.md version-walk + release-status entries) but does NOT push any tag and does NOT claim a publish date/run-id. Both docs explicitly record the required order: v0.27.0 tag first, then v0.28.0. This is the expected, spec-anticipated state, not a defect -- it matches the operator plan of record (078 next, then a UAT-overhaul set, then revisit 077 and 078 UAT/release together).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "session-005/cross-provider-verification",
+      "dateTime": "2026-07-04T13:19:12.120845-04:00",
+      "description": "End-of-session cross-provider verification (routed, task_type=session-verification, gpt-5-4, $0.2159) with an up-front conventions block (suite baseline, release-preparation-only contract, session scope). Result: 4 real doc-accuracy issues, 2 confirmed no-issue findings. Fixed all 4: (1) the CHANGELOG 0.28.0 Fixed bullet for the data-key fix still described the S4-only behavior, not the S5 path-aware-critique refinement -- amended to describe both; (2) the CHANGELOG Rollback step 3 and repository-reference.md both told the operator to pip install dabbler-ai-router==0.27.0 without noting 0.27.0 is ITSELF still publish-pending -- added an explicit note that this step is only reachable once 0.27.0 has actually published, with the config-only step 1 as the available escape meanwhile; (3) engine-file.agents-tail.md said Want full Full-tier guarantees on a Copilot-only seat -- read as overclaiming against the very next sentence own explicitly degraded guarantees framing -- softened to Want the Full-tier workflow on a Copilot-only seat; (4) repository-reference.md claimed No extension changes, which was too absolute since this session recompiled the extension dist/templates/consumer-bootstrap mirror -- reworded to name that as a build-sync fix, not a feature/release. Recompiled the extension dist mirror again after the wording fix and re-ran test_drift_guard.py: clean (back to the single pre-existing one-active-set failure only). Confirmed no-issue: the cli_transport.py fix itself (correct and complete, sibling malformed-dict path preserved), the release-ordering handling, and the google/gemini-2.5-pro no_change_needed adjudication.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "session-005/verification-round-2",
+      "dateTime": "2026-07-04T13:23:20.310103-04:00",
+      "description": "Round 2 re-verification (routed, gpt-5-4, $0.0373), confirming the 4 Round-1 doc-accuracy fixes actually resolved their findings. VERIFIED -- all 4 confirmed resolved with cited evidence, no new issues introduced. Final full pytest suite baseline unchanged: 2482 passed, 5 skipped, same single pre-existing one-active-set drift_guard failure (expected to clear once this session closes and only Set 077 remains in-progress).",
+      "status": "complete"
     }
   ]
 }

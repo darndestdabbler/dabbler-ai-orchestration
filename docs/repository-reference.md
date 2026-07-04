@@ -63,10 +63,44 @@ can learn it.
 
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
-| `dabbler-ai-router` | `0.27.0` | **Publish pending the operator's `v0.27.0` tag push through the green-Test gate** (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness). Last published: `0.26.2` to PyPI 2026-06-23 (tag `v0.26.2`, release.yml run 28048321482, tagged commit `024ad34`) — Set 076 local-only close-out mode. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
+| `dabbler-ai-router` | `0.28.0` | **Publish pending two sequenced operator tag pushes through the green-Test gate: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) must push first, then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes).** `v0.28.0` is cut from a base that includes 077's changes and is never tagged ahead of `v0.27.0` (release-ordering invariant). Last published: `0.26.2` to PyPI 2026-06-23 (tag `v0.26.2`, release.yml run 28048321482, tagged commit `024ad34`) — Set 076 local-only close-out mode. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
 | `dabbler-ai-orchestration` VS Code extension | `0.34.0` | **Publish pending the operator's `vsix-v0.34.0` tag push through the green-Test gate, after per-set UAT attestation on the local VSIX** (Set 077 — tier-leak fix + durable markers, three-way setup choice, Python prerequisite check, self-completing Evaluate prompts + canonical verification doc, owed-state auto-routing and row wording, record-over-seed mode derivation). **Operator prerequisite: renew `VSCE_PAT` (expired 2026-05-28) before the tag push**; staff can sideload the UAT-approved local VSIX if renewal lags. Last published: `0.33.1` to the Marketplace and Open VSX 2026-06-20 (tag `vsix-v0.33.1`, publish-vscode.yml run 27867766323, tagged commit `eed7d5d`). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
+
+- **`dabbler-ai-router 0.28.0`** — Set 078, Copilot CLI hybrid tier. Gives
+  the Full tier a subscription-billed **seat profile**: a new
+  `transport.profile: copilot-cli` dispatches every routed call through the
+  GitHub Copilot CLI's headless mode instead of a direct provider HTTPS
+  API, so a Copilot-seat-only shop (no `DABBLER_*` key possible under
+  corporate policy) gets an indirect Full tier — routed work under one
+  underlying model provider, independently verified under another, inside
+  one subscription. Presented as **Full-compatible with explicitly
+  degraded guarantees**, never byte-equivalent Full: provider provenance is
+  asserted from a seat-local catalog lockfile's name-prefix heuristic
+  (`ai_router/copilot_catalog.py`, `python -m ai_router.copilot_catalog
+  --refresh`), not a first-party API field; seat billing is not locally
+  meterable (cost-keyed guards excluded, a hard non-cost-keyed invocation
+  circuit breaker caps burn instead). Live dogfood against the real CLI
+  (not the hermetic fake-spawner suite) surfaced and fixed three real
+  defects invisible to that suite: a lockfile-breaking multi-line
+  `--version` banner, a silently-empty-content bug from an unwrapped `data`
+  envelope key, and a Windows `cp1252`-decode crash misclassified as a
+  300s timeout. Operator walked and attested all 7 UAT items on their own
+  seat. Evidence basis is a **single personal Copilot seat** — a second
+  representative team seat and a GitHub Models enterprise-availability
+  check were dropped as a gate by an explicit, recorded operator override
+  rather than completed (see
+  `docs/session-sets/078-copilot-cli-hybrid-tier/s1-cli-contract.md`). No
+  extension version bump or new extension feature work — Session 5 did
+  recompile the extension's `dist/templates/consumer-bootstrap` mirror to
+  pick up a canonical-template doc-pointer edit, but that is a build-sync
+  fix, not an extension feature or release. Rollback recipe (config-only,
+  no data migration): `transport.profile: api`, discard
+  `ai_router/copilot-catalog.lock`, or (once `0.27.0` itself has published)
+  pin `dabbler-ai-router==0.27.0`. **Publish pending two sequenced operator
+  tag pushes through the green-Test gate — `v0.27.0` first, then
+  `v0.28.0`; record both run ids here post-publish.**
 
 - **`dabbler-ai-router 0.27.0` + extension `0.34.0`** — Set 077,
   lightweight-tier UX and Copilot hardening. The coordinated release for the

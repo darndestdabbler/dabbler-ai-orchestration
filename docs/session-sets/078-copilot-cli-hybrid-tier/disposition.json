@@ -1,33 +1,35 @@
 {
   "status": "completed",
-  "summary": "Session 4: live dogfood against the real GitHub Copilot CLI (v1.0.68) and operator UAT. Catalog discovery on the operator's seat (--seat-id op-personal) confirmed 15/18 models across anthropic/openai/google, matching S1 evidence. Live dogfood surfaced and fixed THREE real defects the S2/S3 fake-spawner suite never exercised because it modeled the wrong wire shape: (1) get_cli_version() stored the real CLI's multi-line --version banner verbatim as cli_version, producing a lockfile the module's own loader could not parse back (reproduced: ValueError, an unescaped literal newline inside a quoted TOML string) -- fixed to keep only the first line. (2) SEVERE: _success_result() read content/model/outputTokens directly off the assistant.message envelope, but the real CLI nests all message-type payload fields under a \"data\" key -- every real dispatch silently returned content=\"\" as a false success -- fixed by unwrapping final_message.get(\"data\", {}) before field extraction. (3) SEVERE, compounding: default_spawner used Popen(text=True) with no explicit encoding, so on this Windows seat stdout/stderr decoded as cp1252; the real CLI's UTF-8 JSONL routinely contains bytes cp1252 cannot decode (e.g. an em dash in ordinary model prose), which crashed the reader thread mid-stream, left the child process blocked on a full OS pipe, and caused the caller's own 300s total-timeout to force-kill it -- misclassifying a local decode bug as \"total-timeout\" and masking the real cause (reproduced live: a verify() call hung ~300s under the old code; the identical prompt via Popen with encoding=\"utf-8\" completed in ~7s) -- fixed with encoding=\"utf-8\", errors=\"replace\" explicit. All three covered by new/updated regression tests. A routed code-review pass (auto-verified by its own gemini-pro pass) found 6 further findings: 2 fixed (a utf8_replacement_seen observability flag added to transport_metadata; a trailing-newline nit), 3 adjudicated-no-fix with recorded reasoning (result-event field guards -- no live consumer, one claim about a nonexistent exitCode read; a drift-detection false-positive concern -- unreachable because the old bug made lockfiles fail to LOAD, not silently mismatch; an absent-data-key design question -- matches the module's own existing absent-vs-malformed convention), 1 discarded as fabricated (a verifier cited a _read_and_process_stdout method and self._session_id attribute that do not exist anywhere in the file, confirmed by grep). Cross-provider session verification (routed, gemini-pro): VERIFIED, explicitly checking and confirming all three adjudication calls rather than re-flagging them blind. Re-ran the live dogfood after all fixes: route() generated via claude-sonnet-4.6 (anthropic), verify() cross-provider-verified via gpt-5.4 (openai), verdict VERIFIED, zero issues -- saved as s4-dogfood-evidence.json. Authored the ad-hoc per-set UAT checklist (7 walks: catalog discovery, one real routed call, one cross-provider verification, drift refusal induced, unavailable-model probe failure induced [safe stand-in for a genuine auth-failure walk, which S1 ruled out reproducing on the real working seat], invocation-breaker trip induced, api-profile regression confirmation) -- every walk was pre-run for real by the orchestrator before being handed to the operator, per the UAT-for-a-stranger bar set after the Set 077 UAT suspension. Operator walked all 7 items on their own seat and attested all 7 PASS; a saved-file anomaly (7 real filled-in rows plus 7 duplicate blank stub rows, apparently a tool/editor artifact) was flagged to the operator directly rather than silently resolved, then cleaned up per the operator's confirmation. router-config.yaml (transport.profile, max_invocations_per_session) was toggled several times during dogfood/UAT pre-verification and confirmed fully reverted to shipping defaults each time (final diff: none). Final suite: 2482 passed, 5 skipped, one pre-existing unrelated drift_guard failure (Set 077 and Set 078 both simultaneously in-progress by explicit operator direction) throughout. No version bump/release yet (Session 5's scope).",
-  "verification_method": "api",
+  "summary": "Session 5 of 5 (final session): docs, required path-aware critique, and release preparation. Authored documentation across 5 surfaces (tier-model.md seat-profile clause, ai-led-session-workflow.md pointer, consumer-bootstrap engine-agents-tail.md pointer, repository-reference.md version-walk + release-status row, ai_router/CHANGELOG.md dated 0.28.0 section with a rollback recipe), drafted via route(task_type=documentation, gemini-pro) and hand-applied with 2 corrections after its own auto-verify (a broken relative link, a format nit) plus one adjudicated false positive (a router-config.yaml path claim, disproved by grep). Ran the required end-of-set path-aware critique via the first-party automated producer (python -m ai_router.pull_critique, default openai+google providers, natural full sandbox): both providers returned ISSUES_FOUND. openai/gpt-5.4 found a real Major -- an assistant.message event with no data key at all defaulted to an empty-dict success instead of failing closed, the same silent-false-success class Session 4 fixed for the wrong-shaped-data case, one level up; this exact question had been raised as a Suggestion in Session 4's own code review and adjudicated no-fix at the time, but a second independent reviewing surface catching the identical gap was treated as superseding that adjudication. Fixed in ai_router/cli_transport.py (the data key must be present before being treated as a payload dict) with the regression test renamed and flipped. google/gemini-2.5-pro found no new issue -- it independently re-confirmed a Session-4 code-review fabrication that Session 4 had already caught and discarded; recorded no_change_needed. Full adjudication in s5-issues.json; path-aware-critique.json saved raw and unedited. Release-ordering check: confirmed via git tag -l that neither v0.27.0 nor v0.28.0 exists yet and Set 077 is still in-progress (Session 6 of 6); per the spec's invariant, prepared the release (pyproject.toml bumped to 0.28.0, dated CHANGELOG, repository-reference entries) but pushed no tag and claimed no publish date/run-id -- both docs record the required v0.27.0-then-v0.28.0 order. End-of-session cross-provider verification (routed, gpt-5.4) ran 2 rounds: Round 1 (ISSUES_FOUND) found 4 real documentation-accuracy issues (a CHANGELOG Fixed bullet describing only the S4 behavior not the S5 refinement; a rollback recipe recommending a pip pin to 0.27.0 without noting 0.27.0 is itself still publish-pending; an engine-tail phrase reading as an overclaim against the docs' own degraded-guarantee framing; an absolute No extension changes claim that didn't account for the recompiled extension dist mirror), all fixed; Round 2 confirmed VERIFIED, all 4 resolved, no new issues. Also self-caught and fixed a build-sync defect: editing the canonical engine-file.agents-tail.md template (twice) desynced the extension's compiled dist/templates/consumer-bootstrap mirror; fixed both times via npm run compile. Final suite: 2482 passed, 5 skipped, the same single pre-existing test_real_repo_passes_all_drift_checks failure throughout this entire set (Sets 077 and 078 simultaneously in-progress, by explicit operator direction), expected to clear once this close lands. Authored change-log.md for the whole set (Sessions 1-5 summary + release status + end-of-set deliverables).",
   "files_changed": [
+    "ai_router/CHANGELOG.md",
     "ai_router/cli_transport.py",
-    "ai_router/copilot_catalog.py",
     "ai_router/tests/test_cli_transport.py",
-    "ai_router/tests/test_copilot_catalog.py",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/078-copilot-cli-hybrid-tier-uat-checklist.json",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/s4-code-review.md",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/s4-dogfood-evidence.json",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/s4-issues.json",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/s4-verification.md",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/activity-log.json",
+    "docs/ai-led-session-workflow.md",
+    "docs/concepts/tier-model.md",
+    "docs/repository-reference.md",
+    "docs/templates/consumer-bootstrap/engine-file.agents-tail.md",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/engine-file.agents-tail.md",
+    "pyproject.toml",
+    "docs/session-sets/078-copilot-cli-hybrid-tier/path-aware-critique.json",
+    "docs/session-sets/078-copilot-cli-hybrid-tier/s5-issues.json",
+    "docs/session-sets/078-copilot-cli-hybrid-tier/s5-verification.md",
+    "docs/session-sets/078-copilot-cli-hybrid-tier/s5-verification-round-2.md",
+    "docs/session-sets/078-copilot-cli-hybrid-tier/change-log.md",
+    "docs/session-sets/078-copilot-cli-hybrid-tier/disposition.json",
     "docs/session-sets/078-copilot-cli-hybrid-tier/session-state.json",
     "docs/session-sets/078-copilot-cli-hybrid-tier/session-events.jsonl",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/disposition.json"
+    "docs/session-sets/078-copilot-cli-hybrid-tier/activity-log.json"
   ],
+  "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-sonnet-5",
-    "effort": "medium",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Routed analysis (task_type=analysis, gemini-pro) recommended the incumbent continue into Session 5, citing strong context retention demonstrated diagnosing Session 4's live-CLI bugs, and suggested effort could step down from high to medium since Session 5's remaining scope (doc updates, release-ordering check, version bump, tag push) is procedurally simpler than Session 4's live debugging. The routed response also proposed a literal two-engine 'lead + second' team structure to satisfy the path-aware critique's >=2-provider requirement -- this misreads the architecture: the path-aware critique is already a separate, always-multi-provider stage (ai_router/prompt-templates/path-aware-critique.md) independent of which single engine orchestrates the session, exactly as every prior session in this set has done; the next_orchestrator field is a single-engine slot, not a team roster. Recorded the effort-level and continue-incumbent signal as recommended; the invented dual-engine-team framing is not adopted."
-    }
-  },
+  "verification_verdict": "VERIFIED",
+  "next_orchestrator": null,
   "blockers": [],
-  "verification_verdict": "VERIFIED"
+  "lessons_cited": [
+    "L-064-9",
+    "L-064-10",
+    "L-070-1",
+    "L-071-1"
+  ]
 }

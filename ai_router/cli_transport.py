@@ -601,7 +601,15 @@ class CopilotCliTransport:
             # which never exercised this and let every real dispatch return
             # a silently "successful" empty content. Round-2/3 verification
             # findings below still apply to the unwrapped payload dict.
-            message_data = final_message.get("data", {})
+            # S5 path-aware critique finding: an assistant.message event with
+            # no "data" key at all is structurally malformed, not a legitimate
+            # empty response -- the real CLI always wraps message payload
+            # fields under "data" (see the S4 finding above), so an absent
+            # key is a wire-shape anomaly indistinguishable from truncation
+            # unless it fails closed like every other malformed shape here.
+            if "data" not in final_message:
+                raise TypeError("assistant.message missing required 'data' key")
+            message_data = final_message["data"]
             if not isinstance(message_data, dict):
                 raise TypeError("assistant.message data is not a dict")
             # Round-2 verification finding: validate the RAW value before

@@ -266,3 +266,75 @@ def test_record_call_writes_normalized_session_set(
     )
     record = json.loads(log.read_text(encoding="utf-8").strip())
     assert record["session_set"] == "049-orchestrator-coordination-removal"
+
+
+# --- Set 078 S3: honest seat-accounting additive fields --------------------
+
+
+def test_record_call_writes_copilot_cli_accounting_fields(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A copilot-cli-profile caller's new kwargs land verbatim in the
+    written record."""
+    import json
+
+    log = tmp_path / "router-metrics.jsonl"
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(log))
+    metrics_mod.record_call(
+        {"metrics": {"enabled": True}},
+        call_type="route",
+        task_type="general",
+        model="claude-sonnet-4.6",
+        provider="anthropic",
+        tier=0,
+        complexity_score=None,
+        generation_params={},
+        input_tokens=0,
+        output_tokens=10,
+        cost_usd=0.0,
+        elapsed_seconds=1.0,
+        escalated=False,
+        stop_reason="end_turn",
+        transport="copilot-cli",
+        local_invocations=3,
+        attempts=1,
+        billed_usage_unavailable=True,
+    )
+    record = json.loads(log.read_text(encoding="utf-8").strip())
+    assert record["transport"] == "copilot-cli"
+    assert record["local_invocations"] == 3
+    assert record["attempts"] == 1
+    assert record["billed_usage_unavailable"] is True
+
+
+def test_record_call_new_fields_default_to_none_for_old_callers(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A pre-Set-078 call site that never learned about the four new
+    kwargs still produces a schema-complete record — additive, not
+    required."""
+    import json
+
+    log = tmp_path / "router-metrics.jsonl"
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(log))
+    metrics_mod.record_call(
+        {"metrics": {"enabled": True}},
+        call_type="route",
+        task_type="general",
+        model="gemini-flash",
+        provider="google",
+        tier=1,
+        complexity_score=10,
+        generation_params={},
+        input_tokens=5,
+        output_tokens=5,
+        cost_usd=0.001,
+        elapsed_seconds=0.5,
+        escalated=False,
+        stop_reason="end_turn",
+    )
+    record = json.loads(log.read_text(encoding="utf-8").strip())
+    assert record["transport"] is None
+    assert record["local_invocations"] is None
+    assert record["attempts"] is None
+    assert record["billed_usage_unavailable"] is None

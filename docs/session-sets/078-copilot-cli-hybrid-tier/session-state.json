@@ -20,8 +20,22 @@
     {
       "number": 2,
       "title": "Transport layer and catalog lockfile",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-04T06:24:39.357740-04:00",
+      "completedAt": "2026-07-04T07:38:22.128727-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "effort": "high"
+      },
+      "verificationVerdict": "VERIFIED"
+    },
+    {
+      "number": 3,
+      "title": "Routing integration, verification provenance, honest accounting",
+      "status": "in-progress",
+      "startedAt": "2026-07-04T07:40:22.767469-04:00",
       "completedAt": null,
       "orchestrator": {
         "engine": "claude-code",
@@ -29,15 +43,6 @@
         "model": "claude-sonnet-5",
         "effort": "high"
       },
-      "verificationVerdict": null
-    },
-    {
-      "number": 3,
-      "title": "Routing integration, verification provenance, honest accounting",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
       "verificationVerdict": null
     },
     {

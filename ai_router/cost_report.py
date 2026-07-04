@@ -114,12 +114,23 @@ def _load_routed_metrics_for_session_set(session_set_dir: str) -> dict:
           "by_model": {model: {"calls": int, "cost": float}, ...},
           "metrics_path": str,
           "metrics_file_present": bool,
+          "local_invocation_calls": int,
+          "billed_usage_unavailable_calls": int,
         }
 
     Adjudication records have zero cost so they are counted in
     ``total_calls`` but contribute nothing to ``total_cost``; the
     intent of this report is "what did this session set spend",
     which is the cost-bearing fields.
+
+    ``local_invocation_calls`` / ``billed_usage_unavailable_calls`` (Set 078
+    S3) count calls made through the ``copilot-cli`` transport profile —
+    additive fields on the metrics record (absent/null on every "api"
+    record). These calls always contribute ``$0.00`` to ``total_cost``
+    because their spend is genuinely not billing-authoritative (design lock
+    "honest non-accounting"), never because the report fabricated a zero —
+    the caller renders them as a separate unbilled-invocation count instead
+    of folding them silently into "total cost".
     """
     target_canon = _canonicalize_session_set_path(session_set_dir) or ""
     target_basename = os.path.basename(target_canon)
@@ -130,6 +141,8 @@ def _load_routed_metrics_for_session_set(session_set_dir: str) -> dict:
     total_cost = 0.0
     total_calls = 0
     by_model: dict[str, dict[str, Any]] = {}
+    local_invocation_calls = 0
+    billed_usage_unavailable_calls = 0
 
     if present:
         try:
@@ -157,6 +170,10 @@ def _load_routed_metrics_for_session_set(session_set_dir: str) -> dict:
                     )
                     slot["calls"] += 1
                     slot["cost"] += cost
+                    if rec.get("transport") == "copilot-cli":
+                        local_invocation_calls += 1
+                    if rec.get("billed_usage_unavailable"):
+                        billed_usage_unavailable_calls += 1
         except OSError:
             # If we can't read the file, treat it as missing rather
             # than crashing the cost report.
@@ -168,6 +185,8 @@ def _load_routed_metrics_for_session_set(session_set_dir: str) -> dict:
         "by_model": by_model,
         "metrics_path": path,
         "metrics_file_present": present,
+        "local_invocation_calls": local_invocation_calls,
+        "billed_usage_unavailable_calls": billed_usage_unavailable_calls,
     }
 
 
@@ -246,6 +265,10 @@ def _build_json_output(session_set_dir: str, summary: dict) -> dict:
                 for m, d in routed["by_model"].items()
             },
             "metrics_file_present": routed["metrics_file_present"],
+            "local_invocation_calls": routed.get("local_invocation_calls", 0),
+            "billed_usage_unavailable_calls": routed.get(
+                "billed_usage_unavailable_calls", 0
+            ),
         },
         "activity_supplemental": {
             "total_cost": round(activity["total_cost"], 6),
@@ -318,6 +341,17 @@ def print_cost_report(session_set_dir: str, format: str = "text") -> None:
         for model, data in routed["by_model"].items():
             print(f"    {model:20s}  {data['calls']:3d} calls"
                   f"  ${data['cost']:.4f}")
+    if routed.get("local_invocation_calls"):
+        # Set 078 S3: never fold these into "total cost" as if $0.00 meant
+        # free — they are unbilled because the copilot-cli transport has no
+        # dollar/token cost signal at all (honest non-accounting), not
+        # because nothing happened. "Recorded", not "invocations": a failed
+        # dispatch still consumes the invocation breaker's count but is
+        # never written to metrics (session-verification finding), so this
+        # total is a floor on real CLI spawns, not an exact count of them.
+        print(f"  Recorded copilot-cli calls (unbilled): "
+              f"{routed['local_invocation_calls']} of {routed['total_calls']} "
+              f"calls -- cost not tracked (copilot-cli transport profile)")
     print()
     print("Activity-log adjustments (supplemental):")
     if not activity["activity_log_present"]:

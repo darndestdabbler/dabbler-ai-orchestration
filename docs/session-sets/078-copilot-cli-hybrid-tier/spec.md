@@ -635,6 +635,112 @@ never fabricates; the breaker caps seat burn.
 **Progress keys:** `s3.routing`, `s3.provenance`, `s3.accounting`,
 `s3.breaker`, `s3.closed`
 
+#### Session 3 result: route()/verify() wired to the copilot-cli profile, VERIFIED (2026-07-04)
+
+**Start gate.** Set 077 unchanged since S2 (Session 6 of 6, operator-
+suspended over UAT instruction quality — not concurrently in flight).
+Enumerated 077 S6's Touches (`pyproject.toml`,
+`tools/dabbler-ai-orchestration/package.json`, both CHANGELOGs,
+`docs/repository-reference.md`) against this session's
+(`ai_router/__init__.py`, `ai_router/metrics.py`, `ai_router/cost_report.py`,
+`ai_router/verification.py`, pytest suites): zero overlap. Proceeded in the
+main checkout, same reasoning as S2.
+
+**Shipped.** `route()`/`verify()` now dispatch through the `copilot-cli`
+profile end-to-end as a fully separate code path from the untouched
+api-profile body (`_route_via_copilot_cli` / `_run_verification_via_copilot_cli`
+in `ai_router/__init__.py`):
+
+- **Catalog-role resolution** (`_resolve_copilot_generator`, and
+  `verification.walk_role_prefer` shared with the verifier picker below):
+  walks `transports.copilot-cli.roles.generator.prefer` against the seat
+  catalog's confirmed entries; no tier/escalation ladder under this profile
+  — one role, one dispatch.
+- **The verifier provenance rule** (`pick_copilot_cli_verifier`, the
+  declared "picker seam" in `verification.py`): resolves the `verifier`
+  role while enforcing `cross_role_provider_diversity`, failing closed to
+  `ProvenanceUnavailable` — never a same-provider pairing, never an
+  exception. `route()`/`verify()` turn that into a
+  `verdict="verification_unavailable"` stub, non-blocking and
+  operator-visible.
+- **The hard invocation breaker** (`_copilot_cli_dispatch`): a
+  lock-guarded module-level counter checked before every dispatch; raises
+  `InvocationBreakerTripped` once `max_invocations_per_session` is reached.
+  Tripping specifically on the courtesy auto-verify dispatch degrades
+  gracefully to "verification unavailable" rather than discarding an
+  already-successful generation.
+- **Cost-keyed guard exclusions** (`evaluate_cost_guard` + four named guard
+  constants): skip under `copilot-cli` + `billed_usage_unavailable` (the
+  default); wired as a real defensive check in the verifier path that fails
+  loud if a misconfigured operator opt-out is detected.
+- **Honest metrics + cost report**: four new additive `record_call` fields
+  (`transport`, `local_invocations`, `attempts`, `billed_usage_unavailable`),
+  null on every historical/pre-existing line; `cost_report` renders a
+  separate "Recorded copilot-cli calls (unbilled)" count rather than
+  folding `$0.00` copilot-cli records silently into total cost.
+
+**Tests.** Routed test-generation (gemini-pro, $0.0739) against the full
+diff; heavily adapted in-session (same pattern as S1/S2 — wrong dataclass
+field names, an invented `get_costs()` call shape, a `TransportResult(ok=
+False, ...)` construction attempt against a computed `@property`).
+Rewrote from scratch using the generated version as a scenario checklist:
+`ai_router/tests/test_copilot_routing_integration.py` (38 tests after the
+verification-round fixes below) plus extensions to `test_metrics.py` (+2)
+and `test_cost_report.py` (+6). Final suite: 2478 passed, 5 skipped, the
+same single pre-existing unrelated `drift_guard` failure (two session sets
+simultaneously in-progress by explicit operator direction) throughout.
+
+**Code review (routed, sonnet, auto-verified VERIFIED by gemini-pro).**
+Found and fixed: a Major inverted default in `evaluate_cost_guard` for the
+absent `billed_usage_unavailable` key (masked by the shipped config always
+setting it explicitly); a Minor non-atomic check-and-increment on the
+breaker counter (fixed with a `threading.Lock`); a Suggestion-level
+duplicated prefer-list walk between the generator and verifier resolvers
+(extracted to `verification.walk_role_prefer`); a stray `!r` escaping
+newlines in a dispatch-failure error message. One Minor finding (an
+exception during auto-verify leaves an accurate-but-orphaned generator
+metrics record) was deliberately not fixed — it matches the existing
+api-path's own `_run_verification` precedent exactly.
+
+**Cross-provider session verification (routed, gpt-5.4), 4 rounds.**
+R1 `ISSUES_FOUND` (2 Major + 1 Minor): the same inverted-default bug
+independently caught again; a suspected-missing verification-template load
+that was adjudicated a **false positive** with cited evidence
+(`ai_router/config.py`, unmodified this session, already populates
+`_config["_verification_template"]` identically for both transport
+profiles — proven with a new regression test showing the template reaches
+the dispatched prompt verbatim); and the cost-report label rename above.
+R2 `ISSUES_FOUND` (2 Major): `verify()`'s same-provider exclusion trusted
+`model_name` instead of the module's own canonical `model_id` (fixed, with
+a regression test using a deliberately mismatched `RouteResult`); and
+`max_invocations_per_session` was confirmed process-scoped, not
+workflow-session-scoped — a genuine architecture tradeoff (true
+cross-process tracking would mean deriving the count from the *optional*
+metrics log) resolved via the reviewer's own offered fallback: honest
+wording in the breaker's exception message plus a documented, disclosed
+limitation in the code, not a silent gap. R3 `ISSUES_FOUND` (1 Major): the
+name-prefix heuristic fallback for a model absent from the catalog was
+still trusted for the same-provider safety exclusion — correctly
+distinguished from catalog-based trust (a confirmed entry was actually
+dispatched and validated by Session 2's `discover_catalog`; a bare
+untracked `model_id` has neither safeguard) — fixed by removing the
+heuristic fallback entirely; the prior test asserting the fallback was
+replaced with one asserting the fail-closed behavior. R4 `VERIFIED`. Every
+round found a genuine, distinct, reproducible defect or a legitimately
+debatable tradeoff — never a manufactured nit — and one Round-1 Major was
+confirmed false with evidence rather than deflected. Final suite: 2478
+passed, 5 skipped, same 1 pre-existing unrelated failure throughout.
+
+**Known, disclosed limitation carried into S4+:** the invocation breaker
+(`transports.copilot-cli.max_invocations_per_session`) is scoped to one
+Python process, not to an ai-led-workflow session that may span many
+separate process invocations of `route()`/`verify()` — see the code
+comment above `_copilot_invocation_count` in `ai_router/__init__.py` for
+the full reasoning and why a cross-process fix has its own tradeoff
+(dependency on the optional metrics log). Not a blocker for this session;
+worth revisiting if the per-process ceiling proves insufficient in the
+live-seat dogfood (S4).
+
 ### Session 4 of 5: Live dogfood and UAT
 
 **Steps:**

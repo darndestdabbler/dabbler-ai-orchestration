@@ -1,17 +1,15 @@
 {
   "status": "completed",
-  "summary": "Session 2: shipped the Copilot CLI transport layer (ai_router/cli_transport.py -- Transport interface, CopilotCliTransport invocation state machine against an injected spawner, TransportResult) and the seat-local catalog lockfile (ai_router/copilot_catalog.py -- dataclasses, restricted-TOML reader/writer, validate_catalog's four fail-closed rules, discover_catalog + --refresh CLI). Wired transport.profile/transports.copilot-cli into router-config.yaml and config.py (api profile provably unchanged); mechanically extracted providers.py's inline dispatch dict. Routed test-generation produced a 38+4-test Layer-1 fake-spawner suite (adapted: fixed 3 mismatched exception-message expectations and 1 real shared-mutable-fixture cross-test bug). Routed code-review (auto-verified) found and fixed 7 issues (timeout-deadline anchoring, a spawn-timeout process leak, a hardcoded post-EOF wait, a missing reap, an overly-narrow except clause, the copilot-cli profile still requiring provider API keys, dead code). Cross-provider session verification ran 5 rounds, each finding one genuine, distinct, reproducible defect (local-overrides merge ordering; three progressively narrower field-shape gaps in the success-path JSON parser converging from content to outputTokens to nested usage.premiumRequests) -- all fixed with regression tests, round 5 VERIFIED clean under an explicit merge-reviewer materiality bar. Final suite: 2432 passed, 5 skipped, one pre-existing unrelated drift_guard failure (two session sets simultaneously in-progress per this set's own deliberate Sequencing-against-Set-077 design) that predates this session throughout. No route() integration yet (Session 3's scope, by design) and no version bump/release (Session 5's scope).",
+  "summary": "Session 3: wired route()/verify() to the copilot-cli transport profile as a fully separate code path from the untouched api-profile body. Catalog-role resolution for the generator (_resolve_copilot_generator); the verifier provenance rule (verification.pick_copilot_cli_verifier, the picker seam -- cross_role_provider_diversity enforced, fails closed to ProvenanceUnavailable, never a same-provider pairing); the hard invocation breaker (_copilot_cli_dispatch, lock-guarded, degrades gracefully to \"verification unavailable\" if it trips specifically on the auto-verify dispatch rather than discarding a successful generation); cost-keyed guard exclusions (evaluate_cost_guard + 4 named constants, wired as a real defensive check); honest metrics/cost_report accounting (4 additive record_call fields, a separate \"Recorded copilot-cli calls (unbilled)\" cost-report line, never folding $0.00 into total cost). Routed test-generation (heavily adapted, same pattern as S1/S2) produced ai_router/tests/test_copilot_routing_integration.py (38 tests) plus extensions to test_metrics.py and test_cost_report.py. Routed code-review (auto-verified VERIFIED) found and fixed 4 issues (an inverted cost-guard default, a non-atomic breaker counter, a duplicated prefer-list walk, a stray !r in an error message); one Minor finding deliberately not fixed (matches existing api-path precedent). Cross-provider session verification ran 4 rounds, each finding a genuine, distinct, reproducible defect or a legitimately debatable architecture tradeoff -- a same-provider-slip-through path via model_name vs. model_id, a process-scoped-not-session-scoped invocation breaker (adjudicated as a disclosed, deliberate scoping decision per the reviewer's own offered alternative), and a name-prefix-heuristic fallback that lacked the catalog's own dispatch-confirmation safeguard (removed entirely) -- one Round-1 Major was confirmed a false positive with cited evidence (ai_router/config.py, unmodified this session, already populates _verification_template identically for both profiles) rather than deflected without proof. Round 4 VERIFIED. Final suite: 2478 passed, 5 skipped, one pre-existing unrelated drift_guard failure (two session sets simultaneously in-progress by explicit operator direction) that predates this session throughout. No live-seat dogfood yet (Session 4's scope, by design) and no version bump/release (Session 5's scope).",
   "verification_method": "api",
   "files_changed": [
-    ".gitignore",
-    "ai_router/cli_transport.py",
-    "ai_router/copilot_catalog.py",
-    "ai_router/providers.py",
-    "ai_router/config.py",
-    "ai_router/router-config.yaml",
-    "ai_router/tests/test_cli_transport.py",
-    "ai_router/tests/test_copilot_catalog.py",
-    "ai_router/tests/test_transport_profile_config.py",
+    "ai_router/__init__.py",
+    "ai_router/verification.py",
+    "ai_router/metrics.py",
+    "ai_router/cost_report.py",
+    "ai_router/tests/test_copilot_routing_integration.py",
+    "ai_router/tests/test_metrics.py",
+    "ai_router/tests/test_cost_report.py",
     "docs/session-sets/078-copilot-cli-hybrid-tier/spec.md",
     "docs/session-sets/078-copilot-cli-hybrid-tier/activity-log.json",
     "docs/session-sets/078-copilot-cli-hybrid-tier/session-state.json",
@@ -26,7 +24,7 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Routed analysis (task_type=analysis, gemini-pro) recommended continuing with claude-code/anthropic/claude-sonnet-5 for Session 3: integration-heavy work extending route()'s existing control flow that the incumbent orchestrator already has fresh context on, not a net-new implementation where a different provider's strengths would argue for a switch."
+      "specifics": "Routed analysis (task_type=analysis, gemini-pro) recommended the incumbent continue Session 4: it requires a live, authenticated GitHub Copilot CLI seat on the operator's own machine (so the human operator effectively co-drives this session regardless of engine), is UAT-heavy (human-in-the-loop judgment on instruction clarity), and follows directly from Sessions 1-3's implementation context -- not a net-new-implementation case where a different provider's strengths would argue for a switch."
     }
   },
   "blockers": [],

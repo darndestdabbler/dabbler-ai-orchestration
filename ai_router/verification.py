@@ -599,3 +599,112 @@ def reconcile_issue_ledger(
         resurrected=resurrected,
         status=status,
     )
+
+
+# ---------------------------------------------------------------------------
+# Copilot CLI hybrid-tier verifier picker (Set 078 S3).
+#
+# pick_verifier_model() above resolves against the static `models:` registry
+# in router-config.yaml (fixed provider/tier/pricing per entry). Under the
+# `copilot-cli` transport profile there is no such registry entry for a
+# catalog model -- eligibility is late-bound against the seat-local lockfile
+# (ai_router/copilot_catalog.py) instead. This is a parallel picker, not a
+# branch inside pick_verifier_model, because the two eligibility universes
+# (static config vs. seat-probed catalog) don't share a candidate list to
+# filter.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CopilotCliVerifierSelection:
+    """A verifier resolved against the seat catalog (mirrors VerifierSelection's
+    role for the copilot-cli transport)."""
+    model_id: str
+    provider: str
+
+
+@dataclass(frozen=True)
+class ProvenanceUnavailable:
+    """Fail-closed result when no confirmed catalog entry in the verifier
+    role's ``prefer`` list resolves to a provider distinct from the
+    generator's (design lock Section 2's ``cross_role_provider_diversity``,
+    ``on_violation: fail_closed`` -- Critique-2 M3). Never an exception: the
+    route()/verify() caller reads this like any other result-object-style
+    outcome and reports "verification unavailable", never silently verifying
+    with the same underlying provider as the generator.
+    """
+    reason: str
+
+
+def walk_role_prefer(
+    catalog,  # ai_router.copilot_catalog.Catalog -- typed loosely, see below.
+    prefer: list,
+    require_provider_in: set,
+    exclude_providers: set = frozenset(),
+):
+    """Yield each ``prefer``-list entry that survives on the seat catalog, in
+    declared order: (a) ``confirmed``, (b) provider in ``require_provider_in``
+    (when set), (c) provider not in ``exclude_providers``.
+
+    Shared by :func:`pick_copilot_cli_verifier` (below) and
+    ``ai_router._resolve_copilot_generator`` (code-review finding, Set 078
+    S3 -- the two role resolvers duplicated this walk almost verbatim). The
+    fail-closed CONTRACT stays entirely in each caller: an unresolvable
+    generator is fatal (nothing to route()); an unresolvable verifier
+    degrades to "verification unavailable". This helper only does the
+    walk, never decides what "nothing survived" means.
+    """
+    confirmed_by_id = {e.id: e for e in catalog.confirmed_models()}
+    for model_id in prefer:
+        entry = confirmed_by_id.get(model_id)
+        if entry is None:
+            continue
+        if require_provider_in and entry.provider not in require_provider_in:
+            continue
+        if entry.provider in exclude_providers:
+            continue
+        yield entry
+
+
+def pick_copilot_cli_verifier(
+    *,
+    generator_provider: str,
+    config: dict,
+    catalog,  # ai_router.copilot_catalog.Catalog -- typed loosely to avoid a
+              # hard import dependency from this module onto copilot_catalog.
+    exclude_providers: frozenset = frozenset(),
+) -> "CopilotCliVerifierSelection | ProvenanceUnavailable":
+    """Resolve the ``verifier`` role against the seat-local catalog.
+
+    Walks ``transports.copilot-cli.roles.verifier.prefer`` in declared order;
+    a candidate survives if it is (a) ``confirmed`` on the live catalog,
+    (b) its provider is in ``require_provider_in`` (when set), and (c) its
+    provider is neither ``generator_provider`` nor in ``exclude_providers``.
+    The first survivor wins. Fails closed to :class:`ProvenanceUnavailable`
+    when nothing survives -- never raises, never returns a same-provider
+    pairing.
+    """
+    roles_cfg = (
+        (config.get("transports") or {}).get("copilot-cli") or {}
+    ).get("roles") or {}
+    verifier_cfg = roles_cfg.get("verifier") or {}
+    prefer = verifier_cfg.get("prefer") or []
+    require_provider_in = set(verifier_cfg.get("require_provider_in") or [])
+    excluded = set(exclude_providers) | {generator_provider}
+
+    survivor = next(
+        walk_role_prefer(catalog, prefer, require_provider_in, excluded), None
+    )
+    if survivor is not None:
+        return CopilotCliVerifierSelection(
+            model_id=survivor.id, provider=survivor.provider
+        )
+
+    return ProvenanceUnavailable(
+        reason=(
+            f"no confirmed catalog entry in the verifier role's prefer list "
+            f"{prefer!r} resolves to a provider distinct from the generator's "
+            f"{generator_provider!r} (cross_role_provider_diversity, "
+            "on_violation: fail_closed)"
+        )
+    )

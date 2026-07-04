@@ -118,6 +118,52 @@
       "dateTime": "2026-07-04T07:36:10.302598-04:00",
       "description": "Routed next-orchestrator recommendation (gemini-pro, task_type=analysis, $0.003): continue with claude-code/anthropic/claude-sonnet-5/high for Session 3 -- integration-heavy work extending route() control flow the incumbent already has fresh context on; not a net-new implementation where a different provider strengths argument would apply.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/start-gate",
+      "dateTime": "2026-07-04T07:41:34.089095-04:00",
+      "description": "S3 start gate: Set 077 (lightweight-tier-ux-and-copilot-hardening) is status=in-progress, Session 6 of 6 still the sole remaining session (same operator-suspended-over-UAT state as at S2 start; unchanged). Enumerated 077 S6 Touches from its spec.md: pyproject.toml, tools/dabbler-ai-orchestration/package.json, both CHANGELOGs (CHANGELOG.md, tools/dabbler-ai-orchestration/CHANGELOG.md), docs/repository-reference.md. This session (078 S3) Touches: ai_router/__init__.py (route), ai_router/metrics.py, ai_router/cost_report.py, ai_router/verification.py (picker seam), pytest suites. Zero overlap -- file-level disjointness holds. No parallel worktree used, same reasoning as S2: 077 S6 is not concurrently in flight (operator-suspended, sequenced behind 078 per the plan of record), so there is no live race to guard against. Proceeding in the main checkout.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/implementation",
+      "dateTime": "2026-07-04T08:17:03.359547-04:00",
+      "description": [
+        "Implemented route()/verify() integration for the copilot-cli transport profile. ai_router/__init__.py: _resolve_copilot_generator (catalog-role resolution for the generator, no tier/escalation ladder under this profile), _copilot_cli_dispatch (the single dispatch call site, enforcing the hard transports.copilot-cli.max_invocations_per_session breaker before every spawn, lock-guarded check-and-reserve), _route_via_copilot_cli / _run_verification_via_copilot_cli (route()/verify() copilot-cli bodies, fully separate from the api-profile body so the existing regression suite cannot be affected), CopilotCliRoutingError/InvocationBreakerTripped, evaluate_cost_guard + 4 guard-name constants (design lock Section 5 guard-exclusion list), _build_verification_unavailable_stub, _copilot_provider_of. ai_router/verification.py (the picker seam): pick_copilot_cli_verifier resolves the verifier role against the seat catalog with cross_role_provider_diversity enforced, failing closed to ProvenanceUnavailable (never a same-provider pairing, never an exception); walk_role_prefer factors the shared prefer-list walk used by both the generator and verifier resolvers. ai_router/metrics.py: record_call gained four additive fields (transport, local_invocations, attempts, billed_usage_unavailable), null for every pre-existing call site and every historical line. ai_router/cost_report.py: get_costs/_build_json_output/print_cost_report render a separate local_invocation_calls / billed_usage_unavailable_calls count and a \"Local CLI invocations (unbilled)\" text line rather than folding /usr/bin/bash.00 copilot-cli records into total cost silently."
+      ],
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/test-generation",
+      "dateTime": "2026-07-04T08:17:03.359547-04:00",
+      "description": [
+        "Routed test-generation (gemini-pro, $0.0739) for the new integration surface given the full diff as context. Heavily adapted in-session (same pattern as S1/S2): wrong dataclass field names for TransportResult/CatalogMeta/ModelEntry/Catalog (invented fields that do not exist, e.g. \"entries\" instead of \"models\", \"state\"/\"reason\" instead of \"enablement\"/\"provider_source\"), a nonexistent get_costs(list) call shape (real signature takes a single session_set_dir string) and an invented \"by_session_set\" key, record_call() calls missing required keyword-only arguments, and a TransportResult(ok=False, ...) construction attempt against a computed @property. Rewrote the suite from scratch using the generated version as a scenario checklist (happy path, generator-resolution failure, dispatch failure, auto-verify success, the loud same-provider-only failure case, the invocation breaker trip, cost-guard exclusions per category, metrics/cost_report additive-schema back-compat) with correct API usage throughout: ai_router/tests/test_copilot_routing_integration.py (34 tests) plus extensions to test_metrics.py (+2) and test_cost_report.py (+6). Full suite: 2474 passed, 5 skipped, the same single pre-existing unrelated drift_guard failure (two session sets simultaneously in-progress) throughout."
+      ],
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/code-review",
+      "dateTime": "2026-07-04T08:17:03.359547-04:00",
+      "description": [
+        "Routed code-review (sonnet, $0.2871, auto-verified by gemini-pro: VERIFIED). Found and fixed: (1) Major -- evaluate_cost_guard defaulted the absent billed_usage_unavailable key to False, inverting the intended default (the field IS this profile's defining property; router-config.yaml ships it explicitly true, masking the bug in the shipped config) and causing _run_verification_via_copilot_cli to raise for any config that omitted the key; fixed the default to True, added a regression test. (2) Minor -- the breaker's check-and-increment on _copilot_invocation_count was not atomic; added a threading.Lock() guarding check-and-reserve (the slot is now reserved before dispatch, same accounting as before). (3) Suggestion -- _resolve_copilot_generator and pick_copilot_cli_verifier duplicated the confirmed-catalog prefer-list walk; extracted the shared walk_role_prefer() generator into verification.py (already-touched per this session's Touches list), both callers keep their own fail-closed contract (fatal for the generator, degrading to a stub for the verifier). (4) Suggestion -- removed a stray !r around raw stderr in the dispatch-failure error message (was escaping newlines/quotes, hiding the actual CLI output). NOT fixed, by design: Minor finding that record_call for the generator writes before auto-verify runs, so a raise during verification leaves an accurate-but-orphaned generator record on disk -- this matches the EXISTING api-path precedent in _run_verification (same ordering, same best-effort-metrics contract) rather than special-casing the new path; narrowed further by the Bug-1 fix (only reachable via an explicit operator opt-out now). Also noted: a \"corrupted schema comment\" the reviewer flagged in metrics.py was confirmed to be a git-diff-capture artifact (stderr interleaved into the diff bundle via a stray 2>&1), not real file corruption -- verified directly against the file on disk. Full suite re-run green after fixes: 2475 passed, 5 skipped, same 1 pre-existing unrelated drift_guard failure."
+      ],
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/verification",
+      "dateTime": "2026-07-04T08:37:33.347401-04:00",
+      "description": "Routed cross-provider session verification (gpt-5.4), 4 rounds: R1 ISSUES_FOUND -- 2 Major + 1 Minor: (1) evaluate_cost_guard defaulted the absent billed_usage_unavailable key to False (inverted default, masked by the shipped config always setting it explicitly) -- fixed to default True; (2) the verification-template line was adjudicated a FALSE POSITIVE (ai_router/config.py, unmodified this session, already populates _config[\"_verification_template\"] identically for both transport profiles) -- rebutted with a new regression test proving the template reaches the dispatched prompt verbatim; (3) Minor -- the cost-report \"Local CLI invocations\" label overclaimed completeness (a failed dispatch consumes the breaker slot but is never written to metrics) -- renamed to \"Recorded copilot-cli calls\". R2 ISSUES_FOUND -- 2 Majors: (1) verify() derived the same-provider exclusion from route_result.model_name, which a hand-constructed mismatched RouteResult could defeat -- fixed to use model_id (this module's own canonical identifier), new regression test with an explicit model_id/model_name mismatch; (2) max_invocations_per_session is process-scoped, not workflow-session-scoped (a genuine architecture gap -- true cross-process tracking would require deriving the count from the optional metrics log, its own tradeoff) -- adjudicated as a disclosed, deliberate scoping decision per the reviewer's own offered alternative: honest wording in the breaker exception message + a 12-line code comment naming the limitation explicitly, no behavior change. R3 ISSUES_FOUND -- 1 Major: the name-prefix heuristic fallback in _copilot_provider_of remained for a model absent from the catalog, which the reviewer correctly distinguished from catalog-based trust (a confirmed catalog entry was actually dispatched and validated by Session 2's discover_catalog; a bare untracked model_id has neither safeguard) -- fixed by removing the heuristic fallback entirely; the prior test asserting the fallback resolved a plausible-looking untracked model was replaced with a test asserting it now fails closed instead. R4 VERIFIED. Every round found a genuine, distinct, reproducible defect or a legitimately debatable architecture tradeoff (never a manufactured nit); one Round-1 Major was confirmed a false positive with cited evidence rather than deflected without proof. Final suite: 2478 passed, 5 skipped, the same single pre-existing unrelated drift_guard failure (two session sets simultaneously in-progress by explicit operator direction) throughout every round.",
+      "status": "complete"
     }
   ]
 }

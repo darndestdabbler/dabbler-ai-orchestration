@@ -38,6 +38,18 @@ Schema per line:
     "preferred_verifier_skipped": [str, str] or null
          [skipped_model, reason] when preferred_pairings named a model
          the rule-based selection rejected (e.g., not_enabled_as_verifier)
+    # Set 078 S3 — honest seat accounting for the copilot-cli transport
+    # profile. All four are null on every "api"-profile record (historical
+    # and current alike) -- additive, never required by an existing reader.
+    "transport":                  str or null  ("api" | "copilot-cli")
+    "local_invocations":          int or null   (running CLI-spawn count
+         for this process at the time of this call; never a billed count)
+    "attempts":                   int or null   (dispatch attempts this
+         call made; always 1 today -- the transport never retries
+         internally, design lock Section 4)
+    "billed_usage_unavailable":   bool or null  (true whenever cost_usd
+         is not billing-authoritative for this record -- always true for
+         "copilot-cli" records, always null/absent for "api" ones)
   }
 
 Adjudication records (call_type = "adjudication") are written by
@@ -133,6 +145,16 @@ def record_call(
     verifier_fallback: Optional[bool] = None,
     fallback_from_provider: Optional[str] = None,
     preferred_verifier_skipped: Optional[tuple] = None,
+    # Set 078 S3 additions — honest seat accounting for the copilot-cli
+    # transport profile. All three are None for every "api"-profile record
+    # (additive-schema: absent/None on old lines and on every api-profile
+    # line is indistinguishable from "not applicable", which is correct —
+    # this profile is the only one where local invocation counting and
+    # billed-usage-unavailability apply).
+    transport: Optional[str] = None,
+    local_invocations: Optional[int] = None,
+    attempts: Optional[int] = None,
+    billed_usage_unavailable: Optional[bool] = None,
 ) -> None:
     """Append a single record to the metrics log. Never raises — if
     writing fails (disk full, permission), we silently skip rather
@@ -191,6 +213,12 @@ def record_call(
             list(preferred_verifier_skipped)
             if preferred_verifier_skipped else None
         ),
+        # Set 078 S3 — honest seat accounting (None on every api-profile /
+        # historical line; see the docstring above the record_call signature).
+        "transport": transport,
+        "local_invocations": local_invocations,
+        "attempts": attempts,
+        "billed_usage_unavailable": billed_usage_unavailable,
     }
 
     try:

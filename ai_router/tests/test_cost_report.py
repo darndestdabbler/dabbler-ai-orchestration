@@ -29,6 +29,7 @@ import pytest
 import cost_report  # noqa: E402
 from cost_report import (
     _COST_DISCREPANCY_THRESHOLD_USD,
+    _build_json_output,
     _matches_session_set,
     get_costs,
     print_cost_report,
@@ -365,6 +366,75 @@ class TestGetCosts:
 
 
 # --------------------------------------------------------------------
+# Set 078 S3: honest seat accounting -- local CLI invocations never
+# fabricate spend, and additive-schema back-compat holds for old (no
+# transport/billed_usage_unavailable keys at all) records.
+# --------------------------------------------------------------------
+
+class TestLocalInvocationAccounting:
+    def test_counts_copilot_cli_records_only(
+        self, session_set_dir, metrics_path
+    ):
+        _write_metric(
+            metrics_path, model="claude-sonnet-4.6", cost_usd=0.0,
+            transport="copilot-cli", billed_usage_unavailable=True,
+            local_invocations=1,
+        )
+        _write_metric(
+            metrics_path, model="claude-sonnet-4.6", cost_usd=0.0,
+            transport="copilot-cli", billed_usage_unavailable=True,
+            local_invocations=2,
+        )
+        _write_metric(metrics_path, model="opus", cost_usd=1.50)
+        summary = get_costs(str(session_set_dir))
+        routed = summary["routed_canonical"]
+        assert routed["total_calls"] == 3
+        assert routed["local_invocation_calls"] == 2
+        assert routed["billed_usage_unavailable_calls"] == 2
+        # The copilot-cli records genuinely cost $0.00 -- never folded
+        # into total_cost as a fabricated non-zero amount.
+        assert routed["total_cost"] == pytest.approx(1.50)
+
+    def test_zero_when_no_copilot_cli_records(
+        self, session_set_dir, metrics_path
+    ):
+        _write_metric(metrics_path, model="opus", cost_usd=1.00)
+        summary = get_costs(str(session_set_dir))
+        routed = summary["routed_canonical"]
+        assert routed["local_invocation_calls"] == 0
+        assert routed["billed_usage_unavailable_calls"] == 0
+
+    def test_tolerates_historical_records_missing_the_new_keys_entirely(
+        self, session_set_dir, metrics_path
+    ):
+        """A pre-Set-078 metrics line has no ``transport`` /
+        ``billed_usage_unavailable`` key at all (not even ``null``) --
+        additive-schema back-compat means get_costs must not raise and
+        must not miscount it as a copilot-cli record."""
+        rec = {
+            "timestamp": "2026-04-30T12:00:00+00:00",
+            "session_set": os.path.basename(str(session_set_dir)),
+            "call_type": "route",
+            "task_type": "general",
+            "model": "gemini-flash",
+            "provider": "google",
+            "cost_usd": 0.20,
+        }
+        with open(metrics_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(rec) + "\n")
+
+        summary = get_costs(str(session_set_dir))
+        routed = summary["routed_canonical"]
+        assert routed["total_calls"] == 1
+        assert routed["total_cost"] == pytest.approx(0.20)
+        assert routed["local_invocation_calls"] == 0
+        assert routed["billed_usage_unavailable_calls"] == 0
+        # _build_json_output must also tolerate the historical shape.
+        json_out = _build_json_output(str(session_set_dir), summary)
+        assert json_out["routed_canonical"]["local_invocation_calls"] == 0
+
+
+# --------------------------------------------------------------------
 # print_cost_report() — text + JSON
 # --------------------------------------------------------------------
 
@@ -428,6 +498,31 @@ class TestPrintCostReportText:
         text = buf.getvalue()
         assert "router-metrics.jsonl not found" in text
 
+    def test_text_output_shows_local_invocations_line_when_present(
+        self, session_set_dir, metrics_path
+    ):
+        _write_metric(
+            metrics_path, model="claude-sonnet-4.6", cost_usd=0.0,
+            transport="copilot-cli", billed_usage_unavailable=True,
+            local_invocations=1,
+        )
+        _write_metric(metrics_path, model="opus", cost_usd=1.00)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_cost_report(str(session_set_dir))
+        text = buf.getvalue()
+        assert "Recorded copilot-cli calls (unbilled): 1 of 2 calls" in text
+
+    def test_text_output_hides_local_invocations_line_when_absent(
+        self, session_set_dir, metrics_path
+    ):
+        _write_metric(metrics_path, model="opus", cost_usd=1.00)
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_cost_report(str(session_set_dir))
+        text = buf.getvalue()
+        assert "Recorded copilot-cli calls" not in text
+
 
 class TestPrintCostReportJson:
     def test_json_format_is_parseable(
@@ -450,6 +545,21 @@ class TestPrintCostReportJson:
         assert out["delta_usd"] == pytest.approx(-0.50)
         assert out["discrepancy"] is True
         assert out["routed_canonical"]["metrics_file_present"] is True
+
+    def test_json_format_includes_local_invocation_fields(
+        self, session_set_dir, metrics_path
+    ):
+        _write_metric(
+            metrics_path, model="claude-sonnet-4.6", cost_usd=0.0,
+            transport="copilot-cli", billed_usage_unavailable=True,
+            local_invocations=1,
+        )
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            print_cost_report(str(session_set_dir), format="json")
+        out = json.loads(buf.getvalue())
+        assert out["routed_canonical"]["local_invocation_calls"] == 1
+        assert out["routed_canonical"]["billed_usage_unavailable_calls"] == 1
 
     def test_invalid_format_raises(self, session_set_dir, metrics_path):
         with pytest.raises(ValueError, match="format must be"):

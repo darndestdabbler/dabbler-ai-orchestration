@@ -133,6 +133,19 @@ from .verification import (
     is_blocking_verdict, classify_blocking, BlockingClassification,
     reconcile_issue_ledger, LedgerReconciliation,
     LEDGER_RESOLVED, LEDGER_UNRESOLVED,
+    pick_copilot_cli_verifier, CopilotCliVerifierSelection,
+    ProvenanceUnavailable, walk_role_prefer,
+)
+# Set 078 S3: the copilot-cli transport profile's routing integration.
+# cli_transport.py / copilot_catalog.py (Set 078 S2) are already
+# result-object-style (never raise) so route()/verify() compose them
+# directly rather than needing new plumbing in either module.
+from .cli_transport import CopilotCliTransport
+from .copilot_catalog import (
+    Catalog as CopilotCatalog,
+    load_lockfile as load_copilot_catalog,
+    validate_catalog as validate_copilot_catalog,
+    get_cli_version as get_copilot_cli_version,
 )
 from .close_out import (
     CLOSE_OUT_RESULTS,
@@ -150,6 +163,7 @@ from .reconciler import (
 
 from dataclasses import dataclass, field
 from typing import Optional
+import threading
 import time
 import os
 import json
@@ -168,6 +182,35 @@ if not _logger.handlers:
 _logger.setLevel(logging.INFO)
 _logger.propagate = False
 
+# Set 078 S3: the copilot-cli transport profile's own singletons. Populated
+# by _init_copilot_transport() only when transport.profile == "copilot-cli"
+# (untouched, None, under the default "api" profile — no cost to the
+# regression-suite-identical claim). _copilot_invocation_count is the hard
+# circuit breaker's local counter: it is a per-process count of every CLI
+# spawn attempted through _copilot_cli_dispatch(), NOT a billed count (design
+# lock Section 5 — a safety ceiling on what we DID, never a fabricated cap on
+# what GitHub billed).
+#
+# KNOWN LIMITATION (round-2 session-verification finding, Set 078 S3): this
+# counter is scoped to ONE PYTHON PROCESS, not to an ai-led-workflow session
+# (which commonly spans many separate route()/verify() process invocations
+# — this repo's own orchestrator usage pattern is a fresh `python -c "..."`
+# process per routed call). A long orchestrator session that never keeps one
+# process alive therefore never accumulates past 1-2 per process, and the
+# ceiling only bites within a single runaway process (e.g. a tight loop of
+# route() calls). Making this genuinely cross-process would mean deriving the
+# count from a persistent source (e.g. router-metrics.jsonl, scoped by
+# session_set/session_number) instead of an in-memory global — but metrics
+# logging is itself optional (metrics.enabled: false), so tying a HARD safety
+# breaker to an optional log is its own tradeoff, not a drop-in improvement.
+# Left as a deliberate, disclosed scoping decision for this session rather
+# than an unreviewed architecture change; a future session can revisit if the
+# per-process ceiling proves insufficient in practice.
+_copilot_transport: Optional[CopilotCliTransport] = None
+_copilot_catalog: Optional[CopilotCatalog] = None
+_copilot_invocation_count = 0
+_copilot_invocation_lock = threading.Lock()
+
 
 def _init():
     global _config, _rate_limiters
@@ -179,6 +222,61 @@ def _init():
                 provider_cfg["rate_limit"]["requests_per_minute"],
                 provider_cfg["rate_limit"]["tokens_per_minute"]
             )
+        if _config["transport"]["profile"] == "copilot-cli":
+            _init_copilot_transport()
+
+
+def _init_copilot_transport() -> None:
+    """Load + fail-closed-validate the seat catalog and construct the CLI
+    transport. Runs once per process, only under the copilot-cli profile.
+
+    "Fail loud, fail early" (Architecture section): an unreadable lockfile or
+    a catalog that fails any of the four fail-closed rules stops route()/
+    verify() from ever dispatching, with a friendly, actionable message —
+    never a silent fallback to the api transport.
+    """
+    global _copilot_transport, _copilot_catalog
+
+    cli_cfg = _config["transports"]["copilot-cli"]
+    lockfile_path = cli_cfg["lockfile"]
+    try:
+        catalog = load_copilot_catalog(lockfile_path)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            f"transport.profile is 'copilot-cli' but the catalog lockfile at "
+            f"{lockfile_path!r} could not be loaded ({exc}). Run "
+            f"'python -m ai_router.copilot_catalog --refresh --seat-id "
+            f"<your-seat-id>' to generate it, or switch transport.profile "
+            f"back to 'api'."
+        ) from exc
+
+    binary = cli_cfg.get("binary", "copilot")
+    live_cli_version = get_copilot_cli_version(binary=binary) or "unknown"
+    # NOTE on live_seat_id: the CLI has no whoami/account-identity surface
+    # distinguishable from the lockfile's own recorded seat_id (S1 finding —
+    # no discovery/list-models command exists either). There is therefore no
+    # independent "live" seat assertion to probe at routing time; passing the
+    # lockfile's own seat_id makes this one rule a documented no-op here
+    # rather than a false sense of security. It still does real, load-bearing
+    # work at --refresh time and remains meaningful the moment an
+    # operator-declared expected seat_id is added to router-config.yaml (a
+    # config.py change intentionally out of this session's scope). The other
+    # three rules (version drift, provenance, provider diversity) are fully
+    # live checks regardless.
+    validation = validate_copilot_catalog(
+        catalog, live_cli_version=live_cli_version, live_seat_id=catalog.meta.seat_id,
+    )
+    if not validation.ok:
+        raise RuntimeError(
+            "transport.profile is 'copilot-cli' but the catalog lockfile "
+            "failed its fail-closed validation: "
+            + "; ".join(validation.reasons)
+            + ". Re-run 'python -m ai_router.copilot_catalog --refresh' to "
+              "refresh it."
+        )
+
+    _copilot_catalog = catalog
+    _copilot_transport = CopilotCliTransport(binary=binary)
 
 
 @dataclass
@@ -289,6 +387,455 @@ def _build_no_router_verification_stub(generator_model: str) -> "VerificationRes
     )
 
 
+# ---------------------------------------------------------------------------
+# Set 078 S3: route()/verify() integration for the copilot-cli transport
+# profile. Kept as a fully separate code path from the api-profile body below
+# (Architecture section: "Under the api profile the dispatch path is
+# unchanged" / Feature 1 Standards: "the api profile passes the entire
+# existing suite unchanged") — this never rewrites, wraps, or shares control
+# flow with the escalation-loop / pick_model / call_model body, so the
+# api-path regression suite cannot be affected by a bug here.
+# ---------------------------------------------------------------------------
+
+
+class CopilotCliRoutingError(RuntimeError):
+    """Raised when route()/verify() cannot proceed at all under the
+    copilot-cli profile: an unresolvable generator role, or a failed
+    dispatch. Fail-loud by design (Architecture: "fail loud, fail early") —
+    never a silent fallback to the api transport."""
+
+
+class InvocationBreakerTripped(CopilotCliRoutingError):
+    """The transports.copilot-cli.max_invocations_per_session hard circuit
+    breaker has already been reached for this process (design lock Section
+    5: a safety ceiling on local invocation count that we DID make, never a
+    fabricated cap on what GitHub billed)."""
+
+
+# Cost-keyed guard exclusions (design lock Section 5 guard-exclusion list).
+# Every guard whose decision is keyed on a dollar/token cost ESTIMATE must
+# skip under billed_usage_unavailable — never guess a fabricated cost for a
+# transport with no real cost signal. Guards that are NOT cost-keyed (the
+# hard invocation breaker, timeouts, retry policy, lockfile/provider-
+# diversity validation) stay active regardless of profile and are
+# deliberately absent from this list.
+GUARD_DOLLAR_SPEND_BUDGET = "dollar_spend_budget"
+GUARD_TOKEN_COST_ESTIMATE = "token_cost_estimate"
+GUARD_PROVIDER_PRICE_TABLE_ESTIMATE = "provider_price_table_estimate"
+GUARD_QUOTA_BALANCE_PREFLIGHT = "quota_balance_preflight"
+
+COST_KEYED_GUARDS = frozenset({
+    GUARD_DOLLAR_SPEND_BUDGET,
+    GUARD_TOKEN_COST_ESTIMATE,
+    GUARD_PROVIDER_PRICE_TABLE_ESTIMATE,
+    GUARD_QUOTA_BALANCE_PREFLIGHT,
+})
+
+
+@dataclass(frozen=True)
+class CostGuardSkipDecision:
+    guard: str
+    skip: bool
+    reason: str
+
+
+def evaluate_cost_guard(guard: str, config: dict) -> CostGuardSkipDecision:
+    """Decide whether a cost-keyed guard should skip under the active
+    transport profile. Every cost-keyed guard call site consults this
+    instead of re-deriving "is this profile billed" locally, so the skip
+    decision — and its recorded reason — is uniform across every guard
+    category and independently testable per category.
+    """
+    if guard not in COST_KEYED_GUARDS:
+        raise ValueError(f"Unknown cost-keyed guard: {guard!r}")
+
+    profile = (config.get("transport") or {}).get("profile", "api")
+    if profile != "copilot-cli":
+        return CostGuardSkipDecision(
+            guard=guard, skip=False,
+            reason="api profile: billed cost signal available",
+        )
+
+    cli_cfg = (config.get("transports") or {}).get("copilot-cli") or {}
+    # Default True: billed_usage_unavailable is this profile's defining
+    # property (router-config.yaml ships it explicitly true), so an absent
+    # key means "unavailable", not "available" -- code-review finding, Set
+    # 078 S3: the original `.get(..., False)` inverted this, silently
+    # NOT skipping (and therefore raising in _run_verification_via_
+    # copilot_cli) for any config that omitted the key.
+    if not cli_cfg.get("billed_usage_unavailable", True):
+        return CostGuardSkipDecision(
+            guard=guard, skip=False,
+            reason=(
+                "copilot-cli profile configured with "
+                "billed_usage_unavailable=False"
+            ),
+        )
+
+    return CostGuardSkipDecision(
+        guard=guard, skip=True,
+        reason=(
+            "billed_usage_unavailable: copilot-cli has no dollar/token "
+            "cost signal"
+        ),
+    )
+
+
+_VERIFICATION_UNAVAILABLE_VERDICT = "verification_unavailable"
+
+
+def _build_verification_unavailable_stub(
+    generator_model_id: str, generator_provider: str, reason: str
+) -> "VerificationResult":
+    """Fail-closed stub for the copilot-cli verifier provenance rule
+    (Critique-2 M3): returned instead of raising when no confirmed catalog
+    entry resolves the verifier role to a provider distinct from the
+    generator's. Non-blocking so it never reopens a re-verify loop on its
+    own, but the distinct verdict token keeps it from ever being mistaken
+    for a real VERIFIED / ISSUES_FOUND outcome — "operator-visible,
+    non-silent" per the Architecture section.
+    """
+    return VerificationResult(
+        verdict=_VERIFICATION_UNAVAILABLE_VERDICT,
+        verified=False,
+        issues=[],
+        verifier_model="none",
+        verifier_provider="none",
+        generator_model=generator_model_id,
+        generator_provider=generator_provider,
+        verifier_input_tokens=0,
+        verifier_output_tokens=0,
+        verifier_cost_usd=0.0,
+        raw_response=f"[verification unavailable: {reason}]",
+        blocking=False,
+        nits=[],
+    )
+
+
+def _resolve_copilot_generator(
+    config: dict, catalog: "CopilotCatalog"
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Resolve the ``generator`` role against the seat-local catalog.
+
+    Returns ``(model_id, provider, failure_reason)`` — ``failure_reason`` is
+    ``None`` on success. Walks ``transports.copilot-cli.roles.generator.
+    prefer`` in declared order; the first entry that is ``confirmed`` on the
+    live catalog and whose provider is in ``require_provider_in`` (when set)
+    wins. Never raises — the caller decides how loud to be about a failure
+    (unlike the verifier role, there is no "generation unavailable" fallback:
+    without a generator there is nothing to route).
+    """
+    roles_cfg = (
+        (config.get("transports") or {}).get("copilot-cli") or {}
+    ).get("roles") or {}
+    gen_cfg = roles_cfg.get("generator") or {}
+    prefer = gen_cfg.get("prefer") or []
+    require_provider_in = set(gen_cfg.get("require_provider_in") or [])
+
+    survivor = next(walk_role_prefer(catalog, prefer, require_provider_in), None)
+    if survivor is not None:
+        return survivor.id, survivor.provider, None
+
+    return None, None, (
+        f"no confirmed catalog entry in the generator role's prefer list "
+        f"{prefer!r} resolves to a provider in require_provider_in="
+        f"{sorted(require_provider_in)!r}"
+    )
+
+
+def _copilot_provider_of(model_id: str) -> Optional[str]:
+    """Look up ``model_id``'s provider from the seat catalog's CONFIRMED
+    entries only. Returns ``None`` when the model isn't there.
+
+    Round-3 session-verification finding, Set 078 S3: an earlier version of
+    this function fell back to the bare name-prefix heuristic
+    (:func:`ai_router.copilot_catalog.infer_provider`) for a model absent
+    from the catalog. That heuristic is trustworthy for a CONFIRMED catalog
+    entry (Session 2's ``discover_catalog`` only records it after actually
+    dispatching the model successfully, and ``validate_catalog`` checks the
+    result against ``KNOWN_PROVIDERS`` at load time) — but a bare, untracked
+    ``model_id`` string has neither safeguard: nothing confirms the guess is
+    even plausible, let alone correct, and this value drives a same-provider
+    SAFETY exclusion (``cross_role_provider_diversity``). The caller
+    (``verify()``) fails closed to "verification unavailable" on ``None``
+    rather than resolving a verifier against an unconfirmed guess.
+    """
+    if _copilot_catalog is not None:
+        for entry in _copilot_catalog.confirmed_models():
+            if entry.id == model_id:
+                return entry.provider
+    return None
+
+
+def _copilot_cli_dispatch(model_id: str, system_prompt: str, user_message: str):
+    """The single call site every copilot-cli generator/verifier dispatch
+    goes through — enforces the hard invocation breaker BEFORE spawning
+    (never counts a breaker-blocked call as an invocation).
+
+    The check-and-reserve happens under ``_copilot_invocation_lock`` so two
+    concurrent callers can't both pass the check and jointly exceed the
+    declared ceiling (code-review finding, Set 078 S3) — serialized
+    execution is this transport's documented contract (design lock Section
+    3), but the breaker itself should hold even if a future caller violates
+    that. The slot is reserved (incremented) before dispatch, not after, so
+    a failed dispatch still consumes it — same accounting as before.
+    """
+    global _copilot_invocation_count
+
+    cli_cfg = _config["transports"]["copilot-cli"]
+    max_invocations = cli_cfg.get("max_invocations_per_session")
+    with _copilot_invocation_lock:
+        if max_invocations is not None and _copilot_invocation_count >= max_invocations:
+            raise InvocationBreakerTripped(
+                f"transports.copilot-cli.max_invocations_per_session "
+                f"({max_invocations}) reached for this Python process — no "
+                f"further Copilot CLI calls will be made. This is a safety "
+                f"ceiling on local invocation count, not a fabricated cost "
+                f"cap; raise the config value or restart the process to "
+                f"continue. NOTE: the count is process-scoped, not tracked "
+                f"across separate process invocations of the same "
+                f"ai-led-workflow session (see the module comment on "
+                f"_copilot_invocation_count for the known limitation)."
+            )
+        _copilot_invocation_count += 1
+
+    return _copilot_transport.dispatch(
+        model_id=model_id, system_prompt=system_prompt, user_message=user_message,
+    )
+
+
+def _route_via_copilot_cli(
+    *,
+    content: str,
+    task_type: str,
+    context: str,
+    session_set: Optional[str],
+    session_number: Optional[int],
+) -> "RouteResult":
+    """route()'s entire copilot-cli-profile body. Task typing (the prompt
+    template lookup) is unchanged; tier/complexity-based model selection is
+    replaced by late-bound catalog-role resolution (Architecture section) —
+    there is exactly one generator role, not a 3-tier ladder, so there is no
+    escalation loop under this profile.
+    """
+    model_id, provider, failure_reason = _resolve_copilot_generator(
+        _config, _copilot_catalog
+    )
+    if model_id is None:
+        raise CopilotCliRoutingError(
+            f"copilot-cli profile: could not resolve a generator role: "
+            f"{failure_reason}"
+        )
+
+    system_prompt, user_message = build_prompt(
+        content=content, context=context, task_type=task_type,
+        model_cfg={}, config=_config,
+    )
+
+    start = time.time()
+    result = _copilot_cli_dispatch(
+        model_id=model_id, system_prompt=system_prompt, user_message=user_message,
+    )
+    elapsed = time.time() - start
+
+    if not result.ok:
+        raise CopilotCliRoutingError(
+            f"Copilot CLI dispatch failed: error_class="
+            f"{result.transport_metadata.get('error_class')!r}, "
+            f"exit_code={result.transport_metadata.get('exit_code')!r}. "
+            f"stderr: {result.raw_stderr[:500]}"
+        )
+
+    route_result = RouteResult(
+        content=result.content,
+        model_name=model_id,
+        model_id=model_id,
+        tier=0,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        cost_usd=0.0,
+        total_cost_usd=0.0,
+        complexity_score=-1,
+        escalated=False,
+        escalation_history=[],
+        elapsed_seconds=elapsed,
+        truncated=not result.content_complete,
+        verification=None,
+    )
+
+    record_call(
+        _config,
+        call_type="route",
+        task_type=task_type,
+        model=model_id,
+        provider=provider,
+        tier=0,
+        complexity_score=None,
+        generation_params={},
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        cost_usd=0.0,
+        elapsed_seconds=elapsed,
+        escalated=False,
+        stop_reason=result.stop_reason,
+        session_set=session_set,
+        session_number=session_number,
+        transport="copilot-cli",
+        local_invocations=_copilot_invocation_count,
+        attempts=1,
+        billed_usage_unavailable=True,
+    )
+
+    v_config = _config.get("verification", {})
+    auto_types = v_config.get("auto_verify_task_types", [])
+    if v_config.get("enabled", False) and task_type in auto_types:
+        verification = _run_verification_via_copilot_cli(
+            route_result=route_result,
+            original_task=user_message,
+            task_type=task_type,
+            generator_provider=provider,
+            session_set=session_set,
+            session_number=session_number,
+        )
+        route_result.verification = verification
+        # cost_usd is always 0.0 for this profile (honest non-accounting) —
+        # total_cost_usd stays 0.0 rather than merging in a verifier cost
+        # that is equally not billing-authoritative.
+        route_result.total_cost_usd = 0.0
+
+    return route_result
+
+
+def _run_verification_via_copilot_cli(
+    *,
+    route_result: "RouteResult",
+    original_task: str,
+    task_type: str,
+    generator_provider: str,
+    session_set: Optional[str],
+    session_number: Optional[int],
+) -> "VerificationResult":
+    """verify()'s / route()'s auto-verify copilot-cli-profile body.
+
+    Resolves the verifier role via :func:`pick_copilot_cli_verifier`
+    (provenance fail-closed to "verification unavailable" — Critique-2 M3);
+    on success, dispatches through the same CLI transport and parses the
+    verdict with the existing push-surface parser (the verifier still
+    returns free-form markdown through the CLI's ``-p`` prompt, exactly like
+    the api-profile verifier call).
+    """
+    # Guard-exclusion list (design lock Section 5): the token-cost estimate
+    # guard the api-profile verifier applies (max_cost_multiplier in
+    # _run_verification) must never run against a transport with no dollar/
+    # token cost signal. This function never estimates one; the check below
+    # just fails loud instead of silently proceeding if a misconfigured
+    # router-config.yaml ever set billed_usage_unavailable: false under this
+    # profile (the only way this guard would NOT skip here).
+    cost_guard = evaluate_cost_guard(GUARD_TOKEN_COST_ESTIMATE, _config)
+    if not cost_guard.skip:
+        raise CopilotCliRoutingError(
+            f"cost-keyed guard {cost_guard.guard!r} did not skip under the "
+            f"copilot-cli profile ({cost_guard.reason}) — refusing to "
+            f"estimate a fabricated verification cost."
+        )
+
+    selection = pick_copilot_cli_verifier(
+        generator_provider=generator_provider,
+        config=_config,
+        catalog=_copilot_catalog,
+    )
+    if isinstance(selection, ProvenanceUnavailable):
+        return _build_verification_unavailable_stub(
+            generator_model_id=route_result.model_id,
+            generator_provider=generator_provider,
+            reason=selection.reason,
+        )
+
+    v_template = _config.get("_verification_template", "")
+    user_message = build_verification_prompt(
+        original_task=original_task,
+        original_response=route_result.content,
+        task_type=task_type,
+        template=v_template,
+    )
+
+    start = time.time()
+    try:
+        result = _copilot_cli_dispatch(
+            model_id=selection.model_id, system_prompt="", user_message=user_message,
+        )
+    except InvocationBreakerTripped as exc:
+        # The breaker is a hard ceiling on total spawns, generator AND
+        # verifier alike -- but tripping on the courtesy auto-verify step
+        # must not discard an already-successful generation. Unlike the
+        # generator dispatch (route()'s primary result, nothing to salvage
+        # if it can't run), verification failing closed here is exactly the
+        # existing "verification unavailable" contract, just with a
+        # breaker-specific reason.
+        return _build_verification_unavailable_stub(
+            generator_model_id=route_result.model_id,
+            generator_provider=generator_provider,
+            reason=f"invocation breaker tripped before verification could dispatch: {exc}",
+        )
+    elapsed = time.time() - start
+
+    if not result.ok:
+        return _build_verification_unavailable_stub(
+            generator_model_id=route_result.model_id,
+            generator_provider=generator_provider,
+            reason=(
+                f"verifier dispatch failed: error_class="
+                f"{result.transport_metadata.get('error_class')!r}"
+            ),
+        )
+
+    verdict, issues = parse_verification_response(result.content)
+    blocking = is_blocking_verdict(verdict, issues)
+    nits = parse_nits(result.content)
+
+    record_call(
+        _config,
+        call_type="verify",
+        task_type=task_type,
+        model=selection.model_id,
+        provider=selection.provider,
+        tier=0,
+        complexity_score=None,
+        generation_params={},
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        cost_usd=0.0,
+        elapsed_seconds=elapsed,
+        escalated=False,
+        stop_reason=result.stop_reason,
+        session_set=session_set,
+        session_number=session_number,
+        verifier_of=route_result.model_name,
+        verdict=verdict,
+        issue_count=len(issues),
+        transport="copilot-cli",
+        local_invocations=_copilot_invocation_count,
+        attempts=1,
+        billed_usage_unavailable=True,
+    )
+
+    return VerificationResult(
+        verdict=verdict,
+        verified=(verdict == "VERIFIED"),
+        issues=issues,
+        verifier_model=selection.model_id,
+        verifier_provider=selection.provider,
+        generator_model=route_result.model_name,
+        generator_provider=generator_provider,
+        verifier_input_tokens=result.input_tokens,
+        verifier_output_tokens=result.output_tokens,
+        verifier_cost_usd=0.0,
+        raw_response=result.content,
+        blocking=blocking,
+        nits=nits,
+    )
+
+
 def route(
     content: str,
     task_type: str = "general",
@@ -340,6 +887,15 @@ def route(
         return _build_no_router_route_stub()
 
     _init()
+
+    # Set 078 S3: the copilot-cli profile is a fully separate body — see
+    # _route_via_copilot_cli's docstring for why this branches here rather
+    # than threading through the api-path escalation loop below.
+    if _config["transport"]["profile"] == "copilot-cli":
+        return _route_via_copilot_cli(
+            content=content, task_type=task_type, context=context,
+            session_set=session_set, session_number=session_number,
+        )
 
     # 1. Estimate complexity
     full_prompt_text = f"{content}\n{context}"
@@ -643,6 +1199,43 @@ def verify(
         )
 
     _init()
+
+    if _config["transport"]["profile"] == "copilot-cli":
+        # verify() doesn't receive the generator's provider directly (the
+        # api-path derives it from config["models"][route_result.model_name]
+        # below); under copilot-cli the model_name IS the catalog model id,
+        # so look its provider up from the seat catalog instead. Round-2
+        # session-verification finding: prefer model_id over model_name --
+        # model_id is this module's own canonical identifier (every
+        # RouteResult this profile produces sets both to the same catalog
+        # id, but only model_id is guaranteed to be that value for a
+        # hand-constructed RouteResult passed to a standalone verify()
+        # call; model_name is the display/alias field elsewhere in this
+        # module's api-path RouteResults, so trusting it here for a
+        # same-provider-exclusion safety check is the weaker choice).
+        generator_provider = _copilot_provider_of(route_result.model_id)
+        if generator_provider is None:
+            # Fail closed rather than resolving the verifier against an
+            # empty/unreliable exclusion set (session-verification finding,
+            # Set 078 S3): an unresolvable generator provider must never
+            # risk a same-provider "verification" slipping through.
+            return _build_verification_unavailable_stub(
+                generator_model_id=route_result.model_id,
+                generator_provider="unknown",
+                reason=(
+                    f"could not resolve a provider for generator model "
+                    f"{route_result.model_id!r} from the seat catalog or "
+                    f"the name-prefix heuristic"
+                ),
+            )
+        return _run_verification_via_copilot_cli(
+            route_result=route_result,
+            original_task=original_task,
+            task_type=task_type,
+            generator_provider=generator_provider,
+            session_set=session_set,
+            session_number=session_number,
+        )
 
     result = _run_verification(
         route_result, original_task, task_type,

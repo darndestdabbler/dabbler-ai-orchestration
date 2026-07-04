@@ -63,8 +63,8 @@ can learn it.
 
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
-| `dabbler-ai-router` | `0.28.0` | **Publish pending two sequenced operator tag pushes through the green-Test gate: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) must push first, then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes).** `v0.28.0` is cut from a base that includes 077's changes and is never tagged ahead of `v0.27.0` (release-ordering invariant). Last published: `0.26.2` to PyPI 2026-06-23 (tag `v0.26.2`, release.yml run 28048321482, tagged commit `024ad34`) — Set 076 local-only close-out mode. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.34.0` | **Publish pending the operator's `vsix-v0.34.0` tag push through the green-Test gate, after per-set UAT attestation on the local VSIX** (Set 077 — tier-leak fix + durable markers, three-way setup choice, Python prerequisite check, self-completing Evaluate prompts + canonical verification doc, owed-state auto-routing and row wording, record-over-seed mode derivation). **Operator prerequisite: renew `VSCE_PAT` (expired 2026-05-28) before the tag push**; staff can sideload the UAT-approved local VSIX if renewal lags. Last published: `0.33.1` to the Marketplace and Open VSX 2026-06-20 (tag `vsix-v0.33.1`, publish-vscode.yml run 27867766323, tagged commit `eed7d5d`). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-router` | `0.28.0` | **Published.** Sequenced per the release-ordering invariant: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437` — the commit where the 0.27.0 version bump landed, before Set 078 bumped further), then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`). Both confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.34.0` | **Published.** Set 077 (tier-leak fix + durable markers, three-way setup choice, Python prerequisite check, self-completing Evaluate prompts + canonical verification doc, owed-state auto-routing and row wording, record-over-seed mode derivation). Published 2026-07-04 to the Marketplace and Open VSX (tag `vsix-v0.34.0`, publish-vscode.yml run [28718703898](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718703898), tagged commit `a391f61`). The existing `VSCE_PAT` was still valid — no renewal needed. | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
 
@@ -97,10 +97,11 @@ can learn it.
   pick up a canonical-template doc-pointer edit, but that is a build-sync
   fix, not an extension feature or release. Rollback recipe (config-only,
   no data migration): `transport.profile: api`, discard
-  `ai_router/copilot-catalog.lock`, or (once `0.27.0` itself has published)
-  pin `dabbler-ai-router==0.27.0`. **Publish pending two sequenced operator
-  tag pushes through the green-Test gate — `v0.27.0` first, then
-  `v0.28.0`; record both run ids here post-publish.**
+  `ai_router/copilot-catalog.lock`, or pin `dabbler-ai-router==0.27.0`.
+  **Published 2026-07-04** (tag `v0.28.0`, release.yml run
+  [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271),
+  tagged commit `a391f61`), after `v0.27.0` per the release-ordering
+  invariant.
 
 - **`dabbler-ai-router 0.27.0` + extension `0.34.0`** — Set 077,
   lightweight-tier UX and Copilot hardening. The coordinated release for the
@@ -119,9 +120,15 @@ can learn it.
   `start_session` banner, Explorer `verification owed` / `remediation owed`
   wording, and kickoff/remediation auto-routing). Rollback pair if a
   hotfix-grade defect surfaces during the adoption week: extension `0.33.1`
-  + router `0.26.2`. **Publish pending the operator tag pushes (`v0.27.0`,
-  `vsix-v0.34.0`) through the green-Test gate; record the run ids here
-  post-publish.**
+  + router `0.26.2`. UAT re-walked against the Set 078 authoring bar
+  (literal, live-dogfooded steps) after an initial suspension over
+  instruction quality; the re-walk passed 14/14 with no feedback. **Both
+  published 2026-07-04** — router `0.27.0` (tag `v0.27.0`, release.yml run
+  [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653),
+  tagged commit `51fc437`) and extension `0.34.0` (tag `vsix-v0.34.0`,
+  publish-vscode.yml run
+  [28718703898](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718703898),
+  tagged commit `a391f61`).
 
 - **`dabbler-ai-router 0.26.2`** — Set 076, local-only close-out mode
   (`.dabbler/local-only` marker + `ai_router.local_only` CLI waive the

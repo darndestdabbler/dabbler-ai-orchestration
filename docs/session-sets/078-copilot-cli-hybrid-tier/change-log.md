@@ -25,8 +25,8 @@
 > [`spec.md`](spec.md) (folds two adversarial pre-authoring critiques,
 > `planning-critique-1-planning.md` and `planning-critique-2-architecture.md`,
 > plus a recheck, `planning-critique-3-recheck.md`).
-> **Release:** `dabbler-ai-router` **0.28.0** (prepared this set; publish
-> pending two sequenced operator tag pushes — see *Release status* below).
+> **Release:** `dabbler-ai-router` **0.28.0** — published 2026-07-04, after
+> Set 077's `v0.27.0` (see *Release status* below).
 
 ---
 
@@ -217,17 +217,23 @@ Full detail in the S5 `disposition.json`, `s5-verification.md`,
 
 ## Release status (as of this close)
 
-`dabbler-ai-router` is version-bumped to **`0.28.0`** with a dated
-CHANGELOG entry and a rollback recipe, but **not yet tagged or published**.
-Per the spec's release-ordering invariant, the `v0.28.0` tag must never be
-pushed before Set 077's `v0.27.0` tag — and as of this close, **neither tag
-has been pushed yet** (Set 077 Session 6 of 6 is still in-progress). This is
-the expected, spec-anticipated state, not a defect: the operator's plan of
-record sequences this set's own release, and a revisit of both sets' UAT and
-release together, after a separate UAT-process-improvement session set. See
-`docs/repository-reference.md` → *Current release status* /
-*Recent version walk* for the live pointer, to be updated post-publish with
-the actual tag/run-id evidence once both tags push in order.
+**Published.** `dabbler-ai-router` `0.28.0` shipped to PyPI 2026-07-04 (tag
+`v0.28.0`, release.yml run
+[28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271),
+tagged commit `a391f61`), after Set 077's `v0.27.0` tag per the
+release-ordering invariant — Set 077 Session 6 completed its UAT re-walk
+(14/14, clean) earlier the same day, and both sets' releases were pushed
+together in sequence: `v0.27.0` → `vsix-v0.34.0` → `v0.28.0`. See
+`docs/repository-reference.md` → *Current release status* / *Recent
+version walk* for the live pointer and full run-id evidence.
+
+A real gap surfaced after this publish: the `copilot-cli` seat profile has
+no representation anywhere in the Getting Started onboarding flow (a
+Copilot-locked operator has no way to discover it exists short of reading
+`docs/concepts/tier-model.md`). This was an explicit non-goal of this set
+("no extension/UI for profile selection" above) but is now planned as
+follow-on scope in a new session set, alongside simplifying the Lightweight
+verification-mode radio copy.
 
 ---
 

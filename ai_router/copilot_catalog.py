@@ -333,7 +333,18 @@ def get_cli_version(*, binary: str = "copilot") -> Optional[str]:
         return None
     if result.returncode != 0:
         return None
-    return result.stdout.strip()
+    stripped = result.stdout.strip()
+    if not stripped:
+        return None
+    # S4 live-dogfood finding: the real CLI's ``--version`` banner is two
+    # lines ("GitHub Copilot CLI 1.0.68.\nRun 'copilot update' ..."), not the
+    # single clean token every fake-spawner test fixture assumed. The raw
+    # multi-line string, stored verbatim as `cli_version`, produced a
+    # literal unescaped newline inside a quoted TOML value that the module's
+    # own loader could not parse back (round-trip failure caught by
+    # discovering against the real seat). Only the first line is the actual
+    # version banner; keep it, drop the update-nag trailer line.
+    return stripped.splitlines()[0].strip() or None
 
 
 def discover_catalog(

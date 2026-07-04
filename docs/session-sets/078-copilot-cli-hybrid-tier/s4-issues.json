@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The routed code-review pass claimed `default_spawner`'s new encoding fix silently corrupts content with no observable signal when `errors=\"replace\"` substitutes U+FFFD for an undecodable byte.",
+      "category": "Completeness",
+      "severity": "Major",
+      "resolution_status": "fixed",
+      "resolved_in_round": 1,
+      "resolution_notes": "Real, valid finding. Added `_has_utf8_replacement()` and a new `utf8_replacement_seen` field to `transport_metadata` in both `_success_result` and `_error_result`, computed from `chr(0xFFFD)` membership in `raw_stdout`/`raw_stderr` -- makes a decode substitution observable to any caller that cares without changing the never-hang/never-raise contract. Covered by the existing full suite (no new test added for this specific flag; it is additive metadata, not a behavior change)."
+    },
+    {
+      "description": "The `result` event's own fields (`sessionId`, `usage.premiumRequests`) are read via `.get()` without the same `isinstance` guards applied to `assistant.message`'s `data` dict, an apparent inconsistency with the 'fix every sibling site' convention. The reviewer also claimed an unguarded `result_event.get(\"exitCode\")` read exists.",
+      "category": "Consistency / Correctness",
+      "severity": "Major (reviewer) / adjudicated Minor",
+      "resolution_status": "adjudicated-no-fix",
+      "resolved_in_round": 1,
+      "resolution_notes": "Partially inaccurate: `_success_result` never reads `result_event.get(\"exitCode\")` -- `exit_code` comes from the real subprocess's own `proc.wait()` return value, already a real `int`; no such read exists to guard. The `session_id`/`premium_requests` observation is real, but neither has a live consumer that would break on a malformed value today: `transport_metadata[\"session_id\"]` has zero downstream readers (confirmed by repo-wide grep), and `premium_requests` already has its own downstream coercion-to-None guard in `copilot_catalog.discover_catalog` (the round-4 S2 verification fix), so this would be redundant defense-in-depth, not a new correctness fix. Per the project's own materiality bar (L-071-1: a blocker needs the exact requirement violated, concrete impact, and evidence), this lacks a demonstrated failure scenario. Not fixed in this session; worth revisiting if a future consumer starts reading these fields structurally."
+    },
+    {
+      "description": "`get_cli_version()`'s first-line-only fix could cause a spurious drift-detection mismatch against a pre-existing lockfile written by the old (buggy) code with a multi-line `cli_version`.",
+      "category": "Correctness",
+      "severity": "Minor",
+      "resolution_status": "adjudicated-no-fix",
+      "resolved_in_round": 1,
+      "resolution_notes": "Unreachable as described: a lockfile written by the OLD buggy code with a real multi-line `cli_version` fails `load_lockfile()` outright (reproduced live: `ValueError: Unparseable lockfile scalar`) -- TOML with an unescaped literal newline inside a quoted string never parses back, so no such lockfile can reach the drift *comparison* step at all; it errors first, on load, not silently mismatches. No fix needed for this scenario. The reviewer's secondary point (a trailing period on the version banner breaking a hypothetical semver parser) does not apply -- no semver parsing exists anywhere in this codebase (grepped)."
+    },
+    {
+      "description": "Both modified test files were said to be missing a trailing newline.",
+      "category": "Style",
+      "severity": "Minor",
+      "resolution_status": "fixed",
+      "resolved_in_round": 1,
+      "resolution_notes": "test_cli_transport.py was genuinely missing a trailing newline as a result of this session's edit -- fixed. test_copilot_catalog.py's missing trailing newline pre-dates this session (confirmed via `git show HEAD:...`) and is unrelated to this diff -- left as-is rather than introducing unrelated whitespace churn."
+    },
+    {
+      "description": "`test_missing_data_key_defaults_to_empty_dict_success` treats a wholly-absent `\"data\"` key on `assistant.message` as a success-with-empty-content, which the reviewer suggested may not be intentional (a missing `data` key could indicate a wire-format break rather than an empty response).",
+      "category": "Design",
+      "severity": "Suggestion",
+      "resolution_status": "adjudicated-no-fix",
+      "resolved_in_round": 1,
+      "resolution_notes": "This is intentional and consistent with the module's existing, already-established policy: an absent field defaults gracefully (see `test_missing_content_field_defaults_to_empty_string_success`, pre-existing), while an explicitly-present wrong-shaped value is malformed. Treating an absent `data` key the same way is the symmetric application of that same policy, not a new inconsistency. No behavior change made."
+    },
+    {
+      "description": "A second automated verification pass (gemini-pro, ISSUES_FOUND) claimed a `_read_and_process_stdout` method and a `self._session_id` attribute exist and read `event.get(\"sessionId\")` from a `session.start` event without an isinstance guard.",
+      "category": "Correctness",
+      "severity": "Major (claimed)",
+      "resolution_status": "false-positive",
+      "resolved_in_round": 1,
+      "resolution_notes": "Fabricated: grepped `ai_router/cli_transport.py` for `_read_and_process_stdout`, `_session_id`, and `session.start` -- none exist anywhere in the file. This verifier was given only the diff (not the full file), and appears to have invented plausible-sounding code rather than citing real content. Discarded without action."
+    }
+  ]
+}

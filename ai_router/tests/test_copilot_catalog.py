@@ -298,6 +298,33 @@ def test_get_cli_version_success(monkeypatch):
     assert copilot_catalog.get_cli_version() == "1.2.3"
 
 
+def test_get_cli_version_strips_multiline_update_nag(monkeypatch):
+    # S4 live-dogfood finding: the real CLI's --version banner is two lines
+    # ("GitHub Copilot CLI 1.0.68.\nRun 'copilot update' to check for
+    # updates."), not the single clean token every prior fixture assumed.
+    # The raw multi-line string, stored verbatim as `cli_version`, produced a
+    # literal unescaped newline inside a quoted TOML value that the module's
+    # own loader could not parse back -- caught only by discovering against
+    # the real seat. Only the first line is the actual version banner.
+    def fake_run(*args, **kwargs):
+        return FakeCompletedProcess(
+            stdout="GitHub Copilot CLI 1.0.68.\nRun 'copilot update' to check for updates.\n"
+        )
+    monkeypatch.setattr(copilot_catalog.subprocess, "run", fake_run)
+    version = copilot_catalog.get_cli_version()
+    assert version == "GitHub Copilot CLI 1.0.68."
+    assert "\n" not in version
+
+    # The fixed version must round-trip through the lockfile writer/loader
+    # -- the exact failure the raw multi-line value caused for real.
+    catalog = copilot_catalog.discover_catalog(
+        seat_id="s", seat_label="l", probed_at="2024-01-01T00:00:00Z",
+        transport=FakeTransport({"gpt-5.4"}),
+        model_universe=["gpt-5.4"], cli_version=version,
+    )
+    assert "\n" not in catalog.meta.cli_version
+
+
 @pytest.mark.parametrize("error_case", ["os_error", "non_zero"])
 def test_get_cli_version_failure(monkeypatch, error_case):
     if error_case == "os_error":

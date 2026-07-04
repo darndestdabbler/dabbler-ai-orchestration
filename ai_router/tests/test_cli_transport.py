@@ -124,11 +124,15 @@ def short_timeouts():
     )
 
 
-# A realistic success stdout payload from the CLI
+# A realistic success stdout payload from the CLI. Message-type events wrap
+# their payload under "data" ({"type": ..., "data": {...}, "id": ...,
+# ["ephemeral": ...]}); the terminal "result" event does not -- its fields
+# (sessionId/usage) sit at the envelope's top level. This asymmetry is real
+# (S4 live-dogfood finding against the actual CLI, not a simplification).
 SUCCESS_STDOUT_LINES = [
     '{"type": "session.start", "sessionId": "test-session-id"}\n',
-    '{"type": "assistant.message_delta", "content": "Hello", "ephemeral": true}\n',
-    '{"type": "assistant.message", "content": "Hello world", "model": "gpt-5.4", "outputTokens": 2}\n',
+    '{"type": "assistant.message_delta", "data": {"content": "Hello"}, "ephemeral": true}\n',
+    '{"type": "assistant.message", "data": {"content": "Hello world", "model": "gpt-5.4", "outputTokens": 2}}\n',
     '{"type": "result", "sessionId": "test-session-id", "usage": {"premiumRequests": 1}}\n',
 ]
 
@@ -370,28 +374,32 @@ def test_malformed_empty_output_is_generic_error():
     "bad_message_json",
     [
         # outputTokens is a string, not an int
-        '{"type": "assistant.message", "content": "hi", "outputTokens": "not-a-number"}\n',
+        '{"type": "assistant.message", "data": {"content": "hi", "outputTokens": "not-a-number"}}\n',
         # outputTokens is a bool -- isinstance(True, int) is True in Python,
         # so this must be explicitly rejected, not silently coerced to 1.
-        '{"type": "assistant.message", "content": "hi", "outputTokens": true}\n',
+        '{"type": "assistant.message", "data": {"content": "hi", "outputTokens": true}}\n',
         # outputTokens is a numeric string / a float -- int() itself would
         # silently coerce either without complaint (round-3 verification
         # finding), so these must be rejected by an exact-type check, not
         # discovered via int()'s own leniency.
-        '{"type": "assistant.message", "content": "hi", "outputTokens": "7"}\n',
-        '{"type": "assistant.message", "content": "hi", "outputTokens": 1.5}\n',
+        '{"type": "assistant.message", "data": {"content": "hi", "outputTokens": "7"}}\n',
+        '{"type": "assistant.message", "data": {"content": "hi", "outputTokens": 1.5}}\n',
         # content is a number, not a string
-        '{"type": "assistant.message", "content": 12345, "outputTokens": 1}\n',
+        '{"type": "assistant.message", "data": {"content": 12345, "outputTokens": 1}}\n',
         # model is a list, not a string
-        '{"type": "assistant.message", "content": "hi", "model": ["a", "b"]}\n',
+        '{"type": "assistant.message", "data": {"content": "hi", "model": ["a", "b"]}}\n',
         # content is falsy-but-wrong-typed: `x or ""` would previously mask
         # each of these into an empty-but-"valid" string before the type
         # check ever saw the real, wrong type (round-2 verification finding).
-        '{"type": "assistant.message", "content": 0, "outputTokens": 1}\n',
-        '{"type": "assistant.message", "content": false, "outputTokens": 1}\n',
-        '{"type": "assistant.message", "content": [], "outputTokens": 1}\n',
-        '{"type": "assistant.message", "content": {}, "outputTokens": 1}\n',
-        '{"type": "assistant.message", "content": null, "outputTokens": 1}\n',
+        '{"type": "assistant.message", "data": {"content": 0, "outputTokens": 1}}\n',
+        '{"type": "assistant.message", "data": {"content": false, "outputTokens": 1}}\n',
+        '{"type": "assistant.message", "data": {"content": [], "outputTokens": 1}}\n',
+        '{"type": "assistant.message", "data": {"content": {}, "outputTokens": 1}}\n',
+        '{"type": "assistant.message", "data": {"content": null, "outputTokens": 1}}\n',
+        # data itself is the wrong shape (a list, not a dict) -- the S4
+        # live-dogfood fix's new unwrap step must reject this the same way,
+        # not raise or silently treat it as an empty dict.
+        '{"type": "assistant.message", "data": ["not", "a", "dict"]}\n',
     ],
 )
 def test_malformed_field_shape_in_otherwise_valid_json_is_generic_error(
@@ -414,7 +422,7 @@ def test_missing_content_field_defaults_to_empty_string_success():
     # typed value, covered above) is not malformed -- it is treated as an
     # empty response, not an error.
     stdout_lines = [
-        '{"type": "assistant.message", "outputTokens": 0}\n',
+        '{"type": "assistant.message", "data": {"outputTokens": 0}}\n',
         '{"type": "result", "usage": {}}\n',
     ]
     spawner = FakeSpawner(FakeProcess(stdout_lines=stdout_lines, exit_code=0))
@@ -425,9 +433,27 @@ def test_missing_content_field_defaults_to_empty_string_success():
     assert result.content == ""
 
 
+def test_missing_data_key_defaults_to_empty_dict_success():
+    # An assistant.message event with no "data" key at all (distinct from a
+    # present-but-incomplete data dict, covered above) must default to an
+    # empty payload, not raise or misclassify as malformed.
+    stdout_lines = [
+        '{"type": "assistant.message"}\n',
+        '{"type": "result", "usage": {}}\n',
+    ]
+    spawner = FakeSpawner(FakeProcess(stdout_lines=stdout_lines, exit_code=0))
+    result = cli_transport.CopilotCliTransport(spawner=spawner).dispatch(
+        model_id="m", system_prompt="", user_message="u"
+    )
+    assert result.ok
+    assert result.content == ""
+    assert result.output_tokens == 0
+    assert result.transport_metadata["echoed_model"] is None
+
+
 def test_malformed_usage_shape_is_generic_error():
     stdout_lines = [
-        '{"type": "assistant.message", "content": "hi", "outputTokens": 1}\n',
+        '{"type": "assistant.message", "data": {"content": "hi", "outputTokens": 1}}\n',
         '{"type": "result", "usage": ["not", "a", "dict"]}\n',
     ]
     spawner = FakeSpawner(FakeProcess(stdout_lines=stdout_lines, exit_code=0))
@@ -484,3 +510,22 @@ def test_default_spawner():
     assert proc.returncode == 0
     assert stdout == "out"
     assert stderr == "err"
+
+
+def test_default_spawner_decodes_utf8_bytes_cp1252_cannot():
+    # S4 live-dogfood finding: without an explicit encoding, Popen(text=True)
+    # decodes with locale.getpreferredencoding() -- cp1252 on this Windows
+    # seat -- and the real CLI's UTF-8 JSONL routinely contains bytes
+    # (an em dash, "\xe2\x80\x94") that cp1252 cannot decode, which crashed
+    # the reader thread mid-stream and left the child blocked on a full pipe
+    # (see default_spawner's docstring for the full failure chain). Write
+    # the child's stdout via the raw buffer so this test is not itself
+    # subject to the parent's console encoding.
+    argv = [
+        sys.executable, "-c",
+        "import sys; sys.stdout.buffer.write('caf\\u2014e'.encode('utf-8'))",
+    ]
+    proc = cli_transport.default_spawner(argv, env=None)
+    stdout, _ = proc.communicate(timeout=5)
+    assert proc.returncode == 0
+    assert stdout == "caf—e"

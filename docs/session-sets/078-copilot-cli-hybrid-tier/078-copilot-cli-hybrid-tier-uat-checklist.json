@@ -1,0 +1,81 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "dabbler-ai-router pre-0.28.0 (Set 078 'Copilot CLI Hybrid Tier', Session 4 of 5)",
+  "DocumentDate": "7/4/2026, 12:32:56 PM",
+  "Notes": "Ad-hoc per-set UAT for the new copilot-cli transport profile -- a way to run route()/verify() through your GitHub Copilot CLI seat instead of provider API keys. This is a CLI/Python feature with no browser UI, so every step below is a command you type in a terminal, not a click-through. Every step in this checklist was ALREADY run for real by the orchestrator on this same seat before being handed to you (the exact commands and the exact text they produced are quoted in each Expectation) -- you are re-running the same commands to confirm they behave the same way on a fresh run, not exploring unknown territory. Two things this checklist deliberately does NOT cover, both by an explicit operator decision recorded in s1-cli-contract.md: (1) a genuine auth-failure walk -- reproducing one for real would require deauthenticating your real working seat, which S1 ruled out as unsafe; walk 5 below (an unavailable model name) is the closest safe, repeatable stand-in for a 'friendly failure' walk. (2) attestation against a second, representative team-member seat -- the operator explicitly overrode this requirement on 2026-07-04 ('We don't need that artificial hurdle here... giving authority to override any and all requirements'), so this checklist is scoped to your own seat only. All commands assume you are in a terminal at the repo root (d:\\Projects\\dabbler-ai-orchestration) with the project's virtual environment. Where a step says to edit ai_router/router-config.yaml, change ONLY the exact line quoted, and change it back exactly as instructed in the very next step -- do not leave the file in the changed state.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Copilot CLI transport",
+      "Subarea": "Walk 1 -- catalog discovery on your seat",
+      "ItemLabel": "Discovering your seat's model catalog writes a lockfile and prints a one-line summary",
+      "HumanAction": "In a terminal at the repo root, run:\n.venv/Scripts/python.exe -m ai_router.copilot_catalog --refresh --seat-id op-personal --seat-label operator-personal\nWait for it to finish (it makes about 18 short real calls to the Copilot CLI, so it can take a minute or two).",
+      "Expectation": "The last printed line reads exactly:\nWrote ai_router/copilot-catalog.lock: 15/18 models confirmed, providers=['anthropic', 'google', 'openai']\n(The exact count can differ slightly if GitHub adds or removes models from the CLI between now and your walk -- what matters is: it ends in 'Wrote ai_router/copilot-catalog.lock', the confirmed count is close to 15-18, and all three provider names anthropic/google/openai appear.) You may also see one harmless line above it starting with '<frozen runpy>' -- that is expected and not an error.",
+      "ProgrammaticVerification": "Orchestrator ran this exact command for real on this seat during Session 4 and confirmed the lockfile round-trips cleanly through load_lockfile() afterward (this exact scenario was broken before this session's fix -- see s4-issues.json). test_copilot_catalog.py's discover_catalog/lockfile-roundtrip tests cover the mechanics on a fake transport.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Copilot CLI transport",
+      "Subarea": "Walk 2 -- one real routed call through the copilot-cli profile",
+      "ItemLabel": "Switching the transport profile and asking a simple question gets a real answer from Claude via the Copilot CLI",
+      "HumanAction": "1. Open ai_router/router-config.yaml. Find the line near the top that reads:\n  profile: api   # api | copilot-cli\nChange 'api' to 'copilot-cli' so it reads:\n  profile: copilot-cli   # api | copilot-cli\nSave the file.\n2. Run:\n.venv/Scripts/python.exe -c \"from ai_router import route; r = route(content='Explain in one sentence what a hash table is.', task_type='general'); print(r.model_id); print(r.content)\"",
+      "Expectation": "Two lines print. The first line names a real model id starting with 'claude-' (e.g. claude-sonnet-4.6). The second line is a real, coherent one-sentence explanation of a hash table -- NOT an empty line, and NOT an error/traceback. (An empty second line was exactly the bug this session found and fixed -- see s4-issues.json finding #2 -- so an empty line here means something has regressed.)",
+      "ProgrammaticVerification": "Orchestrator ran this exact scenario live during Session 4 (see s4-dogfood-evidence.json for the saved generator content) after fixing the 'data'-envelope-unwrap bug; test_cli_transport.py::test_success_path pins the same field-extraction logic against a fake CLI transcript.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Copilot CLI transport",
+      "Subarea": "Walk 3 -- cross-provider verification through the copilot-cli profile",
+      "ItemLabel": "A second, different-provider model reviews the first model's answer and returns VERIFIED",
+      "HumanAction": "Right after Walk 2 (profile still set to copilot-cli), run:\n.venv/Scripts/python.exe -c \"from ai_router import route, verify; r = route(content='Explain in one sentence what a hash table is.', task_type='general'); v = verify(r, original_task='Explain in one sentence what a hash table is.', task_type='general'); print(v.verdict); print(v.verifier_model); print(v.verifier_provider); print(v.generator_provider)\"",
+      "Expectation": "Four lines print: 'VERIFIED', then a model id starting with 'gpt-' (e.g. gpt-5.4), then 'openai', then 'anthropic'. The verifier's provider (3rd line, openai) must be DIFFERENT from the generator's provider (4th line, anthropic) -- that provider difference is the whole point of this feature. If the verdict line instead reads 'verification_unavailable', re-run once (a real generation call can occasionally run long); if it happens twice in a row, this is a real finding -- stop and report it.",
+      "Expectation_detail": "Do not treat a single verification_unavailable as a pass or a fail on its own -- see HumanAction retry note.",
+      "ProgrammaticVerification": "Orchestrator ran this exact scenario live during Session 4 after fixing the cp1252-decoding bug (see s4-dogfood-evidence.json: verdict VERIFIED, verifier gpt-5.4/openai, generator claude-sonnet-4.6/anthropic). Before that fix, this exact command hung for about 5 minutes and then returned verification_unavailable -- test_cli_transport.py::test_default_spawner_decodes_utf8_bytes_cp1252_cannot pins the underlying encoding fix.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Copilot CLI transport",
+      "Subarea": "Walk 4 -- drift refusal (induced failure)",
+      "ItemLabel": "A stale/mismatched catalog lockfile is refused with a clear, actionable error, never silently accepted",
+      "HumanAction": "1. Make a backup copy of the lockfile: copy ai_router\\copilot-catalog.lock ai_router\\copilot-catalog.lock.bak (Windows) or cp ai_router/copilot-catalog.lock ai_router/copilot-catalog.lock.bak (Bash).\n2. Open ai_router/copilot-catalog.lock in a text editor. Find the line starting with 'cli_version = \"GitHub Copilot CLI' and change the version number in it to something clearly wrong, e.g. change '1.0.68' to '9.9.9'. Save.\n3. With transport.profile still set to copilot-cli (from Walk 2), run:\n.venv/Scripts/python.exe -c \"from ai_router import route; route(content='hello', task_type='general')\"\n4. Restore the real lockfile: copy ai_router\\copilot-catalog.lock.bak ai_router\\copilot-catalog.lock (overwrite), then delete the .bak copy.",
+      "Expectation": "Step 3 does NOT print a real answer. It prints a Python error ending in a message that contains the words 'CLI version drift' and names both the version you typed in and the real installed version, plus an instruction to re-run the --refresh command. It must NOT silently proceed as if nothing were wrong.",
+      "ProgrammaticVerification": "Orchestrator ran this exact induced-drift scenario live during Session 4 and captured the exact message: \"RuntimeError: transport.profile is 'copilot-cli' but the catalog lockfile failed its fail-closed validation: CLI version drift: lock pinned to 'GitHub Copilot CLI 9.9.9.', live CLI reports 'GitHub Copilot CLI 1.0.68.'. Re-run 'python -m ai_router.copilot_catalog --refresh' to refresh it.\" test_copilot_catalog.py's validate_catalog drift-rule tests cover this mechanically.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Copilot CLI transport",
+      "Subarea": "Walk 5 -- probe/dispatch failure is friendly, not a silent hang (induced)",
+      "ItemLabel": "Asking the real Copilot CLI for a model name that does not exist fails immediately with a plain, readable message",
+      "HumanAction": "In a terminal, run:\ncopilot -p \"hello\" --model definitely-not-a-real-model --allow-all-tools --output-format json --no-auto-update\n(This calls the Copilot CLI directly, not through the router -- it is safe and does not use your real quota.)",
+      "Expectation": "The command exits quickly (a few seconds) with a line reading:\nError: Model \"definitely-not-a-real-model\" from --model flag is not available.\nIt must NOT hang for a long time, and it must NOT silently succeed.",
+      "ProgrammaticVerification": "Orchestrator ran this exact command live during Session 4 and captured this exact message. cli_transport.py's error-classification tests (test_invalid_model_error and siblings) cover the router's own handling of this failure shape against a fake CLI.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Copilot CLI transport",
+      "Subarea": "Walk 6 -- the hard invocation breaker trips (induced)",
+      "ItemLabel": "A very low invocation ceiling stops further Copilot CLI calls with a clear message instead of silently continuing to spend quota",
+      "HumanAction": "1. Open ai_router/router-config.yaml. Find the line reading:\n  max_invocations_per_session: 200    # hard circuit breaker, not a budget (design lock Section 5)\nChange 200 to 1, so it reads:\n  max_invocations_per_session: 1    # hard circuit breaker, not a budget (design lock Section 5)\nSave (profile should still be copilot-cli from Walk 2).\n2. Run:\n.venv/Scripts/python.exe -c \"from ai_router import route; route(content='Say OK.', task_type='general'); print('call 1 ok'); route(content='Say OK again.', task_type='general'); print('call 2 ok')\"\n3. Change max_invocations_per_session back to 200 and change transport.profile back to api. Save both.",
+      "Expectation": "You see 'call 1 ok' print, then a Python error before 'call 2 ok' ever prints. The error message contains the words 'max_invocations_per_session' and 'reached for this Python process', and explicitly says this is a safety ceiling, not a real cost cap.",
+      "ProgrammaticVerification": "Orchestrator ran this exact scenario live during Session 4 with the ceiling set to 1 and captured the second call raising InvocationBreakerTripped with this exact wording. test_copilot_routing_integration.py covers the breaker trip mechanically against a fake transport.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Copilot CLI transport",
+      "Subarea": "Walk 7 -- the default (api) profile still works exactly as before",
+      "ItemLabel": "With the transport profile back to its normal default, a routed call still goes through your provider API keys as it always has",
+      "HumanAction": "Confirm ai_router/router-config.yaml reads 'profile: api' (restored in the last step of Walk 6). Run:\n.venv/Scripts/python.exe -c \"from ai_router import route; r = route(content='Say OK.', task_type='general'); print(r.model_name); print(r.content); print(r.cost_usd)\"",
+      "Expectation": "Three lines print: a model name (e.g. opus, sonnet, or gemini-pro depending on routing), the word 'OK' (or similar), and a cost number GREATER than 0 (e.g. 0.0009...). A nonzero cost confirms this went through the real provider API path, not the Copilot CLI path (which always reports 0.0 -- honest non-accounting).",
+      "ProgrammaticVerification": "Orchestrator ran this exact command live after every change in this session and confirmed a nonzero cost each time (most recently: model 'opus', cost 0.000965). Full suite (2482 passed / 5 skipped) confirms the api-profile's own test suite is unchanged by every fix in this session.",
+      "Passes": true
+    }
+  ]
+}

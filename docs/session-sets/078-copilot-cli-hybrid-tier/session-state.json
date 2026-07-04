@@ -34,8 +34,22 @@
     {
       "number": 3,
       "title": "Routing integration, verification provenance, honest accounting",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-04T07:40:22.767469-04:00",
+      "completedAt": "2026-07-04T08:40:00.203296-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "effort": "high"
+      },
+      "verificationVerdict": "VERIFIED"
+    },
+    {
+      "number": 4,
+      "title": "Live dogfood and UAT",
+      "status": "in-progress",
+      "startedAt": "2026-07-04T08:45:45.035675-04:00",
       "completedAt": null,
       "orchestrator": {
         "engine": "claude-code",
@@ -43,15 +57,6 @@
         "model": "claude-sonnet-5",
         "effort": "high"
       },
-      "verificationVerdict": null
-    },
-    {
-      "number": 4,
-      "title": "Live dogfood and UAT",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
       "verificationVerdict": null
     },
     {

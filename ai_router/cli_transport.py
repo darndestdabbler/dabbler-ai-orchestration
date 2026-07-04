@@ -195,6 +195,22 @@ Spawner = Callable[[Sequence[str], Optional[dict]], ProcessHandle]
 def default_spawner(argv: Sequence[str], env: Optional[dict]) -> ProcessHandle:
     """The real spawner: a thin ``subprocess.Popen`` wrapper. ``shell=False``
     always — the model/role names are the only variable part of ``argv``.
+
+    S4 live-dogfood finding (severe): ``text=True`` without an explicit
+    ``encoding`` decodes the child's stdout/stderr using
+    ``locale.getpreferredencoding()`` -- ``cp1252`` on this Windows seat. The
+    real CLI's JSONL is UTF-8 and routinely contains non-cp1252-safe bytes
+    (an em dash, a curly quote -- ordinary in real model output). A decode
+    failure raised ``UnicodeDecodeError`` inside ``_reader_thread``'s
+    ``readline()`` loop, which the thread's broad ``except (OSError,
+    ValueError)`` swallowed -- silently killing that reader mid-stream,
+    *before* the process had actually finished writing. With nobody left to
+    drain it, the child blocked on a full OS pipe once its own stdout buffer
+    filled, never exited on its own, and the caller's total-timeout fired
+    ~300s later and force-killed it -- misclassifying a local decode bug as
+    ``total-timeout`` and masking the real cause entirely. Force UTF-8
+    (JSON's own encoding) explicitly, with ``errors="replace"`` so a
+    genuinely malformed byte is never fatal to the reader either.
     """
     merged_env = None
     if env:
@@ -205,7 +221,8 @@ def default_spawner(argv: Sequence[str], env: Optional[dict]) -> ProcessHandle:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         stdin=subprocess.DEVNULL,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1,
         env=merged_env,
     )
@@ -262,6 +279,21 @@ def _spawn_with_timeout(
     if "exc" in box:
         raise box["exc"]
     return box["proc"]
+
+
+def _has_utf8_replacement(*texts: str) -> bool:
+    """True if any text carries a U+FFFD replacement character.
+
+    S4 live-dogfood follow-up (code-review finding): ``default_spawner``
+    decodes with ``errors="replace"`` so a genuinely malformed byte from the
+    CLI is never fatal to the reader thread -- but that silently substitutes
+    U+FFFD with no other signal, which could mask real content corruption
+    from a caller with no way to notice. This flag makes the substitution
+    observable on the result without changing the never-hang guarantee: a
+    caller that cares can check it; nothing today treats it as blocking.
+    """
+    replacement_char = chr(0xFFFD)
+    return any(replacement_char in text for text in texts)
 
 
 def _classify_stderr(stderr_text: str) -> str:
@@ -529,6 +561,7 @@ class CopilotCliTransport:
                 "reprobe_cli_version": reprobe_cli_version,
                 "reprobe_cli_alive": reprobe_cli_version is not None
                 if reprobed else None,
+                "utf8_replacement_seen": _has_utf8_replacement(raw_stdout, raw_stderr),
             },
         )
 
@@ -558,16 +591,29 @@ class CopilotCliTransport:
         # it is exactly as untrustworthy as a missing event (session-
         # verification finding, Set 078 S2).
         try:
+            # S4 live-dogfood finding: the real CLI wraps every message-type
+            # event's payload (content/model/outputTokens/...) under a
+            # "data" key -- {"type": "assistant.message", "data": {...},
+            # "id": ..., "ephemeral": ...} -- unlike the terminal "result"
+            # event, whose fields (sessionId/exitCode/usage) sit at the
+            # envelope's top level. The fake-spawner suite (S2/S3) modeled
+            # assistant.message with its fields flattened onto the envelope,
+            # which never exercised this and let every real dispatch return
+            # a silently "successful" empty content. Round-2/3 verification
+            # findings below still apply to the unwrapped payload dict.
+            message_data = final_message.get("data", {})
+            if not isinstance(message_data, dict):
+                raise TypeError("assistant.message data is not a dict")
             # Round-2 verification finding: validate the RAW value before
             # any coercion. The prior `.get(..., "") or ""` applied the
             # falsy-coalescing `or` before the type check, so an explicitly
             # present but wrong-typed falsy value (0, False, [], {}) was
             # silently masked into an empty-but-"valid" string instead of
             # being caught as malformed.
-            content = final_message.get("content", "")
+            content = message_data.get("content", "")
             if not isinstance(content, str):
                 raise TypeError("content is not a string")
-            echoed_model = final_message.get("model")
+            echoed_model = message_data.get("model")
             if echoed_model is not None and not isinstance(echoed_model, str):
                 raise TypeError("model is not a string")
             # Round-3 verification finding: int() itself coerces a numeric
@@ -576,7 +622,7 @@ class CopilotCliTransport:
             # success instead of the malformed classification every sibling
             # field above already gets. Require the raw JSON type to be
             # exactly int (bool excluded despite being an int subclass).
-            raw_output_tokens = final_message.get("outputTokens", 0)
+            raw_output_tokens = message_data.get("outputTokens", 0)
             if raw_output_tokens is None:
                 output_tokens = 0
             elif type(raw_output_tokens) is not int:
@@ -621,6 +667,7 @@ class CopilotCliTransport:
                 "premium_requests": usage.get("premiumRequests"),
                 "total_api_duration_ms": usage.get("totalApiDurationMs"),
                 "session_duration_ms": usage.get("sessionDurationMs"),
+                "utf8_replacement_seen": _has_utf8_replacement(raw_stdout, raw_stderr),
             },
         )
 

@@ -1,0 +1,14 @@
+{
+  "generator": {
+    "model_id": "claude-sonnet-4.6",
+    "content": "A hash table is a data structure that maps keys to values using a hash function to compute an index into an array of buckets, enabling average O(1) lookups, insertions, and deletions."
+  },
+  "verifier": {
+    "verdict": "VERIFIED",
+    "verifier_model": "gpt-5.4",
+    "verifier_provider": "openai",
+    "generator_provider": "anthropic",
+    "issues": [],
+    "raw_response": "**VERIFIED** — I checked the response against the task’s only requirement (“Explain in one sentence what a hash table is”) and against the core technical claims it makes. It accurately defines a hash table, correctly describes the role of a hash function and bucketed storage, and the “average O(1)” performance claim is properly qualified rather than overstated."
+  }
+}

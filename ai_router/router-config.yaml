@@ -62,6 +62,46 @@ providers:
       max_retries: 2
       backoff_base_seconds: 2
 
+# --- Transport profile (Set 078) ---
+# Selects HOW every routed call is dispatched, independent of WHICH model is
+# picked. "api" (default) is the existing direct-HTTPS path above — fully
+# unchanged. "copilot-cli" dispatches through the GitHub Copilot CLI's
+# headless mode instead (ai_router/cli_transport.py), for shops whose staff
+# hold only a Copilot seat and no provider API keys. See
+# docs/concepts/tier-model.md and
+# docs/session-sets/078-copilot-cli-hybrid-tier/spec.md for the full
+# seat-profile contract and its explicitly degraded guarantees (asserted
+# provider provenance, no billed-usage accounting).
+transport:
+  profile: api   # api | copilot-cli
+
+# The copilot-cli profile's own settings. Only read/validated when
+# transport.profile == copilot-cli; otherwise inert. Roles are late-bound
+# aliases resolved against the seat-local catalog lockfile at
+# transports.copilot-cli.lockfile — the same role config resolves to
+# different concrete models on different seats (the lock is model-truth;
+# this config is intent). See s1-design-adjudication.md Sections 1-2 for the
+# resolution algorithm and the lockfile schema.
+transports:
+  copilot-cli:
+    kind: cli_subprocess
+    binary: copilot
+    lockfile: ai_router/copilot-catalog.lock
+    require_pinned_version: true       # asserts --no-auto-update on every call
+    billed_usage_unavailable: true      # honest non-accounting; see guard-exclusion list below
+    max_invocations_per_session: 200    # hard circuit breaker, not a budget (design lock Section 5)
+    roles:
+      generator:
+        prefer: [claude-sonnet-4.6, gpt-5.5, gemini-3.1-pro-preview]
+        require_provider_in: [anthropic, openai, google]
+      verifier:
+        prefer: [gpt-5.4, gemini-3.1-pro-preview, claude-sonnet-4.6]
+        require_provider_in: [anthropic, openai, google]
+    constraints:
+      cross_role_provider_diversity:
+        distinct_provider: [generator, verifier]   # verifier family MUST differ from generator
+        on_violation: fail_closed
+
 # --- Model Registry ---
 # Each model has a tier (1=cheap/fast, 2=balanced, 3=powerful/expensive),
 # pricing, context limits, and a reference to its prompt template.

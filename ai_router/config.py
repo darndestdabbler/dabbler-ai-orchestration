@@ -130,17 +130,39 @@ def load_config(path: str | None = None) -> dict:
     config.setdefault("routing", {})
     config["routing"].setdefault("outsourcing_mode", "whenever-helpful")
 
-    # Validate API keys exist in environment (only for enabled providers)
-    for name, provider in config["providers"].items():
-        if not provider.get("enabled", True):
-            continue
-        env_var = provider["api_key_env"]
-        if not resolve_secret(env_var):
-            raise EnvironmentError(
-                f"Missing environment variable {env_var} "
-                f"for provider '{name}'. "
-                f"Set it with: export {env_var}=your-key-here"
-            )
+    # Apply default for transport.profile (Set 078)
+    config.setdefault("transport", {})
+    config["transport"].setdefault("profile", "api")
+
+    # Merge local-overrides.yaml if present (local > shared > default) BEFORE
+    # any validation below runs. Session-verification finding (Set 078 S2):
+    # validating against the pre-merge config meant a local override that
+    # disables a provider (providers.<id>.enabled: false, an existing
+    # supported override) was not respected by the API-key check, which ran
+    # before the merge — the shared config's "enabled" stuck regardless of
+    # what the operator's own machine actually needs. Every validation step
+    # below must see the FINAL effective config, not the pre-override one.
+    local_overrides_path = config_path.parent / "local-overrides.yaml"
+    if local_overrides_path.exists():
+        _apply_local_overrides(config, local_overrides_path)
+
+    # Validate API keys exist in environment (only for enabled providers).
+    # Skipped entirely under the copilot-cli profile (Set 078 verification
+    # finding): that profile's whole point is a seat with NO provider API
+    # keys at all — every call dispatches through the Copilot CLI, never
+    # providers.call_model. Requiring keys anyway would make the profile
+    # fail to load for its one stated use case.
+    if config["transport"]["profile"] != "copilot-cli":
+        for name, provider in config["providers"].items():
+            if not provider.get("enabled", True):
+                continue
+            env_var = provider["api_key_env"]
+            if not resolve_secret(env_var):
+                raise EnvironmentError(
+                    f"Missing environment variable {env_var} "
+                    f"for provider '{name}'. "
+                    f"Set it with: export {env_var}=your-key-here"
+                )
 
     # Validate model references resolve against the providers block
     provider_names = set(config["providers"])
@@ -167,10 +189,11 @@ def load_config(path: str | None = None) -> dict:
     # for V1.5/V2 additions); only known-bad values are rejected.
     _validate_decision_consensus(config)
 
-    # Merge local-overrides.yaml if present (local > shared > default)
-    local_overrides_path = config_path.parent / "local-overrides.yaml"
-    if local_overrides_path.exists():
-        _apply_local_overrides(config, local_overrides_path)
+    # Validate transport.profile + transports.copilot-cli (Set 078).
+    # Default profile "api" (absent block is fine); an unknown profile or a
+    # copilot-cli profile missing its own config block fails loud rather
+    # than silently falling back to the api path.
+    _validate_transport(config)
 
     # Resolve prompt template file paths relative to config file location.
     # The integrated repo stores templates under ai_router/prompt-templates,
@@ -415,6 +438,51 @@ def _validate_decision_consensus(config: dict) -> None:
                 f"delegation.decision_consensus.{path_field} must be a "
                 f"string or null, got {type(value).__name__}"
             )
+
+
+_VALID_TRANSPORT_PROFILES: frozenset[str] = frozenset({"api", "copilot-cli"})
+
+# Required keys in transports.copilot-cli when transport.profile is set to
+# copilot-cli. Validated as PRESENT, not deep-shape-checked here — the
+# lockfile itself and ai_router.copilot_catalog.validate_catalog own the
+# per-seat fail-closed checks (version drift, provenance, diversity, seat
+# mismatch); this is only the config-load-time "did the operator wire the
+# block at all" check.
+_COPILOT_CLI_REQUIRED_KEYS: frozenset[str] = frozenset({"lockfile", "roles"})
+
+
+def _validate_transport(config: dict) -> None:
+    """Validate transport.profile + its matching transports.<profile> block.
+
+    Default profile "api" requires no extra block (the existing dispatch
+    path is unchanged). Selecting "copilot-cli" without a
+    transports.copilot-cli block (or missing its required keys) fails loud
+    at load time rather than silently falling back to "api" — a shop that
+    opted into the seat profile and got the plain API path instead (which
+    it may have no keys for) is a worse failure than refusing to load.
+    """
+    profile = (config.get("transport") or {}).get("profile", "api")
+    if profile not in _VALID_TRANSPORT_PROFILES:
+        raise ValueError(
+            f"transport.profile must be one of "
+            f"{sorted(_VALID_TRANSPORT_PROFILES)}, got {profile!r}"
+        )
+    if profile == "api":
+        return
+
+    transports = config.get("transports") or {}
+    block = transports.get(profile)
+    if not isinstance(block, dict):
+        raise ValueError(
+            f"transport.profile is {profile!r} but transports.{profile} is "
+            "missing — add its config block (see router-config.yaml's "
+            "transports.copilot-cli example) before selecting this profile."
+        )
+    missing = sorted(_COPILOT_CLI_REQUIRED_KEYS - set(block))
+    if missing:
+        raise ValueError(
+            f"transports.{profile} is missing required key(s): {missing}"
+        )
 
 
 def _check_pricing_staleness(config: dict) -> None:

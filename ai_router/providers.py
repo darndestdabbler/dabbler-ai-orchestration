@@ -50,11 +50,7 @@ def call_model(
     generation_params: dict | None = None,
 ) -> APIResult:
     """Call an AI API synchronously. Handles retries."""
-    caller = {
-        "anthropic": _call_anthropic,
-        "google": _call_google,
-        "openai": _call_openai,
-    }[provider_name]
+    caller = _PROVIDER_CALLERS[provider_name]
 
     max_retries = config["retry"]["max_retries"]
     backoff_base = config["retry"]["backoff_base_seconds"]
@@ -298,3 +294,17 @@ def _call_openai(model_id, system_prompt, user_message,
             output_tokens=int(output_tokens),
             stop_reason=stop_reason,
         )
+
+
+# Provider-name -> caller dispatch. Module-level (not inline in call_model)
+# so the api-profile caller path stays a single, introspectable seam: under
+# the copilot-cli transport profile (Set 078), route() dispatches through
+# ai_router.cli_transport.CopilotCliTransport instead of this dict, without
+# call_model itself branching on profile. This is the only change
+# providers.py needs for that — the api profile's own dispatch is otherwise
+# unchanged (Critique-2 nit: regression-suite-identical, not reshaped).
+_PROVIDER_CALLERS = {
+    "anthropic": _call_anthropic,
+    "google": _call_google,
+    "openai": _call_openai,
+}

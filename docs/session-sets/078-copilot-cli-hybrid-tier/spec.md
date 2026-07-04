@@ -458,6 +458,160 @@ weekend minimum (adapter shipped, profile off by default) reached.
 **Progress keys:** `s2.start-gate`, `s2.transport`, `s2.catalog`,
 `s2.tests`, `s2.closed`
 
+#### Session 2 result: transport layer + catalog lockfile shipped, `api` profile unchanged (2026-07-04)
+
+**Start gate.** Set 077 is `in-progress` (Session 6 only, operator-suspended
+over UAT instruction quality — not concurrently in flight). Enumerated 077
+S6's Touches (`pyproject.toml`, `tools/dabbler-ai-orchestration/package.json`,
+both CHANGELOGs, `docs/repository-reference.md`) against this session's
+Touches (`ai_router/providers.py`, `ai_router/config.py`,
+`ai_router/router-config.yaml`, pytest suites, plus the two new modules):
+zero overlap. No parallel worktree used — the clause guards against a
+genuinely concurrent session, and 077 S6 is not one; proceeded in the main
+checkout (recorded in the activity log).
+
+**Shipped.** `ai_router/cli_transport.py` (the `Transport` interface,
+`CopilotCliTransport`'s invocation state machine against an injected
+spawner, `TransportResult`) and `ai_router/copilot_catalog.py` (the
+`ModelEntry`/`CatalogMeta`/`Catalog` dataclasses, a hand-rolled restricted
+TOML reader/writer for the lockfile, `validate_catalog`'s four fail-closed
+rules, `discover_catalog` + the `--refresh` CLI). `router-config.yaml`
+gained `transport.profile` (default `api`) and the `transports.copilot-cli`
+block (roles, breaker value, guard-exclusion flag); `config.py` validates
+both, gated so the `api` profile's own load path is provably unchanged
+(new regression test asserts the default-profile API-key check still
+fires). `providers.py`'s inline provider-dispatch dict became a
+module-level `_PROVIDER_CALLERS` constant — a pure mechanical extraction,
+confirmed identical at runtime.
+
+**Tests.** A Layer-1 fake-spawner suite (routed, `task_type:
+test-generation`) covers the full state machine per Feature 1 Standards —
+argument construction, all three timeout classes, the five error classes
+incl. the auth-class re-probe, no-internal-retry, partial-output-discard,
+malformed/empty output, and the success path — plus the lockfile
+round-trip, the four `validate_catalog` rules, and `discover_catalog`/
+`get_cli_version`/`main`. Three generated assertions didn't match the
+module's actual (correct) error messages and one test fixture leaked
+mutable state across tests; adapted in-session (same pattern as Set 077
+S2's "authored via routed test-generation and adapted"). Full suite: 2409
+pre-existing tests still pass unchanged; 42 new tests added (38 + 4 for
+the profile-gate fix below), all green; the sole failure
+(`test_real_repo_passes_all_drift_checks`, both 077 and 078 simultaneously
+`in-progress`) predates this session and is unrelated to this diff.
+
+**Code review (routed, auto-verified).** Round 1 found one Major (the
+first-byte/total timeout deadlines were anchored before the spawn tier
+ran, silently shrinking the first-byte budget by however long spawning
+took) plus three Minor/Suggestion findings (a missing reap after one kill
+site, a non-`OSError` spawner exception able to escape `dispatch()`
+against the module's own "never raises" contract, and dead code). The
+auto-verifier (gpt-5-4) added three more Majors the first pass missed: (1)
+the `copilot-cli` profile still required provider API keys via the
+unconditional key-check loop, defeating its whole "no keys needed" premise
+— now gated on `transport.profile`; (2) a slow-to-spawn real process could
+be abandoned mid-launch with nothing to kill it once the spawn tier gave
+up — the spawner's background thread now kills+reaps any process that
+completes after the caller has already timed out; (3) the post-EOF exit
+wait used a hardcoded 15s instead of the configured total budget — now
+bounded by the remaining total-deadline. All seven findings fixed in this
+session (not deferred); the timing-sensitive tests were also widened to
+5-10x margins per a Minor finding about CI flakiness. Full suite re-run
+green after fixes.
+
+**Cross-provider session verification, round 1 (routed, gpt-5.4).**
+`ISSUES_FOUND`, two more Majors the code-review pass had not caught: (1)
+`load_config()` validated API keys and `transport.profile` against the
+**pre**-`local-overrides.yaml` config — a local override disabling a
+provider (`providers.<id>.enabled: false`, an existing supported override
+path, unrelated to this session's own `transport.profile` feature but
+sitting in the same validation block) was silently not respected, since
+the merge ran after all validation. Fixed by moving the
+`local-overrides.yaml` merge to run immediately after the provider/
+routing/transport defaults and before every validation step (API keys,
+model refs, tier assignments, decision-consensus, transport); a
+regression test confirms a local override disabling a provider is now
+honored. (2) `_success_result` could still raise
+(`ValueError`/`AttributeError`) on a zero-exit response whose JSON parsed
+cleanly but carried an unexpected field **shape** — a string
+`outputTokens`, a boolean `outputTokens` (Python's `isinstance(True, int)`
+quirk), a non-string `content`/`model`, or a non-dict `usage` — none of
+which the original "missing event" guard caught, since the events
+themselves were present and well-typed as dicts, just with malformed
+inner fields. Fixed by wrapping the field extraction in a
+`try/except (TypeError, ValueError, AttributeError)` that folds any bad
+shape into the same `generic-unknown` classified result; six new
+parametrized regression tests cover each malformed shape. Full suite
+re-run green (2419 passed, 5 skipped, same 1 pre-existing unrelated
+`drift_guard` failure).
+
+**Cross-provider session verification, round 2 (routed, gpt-5.4).**
+`ISSUES_FOUND`, one more Major: the round-1 `_success_result` hardening
+had its own gap — `content = final_message.get("content", "") or ""`
+applied the falsy-coalescing `or` **before** the type check, so an
+explicitly-present but wrong-typed **falsy** value (`0`, `false`, `[]`,
+`{}`, `null`) was silently masked into an empty-but-"valid" string
+instead of being caught as malformed. Fixed by reading the raw
+`.get("content", "")` value and type-checking it before any coercion
+(the absent-key case still correctly defaults to `""` and succeeds,
+which is not the same thing as an explicitly-wrong-typed present value).
+Six new parametrized cases (five malformed-falsy-shape + one confirming
+absent-content still succeeds) added. Full suite re-run green (2425
+passed, 5 skipped, same 1 pre-existing unrelated `drift_guard` failure).
+
+**Cross-provider session verification, round 3 (routed, gpt-5.4).**
+`ISSUES_FOUND`, one more Major, same class as round 2 but on the last
+remaining loose field: `outputTokens`'s `int(raw_output_tokens)` call
+itself silently coerces a numeric string (`"7"`) or a float (`1.5`)
+without complaint — the exact-type strictness already applied to
+`content`/`model`/`usage` had not been applied consistently to this
+field. Fixed by requiring `type(raw_output_tokens) is int` (bool
+excluded, matching the existing bool guard) before ever calling `int()`
+on it, instead of discovering a bad type via `int()`'s own leniency.
+Two new parametrized cases (numeric-string, float) added. Full suite
+re-run green (2427 passed, 5 skipped, same 1 pre-existing unrelated
+`drift_guard` failure).
+
+**Cross-provider session verification, round 4 (routed, gpt-5.4).**
+`ISSUES_FOUND`, one more Major, one boundary further out than rounds
+2-3: `_success_result` now strictly types its own four fields, but the
+sub-field `usage.premiumRequests` it copies verbatim into
+`transport_metadata` was still unvalidated -- a wrong-shaped value (a
+float, list, or dict) would flow through `discover_catalog()` into
+`ModelEntry.premium_request_weight` (a typed `Optional[int]`) and crash
+`write_lockfile()`'s hand-rolled TOML serializer on `--refresh`
+(`_toml_value` only supports `bool`/`int`/`str`). Fixed at the boundary
+where untyped transport metadata crosses into the typed dataclass field:
+`discover_catalog()` now coerces any non-plain-int `premium_requests`
+value to `None` rather than trusting the transport layer's diagnostic
+metadata verbatim (deliberately NOT fixed by loosening
+`_toml_value`'s contract, which is intentionally strict as the
+lockfile's only writer). Five new parametrized cases (float, list, dict,
+numeric-string, bool) confirm both the coercion and that
+`write_lockfile`/`load_lockfile` still round-trip cleanly. Full suite
+re-run green (2432 passed, 5 skipped, same 1 pre-existing unrelated
+`drift_guard` failure).
+
+**Cross-provider session verification, round 5 (routed, gpt-5.4): VERIFIED.**
+Explicitly asked to apply a merge-reviewer's materiality bar rather than
+keep drilling into narrower hypotheticals; converged clean. Five rounds
+total, each finding one genuine, distinct, reproducible defect (never a
+manufactured nit) — 1 (timing/leak/hardcoded-config-gate cluster from
+code-review's own auto-verify), 2-4 (a progressively narrower field-shape
+gap in the same success-path parser, converging outward from `content`
+to `outputTokens` to the nested `usage.premiumRequests`). Final suite:
+2432 passed, 5 skipped, the same single pre-existing unrelated
+`drift_guard` failure throughout every round.
+
+**Scoping note, not a gap:** the Architecture section's "presence/auth/
+catalog probes run before the first dispatch with friendly explainers" is
+S3's job, not S2's — that sequencing only makes sense once `route()`
+itself is wired to the profile (S3's Touches include `ai_router/__init__.py`;
+S2's do not). S2 ships the primitives that pre-flight sequence will call:
+`copilot_catalog.get_cli_version()` (presence) and
+`copilot_catalog.validate_catalog()` (catalog/provenance), both already
+result-object-style (never raise) so S3 can compose them into
+operator-visible friendly explainers without new plumbing.
+
 ### Session 3 of 5: Routing integration, verification provenance, honest accounting
 
 **Steps:**

@@ -1,28 +1,34 @@
 {
   "status": "completed",
-  "summary": "Session 1: probed the installed GitHub Copilot CLI against the six-point go/no-go gate on the operator's personal seat (3 provider families confirmed dispatchable; deterministic JSONL/stderr separation; usage visibility characterized as premium-request-count only; the CLI's silent auto-update mid-session surfaced a new --no-auto-update design requirement); routed the architecture design lock (lockfile schema, role/alias mapping, timeouts, retryable-error taxonomy, breaker default=200, guard-exclusion list); saved s1-cli-contract.md and s1-design-adjudication.md and folded the lock into spec.md. Cross-provider verification (GPT-5.4) raised two Major findings about gate rigor (missing target-team-seat/GitHub-Models checks; an unsanctioned GO-WITH-OPEN-ITEMS verdict); escalated to the operator, who explicitly overrode both and authorized Sessions 2-5 to proceed on single-seat evidence. No pivot to GitHub Models.",
+  "summary": "Session 2: shipped the Copilot CLI transport layer (ai_router/cli_transport.py -- Transport interface, CopilotCliTransport invocation state machine against an injected spawner, TransportResult) and the seat-local catalog lockfile (ai_router/copilot_catalog.py -- dataclasses, restricted-TOML reader/writer, validate_catalog's four fail-closed rules, discover_catalog + --refresh CLI). Wired transport.profile/transports.copilot-cli into router-config.yaml and config.py (api profile provably unchanged); mechanically extracted providers.py's inline dispatch dict. Routed test-generation produced a 38+4-test Layer-1 fake-spawner suite (adapted: fixed 3 mismatched exception-message expectations and 1 real shared-mutable-fixture cross-test bug). Routed code-review (auto-verified) found and fixed 7 issues (timeout-deadline anchoring, a spawn-timeout process leak, a hardcoded post-EOF wait, a missing reap, an overly-narrow except clause, the copilot-cli profile still requiring provider API keys, dead code). Cross-provider session verification ran 5 rounds, each finding one genuine, distinct, reproducible defect (local-overrides merge ordering; three progressively narrower field-shape gaps in the success-path JSON parser converging from content to outputTokens to nested usage.premiumRequests) -- all fixed with regression tests, round 5 VERIFIED clean under an explicit merge-reviewer materiality bar. Final suite: 2432 passed, 5 skipped, one pre-existing unrelated drift_guard failure (two session sets simultaneously in-progress per this set's own deliberate Sequencing-against-Set-077 design) that predates this session throughout. No route() integration yet (Session 3's scope, by design) and no version bump/release (Session 5's scope).",
   "verification_method": "api",
   "files_changed": [
+    ".gitignore",
+    "ai_router/cli_transport.py",
+    "ai_router/copilot_catalog.py",
+    "ai_router/providers.py",
+    "ai_router/config.py",
+    "ai_router/router-config.yaml",
+    "ai_router/tests/test_cli_transport.py",
+    "ai_router/tests/test_copilot_catalog.py",
+    "ai_router/tests/test_transport_profile_config.py",
     "docs/session-sets/078-copilot-cli-hybrid-tier/spec.md",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/s1-cli-contract.md",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/s1-design-adjudication.md",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/s1-verification.md",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/s1-issues.json",
     "docs/session-sets/078-copilot-cli-hybrid-tier/activity-log.json",
     "docs/session-sets/078-copilot-cli-hybrid-tier/session-state.json",
-    "docs/session-sets/078-copilot-cli-hybrid-tier/session-events.jsonl"
+    "docs/session-sets/078-copilot-cli-hybrid-tier/session-events.jsonl",
+    "docs/session-sets/078-copilot-cli-hybrid-tier/disposition.json"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
-    "engine": "codex",
-    "provider": "openai",
-    "model": "gpt-5.4",
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
     "effort": "high",
     "reason": {
-      "code": "other",
-      "specifics": "Routed analysis (task_type=analysis) recommended switching from Claude Code to the OpenAI/Codex binding for Session 2 because the work profile shifts from architectural reasoning (Session 1, locked) to implementation-heavy code generation and a fake-spawner pytest suite against a fixed design, which the analysis judged plays to a GPT-series model's strengths; high effort given the multi-module state-machine implementation and full test coverage required."
+      "code": "continue-current-trajectory",
+      "specifics": "Routed analysis (task_type=analysis, gemini-pro) recommended continuing with claude-code/anthropic/claude-sonnet-5 for Session 3: integration-heavy work extending route()'s existing control flow that the incumbent orchestrator already has fresh context on, not a net-new implementation where a different provider's strengths would argue for a switch."
     }
   },
   "blockers": [],
-  "verification_verdict": "ISSUES_FOUND"
+  "verification_verdict": "VERIFIED"
 }

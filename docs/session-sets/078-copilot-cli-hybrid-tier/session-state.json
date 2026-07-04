@@ -6,24 +6,29 @@
     {
       "number": 1,
       "title": "CLI contract discovery and design lock (go/no-go)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-04T05:58:16.330002-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-04T06:18:40.570300-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-sonnet-5",
         "effort": "medium"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "ISSUES_FOUND"
     },
     {
       "number": 2,
       "title": "Transport layer and catalog lockfile",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-04T06:24:39.357740-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "effort": "high"
+      },
       "verificationVerdict": null
     },
     {

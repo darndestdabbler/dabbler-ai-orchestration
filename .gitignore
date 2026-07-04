@@ -40,3 +40,8 @@ dabbler-log-harvest/
 # packaged extension ships from dist/ (esbuild), so out/ is pure derived
 # churn. Untracked + ignored to end the recurring dirty-tree noise.
 tools/dabbler-ai-orchestration/out/
+# Set 078 (Copilot CLI hybrid-tier transport). The seat-local catalog
+# lockfile is empirically probed per operator/seat (ai_router/copilot_catalog.py
+# --refresh) and never shared truth across seats — same rationale as the
+# local-overrides.yaml entry above.
+ai_router/copilot-catalog.lock

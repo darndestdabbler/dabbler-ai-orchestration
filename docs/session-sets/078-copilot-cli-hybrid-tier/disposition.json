@@ -24,7 +24,7 @@
     "model": "claude-sonnet-5",
     "effort": "medium",
     "reason": {
-      "code": "continue-current-trajectory-lower-effort",
+      "code": "continue-current-trajectory",
       "specifics": "Routed analysis (task_type=analysis, gemini-pro) recommended the incumbent continue into Session 5, citing strong context retention demonstrated diagnosing Session 4's live-CLI bugs, and suggested effort could step down from high to medium since Session 5's remaining scope (doc updates, release-ordering check, version bump, tag push) is procedurally simpler than Session 4's live debugging. The routed response also proposed a literal two-engine 'lead + second' team structure to satisfy the path-aware critique's >=2-provider requirement -- this misreads the architecture: the path-aware critique is already a separate, always-multi-provider stage (ai_router/prompt-templates/path-aware-critique.md) independent of which single engine orchestrates the session, exactly as every prior session in this set has done; the next_orchestrator field is a single-engine slot, not a team roster. Recorded the effort-level and continue-incumbent signal as recommended; the invented dual-engine-team framing is not adopted."
     }
   },

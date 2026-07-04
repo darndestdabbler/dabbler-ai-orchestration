@@ -1,0 +1,34 @@
+{
+  "status": "completed",
+  "summary": "Session 1 of 5: Copilot CLI presence probe + Full-tier seat-profile sub-choice UI. Added src/utils/copilotCli.ts (probeCopilotCliPresenceCore mirrors probePythonPresenceCore: explicit dabblerSessionSets.copilotCliPath setting decides alone, else PATH scan; win32 PATH branch probes copilot.exe only, matching the catalog module's shell=False bare-token spawn, while an explicit path probes plain file existence because CreateProcess executes extension-explicit batch files - both branches verified empirically). Added the Full-only transport-profile radio group (api default / copilot-cli) to gettingStartedHtml.js between the tier radios and the budget block, omitted on Lightweight per the budgetBlockHtml pattern; the missing-CLI warning renders inside the block, visible only when copilot-cli is selected AND the probe failed, failing quiet on an absent payload flag. The D6 provider-key warning is suppressed while copilot-cli is selected (its set-DABBLER_*-keys copy is wrong guidance for the keyless Copilot-seat audience) - the verifier independently confirmed the reachable warning matrix leaves no signal-less actionable state. Extended gsState/persistGsState/restoreGsState with the seat-profile family (transportProfile/profileDirty/lastProfileSeed) under the exact tier/verification-mode seed-dirty-reload precedence; payload gained copilotCliPresent + transportProfileSeed (host seed resolver deliberately omitted until Session 2 wires the durable transport.profile write). No Build wiring by design (Sessions 2-3). Suites: Layer-2 1134 passing, tsc clean, pytest 2483 passed/5 skipped, Playwright 19 passed locally.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "tools/dabbler-ai-orchestration/src/utils/copilotCli.ts",
+    "tools/dabbler-ai-orchestration/src/utils/gettingStartedDetection.ts",
+    "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
+    "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/src/test/suite/copilotCli.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedDetection.test.ts",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map"
+  ],
+  "verification_message_ids": [],
+  "verification_notes": "Routed gate verdict REQUIRED (blast-radius, breadth, build-ci-config); session-verification routed to gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator), verdict VERIFIED, 0 issues (s1-verification.md). Earlier routed code-review (opus) was cross-verified by gpt-5-4 which returned one Major on the explicit-.cmd probe path; adjudicated with two empirical subprocess runs (explicit .cmd executes under shell=False via CreateProcess's implicit cmd.exe; bare token on .cmd-only PATH raises FileNotFoundError), recorded via record_adjudication (context-gap / accept-dismissal); the finding's real substance (comment overclaim + test gap) was fixed in-session.",
+  "next_orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-fable-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 wires the happy path (sequencing, cancellable subprocess, config-write-as-template-variable) where the architecture critique's CRITICAL findings land; the ai-assignment recommends the same engine at high effort for that novelty, and continuity of the Session 1 probe/payload contract helps."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": ["L-064-3", "L-064-6", "L-064-9"]
+}

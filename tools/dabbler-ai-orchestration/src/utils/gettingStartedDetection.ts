@@ -214,6 +214,14 @@ export function selectExplorerMode(hasFolder: boolean, hasAnySets: boolean): Exp
  * host's Python-presence probe. Both are gated to "getting-started"
  * mode like the other probes; `pythonPresent` defaults to true (quiet)
  * when the probe is absent or the mode renders no form.
+ *
+ * `resolveCopilotCliPresent` (Set 079 S1, Feature 1) is the host's
+ * Copilot-CLI presence probe (explicit copilotCliPath setting → PATH),
+ * feeding the step-1 Copilot-missing warning; same gating and same
+ * quiet true default as `pythonPresent`. `resolveTransportProfileSeed`
+ * is the durable seat-profile seed for the Full-tier sub-choice —
+ * Session 2 wires the durable source (the scaffold's transport.profile
+ * write); until then hosts omit the thunk and the seed is null.
  */
 export function computeGettingStarted(
   hasFolder: boolean,
@@ -226,6 +234,8 @@ export function computeGettingStarted(
     root: string,
   ) => "dedicated-sessions" | "out-of-band-or-none" | null,
   resolvePythonPresent?: (root: string) => boolean,
+  resolveCopilotCliPresent?: (root: string) => boolean,
+  resolveTransportProfileSeed?: (root: string) => "api" | "copilot-cli" | null,
 ): GettingStartedPayload {
   const mode = selectExplorerMode(hasFolder, hasAnySets);
   const completion =
@@ -244,6 +254,14 @@ export function computeGettingStarted(
     mode === "getting-started" && root && resolvePythonPresent
       ? resolvePythonPresent(root)
       : true;
+  const copilotCliPresent =
+    mode === "getting-started" && root && resolveCopilotCliPresent
+      ? resolveCopilotCliPresent(root)
+      : true;
+  const transportProfileSeed =
+    mode === "getting-started" && root && resolveTransportProfileSeed
+      ? resolveTransportProfileSeed(root)
+      : null;
   // S077-S2-V1-001: the root the form (and seed) belongs to, so the
   // webview can scope its persisted state per root.
   const rootId = mode === "getting-started" && root ? root : null;
@@ -255,6 +273,8 @@ export function computeGettingStarted(
     rootId,
     verificationModeSeed,
     pythonPresent,
+    copilotCliPresent,
+    transportProfileSeed,
   };
 }
 

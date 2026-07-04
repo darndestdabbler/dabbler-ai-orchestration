@@ -1,15 +1,20 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "079-copilot-seat-onboarding-and-verification-copy",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Copilot CLI presence probe + Full-tier sub-choice UI",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-04T17:42:11.623814-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "medium"
+      },
       "verificationVerdict": null
     },
     {

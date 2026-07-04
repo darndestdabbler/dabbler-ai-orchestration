@@ -345,6 +345,11 @@
           "default": "python",
           "markdownDescription": "Python executable used by `Dabbler: Install ai-router` and `Dabbler: Update ai-router` for venv detection / creation and `pip install` commands. Accepts an absolute path, a workspace-relative path (e.g. `.venv/Scripts/python.exe`), or a bare command on `PATH`. When the path points at an interpreter inside an existing venv (parent dir is `Scripts/` or `bin/`), the install command treats that venv as the install target instead of hunting for `.venv/` at the workspace root."
         },
+        "dabblerSessionSets.copilotCliPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "GitHub Copilot CLI executable used by the Full-tier Copilot seat option (`transport.profile: copilot-cli`). Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `copilot` on `PATH` — on Windows the auto-detect (like the catalog subprocess it pre-flights) resolves a `copilot.exe` only, so an npm-installed `copilot.cmd` shim is found only when this setting points at it explicitly (with its extension)."
+        },
         "dabblerSessionSets.aiRouterRepoUrl": {
           "type": "string",
           "default": "",

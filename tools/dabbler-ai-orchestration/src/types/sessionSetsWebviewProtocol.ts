@@ -156,6 +156,22 @@ export interface GettingStartedPayload {
   // Probed only in "getting-started" mode (true elsewhere — the value
   // renders nowhere else, and true keeps the warning quiet).
   pythonPresent: boolean;
+  // Set 079 S1 (Feature 1): the host's Copilot-CLI presence probe —
+  // false when no `copilot` executable resolves (no explicit
+  // copilotCliPath setting, nothing usable on PATH). Drives the step-1
+  // Copilot-missing warning, which shows only while the Full-tier
+  // Copilot seat sub-choice is selected. Probed only in
+  // "getting-started" mode (true elsewhere — same quiet default as
+  // pythonPresent).
+  copilotCliPresent: boolean;
+  // Set 079 S1 (Feature 1): the durable seat-profile seed for the
+  // Full-tier sub-choice radios ("api" = direct provider keys, the
+  // default; "copilot-cli" = Set 078's Copilot seat profile). Same
+  // (rootId, seed) application semantics as tierSeed /
+  // verificationModeSeed. Null until Session 2 wires the durable
+  // source (the scaffold's transport.profile write); populated only in
+  // "getting-started" mode.
+  transportProfileSeed: "api" | "copilot-cli" | null;
 }
 
 export interface SnapshotPayload {

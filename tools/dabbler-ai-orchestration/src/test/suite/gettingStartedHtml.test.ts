@@ -33,6 +33,8 @@ interface GsControls {
   zeroMethod?: string | null;
   // Set 077 S3: the Lightweight verification-mode pick.
   verificationMode?: string | null;
+  // Set 079 S1: the Full-tier seat-profile pick.
+  transportProfile?: string | null;
 }
 
 const gsHtml = requireFromPackageRoot(
@@ -69,6 +71,17 @@ const gsHtml = requireFromPackageRoot(
   pythonWarningHtml(visible: boolean): string;
   PYTHON_WARNING_TEXT: string;
   VERIFICATION_MODE_LABEL_TEXT: string;
+  // Set 079 S1: the Full-only seat-profile block + the missing-CLI
+  // warning.
+  transportProfileBlockHtml(
+    controls: GsControls,
+    copilotCliPresent?: boolean,
+  ): string;
+  copilotWarningHtml(visible: boolean): string;
+  TRANSPORT_PROFILE_LABEL_TEXT: string;
+  TRANSPORT_PROFILE_API_TEXT: string;
+  TRANSPORT_PROFILE_COPILOT_TEXT: string;
+  COPILOT_WARNING_TEXT: string;
   // Set 077 S2 (A1/A11): pure teardown-restore narrowing for gsState.
   // S3 adds the 4th param (the verification-mode marker seed) and the
   // mode fields, mirroring the tier contract.
@@ -77,6 +90,7 @@ const gsHtml = requireFromPackageRoot(
     tierSeed?: unknown,
     rootId?: unknown,
     modeSeed?: unknown,
+    profileSeed?: unknown,
   ): {
     tier: "full" | "lightweight";
     parallel: boolean;
@@ -87,6 +101,9 @@ const gsHtml = requireFromPackageRoot(
     verificationMode: "dedicated-sessions" | "out-of-band-or-none";
     modeDirty: boolean;
     lastModeSeed: "dedicated-sessions" | "out-of-band-or-none" | null;
+    transportProfile: "api" | "copilot-cli";
+    profileDirty: boolean;
+    lastProfileSeed: "api" | "copilot-cli" | null;
     rootId: string | null;
   };
 };
@@ -97,6 +114,7 @@ function gs(overrides: Partial<{
   sessionSetsPresent: boolean;
   providerKeyPresent: boolean;
   pythonPresent: boolean;
+  copilotCliPresent: boolean;
 }> = {}) {
   return {
     mode: "getting-started",
@@ -396,6 +414,10 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
     verificationMode: "out-of-band-or-none",
     modeDirty: false,
     lastModeSeed: null,
+    // Set 079 S1: the seat-profile family joins the state shape.
+    transportProfile: "api",
+    profileDirty: false,
+    lastProfileSeed: null,
     rootId: null,
   };
 
@@ -419,6 +441,10 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
       verificationMode: "dedicated-sessions",
       modeDirty: true,
       lastModeSeed: "out-of-band-or-none",
+      // Set 079 S1: the seat-profile family round-trips too.
+      transportProfile: "copilot-cli",
+      profileDirty: true,
+      lastProfileSeed: "api",
       rootId: "/repo-a",
     };
     assert.deepStrictEqual(gsHtml.restoreGsState(persisted, null), persisted);
@@ -728,5 +754,243 @@ suite("gettingStartedHtml — restoreGsState verification-mode seed (Set 077 S3)
     );
     assert.strictEqual(state.tier, "lightweight");
     assert.strictEqual(state.verificationMode, "dedicated-sessions");
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 079 Session 1 — the Full-tier seat-profile sub-choice, its
+// missing-CLI warning, the D6 key-warning suppression while Copilot is
+// selected, and the seat-profile seed semantics in restoreGsState.
+// Cases generated via routed test-generation (gemini-pro) and adapted.
+// ---------------------------------------------------------------------
+
+suite("gettingStartedHtml — transport-profile block (Set 079 S1)", () => {
+  test("returns empty string for the Lightweight tier (block omitted, not hidden)", () => {
+    assert.strictEqual(gsHtml.transportProfileBlockHtml(LIGHT, true), "");
+    const html = gsHtml.renderGettingStarted(gs(), LIGHT);
+    assert.ok(!html.includes("data-gs-transport-profile"));
+    assert.ok(!html.includes('name="gs-transport-profile"'));
+  });
+
+  test("renders on Full with 'api' checked by default and both copy texts", () => {
+    const html = gsHtml.transportProfileBlockHtml(FULL, true);
+    assert.ok(html.includes("data-gs-transport-profile"));
+    assert.ok(html.includes(gsHtml.TRANSPORT_PROFILE_LABEL_TEXT));
+    assert.ok(html.includes(gsHtml.TRANSPORT_PROFILE_API_TEXT));
+    assert.ok(html.includes(gsHtml.TRANSPORT_PROFILE_COPILOT_TEXT));
+    assert.ok(/value="api" checked/.test(html));
+    assert.ok(!/value="copilot-cli" checked/.test(html));
+  });
+
+  test("checks 'copilot-cli' when the controls say so", () => {
+    const html = gsHtml.transportProfileBlockHtml(
+      { ...FULL, transportProfile: "copilot-cli" },
+      true,
+    );
+    assert.ok(/value="copilot-cli" checked/.test(html));
+    assert.ok(!/value="api" checked/.test(html));
+  });
+
+  test("sits in step 1 between the tier radios and the budget block", () => {
+    const html = gsHtml.renderGettingStarted(gs(), FULL);
+    const tierIdx = html.indexOf('name="gs-tier"');
+    const profileIdx = html.indexOf("data-gs-transport-profile");
+    const budgetIdx = html.indexOf("data-gs-budget");
+    assert.ok(
+      tierIdx !== -1 && tierIdx < profileIdx && profileIdx < budgetIdx,
+      "transport block not between the tier radios and the budget block",
+    );
+  });
+});
+
+suite("gettingStartedHtml — missing-Copilot-CLI warning (Set 079 S1)", () => {
+  test("copilotWarningHtml renders role=alert and flips hidden on visible", () => {
+    const visible = gsHtml.copilotWarningHtml(true);
+    assert.ok(visible.includes('data-gs-warning="copilot"'));
+    assert.ok(visible.includes('role="alert"'));
+    assert.ok(!/\shidden[\s>]/.test(visible));
+    const hidden = gsHtml.copilotWarningHtml(false);
+    assert.ok(/\shidden>/.test(hidden));
+    assert.ok(hidden.includes("copilot command"));
+    assert.ok(hidden.includes("dabblerSessionSets.copilotCliPath"));
+    assert.ok(hidden.includes("reload the VS Code window"));
+  });
+
+  test("warning VISIBLE when Copilot is selected AND the CLI is missing", () => {
+    const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: false }), {
+      ...FULL,
+      transportProfile: "copilot-cli",
+    });
+    assert.strictEqual(isVisible(html, 'data-gs-warning="copilot"'), true);
+  });
+
+  test("warning hidden when Copilot is selected but the CLI is present", () => {
+    const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: true }), {
+      ...FULL,
+      transportProfile: "copilot-cli",
+    });
+    assert.strictEqual(isVisible(html, 'data-gs-warning="copilot"'), false);
+  });
+
+  test("warning hidden while the API option is selected, even with the CLI missing", () => {
+    const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: false }), {
+      ...FULL,
+      transportProfile: "api",
+    });
+    assert.strictEqual(isVisible(html, 'data-gs-warning="copilot"'), false);
+  });
+
+  test("warning hidden when copilotCliPresent is ABSENT (older host fails quiet)", () => {
+    const html = gsHtml.renderGettingStarted(gs(), {
+      ...FULL,
+      transportProfile: "copilot-cli",
+    });
+    assert.strictEqual(isVisible(html, 'data-gs-warning="copilot"'), false);
+  });
+
+  test("warning absent entirely on Lightweight (the block is omitted)", () => {
+    const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: false }), {
+      ...LIGHT,
+      transportProfile: "copilot-cli",
+    });
+    assert.ok(!html.includes('data-gs-warning="copilot"'));
+  });
+});
+
+suite("gettingStartedHtml — D6 key warning vs the Copilot seat pick (Set 079 S1)", () => {
+  test("env warning HIDDEN while Copilot is selected, even with no keys", () => {
+    // The D6 copy tells the operator to set DABBLER_* keys — exactly
+    // what the keyless Copilot-seat audience must NOT be told to do.
+    const html = gsHtml.renderGettingStarted(gs({ providerKeyPresent: false }), {
+      ...FULL,
+      transportProfile: "copilot-cli",
+    });
+    assert.strictEqual(isVisible(html, 'data-gs-warning="env"'), false);
+  });
+
+  test("env warning still VISIBLE on Full/API with no keys (explicit and default)", () => {
+    for (const controls of [
+      { ...FULL, transportProfile: "api" },
+      FULL, // transportProfile absent — the default is the API path
+    ]) {
+      const html = gsHtml.renderGettingStarted(
+        gs({ providerKeyPresent: false }),
+        controls,
+      );
+      assert.strictEqual(isVisible(html, 'data-gs-warning="env"'), true);
+    }
+  });
+});
+
+suite("gettingStartedHtml — restoreGsState seat-profile seed (Set 079 S1)", () => {
+  test("unknown persisted transportProfile narrows to the 'api' default", () => {
+    const state = gsHtml.restoreGsState({ transportProfile: "invalid" }, null);
+    assert.strictEqual(state.transportProfile, "api");
+    assert.strictEqual(state.profileDirty, false);
+    assert.strictEqual(state.lastProfileSeed, null);
+  });
+
+  test("a valid profile seed overrides an UNTOUCHED persisted profile", () => {
+    const state = gsHtml.restoreGsState(
+      { transportProfile: "api", profileDirty: false },
+      null,
+      null,
+      null,
+      "copilot-cli",
+    );
+    assert.strictEqual(state.transportProfile, "copilot-cli");
+    assert.strictEqual(state.profileDirty, false);
+    assert.strictEqual(state.lastProfileSeed, "copilot-cli");
+  });
+
+  test("a post-seed explicit flip survives the SAME seed (profileDirty)", () => {
+    const state = gsHtml.restoreGsState(
+      {
+        transportProfile: "copilot-cli",
+        profileDirty: true,
+        lastProfileSeed: "api",
+      },
+      null,
+      null,
+      null,
+      "api",
+    );
+    assert.strictEqual(state.transportProfile, "copilot-cli");
+    assert.strictEqual(state.profileDirty, true);
+    assert.strictEqual(state.lastProfileSeed, "api");
+  });
+
+  test("a CHANGED seed re-applies over a dirty flip and clears the flag", () => {
+    const state = gsHtml.restoreGsState(
+      {
+        transportProfile: "api",
+        profileDirty: true,
+        lastProfileSeed: "copilot-cli",
+      },
+      null,
+      null,
+      null,
+      "api",
+    );
+    assert.strictEqual(state.transportProfile, "api");
+    assert.strictEqual(state.profileDirty, false);
+    assert.strictEqual(state.lastProfileSeed, "api");
+  });
+
+  test("profileDirty clears whenever the profile equals the seed", () => {
+    const state = gsHtml.restoreGsState(
+      { transportProfile: "copilot-cli", profileDirty: true },
+      null,
+      null,
+      null,
+      "copilot-cli",
+    );
+    assert.strictEqual(state.transportProfile, "copilot-cli");
+    assert.strictEqual(state.profileDirty, false);
+    assert.strictEqual(state.lastProfileSeed, "copilot-cli");
+  });
+
+  test("cross-root discard resets the profile fields too (S077-S2-V1-001 parity)", () => {
+    const state = gsHtml.restoreGsState(
+      {
+        rootId: "/repo-a",
+        transportProfile: "copilot-cli",
+        profileDirty: true,
+        lastProfileSeed: "api",
+      },
+      null,
+      "/repo-b",
+      null,
+      null,
+    );
+    assert.strictEqual(state.transportProfile, "api");
+    assert.strictEqual(state.profileDirty, false);
+    assert.strictEqual(state.lastProfileSeed, null);
+  });
+
+  test("an absent or junk profile seed leaves the persisted profile untouched", () => {
+    for (const seed of [null, undefined, "junk"]) {
+      const state = gsHtml.restoreGsState(
+        { transportProfile: "copilot-cli" },
+        null,
+        null,
+        null,
+        seed,
+      );
+      assert.strictEqual(state.transportProfile, "copilot-cli", String(seed));
+    }
+  });
+
+  test("regression: tier + mode seeds still apply alongside the profile seed", () => {
+    const state = gsHtml.restoreGsState(
+      {},
+      "lightweight",
+      null,
+      "dedicated-sessions",
+      "copilot-cli",
+    );
+    assert.strictEqual(state.tier, "lightweight");
+    assert.strictEqual(state.verificationMode, "dedicated-sessions");
+    assert.strictEqual(state.transportProfile, "copilot-cli");
   });
 });

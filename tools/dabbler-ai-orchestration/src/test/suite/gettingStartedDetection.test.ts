@@ -204,6 +204,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       rootId: null,
       verificationModeSeed: null,
       pythonPresent: true,
+      copilotCliPresent: true,
+      transportProfileSeed: null,
     });
   });
 
@@ -221,6 +223,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       rootId: null,
       verificationModeSeed: null,
       pythonPresent: true,
+      copilotCliPresent: true,
+      transportProfileSeed: null,
     });
   });
 
@@ -236,6 +240,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       rootId: ROOT,
       verificationModeSeed: null,
       pythonPresent: true,
+      copilotCliPresent: true,
+      transportProfileSeed: null,
     });
   });
 
@@ -251,6 +257,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       rootId: ROOT,
       verificationModeSeed: null,
       pythonPresent: true,
+      copilotCliPresent: true,
+      transportProfileSeed: null,
     });
   });
 
@@ -266,6 +274,8 @@ suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host compos
       rootId: null,
       verificationModeSeed: null,
       pythonPresent: true,
+      copilotCliPresent: true,
+      transportProfileSeed: null,
     });
   });
 });
@@ -459,5 +469,99 @@ suite("computeGettingStarted — S3 thunks (mode seed + pythonPresent)", () => {
     assert.strictEqual(p.mode, "getting-started");
     assert.strictEqual(p.verificationModeSeed, null);
     assert.strictEqual(p.pythonPresent, true);
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 079 Session 1 — the Copilot-CLI presence probe + seat-profile
+// seed thunks on computeGettingStarted: same getting-started-mode
+// gating and quiet defaults as the S3 thunks above. Cases generated
+// via routed test-generation (gemini-pro) and adapted.
+// ---------------------------------------------------------------------
+
+suite("computeGettingStarted — S079 thunks (copilotCliPresent + transportProfileSeed)", () => {
+  function countingThunks() {
+    const calls = { cli: 0, profileSeed: 0 };
+    return {
+      calls,
+      cli: () => {
+        calls.cli++;
+        return false;
+      },
+      profileSeed: () => {
+        calls.profileSeed++;
+        return "copilot-cli" as const;
+      },
+    };
+  }
+
+  test("getting-started mode: thunks run and their values flow through", () => {
+    const t = countingThunks();
+    const p = computeGettingStarted(
+      true,
+      ROOT,
+      false,
+      fullyScaffolded(),
+      {},
+      undefined,
+      undefined,
+      undefined,
+      t.cli,
+      t.profileSeed,
+    );
+    assert.strictEqual(p.mode, "getting-started");
+    assert.strictEqual(t.calls.cli, 1);
+    assert.strictEqual(t.calls.profileSeed, 1);
+    assert.strictEqual(p.copilotCliPresent, false);
+    assert.strictEqual(p.transportProfileSeed, "copilot-cli");
+  });
+
+  test("list mode: thunks never run; quiet defaults ship", () => {
+    const t = countingThunks();
+    const p = computeGettingStarted(
+      true,
+      ROOT,
+      true,
+      fullyScaffolded(),
+      {},
+      undefined,
+      undefined,
+      undefined,
+      t.cli,
+      t.profileSeed,
+    );
+    assert.strictEqual(p.mode, "list");
+    assert.strictEqual(t.calls.cli, 0);
+    assert.strictEqual(t.calls.profileSeed, 0);
+    assert.strictEqual(p.copilotCliPresent, true);
+    assert.strictEqual(p.transportProfileSeed, null);
+  });
+
+  test("no-folder mode: thunks never run; quiet defaults ship", () => {
+    const t = countingThunks();
+    const p = computeGettingStarted(
+      false,
+      undefined,
+      false,
+      fullyScaffolded(),
+      {},
+      undefined,
+      undefined,
+      undefined,
+      t.cli,
+      t.profileSeed,
+    );
+    assert.strictEqual(p.mode, "no-folder");
+    assert.strictEqual(t.calls.cli, 0);
+    assert.strictEqual(t.calls.profileSeed, 0);
+    assert.strictEqual(p.copilotCliPresent, true);
+    assert.strictEqual(p.transportProfileSeed, null);
+  });
+
+  test("omitted thunks yield the quiet defaults in getting-started mode", () => {
+    const p = computeGettingStarted(true, ROOT, false, fullyScaffolded());
+    assert.strictEqual(p.mode, "getting-started");
+    assert.strictEqual(p.copilotCliPresent, true);
+    assert.strictEqual(p.transportProfileSeed, null);
   });
 });

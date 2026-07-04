@@ -92,6 +92,8 @@ import {
   resolveDurableTier,
 } from "../utils/tierMarkerStore";
 import { probePythonPresence } from "../utils/pythonInterpreter";
+// Set 079 Session 1 (Feature 1): the Copilot-CLI presence probe.
+import { probeCopilotCliPresence } from "../utils/copilotCli";
 // Set 060 Session 2: the form's action handlers (D4/D5/D7).
 import {
   GettingStartedHandlers,
@@ -585,6 +587,12 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // Set 077 S3 (A10): the Python-presence probe (explicit setting →
       // workspace venv → PATH scan). Same getting-started-only gating.
       (root) => probePythonPresence(root),
+      // Set 079 S1 (Feature 1): the Copilot-CLI presence probe (explicit
+      // copilotCliPath setting → PATH). Same getting-started-only gating.
+      // The seat-profile seed thunk is deliberately omitted — the durable
+      // source (the scaffold's transport.profile write) lands in Session
+      // 2, so transportProfileSeed stays null until then.
+      (root) => probeCopilotCliPresence(root),
     );
   }
 

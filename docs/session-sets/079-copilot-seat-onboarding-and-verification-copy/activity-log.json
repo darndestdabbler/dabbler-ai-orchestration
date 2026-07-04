@@ -1,0 +1,80 @@
+{
+  "sessionSetName": "079-copilot-seat-onboarding-and-verification-copy",
+  "createdDate": "2026-07-04T17:58:48.807644-04:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "s1.probe",
+      "dateTime": "2026-07-04T17:58:48.807644-04:00",
+      "description": "Added src/utils/copilotCli.ts (probeCopilotCliPresenceCore mirrors probePythonPresenceCore: explicit dabblerSessionSets.copilotCliPath setting decides alone -> copilot on PATH, .exe-only on win32 to match the catalog module's shell=False subprocess semantics); wired resolveCopilotCliPresent thunk + copilotCliPresent payload flag into computeGettingStarted (getting-started-mode gated, quiet true default) and CustomSessionSetsView; contributed the copilotCliPath setting.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.radio",
+      "dateTime": "2026-07-04T17:58:48.808636-04:00",
+      "description": "Added transportProfileBlockHtml (Full-only, omitted on Lightweight - the budgetBlockHtml conditional-render pattern) with api/copilot-cli radios, api default-checked; placed between the tier radios and the budget block; client.js change listener re-renders on flip (profileDirty). D6 env key warning additionally suppressed while copilot-cli is selected (the keyless target audience must not be told to set DABBLER_* keys) - judgment call recorded for verification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "s1.persistence",
+      "dateTime": "2026-07-04T17:58:48.808636-04:00",
+      "description": "Extended gsState/persistGsState/restoreGsState with the seat-profile family (transportProfile default api, profileDirty, lastProfileSeed) using the exact tier/mode seed-dirty-reload precedence; payload gained transportProfileSeed (host resolver deliberately omitted until Session 2 wires the durable transport.profile write - seed is null); client.js seed tuple extended (lastSeedProfile). Copilot-missing warning (copilotWarningHtml, data-gs-warning=copilot) renders hidden inside the block, visible only when copilot selected AND probe failed; absent payload flag fails quiet.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "s1.tests",
+      "dateTime": "2026-07-04T18:07:04.065649-04:00",
+      "description": "Layer-2 tests authored via routed test-generation (gemini-pro, $0.086) and adapted: copilotCli.test.ts (13 probe-core cases), 4 new gettingStartedHtml suites (block render, warning, D6 suppression, seat-profile seed precedence), computeGettingStarted thunk gating suite; existing payload/defaults assertions updated. 1133 passing, tsc clean.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "costUsd": 0.0864,
+          "inputTokens": 23681,
+          "outputTokens": 5682
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "s1.review",
+      "dateTime": "2026-07-04T18:10:12.701397-04:00",
+      "description": "Routed code-review (opus, $0.334): generator found no blocking issues; cross-provider verifier (gpt-5-4) returned ISSUES_FOUND with one Major on the explicit-.cmd probe path. Adjudicated with two empirical subprocess runs: the prescribed fix (reject explicit .cmd) was wrong (spawn genuinely executes explicit .cmd), but the underlying comment overclaim + test gap were real and fixed. record_adjudication written (context-gap / accept-dismissal).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "opus",
+          "taskType": "code-review",
+          "costUsd": 0.3339
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "s1.verification",
+      "dateTime": "2026-07-04T18:22:25.876275-04:00",
+      "description": "Gated routed session-verification (gate verdict REQUIRED: blast-radius, breadth, build-ci-config). Raw output saved to s1-verification.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.192225,
+          "inputTokens": 17514,
+          "outputTokens": 9896
+        }
+      ]
+    }
+  ]
+}

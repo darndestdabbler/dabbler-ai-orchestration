@@ -70,19 +70,23 @@
     null,
     null,
     null,
+    null,
   );
-  // The (rootId, tierSeed, verificationModeSeed) tuple last applied this
-  // script-lifetime. Sentinels (not null) so the first getting-started
-  // snapshot always seeds; a later snapshot whose rootId OR either seed
-  // differs re-runs the restore — the once-per-load boolean missed a
-  // mid-life root switch (S077-S2-V1-001) and a rootId-only key missed a
-  // same-root seed change, e.g. the marker written by a scaffold action
-  // while the webview stays alive (S077-S2-V1-002, round 2). Set 077 S3:
-  // the verification-mode marker seed joins the tuple with identical
-  // semantics.
+  // The (rootId, tierSeed, verificationModeSeed, transportProfileSeed)
+  // tuple last applied this script-lifetime. Sentinels (not null) so the
+  // first getting-started snapshot always seeds; a later snapshot whose
+  // rootId OR any seed differs re-runs the restore — the once-per-load
+  // boolean missed a mid-life root switch (S077-S2-V1-001) and a
+  // rootId-only key missed a same-root seed change, e.g. the marker
+  // written by a scaffold action while the webview stays alive
+  // (S077-S2-V1-002, round 2). Set 077 S3: the verification-mode marker
+  // seed joins the tuple with identical semantics. Set 079 S1: the
+  // seat-profile seed joins too (null from the host until Session 2
+  // wires the durable source).
   let lastSeedRootId = { unseeded: true };
   let lastSeedValue = { unseeded: true };
   let lastSeedMode = { unseeded: true };
+  let lastSeedProfile = { unseeded: true };
   // Merge-preserving write (S2 review, Minor 2): never clobber other
   // keys a future consumer may persist alongside gsState.
   function persistGsState() {
@@ -99,6 +103,9 @@
           verificationMode: gsState.verificationMode,
           modeDirty: gsState.modeDirty,
           lastModeSeed: gsState.lastModeSeed,
+          transportProfile: gsState.transportProfile,
+          profileDirty: gsState.profileDirty,
+          lastProfileSeed: gsState.lastProfileSeed,
           rootId: gsState.rootId,
         },
       }),
@@ -186,16 +193,19 @@
         gs.mode === "getting-started" &&
         (lastSeedRootId !== gs.rootId ||
           lastSeedValue !== gs.tierSeed ||
-          lastSeedMode !== gs.verificationModeSeed)
+          lastSeedMode !== gs.verificationModeSeed ||
+          lastSeedProfile !== gs.transportProfileSeed)
       ) {
         lastSeedRootId = gs.rootId;
         lastSeedValue = gs.tierSeed;
         lastSeedMode = gs.verificationModeSeed;
+        lastSeedProfile = gs.transportProfileSeed;
         gsState = gsHtml.restoreGsState(
           gsState,
           gs.tierSeed,
           gs.rootId,
           gs.verificationModeSeed,
+          gs.transportProfileSeed,
         );
         persistGsState();
       }
@@ -274,6 +284,24 @@
         if (input.checked) gsState.zeroMethod = input.value;
         persistGsState();
         showBudgetError(null);
+      });
+    });
+    // Set 079 S1 (Feature 1): the Full-only seat-profile radios. A flip
+    // is explicit operator intent (profileDirty), so later seeds never
+    // silently revert it — the tierDirty contract. Unlike the
+    // verification-mode radios this DOES re-render: the missing-CLI
+    // warning and the D6 key warning both key on the selection, and the
+    // re-render recomputes their visibility in one pass (radios carry no
+    // typing focus to lose — the budget-input concern doesn't apply).
+    Array.from(root.querySelectorAll('input[name="gs-transport-profile"]')).forEach(function (input) {
+      input.addEventListener("change", function () {
+        if (input.checked) {
+          gsState.transportProfile =
+            input.value === "copilot-cli" ? "copilot-cli" : "api";
+          gsState.profileDirty = true;
+        }
+        persistGsState();
+        render();
       });
     });
     // Set 077 S3 (Feature 2): the Lightweight-only verification-mode

@@ -102,6 +102,36 @@
     "Then reload the VS Code window (changes made after launch are not " +
     "visible until you reload).";
 
+  // Set 079 S1 (Feature 1): the Full-tier seat-profile sub-choice — how
+  // Full's routed calls dispatch. "api" keeps the current direct
+  // provider-key path (the unchanged default); "copilot-cli" is Set
+  // 078's GitHub Copilot seat profile (transport.profile: copilot-cli),
+  // which needs no DABBLER_* keys. Mirrors the Lightweight
+  // verification-mode sub-choice in UI shape only — the Build wiring
+  // (Sessions 2-3) is materially different.
+  var TRANSPORT_PROFILE_LABEL_TEXT = "Provider access (how routed calls run)";
+  var TRANSPORT_PROFILE_API_TEXT =
+    "Direct provider API keys — calls use your DABBLER_* provider API " +
+    "keys (the default).";
+  var TRANSPORT_PROFILE_COPILOT_TEXT =
+    "GitHub Copilot CLI seat — calls run through your Copilot " +
+    "subscription's command-line tool; no provider API keys needed.";
+
+  // Set 079 S1: the missing-Copilot-CLI warning inside the seat-profile
+  // block. Unlike the tier-independent Python warning it keys on the
+  // sub-choice: visible only while the Copilot option is selected AND
+  // the host's probe found no copilot executable. Same remedy shape as
+  // the Python warning (install, or point the setting at an executable,
+  // then reload — the host environment is captured at launch).
+  var COPILOT_WARNING_TEXT =
+    "The GitHub Copilot CLI was not found on this machine. The Copilot " +
+    "seat option runs AI calls through the copilot command, which must " +
+    "be installed and on PATH. Install the GitHub Copilot CLI (see the " +
+    "Copilot CLI guide at docs.github.com/copilot), or set the " +
+    "dabblerSessionSets.copilotCliPath setting to the installed copilot " +
+    "executable. Then reload the VS Code window (changes made after " +
+    "launch are not visible until you reload).";
+
   /**
    * Parse the raw budget input. Required dollar amount: numeric and
    * >= 0; empty / non-numeric / negative are rejected with the inline
@@ -174,10 +204,16 @@
    * `modeDirty` / `lastModeSeed` protect a post-seed explicit flip
    * against the same seed value only).
    *
+   * Set 079 S1 (Feature 1): `transportProfile` — the Full-tier
+   * seat-profile sub-choice ("api" default | "copilot-cli") — joins the
+   * family the same way (`profileSeed` is the durable seat-profile
+   * resolution the host will wire in Session 2; `profileDirty` /
+   * `lastProfileSeed` mirror the mode fields exactly).
+   *
    * Pure so the Layer-2 suite replays teardown/re-init without a
    * webview.
    */
-  function restoreGsState(persisted, tierSeed, rootId, modeSeed) {
+  function restoreGsState(persisted, tierSeed, rootId, modeSeed, profileSeed) {
     var p = persisted && typeof persisted === "object" ? persisted : {};
     var persistedRootId = typeof p.rootId === "string" ? p.rootId : null;
     if (
@@ -212,6 +248,15 @@
         p.lastModeSeed === "out-of-band-or-none"
           ? p.lastModeSeed
           : null,
+      transportProfile:
+        p.transportProfile === "copilot-cli" || p.transportProfile === "api"
+          ? p.transportProfile
+          : "api",
+      profileDirty: p.profileDirty === true,
+      lastProfileSeed:
+        p.lastProfileSeed === "api" || p.lastProfileSeed === "copilot-cli"
+          ? p.lastProfileSeed
+          : null,
       rootId: typeof rootId === "string" ? rootId : persistedRootId,
     };
     if (tierSeed === "full" || tierSeed === "lightweight") {
@@ -234,6 +279,15 @@
       }
       if (state.verificationMode === modeSeed) state.modeDirty = false;
       state.lastModeSeed = modeSeed;
+    }
+    if (profileSeed === "api" || profileSeed === "copilot-cli") {
+      var profileSeedChanged = state.lastProfileSeed !== profileSeed;
+      if (!state.profileDirty || profileSeedChanged) {
+        state.transportProfile = profileSeed;
+        state.profileDirty = false;
+      }
+      if (state.transportProfile === profileSeed) state.profileDirty = false;
+      state.lastProfileSeed = profileSeed;
     }
     return state;
   }
@@ -342,6 +396,58 @@
   }
 
   /**
+   * Set 079 S1 (Feature 1): the missing-Copilot-CLI warning element.
+   * Rendered hidden (not omitted) inside the seat-profile block so the
+   * Full-tier DOM structure is stable across renders. `visible` =
+   * (the Copilot sub-choice is selected AND gs.copilotCliPresent ===
+   * false); an absent payload flag (older host) reads as present, so
+   * the warning fails quiet, never falsely loud.
+   */
+  function copilotWarningHtml(visible) {
+    return (
+      '<div class="gs-warning" data-gs-warning="copilot" role="alert"' +
+      (visible ? "" : " hidden") +
+      ">" +
+      escHtml(COPILOT_WARNING_TEXT) +
+      "</div>"
+    );
+  }
+
+  /**
+   * Set 079 S1 (Feature 1): the Full-tier seat-profile block — the
+   * second radio group under the Full tier radio, mirroring
+   * {@link verificationModeBlockHtml}'s conditional-render shape: on
+   * LIGHTWEIGHT the block is OMITTED from the DOM entirely (tier flips
+   * re-render the form surface, so there is no visibility flip to
+   * manage). The default radio is "api" (direct provider keys),
+   * matching Set 078's unchanged transport.profile default. The
+   * missing-CLI warning renders inside the block, hidden unless the
+   * Copilot option is selected and the probe failed
+   * (`copilotCliPresent === false`).
+   */
+  function transportProfileBlockHtml(controls, copilotCliPresent) {
+    if (controls.tier === "lightweight") return "";
+    var copilotChecked =
+      controls.transportProfile === "copilot-cli" ? " checked" : "";
+    var apiChecked = copilotChecked ? "" : " checked";
+    var warningVisible = !!copilotChecked && copilotCliPresent === false;
+    return (
+      '<div class="gs-transport-profile" data-gs-transport-profile>' +
+        '<div class="gs-transport-profile-label">' +
+          escHtml(TRANSPORT_PROFILE_LABEL_TEXT) +
+        "</div>" +
+        '<label class="gs-radio"><input type="radio" name="gs-transport-profile"' +
+          ' value="api"' + apiChecked + "> " +
+          escHtml(TRANSPORT_PROFILE_API_TEXT) + "</label>" +
+        '<label class="gs-radio"><input type="radio" name="gs-transport-profile"' +
+          ' value="copilot-cli"' + copilotChecked + "> " +
+          escHtml(TRANSPORT_PROFILE_COPILOT_TEXT) + "</label>" +
+        copilotWarningHtml(warningVisible) +
+      "</div>"
+    );
+  }
+
+  /**
    * The A10 missing-Python warning element (Set 077 S3). Like the D6
    * warning it is rendered hidden (not omitted) so the DOM structure is
    * stable across renders; unlike D6 it is tier-independent — both tiers
@@ -406,8 +512,14 @@
     var fullChecked = controls.tier === "lightweight" ? "" : " checked";
     var lightChecked = controls.tier === "lightweight" ? " checked" : "";
     var parallelChecked = controls.parallel ? " checked" : "";
+    // Set 079 S1: the D6 key warning is Full-via-API guidance — while
+    // the Copilot seat sub-choice is selected it would tell the exact
+    // keyless audience the option exists for to go set DABBLER_* keys,
+    // so it stays hidden there (the Copilot path needs no keys).
     var envWarningVisible =
-      controls.tier !== "lightweight" && gs.providerKeyPresent === false;
+      controls.tier !== "lightweight" &&
+      controls.transportProfile !== "copilot-cli" &&
+      gs.providerKeyPresent === false;
     // Set 077 S3 (A10): the missing-Python warning leads step 1 — it is
     // the prerequisite everything below it depends on. `pythonPresent`
     // absent from the payload (an older host) reads as "present" so the
@@ -422,6 +534,7 @@
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="full"' + fullChecked + '> Full</label>' +
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="lightweight"' + lightChecked + '> Lightweight</label>' +
       '</div>' +
+      transportProfileBlockHtml(controls, gs.copilotCliPresent) +
       budgetBlockHtml(controls) +
       verificationModeBlockHtml(controls) +
       '<button class="gs-button" type="button" data-gs-action="build-structure">' +
@@ -472,7 +585,9 @@
     worktreeNoteHtml: worktreeNoteHtml,
     budgetBlockHtml: budgetBlockHtml,
     verificationModeBlockHtml: verificationModeBlockHtml,
+    transportProfileBlockHtml: transportProfileBlockHtml,
     pythonWarningHtml: pythonWarningHtml,
+    copilotWarningHtml: copilotWarningHtml,
     parseBudgetInput: parseBudgetInput,
     validateBudgetControls: validateBudgetControls,
     ENV_WARNING_TEXT: ENV_WARNING_TEXT,
@@ -484,5 +599,9 @@
     VERIFICATION_MODE_OUT_OF_BAND_TEXT: VERIFICATION_MODE_OUT_OF_BAND_TEXT,
     VERIFICATION_MODE_DEDICATED_TEXT: VERIFICATION_MODE_DEDICATED_TEXT,
     PYTHON_WARNING_TEXT: PYTHON_WARNING_TEXT,
+    TRANSPORT_PROFILE_LABEL_TEXT: TRANSPORT_PROFILE_LABEL_TEXT,
+    TRANSPORT_PROFILE_API_TEXT: TRANSPORT_PROFILE_API_TEXT,
+    TRANSPORT_PROFILE_COPILOT_TEXT: TRANSPORT_PROFILE_COPILOT_TEXT,
+    COPILOT_WARNING_TEXT: COPILOT_WARNING_TEXT,
   };
 });

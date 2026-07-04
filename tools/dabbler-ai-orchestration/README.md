@@ -82,14 +82,24 @@ step-by-step instructions in the editor:
 ![The Getting Started form in the Session Set Explorer: build project structure with a Full/Lightweight tier choice, create or import a project plan, build session sets](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
 
 1. **Build project structure** — pick your tier (Full or
-   Lightweight, the cost/attention tradeoff described above) and the
-   form scaffolds everything: the `.venv` with the router package,
+   Lightweight, the cost/attention tradeoff described above). Choosing
+   Lightweight surfaces a second choice: **dedicated verification
+   sessions** (structured verification sessions run on a different AI
+   engine or provider, with a close-out gate) or **out-of-band or
+   none** (copy a review prompt into a second AI assistant and record
+   its verdict by hand — the default). Both choices persist through a
+   window reload, so revisiting the form never silently reverts them.
+   The form scaffolds everything: the `.venv` with the router package,
    the AI-agent instruction files, and the `docs/session-sets/`
    home. On the Full tier the form also asks for your verification
    **budget / NTE cap** (saved to `ai_router/budget.yaml`; a `$0`
    budget asks you to pick manual-via-other-engine or skipped
    verification explicitly) and warns inline when no provider API
-   key is visible.
+   key is visible. A step-1 warning also appears if no Python
+   interpreter resolves (with install guidance); the Build action
+   checks for one before writing anything, so a missing interpreter
+   fails with a friendly explainer instead of a raw error, leaving no
+   partial setup behind.
 2. **Create or import a project plan** — import an existing
    `project-plan.md`, or copy a planning prompt and let your AI
    agent draft the plan with you.
@@ -179,14 +189,20 @@ Sign-up links and a full prerequisites checklist live in the
   Migrate to v4 schema, Cancel set, and Restore set. The
   right-click menu honors light/dark theme natively and dismisses
   on Escape or click-outside.
-- **Copyable review prompts.** Four `Dabbler: Copy …` commands
-  (also under Copy Eval ▸ in the right-click menu) author review
-  prompts that reference your session-set artifacts by path rather
-  than embedding their contents, then write to the clipboard. Paste
-  into any path-aware AI chat (Claude Code, Codex, Cline, Cursor,
-  etc.) and the agent reads the files itself. Optional per-repo
-  files at `docs/review-criteria/{spec,session,set}.md` override
-  the default review instructions if present.
+- **Copyable review prompts that complete themselves.** Four
+  `Dabbler: Copy …` commands (also under Copy Eval ▸ in the
+  right-click menu) author review prompts that reference your
+  session-set artifacts by path rather than embedding their contents,
+  then write to the clipboard. Paste into any path-aware AI chat
+  (Claude Code, Codex, Cline, Cursor, etc.) on a *different* provider
+  than the one that did the work — the prompt points it at the
+  canonical `docs/dabbler/cross-provider-verification.md` instructions
+  (ensure-written into every workspace automatically) and its one
+  non-negotiable closing instruction: the reviewing engine itself
+  writes its verdict into `external-verification.md`, so a verdict
+  that only exists in the chat doesn't count. Optional per-repo files
+  at `docs/review-criteria/{spec,session,set}.md` override the
+  default review instructions if present.
 - **Lightweight tier (no API spend).** Run
   `python -m ai_router.start_session … --no-router`, or set
   `tier: lightweight` in `spec.md`, or `DABBLER_NO_ROUTER=1` in
@@ -212,7 +228,15 @@ Sign-up links and a full prerequisites checklist live in the
   spec-seed rewrite on not-started sets; a recorded, gated
   transition through the `ai_router` blessed writer on completed
   sets). Verified sets stay quiet — the verdict lives in the
-  fraction tooltip, and no positive badge is shown.
+  fraction tooltip, and no positive badge is shown. A row that owes
+  verification or remediation says so in words in its description,
+  and its **Start Next Session** copy action auto-routes to the
+  right prompt (verification kickoff or remediation handoff) instead
+  of a work-session prompt that would just be refused. Separately,
+  `start_session` itself prints a loud, non-blocking banner naming
+  any owed verification the moment you start your next session, on
+  both tiers — so an owed set is never silently forgotten between
+  sessions.
 - **Schema-v4 migrator + prerequisites.** Set 047 introduced the v4
   `session-state.json` shape where every per-session lifecycle field
   (orchestrator, startedAt, completedAt, verdict) lives in a

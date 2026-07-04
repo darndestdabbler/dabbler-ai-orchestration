@@ -1,8 +1,8 @@
 {
   "ProjectName": "Dabbler AI Orchestration",
   "ReleaseLabel": "Extension 0.34.0 + ai_router 0.27.0 (Set 077 'Lightweight Tier UX and Copilot Hardening')",
-  "DocumentDate": "7/4/2026, 3:27:34 AM",
-  "Notes": "Ad-hoc per-set UAT for Set 077 gating BOTH artifacts of the coordinated release: extension 0.34.0 (tier truth chain, three-way Getting Started choice + Python prerequisite, self-completing out-of-band verification prompts, owed-verification banner, Mode-B auto-routing/skew message) and dabbler-ai-router 0.27.0 (resolved-runtime-mode close gate, external-verification round parser incl. WAIVED, Mode-B engine-or-provider gate + start-time same-pair refusal, A12 backfill). UAT runs against a LOCALLY BUILT VSIX ONLY (`npx vsce package`, then Install from VSIX) -- never a published build (the Set 058 lesson). DESIGNED FOR A SHORT OPERATOR PASS (the Set 062 precedent, ~20-30 min): every mechanically-coverable behavior was pre-verified green at the S5 close against this baseline -- pytest 2372 passed / 5 skipped; TS unit (mocha, vscode-stub) 1095 passing; Playwright Layer 3 19/19. Those suites are context only and appear in ProgrammaticVerification; they run on stubs/headless, so the LIVE walk below is what confirms real webview/scaffold/gate behavior. Explorer-row items use the disposable fixture workspace from `npm run make-uat-workspace` (the generated copy pins dabblerSessionSets.pythonPath to the repo .venv; mutating actions are safe -- the copy is throwaway; use the view refresh button if the tree does not auto-refresh). Scaffold walks each use a FRESH EMPTY FOLDER (one per walk) so the durable .dabbler/ markers and generated docs are written from nothing. Row-state references are the Set 077 fixtures documented in test-fixtures/uat-matrix/README.md.",
+  "DocumentDate": "7/4/2026, 3:14:02 PM",
+  "Notes": "Ad-hoc per-set UAT for Set 077 gating BOTH artifacts of the coordinated release: extension 0.34.0 (tier truth chain, three-way Getting Started choice + Python prerequisite, self-completing out-of-band verification prompts, owed-verification banner, Mode-B auto-routing/skew message) and dabbler-ai-router 0.27.0 (resolved-runtime-mode close gate, external-verification round parser incl. WAIVED, Mode-B engine-or-provider gate + start-time same-pair refusal, A12 backfill). REWRITTEN (2026-07-04) to the Set 078 authoring bar after the operator suspended the first walk mid-session over unclear steps ('I couldn't figure out how to run this / I don't see a pending verification banner'): every HumanAction below is now a literal, copy-pasteable command or exact UI element label (never a paraphrase like 'open the form and pick tier choice 1'), every Expectation is a literal string/value to diff against (never 'confirm it looks right'), and every literal string was re-grounded against CURRENT source during this rewrite -- two claims in the original checklist had already drifted from source (Walk 3's button label, and a false claim that the auto-opened doc's callout differs between dedicated-sessions and out-of-band-or-none; it does not -- the callout is tier-only) and are corrected below. UAT runs against a LOCALLY BUILT VSIX ONLY (`npx vsce package`, then Install from VSIX) -- never a published build (the Set 058 lesson). Walks 8, 10, 11, and 12 (the pending-verification banner and the Mode-B start-time gate) are pure Python/CLI features with no webview surface at all; each was re-run live by the orchestrator just now in a disposable scratch fixture (build recipe inlined in the walk) and the Expectation quotes the exact, freshly-captured output byte-for-byte -- this replaces the old checklist's dependence on a fragile multi-walk VS Code scaffold chain for a feature that never needed VS Code to reproduce. Walks 1-7, 9, 13, 14 involve the Getting Started webview and the Session Set Explorer, which cannot be driven headless from this environment; for those, every literal string (button labels, warning copy, marker values, prompt text) was re-verified against current source moments ago, and every Layer 2 (mocha, vscode-stub) test that pins the same behavior was re-run fresh (not cited from memory) -- exact pass counts and output are quoted in each ProgrammaticVerification. What remains genuinely operator-only in those walks is named explicitly per walk (real webview teardown/reload persistence, real right-click menu navigation, real clipboard/status-bar behavior) -- the same honest split as the Set 058 lesson this Notes block already carried, just now enforced walk-by-walk rather than asserted once at the top. Explorer-row items use the disposable fixture workspace from `npm run make-uat-workspace` (the generated copy pins dabblerSessionSets.pythonPath to the repo .venv; mutating actions are safe -- the copy is throwaway; use the view refresh button if the tree does not auto-refresh). Scaffold walks (2-7) each use a FRESH EMPTY FOLDER (one per walk) so the durable .dabbler/ markers and generated docs are written from nothing. Row-state references are the Set 077 fixtures documented in tools/dabbler-ai-orchestration/test-fixtures/uat-matrix/README.md.",
   "Configuration": {
     "reviewWidths": [
       "6%",
@@ -15,131 +15,134 @@
   "Review": [
     {
       "FunctionalArea": "Session Set Explorer",
-      "Subarea": "Operator walk 1 — make-uat-workspace matrix sweep",
-      "ItemLabel": "Owed-state rows read 'verification owed' / 'remediation owed' in words; the N/M+ fraction fix shows the corrected count",
-      "HumanAction": "Run `npm run make-uat-workspace`, open the generated uat-matrix workspace, and inspect the hello-world-lightweight rows in the Session Set Explorer. Confirm: (a) 005-shout-the-greeting shows the description text 'verification owed' (not only the 'v+' glyph) with fraction '2/2+'; (b) 007-echo-the-greeting (new Set 077 row: verification round returned ISSUES_FOUND, remediation session in flight) shows 'remediation owed' with fraction '3/4' and NO '+' (a typed session already grew the count); (c) 004-add-a-farewell reads '1/2+' (denominator can still grow) and 006-whisper-mode reads plain '3/3' with no marker (quiet is success); (d) 003-greet-with-note is quiet -- the out-of-band record exists, so no 'v?' nag.",
-      "Expectation": "Owed states are legible in plain words ('verification owed' / 'remediation owed') as well as the compact marker. The '+' suffix appears exactly while the denominator can still grow (004, 005) and disappears once a typed session is appended (006, 007) -- progressText and the rendered fraction agree. Quiet rows (003, 006) stay quiet.",
-      "ProgrammaticVerification": "uatMatrixFixtures.test.ts (16 tests incl. the new 007 remediation-owed row) drives every fixture row through the real readSessionSets scan and pins these exact signals; tierLegibility.test.ts pins the 'verification owed'/'remediation owed'/'v?'/'v+' strings and the plusFraction rule. All run on a stub, so live webview rendering is the operator portion (Set 058 lesson).",
+      "Subarea": "Walk 1 -- make-uat-workspace matrix sweep",
+      "ItemLabel": "Owed-state rows read 'verification owed' / 'remediation owed' in words; N/M+ fraction and quiet rows behave per the fixture matrix",
+      "HumanAction": "Run `npm run make-uat-workspace` (from tools/dabbler-ai-orchestration), open the printed uat-matrix.code-workspace, and inspect these rows under hello-world-lightweight: 003-greet-with-note, 004-add-a-farewell, 005-shout-the-greeting, 006-whisper-mode, 007-echo-the-greeting.",
+      "Expectation": "005-shout-the-greeting: row description contains the words 'verification owed', fraction reads 2/2+ (the '+' suffix present -- the denominator can still grow). 007-echo-the-greeting: row description contains the words 'remediation owed', fraction reads 3/4 with NO '+' (a typed session already grew the count, so the denominator is fixed). 004-add-a-farewell: fraction reads 1/2+ (still growable), no verification marker. 003-greet-with-note: no verification marker at all and no nag -- an out-of-band record already exists, so the row stays quiet. 006-whisper-mode: fraction reads plain 3/3, no marker -- a completed VERIFIED verification is quiet by design (quiet is success, not absence of coverage).",
+      "ProgrammaticVerification": "Orchestrator ran `npm run test:unit -- --grep \"uat-matrix\"` fresh just now: 16/16 passing, including the exact per-row assertions above (uatMatrixFixtures.test.ts, e.g. '005 Mode B work-complete: 2/2 with the + suffix AND v+ (verification owed)', '007 Mode B remediation in flight: remediation owed'). Also ran `npm run test:unit -- --grep \"tierLegibility\"`-adjacent suites: 26/26 passing, pinning the row-text/marker/fraction rules in tools/dabbler-ai-orchestration/src/utils/tierLegibility.ts and src/providers/SessionSetsModel.ts:195-196 ('verification owed' / 'remediation owed' literal strings). Both suites drive the real readSessionSets scan against the committed fixture tree; the rendered webview text itself (as opposed to the derived data) is the operator portion.",
       "Passes": true
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 2 — Full-tier fresh scaffold",
+      "Subarea": "Walk 2 -- Full-tier fresh scaffold",
       "ItemLabel": "Full choice survives hide/re-expand and window reload; markers, decomposition prompt, and auto-opened doc all say Full",
-      "HumanAction": "Open a FRESH EMPTY FOLDER. Open the Session Sets Getting Started form, pick tier choice 1 (Full -- router on, automatic cross-provider verification). Collapse/hide the view and re-expand it; then run 'Developer: Reload Window'. Re-open the form and confirm the Full radio is STILL selected (no revert to a default, no re-shown warning over your pick). Click the step-1 'Build project structure' button. Then inspect: (a) `.dabbler/tier` contains the single word `full`; (b) `.dabbler/verification-mode` is present (Full's recorded mode); (c) click the step-3 'Copy prompt to build session sets' button and confirm the decomposition prompt declares the Full tier and does NOT invite a fabricated 'per the operator's selection' rationale; (d) the auto-opened getting-started doc leads with a 'you chose Full' callout / Full-first content.",
-      "Expectation": "Tier choice is durable across teardown AND reload (the tier-leak fix). `.dabbler/tier` = `full`, sibling verification-mode marker written by the same scaffold path. Decomposition prompt renders the TRUE tier. Auto-opened doc greets a Full operator with Full content.",
-      "ProgrammaticVerification": "tierMarkerStore.test.ts (durable tier + verification-mode markers, read precedence, write-through), sessionGenPrompt.test.ts (true-tier exemplar, no fabricated rationale), gettingStartedHtml.test.ts + gettingStartedActions.test.ts (three-way render + build-structure rider), gettingStartedDoc.test.ts (tier-aware auto-opened doc). Stub-only; live form state after reload is the operator portion.",
+      "HumanAction": "Open a FRESH EMPTY FOLDER. Open the Session Set Explorer's Getting Started form. Click the radio button labeled exactly \"Full\". Collapse/hide the view and re-expand it; then run 'Developer: Reload Window'. Re-open the form and confirm the \"Full\" radio is still checked (not reverted, no re-shown warning). Click the button labeled exactly \"Build project structure\". Then: (a) open `.dabbler/tier` -- it must contain the single word `full`; (b) open `.dabbler/verification-mode` -- it must contain `out-of-band-or-none` (Full always writes this default marker, even though Full has no verification-mode UI of its own); (c) click the button labeled exactly \"Copy prompt to build session sets\" and paste the clipboard somewhere readable; (d) look at the auto-opened getting-started doc's very first blockquote.",
+      "Expectation": "`.dabbler/tier` contains exactly `full` (plus trailing newline). `.dabbler/verification-mode` contains exactly `out-of-band-or-none`. The copied prompt contains the literal sentence \"The operator selected the **full** tier for this project — author each new set with `tier: full`\" and an exemplar spec block containing `tier: full`. The auto-opened doc's first blockquote reads exactly: \"> **Your project is set up for the Full tier** (recorded in `.dabbler/tier`). Step 1's tier descriptions below cover both options for reference — the **Lightweight-tier** setup notes do not apply to this project. To change tiers, right-click a session set in the Session Set Explorer and use **Switch Tier…**.\"",
+      "ProgrammaticVerification": "Orchestrator ran `npm run test:unit -- --grep \"restoreGsState\"` fresh just now: 18/18 passing -- covers the exact seed/dirty/reload precedence contract (e.g. 'a DIRTY persisted radio (explicit operator flip) beats the SAME seed', 'Set 076 replay: a Lightweight pick never snaps back to Full') in gettingStartedHtml.js:180-239. Also ran the sessionGenPrompt suite (`npm run test:unit -- --grep \"buildSessionGenPrompt\"`): 20/20 passing, pinning the exact prompt wording quoted above (src/wizard/sessionGenPrompt.ts:164-207). The doc callout string is a pure function (gettingStartedDoc.ts:71-81, `tierCalloutMarkdown`) quoted verbatim from current source. Marker write-through is unconditional per gitScaffold.ts:114-131. Live reload persistence and real doc rendering in an actual VS Code window are the operator portion -- Layer 2 runs on a vscode-stub with no real webview host.",
       "Passes": true
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 3 — Lightweight + dedicated verification fresh scaffold",
-      "ItemLabel": "Lightweight/dedicated choice is durable; markers, prompt, and doc reflect dedicated-sessions mode",
-      "HumanAction": "Open a SECOND FRESH EMPTY FOLDER. In the Getting Started form pick tier choice 2 (Lightweight + dedicated verification sessions). Hide/re-expand the view, then 'Developer: Reload Window', re-open the form, and confirm the Lightweight/dedicated radio is still selected (no re-check of Full, no Full-tier warning). Click the step-1 'Build project structure' button. Inspect: (a) `.dabbler/tier` = `lightweight`; (b) `.dabbler/verification-mode` = `dedicated-sessions`; (c) 'Copy Session Set Generation Prompt' renders `tier: lightweight` and seeds `verificationMode: dedicated-sessions`; (d) auto-opened doc leads with the Lightweight/dedicated callout, not Full-first content.",
-      "Expectation": "Choice survives teardown + reload. Both durable markers written (`lightweight` + `dedicated-sessions`) by the same scaffold path. Prompt and doc consume the true two-field contract. No Full-tier leak anywhere.",
-      "ProgrammaticVerification": "tierMarkerStore.test.ts (two-field durable contract), consumerBootstrap.test.ts (structureOnlyContext verificationMode carry), sessionGenPrompt.test.ts (tier: lightweight exemplar), gettingStartedHtml.test.ts (three-way choice), gettingStartedDoc.test.ts. Stubbed; live durability is the operator portion.",
+      "Subarea": "Walk 3 -- Lightweight + dedicated verification fresh scaffold",
+      "ItemLabel": "Lightweight/dedicated choice is durable; markers and prompt reflect dedicated-sessions mode (doc callout is tier-only, see correction)",
+      "HumanAction": "Open a SECOND FRESH EMPTY FOLDER. Click the radio labeled \"Lightweight\". A second radio group appears labeled \"Verification (per session set)\"; click the option labeled \"Dedicated verification sessions\" (the option whose description reads: structured verification sessions run on a different AI engine or provider, with a close-out gate). Hide/re-expand the view, then 'Developer: Reload Window', re-open the form, and confirm BOTH the Lightweight radio and the Dedicated-verification radio are still checked. Click \"Build project structure\". Inspect: (a) `.dabbler/tier` = `lightweight`; (b) `.dabbler/verification-mode` = `dedicated-sessions`; (c) click \"Copy prompt to build session sets\" and confirm the clipboard contains `tier: lightweight` and the sentence \"The operator selected **dedicated verification sessions** for this project — author each Lightweight set with `verificationMode: dedicated-sessions`\".",
+      "Expectation": "Both markers write through as `lightweight` + `dedicated-sessions`, surviving both the re-expand and the reload. The decomposition prompt seeds `verificationMode: dedicated-sessions` in its exemplar plus the guidance sentence quoted above. CORRECTION from the prior version of this checklist: the auto-opened doc's callout is NOT distinct per verification mode -- `tierCalloutMarkdown(tier)` (gettingStartedDoc.ts:71-81) takes only the tier (`\"full\"` or `\"lightweight\"`), never the verification mode, so this walk's doc callout is byte-identical to Walk 4's. Do not expect separate 'dedicated' vs 'out-of-band' doc copy anywhere -- there isn't any.",
+      "ProgrammaticVerification": "Orchestrator ran the same `restoreGsState` suite fresh (18/18 passing, includes the 'restoreGsState verification-mode seed (Set 077 S3)' sub-suite covering exactly this seed+reload contract for verificationMode) and re-ran `buildSessionGenPrompt` (20/20 passing, including the dedicated-sessions exemplar + guidance-sentence assertions) moments ago. The tier-only nature of `tierCalloutMarkdown` was confirmed by reading its current signature directly (gettingStartedDoc.ts:71), which takes a single `Tier` parameter -- there is no verificationMode parameter to source a distinct callout from.",
       "Passes": true
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 4 — Lightweight + out-of-band/none fresh scaffold",
-      "ItemLabel": "Lightweight/out-of-band choice is durable; markers, prompt, and doc reflect out-of-band-or-none mode",
-      "HumanAction": "Open a THIRD FRESH EMPTY FOLDER. Pick tier choice 3 (Lightweight + out-of-band / none). Hide/re-expand, then 'Developer: Reload Window', re-open the form, confirm choice 3 is still selected. Click the step-1 'Build project structure' button. Inspect: (a) `.dabbler/tier` = `lightweight`; (b) `.dabbler/verification-mode` = `out-of-band-or-none`; (c) the decomposition prompt seeds `verificationMode: out-of-band-or-none`; (d) the generated repo contains `docs/dabbler/cross-provider-verification.md` (the canonical engine-facing instruction doc, ensure-written by scaffold); (e) auto-opened doc leads with the Lightweight/out-of-band callout.",
-      "Expectation": "Choice survives teardown + reload. Markers = `lightweight` + `out-of-band-or-none`. Canonical verification doc is present without a re-bootstrap. Doc greets a Lightweight operator correctly.",
-      "ProgrammaticVerification": "tierMarkerStore.test.ts, consumerBootstrap.test.ts (canonical verification doc ensure-write; verificationMode carry), sessionGenPrompt.test.ts, gettingStartedDoc.test.ts. Stub-only; live scaffold output is the operator portion.",
+      "Subarea": "Walk 4 -- Lightweight + out-of-band/none fresh scaffold",
+      "ItemLabel": "Lightweight/out-of-band choice is durable; markers reflect out-of-band-or-none mode; the canonical verification doc is present (but unconditionally, not specific to this walk -- see correction)",
+      "HumanAction": "Open a THIRD FRESH EMPTY FOLDER. Click \"Lightweight\", then confirm the radio labeled \"Out-of-band or none\" (description: copy a review prompt into a second AI assistant and record its verdict by hand) is already checked by default -- this is the pre-selected option, you should not need to click it. Hide/re-expand, 'Developer: Reload Window', re-open the form, confirm the picks held. Click \"Build project structure\". Inspect: (a) `.dabbler/tier` = `lightweight`; (b) `.dabbler/verification-mode` = `out-of-band-or-none`; (c) confirm `docs/dabbler/cross-provider-verification.md` exists in the generated repo.",
+      "Expectation": "Markers write through as `lightweight` + `out-of-band-or-none`. CORRECTION from the prior version of this checklist: `docs/dabbler/cross-provider-verification.md` is NOT specific to the out-of-band choice -- `CROSS_PROVIDER_VERIFICATION_REL_PATH` (consumerBootstrap.ts:382-386) is written unconditionally by the scaffold's file map on every tier and every verification-mode combination (Full included, dedicated-sessions included), so its presence here confirms the scaffold ran, not that this specific mode was chosen. As in Walk 3, the auto-opened doc's callout is identical to Walk 3's -- tier-only, not mode-specific.",
+      "ProgrammaticVerification": "Orchestrator re-ran the `restoreGsState` suite fresh (18/18 passing) for the seed/dirty/reload contract shared by all three tier-choice walks. The unconditional nature of the cross-provider-verification doc write was confirmed by reading consumerBootstrap.ts's file-map object literals directly (both `renderConsumerBootstrap` at :432-441 and `renderStructureBootstrap` at :484-493 include the same key with no tier/mode branch) -- no dedicated Layer 2 test isolates this specific question, so this is a source-grounded claim, not a freshly-run assertion; flagging that distinction explicitly per this rewrite's own bar.",
       "Passes": true
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 5 — tier-leak stress on a live pick",
+      "Subarea": "Walk 5 -- tier-leak stress on a live pick",
       "ItemLabel": "An explicitly flipped radio (tierDirty) is never silently reverted by a later seed",
-      "HumanAction": "In a fresh folder open the form; the durable seed applies. Explicitly flip the radio to a DIFFERENT tier than the seed (e.g. change Full -> Lightweight/out-of-band), then hide/re-expand the view WITHOUT reloading, then reload the window. Re-open the form.",
-      "Expectation": "Your explicitly flipped choice persists across both the re-expand and the reload -- a later durable seed does NOT overwrite fresh operator intent (the tierDirty refinement). No Full-tier warning re-appears over a Lightweight pick.",
-      "ProgrammaticVerification": "tierMarkerStore.test.ts + gettingStartedActions.test.ts cover seed precedence and the tierDirty 'record-over-seed' rule on the stub; the live setState/getState round-trip across a real window reload is the operator portion (cannot be exercised on the vscode-stub).",
+      "HumanAction": "In a fresh folder (no `.dabbler/tier` written yet) open the Getting Started form -- \"Full\" is checked by default since no durable seed exists. Click the radio labeled \"Lightweight\" (this sets the in-memory `tierDirty` flag and persists it via the webview's own state, without contacting the extension host). Hide/re-expand the view WITHOUT reloading. Then run 'Developer: Reload Window' (a full extension-host + webview restart). Re-open the form.",
+      "Expectation": "The Lightweight pick persists across BOTH the re-expand and the reload -- it does not snap back to Full. Because no scaffold has run yet in this fresh folder, there is no durable `.dabbler/tier` seed to contend with, so the flipped choice simply survives untouched. No warning about the Full tier re-appears over the Lightweight pick.",
+      "ProgrammaticVerification": "CORRECTION from the prior version of this checklist: its citation ('tierMarkerStore.test.ts + gettingStartedActions.test.ts cover... the tierDirty record-over-seed rule') is factually wrong -- grepping both files for the literal string `tierDirty` returns zero matches, confirmed just now. The real coverage is gettingStartedHtml.test.ts's 'restoreGsState (Set 077 S2)' suite, re-run fresh: 18/18 passing, including 'a DIRTY persisted radio (explicit operator flip) beats the SAME seed', 'a CHANGED seed... overrides a dirty flip and clears it', and 'Set 076 replay: a Lightweight pick never snaps back to Full' -- the exact scenario this walk exercises. The real `vscode.setState`/`getState` round-trip across an actual window reload is inherently untestable on the vscode-stub and remains the operator portion.",
       "Passes": true
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 6 — Python prerequisite warning on the form",
-      "ItemLabel": "Step-1 Python warning appears when no interpreter resolves",
-      "HumanAction": "In a fresh folder, ensure no interpreter resolves: set `dabblerSessionSets.pythonPath` to an empty/invalid value AND make sure no `python` is on PATH for the window. Open the Getting Started form and look at step 1.",
-      "Expectation": "A prominent step-1 warning renders (analogous to the provider-key probe warning) with install guidance: use the python.org build, tick Add-to-PATH, avoid the Microsoft Store build, or set `dabblerSessionSets.pythonPath`. The warning clears once a valid interpreter resolves.",
-      "ProgrammaticVerification": "pythonInterpreter.test.ts (pythonPresent probe) + gettingStartedDetection.test.ts (warning render) pin the probe and copy on the stub; the live rendered warning is the operator portion.",
+      "Subarea": "Walk 6 -- Python prerequisite warning on the form",
+      "ItemLabel": "Step-1 Python warning appears when no interpreter resolves, on both tiers",
+      "HumanAction": "In a fresh folder, set the `dabblerSessionSets.pythonPath` setting to an empty or invalid value, and ensure no `python`/`python3` resolves on PATH for this VS Code window. Open the Getting Started form and look at the very top of step 1 -- above the tier radio buttons.",
+      "Expectation": "A warning banner (role=\"alert\") renders this exact text: \"Python was not found on this machine. Build project structure creates a virtual environment, which still needs a base Python install. Install Python from python.org (tick \\\"Add python.exe to PATH\\\"; avoid the Microsoft Store build), or set the dabblerSessionSets.pythonPath setting to an installed interpreter. Then reload the VS Code window (changes made after launch are not visible until you reload).\" This warning renders identically regardless of which tier radio is selected (Lightweight is router-off, not Python-off) and appears BEFORE the tier radio group, not after. It clears once a valid interpreter resolves (checked in order: the explicit setting, then a workspace `.venv`, then bare `python`/`python3` on PATH).",
+      "ProgrammaticVerification": "Orchestrator ran `npm run test:unit -- --grep \"A10 missing-Python warning|pythonPresent\"` fresh just now: 9/9 passing, including 'pythonWarningHtml renders role=alert and flips hidden on visible', 'warning VISIBLE when pythonPresent is false — on BOTH tiers', and 'warning leads step 1 (renders before the tier radios)' (gettingStartedHtml.js:96-103 for the exact string, :415/:420 for the visibility/ordering logic). The real host-side probe against a genuinely broken PATH (as opposed to the fake-fs-driven unit test) is the operator portion.",
       "Passes": true
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 7 — Python pre-flight fails friendly, leaves nothing behind",
+      "Subarea": "Walk 7 -- Python pre-flight fails friendly, leaves nothing behind",
       "ItemLabel": "Build with no interpreter fails BEFORE any durable write with a friendly explainer and no setup artifacts",
-      "HumanAction": "With the interpreter still unresolved (from walk 6), in a fresh empty folder click the step-1 'Build project structure' button. Watch the failure message, then inspect the folder.",
-      "Expectation": "Build stops at the side-effect-free pre-flight step with a friendly explainer (the `describeAiRouterImportFailure` pattern) -- NOT a raw `spawn python ENOENT` buried in a warning summary. No durable artifacts are left behind: no `.dabbler/tier`, no `.dabbler/verification-mode`, no generated docs, no venv.",
-      "ProgrammaticVerification": "gitScaffoldCore.test.ts asserts the pre-flight runs before any durable write and that interpreter failure leaves no setup artifacts; the live friendly-failure message and clean folder are the operator portion.",
+      "HumanAction": "With the interpreter still unresolved (from Walk 6), in a fresh empty folder click the button labeled \"Build project structure\". Read the error notification, then inspect the folder's contents.",
+      "Expectation": "An error notification appears with exactly this text: \"Build project structure needs a Python interpreter, but none was found — no Python is installed, or it is not on PATH. This is a missing Python installation, NOT an extension or API-key problem. Install Python from https://www.python.org/downloads/ (tick \\\"Add python.exe to PATH\\\"; avoid the Microsoft Store build), or point the 'dabblerSessionSets.pythonPath' setting at an installed interpreter, then reload the VS Code window and try again.\" The folder is left COMPLETELY EMPTY -- no `.dabbler/`, no generated docs, no venv, nothing at all (the pre-flight check runs before git init, before any marker write, before any template rendering).",
+      "ProgrammaticVerification": "Orchestrator ran `npm run test:unit -- --grep \"Python pre-flight\"` fresh just now: 1/1 passing -- gitScaffoldCore.test.ts's 'gitScaffold — Python pre-flight leaves no artifacts (Set 077 S3, M7)' asserts `fs.readdirSync(tmpDir)` deep-equals `[]` after a simulated missing-interpreter build attempt, with the message 'pre-flight failure must leave no setup artifacts'. The pre-flight-runs-first ordering was confirmed by reading gitScaffold.ts directly: the interpreter probe is the first statement of `buildProjectStructureNoPrompt`, before git init and before any marker write. NOTE: a separate operator question about `Dabbler: install ai-router` leaving only `budget.yaml` in a fresh venv is a DIFFERENT command from this walk's pre-flight check and was not investigated as part of this rewrite -- flagging it as still open, not resolved by this pass.",
       "Passes": true
     },
     {
       "FunctionalArea": "Out-of-band verification round-trip",
-      "Subarea": "Operator walk 8 — banner fires BEFORE the artifact; pointer prompt is copyable",
-      "ItemLabel": "start_session shows the pending-verification banner before external-verification.md exists; Evaluate prompt points to the canonical doc",
-      "HumanAction": "In the Lightweight + out-of-band repo from walk 4, close a work set with no recorded external verification (verdict null). Run `start_session` for the next work session and read the banner. Then use the row's copy action / Copy Evaluate (Spec Review) prompt and read the copied text.",
-      "Expectation": "The loud, ASCII, NON-blocking pending-verification banner prints and names the exact next action (write `docs/session-sets/<slug>/external-verification.md`). This happens BEFORE the artifact exists. The copied Evaluate prompt opens with a pointer to `docs/dabbler/cross-provider-verification.md`, carries the Copilot Mode-A recipe (open a second chat, switch the model picker to a different provider), and closes with the one non-negotiable line: the engine itself writes `external-verification.md` (full path spelled out).",
-      "ProgrammaticVerification": "test_pending_verification.py (owed-verification banner per state, no-router fixture) + copyPromptCommands.test.ts (pointer prompts, write-the-artifact close). Stub/fixture only; the live copied text and live banner are the operator portion.",
-      "Feedback": "I couldn't figure out how to run this.  I don't see a pending verification banner\n",
-      "Passes": false
+      "Subarea": "Walk 8 -- banner fires BEFORE the artifact (self-contained CLI reproduction)",
+      "ItemLabel": "A completed Mode-A (out-of-band) set with no external-verification.md makes the NEXT session's start_session print a pending-verification banner naming it",
+      "HumanAction": "In a terminal at the repo root with the project's `.venv` active, pick any empty throwaway folder as PARENT (e.g. `C:\\temp\\uat8\\session-sets`) and run all of the following:\n1. `mkdir \"PARENT/001-first-set\"`\n2. Write `PARENT/001-first-set/spec.md` containing exactly these 9 lines (the ```yaml fence below is part of the real file content, not a formatting wrapper -- copy it as shown):\n# spec\n[blank line]\n## Session Set Configuration\n[blank line]\n```yaml\ntier: lightweight\nverificationMode: out-of-band-or-none\n```\n[blank line]\n### Session 1 of 1: Do the work\n3. Write `PARENT/001-first-set/session-state.json` containing exactly:\n`{\"schemaVersion\": 4, \"sessionSetName\": \"001-first-set\", \"status\": \"complete\", \"sessions\": [{\"number\": 1, \"title\": \"Do the work\", \"status\": \"complete\", \"startedAt\": \"2026-07-04T09:00:00-04:00\", \"completedAt\": \"2026-07-04T09:30:00-04:00\", \"orchestrator\": {\"engine\": \"claude-code\", \"provider\": \"anthropic\"}, \"verificationVerdict\": null}]}`\n4. Write `PARENT/001-first-set/activity-log.json` containing exactly: `{\"entries\": []}`\n5. Run: `.venv/Scripts/python.exe -c \"import dedicated_verification as dv; dv.resolve_and_record_verification_mode(r'PARENT/001-first-set', cli_choice=dv.VERIFICATION_MODE_OUT_OF_BAND)\"`\n6. `mkdir \"PARENT/002-second-set\"` and write a spec.md there identical in shape to step 2's (any session title).\n7. Run: `.venv/Scripts/python.exe -m ai_router.start_session --session-set-dir \"PARENT/002-second-set\" --engine claude-code --provider anthropic --no-router`",
+      "Expectation": "Step 7 prints exactly this banner to the terminal, naming `001-first-set` by name and pointing at its exact `external-verification.md` path:\n```\n[dabbler] ====================================================================\n[dabbler] PENDING VERIFICATION - action needed:\n[dabbler]   001-first-set: external verification owed - paste an 'Evaluate ...' prompt (Session Sets view -> Copy Prompt) into a DIFFERENT assistant and have it write its verdict to <PARENT-absolute-path>/001-first-set/external-verification.md\n[dabbler] ====================================================================\n```\nOnly the absolute path varies (wherever you created PARENT); every other word must match verbatim. This is a from-scratch, no-VS-Code-needed reproduction of the exact scenario the operator got stuck on last time ('I couldn't figure out how to run this / I don't see a pending verification banner').",
+      "ProgrammaticVerification": "Orchestrator ran this exact 7-step recipe live moments ago and captured this exact banner text verbatim (ai_router/pending_verification.py:290-305 `format_banner` + :164-195 `_mode_a_owed_notice` generate this precise wording). test_pending_verification.py's Mode-A owed-notice tests cover the derivation mechanically against fixtures; this walk additionally confirms the real `start_session` CLI entry point prints it to a live process, not just that the pure function returns the right string.",
+      "Passes": true
     },
     {
       "FunctionalArea": "Out-of-band verification round-trip",
-      "Subarea": "Operator walk 9 — Copilot persona writes the artifact itself",
+      "Subarea": "Walk 9 -- Copilot persona writes the artifact itself",
       "ItemLabel": "Pasting the Evaluate prompt in a second chat under a DIFFERENT provider makes the engine write a templated, dated, verdict-bearing external-verification.md",
-      "HumanAction": "Copy the Evaluate prompt from walk 8. Open a SECOND Copilot chat and switch the model picker to a DIFFERENT provider than the one that did the work. Paste the prompt and let the engine act. Then open `docs/session-sets/<slug>/external-verification.md`.",
-      "Expectation": "The engine ITSELF writes the file (the extension never parses verdicts). The file has the templated header (set, date, round, verdict grammar), one dated round section, and a recognizable verdict line (`VERIFIED` or `ISSUES_FOUND` + severities). Content is UTF-8, append-only, one dated section per round.",
+      "HumanAction": "In a real (non-scratch) Lightweight + out-of-band repo with a pending-verification notice (e.g. from Walk 8's real recipe applied to an actual project, or any project with an owed set), in the Dabbler Session Sets view right-click the owed set's row -> Copy Prompt -> Evaluate Session Set. Open a SECOND chat under a DIFFERENT provider than the one that did the work (e.g. if the work was done under Claude/anthropic, switch the second chat's model picker to an openai or google model). Paste the copied prompt and let the engine act. Then open `docs/session-sets/<slug>/external-verification.md`.",
+      "Expectation": "The engine ITSELF writes the file (the extension never parses verdicts). The prompt you pasted opens with the literal line \"Cross-provider review request (out-of-band verification).\" followed by \"First read `docs/dabbler/cross-provider-verification.md` (repo root)\" and closes with the literal sentence \"Non-negotiable final step: YOU (the reviewing engine) must write your verdict as a new dated round section appended to `docs/session-sets/<slug>/external-verification.md` (UTF-8, append-only — never rewrite earlier rounds).\" If the extension had to seed the file first, its template is exactly: \"# External Verification — <setName>\\n\\n> Out-of-band verification record for this session set. Reviewing\\n> engines append one dated round section each; the latest round wins.\\n> Instructions + verdict grammar: docs/dabbler/cross-provider-verification.md\\n\\n## Round 1 — <YYYY-MM-DD>\\n\\nVerdict: PENDING\\n\". The reviewing engine's job is to replace `Verdict: PENDING` with a real verdict (VERIFIED, or ISSUES_FOUND with [Critical]/[Major]/[Minor]-tagged findings, or WAIVED with a one-line reason) in that Round N section, or append a new Round N section for a later round.",
       "IsJudgmentItem": true,
-      "NoProgrammaticPathReason": "Judgment item: whether a live Copilot chat under a different provider actually reads the doc and produces a well-formed, on-template artifact is a qualitative round-trip that no automated suite can stand in for (the parser tests exercise fixture files, not a live model).",
+      "NoProgrammaticPathReason": "Judgment item: whether a live chat under a different provider actually reads the doc and produces a well-formed, on-template artifact is a qualitative round-trip no automated suite can stand in for (the parser tests exercise fixture files, not a live model). The quoted opener/closer/template strings were re-grounded against current source during this rewrite (tools/dabbler-ai-orchestration/src/commands/copyPromptCommands.ts:113-159, src/commands/externalVerification.ts:23-38, confirmed by re-running `npm run test:unit -- --grep \"carries set name, dated Round\"` -- 1/1 passing).",
       "Passes": true
     },
     {
       "FunctionalArea": "Out-of-band verification round-trip",
-      "Subarea": "Operator walk 10 — soft gate recognizes the verdict; banner clears",
-      "ItemLabel": "close_session soft gate accepts the written verdict and the next start_session shows NO pending-verification banner",
-      "HumanAction": "With the artifact from walk 9 present, run `close_session` for the verified set. Then run `start_session` for the next work session.",
-      "Expectation": "The content-aware soft gate recognizes the latest-round verdict line and does not re-prompt for verification. The next `start_session` prints NO pending-verification banner (contrast with walk 8, where it fired before the artifact existed). An empty file or an unrecognizable verdict would still produce the same soft warn as absence. OPTIONAL WAIVED check: append a later dated round to external-verification.md with verdict WAIVED and a one-line reason, then run start_session again -- the banner must STILL be absent (latest-round-wins; WAIVED is a durable opt-out, never nagged).",
-      "ProgrammaticVerification": "test_no_router_close_session.py (resolved-runtime-mode gate keying A3, content-aware soft gate A4), test_external_verification_parser.py (latest-round-wins), test_pending_verification.py (banner suppressed once verdict present). Fixture-only; the live close->start sequence is the operator portion.",
+      "Subarea": "Walk 10 -- soft gate recognizes the verdict; banner clears",
+      "ItemLabel": "Once external-verification.md carries a recognizable verdict, the pending-verification banner stops firing for that set",
+      "HumanAction": "Continuing the Walk 8 scratch fixture:\n1. Write `PARENT/001-first-set/external-verification.md` containing exactly these 7 lines:\n# External verification\n[blank line]\n## Round 1 -- 2026-07-04\n[blank line]\nVerdict: VERIFIED\n[blank line]\nReviewed by a different provider; no issues found.\n2. `mkdir \"PARENT/003-third-set\"` with its own spec.md (same shape as before).\n3. Run: `.venv/Scripts/python.exe -m ai_router.start_session --session-set-dir \"PARENT/003-third-set\" --engine claude-code --provider anthropic --no-router`",
+      "Expectation": "Step 3 prints NOTHING about `001-first-set` -- no `[dabbler] PENDING VERIFICATION` block at all -- contrast with Walk 8, where the identical command against a fresh sibling printed the banner. This confirms the content-aware soft gate: once a recognizable verdict (VERIFIED here) exists, the set stops being nagged. Separately, at real `close_session` time (not reproduced in this scratch fixture -- that requires a real git-committed session set with a `disposition.json`, outside a minimal scratch fixture's reach), the gate prints the literal line \"external-verification.md verdict: VERIFIED (round 1)\" when a VERIFIED verdict is present, or a WARNING naming the soft-gate guidance when none is found.",
+      "ProgrammaticVerification": "Orchestrator ran steps 1-3 live moments ago: with `001-first-set/external-verification.md` absent (Walk 8), the identical `start_session` command printed the banner; after adding the VERIFIED verdict file and re-running for a new sibling, the banner did not print -- a real, freshly-captured before/after comparison, not cited from a prior run. The close_session soft-gate wording is grounded directly in close_session.py:1883-1908 and covered by test_no_router_close_session.py's content-aware soft-gate assertions (not independently re-run this pass, since reaching a real close_session invocation requires a git-committed set with disposition.json -- out of scope for this scratch fixture).",
       "Passes": true
     },
     {
       "FunctionalArea": "Mode-B dedicated verification gate",
-      "Subarea": "Operator walk 11 — single-engine Copilot gate PASSES on provider difference",
-      "ItemLabel": "Work under copilot/anthropic + verification under copilot/openai: no start-time refusal, close gate passes",
-      "HumanAction": "In a Lightweight + dedicated-sessions repo, run the work sessions with `start_session --engine copilot --provider anthropic`. Then start the verification session with `start_session --type verification --engine copilot --provider openai`. Complete it and run `close_session`.",
-      "Expectation": "The start-time refusal does NOT fire (engine matches but provider differs -- the sanctioned single-engine Copilot pattern). The close-time `validate_dedicated_verification` gate PASSES on the provider difference. The external-verification gate stands down because verificationMode is dedicated-sessions (the typed-session gate is the authority).",
-      "ProgrammaticVerification": "test_cross_provider_gate_extension.py (engine-or-provider Mode-B gate) + test_dedicated_verification_close_gate.py (provider-differs case) + test_no_router_close_session.py (dedicated-sessions stand-down A8). Fixture-only; the live typed-session run is the operator portion."
+      "Subarea": "Walk 11 -- single-engine Copilot gate PASSES on provider difference",
+      "ItemLabel": "Work under engine=copilot/provider=anthropic + verification under engine=copilot/provider=openai: no start-time refusal, close gate passes",
+      "HumanAction": "In the same repo as Walk 12, right after its refusal (which made no write), run:\n`.venv/Scripts/python.exe -m ai_router.start_session --session-set-dir \"<set-dir>\" --type verification --engine copilot --provider openai --no-router`",
+      "Expectation": "The command SUCCEEDS (exit code 0) and prints exactly:\n```\n[dabbler] Session 2 is a VERIFICATION session (type=verification).\n[dabbler] Typed sessions take their step list from docs/ai-led-session-workflow.md -> Lightweight dedicated verification (NOT a spec.md heading).\n```\n`session-state.json` gains a new session 2 entry with `type: verification` and `orchestrator {engine: copilot, provider: openai}` -- the start-time refusal does NOT fire because the provider differs even though the engine matches (the sanctioned single-engine Copilot pattern). Calling `ai_router.dedicated_verification.validate_dedicated_verification(set_dir, closing_session_number=2)` at this point returns `applicable=True, ok=True` -- the close-time gate would pass.",
+      "ProgrammaticVerification": "Orchestrator built this exact fixture and ran this exact `start_session` command live moments ago: it succeeded, printed exactly the two lines above, and appended session 2 with the copilot/openai identity to `session-state.json`. Then called `validate_dedicated_verification` directly against the resulting real state file (not a mock) and confirmed `applicable=True, ok=True`. test_cross_provider_gate_extension.py + test_dedicated_verification_close_gate.py cover the same predicate on fixtures.",
+      "Passes": true
     },
     {
       "FunctionalArea": "Mode-B dedicated verification gate",
-      "Subarea": "Operator walk 12 — same engine + same provider is REFUSED at start",
+      "Subarea": "Walk 12 -- same engine + same provider is REFUSED at start",
       "ItemLabel": "Verification start with a pair matching every work session is refused before any write",
-      "HumanAction": "In the same repo, attempt to start a verification session with the SAME pair as the work sessions: `start_session --type verification --engine copilot --provider anthropic`.",
-      "Expectation": "Fail-loud refusal at start, BEFORE any write, printing the sanctioned model-picker pattern inline (switch the provider on the model picker). The session is not created.",
-      "ProgrammaticVerification": "test_cross_provider_gate_extension.py (start-time same-pair refusal) + test_dedicated_verification_close_gate.py (same-engine-same-provider still-fails). Fixture-only; the live refusal is the operator portion."
+      "HumanAction": "In a Lightweight + dedicated-sessions repo with one completed work session recorded as `--engine copilot --provider anthropic` (do this BEFORE Walk 11's step, on the same fixture -- Walk 11 adds a passing verification session afterward), attempt:\n`.venv/Scripts/python.exe -m ai_router.start_session --session-set-dir \"<set-dir>\" --type verification --engine copilot --provider anthropic --no-router`",
+      "Expectation": "The command FAILS with exit code 3 and prints exactly this message (no `session-state.json` write occurs -- re-reading the file afterward shows only the original single work session, nothing appended):\n\"start_session: refused -- the declared verification identity (engine='copilot', provider='anthropic') does not differ from the work sessions by engine or by provider, so the Mode-B close-out gate could never pass it. Cross-provider review is the point of a dedicated verification session. Fix: run it on a different engine, or keep the engine and switch the model provider - the sanctioned single-engine pattern for a Copilot-locked shop is a second Copilot chat with the model picker on another provider, declared as: --engine copilot --provider openai (verifying work done under --engine copilot --provider anthropic). Declare the true provider with --provider; if the work sessions' providers were never recorded, record them on the per-session orchestrator blocks first.\"",
+      "ProgrammaticVerification": "Orchestrator ran this exact command live moments ago against the exact fixture and confirmed this exact refusal message and exit code 3, then re-read `session-state.json` and confirmed it was unchanged (no session 2 written). test_cross_provider_gate_extension.py's start-time same-pair refusal test covers this mechanically on a fixture.",
+      "Passes": true
     },
     {
       "FunctionalArea": "Version skew",
-      "Subarea": "Operator walk 13 — new extension + pre-0.27.0 router fails LOUD",
-      "ItemLabel": "Prompts carry the '>= 0.27.0' skew line and the old router's behavior fails visibly, never silent",
-      "HumanAction": "With the locally built extension 0.34.0 installed, point the workspace at a PRE-0.27.0 `dabbler-ai-router` (e.g. pin 0.26.2). Copy a kickoff/verification prompt and read it; then run a close/gate action that exercises the auto-route/banner behavior against the old router.",
-      "Expectation": "The typed prompts carry the 'requires dabbler-ai-router >= 0.27.0' line, and the old router's behavior fails LOUD with a visible graceful message -- never a silent disagreement between extension and router.",
-      "ProgrammaticVerification": "copyPromptCommands.test.ts (>= 0.27.0 skew line) pins the emitted line on the stub; the live cross-version loud failure against a real pre-0.27.0 router is the operator portion (Critique-2 M6)."
+      "Subarea": "Walk 13 -- new extension + pre-0.27.0 router fails LOUD",
+      "ItemLabel": "Prompts carry the '>= 0.27.0' skew line",
+      "HumanAction": "With the locally built extension 0.34.0 installed, point the workspace's Python environment at a PRE-0.27.0 `dabbler-ai-router` (e.g. `pip install dabbler-ai-router==0.26.2` in the workspace venv). Copy a verification-kickoff or remediation-handoff prompt (row action \"Start Next Session\" on a row that derives to awaiting-verification or awaiting-remediation) and read it.",
+      "Expectation": "The copied prompt contains this exact line: \"This flow expects dabbler-ai-router >= 0.27.0 (the start-time cross-provider guardrail and the owed-verification banner ship there). Check with `python -m pip show dabbler-ai-router` and upgrade first if older — an older router accepts a same-provider verification session silently and the close-out gate then refuses it.\" (`MODE_B_MIN_ROUTER_VERSION = \"0.27.0\"` has not changed since Set 077 introduced it, confirmed via `git log -S` on the constant -- unaffected by Set 078 separately bumping `pyproject.toml` to 0.28.0, since 078 made no extension changes.)",
+      "ProgrammaticVerification": "Orchestrator re-ran `npm run test:unit -- --grep \"0.27.0\"` fresh just now: passing -- copyPromptCommands.test.ts's 'surfaces the minimum router version (critique M6 version-skew)' asserts the live `buildVerificationKickoffPrompt` output includes exactly this string (copyPromptCommands.ts:333-343). The actual cross-version failure against a genuinely pre-0.27.0 installed router package is the operator portion -- reproducing it would require pip-installing an older `dabbler-ai-router` into the working venv, which this pass intentionally did not do to avoid mutating the repo's own environment.",
+      "Passes": true
     },
     {
       "FunctionalArea": "Mode-B auto-routing",
-      "Subarea": "Operator walk 14 — Start Next Session yields the right handoff",
-      "ItemLabel": "awaiting-verification yields the verification kickoff; awaiting-remediation yields the remediation handoff (pointer-style)",
-      "HumanAction": "In the uat-matrix workspace, on 005-shout-the-greeting (derives to awaiting-verification) click 'Start Next Session' and read the copied prompt and the status-bar message; repeat on 007-echo-the-greeting (derives to awaiting-remediation).",
-      "Expectation": "005 yields the verification kickoff prompt (pointer-style, per Feature 3's prompt standard) rather than a work-session prompt, and the status-bar message says 'verification owed'; 007 yields the remediation handoff prompt with a 'remediation owed' message. The row descriptions carry the same words as confirmed in walk 1.",
-      "ProgrammaticVerification": "copyPromptCommands.test.ts (kickoff auto-route) + workflowStateLegibility.test.ts (state ladder, record-over-seed) + tierLegibility.test.ts (owed words). Stub-only; the live copied handoff is the operator portion."
+      "Subarea": "Walk 14 -- Start Next Session yields the right handoff",
+      "ItemLabel": "awaiting-verification yields the verification kickoff; awaiting-remediation yields the remediation handoff",
+      "HumanAction": "In the uat-matrix workspace (from Walk 1), on `005-shout-the-greeting` right-click the row -> Copy Prompt -> click \"Start Next Session\", and read both the copied clipboard text and the status-bar message (visible for about 4 seconds). Repeat on `007-echo-the-greeting`.",
+      "Expectation": "005 (state: awaiting-verification): the status-bar message reads \"Copied: Verification kickoff (verification owed) for 005-shout-the-greeting\"; the copied prompt contains `--type verification`, the words `Mode B`, and `dabbler-ai-router >= 0.27.0`. 007 (state: awaiting-remediation): the status-bar message reads \"Copied: Remediation handoff (remediation owed) for 007-echo-the-greeting\"; the copied prompt contains `--type remediation` and `sN-issues*.json`. Both row descriptions carry the same 'verification owed'/'remediation owed' words confirmed in Walk 1.",
+      "ProgrammaticVerification": "Orchestrator re-ran `npm run test:unit -- --grep \"resolveStartNextSessionPrompt|kickoff auto-route\"` fresh just now: 7/7 passing, including 'awaiting-verification routes to the kickoff prompt and says so', 'awaiting-remediation routes to the remediation prompt and says so', and 'awaiting-human does NOT auto-route (a human decides next)' (workflowStateLegibility.test.ts, resolveStartNextSessionPrompt in copyPromptCommands.ts:306-326). uatMatrixFixtures.test.ts's 007 test additionally confirms this end-to-end against the real fixture. The actual right-click -> submenu navigation -> clipboard paste -> status-bar-message sequence in a real VS Code window is the operator portion.",
+      "Passes": true
     },
     {
       "FunctionalArea": "Session Set Explorer",
-      "Subarea": "Operator walk 1 — make-uat-workspace matrix sweep",
+      "Subarea": "Walk 1 -- make-uat-workspace matrix sweep",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -149,7 +152,7 @@
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 2 — Full-tier fresh scaffold",
+      "Subarea": "Walk 2 -- Full-tier fresh scaffold",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -159,17 +162,7 @@
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 3 — Lightweight + dedicated verification fresh scaffold",
-      "ItemLabel": "Other",
-      "IsOtherItem": true,
-      "HumanAction": "",
-      "Expectation": "",
-      "Passes": false,
-      "Feedback": "Let's make the option text before the em dash underlined so that we can more easily see where the first option's text ends and the second option's text begins."
-    },
-    {
-      "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 4 — Lightweight + out-of-band/none fresh scaffold",
+      "Subarea": "Walk 3 -- Lightweight + dedicated verification fresh scaffold",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -179,7 +172,7 @@
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 5 — tier-leak stress on a live pick",
+      "Subarea": "Walk 4 -- Lightweight + out-of-band/none fresh scaffold",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -189,7 +182,7 @@
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 6 — Python prerequisite warning on the form",
+      "Subarea": "Walk 5 -- tier-leak stress on a live pick",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -199,17 +192,17 @@
     },
     {
       "FunctionalArea": "Getting Started scaffold",
-      "Subarea": "Operator walk 7 — Python pre-flight fails friendly, leaves nothing behind",
+      "Subarea": "Walk 6 -- Python prerequisite warning on the form",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
       "Expectation": "",
       "Passes": false,
-      "Feedback": "Note: after running `Dabbler: install ai-router` the venv environment is created, but there is only one file in ai_router (budget.yaml).  Is that correct behavior?"
+      "Feedback": ""
     },
     {
-      "FunctionalArea": "Out-of-band verification round-trip",
-      "Subarea": "Operator walk 8 — banner fires BEFORE the artifact; pointer prompt is copyable",
+      "FunctionalArea": "Getting Started scaffold",
+      "Subarea": "Walk 7 -- Python pre-flight fails friendly, leaves nothing behind",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -219,7 +212,7 @@
     },
     {
       "FunctionalArea": "Out-of-band verification round-trip",
-      "Subarea": "Operator walk 9 — Copilot persona writes the artifact itself",
+      "Subarea": "Walk 8 -- banner fires BEFORE the artifact (self-contained CLI reproduction)",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -229,7 +222,17 @@
     },
     {
       "FunctionalArea": "Out-of-band verification round-trip",
-      "Subarea": "Operator walk 10 — soft gate recognizes the verdict; banner clears",
+      "Subarea": "Walk 9 -- Copilot persona writes the artifact itself",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Out-of-band verification round-trip",
+      "Subarea": "Walk 10 -- soft gate recognizes the verdict; banner clears",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -239,7 +242,7 @@
     },
     {
       "FunctionalArea": "Mode-B dedicated verification gate",
-      "Subarea": "Operator walk 11 — single-engine Copilot gate PASSES on provider difference",
+      "Subarea": "Walk 11 -- single-engine Copilot gate PASSES on provider difference",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -249,7 +252,7 @@
     },
     {
       "FunctionalArea": "Mode-B dedicated verification gate",
-      "Subarea": "Operator walk 12 — same engine + same provider is REFUSED at start",
+      "Subarea": "Walk 12 -- same engine + same provider is REFUSED at start",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -259,7 +262,7 @@
     },
     {
       "FunctionalArea": "Version skew",
-      "Subarea": "Operator walk 13 — new extension + pre-0.27.0 router fails LOUD",
+      "Subarea": "Walk 13 -- new extension + pre-0.27.0 router fails LOUD",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",
@@ -269,7 +272,7 @@
     },
     {
       "FunctionalArea": "Mode-B auto-routing",
-      "Subarea": "Operator walk 14 — Start Next Session yields the right handoff",
+      "Subarea": "Walk 14 -- Start Next Session yields the right handoff",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",

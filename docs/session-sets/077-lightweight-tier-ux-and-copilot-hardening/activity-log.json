@@ -724,6 +724,14 @@
       "dateTime": "2026-07-04T03:48:03.498550-04:00",
       "description": "OPERATOR DECISION (2026-07-04): UAT suspended mid-walk over instruction quality - steps required guessing, could not distinguish product bugs from misread instructions, written above the needed reading level with shared-context assumptions. Set 077 stays OPEN (session 6 not closed); deferred until after Set 078 and a dedicated UAT-improvement set (candidate input: operator UAT DSL at D:/Projects/dabbler-uat-dsl; goal: everything Playwright-testable is Playwright-tested BEFORE human UAT). Then 077 UAT is revisited and 078 UAT run under the improved experience. Release gates remain open: UAT attestation, VSCE_PAT renewal, tag pushes v0.27.0 + vsix-v0.34.0, Marketplace publish (0.34.0 VSIX sideloadable meanwhile). Two operator directives captured as durable guidance in docs/planning/project-guidance.md (UAT-for-a-stranger + prefer-removal-over-addition) and pre-authoring notes in docs/planning/uat-improvement-notes.md.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 11,
+      "stepKey": "session-006/uat-attested",
+      "dateTime": "2026-07-04T15:52:06.059903-04:00",
+      "description": "OPERATOR ATTESTATION (2026-07-04): UAT checklist rewritten to the Set 078 authoring bar (literal HumanAction/Expectation, live-dogfooded CLI walks for 8/10/11/12, source-re-grounded strings for the webview walks, two factual drifts corrected -- Walk 3 button label, and the false claim that the auto-opened doc callout differs by verification mode). Operator re-walked all 14 real items: 14/14 Passes=true, zero feedback recorded on any Other row -- a clean attestation, resolving the prior suspension. Also reviewed and updated both README.md files (root + tools/dabbler-ai-orchestration) for drift against the actually-shipped 0.27.0/0.34.0 feature set: three-way Getting Started choice, Python prerequisite check, canonical cross-provider-verification.md doc + self-completing Evaluate prompts, pending-verification banner, Start Next Session auto-routing. Getting-started screenshot flagged as stale (pre-dates the verification-mode radio group) but not regenerated -- no live VS Code capture available in this pass. Path-aware critique and version bumps/CHANGELOGs remain already-done from the earlier S6 pass (51fc437). Remaining release gates: operator confirms VSCE_PAT still valid (no renewal planned -- operator instruction), then commit+push this pass, green Test run, then operator-authorized tag pushes v0.27.0 -> vsix-v0.34.0 (v0.28.0 for Set 078 must not go out ahead of v0.27.0 per the release-ordering invariant).",
+      "status": "complete"
     }
   ]
 }

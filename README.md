@@ -92,7 +92,9 @@ deeper feature descriptions live at
   cross-provider verification; Lightweight makes zero metered calls and
   verifies per-set (copyable review prompts pasted into a different
   assistant, a dedicated different-engine verification session, or opt
-  out). The single source of truth is
+  out). On either tier, `start_session` prints a loud, non-blocking
+  banner the moment a set's verification or remediation is owed, so
+  nothing sits forgotten between sessions. The single source of truth is
   [docs/concepts/tier-model.md](docs/concepts/tier-model.md).
   [Deep dive](docs/concepts/tier-model.md).
 
@@ -139,15 +141,23 @@ project that hasn't yet adopted the workflow — the recommended
 starting point is **`Dabbler: Get Started`** from the command palette.
 The Session Set Explorer's Getting Started form walks you through tier
 choice (Full vs. Lightweight — see
-[docs/concepts/tier-model.md](docs/concepts/tier-model.md)), the
-Full-tier verification **budget / NTE step** (saved to
-`ai_router/budget.yaml` —
-[schema](docs/budget-yaml-schema.md)), and a one-click project
-scaffold: the `.venv` with the router package, the AI-agent
-instruction files, and the `docs/session-sets/` home. From there the
-form hands you copyable prompts for drafting
-`docs/planning/project-plan.md` and decomposing it into session sets
-with your AI agent. The four-tier budget mapping is documented in
+[docs/concepts/tier-model.md](docs/concepts/tier-model.md)); picking
+Lightweight surfaces a second choice between dedicated verification
+sessions (a different AI engine/provider runs a structured
+verification session, with a close-out gate) and out-of-band-or-none
+(copy a review prompt into a second AI assistant and record its
+verdict by hand — the default). Both picks persist through a window
+reload. The form also runs the Full-tier verification **budget / NTE
+step** (saved to `ai_router/budget.yaml` —
+[schema](docs/budget-yaml-schema.md)), warns inline if no Python
+interpreter or provider API key resolves (checked before any write,
+so a missing prerequisite fails with a friendly explainer and leaves
+nothing behind), and performs a one-click project scaffold: the
+`.venv` with the router package, the AI-agent instruction files, and
+the `docs/session-sets/` home. From there the form hands you copyable
+prompts for drafting `docs/planning/project-plan.md` and decomposing
+it into session sets with your AI agent. The four-tier budget mapping
+is documented in
 [docs/ai-led-session-workflow.md → Cost-budgeted verification modes](docs/ai-led-session-workflow.md#cost-budgeted-verification-modes).
 
 Setting up without VS Code? See the manual-setup note in

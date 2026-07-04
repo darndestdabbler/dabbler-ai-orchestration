@@ -95,11 +95,11 @@ step-by-step instructions in the editor:
    **budget / NTE cap** (saved to `ai_router/budget.yaml`; a `$0`
    budget asks you to pick manual-via-other-engine or skipped
    verification explicitly) and warns inline when no provider API
-   key is visible. A step-1 warning also appears if no Python
-   interpreter resolves (with install guidance); the Build action
-   checks for one before writing anything, so a missing interpreter
-   fails with a friendly explainer instead of a raw error, leaving no
-   partial setup behind.
+   key is visible. A step-1 warning also appears if a Python
+   interpreter can't be found (with install guidance); the Build
+   action checks for one before writing anything, so a missing
+   interpreter fails with a friendly explainer instead of a raw
+   error, leaving no partial setup behind.
 2. **Create or import a project plan** — import an existing
    `project-plan.md`, or copy a planning prompt and let your AI
    agent draft the plan with you.

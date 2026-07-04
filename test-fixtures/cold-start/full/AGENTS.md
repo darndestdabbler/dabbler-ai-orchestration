@@ -84,3 +84,12 @@ files share the body above — only this tail differs.
   refuses a same-engine+same-provider start, and the close-out gate fails it —
   so always pass `--provider` on work sessions too, or the provider arm cannot
   be confirmed and a different engine becomes the only accepted path.
+- **Want the Full-tier workflow on a Copilot-only seat, not just
+  Lightweight Mode B?** A `copilot-cli` transport profile
+  (`dabbler-ai-router` >= 0.28.0) lets Full-tier `route()`/`verify()`
+  dispatch through the Copilot CLI's headless mode instead of a direct
+  provider API — an indirect Full tier with explicitly degraded guarantees
+  (asserted, not confirmed, provider provenance; no locally meterable
+  billing). See
+  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>
+  → *The Full tier seat-profile option*.

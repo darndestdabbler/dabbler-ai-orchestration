@@ -149,10 +149,10 @@ verification session, with a close-out gate) and out-of-band-or-none
 verdict by hand — the default). Both picks persist through a window
 reload. The form also runs the Full-tier verification **budget / NTE
 step** (saved to `ai_router/budget.yaml` —
-[schema](docs/budget-yaml-schema.md)), warns inline if no Python
-interpreter or provider API key resolves (checked before any write,
-so a missing prerequisite fails with a friendly explainer and leaves
-nothing behind), and performs a one-click project scaffold: the
+[schema](docs/budget-yaml-schema.md)), warns inline when a Python
+interpreter or provider API key can't be found (checked before any
+write, so a missing prerequisite fails with a friendly explainer and
+leaves nothing behind), and performs a one-click project scaffold: the
 `.venv` with the router package, the AI-agent instruction files, and
 the `docs/session-sets/` home. From there the form hands you copyable
 prompts for drafting `docs/planning/project-plan.md` and decomposing

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "080-getting-started-subchoice-legibility",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Row-structured option layout for both sub-choice groups",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "UAT, screenshot, and release",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

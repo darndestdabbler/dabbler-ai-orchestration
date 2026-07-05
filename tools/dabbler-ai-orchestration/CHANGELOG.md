@@ -5,6 +5,69 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.35.0] — 2026-07-05 (Set 079 — Copilot seat-profile onboarding and verification-mode copy)
+
+Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero
+`ai_router/` changes in this set — this UI reads Set 078's CLI surface,
+never modifies it).
+
+### Added
+
+- **Guided Full-tier Copilot seat-profile onboarding.** Picking **Full**
+  in the Getting Started form now surfaces a "Provider access (how
+  routed calls run)" sub-choice: **direct provider API keys** (the
+  unchanged default) or a **GitHub Copilot CLI seat** (Set 078's
+  `transport.profile: copilot-cli` — no `DABBLER_*` keys needed). The
+  pick persists across window reloads with the same seed/dirty
+  precedence as the tier and verification-mode radios, and a step-1
+  warning (mirroring the Python one) appears when the Copilot option is
+  selected but no `copilot` CLI resolves (explicit
+  `dabblerSessionSets.copilotCliPath` setting first, then PATH — an
+  explicitly configured path decides alone).
+- **Build wiring that tells the truth.** With the Copilot option
+  selected, Build runs the standard scaffold first and only on success
+  invokes the seat's catalog refresh with the scaffolded `.venv`'s own
+  interpreter (auto-derived seat id/label — zero typing), inside a
+  cancellable progress notification with a host-teardown disposal
+  handler. The wrapper parses the refresh's actual confirmed-provider
+  result — never the exit code — and renders
+  `transport.profile: copilot-cli` into `router-config.yaml` as an
+  anchored field replacement (never an append) only when the seat
+  confirms ≥2 distinct provider families. Cancel kills the child
+  process tree and restores the lockfile's pre-run state.
+- **Honest failure UX on every branch.** Every seat-setup failure lands
+  in one of two honest states, keyed on the same `DABBLER_*` presence
+  probe the key warning uses: with no keys, the message says plainly the
+  router is **not yet functional** (plus reason-specific guidance and a
+  copy-runnable re-run command — no re-scaffold needed); with keys
+  present, `api` is affirmed as a genuinely working fallback. An
+  enterprise-locked seat exposing a single provider family gets the
+  specific "re-running will not change the result" guidance.
+
+### Changed
+
+- **Simplified Lightweight verification-mode copy.** The two radio
+  descriptions are now plain language: "Manual review (default) — paste
+  a review prompt into a second AI assistant yourself and record what
+  it says." and "Separate verification sessions — a dedicated session
+  on a different AI engine or provider reviews the work before the set
+  can close." Copy only — radio values, schema fields, and gate logic
+  are untouched. Both READMEs' paraphrases updated in the same pass.
+- **Docs present the guided flow as the primary seat-profile path.**
+  `docs/concepts/tier-model.md` and the bundled getting-started doc now
+  document the in-form setup first, manual `router-config.yaml` editing
+  as the fallback — carrying forward, verbatim in spirit, the Set 078
+  honesty note: evidence remains a **single personal seat** (Set 079's
+  dogfood used the same seat); multi-seat / enterprise-seat model
+  availability is **not** validated by this set.
+
+### Evidence limits (recorded, not hidden)
+
+- The POSIX process-tree kill on cancel is unit-pinned but has not been
+  exercised against a live POSIX process tree (dogfood host: Windows).
+- The seat-setup config write is atomic against process crash; it makes
+  no power-loss durability claim.
+
 ## [0.34.0] — 2026-07-03 (Set 077 — lightweight-tier UX and Copilot hardening)
 
 ### Added

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "079-copilot-seat-onboarding-and-verification-copy",
+  "pathAwareCritique": "none",
+  "critiquedAt": "2026-07-05T06:10:38.419459-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Reviewed the Set 079 source and docs around the new Full-tier Copilot seat option, its build wiring, the Getting Started webview/state plumbing, the seat-setup helper/tests, and the updated READMEs/tier-model/template/UAT artifacts. I found one blocking contract drift: the implementation and user-facing docs/tests repeatedly tell operators to re-run seat setup via a command that does not exist in the extension, so the prescribed recovery path cannot be followed as written.",
+      "findings": [
+        {
+          "description": "Violation: the set's user-facing contract repeatedly promises a re-runnable command-based recovery path for failed seat setup (for example the UAT checklist says `run \"Dabbler: Set Up Copilot Seat\"`, and the implementation says `Re-run seat setup (no need to re-scaffold): ...`). Impact: this changes the merge decision because the new failure UX's core remediation story is misleading at the exact moment operators need it most; there is no contributed `dabbler...set up copilot seat` command in `package.json`, so users who follow the named command path cannot recover as documented and instead must discover and run a raw Python command by hand. Evidence: `tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts:592-607` builds only a shell command string, not a VS Code command; `tools/dabbler-ai-orchestration/package.json` contributes no command matching \"Set Up Copilot Seat\"; and the shipped artifacts/tests still reference that nonexistent command (`tools/dabbler-ai-orchestration/src/test/suite/copilotSeatSetup.test.ts:796`, `docs/session-sets/079-copilot-seat-onboarding-and-verification-copy/079-copilot-seat-onboarding-and-verification-copy-uat-checklist.json`). Fix: either add the promised VS Code command and wire it to rerun the seat setup against the current workspace, or remove every command-level claim and consistently document the raw `.venv/.../python -m ai_router.copilot_catalog --refresh ...` rerun path instead.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have conducted a thorough review of the final state of Set 079, focusing on documentation, release readiness, and the implementation of the Copilot seat onboarding feature. My review confirms that the changes are correct, complete, and consistent with the project's high standards for quality and transparency.\n\nI verified the key claims by reading the repository files:\n1.  **Release Scope & Versioning:** I confirmed this is an extension-only release. `tools/dabbler-ai-orchestration/package.json` correctly sets the version to `0.35.0`, and the `tools/dabbler-ai-orchestration/CHANGELOG.md` entry for this version is accurate and comprehensive. The `get_diff` output shows no changes to the `ai_router/` directory or root `pyproject.toml`.\n2.  **Documentation Honesty:** The critical \"honesty note\" from the architecture critique (M3) — acknowledging that validation was performed on a single personal seat and that enterprise seats might fail the multi-provider check — has been correctly propagated. I read `README.md`, `docs/concepts/tier-model.md`, and the `079...-uat-checklist.json`, all of which state these limitations clearly. This transparency is a major strength.\n3.  **UAT Checklist:** I reviewed the UAT checklist and found it to be exceptionally detailed. It specifies exact user actions and expected outcomes, grounds claims in specific source code files, and explicitly documents its own scope limitations, aligning perfectly with the honesty requirement.\n4.  **Consistency:** I found no evidence of contract drift between the code, tests, and documentation. The project's documentation is not just an afterthought but a reliable and accurate reflection of the implementation.\n\nBased on this comprehensive file-based verification, I found no blocking issues, inconsistencies, or unfulfilled claims. The work is ready for release.",
+      "findings": []
+    }
+  ]
+}

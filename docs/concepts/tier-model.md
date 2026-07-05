@@ -213,21 +213,52 @@ guarantees** — never as byte-equivalent to the direct-API Full tier:
   breaker (`transport.max_invocations_per_session`, default 200) caps seat
   burn instead.
 
-**Activation:** set `transport.profile: copilot-cli` in
-`ai_router/router-config.yaml` (default is `api`, the unchanged direct-HTTPS
-path). Each seat must then build its own local model catalog — run `python -m
-ai_router.copilot_catalog --refresh` to discover the seat's dispatchable
-models and write `ai_router/copilot-catalog.lock`; every routed call
-validates the lockfile against the live CLI and fails closed on version
-drift, missing provenance, or fewer than two distinct providers among
-confirmed entries.
+**Activation (guided, the primary path — Set 079):** use the VS Code
+extension's Getting Started form. In step 1, choosing the **Full** tier
+surfaces a "Provider access (how routed calls run)" choice: **Direct
+provider API keys** (the default) or **GitHub Copilot CLI seat**.
+Selecting the seat option automates the setup: after the standard
+project scaffold succeeds, the form runs the seat's catalog refresh
+(`python -m ai_router.copilot_catalog --refresh`, invoked with the
+scaffolded `.venv`'s own interpreter and an auto-derived seat id/label —
+zero typing) as a cancellable progress notification, parses the
+refresh's actual confirmed-provider result rather than its exit code,
+and only when the seat confirms at least two distinct provider families
+renders `transport.profile: copilot-cli` into
+`ai_router/router-config.yaml`. If seat setup fails and no `DABBLER_*`
+key is present, the form says plainly that the scaffold completed but
+the router is **not yet functional**, with reason-specific guidance and
+the re-run command (re-run the refresh from the scaffolded `.venv`; no
+re-scaffold is needed). `api` is offered as a working fallback only
+when `DABBLER_*` keys are actually present.
+
+**Activation (manual, the fallback path):** set `transport.profile:
+copilot-cli` in `ai_router/router-config.yaml` (default is `api`, the
+unchanged direct-HTTPS path) and build the seat's local model catalog —
+run `python -m ai_router.copilot_catalog --refresh` to discover the
+seat's dispatchable models and write `ai_router/copilot-catalog.lock`.
+On either path, every routed call validates the lockfile against the
+live CLI and fails closed on version drift, missing provenance, or
+fewer than two distinct providers among confirmed entries.
 
 **Evidence basis:** validated end-to-end (design lock, live dogfood, UAT
-attestation) on a single operator's personal Copilot seat. A second,
-representative target-team seat and a GitHub Models enterprise-availability
-check were never completed and were dropped as a gate requirement by an
-explicit, recorded operator override rather than proven — see
+attestation) on a single operator's personal Copilot seat — Set 078 for
+the transport itself, and Set 079's live dogfood of the guided form ran
+on that **same** personal seat. Neither set validates multi-seat or
+enterprise-seat model availability: an enterprise-locked seat may expose
+only one provider family, which fails the ≥2-provider check even though
+the guided flow itself "worked", and whether a given team seat confirms
+two distinct providers is unknown until someone on that team actually
+runs the flow. A second, representative target-team seat and a GitHub
+Models enterprise-availability check were never completed and were
+dropped as a gate requirement by an explicit, recorded operator override
+rather than proven — see
 `docs/session-sets/078-copilot-cli-hybrid-tier/s1-cli-contract.md`.
+Two further recorded limits from Set 079's induced-failure dogfood: the
+POSIX process-tree kill on cancel is unit-tested but has not yet been
+exercised against a live POSIX process tree (the dogfood host was
+Windows), and the config write is atomic against process crash only —
+it makes no power-loss durability claim.
 
 **Choose this profile when:** staff are corporate-policy-locked to Copilot
 seats only, no `DABBLER_*` key is possible, and Full's cross-provider

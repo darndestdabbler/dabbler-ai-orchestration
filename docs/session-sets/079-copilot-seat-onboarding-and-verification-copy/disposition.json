@@ -1,28 +1,32 @@
 {
-  "status": "completed",
-  "summary": "Session 4 of 5: Feature 2, the simplified Lightweight verification-mode copy. Rewrote VERIFICATION_MODE_OUT_OF_BAND_TEXT ('Manual review (default) - paste a review prompt into a second AI assistant yourself and record what it says.') and VERIFICATION_MODE_DEDICATED_TEXT ('Separate verification sessions - a dedicated session on a different AI engine or provider reviews the work before the set can close.') in gettingStartedHtml.js - copy only; radio values, schema, and gate logic untouched. The dedicated description was checked against actual Mode B behavior before locking (critique m3: operator-started typed sessions, engine-or-provider rule, Q6 close gate - no automation overclaim). Added a Layer-2 pin test asserting the exact strings + block render (no prior test pinned the literals). Swept both READMEs' paraphrases. Deliberate residuals recorded in s4-close-reason.md: the 079 spec's before-state quote, the sealed/attested 077 UAT checklist, the distinct setupVerification.ts QuickPick copy, and generic workflow-term uses. Incidental: resynced the committed dist/extension.js, stale since S3's dispatchKill refactor (templates-only drift guard cannot see the bundle). Suites green: pytest 2483/5 skipped; tsc clean; Layer 2 1238 passing; Playwright 17/19 parallel with both failures proven environmental flakes on isolated re-run (neither touches the getting-started form). Feature 2 stays independently landable from Feature 1 (critique m6).",
+  "status": "requires_review",
+  "summary": "Session 5 of 5 (Docs, UAT, and release) - all orchestrator-side work is complete and cross-provider VERIFIED; the session is held open pending the two operator-only items: the UAT walk (6-item checklist authored this session) and the vsix-v0.35.0 tag-push authorization. What landed: (1) Docs pass - docs/concepts/tier-model.md now documents the guided Getting Started flow as the primary copilot-cli activation path with manual router-config.yaml editing as the fallback, and its evidence basis carries the M3 honesty note (Sets 078+079 validated on the SAME single personal seat; multi-seat/enterprise availability NOT validated; enterprise one-provider-family seats fail the >=2 check even when the flow works; POSIX kill unit-pinned only; config write process-crash-atomic, not power-loss-durable). Both READMEs describe the Full-tier 'Provider access' sub-choice + missing-CLI warning and carry the same full honesty caveat; the bundled getting-started template no longer claims DABBLER_* keys are required for Full (keys are the direct-API option; the Copilot CLI seat is the keyless alternative); cold-start goldens regenerated; the decomposition prompt was checked and needs no change (references tier only at spec-authoring level). (2) The 6-walk UAT checklist authored to the Set 078 bar (literal strings re-grounded from source, fresh Layer-2 counts quoted per walk, real-seat walks backed by the S2/S3 dogfoods, honest scope limits in Notes). (3) End-of-set multi-provider path-aware critique (gemini-2.5-pro VERIFIED clean + gpt-5.4 one Major contract-drift finding adjudicated accept-finding: its blocking premises were refuted by grep evidence, its real residue - a fictional 'Dabbler: Set Up Copilot Seat' command name in a test fixture - was fixed, suite 82/82; artifact saved raw, round lineage recorded). (4) Release scope confirmed extension-only (git diff a05c014..HEAD over ai_router/ + pyproject.toml is empty; router stays 0.28.0); extension bumped to 0.35.0 with CHANGELOG entry and repository-reference release-status/version-walk rows (publish honestly marked PENDING). (5) Suites: pytest 2483/5 skipped, tsc clean, Layer 2 1238 passing. Session verification (gpt-5-4, OpenAI, cross-provider): R1 two findings with no verdict token/severities, treated blocking per anti-laundering (S5-V-001 incomplete README honesty caveat; S5-V-002 stale generic key-requirement phrasing), both fixed; R2 narrow re-verify VERIFIED, both ledger ids RESOLVED.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
-    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
     "README.md",
+    "docs/concepts/tier-model.md",
+    "docs/repository-reference.md",
+    "docs/templates/consumer-bootstrap/getting-started.md.template",
+    "test-fixtures/cold-start/full/docs/dabbler/getting-started.md",
+    "test-fixtures/cold-start/lightweight/docs/dabbler/getting-started.md",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
     "tools/dabbler-ai-orchestration/README.md",
-    "tools/dabbler-ai-orchestration/dist/extension.js",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map"
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/getting-started.md.template",
+    "tools/dabbler-ai-orchestration/src/test/suite/copilotSeatSetup.test.ts",
+    "docs/session-sets/079-copilot-seat-onboarding-and-verification-copy/079-copilot-seat-onboarding-and-verification-copy-uat-checklist.json",
+    "docs/session-sets/079-copilot-seat-onboarding-and-verification-copy/path-aware-critique.json",
+    "docs/session-sets/079-copilot-seat-onboarding-and-verification-copy/s5-verification.md",
+    "docs/session-sets/079-copilot-seat-onboarding-and-verification-copy/s5-verification-round-2.md",
+    "docs/session-sets/079-copilot-seat-onboarding-and-verification-copy/s5-issues.json"
   ],
   "verification_message_ids": [],
-  "verification_notes": "Routed gate REQUIRED (multi-module, breadth >=4 files). Routed code-review first (sonnet -> gemini-pro auto-verify): 1 Major - the new pin-test comment falsely claimed both READMEs quote the strings verbatim (they paraphrase; a literal grep finds zero README hits) - fixed in-session by stating the paraphrase relationship and naming both README paths. 2 Minors, no code change (default-marker placement differs by design; 'reviews the work' judged not an automation overclaim). Session verification on gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator): VERIFIED round 1; the response was the bare verdict token with no summary prose - recorded as-is per never-edit discipline; a wording-only re-verify round was not opened per the L-071-1 materiality discipline.",
-  "next_orchestrator": {
-    "engine": "claude",
-    "provider": "anthropic",
-    "model": "claude-fable-5",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 5 is docs + UAT authoring + the required end-of-set multi-provider path-aware critique + release. Fresh routed analysis (gemini-pro, post-S4) recommends high effort: the literal-HumanAction/Expectation UAT bar and the path-aware critique demand more precision and synthesis than routine release mechanics. This supersedes the set-start recommendation of medium (which rested on Set 077 S6 / 078 S5 precedent); the operator controls the final choice."
-    }
-  },
-  "blockers": [],
-  "lessons_cited": ["L-064-3", "L-064-6", "L-064-9", "L-064-10", "L-071-1"]
+  "verification_notes": "Routed gate: REQUIRED (blast-radius, multi-module, breadth >=14 files, build-ci-config via package.json). Session verification on gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator): R1 returned two findings with no verdict token and no severities - treated as blocking per the L-071-1 anti-laundering rule; ledger ids S5-V-001 and S5-V-002, both docs-honesty findings, both fixed in-session; R2 (narrow, fixes-only) VERIFIED with both ids RESOLVED and no new defect. Path-aware critique round lineage (L-070-1: final round is the committed artifact, lineage recorded here): R1 both arms ran but the producer's identity guard refused the write (--level required vs recorded policy 'none' - the spec prose said 'required' but the config block never seeded pathAwareCritique, so the immutable set-start record is 'none'; spec-authoring gap flagged for the Step 9 review); R2 wrote a valid artifact but the instruction framed only S4's close summary (the producer fills from disposition.json); R3 (final, committed) ran after a preliminary set-wide disposition summary was authored: gemini-2.5-pro VERIFIED 0 findings, gpt-5.4 1 Major adjudicated accept-finding with false-premise notes via record_adjudication (fixture fixed; blocking premises refuted by grep/source evidence). Routed cost in router-metrics.jsonl for session 5: $0.25 (documentation gemini-pro $0.03 + gpt-5-4-mini auto-verify $0.04; session-verification gpt-5-4 $0.15 + $0.05). The three pull-critique producer runs (2 arms each) meter outside router-metrics.jsonl and are not in that figure.",
+  "next_orchestrator": null,
+  "blockers": [
+    "Operator UAT walk of 079-copilot-seat-onboarding-and-verification-copy-uat-checklist.json (6 walks; run via the checklist editor against a locally built VSIX)",
+    "Operator authorization for the vsix-v0.35.0 tag push (extension-only release; router stays 0.28.0)"
+  ],
+  "lessons_cited": ["L-064-3", "L-064-6", "L-064-9", "L-064-10", "L-065-1", "L-070-1", "L-071-1", "L-078-1"]
 }

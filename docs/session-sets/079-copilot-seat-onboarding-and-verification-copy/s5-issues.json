@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 5,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "issueId": "S5-V-001",
+      "issueType": "standards-departure",
+      "category": "docs",
+      "severity": "Major",
+      "description": "The README honesty caveat was incomplete in both READMEs: they said 'validated so far on a single personal seat' and named the one-provider-family failure shape, but did not say Set 079 used the SAME seat as Set 078, and did not explicitly say multi-seat / enterprise-seat model availability remains UNVALIDATED (spec Session 5 step 2/3 requires the full caveat on both READMEs). (Verifier returned no explicit severity; treated as blocking per the anti-laundering rule and recorded as Major.)",
+      "verificationMethod": "Read the Full-tier Getting Started paragraph in README.md and step 1 of tools/dabbler-ai-orchestration/README.md; confirm both state same-seat-as-078 and the explicit not-validated claim.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Both READMEs now read: validated so far ONLY on a single personal seat (the same seat Set 078's evidence came from / validated on); multi-seat and enterprise-seat model availability are not yet validated; an enterprise-managed seat may expose only one provider family and fail the two-provider check even when the guided flow itself succeeds/ran."
+    },
+    {
+      "issueId": "S5-V-002",
+      "issueType": "standards-departure",
+      "category": "docs",
+      "severity": "Major",
+      "description": "The root README's Getting Started paragraph kept the generic phrasing 'warns inline when a Python interpreter or provider API key can't be found', implying DABBLER_* keys are a prerequisite for every Full-tier setup - stale now that the Copilot seat option needs no keys. (Verifier returned no explicit severity; treated as blocking per the anti-laundering rule and recorded as Major.)",
+      "verificationMethod": "Read the sentence in README.md's 'For new projects' paragraph; confirm the key warning is qualified to the direct-API option and the Copilot option's missing-CLI warning is named instead.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Sentence now reads: 'warns inline when a Python interpreter can't be found - and, for the direct-API option, when no provider API key is visible (the Copilot seat option instead warns when the copilot CLI is missing; ...)'. The extension README already carried the qualified phrasing ('the direct-API option needs one') and is unchanged by this fix."
+    }
+  ]
+}

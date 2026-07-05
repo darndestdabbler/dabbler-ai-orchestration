@@ -301,6 +301,76 @@
           "costUsd": 0.041813
         }
       ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 1,
+      "stepKey": "s5.docs",
+      "dateTime": "2026-07-05T05:23:25.280007-04:00",
+      "description": "Updated docs/concepts/tier-model.md (guided in-form seat setup as primary activation path, manual as fallback; evidence-basis extended with the M3 honesty note: multi-seat/enterprise unvalidated, 079 dogfood on the SAME personal seat as 078, POSIX-kill and power-loss limits), README.md and tools/dabbler-ai-orchestration/README.md (Full-tier provider-access sub-choice + missing-CLI warning + same honesty caveat), and docs/templates/consumer-bootstrap/getting-started.md.template (keys required only for the direct-API option; Copilot CLI seat alternative described honestly). Decomposition prompt (sessionGenPrompt.ts) checked: references tier only at spec-authoring level (tier: full|lightweight), unchanged by this feature - no edit needed. Prose drafted via route(task_type=documentation) (gemini generator + gpt-5-4-mini auto-verify); three load-bearing claims the draft dropped were restored during merge (lockfile fail-closed sentence, 078 operator-override evidence record, $0-budget parenthetical).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "documentation",
+          "costUsd": 0.036
+        }
+      ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 2,
+      "stepKey": "s5.uat",
+      "dateTime": "2026-07-05T05:30:40.806581-04:00",
+      "description": "Authored 079-copilot-seat-onboarding-and-verification-copy-uat-checklist.json to the Set 078/077-rewrite bar: 6 walks (sub-choice render, reload persistence, induced missing-CLI warning via copilotCliPath, REAL guided happy-path Build on the operator seat, REAL mid-run cancel, simplified verification-mode copy). Every literal string re-grounded against current source during authoring; every cited Layer-2 suite re-run fresh (Set 079 S1 suites 20/20, verification-mode block 5/5, copilotSeatSetup 82/82, gitScaffold 25/25); walks 4-5 lean on the S2/S3 real-seat dogfoods (102s success 15/18; real cancel, tree-kill, no partial lockfile). Ad-hoc floor validated: all 6 non-judgment items carry ProgrammaticVerification. Honest scope limits in Notes: single personal seat (M3), keys-present machine (keyless variants Layer-2-pinned), POSIX branch unwalkable on win32, no auth-failure walk (078 stance). Authored direct per the routed ai-assignment routing table (supersedes generic uat-plan-generation default, matching 077/078 practice).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "s5.release-scope",
+      "dateTime": "2026-07-05T05:32:00.366564-04:00",
+      "description": "Spec step 7 confirmed: git diff a05c014..HEAD -- ai_router/ pyproject.toml is EMPTY (tracked) and git status shows no working-tree changes there either; ai_router/router-metrics.jsonl is gitignored. The non-goals zero-ai_router-changes claim held -- this is an extension-only release (dabbler-ai-router stays 0.28.0; extension 0.34.0 -> 0.35.0).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 4,
+      "stepKey": "s5.release",
+      "dateTime": "2026-07-05T05:39:49.462234-04:00",
+      "description": "Release prep: extension version 0.34.0 -> 0.35.0 (package.json), CHANGELOG.md 0.35.0 entry (extension-only release, honesty caveats + evidence limits recorded), docs/repository-reference.md release-status row + version-walk entry (publish PENDING operator UAT walk + tag authorization; rollback names extension 0.34.0 which is confirmed live on the Marketplace per L-078-1). npm run compile resynced dist/templates (getting-started template edit). Suites: pytest 2483 passed / 5 skipped (baseline); npx tsc --noEmit clean; npm run test:unit 1238 passing after regenerating the cold-start golden snapshots (the intended getting-started template drift; UPDATE_GOLDEN=1). No TS source changed this session (docs/copy/config only), so no new lint surface.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "s5.critique",
+      "dateTime": "2026-07-05T06:12:53.100385-04:00",
+      "description": "End-of-set multi-provider path-aware critique (ai_router.pull_critique, google gemini-2.5-pro + openai gpt-5.4, full-repo sandbox, get_diff a05c014..HEAD). Round lineage: R1 ran both critics but was DISCARDED unwritten by the producer identity guard (--level required vs the recorded policy none -- the spec prose said required but the config block never seeded it; spec-authoring gap flagged for Step 9). R2 wrote a valid artifact but its instruction framed the critics on S4 close summary only (the producer fills from disposition.json). R3 (FINAL, committed): preliminary set-wide S5 disposition authored first so the instruction covered the whole set; gemini VERIFIED 0 findings (release scope, honesty-note propagation, UAT checklist all checked); gpt-5.4 ISSUES_FOUND with 1 Major contract-drift, adjudicated accept-finding with false-premise notes (recorded via record_adjudication): the fictional test-fixture command string was fixed, the blocking claims (checklist reference; unfollowable recovery path) were refuted by grep/source evidence. Converged per L-070-1: artifact is evidence, adjudication in disposition; no further round (the residue was a test-string rename, exactly the Minor-churn L-071-1 forbids re-running two provider arms over).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "s5.honesty-note",
+      "dateTime": "2026-07-05T06:19:12.197000-04:00",
+      "description": "M3 honesty note verified present on every required surface after the R1 fixes: tier-model.md evidence basis, both READMEs (same-seat-as-078 + explicit not-validated wording), the getting-started template, the CHANGELOG evidence-limits section, and the UAT checklist Notes/walk framing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "s5.verification",
+      "dateTime": "2026-07-05T06:19:12.198006-04:00",
+      "description": "Cross-provider session verification (routed gate REQUIRED). gpt-5-4 R1: two findings, no verdict token/severities - blocking per L-071-1 anti-laundering; S5-V-001 (README honesty caveat incomplete) and S5-V-002 (stale generic key-requirement phrasing) both fixed; R2 narrow re-verify VERIFIED, both ledger ids RESOLVED. Artifacts: s5-verification.md, s5-verification-round-2.md, s5-issues.json. Routed cost this session (router-metrics): $0.25.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.193
+        }
+      ]
     }
   ]
 }

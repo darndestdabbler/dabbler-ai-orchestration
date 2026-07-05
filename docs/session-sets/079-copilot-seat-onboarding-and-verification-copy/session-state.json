@@ -62,10 +62,15 @@
     {
       "number": 5,
       "title": "Docs, UAT, and release",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-05T05:16:33.204421-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "high"
+      },
       "verificationVerdict": null
     }
   ]

@@ -142,19 +142,33 @@ starting point is **`Dabbler: Get Started`** from the command palette.
 The Session Set Explorer's Getting Started form walks you through tier
 choice (Full vs. Lightweight — see
 [docs/concepts/tier-model.md](docs/concepts/tier-model.md)); picking
+Full surfaces a second choice for provider access — direct `DABBLER_*`
+API keys (the default) or a GitHub Copilot CLI seat that routes calls
+through your Copilot subscription with no provider keys, with an
+inline warning when the `copilot` CLI can't be found; picking
 Lightweight surfaces a second choice between separate verification
 sessions (a dedicated session on a different AI engine or provider
 reviews the work before the set can close) and manual review (paste a
 review prompt into a second AI assistant yourself and record what it
-says — the default). Both picks persist through a window
+says — the default). All picks persist through a window
 reload. The form also runs the Full-tier verification **budget / NTE
 step** (saved to `ai_router/budget.yaml` —
 [schema](docs/budget-yaml-schema.md)), warns inline when a Python
-interpreter or provider API key can't be found (checked before any
-write, so a missing prerequisite fails with a friendly explainer and
-leaves nothing behind), and performs a one-click project scaffold: the
+interpreter can't be found — and, for the direct-API option, when no
+provider API key is visible (the Copilot seat option instead warns
+when the `copilot` CLI is missing; prerequisites are checked before
+any write, so a missing one fails with a friendly explainer and
+leaves nothing behind) — and performs a one-click project scaffold: the
 `.venv` with the router package, the AI-agent instruction files, and
-the `docs/session-sets/` home. From there the form hands you copyable
+the `docs/session-sets/` home. With the Copilot seat option, Build
+also runs the seat's catalog check and enables the seat profile only
+when the seat confirms two distinct provider families — validated so
+far only on a single personal seat (the same seat Set 078's evidence
+came from); multi-seat and enterprise-seat model availability are not
+yet validated, and an enterprise-managed seat may expose only one
+provider family and fail the two-provider check even when the guided
+flow itself succeeds — the form reports that honestly instead of
+leaving a silently broken router. From there the form hands you copyable
 prompts for drafting `docs/planning/project-plan.md` and decomposing
 it into session sets with your AI agent. The four-tier budget mapping
 is documented in

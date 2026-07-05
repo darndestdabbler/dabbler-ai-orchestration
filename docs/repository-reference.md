@@ -64,9 +64,34 @@ can learn it.
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
 | `dabbler-ai-router` | `0.28.0` | **Published.** Sequenced per the release-ordering invariant: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437` — the commit where the 0.27.0 version bump landed, before Set 078 bumped further), then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`). Both confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.34.0` | **Published.** Set 077 (tier-leak fix + durable markers, three-way setup choice, Python prerequisite check, self-completing Evaluate prompts + canonical verification doc, owed-state auto-routing and row wording, record-over-seed mode derivation). Published 2026-07-04 to the Marketplace and Open VSX (tag `vsix-v0.34.0`, publish-vscode.yml run [28718703898](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718703898), tagged commit `a391f61`). The existing `VSCE_PAT` was still valid — no renewal needed. | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.35.0` | **Version-bumped in repo; publish PENDING.** Set 079 (guided Full-tier Copilot seat-profile onboarding + simplified verification-mode copy; extension-only — `ai_router` untouched, router stays `0.28.0`). The `vsix-v0.35.0` tag push is held for the operator's UAT walk (`docs/session-sets/079-copilot-seat-onboarding-and-verification-copy/079-…-uat-checklist.json`) and explicit tag authorization. The live published build remains `0.34.0` (Set 077 — tier-leak fix + durable markers, three-way setup choice, Python prerequisite check, self-completing Evaluate prompts, owed-state auto-routing; published 2026-07-04 to Marketplace and Open VSX, tag `vsix-v0.34.0`, publish-vscode.yml run [28718703898](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718703898), tagged commit `a391f61`). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
+
+- **Extension `0.35.0`** — Set 079, Copilot seat-profile onboarding and
+  verification-mode copy. Extension-only (`ai_router` untouched; router
+  stays `0.28.0` — the zero-`ai_router`-changes claim was verified by
+  diff at set close). Feature 1 gives Set 078's `copilot-cli` seat
+  profile a guided, discoverable path inside the Getting Started form:
+  a Full-tier "Provider access" sub-choice (direct API keys default /
+  Copilot CLI seat), a step-1 missing-CLI warning, scaffold-then-refresh
+  sequencing on the scaffolded venv's own interpreter with auto-derived
+  seat identity, a cancellable progress notification with
+  host-teardown disposal, a parsed provider-count check (exit code
+  never trusted), an anchored `transport.profile` render (never an
+  append), and honest failure UX on every branch keyed on real
+  `DABBLER_*` presence. Feature 2 simplifies the Lightweight
+  verification-mode radio copy (plain language, same values/schema).
+  Honesty carried forward: evidence remains a **single personal seat**
+  (Set 079's dogfoods ran on the same seat as Set 078's); multi-seat /
+  enterprise-seat availability is NOT validated; the POSIX cancel
+  branch is unit-pinned only; the config write is process-crash-atomic,
+  not power-loss-durable. Rollback (config/install-only): reinstall
+  extension `0.34.0` from the Marketplace (published 2026-07-04,
+  confirmed live) — workspaces that already wrote
+  `transport.profile: copilot-cli` can hand-flip it back to `api` if
+  needed; no data migration either way. **Publish pending** the
+  operator's UAT walk and tag authorization (`vsix-v0.35.0`).
 
 - **`dabbler-ai-router 0.28.0`** — Set 078, Copilot CLI hybrid tier. Gives
   the Full tier a subscription-billed **seat profile**: a new

@@ -83,23 +83,37 @@ step-by-step instructions in the editor:
 
 1. **Build project structure** — pick your tier (Full or
    Lightweight, the cost/attention tradeoff described above). Choosing
-   Lightweight surfaces a second choice: **separate verification
-   sessions** (a dedicated session on a different AI engine or
-   provider reviews the work before the set can close) or **manual
-   review** (paste a review prompt into a second AI assistant yourself
-   and record what it says — the default). Both choices persist through a
-   window reload, so revisiting the form never silently reverts them.
-   The form scaffolds everything: the `.venv` with the router package,
-   the AI-agent instruction files, and the `docs/session-sets/`
-   home. On the Full tier the form also asks for your verification
-   **budget / NTE cap** (saved to `ai_router/budget.yaml`; a `$0`
-   budget asks you to pick manual-via-other-engine or skipped
-   verification explicitly) and warns inline when no provider API
-   key is visible. A step-1 warning also appears if a Python
-   interpreter can't be found (with install guidance); the Build
-   action checks for one before writing anything, so a missing
-   interpreter fails with a friendly explainer instead of a raw
-   error, leaving no partial setup behind.
+   Full surfaces a second choice for **provider access**: **direct
+   provider API keys** (the default) or a **GitHub Copilot CLI seat**
+   (calls run through your Copilot subscription's command-line tool —
+   no `DABBLER_*` keys needed). Choosing Lightweight surfaces a second
+   choice: **separate verification sessions** (a dedicated session on
+   a different AI engine or provider reviews the work before the set
+   can close) or **manual review** (paste a review prompt into a
+   second AI assistant yourself and record what it says — the
+   default). All choices persist through a window reload, so
+   revisiting the form never silently reverts them. The form
+   scaffolds everything: the `.venv` with the router package, the
+   AI-agent instruction files, and the `docs/session-sets/` home. On
+   the Full tier the form also asks for your verification **budget /
+   NTE cap** (saved to `ai_router/budget.yaml`; a `$0` budget asks
+   you to pick manual-via-other-engine or skipped verification
+   explicitly) and warns inline when no provider API key is visible
+   (the direct-API option needs one). A step-1 warning also appears
+   if a Python interpreter — or, with the Copilot seat option
+   selected, the `copilot` CLI — can't be found (with install
+   guidance); the Build action checks prerequisites before writing
+   anything, so a missing tool fails with a friendly explainer
+   instead of a raw error, leaving no partial setup behind. With the
+   Copilot seat option, Build finishes by checking the seat's model
+   catalog and enables the seat profile only when the seat confirms
+   two distinct provider families — a check validated so far only on
+   a single personal seat (the same seat Set 078 validated on);
+   multi-seat and enterprise-seat model availability are not yet
+   validated, and an enterprise-managed seat may expose only one
+   provider family and fail the two-provider check even though the
+   guided flow itself ran — the form says so honestly rather than
+   leaving a silently broken router.
 2. **Create or import a project plan** — import an existing
    `project-plan.md`, or copy a planning prompt and let your AI
    agent draft the plan with you.

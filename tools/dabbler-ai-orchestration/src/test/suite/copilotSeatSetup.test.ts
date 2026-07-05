@@ -793,7 +793,14 @@ suite("copilotSeatSetup", () => {
   // (gemini-pro) and adapted (composer copy re-grounded against the real
   // strings; tmp-write assertion fixed for the move-semantics fake). ---
   suite("Session 3 failure-matrix", () => {
-    const rerunHint = 'run "Dabbler: Set Up Copilot Seat"';
+    // Realistic fixture: production (gitScaffold.rerunRefreshHint) passes a
+    // directly runnable copilot_catalog --refresh command line, never a VS
+    // Code command name — no such command is contributed in package.json
+    // (S5 path-aware critique: a fictional command string here misled a
+    // repo-reading reviewer into a contract-drift finding).
+    const rerunHint =
+      '.venv\\Scripts\\python.exe -m ai_router.copilot_catalog --refresh ' +
+      '--seat-id seat-abc123def456 --seat-label "project"';
     const projectDir =
       process.platform === "win32" ? "C:\\Users\\test\\project" : "/home/test/project";
     const configRel = path.join("ai_router", "router-config.yaml");
@@ -849,7 +856,7 @@ suite("copilotSeatSetup", () => {
           assert.strictEqual(msg.level, "warning");
           assert.match(msg.message, /not yet functional/);
           assert.doesNotMatch(msg.message, /api profile working/);
-          assert.match(msg.message, new RegExp(rerunHint));
+          assert.ok(msg.message.includes(rerunHint));
         });
 
         test("keys present: affirms 'api profile working', gives rerun hint", () => {
@@ -861,7 +868,7 @@ suite("copilotSeatSetup", () => {
           assert.strictEqual(msg.level, "warning");
           assert.match(msg.message, /api profile working/);
           assert.doesNotMatch(msg.message, /not yet functional/);
-          assert.match(msg.message, new RegExp(rerunHint));
+          assert.ok(msg.message.includes(rerunHint));
         });
 
         test("reason-specific guidance: 0 confirmed -> 'CLI may be missing'", () => {
@@ -897,7 +904,7 @@ suite("copilotSeatSetup", () => {
           assert.match(msg.message, /not yet functional/);
           assert.doesNotMatch(msg.message, /api profile working/);
           assert.match(msg.message, /test detail/);
-          assert.match(msg.message, new RegExp(rerunHint));
+          assert.ok(msg.message.includes(rerunHint));
         });
 
         test("keys present: affirms 'api profile working', gives rerun hint", () => {
@@ -905,7 +912,7 @@ suite("copilotSeatSetup", () => {
           assert.strictEqual(msg.level, "warning");
           assert.match(msg.message, /api profile working/);
           assert.doesNotMatch(msg.message, /not yet functional/);
-          assert.match(msg.message, new RegExp(rerunHint));
+          assert.ok(msg.message.includes(rerunHint));
         });
       });
 
@@ -917,7 +924,7 @@ suite("copilotSeatSetup", () => {
           assert.match(msg.message, /lockfile was restored/);
           assert.match(msg.message, /not yet functional/);
           assert.doesNotMatch(msg.message, /api profile working/);
-          assert.match(msg.message, new RegExp(rerunHint));
+          assert.ok(msg.message.includes(rerunHint));
         });
 
         test("keys present: affirms 'api profile working', mentions restore + rerun hint", () => {
@@ -926,7 +933,7 @@ suite("copilotSeatSetup", () => {
           assert.match(msg.message, /lockfile was restored/);
           assert.match(msg.message, /api profile working/);
           assert.doesNotMatch(msg.message, /not yet functional/);
-          assert.match(msg.message, new RegExp(rerunHint));
+          assert.ok(msg.message.includes(rerunHint));
         });
       });
 
@@ -942,7 +949,7 @@ suite("copilotSeatSetup", () => {
           assert.match(msg.message, /not yet functional/);
           assert.doesNotMatch(msg.message, /api profile with the DABBLER_\* key/);
           assert.match(msg.message, /no re-probe is needed/);
-          assert.doesNotMatch(msg.message, new RegExp(rerunHint));
+          assert.ok(!msg.message.includes(rerunHint));
         });
 
         test("keys present: affirms api keeps running, gives hand-edit guidance", () => {
@@ -951,7 +958,7 @@ suite("copilotSeatSetup", () => {
           assert.match(msg.message, /api profile with the DABBLER_\* key/);
           assert.doesNotMatch(msg.message, /not yet functional/);
           assert.match(msg.message, /no re-probe is needed/);
-          assert.doesNotMatch(msg.message, new RegExp(rerunHint));
+          assert.ok(!msg.message.includes(rerunHint));
         });
       });
     });

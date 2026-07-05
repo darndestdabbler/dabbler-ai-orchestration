@@ -16,19 +16,29 @@ option and then click **Build project structure**.
 
 **Full tier.** The full tier uses an AI router to "outsource" much of
 the work via AI APIs. By outsourcing most of the work, you pay more
-money but you are less subject to AI capacity limitations. Also,
-assuming that you have set up accounts with multiple AI engines, each
-session is automatically cross-verified with a different AI engine
-than the one that did the development work.
+money but you are less subject to AI capacity limitations. The full
+tier needs access to more than one AI provider family, so that work
+done under one provider is automatically cross-verified by a
+different one.
 
-The AI router requires that you have accounts with at least one API
-(should be a different provider from the one that you use for your
-sessions) and that your provider-issued account keys are stored in Dabbler-named
-environment variables (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY`, or
-`DABBLER_GEMINI_API_KEY`). These are the same keys you get from Anthropic,
-Google, or OpenAI; only the environment variable names are Dabbler-prefixed to
-avoid collisions with provider-owned tools. For more information on setting up the accounts
-and environment variables, see the tier model documentation:
+There are two ways to give the router that access. The default is
+**direct provider API keys**: you have an account with at least one
+provider (it should be a different provider from the one that runs
+your sessions) and your provider-issued keys are stored in
+Dabbler-named environment variables (`DABBLER_ANTHROPIC_API_KEY`,
+`DABBLER_OPENAI_API_KEY`, or `DABBLER_GEMINI_API_KEY`). These are the
+same keys you get from Anthropic, Google, or OpenAI; only the
+environment variable names are Dabbler-prefixed to avoid collisions
+with provider-owned tools. The alternative, for users whose only AI
+access is a GitHub Copilot subscription, is the **GitHub Copilot CLI
+seat** option in the form: calls run through the `copilot`
+command-line tool instead, and no provider API keys are needed — but
+the GitHub Copilot CLI must be installed on your machine. When you
+pick the Copilot option, the Build step configures and checks the
+seat automatically: it confirms the seat can dispatch models from at
+least two different provider families, and tells you honestly if it
+cannot (some enterprise-managed seats expose only one). For more
+information on either option, see the tier model documentation:
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
 
 **Lightweight tier.** The lightweight tier does not outsource any AI

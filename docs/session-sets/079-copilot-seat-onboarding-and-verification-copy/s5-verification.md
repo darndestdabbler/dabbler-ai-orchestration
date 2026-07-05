@@ -1,0 +1,7 @@
+- **Issue →** The honesty caveat is incomplete in both READMEs. They mention a single personal seat and the one-provider-family failure shape, but they do **not** say Set 079 used the **same** seat as Set 078, and they do **not** explicitly say multi-seat / enterprise-seat availability remains **unvalidated**.  
+  **Location →** `README.md` (Full-tier Getting Started paragraph), `tools/dabbler-ai-orchestration/README.md` (step 1 Copilot-seat paragraph).  
+  **Fix →** Add explicit wording in both places: validated only on the **same single personal seat used in Set 078**; **multi-seat and enterprise-seat model availability are not validated**; a different team or enterprise-managed seat may expose only one provider family and fail the ≥2-provider gate even though the guided flow itself succeeds.
+
+- **Issue →** The root README still overstates provider API keys as a general Full-tier prerequisite, which leaves a stale “Full requires `DABBLER_*` keys” implication in a touched surface.  
+  **Location →** `README.md`, the sentence beginning `The form also runs the Full-tier verification budget / NTE step... warns inline when a Python interpreter or provider API key can't be found...`  
+  **Fix →** Qualify the warning by sub-choice: direct API mode warns on missing `DABBLER_*` keys; Copilot-seat mode warns on missing `copilot` CLI. Remove the generic phrasing that makes provider API keys sound required for all Full-tier setups.

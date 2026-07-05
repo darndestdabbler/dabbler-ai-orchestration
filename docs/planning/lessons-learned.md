@@ -215,7 +215,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   alongside the diff so additions are visible.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="077" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="079" status="active" scope="portable" -->
 
 - **Context:** Cross-provider verification of a heavily cross-referenced
   synthesis document — a proposal, design doc, or spec whose central
@@ -423,7 +423,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   done. Record the resolved installed version in the close-out, not just the new floor.
 
 ## A Rollback Recipe Naming A Pinned Version Must Confirm That Version Is Actually Available
-<!-- lesson: id="L-078-1" added-set="078" last-used-set="078" status="active" scope="portable" -->
+<!-- lesson: id="L-078-1" added-set="078" last-used-set="079" status="active" scope="portable" -->
 
 - **Context:** Writing a rollback/downgrade recipe as part of a release-prep session,
   before the referenced versions have actually published (Set 078 S5's `copilot-cli`

@@ -78,12 +78,14 @@
   // the operator's three-way setup choice (Full / Lightweight+dedicated /
   // Lightweight+out-of-band).
   var VERIFICATION_MODE_LABEL_TEXT = "Verification (per session set)";
+  // Set 079 S4 (Feature 2): plain-language rewrite of both descriptions
+  // (same meaning, same radio values — only the human-facing copy).
   var VERIFICATION_MODE_OUT_OF_BAND_TEXT =
-    "Out-of-band or none — copy a review prompt into a second AI " +
-    "assistant and record its verdict by hand (the default).";
+    "Manual review (default) — paste a review prompt into a second AI " +
+    "assistant yourself and record what it says.";
   var VERIFICATION_MODE_DEDICATED_TEXT =
-    "Dedicated verification sessions — structured verification sessions " +
-    "run on a different AI engine or provider, with a close-out gate.";
+    "Separate verification sessions — a dedicated session on a different " +
+    "AI engine or provider reviews the work before the set can close.";
 
   // Set 077 S3 (A10): the missing-Python warning at the top of step 1.
   // BOTH tiers need a base interpreter (Lightweight is router-off, not

@@ -1,30 +1,28 @@
 {
   "status": "completed",
-  "summary": "Session 3 of 5: the failure matrix and the honest failure UX (critique C3). New pure composer describeSeatSetupOutcome(outcome, providerKeysPresent, rerunHint) in copilotSeatSetup.ts, keyed on the SAME DABBLER_* presence probe the Full-tier inline key warning uses (providerKeyPresent) - every failure branch (insufficient-providers, refresh-failed, cancelled, config-write-failed, and gitScaffold's skip-install-incomplete) lands in exactly one of two honest states: keyless => 'router is not yet functional' + reason-specific fix guidance; keys present => api affirmed as a genuinely working fallback. insufficient-providers distinguishes confirmed==0 (CLI missing / not signed in - re-run can help) from a 1-provider enterprise-locked seat (re-run will not change the result); config-write-failed instructs the one-field hand edit, no re-probe. Both named S2 residuals closed: (1) atomic config write - writeConfigAtomically stages <config>.dabbler-seat-setup.tmp then renames (optional FileOps.rename, real ops use fs.renameSync; no-rename fallback keeps writing; failed rename cleans temp and surfaces as config-write-failed; guarantee deliberately scoped to process-crash atomic replacement, not power-loss durability); (2) POSIX process-tree kill - the refresh child spawns detached on POSIX (own group leader) and cancel dispatches through the extracted, exported dispatchKill(platform, pid, KillEffects): win32 taskkill /T (async spawn-error fallback via makeRealKillEffects), POSIX process.kill(-pid, SIGTERM), sync-throw fallback to plain kill. requiresE2E 'suggested' resolved: NO new Playwright Layer-3 spec - the async-progress surface is a native vscode notification the webview harness cannot drive; all logic behind it is Layer-2-pinned; decision + reasoning recorded (s3.e2e-decision). 31 new Layer-2 tests (1206 -> 1237 passing). Real induced-failure dogfood: missing-binary run => insufficient-providers with the keyless honest message in 0.3s; REAL mid-run cancel (copilot CLI 1.0.68, 15s in) killed the python child AND both live copilot descendants (taskkill /T verified), restored the lockfile to pre-run absent; real-NTFS temp+rename replaced an existing config with no tmp left.",
+  "summary": "Session 4 of 5: Feature 2, the simplified Lightweight verification-mode copy. Rewrote VERIFICATION_MODE_OUT_OF_BAND_TEXT ('Manual review (default) - paste a review prompt into a second AI assistant yourself and record what it says.') and VERIFICATION_MODE_DEDICATED_TEXT ('Separate verification sessions - a dedicated session on a different AI engine or provider reviews the work before the set can close.') in gettingStartedHtml.js - copy only; radio values, schema, and gate logic untouched. The dedicated description was checked against actual Mode B behavior before locking (critique m3: operator-started typed sessions, engine-or-provider rule, Q6 close gate - no automation overclaim). Added a Layer-2 pin test asserting the exact strings + block render (no prior test pinned the literals). Swept both READMEs' paraphrases. Deliberate residuals recorded in s4-close-reason.md: the 079 spec's before-state quote, the sealed/attested 077 UAT checklist, the distinct setupVerification.ts QuickPick copy, and generic workflow-term uses. Incidental: resynced the committed dist/extension.js, stale since S3's dispatchKill refactor (templates-only drift guard cannot see the bundle). Suites green: pytest 2483/5 skipped; tsc clean; Layer 2 1238 passing; Playwright 17/19 parallel with both failures proven environmental flakes on isolated re-run (neither touches the getting-started form). Feature 2 stays independently landable from Feature 1 (critique m6).",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "tools/dabbler-ai-orchestration/src/utils/copilotSeatSetup.ts",
-    "tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts",
-    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
-    "tools/dabbler-ai-orchestration/src/commands/installAiRouterCommands.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/copilotSeatSetup.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldSeatSetup.test.ts",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
+    "README.md",
+    "tools/dabbler-ai-orchestration/README.md",
     "tools/dabbler-ai-orchestration/dist/extension.js",
     "tools/dabbler-ai-orchestration/dist/extension.js.map"
   ],
   "verification_message_ids": [],
-  "verification_notes": "Routed gate REQUIRED (blast-radius, multi-module, breadth). Routed code-review first (opus -> gpt-5-4 auto-verify VERIFIED): 1 Major (POSIX kill dispatch had zero unit coverage -> extracted injectable dispatchKill + 5 tests) + 2 Minors + 3 suggestions, all fixed in-session. Session verification on gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator): R1 returned two findings with no verdict token and no severities - treated as blocking per the L-071-1 anti-laundering rule; ledger ids S3-V-001 (async taskkill-error fallback untested -> makeRealKillEffects factory with TaskkillSpawn seam + 3 pinning tests) and S3-V-002 (skip-install honesty tests missing the negative half -> fixed). R2 (narrow, fixes-only) VERIFIED with both ledger ids resolved and no regression. Known, honestly-scoped limitations carried to S5 docs: the POSIX group-kill is unit-pinned but not live-dogfooded (win32 host); atomicity is process-crash-scoped (no fsync).",
+  "verification_notes": "Routed gate REQUIRED (multi-module, breadth >=4 files). Routed code-review first (sonnet -> gemini-pro auto-verify): 1 Major - the new pin-test comment falsely claimed both READMEs quote the strings verbatim (they paraphrase; a literal grep finds zero README hits) - fixed in-session by stating the paraphrase relationship and naming both README paths. 2 Minors, no code change (default-marker placement differs by design; 'reviews the work' judged not an automation overclaim). Session verification on gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator): VERIFIED round 1; the response was the bare verdict token with no summary prose - recorded as-is per never-edit discipline; a wording-only re-verify round was not opened per the L-071-1 materiality discipline.",
   "next_orchestrator": {
     "engine": "claude",
     "provider": "anthropic",
     "model": "claude-fable-5",
-    "effort": "medium",
+    "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 4 is Feature 2 (simplified verification-mode copy): a small copy decision plus a repo-wide stale-quote sweep - mechanical breadth, not deep reasoning. The routed ai-assignment recommendation (authored at set start) is claude-fable-5 @ medium with routed code-review as the completeness net; nothing in Sessions 1-3 changed that calculus, and Session 4 is deliberately independent of Feature 1 (critique m6)."
+      "specifics": "Session 5 is docs + UAT authoring + the required end-of-set multi-provider path-aware critique + release. Fresh routed analysis (gemini-pro, post-S4) recommends high effort: the literal-HumanAction/Expectation UAT bar and the path-aware critique demand more precision and synthesis than routine release mechanics. This supersedes the set-start recommendation of medium (which rested on Set 077 S6 / 078 S5 precedent); the operator controls the final choice."
     }
   },
   "blockers": [],
-  "lessons_cited": ["L-064-3", "L-064-9", "L-064-10", "L-071-1"]
+  "lessons_cited": ["L-064-3", "L-064-6", "L-064-9", "L-064-10", "L-071-1"]
 }

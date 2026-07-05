@@ -48,10 +48,15 @@
     {
       "number": 4,
       "title": "Simplify verification-mode copy (Feature 2)",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-05T04:54:08.900203-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "medium"
+      },
       "verificationVerdict": null
     },
     {

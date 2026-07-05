@@ -157,16 +157,19 @@ Low
 | 5.   | Full pass; verify; close | `direct:shell`, `session-verification` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium (as recommended)
+- Total routed cost: $0.12 (code-review sonnet $0.07 + gemini-pro auto-verify $0.01; session-verification gpt-5-4 $0.04; next-orch analysis gemini-pro <$0.01)
+- Deviations from recommendation: none on routing. Code-review found 1 Major (the new pin-test comment claimed the READMEs quote the strings verbatim when they paraphrase — fixed in-session); session verification (gpt-5-4) VERIFIED in one round, bare verdict token with no summary prose (noted; not worth a wording-only re-verify round per L-071-1).
+- Notes for next-session calibration: the sweep's deliberate residuals are recorded in s4-close-reason.md — S5's README pass must NOT "fix" the 077 UAT checklist's old-copy quotes (sealed attested record) and must re-ground its own UAT strings against the NEW copy (pin test: gettingStartedHtml.test.ts "pins the simplified verification-mode copy"). Incidental dist resync: the committed dist/extension.js was stale relative to S3's dispatchKill refactor (templates-only drift guard cannot see extension.js); resynced in the S4 commit — S5's release build regenerates it anyway.
 
 **Next-session orchestrator recommendation (Session 5):**
-Claude Code claude-fable-5 @ effort=medium
-Rationale: Session 5 is UAT authoring + docs + release mechanics, the
-same profile as Set 077 Session 6 and Set 078 Session 5, where medium
-effort plus routed review/verification consistently sufficed.
+Claude Code claude-fable-5 @ effort=high
+Rationale (routed, gemini-pro, post-S4): the literal-HumanAction/Expectation
+UAT bar and the required multi-provider path-aware critique demand more
+precision and synthesis than routine docs/release mechanics — high effort to
+land a verified outcome on the first attempt. (Supersedes the set-start
+recommendation of medium, which rested on the Set 077 S6 / 078 S5 precedent;
+the operator controls the final choice per Rule 7.)
 
 ---
 

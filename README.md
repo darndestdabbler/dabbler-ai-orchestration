@@ -142,11 +142,11 @@ starting point is **`Dabbler: Get Started`** from the command palette.
 The Session Set Explorer's Getting Started form walks you through tier
 choice (Full vs. Lightweight — see
 [docs/concepts/tier-model.md](docs/concepts/tier-model.md)); picking
-Lightweight surfaces a second choice between dedicated verification
-sessions (a different AI engine/provider runs a structured
-verification session, with a close-out gate) and out-of-band-or-none
-(copy a review prompt into a second AI assistant and record its
-verdict by hand — the default). Both picks persist through a window
+Lightweight surfaces a second choice between separate verification
+sessions (a dedicated session on a different AI engine or provider
+reviews the work before the set can close) and manual review (paste a
+review prompt into a second AI assistant yourself and record what it
+says — the default). Both picks persist through a window
 reload. The form also runs the Full-tier verification **budget / NTE
 step** (saved to `ai_router/budget.yaml` —
 [schema](docs/budget-yaml-schema.md)), warns inline when a Python

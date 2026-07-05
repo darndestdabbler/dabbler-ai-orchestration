@@ -83,11 +83,11 @@ step-by-step instructions in the editor:
 
 1. **Build project structure** — pick your tier (Full or
    Lightweight, the cost/attention tradeoff described above). Choosing
-   Lightweight surfaces a second choice: **dedicated verification
-   sessions** (structured verification sessions run on a different AI
-   engine or provider, with a close-out gate) or **out-of-band or
-   none** (copy a review prompt into a second AI assistant and record
-   its verdict by hand — the default). Both choices persist through a
+   Lightweight surfaces a second choice: **separate verification
+   sessions** (a dedicated session on a different AI engine or
+   provider reviews the work before the set can close) or **manual
+   review** (paste a review prompt into a second AI assistant yourself
+   and record what it says — the default). Both choices persist through a
    window reload, so revisiting the form never silently reverts them.
    The form scaffolds everything: the `.venv` with the router package,
    the AI-agent instruction files, and the `docs/session-sets/`

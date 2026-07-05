@@ -23572,6 +23572,18 @@ function currentUsername() {
     return process.env.USERNAME ?? process.env.USER ?? "user";
   }
 }
+function makeRealKillEffects(child, spawnFn = (cmd, args, opts) => cp3.spawn(cmd, args, opts)) {
+  return {
+    taskkillTree: (pid) => {
+      const tk = spawnFn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+        windowsHide: true
+      });
+      tk.on("error", () => child.kill());
+    },
+    signalGroup: (pid) => process.kill(-pid, "SIGTERM"),
+    plainKill: () => child.kill()
+  };
+}
 function makeRefreshChildSpawner() {
   return (cmd, args, opts, callbacks) => {
     const child = cp3.spawn(cmd, args, {
@@ -23596,16 +23608,7 @@ function makeRefreshChildSpawner() {
     child.on("close", (code) => callbacks.onClose(code));
     return {
       kill: () => {
-        dispatchKill(process.platform, child.pid, {
-          taskkillTree: (pid) => {
-            const tk = cp3.spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
-              windowsHide: true
-            });
-            tk.on("error", () => child.kill());
-          },
-          signalGroup: (pid) => process.kill(-pid, "SIGTERM"),
-          plainKill: () => child.kill()
-        });
+        dispatchKill(process.platform, child.pid, makeRealKillEffects(child));
       }
     };
   };

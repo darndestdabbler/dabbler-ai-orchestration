@@ -243,6 +243,64 @@
           "costUsd": 0.2208
         }
       ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "s4.copy",
+      "dateTime": "2026-07-05T05:02:06.843578-04:00",
+      "description": "Finalized the simplified verification-mode copy from the spec draft after verifying the dedicated description against actual Mode B behavior (workflow doc: operator-started typed sessions, engine-or-provider difference, close-out gate hard-blocks interactive set-terminal close) - no automation overclaim (critique m3). New strings: OUT_OF_BAND='Manual review (default) - paste a review prompt into a second AI assistant yourself and record what it says.'; DEDICATED='Separate verification sessions - a dedicated session on a different AI engine or provider reviews the work before the set can close.' Updated VERIFICATION_MODE_*_TEXT in media/session-sets-tree/gettingStartedHtml.js (values unchanged); added a literal pin test + render assertions to gettingStartedHtml.test.ts (no prior test pinned the exact strings - they asserted via constant reference only).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "s4.sweep",
+      "dateTime": "2026-07-05T05:02:06.843578-04:00",
+      "description": "Repo-wide grep sweep for the OLD strings and distinctive fragments (full sentences, 'copy a review prompt into a second AI assistant', 'structured verification sessions run', 'with a close-out gate', 'verdict by hand'). Verbatim quoters found and updated: README.md:144-150 and tools/dabbler-ai-orchestration/README.md:84-91. Deliberate residuals (recorded, not misses): 079 spec.md quotes the old strings as the before-state; 077 UAT checklist is a sealed attested record (Passes:true) - S5 authors the new-copy UAT; setupVerification.ts QuickPick copy is a different surface with its own wording; generic workflow uses of 'close-out gate'/'verdict by hand in external-verification.md' are not quotes; dist/extension.js does not embed the form copy (grep-verified - media webview script ships unbundled).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "s4.tests",
+      "dateTime": "2026-07-05T05:04:00.522043-04:00",
+      "description": "Routed code-review of the sweep (raw output saved to s4-code-review.md). Generator (sonnet) found 1 Major: the new pin-test comment falsely claimed both READMEs quote the strings verbatim (they paraphrase - a literal grep would miss them); fixed the comment to state the paraphrase relationship and name both README paths. Two Minors noted, no code change: (default)-marker placement differs by design between constant and README prose; 'reviews the work' phrasing judged within acceptable copy range (no automation overclaim). Auto-verify (gemini-pro) ISSUES_FOUND concerned the review artifact's own template completeness (no security/perf section for a copy-only diff), not the session code.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "sonnet",
+          "taskType": "code-review",
+          "inputTokens": 2856,
+          "outputTokens": 4114,
+          "costUsd": 0.070278
+        }
+      ]
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "s4.tests",
+      "dateTime": "2026-07-05T05:08:14.969245-04:00",
+      "description": "Full pre-commit pass green: python -m pytest 2483 passed / 5 skipped; npx tsc --noEmit clean; npm run test:unit 1238 passing (includes the new Set 079 S4 pin test asserting the exact simplified strings + block render); npm run test:playwright 17/19 first pass with 2 environmental flakes (migration-cta-v4:78, session-sets-tree:284 - F1 palette timeout under parallel load), both pass on isolated re-run; neither spec touches the getting-started form. Drift guard (test_drift_guard.py) included in the pytest pass. Incidental: the compile step revealed the committed dist/extension.js was stale relative to Session 3 dispatchKill/makeRealKillEffects source refactor (media copy is not bundled; the templates-only dist-in-sync guard cannot see extension.js) - the rebuilt bundle is included in this session commit to resync.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "s4.tests",
+      "dateTime": "2026-07-05T05:12:29.247156-04:00",
+      "description": "Routed gate REQUIRED (multi-module + breadth). Cross-provider session verification on gpt-5-4: VERIFIED round 1 (raw output saved unedited to s4-verification.md; bare verdict token, no summary prose - recorded, no wording-only re-verify opened per L-071-1). Disposition authored with verification_verdict=VERIFIED and routed next-orchestrator recommendation for S5 (claude-fable-5 @ high, gemini-pro analysis superseding the set-start medium).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 3855,
+          "outputTokens": 2145,
+          "costUsd": 0.041813
+        }
+      ]
     }
   ]
 }

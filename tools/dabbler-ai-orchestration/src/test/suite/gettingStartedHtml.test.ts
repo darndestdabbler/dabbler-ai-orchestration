@@ -71,6 +71,8 @@ const gsHtml = requireFromPackageRoot(
   pythonWarningHtml(visible: boolean): string;
   PYTHON_WARNING_TEXT: string;
   VERIFICATION_MODE_LABEL_TEXT: string;
+  VERIFICATION_MODE_OUT_OF_BAND_TEXT: string;
+  VERIFICATION_MODE_DEDICATED_TEXT: string;
   // Set 079 S1: the Full-only seat-profile block + the missing-CLI
   // warning.
   transportProfileBlockHtml(
@@ -597,6 +599,30 @@ suite("gettingStartedHtml — verification-mode block (Set 077 S3)", () => {
     });
     assert.ok(/value="dedicated-sessions" checked/.test(html));
     assert.ok(!/value="out-of-band-or-none" checked/.test(html));
+  });
+
+  // Set 079 S4 (Feature 2): pin the simplified plain-language copy and
+  // prove the block renders it. Both READMEs paraphrase these constants
+  // (not verbatim copies — the default marker moves to a trailing
+  // "— the default" there), so a literal grep for these strings will
+  // NOT find the README echoes: any wording change here requires a
+  // parallel prose update in both README.md and
+  // tools/dabbler-ai-orchestration/README.md.
+  test("pins the simplified verification-mode copy (Set 079 S4)", () => {
+    assert.strictEqual(
+      gsHtml.VERIFICATION_MODE_OUT_OF_BAND_TEXT,
+      "Manual review (default) — paste a review prompt into a second AI " +
+        "assistant yourself and record what it says.",
+    );
+    assert.strictEqual(
+      gsHtml.VERIFICATION_MODE_DEDICATED_TEXT,
+      "Separate verification sessions — a dedicated session on a " +
+        "different AI engine or provider reviews the work before the " +
+        "set can close.",
+    );
+    const html = gsHtml.verificationModeBlockHtml(LIGHT);
+    assert.ok(html.includes(gsHtml.VERIFICATION_MODE_OUT_OF_BAND_TEXT));
+    assert.ok(html.includes(gsHtml.VERIFICATION_MODE_DEDICATED_TEXT));
   });
 
   test("budget block and verification block are mutually exclusive by tier", () => {

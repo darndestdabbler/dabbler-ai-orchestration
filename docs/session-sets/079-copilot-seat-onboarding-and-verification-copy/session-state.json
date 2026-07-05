@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "079-copilot-seat-onboarding-and-verification-copy",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -62,16 +62,16 @@
     {
       "number": 5,
       "title": "Docs, UAT, and release",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-05T05:16:33.204421-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-05T15:07:12.628957-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
         "model": "claude-fable-5",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

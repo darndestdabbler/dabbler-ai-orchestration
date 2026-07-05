@@ -1,7 +1,7 @@
 {
   "sessionSetName": "080-getting-started-subchoice-legibility",
   "createdDate": "2026-07-05T19:58:00.064798+00:00",
-  "totalSessions": 0,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -76,6 +76,22 @@
       "stepKey": "session-1/routed-gate",
       "dateTime": "2026-07-05T16:13:10.094515-04:00",
       "description": "routed_gate verdict SKIP (exit 10): 3 files, 1 module, no coupling triggers; per Set 068 DEMOTE the per-session routed verification is bypassed; no raise-only flags apply",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "s2.uat",
+      "dateTime": "2026-07-05T16:26:50.432955-04:00",
+      "description": "Authored 080-getting-started-subchoice-legibility-uat-checklist.json to the Set 078/079 bar: 3 walks / 5 items (Full-group rows + judgment, Lightweight-group rows + judgment, whole-row selection + reload persistence). Every literal string re-grounded against current gettingStartedHtml.js/tree.css during authoring (programmatic string-match sweep: 10/10 found in both source and checklist); every cited Layer-2 suite re-run fresh during authoring: Set 080 S1 6/6, Set 079 S1 20/20, verification-mode block 5/5, restoreGsState 26/26. Ad-hoc floor validated programmatically: 3 functional items all carry ProgrammaticVerification, 2 judgment items flagged IsJudgmentItem with justification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/vsix-build",
+      "dateTime": "2026-07-05T16:26:50.432955-04:00",
+      "description": "Built local VSIX for the operator walk (Set 058 lesson: locally built only): npx vsce package -> tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.35.0.vsix (36 files, 1.08 MB, built 2026-07-05 16:26 from master with the S1 row layout; version string still 0.35.0 - the 0.36.0 bump lands at the release step after UAT).",
       "status": "complete"
     }
   ]

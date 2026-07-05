@@ -328,6 +328,12 @@ export interface SeatSetupFileOps {
   readFile(absPath: string): string;
   writeFile(absPath: string, content: string): void;
   removeRecursive(absPath: string): void;
+  /** Atomic replace (S3, S2-residual): when present, the config write
+   * goes through temp-file + rename so a mid-write crash can never leave
+   * a truncated router-config.yaml. Optional so existing structural
+   * satisfiers (and older test fakes) keep compiling; absent, the write
+   * falls back to the plain (non-atomic) writeFile. */
+  rename?(oldAbsPath: string, newAbsPath: string): void;
 }
 
 /** Minimal handle over the spawned child — kill is all the runner needs. */
@@ -598,6 +604,254 @@ export type SeatSetupOutcome =
       detail: string;
     };
 
+/** Suffix for the temp file the atomic config write stages through —
+ * distinctive so a crash-orphaned temp is attributable at a glance. */
+export const CONFIG_WRITE_TMP_SUFFIX = ".dabbler-seat-setup.tmp";
+
+/**
+ * The config write, atomically when the ops support it (S3, the named S2
+ * residual): stage the full new content in a sibling temp file, then
+ * rename over the target — a PROCESS crash between the write and the
+ * rename leaves the original router-config.yaml intact (plus an orphaned
+ * temp), never a truncated config. (The guarantee is process-crash
+ * atomic-replacement; sudden power loss without an fsync is out of scope
+ * — S3 review finding 5, scoped deliberately.) When the injected ops
+ * carry no `rename`, fall back to the plain write (the pre-S3 behavior)
+ * rather than silently skipping the write. A failed rename cleans up its
+ * temp best-effort and rethrows so the caller reports
+ * `config-write-failed` with the real cause.
+ */
+export function writeConfigAtomically(
+  ops: SeatSetupFileOps,
+  configAbs: string,
+  content: string,
+): void {
+  if (!ops.rename) {
+    ops.writeFile(configAbs, content);
+    return;
+  }
+  const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
+  ops.writeFile(tmpAbs, content);
+  try {
+    ops.rename(tmpAbs, configAbs);
+  } catch (err) {
+    try {
+      ops.removeRecursive(tmpAbs);
+    } catch {
+      // best-effort cleanup — the rename failure is the real story
+    }
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Child-kill strategy (S3, the named S2 residual: POSIX process-tree kill)
+// ---------------------------------------------------------------------------
+
+export type KillStrategy = "taskkill-tree" | "posix-group" | "plain";
+
+/**
+ * Which kill mechanism the refresh spawner should use. The refresh's
+ * python child spawns the `copilot` binary as a grandchild, so a plain
+ * kill() signals only the interpreter and orphans the in-flight probe:
+ *   - win32 → `taskkill /pid <pid> /T /F` (shipped in S2);
+ *   - POSIX → signal the process GROUP (`kill(-pid)`) — requires the
+ *     child to have been spawned `detached: true` so it leads its own
+ *     group (the spawner's `spawnDetached` flag below);
+ *   - no pid (spawn failed early) → plain kill() as the only option.
+ */
+export function resolveKillStrategy(
+  platform: NodeJS.Platform,
+  pid: number | undefined,
+): KillStrategy {
+  if (!pid) return "plain";
+  return platform === "win32" ? "taskkill-tree" : "posix-group";
+}
+
+/** Whether the refresh child must be spawned `detached` on this platform
+ * (POSIX group-kill needs the child to lead its own process group;
+ * win32's taskkill /T walks the tree without it). */
+export function spawnDetached(platform: NodeJS.Platform): boolean {
+  return platform !== "win32";
+}
+
+/** The three concrete kill mechanisms, injected so the dispatch below is
+ * pinnable at Layer 2 without real processes (S3 review Major 1). */
+export interface KillEffects {
+  /** win32: `taskkill /pid <pid> /T /F` (the spawner also wires the
+   * taskkill child's async `error` event to `plainKill` — a missing or
+   * blocked taskkill reports asynchronously, not as a sync throw). */
+  taskkillTree(pid: number): void;
+  /** POSIX: signal the process GROUP — `process.kill(-pid, "SIGTERM")`. */
+  signalGroup(pid: number): void;
+  /** The last resort: the child handle's own kill(). */
+  plainKill(): void;
+}
+
+/**
+ * Dispatch a cancel-kill through the platform strategy, falling back to
+ * the plain kill when the preferred mechanism throws synchronously.
+ * (Each `break` exits the switch; the plain kill runs after it — there
+ * is no case-to-case fall-through.)
+ */
+export function dispatchKill(
+  platform: NodeJS.Platform,
+  pid: number | undefined,
+  fx: KillEffects,
+): void {
+  switch (resolveKillStrategy(platform, pid)) {
+    case "taskkill-tree":
+      try {
+        fx.taskkillTree(pid as number);
+        return;
+      } catch {
+        break; // exit switch -> plainKill below
+      }
+    case "posix-group":
+      try {
+        fx.signalGroup(pid as number);
+        return;
+      } catch {
+        break; // group gone or not a leader -> plainKill below
+      }
+    case "plain":
+      break;
+  }
+  fx.plainKill();
+}
+
+// ---------------------------------------------------------------------------
+// Honest per-outcome messaging (S3, critique C3 — the corrected failure UX)
+// ---------------------------------------------------------------------------
+
+export interface SeatSetupMessage {
+  level: "info" | "warning";
+  message: string;
+}
+
+/**
+ * Compose the operator-facing message for a seat-setup outcome — the
+ * corrected failure UX (spec Feature 1 → Failure UX, critique C3), as a
+ * pure function so every failure branch's honesty is pinned by Layer-2
+ * tests without a live extension host.
+ *
+ * The load-bearing rule: `api` is presented as a working state ONLY when
+ * `providerKeysPresent` is true (the caller runs the same `DABBLER_*`
+ * probe the Full-tier inline key warning uses). For the keyless audience
+ * — this feature's exact target audience, a Copilot-locked shop where no
+ * `DABBLER_*` key is possible — every failure says plainly that the
+ * router is not yet functional, plus reason-specific fix guidance. Every
+ * failure path lands in exactly one of those two honest states; none
+ * implies `api` "still works" when no key exists to make it work.
+ */
+export function describeSeatSetupOutcome(
+  outcome: SeatSetupOutcome,
+  providerKeysPresent: boolean,
+  rerunHint: string,
+): SeatSetupMessage {
+  const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunHint}`;
+  const keyless =
+    "no DABBLER_* provider key is set, so the router is not yet functional";
+  const keyed =
+    "the DABBLER_* provider key(s) already set keep the api profile working";
+  switch (outcome.kind) {
+    case "success":
+      return {
+        level: "info",
+        message:
+          `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models ` +
+          `confirmed (providers: ${outcome.providers.join(", ")}). ` +
+          "transport.profile: copilot-cli written to ai_router/router-config.yaml.",
+      };
+    case "insufficient-providers": {
+      // Reason-specific guidance: zero confirmations means the CLI never
+      // answered (missing binary, not signed in, blocked) — a re-run
+      // after fixing that can genuinely change the result. Exactly one
+      // confirmed provider family is the enterprise-locked-seat shape,
+      // where a plain re-run will NOT change anything (the multi-seat
+      // honesty stance this set carries forward).
+      const cause =
+        outcome.confirmed === 0
+          ? "No models responded at all — the Copilot CLI may be missing " +
+            "from PATH, not signed in, or blocked by policy. "
+          : outcome.providers.length === 1
+            ? "This seat may expose only one provider family (an " +
+              "enterprise-managed seat can do this), in which case " +
+              "re-running will not change the result. "
+            : "";
+      return {
+        level: "warning",
+        message:
+          `Copilot seat setup completed, but only ${outcome.providers.length} ` +
+          `distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) — ` +
+          "routed dispatch would fail closed, so router-config.yaml keeps " +
+          `transport.profile: api. ${cause}` +
+          (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) +
+          "The probe lockfile was kept for inspection at " +
+          `ai_router/copilot-catalog.lock. ${rerun}`,
+      };
+    }
+    case "refresh-failed":
+      return {
+        level: "warning",
+        message: providerKeysPresent
+          ? `Copilot seat setup failed: ${outcome.detail}. router-config.yaml ` +
+            `keeps transport.profile: api, and ${keyed}. To use the Copilot ` +
+            `seat instead, fix the cause first. ${rerun}`
+          : `Scaffold completed, but the Copilot seat setup did not: ` +
+            `${outcome.detail}. router-config.yaml keeps transport.profile: ` +
+            `api, and ${keyless}. Fix the cause, then: ${rerun}`,
+      };
+    case "cancelled":
+      return {
+        level: "warning",
+        message:
+          "Copilot seat setup was cancelled — the lockfile was restored to " +
+          "its pre-run state and router-config.yaml keeps " +
+          "transport.profile: api. " +
+          (providerKeysPresent
+            ? `Meanwhile ${keyed}. `
+            : `Note ${keyless} until seat setup completes. `) +
+          rerun,
+      };
+    case "config-write-failed":
+      return {
+        level: "warning",
+        message:
+          `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) ` +
+          "and the lockfile is in place, but writing transport.profile to " +
+          `ai_router/router-config.yaml failed: ${outcome.detail}. Set ` +
+          "`profile: copilot-cli` under the `transport:` block in that file " +
+          "by hand — no re-probe is needed. Until then " +
+          (providerKeysPresent
+            ? "the router keeps running on the api profile with the " +
+              "DABBLER_* key(s) already set."
+            : "the router is not yet functional (transport.profile is " +
+              "still api and no DABBLER_* provider key is set)."),
+      };
+    default: {
+      // Exhaustiveness guard (S3 review finding 6): a future
+      // SeatSetupOutcome kind must fail the build here, not return
+      // undefined at runtime.
+      const unreachable: never = outcome;
+      throw new Error(`unhandled seat-setup outcome: ${JSON.stringify(unreachable)}`);
+    }
+  }
+}
+
+/** The honesty suffix for the install-incomplete skip branch (the
+ * scaffold's install failed, so the refresh had no venv to run in) —
+ * same two-honest-states rule as {@link describeSeatSetupOutcome}. */
+export function describeSkipInstallIncompleteHonesty(
+  providerKeysPresent: boolean,
+): string {
+  return providerKeysPresent
+    ? "The DABBLER_* provider key(s) already set will keep the api " +
+      "profile working once the install completes."
+    : "No DABBLER_* provider key is set, so the router is not functional " +
+      "until the install completes and seat setup succeeds.";
+}
+
 /** Last couple of non-empty output lines, for operator-facing messages
  * (the `aiRouterInstall.oneLine` posture). */
 function outputTail(s: string): string {
@@ -672,7 +926,9 @@ export async function performCopilotSeatSetup(
             detail: rendered.reason,
           };
         }
-        if (rendered.changed) deps.fileOps.writeFile(configAbs, rendered.text);
+        if (rendered.changed) {
+          writeConfigAtomically(deps.fileOps, configAbs, rendered.text);
+        }
         return { kind: "success", ...base };
       } catch (err) {
         return {

@@ -170,6 +170,79 @@
           "costUsd": 0.022235
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "s3.failure-ux",
+      "dateTime": "2026-07-05T03:51:09.069262-04:00",
+      "description": "Implemented the corrected failure UX (critique C3): pure describeSeatSetupOutcome composer in copilotSeatSetup.ts keyed on the same DABBLER_* presence probe the Full-tier key warning uses (providerKeyPresent) - every failure outcome (insufficient-providers, refresh-failed, cancelled, config-write-failed, skip-install-incomplete) lands in one of two honest states: keyless => 'router is not yet functional' + reason-specific fix; keys present => api offered as a genuinely working fallback. Reason-specific guidance distinguishes confirmed==0 (CLI missing/not signed in) from a 1-provider enterprise-locked seat. gitScaffold messaging switch replaced by the composer.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "s3.failure-ux",
+      "dateTime": "2026-07-05T03:51:09.070257-04:00",
+      "description": "Closed the two named S2 residuals: (1) atomic config write - writeConfigAtomically (temp + rename via new optional FileOps.rename; makeFileOps implements fs.renameSync; plain-write fallback when ops lack rename; failed rename cleans temp and reports config-write-failed); (2) POSIX process-tree kill - refresh child spawned detached on POSIX (own process group), cancel signals the group (kill(-pid, SIGTERM)) via resolveKillStrategy; win32 taskkill /T unchanged. tsc --noEmit clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "s3.dogfood",
+      "dateTime": "2026-07-05T03:59:14.915937-04:00",
+      "description": "Real induced-failure dogfood (driver: scratchpad s3_dogfood.js, real venv python + real GitHub Copilot CLI 1.0.68, scratch project, 2026-07-05). Run A missing binary (--binary nonexistent): completed 0.3s, 0/18 confirmed, providers=[] -> insufficient-providers; lockfile kept (CLI's own artifact); config stays api; keyless message says 'not yet functional' + 'CLI may be missing from PATH'. Run B mid-run cancel against the REAL CLI at 15s: child pid 14948 had 2 live descendants pre-cancel; post-cancel outcome=cancelled, python pid dead, BOTH descendants dead (taskkill /T tree-kill verified), NO partial lockfile (restored to pre-run absent). Run C atomic config write on real NTFS: temp+rename replaced existing router-config.yaml, profile: copilot-cli, no tmp left behind. Results persisted to s3-dogfood-results.json in the session scratchpad.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "s3.e2e-decision",
+      "dateTime": "2026-07-05T03:59:14.922964-04:00",
+      "description": "requiresE2E: suggested - DECISION: no Playwright Layer-3 addition for the async-progress UI. Reasoning: the progress surface is a native vscode.window.withProgress notification, not webview DOM - the Layer-3 harness renders the Explorer/Getting Started webview in a browser and cannot drive native VS Code notifications. Everything behind that surface (cancellable-notification options, cancellation propagation, teardown disposal, per-outcome honest messaging) is pinned at Layer 2 through SeatSetupProgressSeams/BuildStructureSeams against the real runCopilotSeatSetupWithProgress and buildProjectStructureNoPrompt paths, plus two real-CLI dogfoods (S2 happy path; S3 induced failures). Sessions 2-3 added no new webview DOM (S1's radio/warning already has Layer-2 render tests), so there is no rendered-DOM delta for Playwright to cover.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "s3.tests",
+      "dateTime": "2026-07-05T04:12:14.236671-04:00",
+      "description": "Layer-2 failure-matrix tests: routed test-generation (gemini-pro) produced the honest-UX matrix (5 outcome kinds x keyed/keyless), writeConfigAtomically cases, performCopilotSeatSetup atomic-write integration, and kill-strategy selectors; adapted (composer copy re-grounded, tmp-write assertion fixed for move-semantics fake). Routed code-review (opus -> gpt-5-4 auto-verify VERIFIED, $0.44): 1 Major (POSIX kill dispatch had no unit coverage -> extracted injectable dispatchKill(platform, pid, KillEffects), spawner now calls it with real effects, 5 new dispatch tests incl. sync-throw fallback), 2 Minors fixed (keyless tests now also assert the NEGATIVE half - no api-works claim; taskkill spawn failure now falls back via the taskkill child's async error event), 3 suggestions taken (comment rewording, atomicity guarantee scoped to process-crash, exhaustiveness never-guard on the composer). Suite: 1234 passing, tsc --noEmit clean, changed-files eslint clean (6 pre-existing no-var-requires errors in 5 untouched Set-077-era test files are baseline, not S3 regressions).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.0
+        },
+        {
+          "model": "opus",
+          "taskType": "code-review",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.4383
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "s3.verification",
+      "dateTime": "2026-07-05T04:27:41.719178-04:00",
+      "description": "Routed gate: REQUIRED (blast-radius, multi-module, breadth). Cross-provider session verification on gpt-5-4 (OpenAI): R1 returned two findings with NO verdict token and NO severities -> treated as blocking per the anti-laundering rule (L-071-1); ledger ids S3-V-001 (async taskkill fallback untested -> fixed via exported makeRealKillEffects factory + TaskkillSpawn seam + 3 pinning tests) and S3-V-002 (skip-install honesty tests missing the negative half -> fixed). R2 (narrow, fixes-only) VERIFIED, both ledger ids resolved, no regression. Suites at close: mocha 1237 passing, tsc clean, changed-files eslint clean, pytest 2483/5 skipped, Playwright 19 passed. Artifacts: s3-verification.md, s3-verification-round-2.md, s3-issues.json.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.2208
+        }
+      ]
     }
   ]
 }

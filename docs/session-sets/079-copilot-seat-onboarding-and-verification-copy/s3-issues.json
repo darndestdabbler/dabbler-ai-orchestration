@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "issueId": "S3-V-001",
+      "issueType": "standards-departure",
+      "category": "tests",
+      "severity": "Major",
+      "description": "The new async taskkill fallback path is untested: the taskkill child's 'error' event wiring to the plain child.kill() fallback (gitScaffold.ts makeRefreshChildSpawner kill effects) had no unit coverage; the dispatchKill tests only cover synchronous throws. (Verifier returned no explicit severity; treated as blocking per the anti-laundering rule and recorded as Major.)",
+      "verificationMethod": "Inspect the kill/dispatch test coverage in copilotSeatSetup.test.ts / gitScaffoldSeatSetup.test.ts for a case that emits the taskkill child's error event and asserts the plain-kill fallback runs.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Extracted makeRealKillEffects(child, spawnFn) in gitScaffold.ts (exported, with a TaskkillSpawn seam); the spawner's kill() now calls dispatchKill(platform, pid, makeRealKillEffects(child)). New gitScaffoldSeatSetup.test.ts suite pins: taskkill argv + no plain kill on success; the ASYNC error event falling back to child.kill(); plainKill delegating to the child's own kill()."
+    },
+    {
+      "issueId": "S3-V-002",
+      "issueType": "standards-departure",
+      "category": "tests",
+      "severity": "Minor",
+      "description": "describeSkipInstallIncompleteHonesty tests pinned only the positive half of the two-honest-states invariant: the keyless case lacked doesNotMatch(/api profile working/). (Verifier returned no explicit severity; the keyed negative half already existed. Fixed in the same pass regardless.)",
+      "verificationMethod": "Inspect the describeSkipInstallIncompleteHonesty suite for reciprocal negative assertions on both branches.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Keyless case now asserts doesNotMatch(/api profile working/); keyed case keeps doesNotMatch(/not functional/)."
+    }
+  ]
+}

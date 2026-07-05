@@ -14,13 +14,19 @@ import {
 import { makeSpawner, makeFileOps } from "./installAiRouterCommands";
 import { resolveCopilotCliBinary } from "../utils/copilotCli";
 import {
+  KillEffects,
   RefreshChildSpawner,
   SeatSetupOutcome,
   TransportProfile,
   deriveSeatId,
   deriveSeatLabel,
+  describeSeatSetupOutcome,
+  describeSkipInstallIncompleteHonesty,
+  dispatchKill,
   performCopilotSeatSetup,
+  spawnDetached,
 } from "../utils/copilotSeatSetup";
+import { providerKeyPresent } from "../utils/gettingStartedDetection";
 import {
   describeMissingPython,
   probePythonPresence,
@@ -533,12 +539,17 @@ export async function buildProjectStructureNoPrompt(
       // Honest state, not a silent skip: the operator chose the Copilot
       // seat but the scaffold's install step failed, so the refresh has
       // no venv to run in. router-config.yaml (if seeded) keeps `api`.
+      // The S3 honesty suffix applies the same two-honest-states rule as
+      // every other failure branch (critique C3): keyless operators are
+      // told the router is not functional, never implied-working `api`.
       showWarning(
         "Copilot seat setup was skipped because the ai-router install did " +
           "not complete — the catalog refresh runs inside the scaffolded " +
           ".venv. Finish the install (\"Dabbler: Install ai-router\"), then " +
           "run seat setup from the venv: " +
-          rerunRefreshHint(projectDir),
+          rerunRefreshHint(projectDir) +
+          " " +
+          describeSkipInstallIncompleteHonesty(providerKeyPresent(process.env)),
       );
       break;
     case "skip-not-selected":
@@ -605,6 +616,45 @@ function currentUsername(): string {
   }
 }
 
+/** The child subset the real kill effects need. */
+interface KillableChild {
+  pid?: number;
+  kill(): unknown;
+}
+
+/** The spawn subset {@link makeRealKillEffects} needs — returns a handle
+ * whose async `error` event is the only signal a missing/blocked taskkill
+ * gives (it does NOT throw synchronously). */
+export type TaskkillSpawn = (
+  cmd: string,
+  args: string[],
+  opts: { windowsHide: boolean },
+) => { on(event: "error", cb: (err: Error) => void): unknown };
+
+/**
+ * The REAL {@link KillEffects} for a spawned refresh child — exported so
+ * the Layer-2 suite can pin the async taskkill-error fallback (S3
+ * verification round 1) by injecting a fake spawn.
+ */
+export function makeRealKillEffects(
+  child: KillableChild,
+  spawnFn: TaskkillSpawn = (cmd, args, opts) => cp.spawn(cmd, args, opts),
+): KillEffects {
+  return {
+    taskkillTree: (pid) => {
+      const tk = spawnFn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+        windowsHide: true,
+      });
+      // spawn reports a missing/blocked taskkill via the async `error`
+      // event, not a sync throw (S3 review finding 3) — fall back to the
+      // plain kill from there.
+      tk.on("error", () => child.kill());
+    },
+    signalGroup: (pid) => process.kill(-pid, "SIGTERM"),
+    plainKill: () => child.kill(),
+  };
+}
+
 /** Real `child_process.spawn` adapter for the refresh runner. */
 function makeRefreshChildSpawner(): RefreshChildSpawner {
   return (cmd, args, opts, callbacks) => {
@@ -612,6 +662,11 @@ function makeRefreshChildSpawner(): RefreshChildSpawner {
       cwd: opts.cwd,
       env: process.env,
       windowsHide: true,
+      // POSIX: run the child as its own process-group leader so a cancel
+      // can signal the whole group — python AND its in-flight `copilot`
+      // grandchild (S3, the named S2 residual). win32 stays undetached;
+      // taskkill /T walks the tree without it.
+      detached: spawnDetached(process.platform),
     });
     child.stdout?.on("data", (chunk: Buffer) =>
       callbacks.onStdout(chunk.toString("utf8")),
@@ -623,25 +678,14 @@ function makeRefreshChildSpawner(): RefreshChildSpawner {
     child.on("close", (code: number | null) => callbacks.onClose(code));
     return {
       kill: () => {
-        // S2 review Minor 3: the refresh's python child spawns the
-        // `copilot` binary as a grandchild; a plain kill() signals only
-        // the interpreter and (on Windows especially) orphans the
-        // in-flight probe. Kill the whole tree via taskkill on win32.
-        // POSIX keeps the single kill — the orphaned grandchild is
-        // bounded by its own per-probe timeout; a full process-group
-        // kill is Session 3 failure-matrix scope if the induced-failure
-        // dogfood shows it matters.
-        if (process.platform === "win32" && child.pid) {
-          try {
-            cp.spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
-              windowsHide: true,
-            });
-            return;
-          } catch {
-            // fall through to the plain kill
-          }
-        }
-        child.kill();
+        // S2 review Minor 3 + S3 residual: the refresh's python child
+        // spawns the `copilot` binary as a grandchild; a plain kill()
+        // signals only the interpreter and orphans the in-flight probe.
+        // Kill the whole tree — taskkill /T on win32, process-group
+        // signal on POSIX (the child is its own group leader, above).
+        // The dispatch itself is the pinned `dispatchKill`; the effects
+        // come from the pinned factory above.
+        dispatchKill(process.platform, child.pid, makeRealKillEffects(child));
       },
     };
   };
@@ -730,46 +774,15 @@ export async function runCopilotSeatSetupWithProgress(
       }),
   );
 
-  const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunRefreshHint(projectDir)}`;
-  switch (outcome.kind) {
-    case "success":
-      showInfo(
-        `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models ` +
-          `confirmed (providers: ${outcome.providers.join(", ")}). ` +
-          "transport.profile: copilot-cli written to ai_router/router-config.yaml.",
-      );
-      break;
-    case "insufficient-providers":
-      showWarning(
-        `Copilot seat setup completed, but only ${outcome.providers.length} ` +
-          `distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) — ` +
-          "routed dispatch would fail closed, so router-config.yaml keeps " +
-          "transport.profile: api. The probe lockfile was kept for " +
-          `inspection at ai_router/copilot-catalog.lock. ${rerun}`,
-      );
-      break;
-    case "refresh-failed":
-      showWarning(
-        `Copilot seat setup failed: ${outcome.detail}. router-config.yaml ` +
-          `keeps transport.profile: api. ${rerun}`,
-      );
-      break;
-    case "cancelled":
-      showWarning(
-        "Copilot seat setup was cancelled — the lockfile was restored to " +
-          "its pre-run state and router-config.yaml keeps " +
-          `transport.profile: api. ${rerun}`,
-      );
-      break;
-    case "config-write-failed":
-      showWarning(
-        `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) ` +
-          "and the lockfile is in place, but writing transport.profile to " +
-          `ai_router/router-config.yaml failed: ${outcome.detail}. Set ` +
-          "`transport:  profile: copilot-cli` in that file by hand — no " +
-          "re-probe is needed.",
-      );
-      break;
-  }
+  // S3 (critique C3 — the corrected failure UX): every outcome message is
+  // composed by the pure `describeSeatSetupOutcome`, keyed on the SAME
+  // `DABBLER_*` presence probe the Full-tier inline key warning uses —
+  // `api` is only ever presented as working when a key actually exists.
+  const msg = describeSeatSetupOutcome(
+    outcome,
+    providerKeyPresent(process.env),
+    rerunRefreshHint(projectDir),
+  );
+  (msg.level === "info" ? showInfo : showWarning)(msg.message);
   return outcome;
 }

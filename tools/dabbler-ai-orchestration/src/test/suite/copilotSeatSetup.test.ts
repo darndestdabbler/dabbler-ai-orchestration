@@ -11,20 +11,29 @@ import * as assert from "assert";
 import * as path from "path";
 import {
   CATALOG_LOCKFILE_REL,
+  CONFIG_WRITE_TMP_SUFFIX,
   CancellationLike,
+  KillEffects,
   RefreshChildCallbacks,
   RefreshChildSpawner,
   RunCatalogRefreshDeps,
   SeatSetupFileOps,
+  SeatSetupOutcome,
   SeedReadOps,
   buildRefreshArgs,
   deriveSeatId,
   deriveSeatLabel,
+  describeSeatSetupOutcome,
+  describeSkipInstallIncompleteHonesty,
+  dispatchKill,
   parseRefreshStdout,
   performCopilotSeatSetup,
   readTransportProfile,
   renderTransportProfile,
+  resolveKillStrategy,
   runCatalogRefresh,
+  spawnDetached,
+  writeConfigAtomically,
 } from "../../utils/copilotSeatSetup";
 import {
   asTransportProfileRider,
@@ -775,6 +784,401 @@ suite("copilotSeatSetup", () => {
 
       test("full throws on a malformed rider", () => {
         assert.throws(() => resolveTransportProfile(msg("invalid"), "full"));
+      });
+    });
+  });
+
+  // --- Session 3: the failure matrix (honest failure UX, atomic config
+  // write, kill strategy). Cases generated via routed test-generation
+  // (gemini-pro) and adapted (composer copy re-grounded against the real
+  // strings; tmp-write assertion fixed for the move-semantics fake). ---
+  suite("Session 3 failure-matrix", () => {
+    const rerunHint = 'run "Dabbler: Set Up Copilot Seat"';
+    const projectDir =
+      process.platform === "win32" ? "C:\\Users\\test\\project" : "/home/test/project";
+    const configRel = path.join("ai_router", "router-config.yaml");
+    const configAbs = path.join(projectDir, configRel);
+    const baseConfigContent = "transport:\n  profile: api\n";
+
+    // S3 fake: file ops with atomic rename support (the base FakeFileOps
+    // deliberately stays rename-less — it must keep satisfying
+    // SeatSetupFileOps without one, pinning the optionality).
+    class FakeFileOpsWithRename extends FakeFileOps {
+      public renameLog: { old: string; new: string }[] = [];
+      public throwOnRename: Error | null = null;
+
+      rename(oldAbsPath: string, newAbsPath: string): void {
+        if (this.throwOnRename) throw this.throwOnRename;
+        this.renameLog.push({ old: oldAbsPath, new: newAbsPath });
+        if (this.files.has(oldAbsPath)) {
+          this.files.set(newAbsPath, this.files.get(oldAbsPath)!);
+          this.files.delete(oldAbsPath);
+        }
+      }
+    }
+
+    suite("describeSeatSetupOutcome (honest failure UX)", () => {
+      suite("kind: success", () => {
+        const outcome: SeatSetupOutcome = {
+          kind: "success",
+          providers: ["p1", "p2"],
+          confirmed: 10,
+          total: 12,
+        };
+        test("message is level:info, identical for keyed/keyless states", () => {
+          const expected =
+            "Copilot seat set up: 10/12 models confirmed (providers: p1, p2). " +
+            "transport.profile: copilot-cli written to ai_router/router-config.yaml.";
+          const msgKeyless = describeSeatSetupOutcome(outcome, false, rerunHint);
+          assert.strictEqual(msgKeyless.level, "info");
+          assert.strictEqual(msgKeyless.message, expected);
+          const msgKeyed = describeSeatSetupOutcome(outcome, true, rerunHint);
+          assert.strictEqual(msgKeyed.level, "info");
+          assert.strictEqual(msgKeyed.message, expected);
+        });
+      });
+
+      suite("kind: insufficient-providers", () => {
+        const baseOutcome = { confirmed: 1, total: 12 };
+        test("keyless: warns 'not yet functional', no api-works claim, gives rerun hint", () => {
+          const msg = describeSeatSetupOutcome(
+            { kind: "insufficient-providers", ...baseOutcome, providers: ["p1"] },
+            false,
+            rerunHint,
+          );
+          assert.strictEqual(msg.level, "warning");
+          assert.match(msg.message, /not yet functional/);
+          assert.doesNotMatch(msg.message, /api profile working/);
+          assert.match(msg.message, new RegExp(rerunHint));
+        });
+
+        test("keys present: affirms 'api profile working', gives rerun hint", () => {
+          const msg = describeSeatSetupOutcome(
+            { kind: "insufficient-providers", ...baseOutcome, providers: ["p1"] },
+            true,
+            rerunHint,
+          );
+          assert.strictEqual(msg.level, "warning");
+          assert.match(msg.message, /api profile working/);
+          assert.doesNotMatch(msg.message, /not yet functional/);
+          assert.match(msg.message, new RegExp(rerunHint));
+        });
+
+        test("reason-specific guidance: 0 confirmed -> 'CLI may be missing'", () => {
+          const msg = describeSeatSetupOutcome(
+            { kind: "insufficient-providers", confirmed: 0, total: 12, providers: [] },
+            false,
+            rerunHint,
+          );
+          assert.match(msg.message, /CLI may be missing/);
+          assert.doesNotMatch(msg.message, /only one provider family/);
+        });
+
+        test("reason-specific guidance: 1 provider -> enterprise-lock note", () => {
+          const msg = describeSeatSetupOutcome(
+            { kind: "insufficient-providers", confirmed: 5, total: 12, providers: ["p1"] },
+            false,
+            rerunHint,
+          );
+          assert.match(msg.message, /only one provider family/);
+          assert.match(msg.message, /re-running will not change the result/);
+          assert.doesNotMatch(msg.message, /CLI may be missing/);
+        });
+      });
+
+      suite("kind: refresh-failed", () => {
+        const outcome: SeatSetupOutcome = {
+          kind: "refresh-failed",
+          detail: "test detail",
+        };
+        test("keyless: warns 'not yet functional', no api-works claim, gives rerun hint", () => {
+          const msg = describeSeatSetupOutcome(outcome, false, rerunHint);
+          assert.strictEqual(msg.level, "warning");
+          assert.match(msg.message, /not yet functional/);
+          assert.doesNotMatch(msg.message, /api profile working/);
+          assert.match(msg.message, /test detail/);
+          assert.match(msg.message, new RegExp(rerunHint));
+        });
+
+        test("keys present: affirms 'api profile working', gives rerun hint", () => {
+          const msg = describeSeatSetupOutcome(outcome, true, rerunHint);
+          assert.strictEqual(msg.level, "warning");
+          assert.match(msg.message, /api profile working/);
+          assert.doesNotMatch(msg.message, /not yet functional/);
+          assert.match(msg.message, new RegExp(rerunHint));
+        });
+      });
+
+      suite("kind: cancelled", () => {
+        const outcome: SeatSetupOutcome = { kind: "cancelled", by: "operator" };
+        test("keyless: warns 'not yet functional', no api-works claim, mentions restore + rerun hint", () => {
+          const msg = describeSeatSetupOutcome(outcome, false, rerunHint);
+          assert.strictEqual(msg.level, "warning");
+          assert.match(msg.message, /lockfile was restored/);
+          assert.match(msg.message, /not yet functional/);
+          assert.doesNotMatch(msg.message, /api profile working/);
+          assert.match(msg.message, new RegExp(rerunHint));
+        });
+
+        test("keys present: affirms 'api profile working', mentions restore + rerun hint", () => {
+          const msg = describeSeatSetupOutcome(outcome, true, rerunHint);
+          assert.strictEqual(msg.level, "warning");
+          assert.match(msg.message, /lockfile was restored/);
+          assert.match(msg.message, /api profile working/);
+          assert.doesNotMatch(msg.message, /not yet functional/);
+          assert.match(msg.message, new RegExp(rerunHint));
+        });
+      });
+
+      suite("kind: config-write-failed", () => {
+        const outcome: SeatSetupOutcome = {
+          kind: "config-write-failed",
+          providers: ["p1", "p2"],
+          detail: "test detail",
+        };
+        test("keyless: warns 'not yet functional', gives hand-edit (not re-probe) guidance", () => {
+          const msg = describeSeatSetupOutcome(outcome, false, rerunHint);
+          assert.strictEqual(msg.level, "warning");
+          assert.match(msg.message, /not yet functional/);
+          assert.doesNotMatch(msg.message, /api profile with the DABBLER_\* key/);
+          assert.match(msg.message, /no re-probe is needed/);
+          assert.doesNotMatch(msg.message, new RegExp(rerunHint));
+        });
+
+        test("keys present: affirms api keeps running, gives hand-edit guidance", () => {
+          const msg = describeSeatSetupOutcome(outcome, true, rerunHint);
+          assert.strictEqual(msg.level, "warning");
+          assert.match(msg.message, /api profile with the DABBLER_\* key/);
+          assert.doesNotMatch(msg.message, /not yet functional/);
+          assert.match(msg.message, /no re-probe is needed/);
+          assert.doesNotMatch(msg.message, new RegExp(rerunHint));
+        });
+      });
+    });
+
+    suite("describeSkipInstallIncompleteHonesty", () => {
+      test("keyless: says 'not functional', no api-works claim", () => {
+        const msg = describeSkipInstallIncompleteHonesty(false);
+        assert.match(msg, /not functional/);
+        assert.doesNotMatch(msg, /api profile working/);
+      });
+      test("keys present: affirms 'api profile working', no non-functional claim", () => {
+        const msg = describeSkipInstallIncompleteHonesty(true);
+        assert.match(msg, /api profile working/);
+        assert.doesNotMatch(msg, /not functional/);
+      });
+    });
+
+    suite("writeConfigAtomically", () => {
+      test("with rename support: stages through the tmp path, no tmp left behind", () => {
+        const ops = new FakeFileOpsWithRename();
+        const newContent = "new content";
+        const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
+
+        writeConfigAtomically(ops, configAbs, newContent);
+
+        assert.deepStrictEqual(
+          ops.renameLog,
+          [{ old: tmpAbs, new: configAbs }],
+          "must stage through the tmp path and rename over the target",
+        );
+        assert.ok(!ops.files.has(tmpAbs), "temp file should be gone after rename");
+        assert.strictEqual(ops.files.get(configAbs), newContent, "final file has new content");
+      });
+
+      test("when rename throws: propagates error, removes temp file, leaves original", () => {
+        const ops = new FakeFileOpsWithRename();
+        const newContent = "new content";
+        const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
+        const renameError = new Error("Fake rename fail");
+        ops.throwOnRename = renameError;
+        ops.files.set(configAbs, baseConfigContent);
+
+        assert.throws(() => writeConfigAtomically(ops, configAbs, newContent), renameError);
+
+        assert.strictEqual(ops.files.get(configAbs), baseConfigContent, "original untouched");
+        assert.deepStrictEqual(
+          ops.removeRecursiveLog,
+          [tmpAbs],
+          "should clean up temp file",
+        );
+        assert.ok(!ops.files.has(tmpAbs), "temp file should be gone");
+      });
+
+      test("without rename support: falls back to plain writeFile", () => {
+        const ops = new FakeFileOps(); // the original fake without .rename
+        const newContent = "new content";
+
+        writeConfigAtomically(ops, configAbs, newContent);
+
+        assert.strictEqual(ops.files.get(configAbs), newContent);
+        const tempFileWritten = [...ops.files.keys()].some((k) =>
+          k.endsWith(CONFIG_WRITE_TMP_SUFFIX),
+        );
+        assert.ok(!tempFileWritten, "no temp file should be created");
+      });
+    });
+
+    suite("performCopilotSeatSetup (atomic write integration)", () => {
+      let deps: RunCatalogRefreshDeps;
+      let fileOps: FakeFileOpsWithRename;
+      let spawner: FakeSpawnerState;
+      let cancellation: FakeCancellation;
+
+      setup(() => {
+        fileOps = new FakeFileOpsWithRename();
+        spawner = createFakeSpawner();
+        cancellation = new FakeCancellation();
+        deps = {
+          venvPythonPath: "python",
+          projectDir,
+          seatId: "seat-123",
+          seatLabel: "project",
+          spawn: spawner.spawner,
+          fileOps,
+          cancellation,
+          registerDisposal: () => ({ dispose: () => {} }),
+        };
+      });
+
+      test("success with atomic write: renames config, outcome is success", async () => {
+        fileOps.files.set(configAbs, baseConfigContent);
+        const run = performCopilotSeatSetup(deps);
+        await new Promise((r) => setTimeout(r, 0));
+        spawner.child.callbacks?.onStdout(
+          "Wrote ai_router/copilot-catalog.lock: 3/3 models confirmed, providers=['p1', 'p2']",
+        );
+        spawner.child.callbacks?.onClose(0);
+
+        const outcome = await run;
+        assert.deepStrictEqual(outcome, {
+          kind: "success",
+          providers: ["p1", "p2"],
+          confirmed: 3,
+          total: 3,
+        });
+
+        const finalContent = fileOps.files.get(configAbs);
+        assert.ok(finalContent, "config file should exist");
+        assert.match(finalContent!, /profile: copilot-cli/);
+        assert.strictEqual(fileOps.renameLog.length, 1);
+        assert.ok(
+          !fileOps.files.has(configAbs + CONFIG_WRITE_TMP_SUFFIX),
+          "temp file should not exist",
+        );
+      });
+
+      test("when rename fails: outcome is config-write-failed, original config intact", async () => {
+        const renameError = new Error("EPERM: rename failed");
+        fileOps.throwOnRename = renameError;
+        fileOps.files.set(configAbs, baseConfigContent);
+        const run = performCopilotSeatSetup(deps);
+        await new Promise((r) => setTimeout(r, 0));
+        spawner.child.callbacks?.onStdout(
+          "Wrote ai_router/copilot-catalog.lock: 3/3 models confirmed, providers=['p1', 'p2']",
+        );
+        spawner.child.callbacks?.onClose(0);
+
+        const outcome = await run;
+        assert.strictEqual(outcome.kind, "config-write-failed");
+        if (outcome.kind === "config-write-failed") {
+          assert.strictEqual(outcome.detail, renameError.message);
+        }
+        assert.strictEqual(
+          fileOps.files.get(configAbs),
+          baseConfigContent,
+          "config file is unchanged",
+        );
+        assert.deepStrictEqual(
+          fileOps.removeRecursiveLog,
+          [configAbs + CONFIG_WRITE_TMP_SUFFIX],
+          "attempted to clean temp file",
+        );
+      });
+    });
+
+    suite("kill strategy", () => {
+      suite("resolveKillStrategy", () => {
+        test("win32 with pid -> taskkill-tree", () => {
+          assert.strictEqual(resolveKillStrategy("win32", 123), "taskkill-tree");
+        });
+        test("posix with pid -> posix-group", () => {
+          assert.strictEqual(resolveKillStrategy("linux", 123), "posix-group");
+          assert.strictEqual(resolveKillStrategy("darwin", 123), "posix-group");
+        });
+        test("any platform without pid -> plain", () => {
+          assert.strictEqual(resolveKillStrategy("win32", undefined), "plain");
+          assert.strictEqual(resolveKillStrategy("linux", undefined), "plain");
+        });
+      });
+
+      suite("spawnDetached", () => {
+        test("win32 -> false (taskkill /T walks the tree undetached)", () => {
+          assert.strictEqual(spawnDetached("win32"), false);
+        });
+        test("posix -> true (child must lead its own process group)", () => {
+          assert.strictEqual(spawnDetached("linux"), true);
+          assert.strictEqual(spawnDetached("darwin"), true);
+        });
+      });
+
+      // S3 code-review Major 1: the dispatch itself (not just the pure
+      // selector) must be pinned — group signal on POSIX, taskkill on
+      // win32, sync-throw fallback to the plain kill on both.
+      suite("dispatchKill", () => {
+        function makeEffects(overrides?: {
+          taskkillThrows?: boolean;
+          signalThrows?: boolean;
+        }) {
+          const calls: string[] = [];
+          const fx: KillEffects = {
+            taskkillTree: (pid: number) => {
+              calls.push(`taskkill:${pid}`);
+              if (overrides?.taskkillThrows) throw new Error("EPERM");
+            },
+            signalGroup: (pid: number) => {
+              calls.push(`group:${pid}`);
+              if (overrides?.signalThrows) throw new Error("ESRCH");
+            },
+            plainKill: () => {
+              calls.push("plain");
+            },
+          };
+          return { calls, fx };
+        }
+
+        test("posix-group signals the GROUP and does not plain-kill on success", () => {
+          const { calls, fx } = makeEffects();
+          dispatchKill("linux", 123, fx);
+          assert.deepStrictEqual(calls, ["group:123"]);
+        });
+
+        test("posix-group falls back to the plain kill when the signal throws", () => {
+          const { calls, fx } = makeEffects({ signalThrows: true });
+          dispatchKill("linux", 123, fx);
+          assert.deepStrictEqual(calls, ["group:123", "plain"]);
+        });
+
+        test("win32 taskkill success does not plain-kill", () => {
+          const { calls, fx } = makeEffects();
+          dispatchKill("win32", 123, fx);
+          assert.deepStrictEqual(calls, ["taskkill:123"]);
+        });
+
+        test("win32 falls back to the plain kill when taskkill throws synchronously", () => {
+          const { calls, fx } = makeEffects({ taskkillThrows: true });
+          dispatchKill("win32", 123, fx);
+          assert.deepStrictEqual(calls, ["taskkill:123", "plain"]);
+        });
+
+        test("no pid -> plain kill only, on any platform", () => {
+          const a = makeEffects();
+          dispatchKill("win32", undefined, a.fx);
+          assert.deepStrictEqual(a.calls, ["plain"]);
+          const b = makeEffects();
+          dispatchKill("linux", undefined, b.fx);
+          assert.deepStrictEqual(b.calls, ["plain"]);
+        });
       });
     });
   });

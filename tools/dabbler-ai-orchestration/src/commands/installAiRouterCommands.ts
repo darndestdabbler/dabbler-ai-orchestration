@@ -172,6 +172,10 @@ export function makeFileOps(): FileOps {
       if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true });
     },
     mkdtemp: (prefix) => fs.mkdtempSync(path.join(os.tmpdir(), prefix)),
+    // Set 079 S3: same-directory atomic replace for the seat-setup config
+    // write (fs.rename replaces an existing destination file on both NTFS
+    // and POSIX filesystems).
+    rename: (oldP, newP) => fs.renameSync(oldP, newP),
   };
 }
 

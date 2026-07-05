@@ -11,8 +11,10 @@ import * as vscode from "vscode";
 import {
   BuildStructureSeams,
   ScaffoldResult,
+  TaskkillSpawn,
   buildProjectStructureNoPrompt,
   decideCopilotSeatSetup,
+  makeRealKillEffects,
   runCopilotSeatSetupWithProgress,
 } from "../../commands/gitScaffold";
 import { InstallOutcome, venvPython } from "../../utils/aiRouterInstall";
@@ -27,6 +29,60 @@ import {
 function fakeContext(): vscode.ExtensionContext {
   return { subscriptions: [] as { dispose(): void }[] } as unknown as vscode.ExtensionContext;
 }
+
+suite("gitScaffold — makeRealKillEffects (S3 verification R1: async taskkill fallback)", () => {
+  function makeFakeTaskkill(): {
+    spawn: TaskkillSpawn;
+    calls: { cmd: string; args: string[] }[];
+    fireError: () => void;
+  } {
+    let errorCb: ((err: Error) => void) | null = null;
+    const calls: { cmd: string; args: string[] }[] = [];
+    return {
+      spawn: (cmd, args) => {
+        calls.push({ cmd, args });
+        return {
+          on: (event: "error", cb: (err: Error) => void) => {
+            errorCb = cb;
+            return undefined;
+          },
+        };
+      },
+      calls,
+      fireError: () => errorCb?.(new Error("spawn taskkill ENOENT")),
+    };
+  }
+
+  test("taskkillTree spawns taskkill /pid <pid> /T /F and does not plain-kill on success", () => {
+    let killCount = 0;
+    const fake = makeFakeTaskkill();
+    const fx = makeRealKillEffects({ pid: 4242, kill: () => killCount++ }, fake.spawn);
+    fx.taskkillTree(4242);
+    assert.deepStrictEqual(fake.calls, [
+      { cmd: "taskkill", args: ["/pid", "4242", "/T", "/F"] },
+    ]);
+    assert.strictEqual(killCount, 0, "no plain kill while taskkill is presumed running");
+  });
+
+  test("the taskkill child's ASYNC error event falls back to the plain kill", () => {
+    let killCount = 0;
+    const fake = makeFakeTaskkill();
+    const fx = makeRealKillEffects({ pid: 4242, kill: () => killCount++ }, fake.spawn);
+    fx.taskkillTree(4242);
+    // a missing/blocked taskkill reports via the error event, not a throw
+    fake.fireError();
+    assert.strictEqual(killCount, 1, "plain kill must run from the error event");
+  });
+
+  test("plainKill delegates to the child's own kill()", () => {
+    let killCount = 0;
+    const fake = makeFakeTaskkill();
+    const fx = makeRealKillEffects({ pid: 4242, kill: () => killCount++ }, fake.spawn);
+    fx.plainKill();
+    assert.strictEqual(killCount, 1);
+    assert.strictEqual(fake.calls.length, 0, "plain kill never spawns taskkill");
+  });
+});
 
 suite("gitScaffold — decideCopilotSeatSetup (the sequencing gate)", () => {
   test("not selected: lightweight tier never runs, whatever the profile", () => {

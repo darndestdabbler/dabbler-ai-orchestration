@@ -117,10 +117,10 @@ Moderate to High
 | 6.   | Full pass; verify; close | `direct:shell`, `session-verification` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=high (as recommended)
+- Total routed cost: $0.95 (test-generation gemini-pro $0.05; code-review opus $0.44 + gpt-5-4 auto-verify $0.23; session-verification gpt-5-4 2 rounds $0.22)
+- Deviations from recommendation: none on routing. Verification R1 (gpt-5-4) returned findings with no verdict token and no severities — handled as blocking per L-071-1's anti-laundering rule (unknown severity blocks); both findings were test-coverage gaps, fixed, R2 VERIFIED.
+- Notes for next-session calibration: Session 4's grep sweep must cover the full OLD strings AND distinctive fragments ("structured verification sessions", "close-out gate", "copy a review prompt into a second AI assistant") across both READMEs, the pinning tests, and any UAT/doc quote. Nothing in S3 touched `VERIFICATION_MODE_*_TEXT` or its quoters, so S4 starts from the Set 077 state. Two S3 limitations are S5-docs material (already named in s3-close-reason.md): POSIX group-kill unit-pinned but not live-dogfooded (win32 host); atomic write scoped to process-crash, not power-loss.
 
 **Next-session orchestrator recommendation (Session 4):**
 Claude Code claude-fable-5 @ effort=medium

@@ -17681,6 +17681,94 @@ function runCatalogRefresh(deps) {
     }
   });
 }
+var CONFIG_WRITE_TMP_SUFFIX = ".dabbler-seat-setup.tmp";
+function writeConfigAtomically(ops, configAbs, content) {
+  if (!ops.rename) {
+    ops.writeFile(configAbs, content);
+    return;
+  }
+  const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
+  ops.writeFile(tmpAbs, content);
+  try {
+    ops.rename(tmpAbs, configAbs);
+  } catch (err) {
+    try {
+      ops.removeRecursive(tmpAbs);
+    } catch {
+    }
+    throw err;
+  }
+}
+function resolveKillStrategy(platform, pid) {
+  if (!pid)
+    return "plain";
+  return platform === "win32" ? "taskkill-tree" : "posix-group";
+}
+function spawnDetached(platform) {
+  return platform !== "win32";
+}
+function dispatchKill(platform, pid, fx) {
+  switch (resolveKillStrategy(platform, pid)) {
+    case "taskkill-tree":
+      try {
+        fx.taskkillTree(pid);
+        return;
+      } catch {
+        break;
+      }
+    case "posix-group":
+      try {
+        fx.signalGroup(pid);
+        return;
+      } catch {
+        break;
+      }
+    case "plain":
+      break;
+  }
+  fx.plainKill();
+}
+function describeSeatSetupOutcome(outcome, providerKeysPresent, rerunHint) {
+  const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunHint}`;
+  const keyless = "no DABBLER_* provider key is set, so the router is not yet functional";
+  const keyed = "the DABBLER_* provider key(s) already set keep the api profile working";
+  switch (outcome.kind) {
+    case "success":
+      return {
+        level: "info",
+        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/router-config.yaml.`
+      };
+    case "insufficient-providers": {
+      const cause = outcome.confirmed === 0 ? "No models responded at all \u2014 the Copilot CLI may be missing from PATH, not signed in, or blocked by policy. " : outcome.providers.length === 1 ? "This seat may expose only one provider family (an enterprise-managed seat can do this), in which case re-running will not change the result. " : "";
+      return {
+        level: "warning",
+        message: `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so router-config.yaml keeps transport.profile: api. ${cause}` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) + `The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
+      };
+    }
+    case "refresh-failed":
+      return {
+        level: "warning",
+        message: providerKeysPresent ? `Copilot seat setup failed: ${outcome.detail}. router-config.yaml keeps transport.profile: api, and ${keyed}. To use the Copilot seat instead, fix the cause first. ${rerun}` : `Scaffold completed, but the Copilot seat setup did not: ${outcome.detail}. router-config.yaml keeps transport.profile: api, and ${keyless}. Fix the cause, then: ${rerun}`
+      };
+    case "cancelled":
+      return {
+        level: "warning",
+        message: "Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and router-config.yaml keeps transport.profile: api. " + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `Note ${keyless} until seat setup completes. `) + rerun
+      };
+    case "config-write-failed":
+      return {
+        level: "warning",
+        message: `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but writing transport.profile to ai_router/router-config.yaml failed: ${outcome.detail}. Set \`profile: copilot-cli\` under the \`transport:\` block in that file by hand \u2014 no re-probe is needed. Until then ` + (providerKeysPresent ? "the router keeps running on the api profile with the DABBLER_* key(s) already set." : "the router is not yet functional (transport.profile is still api and no DABBLER_* provider key is set).")
+      };
+    default: {
+      const unreachable = outcome;
+      throw new Error(`unhandled seat-setup outcome: ${JSON.stringify(unreachable)}`);
+    }
+  }
+}
+function describeSkipInstallIncompleteHonesty(providerKeysPresent) {
+  return providerKeysPresent ? "The DABBLER_* provider key(s) already set will keep the api profile working once the install completes." : "No DABBLER_* provider key is set, so the router is not functional until the install completes and seat setup succeeds.";
+}
 function outputTail(s) {
   const trimmed2 = (s || "").trim();
   if (!trimmed2)
@@ -17737,8 +17825,9 @@ async function performCopilotSeatSetup(deps) {
             detail: rendered.reason
           };
         }
-        if (rendered.changed)
-          deps.fileOps.writeFile(configAbs, rendered.text);
+        if (rendered.changed) {
+          writeConfigAtomically(deps.fileOps, configAbs, rendered.text);
+        }
         return { kind: "success", ...base };
       } catch (err) {
         return {
@@ -22855,7 +22944,11 @@ function makeFileOps() {
       if (fs10.existsSync(p2))
         fs10.rmSync(p2, { recursive: true, force: true });
     },
-    mkdtemp: (prefix) => fs10.mkdtempSync(path11.join(os.tmpdir(), prefix))
+    mkdtemp: (prefix) => fs10.mkdtempSync(path11.join(os.tmpdir(), prefix)),
+    // Set 079 S3: same-directory atomic replace for the seat-setup config
+    // write (fs.rename replaces an existing destination file on both NTFS
+    // and POSIX filesystems).
+    rename: (oldP, newP) => fs10.renameSync(oldP, newP)
   };
 }
 function copyDirSync(src, dst) {
@@ -23448,7 +23541,7 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
       break;
     case "skip-install-incomplete":
       showWarning(
-        'Copilot seat setup was skipped because the ai-router install did not complete \u2014 the catalog refresh runs inside the scaffolded .venv. Finish the install ("Dabbler: Install ai-router"), then run seat setup from the venv: ' + rerunRefreshHint(projectDir)
+        'Copilot seat setup was skipped because the ai-router install did not complete \u2014 the catalog refresh runs inside the scaffolded .venv. Finish the install ("Dabbler: Install ai-router"), then run seat setup from the venv: ' + rerunRefreshHint(projectDir) + " " + describeSkipInstallIncompleteHonesty(providerKeyPresent(process.env))
       );
       break;
     case "skip-not-selected":
@@ -23484,7 +23577,12 @@ function makeRefreshChildSpawner() {
     const child = cp3.spawn(cmd, args, {
       cwd: opts.cwd,
       env: process.env,
-      windowsHide: true
+      windowsHide: true,
+      // POSIX: run the child as its own process-group leader so a cancel
+      // can signal the whole group — python AND its in-flight `copilot`
+      // grandchild (S3, the named S2 residual). win32 stays undetached;
+      // taskkill /T walks the tree without it.
+      detached: spawnDetached(process.platform)
     });
     child.stdout?.on(
       "data",
@@ -23498,16 +23596,16 @@ function makeRefreshChildSpawner() {
     child.on("close", (code) => callbacks.onClose(code));
     return {
       kill: () => {
-        if (process.platform === "win32" && child.pid) {
-          try {
-            cp3.spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+        dispatchKill(process.platform, child.pid, {
+          taskkillTree: (pid) => {
+            const tk = cp3.spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
               windowsHide: true
             });
-            return;
-          } catch {
-          }
-        }
-        child.kill();
+            tk.on("error", () => child.kill());
+          },
+          signalGroup: (pid) => process.kill(-pid, "SIGTERM"),
+          plainKill: () => child.kill()
+        });
       }
     };
   };
@@ -23552,34 +23650,12 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
       }
     })
   );
-  const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunRefreshHint(projectDir)}`;
-  switch (outcome.kind) {
-    case "success":
-      showInfo(
-        `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/router-config.yaml.`
-      );
-      break;
-    case "insufficient-providers":
-      showWarning(
-        `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so router-config.yaml keeps transport.profile: api. The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
-      );
-      break;
-    case "refresh-failed":
-      showWarning(
-        `Copilot seat setup failed: ${outcome.detail}. router-config.yaml keeps transport.profile: api. ${rerun}`
-      );
-      break;
-    case "cancelled":
-      showWarning(
-        `Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and router-config.yaml keeps transport.profile: api. ${rerun}`
-      );
-      break;
-    case "config-write-failed":
-      showWarning(
-        `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but writing transport.profile to ai_router/router-config.yaml failed: ${outcome.detail}. Set \`transport:  profile: copilot-cli\` in that file by hand \u2014 no re-probe is needed.`
-      );
-      break;
-  }
+  const msg = describeSeatSetupOutcome(
+    outcome,
+    providerKeyPresent(process.env),
+    rerunRefreshHint(projectDir)
+  );
+  (msg.level === "info" ? showInfo : showWarning)(msg.message);
   return outcome;
 }
 

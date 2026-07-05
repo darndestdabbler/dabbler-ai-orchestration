@@ -1,34 +1,30 @@
 {
   "status": "completed",
-  "summary": "Session 2 of 5: wired the Copilot seat-profile happy path. New src/utils/copilotSeatSetup.ts (VS Code-free core): auto-derived seat identity (seat-id = sha256(hostname|username)[:12], seat-label = workspace basename, zero typing per critique C1); cancellable catalog-refresh runner with pre-run lockfile snapshot restored on every non-completed path (cancel / teardown / spawn error / non-zero exit), teardown re-restore from the close event, completed-run-wins-over-late-cancel, and a bounded post-kill force-settle; success decided ONLY by parsing the CLI's stdout summary line (exit code never trusted, pinned M5 contract); transport.profile written as an anchored DIRECT-CHILD field replacement in the transport: block (fail-loud on missing anchor / operator-edited value, never an append; nested-profile locator hole from the cross-verifier fixed); readTransportProfile wired as the durable transportProfileSeed source. gitScaffold.ts: pure sequencing gate decideCopilotSeatSetup consuming the completed scaffold's installOk+venvPath, seat setup awaited strictly after the scaffold step through the scaffolded venv's own interpreter (venvPython(installOutcome.venvPath)), cancellable INDETERMINATE notification (determinate not parseable - the CLI emits no per-model output; m2 fallback recorded), win32 taskkill /T tree-kill, subscriptions splice hygiene, honest per-outcome messaging with a copy-pasteable re-run hint. transportProfile rider threaded webview -> protocol -> fail-loud narrowing -> build handler (Full-only). 72 new Layer-2 tests (1206 total passing); real live-seat dogfood SUCCESS (102s, 15/18 models, providers anthropic+google+openai, config + lockfile written). Suites: tsc/eslint clean, pytest 2483/5 skipped, Playwright 19 passed re-run after final dist rebuild.",
+  "summary": "Session 3 of 5: the failure matrix and the honest failure UX (critique C3). New pure composer describeSeatSetupOutcome(outcome, providerKeysPresent, rerunHint) in copilotSeatSetup.ts, keyed on the SAME DABBLER_* presence probe the Full-tier inline key warning uses (providerKeyPresent) - every failure branch (insufficient-providers, refresh-failed, cancelled, config-write-failed, and gitScaffold's skip-install-incomplete) lands in exactly one of two honest states: keyless => 'router is not yet functional' + reason-specific fix guidance; keys present => api affirmed as a genuinely working fallback. insufficient-providers distinguishes confirmed==0 (CLI missing / not signed in - re-run can help) from a 1-provider enterprise-locked seat (re-run will not change the result); config-write-failed instructs the one-field hand edit, no re-probe. Both named S2 residuals closed: (1) atomic config write - writeConfigAtomically stages <config>.dabbler-seat-setup.tmp then renames (optional FileOps.rename, real ops use fs.renameSync; no-rename fallback keeps writing; failed rename cleans temp and surfaces as config-write-failed; guarantee deliberately scoped to process-crash atomic replacement, not power-loss durability); (2) POSIX process-tree kill - the refresh child spawns detached on POSIX (own group leader) and cancel dispatches through the extracted, exported dispatchKill(platform, pid, KillEffects): win32 taskkill /T (async spawn-error fallback via makeRealKillEffects), POSIX process.kill(-pid, SIGTERM), sync-throw fallback to plain kill. requiresE2E 'suggested' resolved: NO new Playwright Layer-3 spec - the async-progress surface is a native vscode notification the webview harness cannot drive; all logic behind it is Layer-2-pinned; decision + reasoning recorded (s3.e2e-decision). 31 new Layer-2 tests (1206 -> 1237 passing). Real induced-failure dogfood: missing-binary run => insufficient-providers with the keyless honest message in 0.3s; REAL mid-run cancel (copilot CLI 1.0.68, 15s in) killed the python child AND both live copilot descendants (taskkill /T verified), restored the lockfile to pre-run absent; real-NTFS temp+rename replaced an existing config with no tmp left.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
     "tools/dabbler-ai-orchestration/src/utils/copilotSeatSetup.ts",
-    "tools/dabbler-ai-orchestration/src/utils/copilotCli.ts",
+    "tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts",
     "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
-    "tools/dabbler-ai-orchestration/src/commands/gettingStartedActions.ts",
-    "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
-    "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
+    "tools/dabbler-ai-orchestration/src/commands/installAiRouterCommands.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/copilotSeatSetup.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldSeatSetup.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/vscode-stub.js",
     "tools/dabbler-ai-orchestration/dist/extension.js",
     "tools/dabbler-ai-orchestration/dist/extension.js.map"
   ],
   "verification_message_ids": [],
-  "verification_notes": "Routed gate REQUIRED (blast-radius, multi-module, breadth). Session verification on gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator): round 1 ISSUES_FOUND (1 Major, ledger id S2-V-001: gitScaffold integration wiring unpinned by Layer-2 tests); round 2 held S2-V-001 partially-fixed (helpers pinned, the real buildProjectStructureNoPrompt path still unexercised); round 3 VERIFIED after BuildStructureSeams let the suite drive the REAL build path (ordering, venvPath threading, skip branches). Single ledger id across rounds per the Set 071 discipline. Earlier routed code-review (opus -> gpt-5-4 auto-verify) produced 2 Majors (teardown-restore race, late-cancel-after-completed race) + 1 cross-verifier Major (nested-profile locator) - all fixed in-session with pinning tests. sN-issues artifacts: s2-issues.json, s2-issues-round-2.json.",
+  "verification_notes": "Routed gate REQUIRED (blast-radius, multi-module, breadth). Routed code-review first (opus -> gpt-5-4 auto-verify VERIFIED): 1 Major (POSIX kill dispatch had zero unit coverage -> extracted injectable dispatchKill + 5 tests) + 2 Minors + 3 suggestions, all fixed in-session. Session verification on gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator): R1 returned two findings with no verdict token and no severities - treated as blocking per the L-071-1 anti-laundering rule; ledger ids S3-V-001 (async taskkill-error fallback untested -> makeRealKillEffects factory with TaskkillSpawn seam + 3 pinning tests) and S3-V-002 (skip-install honesty tests missing the negative half -> fixed). R2 (narrow, fixes-only) VERIFIED with both ledger ids resolved and no regression. Known, honestly-scoped limitations carried to S5 docs: the POSIX group-kill is unit-pinned but not live-dogfooded (win32 host); atomicity is process-crash-scoped (no fsync).",
   "next_orchestrator": {
     "engine": "claude",
     "provider": "anthropic",
     "model": "claude-fable-5",
-    "effort": "high",
+    "effort": "medium",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 3 implements the honest failure UX (critique C3) and the full failure matrix over the exact wrapper this session built - continuity with the S2 outcome states (refresh-failed / insufficient-providers / config-write-failed / cancelled) and the named residuals (atomic config write, POSIX tree-kill) makes the same engine at high effort the natural pickup, matching the ai-assignment recommendation."
+      "specifics": "Session 4 is Feature 2 (simplified verification-mode copy): a small copy decision plus a repo-wide stale-quote sweep - mechanical breadth, not deep reasoning. The routed ai-assignment recommendation (authored at set start) is claude-fable-5 @ medium with routed code-review as the completeness net; nothing in Sessions 1-3 changed that calculus, and Session 4 is deliberately independent of Feature 1 (critique m6)."
     }
   },
   "blockers": [],
-  "lessons_cited": ["L-064-3", "L-064-6", "L-064-7", "L-064-9", "L-064-10", "L-071-1"]
+  "lessons_cited": ["L-064-3", "L-064-9", "L-064-10", "L-071-1"]
 }

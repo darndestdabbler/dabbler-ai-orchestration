@@ -59,6 +59,10 @@ export interface FileOps {
   removeRecursive: (absPath: string) => void;
   /** Make a unique temporary directory and return its absolute path. */
   mkdtemp: (prefix: string) => string;
+  /** Atomic same-directory replace (Set 079 S3: the seat-setup config
+   * write stages temp + rename). Optional so existing structural
+   * satisfiers and test fakes keep compiling; the real ops implement it. */
+  rename?: (oldAbsPath: string, newAbsPath: string) => void;
 }
 
 export interface InstallPrompts {

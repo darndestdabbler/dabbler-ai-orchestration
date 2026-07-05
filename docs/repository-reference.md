@@ -64,7 +64,7 @@ can learn it.
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
 | `dabbler-ai-router` | `0.28.0` | **Published.** Sequenced per the release-ordering invariant: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437` — the commit where the 0.27.0 version bump landed, before Set 078 bumped further), then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`). Both confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.35.0` | **Version-bumped in repo; publish PENDING.** Set 079 (guided Full-tier Copilot seat-profile onboarding + simplified verification-mode copy; extension-only — `ai_router` untouched, router stays `0.28.0`). The `vsix-v0.35.0` tag push is held for the operator's UAT walk (`docs/session-sets/079-copilot-seat-onboarding-and-verification-copy/079-…-uat-checklist.json`) and explicit tag authorization. The live published build remains `0.34.0` (Set 077 — tier-leak fix + durable markers, three-way setup choice, Python prerequisite check, self-completing Evaluate prompts, owed-state auto-routing; published 2026-07-04 to Marketplace and Open VSX, tag `vsix-v0.34.0`, publish-vscode.yml run [28718703898](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718703898), tagged commit `a391f61`). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.35.0` | **Published.** Set 079 (guided Full-tier Copilot seat-profile onboarding + simplified verification-mode copy; extension-only — `ai_router` untouched, router stays `0.28.0`). UAT-gated release: the operator's first walk failed walks 4–5 on a real pre-existing defect (the cp1252 config-seed crash left fresh Windows scaffolds with no `ai_router/router-config.yaml`), fixed and re-verified in-session (rounds 3–4), re-walk attested PASS; walk 3 operator-waived with recorded rationale. Published 2026-07-05 (tag `vsix-v0.35.0`, tagged commit `c2ed2b4`, publish-vscode.yml run [28751504260](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28751504260)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
 
@@ -90,8 +90,18 @@ can learn it.
   extension `0.34.0` from the Marketplace (published 2026-07-04,
   confirmed live) — workspaces that already wrote
   `transport.profile: copilot-cli` can hand-flip it back to `api` if
-  needed; no data migration either way. **Publish pending** the
-  operator's UAT walk and tag authorization (`vsix-v0.35.0`).
+  needed; no data migration either way. The release also carries two
+  fixes the UAT walk itself earned: the **cp1252 config-seed crash**
+  (fresh Windows scaffolds silently got no `ai_router/router-config.yaml`
+  because the seed one-liner printed the bundled config through the
+  child Python's cp1252 text stdout; now a raw-bytes emit, with a failed
+  seed named in the install message) and the class-wide **chunk-split
+  UTF-8 decode fix** (shared `StringDecoder`-based decoder at every
+  spawner sink). **Published 2026-07-05** (tag `vsix-v0.35.0`, tagged
+  commit `c2ed2b4`, publish-vscode.yml run
+  [28751504260](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28751504260)).
+  Follow-up queued: Set 080 (sub-choice row-layout legibility +
+  screenshot refresh, operator-requested during this set's UAT).
 
 - **`dabbler-ai-router 0.28.0`** — Set 078, Copilot CLI hybrid tier. Gives
   the Full tier a subscription-billed **seat profile**: a new

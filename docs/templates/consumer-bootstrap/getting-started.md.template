@@ -147,6 +147,31 @@ be installed on every machine, even though the venv is created for you.
   (e.g. `C:\Python311\python.exe`); the scaffold uses it to build
   the venv.
 
+### "The GitHub Copilot CLI was not found on this machine"
+
+The **GitHub Copilot CLI seat** option in step 1 runs AI calls through
+the `copilot` command-line tool, which is a separate install from the
+Copilot features inside VS Code — having Copilot chat in your editor
+does *not* mean the CLI is installed. If you pick the seat option and
+see this warning:
+
+- Install the GitHub Copilot CLI (see the Copilot CLI guide at
+  <https://docs.github.com/copilot>) and make sure the `copilot`
+  command is on your `PATH`, **or** point the
+  `dabblerSessionSets.copilotCliPath` setting at the installed
+  executable. If that setting is set, it decides alone — a wrong path
+  there makes the CLI count as missing even when `copilot` works in a
+  terminal.
+- Then reload the VS Code window (changes made after launch are not
+  visible until you reload).
+
+If seat setup later fails even though the CLI is present (for example,
+your seat confirms models from only one AI provider family), the
+message you see explains the specific cause and gives the exact
+command to re-run just the seat check — the project scaffold itself is
+already complete, and you never need to re-run **Build project
+structure** for this.
+
 ### `.venv\Scripts\` has the `.exe` files but no `activate` scripts
 
 On managed / corporate laptops, endpoint-security software (antivirus,

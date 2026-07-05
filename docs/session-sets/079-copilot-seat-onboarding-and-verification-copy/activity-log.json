@@ -394,6 +394,14 @@
           "costUsd": 0.147
         }
       ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 10,
+      "stepKey": "s5.uat-attested",
+      "dateTime": "2026-07-05T14:54:14.545950-04:00",
+      "description": "Operator re-walked UAT against the rebuilt VSIX: walks 4 and 5 PASS (attested via chat + Passes flipped in the checklist; resolution notes appended to the original failure feedback). Walk 3 WAIVED by explicit operator decision (recorded in the checklist with the Layer-2 evidence rationale; consistent with the Set 078 S1 standing override authority). Walks 1/2/6 passed on the first walk. Doc-sufficiency audit before tag push found one gap: the auto-opened getting-started doc had no Copilot-CLI troubleshooting entry - added (mirrors the Python entry: separate install from editor Copilot, copilotCliPath decides alone, no re-scaffold needed after seat-check failures); cold-start goldens regenerated; suite 1244 passing, tsc clean. Operator authorized the vsix-v0.35.0 tag push and queued the radio-group table reformatting as Set 080.",
+      "status": "complete"
     }
   ]
 }

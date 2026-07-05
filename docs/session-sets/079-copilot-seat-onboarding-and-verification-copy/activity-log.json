@@ -410,6 +410,21 @@
       "dateTime": "2026-07-05T15:03:44.074560-04:00",
       "description": "RELEASE EXECUTED: operator authorized; tag vsix-v0.35.0 pushed on CI-green c2ed2b4; publish-vscode.yml run 28751504260 SUCCESS (Marketplace + Open VSX) 2026-07-05. repository-reference release-status and version-walk flipped to Published. Set 080 (sub-choice legibility + screenshot refresh) spec authored and queued not-started per operator request. Extension-only release confirmed end-to-end: router stays 0.28.0.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 12,
+      "stepKey": "s5.change-log",
+      "dateTime": "2026-07-05T15:07:10.662730-04:00",
+      "description": "Authored change-log.md via route(task_type=documentation) (gemini-pro; gpt-5-4-mini auto-verify found 1 Major - the S5 section dropped the false-premise adjudication notes, the artifact-committed fact, and the pathAwareCritique config-gap lesson - all restored in the committed version; verification footer stripped per raw-output discipline, draft preserved in session scratchpad).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "documentation",
+          "costUsd": 0.031
+        }
+      ]
     }
   ]
 }

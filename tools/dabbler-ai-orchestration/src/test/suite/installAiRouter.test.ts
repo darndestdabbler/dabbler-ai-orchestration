@@ -15,6 +15,7 @@ import {
   ProcessSpawner,
   SpawnResult,
   PYPI_PACKAGE_NAME,
+  READ_BUNDLED_ROUTER_CONFIG_CODE,
   ROUTER_CONFIG_REL,
   INSTALL_METHOD_REL,
   GITHUB_CHECKOUT_REL,
@@ -442,6 +443,65 @@ suite("aiRouterInstall — PyPI install (happy path)", () => {
     // pip install + the importlib.resources read = 2 calls.
     assert.strictEqual(calls.length, 2);
     assert.match(outcome.message, /Seeded ai_router\/router-config\.yaml/);
+    fs.rmSync(ws, { recursive: true, force: true });
+  });
+
+  test("the config-seed one-liner emits RAW BYTES, never text-mode stdout (Set 079 UAT walk 4 cp1252 regression)", () => {
+    // On Windows the child's stdout text layer defaults to cp1252
+    // (pre-3.15 Python), and the bundled router-config.yaml carries
+    // characters cp1252 cannot encode (e.g. U+2192 in comments). A
+    // text-mode `sys.stdout.write(p.read_text(...))` raised
+    // UnicodeEncodeError, exited non-zero, and the seed was silently
+    // skipped — the guided Build then scaffolded a workspace with NO
+    // ai_router/router-config.yaml, and the Copilot seat setup's config
+    // write failed at the anchor lookup (Set 079 UAT walk 4). The raw
+    // byte round-trip (read_bytes -> stdout.buffer.write, decoded utf8
+    // by the spawner) never touches the console text encoding.
+    assert.ok(
+      READ_BUNDLED_ROUTER_CONFIG_CODE.includes("sys.stdout.buffer.write"),
+      "one-liner must write to sys.stdout.buffer (bytes), not the text layer",
+    );
+    assert.ok(
+      READ_BUNDLED_ROUTER_CONFIG_CODE.includes("read_bytes()"),
+      "one-liner must read the package data as bytes",
+    );
+    assert.ok(
+      !READ_BUNDLED_ROUTER_CONFIG_CODE.includes("read_text"),
+      "text-mode read reintroduces an encode step on the cp1252 console",
+    );
+    assert.ok(
+      !/sys\.stdout\.write\(/.test(READ_BUNDLED_ROUTER_CONFIG_CODE),
+      "text-mode stdout write is the exact cp1252 crash this pin guards",
+    );
+  });
+
+  test("a failed config-seed read is NAMED in the install message, never silent (Set 079 UAT walk 4)", async () => {
+    const ws = makeTmpWorkspace();
+    seedExistingVenv(ws);
+    const { spawner } = recordingSpawner((call) => {
+      if (call.args[0] === "-m" && call.args[1] === "pip" && call.args[2] === "install") {
+        return { exitCode: 0 };
+      }
+      // The importlib.resources one-liner fails (the pre-fix cp1252
+      // crash shape: non-zero exit, nothing usable on stdout).
+      if (call.args[0] === "-c" && call.args[1].includes("router-config.yaml")) {
+        return { exitCode: 1, stdout: "" };
+      }
+      return { exitCode: 0 };
+    });
+
+    const outcome = await installAiRouter({
+      workspaceRoot: ws,
+      pythonPath: "python",
+      spawner,
+      fileOps: realFileOps(),
+      prompts: autoPrompts({ source: "pypi" }),
+    });
+
+    assert.strictEqual(outcome.ok, true, "install itself still succeeds");
+    assert.strictEqual(outcome.routerConfigPreserved, false);
+    assert.ok(!fs.existsSync(path.join(ws, ROUTER_CONFIG_REL)));
+    assert.match(outcome.message, /Could not seed ai_router\/router-config\.yaml/);
     fs.rmSync(ws, { recursive: true, force: true });
   });
 

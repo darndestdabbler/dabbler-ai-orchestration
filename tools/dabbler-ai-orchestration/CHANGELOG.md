@@ -61,6 +61,28 @@ never modifies it).
   dogfood used the same seat); multi-seat / enterprise-seat model
   availability is **not** validated by this set.
 
+### Fixed
+
+- **Fresh scaffolds got no `ai_router/router-config.yaml` on Windows —
+  found by this set's own UAT walk 4.** The PyPI install's config-seed
+  one-liner printed the bundled `router-config.yaml` through the child
+  Python's **text-mode stdout**, which defaults to `cp1252` on Windows
+  (pre-3.15 Python); the bundled config contains characters `cp1252`
+  cannot encode (e.g. `U+2192` in comments), so the one-liner crashed
+  with `UnicodeEncodeError`, the fail-open seed path silently skipped,
+  and every fresh scaffold was left with no workspace config — which the
+  Copilot seat setup then surfaced as its (correct, honest)
+  `config-write-failed` message. Pre-existing defect (any fresh Windows
+  scaffold since the bundled config gained non-ASCII characters), same
+  `cp1252` bug class as Set 078's CLI-transport decode fix, now on the
+  encode side. The one-liner now emits **raw bytes**
+  (`sys.stdout.buffer.write(p.read_bytes())` — the spawner already
+  decodes UTF-8), a failed seed is **named in the install message**
+  instead of staying silent, and both behaviors are pinned by new
+  Layer-2 tests. Verified against the real published 0.28.0 wheel on a
+  `cp1252` host: the old form crashes, the fixed form emits the full
+  config with the `transport:` anchor intact.
+
 ### Evidence limits (recorded, not hidden)
 
 - The POSIX process-tree kill on cancel is unit-pinned but has not been

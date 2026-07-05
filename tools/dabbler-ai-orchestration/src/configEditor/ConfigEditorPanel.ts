@@ -17,6 +17,7 @@ import {
   emptyLocalOverridesDoc,
 } from "./patch";
 import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
+import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 import {
   isAiRouterNotInstalled,
   describeAiRouterImportFailure,
@@ -727,14 +728,20 @@ export class ConfigEditorPanel {
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
-    child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf8"); });
-    child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString("utf8"); });
+    // Streaming-safe decode (S5 verification R3): chunk boundaries can
+    // split multibyte UTF-8; StringDecoder carries the partial bytes.
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
+    child.stdout?.on("data", (chunk: Buffer) => { stdout += outDec.write(chunk); });
+    child.stderr?.on("data", (chunk: Buffer) => { stderr += errDec.write(chunk); });
     child.on("error", (err: Error) => {
       spawnErrored = true;
       vscode.window.showErrorMessage(`Test notification failed — could not spawn Python: ${err.message}`);
     });
     child.on("close", () => {
       if (spawnErrored) return;
+      stdout += outDec.end();
+      stderr += errDec.end();
       try {
         const result = JSON.parse(stdout.trim()) as { ok: boolean; request_id?: string; error?: string };
         if (result.ok) {

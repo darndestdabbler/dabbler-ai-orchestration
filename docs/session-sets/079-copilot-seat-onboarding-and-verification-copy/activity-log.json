@@ -371,6 +371,29 @@
           "costUsd": 0.193
         }
       ]
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 8,
+      "stepKey": "s5.ci-green",
+      "dateTime": "2026-07-05T06:25:30.352450-04:00",
+      "description": "Pushed a5ca28b; GitHub Test workflow run 28737501450 completed SUCCESS (5m45s). Release state: extension 0.35.0 version-bumped and CI-green; vsix-v0.35.0 tag push HELD for operator UAT walk + authorization. Session left in-progress (disposition requires_review) pending the two operator-only items.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 9,
+      "stepKey": "s5.uat-remediation",
+      "dateTime": "2026-07-05T12:51:38.265512-04:00",
+      "description": "Operator walked UAT: walks 1/2/6 PASS; walks 4/5 FAIL on a real pre-existing defect (fresh guided Build produced no ai_router/router-config.yaml; the honest config-write-failed message fired after a successful probe); walk 3 recorded not-passing with no feedback (clarification requested). Root cause reproduced against the real published 0.28.0 wheel on this cp1252 host: the config-seed one-liner wrote the bundled config through the child python TEXT-mode stdout (cp1252 on Windows; config carries U+2192) -> UnicodeEncodeError -> silent fail-open skip. Same cp1252 class as Set 078 decode fix, encode side; S2 dogfood missed it because it drove performCopilotSeatSetup against a pre-seeded scratch config and the install tests stub the spawn. Fix: raw-bytes one-liner (READ_BUNDLED_ROUTER_CONFIG_CODE, pinned) + failed seed now named in the install message + (R3 finding S5-V-003, Major) per-chunk toString(utf8) multibyte-split corruption fixed class-wide via shared makeUtf8ChunkDecoder at all five spawner sinks (L-069-1 sweep). Verification R3 ISSUES_FOUND -> R4 VERIFIED (gpt-5-4, narrow rounds). Layer 2 1244 passing; tsc clean; bundle rebuilt. CHANGELOG 0.35.0 Fixed entry added. Operator also requested table-style reformatting of the two second-level radio groups - recorded as follow-up-scope candidate, operator decides placement.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.147
+        }
+      ]
     }
   ]
 }

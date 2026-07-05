@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 5,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "issueId": "S5-V-003",
+      "issueType": "deterministic-defect",
+      "category": "correctness",
+      "severity": "Major",
+      "description": "Round 3 (narrow verification of the UAT-walk-4 cp1252 config-seed fix) found the fix incomplete: the spawner sinks decode child stdout/stderr with per-chunk chunk.toString('utf8'), which corrupts any multibyte UTF-8 sequence a pipe boundary splits (each call decodes its dangling partial sequence to U+FFFD instead of carrying the bytes to the next chunk). The seeded router-config.yaml payload contains multibyte characters, so the raw-bytes one-liner fix alone could still deliver corrupted config content.",
+      "verificationMethod": "Feed a spawner sink a multibyte UTF-8 sequence split across two data chunks and assert exact reconstruction (see utf8ChunkDecoder.test.ts, which also documents that the naive per-chunk decode really corrupts the same split).",
+      "resolution_status": "fixed",
+      "resolution_notes": "Shared makeUtf8ChunkDecoder (string_decoder.StringDecoder wrapper, src/utils/utf8ChunkDecoder.ts) now replaces per-chunk toString('utf8') at every spawner sink in the extension - the repo-wide grep returned exactly five sites, all fixed class-wide per the fix-every-sibling convention: installAiRouterCommands.makeSpawner (flushes end() on close AND error), gitScaffold.makeRefreshChildSpawner (flushes the tail to the streaming callbacks before onClose), ConfigEditorPanel test-notification spawn, setupVerification change writer, upgradeOlderSets migrator (all flush before parsing). 4-test unit suite added; Layer 2 1244 passing; tsc clean. Round 4 (narrow) VERIFIED: S5-V-003 RESOLVED, no lost tail / double-count / error-path regression found."
+    }
+  ]
+}

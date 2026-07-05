@@ -99,6 +99,56 @@ items:
   state writer, or fixture harness changed (S3's recorded requiresE2E
   decision + the L-064-12 scope rule); CI runs the full matrix on push.
 
+## UAT remediation (post-attestation round — operator walk 2026-07-05)
+
+The operator's walk PASSED walks 1, 2, and 6 and FAILED walks 4 and 5 on a
+real defect (walk 3 was recorded not-passing with no feedback — awaiting
+the operator's clarification). The failure: a fresh guided Build produced
+**no `ai_router/router-config.yaml`**, so the seat setup's config write
+correctly reported its honest `config-write-failed` message ("missing from
+the workspace") after a fully successful probe.
+
+**Root cause (orchestrator-reproduced against the real published 0.28.0
+wheel on this cp1252 host):** the PyPI install's config-seed one-liner
+printed the bundled config through the child Python's **text-mode stdout**
+(`sys.stdout.write(p.read_text(...))`). Windows' child stdout text layer
+defaults to `cp1252` (pre-3.15 Python) and the bundled config carries
+`U+2192` in comments → `UnicodeEncodeError`, non-zero exit, and the
+fail-open seed branch **silently skipped**. Pre-existing defect (any fresh
+Windows scaffold since the bundled config gained non-ASCII characters) —
+the same `cp1252` class as Set 078's decode-side fix, now on the encode
+side. Why the set's own evidence missed it: the S2 real-seat dogfood drove
+`performCopilotSeatSetup` against a scratch project whose config was
+already present, and the Layer-2 install tests stub the one-liner's spawn
+— only the operator's true end-to-end form walk exercised the real
+venv-python one-liner on a real console. UAT earned its keep.
+
+**Fix (verification rounds 3–4):**
+
+- The one-liner now emits **raw bytes** (`sys.stdout.buffer.write(
+  p.read_bytes())`), exported as `READ_BUNDLED_ROUTER_CONFIG_CODE` with a
+  Layer-2 pin forbidding the text-mode form; a failed seed is now **named
+  in the install message** instead of staying silent. Proven against the
+  real 0.28.0 wheel: old form crashes, fixed form emits the full 37,860-
+  byte config with the `transport:` anchor intact.
+- R3 (gpt-5-4, narrow) confirmed the fix but found one further Major
+  (**S5-V-003**): per-chunk `chunk.toString("utf8")` in the spawner sinks
+  corrupts multibyte sequences split across chunk boundaries. Fixed
+  class-wide (L-069-1): shared `makeUtf8ChunkDecoder`
+  (`string_decoder.StringDecoder`) at all five spawner sinks the repo-wide
+  grep found, with close/error-path flushes and a 4-test unit suite.
+- R4 (gpt-5-4, narrow) **VERIFIED**: S5-V-003 RESOLVED, no regression.
+  Suites: Layer 2 1244 passing, tsc clean (no Python change). Artifacts:
+  `s5-verification-round-3.md`, `s5-verification-round-4.md`,
+  `s5-issues-round-3.json`. CHANGELOG 0.35.0 gained the Fixed entry.
+
+**Still open for the operator:** re-walk 4 and 5 against a REBUILT VSIX,
+clarify walk 3's recorded not-pass (no feedback was attached), and the
+tag authorization. The operator also requested a table-style visual
+reformatting of the two second-level radio groups (provider access /
+verification mode) — recorded as a follow-up-scope candidate, operator to
+decide whether it lands in a small follow-on set or holds this release.
+
 ## For the Step 9 reorganization review (when the set closes)
 
 - Spec-authoring gap: prose that declares an end-of-set critique

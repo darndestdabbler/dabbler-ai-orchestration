@@ -32,6 +32,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { discoverRoots } from "../utils/fileSystem";
 import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
+import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 import {
   isAiRouterNotInstalled,
   describeAiRouterImportFailure,
@@ -70,8 +71,12 @@ function runMigrator(
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
-    child.stdout?.on("data", (c: Buffer) => (stdout += c.toString("utf8")));
-    child.stderr?.on("data", (c: Buffer) => (stderr += c.toString("utf8")));
+    // Streaming-safe decode (S5 verification R3): chunk boundaries can
+    // split multibyte UTF-8; StringDecoder carries the partial bytes.
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
+    child.stdout?.on("data", (c: Buffer) => (stdout += outDec.write(c)));
+    child.stderr?.on("data", (c: Buffer) => (stderr += errDec.write(c)));
     child.on("error", (err: Error) => {
       spawnErrored = true;
       resolve({
@@ -82,6 +87,8 @@ function runMigrator(
     });
     child.on("close", (code: number | null) => {
       if (spawnErrored) return;
+      stdout += outDec.end();
+      stderr += errDec.end();
       if (code === 0) {
         resolve({ ok: true, module, detail: summarizeJson(stdout) });
       } else if (isAiRouterNotInstalled(stderr)) {

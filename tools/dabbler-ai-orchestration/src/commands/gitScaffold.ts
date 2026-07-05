@@ -51,6 +51,7 @@ import {
   writeVerificationModeMarker,
 } from "../utils/tierMarkerStore";
 import { VerificationMode } from "../types";
+import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 
 // ---------- pure scaffolding core (tested without VS Code) ----------
 
@@ -668,14 +669,30 @@ function makeRefreshChildSpawner(): RefreshChildSpawner {
       // taskkill /T walks the tree without it.
       detached: spawnDetached(process.platform),
     });
+    // Streaming-safe decode (S5 verification R3): a pipe boundary can
+    // split a multibyte UTF-8 sequence across `data` chunks; per-chunk
+    // toString("utf8") would corrupt it. StringDecoder carries the
+    // partial bytes to the next chunk; flush any dangling remainder to
+    // the callbacks before the close event.
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
     child.stdout?.on("data", (chunk: Buffer) =>
-      callbacks.onStdout(chunk.toString("utf8")),
+      callbacks.onStdout(outDec.write(chunk)),
     );
     child.stderr?.on("data", (chunk: Buffer) =>
-      callbacks.onStderr(chunk.toString("utf8")),
+      callbacks.onStderr(errDec.write(chunk)),
     );
+    const flush = () => {
+      const outTail = outDec.end();
+      if (outTail) callbacks.onStdout(outTail);
+      const errTail = errDec.end();
+      if (errTail) callbacks.onStderr(errTail);
+    };
     child.on("error", (err: Error) => callbacks.onError(err));
-    child.on("close", (code: number | null) => callbacks.onClose(code));
+    child.on("close", (code: number | null) => {
+      flush();
+      callbacks.onClose(code);
+    });
     return {
       kill: () => {
         // S2 review Minor 3 + S3 residual: the refresh's python child

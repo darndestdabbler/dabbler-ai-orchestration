@@ -435,6 +435,7 @@ async function runPyPiInstall(
   // local copy that the operator edits without touching site-packages.
   // An *existing* local copy is left untouched.
   let materialized = false;
+  let seedFailed = false;
   const workspaceConfig = path.join(deps.workspaceRoot, ROUTER_CONFIG_REL);
   if (!deps.fileOps.exists(workspaceConfig)) {
     const seed = await readBundledRouterConfig(deps, venvPy);
@@ -445,18 +446,32 @@ async function runPyPiInstall(
         materialized = true;
       } catch {
         // Non-fatal: the install succeeded, the file copy didn't. The
-        // operator can re-run or copy by hand. The success message
-        // below still surfaces "installed".
+        // operator can re-run or copy by hand. The message below names
+        // the miss instead of staying silent (Set 079 UAT walk 4: a
+        // silent seed skip left downstream steps to fail confusingly).
+        seedFailed = true;
       }
+    } else {
+      seedFailed = true;
     }
   }
   writeInstallMethodMarker(deps, "pypi");
+  // Name the seed outcome honestly: seeded, could-not-seed, or (existing
+  // file kept) nothing — a silent skip is what let Set 079's UAT walk 4
+  // reach seat setup with no router-config.yaml on disk.
+  const seedNote = materialized
+    ? " Seeded ai_router/router-config.yaml from the installed package."
+    : seedFailed
+      ? " Could not seed ai_router/router-config.yaml from the installed" +
+        ' package — run "Dabbler: Install ai-router" again, or copy the' +
+        " file from the venv's site-packages/ai_router/ by hand."
+      : "";
   return {
     ok: true,
     message:
       opts.mode === "update"
-        ? `Upgraded ${PYPI_PACKAGE_NAME} in ${opts.venvPath}.${materialized ? " Seeded ai_router/router-config.yaml from the installed package." : ""}`
-        : `Installed ${PYPI_PACKAGE_NAME} into ${opts.venvPath}.${materialized ? " Seeded ai_router/router-config.yaml from the installed package." : ""}`,
+        ? `Upgraded ${PYPI_PACKAGE_NAME} in ${opts.venvPath}.${seedNote}`
+        : `Installed ${PYPI_PACKAGE_NAME} into ${opts.venvPath}.${seedNote}`,
     source: "pypi",
     venvPath: opts.venvPath,
     routerConfigPreserved: materialized,
@@ -471,16 +486,28 @@ async function runPyPiInstall(
  * package was installed without its package data, the spawn failed)
  * returns ``null`` so the caller can fall through gracefully without
  * derailing the install.
+ *
+ * The one-liner MUST emit raw bytes (``sys.stdout.buffer.write(
+ * p.read_bytes())``), never decoded text through ``sys.stdout.write``:
+ * on Windows the child's stdout text layer defaults to ``cp1252``
+ * (pre-3.15 Python), and the bundled config contains characters cp1252
+ * cannot encode (e.g. U+2192 in comments) — the text-mode write raises
+ * ``UnicodeEncodeError``, the one-liner exits non-zero, and the seed is
+ * silently skipped, leaving a scaffolded workspace with NO
+ * ``ai_router/router-config.yaml`` (Set 079 UAT walk 4 finding). The
+ * spawner decodes stdout as UTF-8, so the raw-bytes round-trip is
+ * lossless. Same cp1252 bug class as Set 078's CLI-transport decode fix.
  */
+export const READ_BUNDLED_ROUTER_CONFIG_CODE =
+  "from importlib.resources import files; " +
+  "p = files('ai_router').joinpath('router-config.yaml'); " +
+  "import sys; sys.stdout.buffer.write(p.read_bytes())";
+
 async function readBundledRouterConfig(
   deps: InstallDeps,
   venvPy: string,
 ): Promise<string | null> {
-  const code =
-    "from importlib.resources import files; " +
-    "p = files('ai_router').joinpath('router-config.yaml'); " +
-    "import sys; sys.stdout.write(p.read_text(encoding='utf-8'))";
-  const result = await deps.spawner(venvPy, ["-c", code], {
+  const result = await deps.spawner(venvPy, ["-c", READ_BUNDLED_ROUTER_CONFIG_CODE], {
     cwd: deps.workspaceRoot,
     timeoutMs: 30_000,
   });

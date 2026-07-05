@@ -15892,6 +15892,7 @@ async function runPyPiInstall(deps, opts) {
     };
   }
   let materialized = false;
+  let seedFailed = false;
   const workspaceConfig = path4.join(deps.workspaceRoot, ROUTER_CONFIG_REL);
   if (!deps.fileOps.exists(workspaceConfig)) {
     const seed = await readBundledRouterConfig(deps, venvPy);
@@ -15901,21 +15902,25 @@ async function runPyPiInstall(deps, opts) {
         deps.fileOps.writeFile(workspaceConfig, seed);
         materialized = true;
       } catch {
+        seedFailed = true;
       }
+    } else {
+      seedFailed = true;
     }
   }
   writeInstallMethodMarker(deps, "pypi");
+  const seedNote = materialized ? " Seeded ai_router/router-config.yaml from the installed package." : seedFailed ? ` Could not seed ai_router/router-config.yaml from the installed package \u2014 run "Dabbler: Install ai-router" again, or copy the file from the venv's site-packages/ai_router/ by hand.` : "";
   return {
     ok: true,
-    message: opts.mode === "update" ? `Upgraded ${PYPI_PACKAGE_NAME} in ${opts.venvPath}.${materialized ? " Seeded ai_router/router-config.yaml from the installed package." : ""}` : `Installed ${PYPI_PACKAGE_NAME} into ${opts.venvPath}.${materialized ? " Seeded ai_router/router-config.yaml from the installed package." : ""}`,
+    message: opts.mode === "update" ? `Upgraded ${PYPI_PACKAGE_NAME} in ${opts.venvPath}.${seedNote}` : `Installed ${PYPI_PACKAGE_NAME} into ${opts.venvPath}.${seedNote}`,
     source: "pypi",
     venvPath: opts.venvPath,
     routerConfigPreserved: materialized
   };
 }
+var READ_BUNDLED_ROUTER_CONFIG_CODE = "from importlib.resources import files; p = files('ai_router').joinpath('router-config.yaml'); import sys; sys.stdout.buffer.write(p.read_bytes())";
 async function readBundledRouterConfig(deps, venvPy) {
-  const code = "from importlib.resources import files; p = files('ai_router').joinpath('router-config.yaml'); import sys; sys.stdout.write(p.read_text(encoding='utf-8'))";
-  const result = await deps.spawner(venvPy, ["-c", code], {
+  const result = await deps.spawner(venvPy, ["-c", READ_BUNDLED_ROUTER_CONFIG_CODE], {
     cwd: deps.workspaceRoot,
     timeoutMs: 3e4
   });
@@ -22817,6 +22822,18 @@ var fs10 = __toESM(require("fs"));
 var os = __toESM(require("os"));
 var path11 = __toESM(require("path"));
 var vscode5 = __toESM(require("vscode"));
+
+// src/utils/utf8ChunkDecoder.ts
+var import_string_decoder = require("string_decoder");
+function makeUtf8ChunkDecoder() {
+  const sd = new import_string_decoder.StringDecoder("utf8");
+  return {
+    write: (chunk) => sd.write(chunk),
+    end: () => sd.end()
+  };
+}
+
+// src/commands/installAiRouterCommands.ts
 function registerInstallAiRouterCommands(context) {
   context.subscriptions.push(
     vscode5.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
@@ -22887,20 +22904,27 @@ function makeSpawner() {
     });
     let stdout = "";
     let stderr = "";
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
+    const flush = () => {
+      stdout += outDec.end();
+      stderr += errDec.end();
+    };
     let timedOut = false;
     const timer = opts?.timeoutMs ? setTimeout(() => {
       timedOut = true;
       child.kill();
     }, opts.timeoutMs) : null;
     child.stdout?.on("data", (chunk) => {
-      stdout += chunk.toString("utf8");
+      stdout += outDec.write(chunk);
     });
     child.stderr?.on("data", (chunk) => {
-      stderr += chunk.toString("utf8");
+      stderr += errDec.write(chunk);
     });
     child.on("error", (err) => {
       if (timer)
         clearTimeout(timer);
+      flush();
       resolve5({
         exitCode: null,
         stdout,
@@ -22910,6 +22934,7 @@ function makeSpawner() {
     child.on("close", (code) => {
       if (timer)
         clearTimeout(timer);
+      flush();
       if (timedOut) {
         resolve5({
           exitCode: code ?? -1,
@@ -23596,16 +23621,29 @@ function makeRefreshChildSpawner() {
       // taskkill /T walks the tree without it.
       detached: spawnDetached(process.platform)
     });
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
     child.stdout?.on(
       "data",
-      (chunk) => callbacks.onStdout(chunk.toString("utf8"))
+      (chunk) => callbacks.onStdout(outDec.write(chunk))
     );
     child.stderr?.on(
       "data",
-      (chunk) => callbacks.onStderr(chunk.toString("utf8"))
+      (chunk) => callbacks.onStderr(errDec.write(chunk))
     );
+    const flush = () => {
+      const outTail = outDec.end();
+      if (outTail)
+        callbacks.onStdout(outTail);
+      const errTail = errDec.end();
+      if (errTail)
+        callbacks.onStderr(errTail);
+    };
     child.on("error", (err) => callbacks.onError(err));
-    child.on("close", (code) => callbacks.onClose(code));
+    child.on("close", (code) => {
+      flush();
+      callbacks.onClose(code);
+    });
     return {
       kill: () => {
         dispatchKill(process.platform, child.pid, makeRealKillEffects(child));
@@ -28224,11 +28262,13 @@ ${msgs}`,
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
     child.stdout?.on("data", (chunk) => {
-      stdout += chunk.toString("utf8");
+      stdout += outDec.write(chunk);
     });
     child.stderr?.on("data", (chunk) => {
-      stderr += chunk.toString("utf8");
+      stderr += errDec.write(chunk);
     });
     child.on("error", (err) => {
       spawnErrored = true;
@@ -28237,6 +28277,8 @@ ${msgs}`,
     child.on("close", () => {
       if (spawnErrored)
         return;
+      stdout += outDec.end();
+      stderr += errDec.end();
       try {
         const result = JSON.parse(stdout.trim());
         if (result.ok) {
@@ -29403,8 +29445,10 @@ function runMigrator2(pythonPath, module2, cwd) {
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
-    child.stdout?.on("data", (c3) => stdout += c3.toString("utf8"));
-    child.stderr?.on("data", (c3) => stderr += c3.toString("utf8"));
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
+    child.stdout?.on("data", (c3) => stdout += outDec.write(c3));
+    child.stderr?.on("data", (c3) => stderr += errDec.write(c3));
     child.on("error", (err) => {
       spawnErrored = true;
       resolve5({
@@ -29416,6 +29460,8 @@ function runMigrator2(pythonPath, module2, cwd) {
     child.on("close", (code) => {
       if (spawnErrored)
         return;
+      stdout += outDec.end();
+      stderr += errDec.end();
       if (code === 0) {
         resolve5({ ok: true, module: module2, detail: summarizeJson(stdout) });
       } else if (isAiRouterNotInstalled(stderr)) {
@@ -29777,8 +29823,10 @@ function runChangeWriter(pythonPath, setDir, cwd) {
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
-    child.stdout?.on("data", (c3) => stdout += c3.toString("utf8"));
-    child.stderr?.on("data", (c3) => stderr += c3.toString("utf8"));
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
+    child.stdout?.on("data", (c3) => stdout += outDec.write(c3));
+    child.stderr?.on("data", (c3) => stderr += errDec.write(c3));
     child.on("error", (err) => {
       spawnErrored = true;
       resolve5({
@@ -29790,6 +29838,8 @@ function runChangeWriter(pythonPath, setDir, cwd) {
     child.on("close", (exitCode) => {
       if (spawnErrored)
         return;
+      stdout += outDec.end();
+      stderr += errDec.end();
       const parsed = parseChangeWriterOutput(stdout);
       if (parsed) {
         resolve5(parsed);

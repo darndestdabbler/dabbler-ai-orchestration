@@ -12,6 +12,7 @@ import {
   ROUTER_CONFIG_REL,
 } from "../utils/aiRouterInstall";
 import { resolveExplicitPythonPath } from "../utils/pythonInterpreter";
+import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 
 /**
  * VS Code wiring for the ``Dabbler: Install ai-router`` and
@@ -114,6 +115,15 @@ export function makeSpawner(): ProcessSpawner {
       });
       let stdout = "";
       let stderr = "";
+      // Streaming-safe decode: this spawner carries whole-file payloads
+      // (the router-config.yaml seed read), where a pipe boundary can
+      // split a multibyte UTF-8 sequence mid-character.
+      const outDec = makeUtf8ChunkDecoder();
+      const errDec = makeUtf8ChunkDecoder();
+      const flush = () => {
+        stdout += outDec.end();
+        stderr += errDec.end();
+      };
       let timedOut = false;
       const timer = opts?.timeoutMs
         ? setTimeout(() => {
@@ -122,13 +132,14 @@ export function makeSpawner(): ProcessSpawner {
           }, opts.timeoutMs)
         : null;
       child.stdout?.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString("utf8");
+        stdout += outDec.write(chunk);
       });
       child.stderr?.on("data", (chunk: Buffer) => {
-        stderr += chunk.toString("utf8");
+        stderr += errDec.write(chunk);
       });
       child.on("error", (err: Error) => {
         if (timer) clearTimeout(timer);
+        flush();
         resolve({
           exitCode: null,
           stdout,
@@ -137,6 +148,7 @@ export function makeSpawner(): ProcessSpawner {
       });
       child.on("close", (code: number | null) => {
         if (timer) clearTimeout(timer);
+        flush();
         if (timedOut) {
           resolve({
             exitCode: code ?? -1,

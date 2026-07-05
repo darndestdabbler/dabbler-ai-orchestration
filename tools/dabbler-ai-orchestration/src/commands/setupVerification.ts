@@ -44,6 +44,7 @@ import {
   isAiRouterNotInstalled,
 } from "../utils/aiRouterInstall";
 import { buildVerificationKickoffPrompt } from "./copyPromptCommands";
+import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 
 interface SetItem {
   set?: SessionSet;
@@ -197,8 +198,12 @@ function runChangeWriter(
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
-    child.stdout?.on("data", (c: Buffer) => (stdout += c.toString("utf8")));
-    child.stderr?.on("data", (c: Buffer) => (stderr += c.toString("utf8")));
+    // Streaming-safe decode (S5 verification R3): chunk boundaries can
+    // split multibyte UTF-8; StringDecoder carries the partial bytes.
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
+    child.stdout?.on("data", (c: Buffer) => (stdout += outDec.write(c)));
+    child.stderr?.on("data", (c: Buffer) => (stderr += errDec.write(c)));
     child.on("error", (err: Error) => {
       spawnErrored = true;
       resolve({
@@ -211,6 +216,8 @@ function runChangeWriter(
     });
     child.on("close", (exitCode: number | null) => {
       if (spawnErrored) return;
+      stdout += outDec.end();
+      stderr += errDec.end();
       const parsed = parseChangeWriterOutput(stdout);
       if (parsed) {
         resolve(parsed);

@@ -1,0 +1,82 @@
+{
+  "sessionSetName": "080-getting-started-subchoice-legibility",
+  "createdDate": "2026-07-05T19:58:00.064798+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-05T19:58:00.065808+00:00",
+      "description": "Operator set pathAwareCritique: none.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "none"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 0,
+      "stepKey": "session-1/ai-assignment",
+      "dateTime": "2026-07-05T16:02:41.399915-04:00",
+      "description": "Authored ai-assignment.md via routed analysis (gemini-pro)",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 2237,
+          "outputTokens": 692,
+          "costUsd": 0.00971625
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "s1.layout",
+      "dateTime": "2026-07-05T16:06:34.927372-04:00",
+      "description": "Restructured transportProfileBlockHtml + verificationModeBlockHtml to shared optionRowHtml row layout (radio | name | desc), copy constants split at em-dash for presentation only",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.css",
+      "dateTime": "2026-07-05T16:06:34.927372-04:00",
+      "description": "Added .gs-option-row grid CSS with theme-variable row separation to tree.css",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "s1.tests",
+      "dateTime": "2026-07-05T16:06:34.927372-04:00",
+      "description": "Updated S4 copy-pin + transport copy assertions to assert same literal strings across the split structure; added Set 080 S1 option-row suite (6 tests)",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-1/layer2-tsc",
+      "dateTime": "2026-07-05T16:06:34.927372-04:00",
+      "description": "Layer-2 mocha suite 1250 passing; esbuild compile + tsc clean",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/layer3",
+      "dateTime": "2026-07-05T16:12:28.258109-04:00",
+      "description": "Layer-3 Playwright smoke: 18/19 passed; single ARIA-tree failure was a palette-open timeout flake, passed clean on isolated re-run (19/19 effective)",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/routed-gate",
+      "dateTime": "2026-07-05T16:13:10.094515-04:00",
+      "description": "routed_gate verdict SKIP (exit 10): 3 files, 1 module, no coupling triggers; per Set 068 DEMOTE the per-session routed verification is bypassed; no raise-only flags apply",
+      "status": "complete"
+    }
+  ]
+}

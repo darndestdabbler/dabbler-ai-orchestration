@@ -453,6 +453,39 @@ body.vscode-light, body.vscode-high-contrast-light {
 }
 .gs-zero-choice[hidden] { display: none; }
 .gs-zero-copy { font-size: 11px; line-height: 1.45; }
+
+/* Set 080 S1: the second-level sub-choice groups (Full's provider
+   access, Lightweight's verification mode) render each option as a
+   table-like row — radio | short bold name | description — with a
+   light rule between rows so it is easy to see where one option ends
+   and the next begins. The name column is percentage-based so the
+   three parts stay aligned across rows at any view width. */
+.gs-verification-mode-label,
+.gs-transport-profile-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.gs-option-row {
+  display: grid;
+  grid-template-columns: auto minmax(110px, 32%) 1fr;
+  column-gap: 8px;
+  align-items: start;
+  padding: 5px 0;
+  cursor: pointer;
+}
+.gs-option-row + .gs-option-row {
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+.gs-option-row input[type="radio"] { margin: 1px 0 0; }
+.gs-option-name {
+  font-size: 12px;
+  font-weight: 600;
+}
+.gs-option-desc {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--vscode-descriptionForeground);
+}
 .gs-validation {
   font-size: 11px;
   line-height: 1.45;

@@ -79,6 +79,13 @@ const gsHtml = requireFromPackageRoot(
     controls: GsControls,
     copilotCliPresent?: boolean,
   ): string;
+  // Set 080 S1: the shared sub-choice option row (radio | name | desc).
+  optionRowHtml(
+    groupName: string,
+    value: string,
+    checked: boolean,
+    text: string,
+  ): string;
   copilotWarningHtml(visible: boolean): string;
   TRANSPORT_PROFILE_LABEL_TEXT: string;
   TRANSPORT_PROFILE_API_TEXT: string;
@@ -141,6 +148,26 @@ function isVisible(html: string, dataAttr: string): boolean {
   const tagEnd = html.indexOf(">", idx);
   const openTag = html.slice(tagStart, tagEnd + 1);
   return !/\shidden[\s>]/.test(openTag);
+}
+
+// Set 080 S1: the sub-choice groups render each option as a row —
+// radio | bold name | description — splitting the copy CONSTANT at its
+// first em-dash for presentation only. This asserts the exact same
+// literal copy survives across the new structure: the name part inside
+// gs-option-name, the description part inside gs-option-desc.
+function assertOptionCopy(html: string, constant: string): void {
+  const sep = " — ";
+  const idx = constant.indexOf(sep);
+  assert.notStrictEqual(idx, -1, `copy constant lost its em-dash: ${constant}`);
+  const name = constant.slice(0, idx);
+  const desc = constant.slice(idx + sep.length);
+  assert.ok(
+    html.includes(
+      `<span class="gs-option-name">${name}</span>` +
+        `<span class="gs-option-desc">${desc}</span>`,
+    ),
+    `option row does not carry the split copy verbatim: ${constant}`,
+  );
 }
 
 suite("gettingStartedHtml — form structure (Set 060 S1/S2 parity)", () => {
@@ -608,6 +635,10 @@ suite("gettingStartedHtml — verification-mode block (Set 077 S3)", () => {
   // NOT find the README echoes: any wording change here requires a
   // parallel prose update in both README.md and
   // tools/dabbler-ai-orchestration/README.md.
+  // Set 080 S1: the block now splits each constant at its em-dash into
+  // a name/description row (presentation only), so the render assertion
+  // checks the same literal copy across the two spans instead of one
+  // contiguous string.
   test("pins the simplified verification-mode copy (Set 079 S4)", () => {
     assert.strictEqual(
       gsHtml.VERIFICATION_MODE_OUT_OF_BAND_TEXT,
@@ -621,8 +652,8 @@ suite("gettingStartedHtml — verification-mode block (Set 077 S3)", () => {
         "set can close.",
     );
     const html = gsHtml.verificationModeBlockHtml(LIGHT);
-    assert.ok(html.includes(gsHtml.VERIFICATION_MODE_OUT_OF_BAND_TEXT));
-    assert.ok(html.includes(gsHtml.VERIFICATION_MODE_DEDICATED_TEXT));
+    assertOptionCopy(html, gsHtml.VERIFICATION_MODE_OUT_OF_BAND_TEXT);
+    assertOptionCopy(html, gsHtml.VERIFICATION_MODE_DEDICATED_TEXT);
   });
 
   test("budget block and verification block are mutually exclusive by tier", () => {
@@ -802,8 +833,10 @@ suite("gettingStartedHtml — transport-profile block (Set 079 S1)", () => {
     const html = gsHtml.transportProfileBlockHtml(FULL, true);
     assert.ok(html.includes("data-gs-transport-profile"));
     assert.ok(html.includes(gsHtml.TRANSPORT_PROFILE_LABEL_TEXT));
-    assert.ok(html.includes(gsHtml.TRANSPORT_PROFILE_API_TEXT));
-    assert.ok(html.includes(gsHtml.TRANSPORT_PROFILE_COPILOT_TEXT));
+    // Set 080 S1: the copy renders split across the name/description
+    // row spans — same literal strings, new structure.
+    assertOptionCopy(html, gsHtml.TRANSPORT_PROFILE_API_TEXT);
+    assertOptionCopy(html, gsHtml.TRANSPORT_PROFILE_COPILOT_TEXT);
     assert.ok(/value="api" checked/.test(html));
     assert.ok(!/value="copilot-cli" checked/.test(html));
   });
@@ -1018,5 +1051,92 @@ suite("gettingStartedHtml — restoreGsState seat-profile seed (Set 079 S1)", ()
     assert.strictEqual(state.tier, "lightweight");
     assert.strictEqual(state.verificationMode, "dedicated-sessions");
     assert.strictEqual(state.transportProfile, "copilot-cli");
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 080 Session 1 — the row-structured option layout both sub-choice
+// groups share: each option is a gs-option-row label carrying the radio,
+// the bold short name (copy before the em-dash), and the description
+// (copy after it). Radio names/values and the block data attributes are
+// unchanged — this is presentation only; the persistence and placement
+// suites above run against the same markup untouched.
+// ---------------------------------------------------------------------
+
+suite("gettingStartedHtml — sub-choice option rows (Set 080 S1)", () => {
+  test("optionRowHtml splits its copy at the first em-dash into name/desc spans", () => {
+    const html = gsHtml.optionRowHtml(
+      "gs-demo",
+      "a",
+      true,
+      "Short name (default) — longer description text.",
+    );
+    assert.ok(html.startsWith('<label class="gs-option-row">'));
+    assert.ok(
+      html.includes('<input type="radio" name="gs-demo" value="a" checked>'),
+    );
+    assert.ok(
+      html.includes('<span class="gs-option-name">Short name (default)</span>'),
+    );
+    assert.ok(
+      html.includes(
+        '<span class="gs-option-desc">longer description text.</span>',
+      ),
+    );
+  });
+
+  test("optionRowHtml: unchecked omits the checked attr; no em-dash renders whole name", () => {
+    const html = gsHtml.optionRowHtml("gs-demo", "b", false, "No dash here");
+    assert.ok(html.includes('<input type="radio" name="gs-demo" value="b">'));
+    assert.ok(!/ checked/.test(html));
+    assert.ok(html.includes('<span class="gs-option-name">No dash here</span>'));
+    assert.ok(html.includes('<span class="gs-option-desc"></span>'));
+  });
+
+  test("optionRowHtml escapes copy and attribute values", () => {
+    const html = gsHtml.optionRowHtml(
+      'g"n',
+      'v"1',
+      false,
+      "a <b> & c — d <i>",
+    );
+    assert.ok(html.includes('name="g&quot;n"'));
+    assert.ok(html.includes('value="v&quot;1"'));
+    assert.ok(html.includes("a &lt;b&gt; &amp; c"));
+    assert.ok(html.includes("d &lt;i&gt;"));
+  });
+
+  test("both groups render exactly two option rows in the same pattern", () => {
+    const countRows = (html: string) =>
+      (html.match(/class="gs-option-row"/g) || []).length;
+    assert.strictEqual(
+      countRows(gsHtml.transportProfileBlockHtml(FULL, true)),
+      2,
+    );
+    assert.strictEqual(countRows(gsHtml.verificationModeBlockHtml(LIGHT)), 2);
+  });
+
+  test("the radio sits inside its row label so the whole row stays clickable", () => {
+    for (const [html, name] of [
+      [gsHtml.transportProfileBlockHtml(FULL, true), "gs-transport-profile"],
+      [gsHtml.verificationModeBlockHtml(LIGHT), "gs-verification-mode"],
+    ] as const) {
+      const rowIdx = html.indexOf('class="gs-option-row"');
+      const inputIdx = html.indexOf(`<input type="radio" name="${name}"`);
+      const labelClose = html.indexOf("</label>");
+      assert.ok(
+        rowIdx !== -1 && rowIdx < inputIdx && inputIdx < labelClose,
+        `${name}: radio not inside the first gs-option-row label`,
+      );
+    }
+  });
+
+  test("full form render carries the row structure for the active tier's group", () => {
+    const full = gsHtml.renderGettingStarted(gs(), FULL);
+    assertOptionCopy(full, gsHtml.TRANSPORT_PROFILE_API_TEXT);
+    assertOptionCopy(full, gsHtml.TRANSPORT_PROFILE_COPILOT_TEXT);
+    const light = gsHtml.renderGettingStarted(gs(), LIGHT);
+    assertOptionCopy(light, gsHtml.VERIFICATION_MODE_OUT_OF_BAND_TEXT);
+    assertOptionCopy(light, gsHtml.VERIFICATION_MODE_DEDICATED_TEXT);
   });
 });

@@ -1,0 +1,28 @@
+{
+  "status": "completed",
+  "summary": "Session 1 of 2 (Row-structured option layout for both sub-choice groups): both second-level radio groups in the Getting Started form - the Full tier's 'Provider access (how routed calls run)' pair (transportProfileBlockHtml) and the Lightweight tier's 'Verification (per session set)' pair (verificationModeBlockHtml) - now render through a shared optionRowHtml helper as visually separated rows: radio | short bold option name | description, with the existing copy constants split at their first em-dash for presentation only (wording, values, '(default)' marker positions, radio names, and block data attributes all unchanged). tree.css gained the .gs-option-row grid layout (auto | minmax(110px,32%) | 1fr columns so the three parts stay aligned across rows at any view width) with a light var(--vscode-panel-border) rule between rows, plus bold styling for the two group labels. The Set 079 S4 literal-string copy pin and the transport-profile copy assertions were updated to assert the exact same literal strings across the new name/desc span structure (via a shared assertOptionCopy helper that splits the constant, keeping the constants the single source); a new 6-test Set 080 S1 suite covers the row split, checked/unchecked attrs, escaping, two-rows-per-group, whole-row-clickable label nesting, and full-form renders. All placement, default-checked, warning-visibility, and persistence (restoreGsState) suites passed unchanged - no semantic test edits were needed. Suites: Layer-2 mocha 1250 passing (was 1244), esbuild compile + tsc clean, Layer-3 Playwright 18/19 with the single ARIA-tree failure a palette-open timeout flake that passed clean on isolated re-run. client.js wiring untouched (it selects input[name=...] and [data-gs-*], both preserved).",
+  "verification_method": "skipped",
+  "verification_notes": "Routed gate: SKIP (exit 10) - 'python -m ai_router.routed_gate' over the session's 3 changed code files (gettingStartedHtml.js, tree.css, gettingStartedHtml.test.ts) found 1 module, no coupling/contract/build-config triggers ('small, single-module, probe-covered diff with no coupling signal'), and none of the three raise-only operator facts apply (the changed surface is pinned by the Layer-2 render suite; not high-blast; not post-failed-loop). Per the Set 068 DEMOTE policy (workflow Step 6) the per-session routed verification is therefore bypassed - this is the gate-authorized skip, NOT the budget.yaml zero-budget opt-out; verification_method 'skipped' is used because no routed verifier ran and fabricating a VERIFIED token via the api-method status fallback would be dishonest. The skip is recorded in activity-log.json (step key session-1/routed-gate). Safety net for this diff: the Layer-2 pin/render suites shipped in the same change, plus Set 080 Session 2's operator UAT walk (requiresUAT: true, per-set), which is the set's declared judgment gate for exactly this surface.",
+  "files_changed": [
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
+    "docs/session-sets/080-getting-started-subchoice-legibility/ai-assignment.md",
+    "docs/session-sets/080-getting-started-subchoice-legibility/activity-log.json",
+    "docs/session-sets/080-getting-started-subchoice-legibility/session-state.json",
+    "docs/session-sets/080-getting-started-subchoice-legibility/session-events.jsonl"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "codex",
+    "provider": "openai",
+    "model": "gpt-5.4",
+    "effort": "low",
+    "reason": {
+      "code": "switch-due-to-cost",
+      "specifics": "Routed ai-assignment analysis (gemini-pro) recommends Codex CLI gpt-5.4 @ low for Session 2: a procedural session (UAT checklist authoring, screenshot commit, version bump, CHANGELOG, tag-push walk) suited to a cheaper step-by-step tool-and-file orchestrator; note Session 2's package.json touch trips the routed gate, so a cross-provider session-verification call is expected there."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": ["L-064-3", "L-064-6", "L-064-12"]
+}

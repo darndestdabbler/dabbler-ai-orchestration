@@ -371,28 +371,59 @@
   }
 
   /**
+   * Set 080 S1: one option row of a second-level radio group — the
+   * shared table-like presentation both sub-choice groups render
+   * (radio | short bold name | description, visually separated rows;
+   * `.gs-option-row + .gs-option-row` in tree.css draws the light
+   * rule). The row REUSES the existing copy constant, split at its
+   * first em-dash for presentation only — the constant stays the
+   * single source of the copy, and the wording (including the
+   * "(default)" marker's position) is unchanged. A constant with no
+   * em-dash renders whole as the name, with an empty description.
+   */
+  function optionRowHtml(groupName, value, checked, text) {
+    var sep = " — ";
+    var idx = String(text).indexOf(sep);
+    var name = idx === -1 ? String(text) : String(text).slice(0, idx);
+    var desc = idx === -1 ? "" : String(text).slice(idx + sep.length);
+    return (
+      '<label class="gs-option-row"><input type="radio" name="' +
+        escAttr(groupName) + '" value="' + escAttr(value) + '"' +
+        (checked ? " checked" : "") + ">" +
+        '<span class="gs-option-name">' + escHtml(name) + "</span>" +
+        '<span class="gs-option-desc">' + escHtml(desc) + "</span>" +
+      "</label>"
+    );
+  }
+
+  /**
    * Set 077 S3 (Feature 2): the Lightweight-only verification-mode block
    * inside step 1 — the mirror image of {@link budgetBlockHtml}: on FULL
    * the block is OMITTED from the DOM entirely (tier flips re-render the
    * form surface, so there is no visibility flip to manage). The default
    * radio is out-of-band-or-none, matching the spec-level default.
+   * Set 080 S1: options render as {@link optionRowHtml} rows.
    */
   function verificationModeBlockHtml(controls) {
     if (controls.tier !== "lightweight") return "";
-    var dedicatedChecked =
-      controls.verificationMode === "dedicated-sessions" ? " checked" : "";
-    var outOfBandChecked = dedicatedChecked ? "" : " checked";
+    var dedicated = controls.verificationMode === "dedicated-sessions";
     return (
       '<div class="gs-verification-mode" data-gs-verification-mode>' +
         '<div class="gs-verification-mode-label">' +
           escHtml(VERIFICATION_MODE_LABEL_TEXT) +
         "</div>" +
-        '<label class="gs-radio"><input type="radio" name="gs-verification-mode"' +
-          ' value="out-of-band-or-none"' + outOfBandChecked + "> " +
-          escHtml(VERIFICATION_MODE_OUT_OF_BAND_TEXT) + "</label>" +
-        '<label class="gs-radio"><input type="radio" name="gs-verification-mode"' +
-          ' value="dedicated-sessions"' + dedicatedChecked + "> " +
-          escHtml(VERIFICATION_MODE_DEDICATED_TEXT) + "</label>" +
+        optionRowHtml(
+          "gs-verification-mode",
+          "out-of-band-or-none",
+          !dedicated,
+          VERIFICATION_MODE_OUT_OF_BAND_TEXT,
+        ) +
+        optionRowHtml(
+          "gs-verification-mode",
+          "dedicated-sessions",
+          dedicated,
+          VERIFICATION_MODE_DEDICATED_TEXT,
+        ) +
       "</div>"
     );
   }
@@ -426,24 +457,29 @@
    * missing-CLI warning renders inside the block, hidden unless the
    * Copilot option is selected and the probe failed
    * (`copilotCliPresent === false`).
+   * Set 080 S1: options render as {@link optionRowHtml} rows.
    */
   function transportProfileBlockHtml(controls, copilotCliPresent) {
     if (controls.tier === "lightweight") return "";
-    var copilotChecked =
-      controls.transportProfile === "copilot-cli" ? " checked" : "";
-    var apiChecked = copilotChecked ? "" : " checked";
-    var warningVisible = !!copilotChecked && copilotCliPresent === false;
+    var copilot = controls.transportProfile === "copilot-cli";
+    var warningVisible = copilot && copilotCliPresent === false;
     return (
       '<div class="gs-transport-profile" data-gs-transport-profile>' +
         '<div class="gs-transport-profile-label">' +
           escHtml(TRANSPORT_PROFILE_LABEL_TEXT) +
         "</div>" +
-        '<label class="gs-radio"><input type="radio" name="gs-transport-profile"' +
-          ' value="api"' + apiChecked + "> " +
-          escHtml(TRANSPORT_PROFILE_API_TEXT) + "</label>" +
-        '<label class="gs-radio"><input type="radio" name="gs-transport-profile"' +
-          ' value="copilot-cli"' + copilotChecked + "> " +
-          escHtml(TRANSPORT_PROFILE_COPILOT_TEXT) + "</label>" +
+        optionRowHtml(
+          "gs-transport-profile",
+          "api",
+          !copilot,
+          TRANSPORT_PROFILE_API_TEXT,
+        ) +
+        optionRowHtml(
+          "gs-transport-profile",
+          "copilot-cli",
+          copilot,
+          TRANSPORT_PROFILE_COPILOT_TEXT,
+        ) +
         copilotWarningHtml(warningVisible) +
       "</div>"
     );
@@ -586,6 +622,7 @@
     envWarningHtml: envWarningHtml,
     worktreeNoteHtml: worktreeNoteHtml,
     budgetBlockHtml: budgetBlockHtml,
+    optionRowHtml: optionRowHtml,
     verificationModeBlockHtml: verificationModeBlockHtml,
     transportProfileBlockHtml: transportProfileBlockHtml,
     pythonWarningHtml: pythonWarningHtml,

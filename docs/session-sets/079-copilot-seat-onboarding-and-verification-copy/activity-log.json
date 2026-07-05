@@ -1,7 +1,7 @@
 {
   "sessionSetName": "079-copilot-seat-onboarding-and-verification-copy",
   "createdDate": "2026-07-04T17:58:48.807644-04:00",
-  "totalSessions": 0,
+  "totalSessions": 5,
   "entries": [
     {
       "sessionNumber": 1,
@@ -73,6 +73,101 @@
           "costUsd": 0.192225,
           "inputTokens": 17514,
           "outputTokens": 9896
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "s2.sequencing",
+      "dateTime": "2026-07-05T02:59:26.535287-04:00",
+      "description": "Hooked the catalog refresh strictly after the scaffold sequence (venv -> pip install -> template render) in buildProjectStructureNoPrompt, reusing the install outcome's venvPath via venvPython() (the same interpreter resolution Dabbler: Install ai-router uses); install-failed path gets an honest skip warning, never a silent bypass.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "s2.seat-identity",
+      "dateTime": "2026-07-05T02:59:26.535287-04:00",
+      "description": "Auto-derived seat identity: deriveSeatId = seat- + sha256(hostname|username)[:12] (trimmed/lowercased inputs), deriveSeatLabel = workspace folder basename with 'workspace' fallback; no operator-typed fields (critique C1). Explicit copilotCliPath setting threads to --binary via resolveCopilotCliBinary (probe/spawn agreement).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "s2.subprocess-ux",
+      "dateTime": "2026-07-05T02:59:26.535287-04:00",
+      "description": "runCatalogRefresh: cancellable child process with lockfile snapshot/restore on every non-completed path; vscode.window.withProgress cancellable notification (INDETERMINATE - the CLI prints nothing until its final line, per-model progress not parseable; critique m2 fallback recorded); teardown disposal hook in context.subscriptions with post-exit re-restore; post-kill force-settle timeout; win32 taskkill /T tree-kill.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "s2.config-write",
+      "dateTime": "2026-07-05T02:59:26.535287-04:00",
+      "description": "Refresh result parsed from the CLI's own stdout line (never exit code); >=2 distinct providers gates the config write; transport.profile rendered as an anchored direct-child field replacement in the transport: block (renderTransportProfile - fail-loud on missing anchor or operator-edited value, never an append); refresh-ok-but-write-failed reported as its own config-write-failed state; readTransportProfile wired as the durable transportProfileSeed source (S1 handoff note).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "s2.tests",
+      "dateTime": "2026-07-05T02:59:26.535287-04:00",
+      "description": "54 new Layer-2 tests (routed test-generation, adapted platform-safe) covering seat identity, pinned argv, stdout parsing, anchored render (incl. nested-sub-block Major from the cross-verifier), cancel/teardown/late-cancel races, kill timeout, seat-setup outcomes, rider narrowing. Routed code-review (opus, gpt-5-4 auto-verify) returned 2 Major + 1 verifier Major - all fixed in-session with pinning tests; minors 3/4/6/8 fixed, atomic-write + POSIX tree-kill deferred to S3 failure matrix as named residuals.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "test-generation",
+          "inputTokens": 9788,
+          "outputTokens": 7007,
+          "costUsd": 0.082305
+        },
+        {
+          "model": "opus",
+          "taskType": "code-review",
+          "inputTokens": 20035,
+          "outputTokens": 12710,
+          "costUsd": 0.417925
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "s2.dogfood-and-suites",
+      "dateTime": "2026-07-05T02:59:26.535287-04:00",
+      "description": "Real live-seat dogfood via performCopilotSeatSetup (real venv python + real copilot CLI 1.0.68, scratch project): SUCCESS in 102s, 15/18 models confirmed, providers=[anthropic, google, openai], transport.profile: copilot-cli written, valid lockfile. Suites: Layer-2 mocha 1188 passing, tsc --noEmit clean, eslint clean, pytest 2483 passed/5 skipped, Playwright Layer 3 19 passed (client.js changed -> L-064-12 local run).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "s2.verification",
+      "dateTime": "2026-07-05T03:19:18.317827-04:00",
+      "description": "Routed gate: REQUIRED (blast-radius, multi-module, breadth). Cross-provider session verification on gpt-5-4 (OpenAI): R1 ISSUES_FOUND (1 Major: gitScaffold integration wiring unpinned) -> fixed via decideCopilotSeatSetup + injectable seams + gitScaffoldSeatSetup.test.ts; R2 held the same ledger issue (S2-V-001) partially-fixed -> BuildStructureSeams drives the REAL buildProjectStructureNoPrompt path in 4 more tests; R3 VERIFIED. Ledger discipline kept a single issueId across rounds. Post-fix suites: Layer-2 1206 passing, tsc/eslint clean, dist rebuilt, Playwright re-run 19 passed.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 23524,
+          "outputTokens": 8638,
+          "costUsd": 0.18838
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 7952,
+          "outputTokens": 2239,
+          "costUsd": 0.053465
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 4160,
+          "outputTokens": 789,
+          "costUsd": 0.022235
         }
       ]
     }

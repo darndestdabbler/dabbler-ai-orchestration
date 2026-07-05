@@ -137,3 +137,46 @@ export function probeCopilotCliPresence(
     process.platform,
   );
 }
+
+/**
+ * Pure core of the `--binary` rider resolution (Set 079 S2): what an
+ * explicit `copilotCliPath` setting should hand the catalog refresh so
+ * the probe above and the refresh spawn resolve the SAME executable.
+ * Path-shaped settings (absolute, or workspace-relative with a
+ * separator) resolve to an ABSOLUTE path — the refresh spawns with
+ * `cwd: projectDir`, so passing the pre-resolved absolute form keeps
+ * the two surfaces agreeing byte-for-byte instead of relying on the
+ * child's own cwd resolution. A bare command token passes through
+ * as-is (the CLI's `subprocess` PATH resolution handles it, with the
+ * documented `.exe`-only asymmetry the probe already encodes).
+ * `undefined` when no explicit setting is in effect — the CLI's own
+ * default (`copilot`) applies and no `--binary` flag is sent.
+ */
+export function resolveCopilotCliBinaryCore(
+  explicitSetting: string | undefined,
+  workspaceRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): string | undefined {
+  if (!explicitSetting) return undefined;
+  const p = platform === "win32" ? path.win32 : path.posix;
+  if (p.isAbsolute(explicitSetting)) return explicitSetting;
+  if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
+    return p.resolve(workspaceRoot, explicitSetting);
+  }
+  return explicitSetting;
+}
+
+/**
+ * Host-facing `--binary` resolver: the operator's explicit
+ * `dabblerSessionSets.copilotCliPath` (workspace-folder > workspace >
+ * global), resolved through the pure core above.
+ */
+export function resolveCopilotCliBinary(
+  workspaceRoot: string,
+): string | undefined {
+  return resolveCopilotCliBinaryCore(
+    explicitCopilotCliPathSetting(),
+    workspaceRoot,
+    process.platform,
+  );
+}

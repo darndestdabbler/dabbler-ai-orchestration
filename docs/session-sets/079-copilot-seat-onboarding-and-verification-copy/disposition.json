@@ -1,24 +1,24 @@
 {
   "status": "completed",
-  "summary": "Session 1 of 5: Copilot CLI presence probe + Full-tier seat-profile sub-choice UI. Added src/utils/copilotCli.ts (probeCopilotCliPresenceCore mirrors probePythonPresenceCore: explicit dabblerSessionSets.copilotCliPath setting decides alone, else PATH scan; win32 PATH branch probes copilot.exe only, matching the catalog module's shell=False bare-token spawn, while an explicit path probes plain file existence because CreateProcess executes extension-explicit batch files - both branches verified empirically). Added the Full-only transport-profile radio group (api default / copilot-cli) to gettingStartedHtml.js between the tier radios and the budget block, omitted on Lightweight per the budgetBlockHtml pattern; the missing-CLI warning renders inside the block, visible only when copilot-cli is selected AND the probe failed, failing quiet on an absent payload flag. The D6 provider-key warning is suppressed while copilot-cli is selected (its set-DABBLER_*-keys copy is wrong guidance for the keyless Copilot-seat audience) - the verifier independently confirmed the reachable warning matrix leaves no signal-less actionable state. Extended gsState/persistGsState/restoreGsState with the seat-profile family (transportProfile/profileDirty/lastProfileSeed) under the exact tier/verification-mode seed-dirty-reload precedence; payload gained copilotCliPresent + transportProfileSeed (host seed resolver deliberately omitted until Session 2 wires the durable transport.profile write). No Build wiring by design (Sessions 2-3). Suites: Layer-2 1134 passing, tsc clean, pytest 2483 passed/5 skipped, Playwright 19 passed locally.",
+  "summary": "Session 2 of 5: wired the Copilot seat-profile happy path. New src/utils/copilotSeatSetup.ts (VS Code-free core): auto-derived seat identity (seat-id = sha256(hostname|username)[:12], seat-label = workspace basename, zero typing per critique C1); cancellable catalog-refresh runner with pre-run lockfile snapshot restored on every non-completed path (cancel / teardown / spawn error / non-zero exit), teardown re-restore from the close event, completed-run-wins-over-late-cancel, and a bounded post-kill force-settle; success decided ONLY by parsing the CLI's stdout summary line (exit code never trusted, pinned M5 contract); transport.profile written as an anchored DIRECT-CHILD field replacement in the transport: block (fail-loud on missing anchor / operator-edited value, never an append; nested-profile locator hole from the cross-verifier fixed); readTransportProfile wired as the durable transportProfileSeed source. gitScaffold.ts: pure sequencing gate decideCopilotSeatSetup consuming the completed scaffold's installOk+venvPath, seat setup awaited strictly after the scaffold step through the scaffolded venv's own interpreter (venvPython(installOutcome.venvPath)), cancellable INDETERMINATE notification (determinate not parseable - the CLI emits no per-model output; m2 fallback recorded), win32 taskkill /T tree-kill, subscriptions splice hygiene, honest per-outcome messaging with a copy-pasteable re-run hint. transportProfile rider threaded webview -> protocol -> fail-loud narrowing -> build handler (Full-only). 72 new Layer-2 tests (1206 total passing); real live-seat dogfood SUCCESS (102s, 15/18 models, providers anthropic+google+openai, config + lockfile written). Suites: tsc/eslint clean, pytest 2483/5 skipped, Playwright 19 passed re-run after final dist rebuild.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
+    "tools/dabbler-ai-orchestration/src/utils/copilotSeatSetup.ts",
     "tools/dabbler-ai-orchestration/src/utils/copilotCli.ts",
-    "tools/dabbler-ai-orchestration/src/utils/gettingStartedDetection.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gettingStartedActions.ts",
     "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
     "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
     "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
-    "tools/dabbler-ai-orchestration/package.json",
-    "tools/dabbler-ai-orchestration/src/test/suite/copilotCli.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedDetection.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/copilotSeatSetup.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldSeatSetup.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/vscode-stub.js",
     "tools/dabbler-ai-orchestration/dist/extension.js",
     "tools/dabbler-ai-orchestration/dist/extension.js.map"
   ],
   "verification_message_ids": [],
-  "verification_notes": "Routed gate verdict REQUIRED (blast-radius, breadth, build-ci-config); session-verification routed to gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator), verdict VERIFIED, 0 issues (s1-verification.md). Earlier routed code-review (opus) was cross-verified by gpt-5-4 which returned one Major on the explicit-.cmd probe path; adjudicated with two empirical subprocess runs (explicit .cmd executes under shell=False via CreateProcess's implicit cmd.exe; bare token on .cmd-only PATH raises FileNotFoundError), recorded via record_adjudication (context-gap / accept-dismissal); the finding's real substance (comment overclaim + test gap) was fixed in-session.",
+  "verification_notes": "Routed gate REQUIRED (blast-radius, multi-module, breadth). Session verification on gpt-5-4 (OpenAI, cross-provider from the Claude orchestrator): round 1 ISSUES_FOUND (1 Major, ledger id S2-V-001: gitScaffold integration wiring unpinned by Layer-2 tests); round 2 held S2-V-001 partially-fixed (helpers pinned, the real buildProjectStructureNoPrompt path still unexercised); round 3 VERIFIED after BuildStructureSeams let the suite drive the REAL build path (ordering, venvPath threading, skip branches). Single ledger id across rounds per the Set 071 discipline. Earlier routed code-review (opus -> gpt-5-4 auto-verify) produced 2 Majors (teardown-restore race, late-cancel-after-completed race) + 1 cross-verifier Major (nested-profile locator) - all fixed in-session with pinning tests. sN-issues artifacts: s2-issues.json, s2-issues-round-2.json.",
   "next_orchestrator": {
     "engine": "claude",
     "provider": "anthropic",
@@ -26,9 +26,9 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 wires the happy path (sequencing, cancellable subprocess, config-write-as-template-variable) where the architecture critique's CRITICAL findings land; the ai-assignment recommends the same engine at high effort for that novelty, and continuity of the Session 1 probe/payload contract helps."
+      "specifics": "Session 3 implements the honest failure UX (critique C3) and the full failure matrix over the exact wrapper this session built - continuity with the S2 outcome states (refresh-failed / insufficient-providers / config-write-failed / cancelled) and the named residuals (atomic config write, POSIX tree-kill) makes the same engine at high effort the natural pickup, matching the ai-assignment recommendation."
     }
   },
   "blockers": [],
-  "lessons_cited": ["L-064-3", "L-064-6", "L-064-9"]
+  "lessons_cited": ["L-064-3", "L-064-6", "L-064-7", "L-064-9", "L-064-10", "L-071-1"]
 }

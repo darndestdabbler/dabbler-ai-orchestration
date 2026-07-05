@@ -510,7 +510,7 @@ var require_has_flag = __commonJS({
 var require_supports_color = __commonJS({
   "node_modules/supports-color/index.js"(exports2, module2) {
     "use strict";
-    var os3 = require("os");
+    var os4 = require("os");
     var tty = require("tty");
     var hasFlag = require_has_flag();
     var { env: env8 } = process;
@@ -558,7 +558,7 @@ var require_supports_color = __commonJS({
         return min;
       }
       if (process.platform === "win32") {
-        const osRelease = os3.release().split(".");
+        const osRelease = os4.release().split(".");
         if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
           return Number(osRelease[2]) >= 14931 ? 3 : 2;
         }
@@ -804,10 +804,10 @@ var require_src2 = __commonJS({
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src());
     var log = debug_1.default("@kwsites/file-exists");
-    function check(path35, isFile, isDirectory) {
-      log(`checking %s`, path35);
+    function check(path36, isFile, isDirectory) {
+      log(`checking %s`, path36);
       try {
-        const stat = fs_1.statSync(path35);
+        const stat = fs_1.statSync(path36);
         if (stat.isFile() && isFile) {
           log(`[OK] path represents a file`);
           return true;
@@ -827,8 +827,8 @@ var require_src2 = __commonJS({
         throw e;
       }
     }
-    function exists2(path35, type = exports2.READABLE) {
-      return check(path35, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+    function exists2(path36, type = exports2.READABLE) {
+      return check(path36, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
     }
     exports2.exists = exists2;
     exports2.FILE = 1;
@@ -970,17 +970,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path35) {
-      const ctrl = callVisitor(key, node, visitor, path35);
+    function visit_(key, node, visitor, path36) {
+      const ctrl = callVisitor(key, node, visitor, path36);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path35, ctrl);
-        return visit_(key, ctrl, visitor, path35);
+        replaceNode(key, path36, ctrl);
+        return visit_(key, ctrl, visitor, path36);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path35 = Object.freeze(path35.concat(node));
+          path36 = Object.freeze(path36.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = visit_(i2, node.items[i2], visitor, path35);
+            const ci = visit_(i2, node.items[i2], visitor, path36);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -991,13 +991,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path35 = Object.freeze(path35.concat(node));
-          const ck = visit_("key", node.key, visitor, path35);
+          path36 = Object.freeze(path36.concat(node));
+          const ck = visit_("key", node.key, visitor, path36);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path35);
+          const cv = visit_("value", node.value, visitor, path36);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -1018,17 +1018,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path35) {
-      const ctrl = await callVisitor(key, node, visitor, path35);
+    async function visitAsync_(key, node, visitor, path36) {
+      const ctrl = await callVisitor(key, node, visitor, path36);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path35, ctrl);
-        return visitAsync_(key, ctrl, visitor, path35);
+        replaceNode(key, path36, ctrl);
+        return visitAsync_(key, ctrl, visitor, path36);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path35 = Object.freeze(path35.concat(node));
+          path36 = Object.freeze(path36.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = await visitAsync_(i2, node.items[i2], visitor, path35);
+            const ci = await visitAsync_(i2, node.items[i2], visitor, path36);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -1039,13 +1039,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path35 = Object.freeze(path35.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path35);
+          path36 = Object.freeze(path36.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path36);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path35);
+          const cv = await visitAsync_("value", node.value, visitor, path36);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -1072,23 +1072,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path35) {
+    function callVisitor(key, node, visitor, path36) {
       if (typeof visitor === "function")
-        return visitor(key, node, path35);
+        return visitor(key, node, path36);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path35);
+        return visitor.Map?.(key, node, path36);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path35);
+        return visitor.Seq?.(key, node, path36);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path35);
+        return visitor.Pair?.(key, node, path36);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path35);
+        return visitor.Scalar?.(key, node, path36);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path35);
+        return visitor.Alias?.(key, node, path36);
       return void 0;
     }
-    function replaceNode(key, path35, node) {
-      const parent = path35[path35.length - 1];
+    function replaceNode(key, path36, node) {
+      const parent = path36[path36.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -1698,10 +1698,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path35, value) {
+    function collectionFromPath(schema, path36, value) {
       let v = value;
-      for (let i2 = path35.length - 1; i2 >= 0; --i2) {
-        const k2 = path35[i2];
+      for (let i2 = path36.length - 1; i2 >= 0; --i2) {
+        const k2 = path36[i2];
         if (typeof k2 === "number" && Number.isInteger(k2) && k2 >= 0) {
           const a = [];
           a[k2] = v;
@@ -1720,7 +1720,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path35) => path35 == null || typeof path35 === "object" && !!path35[Symbol.iterator]().next().done;
+    var isEmptyPath = (path36) => path36 == null || typeof path36 === "object" && !!path36[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -1750,11 +1750,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path35, value) {
-        if (isEmptyPath(path35))
+      addIn(path36, value) {
+        if (isEmptyPath(path36))
           this.add(value);
         else {
-          const [key, ...rest] = path35;
+          const [key, ...rest] = path36;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -1768,8 +1768,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path35) {
-        const [key, ...rest] = path35;
+      deleteIn(path36) {
+        const [key, ...rest] = path36;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -1783,8 +1783,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path35, keepScalar) {
-        const [key, ...rest] = path35;
+      getIn(path36, keepScalar) {
+        const [key, ...rest] = path36;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -1802,8 +1802,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path35) {
-        const [key, ...rest] = path35;
+      hasIn(path36) {
+        const [key, ...rest] = path36;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -1813,8 +1813,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path35, value) {
-        const [key, ...rest] = path35;
+      setIn(path36, value) {
+        const [key, ...rest] = path36;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -4329,9 +4329,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path35, value) {
+      addIn(path36, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path35, value);
+          this.contents.addIn(path36, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -4406,14 +4406,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path35) {
-        if (Collection.isEmptyPath(path35)) {
+      deleteIn(path36) {
+        if (Collection.isEmptyPath(path36)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path35) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path36) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -4428,10 +4428,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path35, keepScalar) {
-        if (Collection.isEmptyPath(path35))
+      getIn(path36, keepScalar) {
+        if (Collection.isEmptyPath(path36))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path35, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path36, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -4442,10 +4442,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path35) {
-        if (Collection.isEmptyPath(path35))
+      hasIn(path36) {
+        if (Collection.isEmptyPath(path36))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path35) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path36) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -4462,13 +4462,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path35, value) {
-        if (Collection.isEmptyPath(path35)) {
+      setIn(path36, value) {
+        if (Collection.isEmptyPath(path36)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path35), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path36), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path35, value);
+          this.contents.setIn(path36, value);
         }
       }
       /**
@@ -6424,9 +6424,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path35) => {
+    visit.itemAtPath = (cst, path36) => {
       let item = cst;
-      for (const [field, index] of path35) {
+      for (const [field, index] of path36) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -6435,23 +6435,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path35) => {
-      const parent = visit.itemAtPath(cst, path35.slice(0, -1));
-      const field = path35[path35.length - 1][0];
+    visit.parentCollection = (cst, path36) => {
+      const parent = visit.itemAtPath(cst, path36.slice(0, -1));
+      const field = path36[path36.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path35, item, visitor) {
-      let ctrl = visitor(item, path35);
+    function _visit(path36, item, visitor) {
+      let ctrl = visitor(item, path36);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i2 = 0; i2 < token.items.length; ++i2) {
-            const ci = _visit(Object.freeze(path35.concat([[field, i2]])), token.items[i2], visitor);
+            const ci = _visit(Object.freeze(path36.concat([[field, i2]])), token.items[i2], visitor);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -6462,10 +6462,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path35);
+            ctrl = ctrl(item, path36);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path35) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path36) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -7762,14 +7762,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs34 = this.flowScalar(this.type);
+              const fs35 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs34, sep: [] });
+                map.items.push({ start, key: fs35, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs34);
+                this.stack.push(fs35);
               } else {
-                Object.assign(it, { key: fs34, sep: [] });
+                Object.assign(it, { key: fs35, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7897,13 +7897,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs34 = this.flowScalar(this.type);
+              const fs35 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs34, sep: [] });
+                fc.items.push({ start: [], key: fs35, sep: [] });
               else if (it.sep)
-                this.stack.push(fs34);
+                this.stack.push(fs35);
               else
-                Object.assign(it, { key: fs34, sep: [] });
+                Object.assign(it, { key: fs35, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -11414,8 +11414,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path35) {
-      let input = path35;
+    function removeDotSegments(path36) {
+      let input = path36;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -11614,8 +11614,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path35, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path35 && path35 !== "/" ? path35 : void 0;
+        const [path36, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path36 && path36 !== "/" ? path36 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -14682,11 +14682,11 @@ __export(extension_exports, {
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode31 = __toESM(require("vscode"));
-var fs33 = __toESM(require("fs"));
-var path34 = __toESM(require("path"));
+var fs34 = __toESM(require("fs"));
+var path35 = __toESM(require("path"));
 
 // src/providers/CustomSessionSetsView.ts
-var crypto = __toESM(require("crypto"));
+var crypto2 = __toESM(require("crypto"));
 var vscode11 = __toESM(require("vscode"));
 
 // src/utils/fileSystem.ts
@@ -17401,13 +17401,364 @@ function probeCopilotCliPresence(workspaceRoot2, fileExists2 = realExists2) {
     process.platform
   );
 }
+function resolveCopilotCliBinaryCore(explicitSetting, workspaceRoot2, platform = process.platform) {
+  if (!explicitSetting)
+    return void 0;
+  const p2 = platform === "win32" ? path9.win32 : path9.posix;
+  if (p2.isAbsolute(explicitSetting))
+    return explicitSetting;
+  if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
+    return p2.resolve(workspaceRoot2, explicitSetting);
+  }
+  return explicitSetting;
+}
+function resolveCopilotCliBinary(workspaceRoot2) {
+  return resolveCopilotCliBinaryCore(
+    explicitCopilotCliPathSetting(),
+    workspaceRoot2,
+    process.platform
+  );
+}
+
+// src/utils/copilotSeatSetup.ts
+var crypto = __toESM(require("crypto"));
+var fs9 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
+var CATALOG_LOCKFILE_REL = path10.posix.join(
+  "ai_router",
+  "copilot-catalog.lock"
+);
+function deriveSeatId(hostname2, username) {
+  const canonical = `${hostname2.trim().toLowerCase()}|${username.trim().toLowerCase()}`;
+  const digest = crypto.createHash("sha256").update(canonical, "utf8").digest("hex");
+  return `seat-${digest.slice(0, 12)}`;
+}
+function deriveSeatLabel(projectDir) {
+  const base = path10.basename(projectDir);
+  return base === "" ? "workspace" : base;
+}
+function buildRefreshArgs(seatId, seatLabel, explicitBinary) {
+  const args = [
+    "-m",
+    "ai_router.copilot_catalog",
+    "--refresh",
+    "--seat-id",
+    seatId,
+    "--seat-label",
+    seatLabel
+  ];
+  if (explicitBinary)
+    args.push("--binary", explicitBinary);
+  return args;
+}
+var REFRESH_SUMMARY_RE = /^Wrote (.+): (\d+)\/(\d+) models confirmed, providers=\[([^\]]*)\]\s*$/m;
+function parseRefreshStdout(stdout) {
+  const m = REFRESH_SUMMARY_RE.exec(stdout);
+  if (!m)
+    return null;
+  const providers = m[4].split(",").map((tok) => tok.trim().replace(/^'(.*)'$/, "$1")).filter((tok) => tok.length > 0);
+  return {
+    lockfilePath: m[1],
+    confirmed: Number(m[2]),
+    total: Number(m[3]),
+    providers
+  };
+}
+function locateTransportProfile(text) {
+  const blockMatch = /^transport:[ \t]*(?:#.*)?$/m.exec(text);
+  if (!blockMatch)
+    return null;
+  let lineStart = blockMatch.index + blockMatch[0].length;
+  while (lineStart < text.length && (text[lineStart] === "\r" || text[lineStart] === "\n")) {
+    if (text[lineStart] === "\n") {
+      lineStart += 1;
+      break;
+    }
+    lineStart += 1;
+  }
+  let childIndent = null;
+  while (lineStart < text.length) {
+    let lineEnd = text.indexOf("\n", lineStart);
+    if (lineEnd === -1)
+      lineEnd = text.length;
+    const line = text.slice(lineStart, lineEnd).replace(/\r$/, "");
+    if (/^[^ \t\r\n#]/.test(line))
+      return null;
+    const content = /^([ \t]+)\S/.exec(line);
+    if (content && !/^[ \t]*#/.test(line)) {
+      const indent = content[1].length;
+      if (childIndent === null)
+        childIndent = indent;
+      if (indent === childIndent) {
+        const m = /^([ \t]+profile:[ \t]*)([^\s#]+)/.exec(line);
+        if (m) {
+          const valueStart = lineStart + m[1].length;
+          return {
+            valueStart,
+            valueEnd: valueStart + m[2].length,
+            value: m[2]
+          };
+        }
+      }
+    }
+    lineStart = lineEnd + 1;
+  }
+  return null;
+}
+function renderTransportProfile(configText, profile) {
+  const loc = locateTransportProfile(configText);
+  if (!loc) {
+    return {
+      ok: false,
+      reason: "no `transport:` block with a `profile:` field was found in router-config.yaml (the seeded template shape this write expects)"
+    };
+  }
+  if (loc.value === profile)
+    return { ok: true, text: configText, changed: false };
+  if (loc.value !== "api") {
+    return {
+      ok: false,
+      reason: `transport.profile is ${JSON.stringify(loc.value)} \u2014 not the seeded default \`api\`, so it looks operator-edited and will not be overwritten`
+    };
+  }
+  return {
+    ok: true,
+    changed: true,
+    text: configText.slice(0, loc.valueStart) + profile + configText.slice(loc.valueEnd)
+  };
+}
+var nodeSeedReadOps = {
+  exists(p2) {
+    try {
+      return fs9.existsSync(p2);
+    } catch {
+      return false;
+    }
+  },
+  readFile(p2) {
+    return fs9.readFileSync(p2, "utf8");
+  }
+};
+function readTransportProfile(root, ops = nodeSeedReadOps) {
+  const abs = path10.join(root, ROUTER_CONFIG_REL);
+  if (!ops.exists(abs))
+    return null;
+  let text;
+  try {
+    text = ops.readFile(abs);
+  } catch {
+    return null;
+  }
+  const loc = locateTransportProfile(text);
+  if (!loc)
+    return null;
+  return loc.value === "api" || loc.value === "copilot-cli" ? loc.value : null;
+}
+var DEFAULT_KILL_SETTLE_TIMEOUT_MS = 1e4;
+function runCatalogRefresh(deps) {
+  const lockfileAbs = path10.join(deps.projectDir, CATALOG_LOCKFILE_REL);
+  const existedBefore = deps.fileOps.exists(lockfileAbs);
+  let priorContent = null;
+  if (existedBefore) {
+    try {
+      priorContent = deps.fileOps.readFile(lockfileAbs);
+    } catch {
+      priorContent = null;
+    }
+  }
+  const restoreLockfile = () => {
+    try {
+      if (!existedBefore) {
+        deps.fileOps.removeRecursive(lockfileAbs);
+      } else if (priorContent !== null) {
+        deps.fileOps.writeFile(lockfileAbs, priorContent);
+      }
+    } catch {
+    }
+  };
+  return new Promise((resolve5) => {
+    let settled = false;
+    let stdout = "";
+    let stderr = "";
+    let cancelledBy = null;
+    let cancelReg = null;
+    let disposal = null;
+    let killSettleTimer = null;
+    const settle = (outcome) => {
+      if (settled)
+        return;
+      settled = true;
+      if (killSettleTimer)
+        clearTimeout(killSettleTimer);
+      cancelReg?.dispose();
+      disposal?.dispose();
+      resolve5(outcome);
+    };
+    if (deps.cancellation.isCancellationRequested) {
+      settle({ kind: "cancelled", by: "operator" });
+      return;
+    }
+    let child = null;
+    const killForCancel = (by) => {
+      if (settled || cancelledBy)
+        return;
+      cancelledBy = by;
+      try {
+        child?.kill();
+      } catch {
+      }
+      killSettleTimer = setTimeout(() => {
+        if (settled)
+          return;
+        restoreLockfile();
+        settle({ kind: "cancelled", by });
+      }, deps.killSettleTimeoutMs ?? DEFAULT_KILL_SETTLE_TIMEOUT_MS);
+    };
+    disposal = deps.registerDisposal(() => {
+      if (settled)
+        return;
+      cancelledBy = cancelledBy ?? "teardown";
+      try {
+        child?.kill();
+      } catch {
+      }
+      restoreLockfile();
+      settle({ kind: "cancelled", by: cancelledBy });
+    });
+    cancelReg = deps.cancellation.onCancellationRequested(
+      () => killForCancel("operator")
+    );
+    try {
+      child = deps.spawn(
+        deps.venvPythonPath,
+        buildRefreshArgs(deps.seatId, deps.seatLabel, deps.explicitBinary),
+        { cwd: deps.projectDir },
+        {
+          onStdout: (chunk) => {
+            stdout += chunk;
+          },
+          onStderr: (chunk) => {
+            stderr += chunk;
+          },
+          onError: (err) => {
+            restoreLockfile();
+            settle({ kind: "spawn-error", message: err.message });
+          },
+          onClose: (exitCode) => {
+            if (settled) {
+              if (cancelledBy === "teardown")
+                restoreLockfile();
+              return;
+            }
+            if (exitCode === 0) {
+              const summary = parseRefreshStdout(stdout);
+              if (summary) {
+                settle({ kind: "completed", summary, stdout, stderr });
+                return;
+              }
+            }
+            if (cancelledBy) {
+              restoreLockfile();
+              settle({ kind: "cancelled", by: cancelledBy });
+              return;
+            }
+            if (exitCode !== 0) {
+              restoreLockfile();
+              settle({ kind: "exit-error", exitCode, stdout, stderr });
+              return;
+            }
+            settle({ kind: "completed-unparseable", stdout, stderr });
+          }
+        }
+      );
+    } catch (err) {
+      restoreLockfile();
+      settle({
+        kind: "spawn-error",
+        message: err instanceof Error ? err.message : String(err)
+      });
+      return;
+    }
+  });
+}
+function outputTail(s) {
+  const trimmed2 = (s || "").trim();
+  if (!trimmed2)
+    return "";
+  return trimmed2.split(/\r?\n/).filter(Boolean).slice(-2).join(" / ");
+}
+async function performCopilotSeatSetup(deps) {
+  const outcome = await runCatalogRefresh(deps);
+  switch (outcome.kind) {
+    case "cancelled":
+      return { kind: "cancelled", by: outcome.by };
+    case "spawn-error":
+      return {
+        kind: "refresh-failed",
+        detail: `the refresh subprocess could not start: ${outcome.message}`
+      };
+    case "exit-error":
+      return {
+        kind: "refresh-failed",
+        detail: `the refresh exited with code ${outcome.exitCode}` + (outputTail(outcome.stderr || outcome.stdout) ? `: ${outputTail(outcome.stderr || outcome.stdout)}` : "")
+      };
+    case "completed-unparseable":
+      return {
+        kind: "refresh-failed",
+        detail: "the refresh finished but its result line could not be parsed" + (outputTail(outcome.stdout) ? ` (last output: ${outputTail(outcome.stdout)})` : " (no output)")
+      };
+    case "completed": {
+      const distinct = Array.from(new Set(outcome.summary.providers)).sort();
+      const base = {
+        providers: distinct,
+        confirmed: outcome.summary.confirmed,
+        total: outcome.summary.total
+      };
+      if (distinct.length < 2) {
+        return { kind: "insufficient-providers", ...base };
+      }
+      const configAbs = path10.join(deps.projectDir, ROUTER_CONFIG_REL);
+      if (!deps.fileOps.exists(configAbs)) {
+        return {
+          kind: "config-write-failed",
+          providers: distinct,
+          detail: `${ROUTER_CONFIG_REL} is missing from the workspace`
+        };
+      }
+      try {
+        const rendered = renderTransportProfile(
+          deps.fileOps.readFile(configAbs),
+          "copilot-cli"
+        );
+        if (!rendered.ok) {
+          return {
+            kind: "config-write-failed",
+            providers: distinct,
+            detail: rendered.reason
+          };
+        }
+        if (rendered.changed)
+          deps.fileOps.writeFile(configAbs, rendered.text);
+        return { kind: "success", ...base };
+      } catch (err) {
+        return {
+          kind: "config-write-failed",
+          providers: distinct,
+          detail: err instanceof Error ? err.message : String(err)
+        };
+      }
+    }
+  }
+}
 
 // src/commands/gettingStartedActions.ts
 var vscode9 = __toESM(require("vscode"));
 
 // src/commands/gitScaffold.ts
 var vscode6 = __toESM(require("vscode"));
-var path13 = __toESM(require("path"));
+var cp3 = __toESM(require("child_process"));
+var os2 = __toESM(require("os"));
+var path14 = __toESM(require("path"));
 
 // node_modules/simple-git/dist/esm/index.js
 var import_file_exists = __toESM(require_dist(), 1);
@@ -17999,8 +18350,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = "\n") {
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path35) {
-  return (0, import_file_exists.exists)(path35, import_file_exists.FOLDER);
+function folderExists(path36) {
+  return (0, import_file_exists.exists)(path36, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -18402,8 +18753,8 @@ function checkIsRepoRootTask() {
     commands: commands27,
     format: "utf-8",
     onError,
-    parser(path35) {
-      return /^\.(git)?$/.test(path35.trim());
+    parser(path36) {
+      return /^\.(git)?$/.test(path36.trim());
     }
   };
 }
@@ -18837,11 +19188,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path35, line, preview] = input.split(NULL);
-    paths.add(path35);
-    (results[path35] = results[path35] || []).push({
+    const [path36, line, preview] = input.split(NULL);
+    paths.add(path36);
+    (results[path36] = results[path36] || []).push({
       line: asNumber(line),
-      path: path35,
+      path: path36,
       preview
     });
   });
@@ -19605,14 +19956,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path35, text) {
+function parseInit(bare, path36, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path35, false, result[1]);
+    return new InitSummary(bare, path36, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path35, true, result[1]);
+    return new InitSummary(bare, path36, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -19623,7 +19974,7 @@ function parseInit(bare, path35, text) {
       break;
     }
   }
-  return new InitSummary(bare, path35, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path36, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -19632,9 +19983,9 @@ var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     "use strict";
     InitSummary = class {
-      constructor(bare, path35, existing, gitDir) {
+      constructor(bare, path36, existing, gitDir) {
         this.bare = bare;
-        this.path = path35;
+        this.path = path36;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -19646,7 +19997,7 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path35, customArgs) {
+function initTask(bare = false, path36, customArgs) {
   const commands27 = ["init", ...customArgs];
   if (bare && !hasBareCommand(commands27)) {
     commands27.splice(1, 0, bareCommand);
@@ -19655,7 +20006,7 @@ function initTask(bare = false, path35, customArgs) {
     commands: commands27,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands27.includes("--bare"), path35, text);
+      return parseInit(commands27.includes("--bare"), path36, text);
     }
   };
 }
@@ -20470,12 +20821,12 @@ var init_FileStatusSummary = __esm({
     "use strict";
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path35, index, working_dir) {
-        this.path = path35;
+      constructor(path36, index, working_dir) {
+        this.path = path36;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path35) || [null, path35, path35];
+          const detail = fromPathRegex.exec(path36) || [null, path36, path36];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -20506,14 +20857,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path35) {
+  function data(index, workingDir, path36) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path35);
+      handler(result, path36);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path35, index, workingDir));
+      result.files.push(new FileStatusSummary(path36, index, workingDir));
     }
   }
 }
@@ -20864,9 +21215,9 @@ var init_simple_git_api = __esm({
           next
         );
       }
-      hashObject(path35, write) {
+      hashObject(path36, write) {
         return this._runTask(
-          hashObjectTask(path35, write === true),
+          hashObjectTask(path36, write === true),
           trailingFunctionArgument(arguments)
         );
       }
@@ -21220,8 +21571,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path35 = input.trim().replace(/^["']|["']$/g, "");
-  return path35 && (0, import_node_path.normalize)(path35);
+  const path36 = input.trim().replace(/^["']|["']$/g, "");
+  return path36 && (0, import_node_path.normalize)(path36);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -21506,8 +21857,8 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path35) {
-  return subModuleTask(["add", repo, path35]);
+function addSubModuleTask(repo, path36) {
+  return subModuleTask(["add", repo, path36]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
@@ -21821,8 +22172,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path35, then) {
-      return this._runTask(addSubModuleTask2(repo, path35), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path36, then) {
+      return this._runTask(addSubModuleTask2(repo, path36), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(
@@ -22373,9 +22724,9 @@ var esm_default = gitInstanceFactory;
 
 // src/commands/installAiRouterCommands.ts
 var cp2 = __toESM(require("child_process"));
-var fs9 = __toESM(require("fs"));
+var fs10 = __toESM(require("fs"));
 var os = __toESM(require("os"));
-var path10 = __toESM(require("path"));
+var path11 = __toESM(require("path"));
 var vscode5 = __toESM(require("vscode"));
 function registerInstallAiRouterCommands(context) {
   context.subscriptions.push(
@@ -22421,8 +22772,8 @@ async function runInstallFlow(mode) {
     return;
   }
   vscode5.window.showInformationMessage(outcome.message);
-  const routerConfig = path10.join(root, ROUTER_CONFIG_REL);
-  if (fs9.existsSync(routerConfig)) {
+  const routerConfig = path11.join(root, ROUTER_CONFIG_REL);
+  if (fs10.existsSync(routerConfig)) {
     try {
       const doc = await vscode5.workspace.openTextDocument(routerConfig);
       await vscode5.window.showTextDocument(doc, { preview: false });
@@ -22484,8 +22835,8 @@ function makeSpawner() {
 }
 function makeFileOps() {
   return {
-    exists: (p2) => fs9.existsSync(p2),
-    readFile: (p2) => fs9.readFileSync(p2, "utf8"),
+    exists: (p2) => fs10.existsSync(p2),
+    readFile: (p2) => fs10.readFileSync(p2, "utf8"),
     // Always ensure the parent directory exists before writing. The
     // GitHub-fallback flow can momentarily leave the destination
     // ai_router/ directory missing (between `removeRecursive(dst)` and
@@ -22495,30 +22846,30 @@ function makeFileOps() {
     // cost of dropping it is silent data loss in a narrow but real
     // failure window. Round-3 verifier catch.
     writeFile: (p2, content) => {
-      fs9.mkdirSync(path10.dirname(p2), { recursive: true });
-      fs9.writeFileSync(p2, content, "utf8");
+      fs10.mkdirSync(path11.dirname(p2), { recursive: true });
+      fs10.writeFileSync(p2, content, "utf8");
     },
-    mkdirp: (p2) => fs9.mkdirSync(p2, { recursive: true }),
+    mkdirp: (p2) => fs10.mkdirSync(p2, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),
     removeRecursive: (p2) => {
-      if (fs9.existsSync(p2))
-        fs9.rmSync(p2, { recursive: true, force: true });
+      if (fs10.existsSync(p2))
+        fs10.rmSync(p2, { recursive: true, force: true });
     },
-    mkdtemp: (prefix) => fs9.mkdtempSync(path10.join(os.tmpdir(), prefix))
+    mkdtemp: (prefix) => fs10.mkdtempSync(path11.join(os.tmpdir(), prefix))
   };
 }
 function copyDirSync(src, dst) {
-  fs9.mkdirSync(dst, { recursive: true });
-  for (const entry of fs9.readdirSync(src, { withFileTypes: true })) {
-    const s = path10.join(src, entry.name);
-    const d = path10.join(dst, entry.name);
+  fs10.mkdirSync(dst, { recursive: true });
+  for (const entry of fs10.readdirSync(src, { withFileTypes: true })) {
+    const s = path11.join(src, entry.name);
+    const d = path11.join(dst, entry.name);
     if (entry.isDirectory()) {
       copyDirSync(s, d);
     } else if (entry.isSymbolicLink()) {
-      const target = fs9.readlinkSync(s);
-      fs9.symlinkSync(target, d);
+      const target = fs10.readlinkSync(s);
+      fs10.symlinkSync(target, d);
     } else {
-      fs9.copyFileSync(s, d);
+      fs10.copyFileSync(s, d);
     }
   }
 }
@@ -22567,8 +22918,8 @@ function makePrompts() {
 }
 
 // src/utils/consumerBootstrap.ts
-var fs10 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var fs11 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
 var DEFAULT_VERIFICATION_MODE = "out-of-band-or-none";
 var BUNDLE_FILES = {
   specTemplate: "spec.md.template",
@@ -22586,10 +22937,10 @@ var BUNDLE_FILES = {
 };
 var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
 function resolveBundledTemplateDir(extensionPath) {
-  return path11.join(extensionPath, "dist", "templates", "consumer-bootstrap");
+  return path12.join(extensionPath, "dist", "templates", "consumer-bootstrap");
 }
 function loadTemplateBundle(bundleDir) {
-  const read = (name) => fs10.readFileSync(path11.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
+  const read = (name) => fs11.readFileSync(path12.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
   return {
     specTemplate: read(BUNDLE_FILES.specTemplate),
     sessionStateTemplate: read(BUNDLE_FILES.sessionStateTemplate),
@@ -22709,18 +23060,18 @@ function renderStartHere(bundle, ctx) {
   return substituteTokens(bundle.startHereTemplate, ctx);
 }
 function specRelPath(ctx) {
-  return path11.posix.join("docs", "session-sets", ctx.slug, "spec.md");
+  return path12.posix.join("docs", "session-sets", ctx.slug, "spec.md");
 }
 function sessionStateRelPath(ctx) {
-  return path11.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
+  return path12.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
 }
-var START_HERE_REL_PATH = path11.posix.join("docs", "dabbler", "start-here.md");
-var GETTING_STARTED_REL_PATH = path11.posix.join(
+var START_HERE_REL_PATH = path12.posix.join("docs", "dabbler", "start-here.md");
+var GETTING_STARTED_REL_PATH = path12.posix.join(
   "docs",
   "dabbler",
   "getting-started.md"
 );
-var CROSS_PROVIDER_VERIFICATION_REL_PATH = path11.posix.join(
+var CROSS_PROVIDER_VERIFICATION_REL_PATH = path12.posix.join(
   "docs",
   "dabbler",
   "cross-provider-verification.md"
@@ -22728,9 +23079,9 @@ var CROSS_PROVIDER_VERIFICATION_REL_PATH = path11.posix.join(
 function renderCrossProviderVerification(bundle, ctx) {
   return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
 }
-var LESSONS_LEARNED_REL_PATH = path11.posix.join("docs", "planning", "lessons-learned.md");
-var PROJECT_GUIDANCE_REL_PATH = path11.posix.join("docs", "planning", "project-guidance.md");
-var LESSONS_ARCHIVE_REL_PATH = path11.posix.join("docs", "planning", "lessons-archive.md");
+var LESSONS_LEARNED_REL_PATH = path12.posix.join("docs", "planning", "lessons-learned.md");
+var PROJECT_GUIDANCE_REL_PATH = path12.posix.join("docs", "planning", "project-guidance.md");
+var LESSONS_ARCHIVE_REL_PATH = path12.posix.join("docs", "planning", "lessons-archive.md");
 function guidanceFiles(bundle, ctx) {
   return {
     [LESSONS_LEARNED_REL_PATH]: substituteTokens(bundle.lessonsLearnedTemplate, ctx),
@@ -22815,8 +23166,8 @@ function structureOnlyContext(repoName, tier, created, verificationMode = DEFAUL
 }
 
 // src/utils/budgetYaml.ts
-var path12 = __toESM(require("path"));
-var BUDGET_YAML_REL = path12.join("ai_router", "budget.yaml");
+var path13 = __toESM(require("path"));
+var BUDGET_YAML_REL = path13.join("ai_router", "budget.yaml");
 function deriveBudgetMode(thresholdUsd) {
   if (thresholdUsd === 0)
     return "zero-budget";
@@ -22863,7 +23214,7 @@ function writeBudgetYaml(projectDir, budget, fileOps, now = /* @__PURE__ */ new 
   const method = resolveVerificationMethod(budget.thresholdUsd, budget.zeroMethod);
   if (!method)
     return { outcome: "skipped-unresolved", relPath };
-  const abs = path12.join(projectDir, relPath);
+  const abs = path13.join(projectDir, relPath);
   if (fileOps.exists(abs))
     return { outcome: "skipped-exists", relPath };
   fileOps.writeFile(
@@ -22885,7 +23236,7 @@ async function scaffoldConsumerRepo(deps) {
   const written = [];
   const skipped = [];
   for (const [rel, content] of Object.entries(files)) {
-    const abs = path13.join(deps.projectDir, rel);
+    const abs = path14.join(deps.projectDir, rel);
     if (deps.fileOps.exists(abs)) {
       skipped.push(rel);
       continue;
@@ -22903,7 +23254,7 @@ async function scaffoldConsumerRepo(deps) {
   const install = await deps.installRouter();
   let routerConfigRemoved = false;
   if (deps.ctx.tier === "lightweight") {
-    const cfg = path13.join(deps.projectDir, ROUTER_CONFIG_REL);
+    const cfg = path14.join(deps.projectDir, ROUTER_CONFIG_REL);
     if (deps.fileOps.exists(cfg)) {
       deps.fileOps.removeRecursive(cfg);
       routerConfigRemoved = true;
@@ -23008,24 +23359,28 @@ function makeScaffoldInstallPrompts() {
     promptGitHubRef: async () => ""
   };
 }
-async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, verificationMode) {
-  if (!probePythonPresence(projectDir)) {
+async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, verificationMode, transportProfile, seams = {}) {
+  if (!(seams.probePython ?? probePythonPresence)(projectDir)) {
     vscode6.window.showErrorMessage(
       describeMissingPython("Build project structure")
     );
     return void 0;
   }
   try {
-    const git = esm_default(projectDir);
-    const isRepo = await git.checkIsRepo().catch(() => false);
-    if (!isRepo)
-      await git.init();
+    if (seams.gitInit) {
+      await seams.gitInit(projectDir);
+    } else {
+      const git = esm_default(projectDir);
+      const isRepo = await git.checkIsRepo().catch(() => false);
+      if (!isRepo)
+        await git.init();
+    }
   } catch (err) {
     console.warn("[gettingStarted] git init failed \u2014 continuing scaffold", err);
   }
   let bundle;
   try {
-    bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
+    bundle = seams.loadBundle ? seams.loadBundle() : loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
   } catch (err) {
     vscode6.window.showErrorMessage(
       `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
@@ -23033,53 +23388,206 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
     return void 0;
   }
   const ctx = structureOnlyContext(
-    path13.basename(projectDir),
+    path14.basename(projectDir),
     tier,
     isoDate(),
     verificationMode
   );
   const pythonPath = resolveScaffoldBootstrapPython(projectDir) ?? resolveExplicitPythonPath(projectDir);
-  const result = await vscode6.window.withProgress(
-    {
-      location: vscode6.ProgressLocation.Notification,
-      title: "Building project structure\u2026",
-      cancellable: false
-    },
-    async (progress) => scaffoldConsumerRepo({
-      projectDir,
-      ctx,
-      bundle,
-      fileOps: makeFileOps(),
-      structureOnly: true,
-      budget,
-      reportProgress: (m) => progress.report({ message: m }),
-      installRouter: () => installAiRouter({
-        workspaceRoot: projectDir,
-        pythonPath,
-        spawner: makeSpawner(),
+  const runScaffold = seams.runScaffold ?? (async (scaffoldCtx, scaffoldBundle, scaffoldPython) => {
+    let installOutcome2 = null;
+    const scaffolded = await vscode6.window.withProgress(
+      {
+        location: vscode6.ProgressLocation.Notification,
+        title: "Building project structure\u2026",
+        cancellable: false
+      },
+      async (progress) => scaffoldConsumerRepo({
+        projectDir,
+        ctx: scaffoldCtx,
+        bundle: scaffoldBundle,
         fileOps: makeFileOps(),
-        prompts: makeScaffoldInstallPrompts(),
-        reportProgress: (m) => progress.report({ message: m })
+        structureOnly: true,
+        budget,
+        reportProgress: (m) => progress.report({ message: m }),
+        installRouter: async () => {
+          installOutcome2 = await installAiRouter({
+            workspaceRoot: projectDir,
+            pythonPath: scaffoldPython,
+            spawner: makeSpawner(),
+            fileOps: makeFileOps(),
+            prompts: makeScaffoldInstallPrompts(),
+            reportProgress: (m) => progress.report({ message: m })
+          });
+          return installOutcome2;
+        }
       })
-    })
-  );
+    );
+    return { result: scaffolded, installOutcome: installOutcome2 };
+  });
+  const { result, installOutcome } = await runScaffold(ctx, bundle, pythonPath);
   const budgetNote = result.budgetOutcome === "written" ? " Budget saved to ai_router/budget.yaml." : result.budgetOutcome === "skipped-exists" ? " Existing ai_router/budget.yaml kept (budget input not applied)." : "";
   const summary = `Project structure built (${tier} tier): ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote;
+  const showInfo = seams.showInfo ?? ((m) => void vscode6.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode6.window.showWarningMessage(m));
   if (result.installOk) {
-    vscode6.window.showInformationMessage(summary);
+    showInfo(summary);
   } else {
-    vscode6.window.showWarningMessage(
+    showWarning(
       `${summary} You can finish the install later with "Dabbler: Install ai-router".`
     );
   }
+  const venvPath = installOutcome?.venvPath ?? null;
+  switch (decideCopilotSeatSetup(tier, transportProfile, result.installOk, venvPath)) {
+    case "run":
+      await (seams.seatSetup ?? runCopilotSeatSetupWithProgress)(
+        context,
+        projectDir,
+        venvPath
+      );
+      break;
+    case "skip-install-incomplete":
+      showWarning(
+        'Copilot seat setup was skipped because the ai-router install did not complete \u2014 the catalog refresh runs inside the scaffolded .venv. Finish the install ("Dabbler: Install ai-router"), then run seat setup from the venv: ' + rerunRefreshHint(projectDir)
+      );
+      break;
+    case "skip-not-selected":
+      break;
+  }
   return result;
+}
+function decideCopilotSeatSetup(tier, transportProfile, installOk, venvPath) {
+  if (tier !== "full" || transportProfile !== "copilot-cli") {
+    return "skip-not-selected";
+  }
+  if (!installOk || !venvPath)
+    return "skip-install-incomplete";
+  return "run";
+}
+function rerunRefreshHint(projectDir) {
+  const venvPy = process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
+  const seatId = deriveSeatId(os2.hostname(), currentUsername());
+  const seatLabel = deriveSeatLabel(projectDir).replace(/"/g, '\\"');
+  const binary = resolveCopilotCliBinary(projectDir);
+  const binaryArg = binary ? ` --binary "${binary.replace(/"/g, '\\"')}"` : "";
+  return `${venvPy} -m ai_router.copilot_catalog --refresh --seat-id ${seatId} --seat-label "${seatLabel}"${binaryArg}`;
+}
+function currentUsername() {
+  try {
+    return os2.userInfo().username;
+  } catch {
+    return process.env.USERNAME ?? process.env.USER ?? "user";
+  }
+}
+function makeRefreshChildSpawner() {
+  return (cmd, args, opts, callbacks) => {
+    const child = cp3.spawn(cmd, args, {
+      cwd: opts.cwd,
+      env: process.env,
+      windowsHide: true
+    });
+    child.stdout?.on(
+      "data",
+      (chunk) => callbacks.onStdout(chunk.toString("utf8"))
+    );
+    child.stderr?.on(
+      "data",
+      (chunk) => callbacks.onStderr(chunk.toString("utf8"))
+    );
+    child.on("error", (err) => callbacks.onError(err));
+    child.on("close", (code) => callbacks.onClose(code));
+    return {
+      kill: () => {
+        if (process.platform === "win32" && child.pid) {
+          try {
+            cp3.spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+              windowsHide: true
+            });
+            return;
+          } catch {
+          }
+        }
+        child.kill();
+      }
+    };
+  };
+}
+async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, seams = {}) {
+  const withProgress = seams.withProgress ?? vscode6.window.withProgress.bind(vscode6.window);
+  const perform = seams.perform ?? performCopilotSeatSetup;
+  const showInfo = seams.showInfo ?? ((m) => void vscode6.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode6.window.showWarningMessage(m));
+  const seatId = deriveSeatId(os2.hostname(), currentUsername());
+  const seatLabel = deriveSeatLabel(projectDir);
+  const outcome = await withProgress(
+    {
+      location: vscode6.ProgressLocation.Notification,
+      title: "Setting up the Copilot seat \u2014 probing the seat's models (about 1\u20132 minutes)\u2026",
+      cancellable: true
+    },
+    (_progress, token) => perform({
+      venvPythonPath: venvPython(venvPath),
+      projectDir,
+      seatId,
+      seatLabel,
+      explicitBinary: resolveCopilotCliBinary(projectDir),
+      spawn: seams.spawn ?? makeRefreshChildSpawner(),
+      fileOps: makeFileOps(),
+      cancellation: token,
+      registerDisposal: (dispose) => {
+        const d = new vscode6.Disposable(dispose);
+        context.subscriptions.push(d);
+        return {
+          // S2 review Minor 4: also splice the Disposable back out of
+          // context.subscriptions when the run settles, so repeated
+          // builds do not accumulate dead entries for the host's
+          // lifetime.
+          dispose: () => {
+            d.dispose();
+            const i2 = context.subscriptions.indexOf(d);
+            if (i2 >= 0)
+              context.subscriptions.splice(i2, 1);
+          }
+        };
+      }
+    })
+  );
+  const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunRefreshHint(projectDir)}`;
+  switch (outcome.kind) {
+    case "success":
+      showInfo(
+        `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/router-config.yaml.`
+      );
+      break;
+    case "insufficient-providers":
+      showWarning(
+        `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so router-config.yaml keeps transport.profile: api. The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
+      );
+      break;
+    case "refresh-failed":
+      showWarning(
+        `Copilot seat setup failed: ${outcome.detail}. router-config.yaml keeps transport.profile: api. ${rerun}`
+      );
+      break;
+    case "cancelled":
+      showWarning(
+        `Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and router-config.yaml keeps transport.profile: api. ${rerun}`
+      );
+      break;
+    case "config-write-failed":
+      showWarning(
+        `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but writing transport.profile to ai_router/router-config.yaml failed: ${outcome.detail}. Set \`transport:  profile: copilot-cli\` in that file by hand \u2014 no re-probe is needed.`
+      );
+      break;
+  }
+  return outcome;
 }
 
 // src/wizard/planImport.ts
 var vscode7 = __toESM(require("vscode"));
-var fs11 = __toESM(require("fs"));
-var path14 = __toESM(require("path"));
-var PLAN_DEST = path14.join("docs", "planning", "project-plan.md");
+var fs12 = __toESM(require("fs"));
+var path15 = __toESM(require("path"));
+var PLAN_DEST = path15.join("docs", "planning", "project-plan.md");
 var PLAN_AUTHORING_PROMPT = `You are a project planning assistant for an AI-led development workflow.
 
 Help me create a project plan in Markdown format for my software project.
@@ -23127,18 +23635,18 @@ async function importPlanFromFile(ui = defaultUi()) {
     void ui.showErrorMessage("No workspace folder is open.");
     return false;
   }
-  const destPath = path14.join(root, PLAN_DEST);
-  const destDir = path14.dirname(destPath);
+  const destPath = path15.join(root, PLAN_DEST);
+  const destDir = path15.dirname(destPath);
   try {
-    if (!fs11.existsSync(destDir))
-      fs11.mkdirSync(destDir, { recursive: true });
+    if (!fs12.existsSync(destDir))
+      fs12.mkdirSync(destDir, { recursive: true });
   } catch (err) {
     void ui.showErrorMessage(
       `Failed to create ${destDir}: ${err instanceof Error ? err.message : String(err)}`
     );
     return false;
   }
-  if (fs11.existsSync(destPath)) {
+  if (fs12.existsSync(destPath)) {
     const overwrite = await ui.showWarningMessage(
       `${PLAN_DEST} already exists. Overwrite it?`,
       { modal: true },
@@ -23148,7 +23656,7 @@ async function importPlanFromFile(ui = defaultUi()) {
       return false;
   }
   try {
-    fs11.copyFileSync(picked[0].fsPath, destPath);
+    fs12.copyFileSync(picked[0].fsPath, destPath);
   } catch (err) {
     void ui.showErrorMessage(
       `Failed to write ${PLAN_DEST}: ${err instanceof Error ? err.message : String(err)}`
@@ -23184,9 +23692,9 @@ function registerPlanImportCommand(context) {
 
 // src/wizard/sessionGenPrompt.ts
 var vscode8 = __toESM(require("vscode"));
-var fs12 = __toESM(require("fs"));
-var path15 = __toESM(require("path"));
-var PLAN_PATH = path15.join("docs", "planning", "project-plan.md");
+var fs13 = __toESM(require("fs"));
+var path16 = __toESM(require("path"));
+var PLAN_PATH = path16.join("docs", "planning", "project-plan.md");
 var PLAN_REL_POSIX = "docs/planning/project-plan.md";
 function sampleContext(tier, verificationMode = "out-of-band-or-none") {
   return {
@@ -23306,8 +23814,8 @@ async function copySessionSetGenPrompt(context, options = {}) {
     void vscode8.window.showErrorMessage("No workspace folder is open.");
     return false;
   }
-  const planPath = path15.join(root, PLAN_PATH);
-  if (!fs12.existsSync(planPath)) {
+  const planPath = path16.join(root, PLAN_PATH);
+  if (!fs13.existsSync(planPath)) {
     const action = await vscode8.window.showWarningMessage(
       `No project plan found at ${PLAN_PATH}. Import one first?`,
       "Import Plan"
@@ -23368,6 +23876,23 @@ function resolveVerificationMode(msg, tier) {
     return void 0;
   return asVerificationModeRider(msg.verificationMode) ?? DEFAULT_VERIFICATION_MODE;
 }
+function asTransportProfileRider(value) {
+  if (value === void 0 || value === null)
+    return void 0;
+  if (typeof value === "string") {
+    const v = value.toLowerCase();
+    if (v === "api" || v === "copilot-cli")
+      return v;
+  }
+  throw new Error(
+    `Unrecognized transportProfile value ${JSON.stringify(value)} \u2014 expected "api" or "copilot-cli".`
+  );
+}
+function resolveTransportProfile(msg, tier) {
+  if (tier !== "full")
+    return void 0;
+  return asTransportProfileRider(msg.transportProfile) ?? "api";
+}
 function asBudgetChoice(msg, tier) {
   if (tier !== "full")
     return void 0;
@@ -23388,9 +23913,11 @@ async function routeGettingStartedAction(msg, handlers) {
     case "build-structure": {
       let tier;
       let verificationMode;
+      let transportProfile;
       try {
         tier = asTier(msg.tier) ?? "full";
         verificationMode = resolveVerificationMode(msg, tier);
+        transportProfile = resolveTransportProfile(msg, tier);
       } catch (err) {
         vscode9.window.showErrorMessage(
           `Build project structure was rejected: ${err instanceof Error ? err.message : String(err)}`
@@ -23407,7 +23934,7 @@ async function routeGettingStartedAction(msg, handlers) {
         );
         return false;
       }
-      await handlers.buildStructure(tier, budget, verificationMode);
+      await handlers.buildStructure(tier, budget, verificationMode, transportProfile);
       return true;
     }
     case "import-plan":
@@ -23463,7 +23990,7 @@ function makeGettingStartedHandlers(context) {
     // — pick, scaffold there, then open the folder so the form's live
     // state tracks the scaffolded root. Set 063 S2 (D1): the narrowed
     // budget pick rides through to the scaffold's budget.yaml write.
-    async buildStructure(tier, budget, verificationMode) {
+    async buildStructure(tier, budget, verificationMode, transportProfile) {
       const openRoot = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (openRoot) {
         await buildProjectStructureNoPrompt(
@@ -23471,7 +23998,8 @@ function makeGettingStartedHandlers(context) {
           openRoot,
           tier,
           budget,
-          verificationMode
+          verificationMode,
+          transportProfile
         );
         return;
       }
@@ -23489,7 +24017,8 @@ function makeGettingStartedHandlers(context) {
         picked[0].fsPath,
         tier,
         budget,
-        verificationMode
+        verificationMode,
+        transportProfile
       );
       if (!result)
         return;
@@ -23514,27 +24043,27 @@ function makeGettingStartedHandlers(context) {
 
 // src/commands/gettingStartedDoc.ts
 var vscode10 = __toESM(require("vscode"));
-var fs13 = __toESM(require("fs"));
-var path16 = __toESM(require("path"));
+var fs14 = __toESM(require("fs"));
+var path17 = __toESM(require("path"));
 function workspaceGettingStartedDoc(workspaceRoot2) {
   if (!workspaceRoot2)
     return void 0;
-  const abs = path16.join(workspaceRoot2, ...GETTING_STARTED_REL_PATH.split("/"));
+  const abs = path17.join(workspaceRoot2, ...GETTING_STARTED_REL_PATH.split("/"));
   try {
-    return fs13.statSync(abs).isFile() ? abs : void 0;
+    return fs14.statSync(abs).isFile() ? abs : void 0;
   } catch {
     return void 0;
   }
 }
 function materializeBundledDoc(context) {
-  const src = path16.join(
+  const src = path17.join(
     resolveBundledTemplateDir(context.extensionPath),
     GETTING_STARTED_TEMPLATE_FILENAME
   );
   const dstDir = context.globalStorageUri.fsPath;
-  fs13.mkdirSync(dstDir, { recursive: true });
-  const dst = path16.join(dstDir, "getting-started.md");
-  fs13.copyFileSync(src, dst);
+  fs14.mkdirSync(dstDir, { recursive: true });
+  const dst = path17.join(dstDir, "getting-started.md");
+  fs14.copyFileSync(src, dst);
   return dst;
 }
 function tierCalloutMarkdown(tier) {
@@ -23571,15 +24100,15 @@ async function openGettingStartedDoc(context) {
     const durable = root ? resolveDurableTier(root) : null;
     let docPath;
     if (durable) {
-      const src = workspaceDoc ?? path16.join(
+      const src = workspaceDoc ?? path17.join(
         resolveBundledTemplateDir(context.extensionPath),
         GETTING_STARTED_TEMPLATE_FILENAME
       );
-      const text = fs13.readFileSync(src, "utf8");
+      const text = fs14.readFileSync(src, "utf8");
       const dstDir = context.globalStorageUri.fsPath;
-      fs13.mkdirSync(dstDir, { recursive: true });
-      docPath = path16.join(dstDir, "getting-started.md");
-      fs13.writeFileSync(
+      fs14.mkdirSync(dstDir, { recursive: true });
+      docPath = path17.join(dstDir, "getting-started.md");
+      fs14.writeFileSync(
         docPath,
         renderTierAwareGettingStarted(text, durable.tier),
         "utf8"
@@ -23961,10 +24490,13 @@ var CustomSessionSetsView = class {
       (root) => probePythonPresence(root),
       // Set 079 S1 (Feature 1): the Copilot-CLI presence probe (explicit
       // copilotCliPath setting → PATH). Same getting-started-only gating.
-      // The seat-profile seed thunk is deliberately omitted — the durable
-      // source (the scaffold's transport.profile write) lands in Session
-      // 2, so transportProfileSeed stays null until then.
-      (root) => probeCopilotCliPresence(root)
+      (root) => probeCopilotCliPresence(root),
+      // Set 079 S2 (Feature 1): the durable seat-profile seed — the
+      // workspace router-config.yaml's transport.profile value (the
+      // durable source the scaffold's config write creates). Tolerant:
+      // missing/unparseable reads as null and the form's volatile
+      // default applies. Same getting-started-only gating.
+      (root) => readTransportProfile(root)
     );
   }
   buildBuckets(all) {
@@ -24034,7 +24566,7 @@ var CustomSessionSetsView = class {
     const gsHtmlUri = webview.asWebviewUri(
       vscode11.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "gettingStartedHtml.js")
     );
-    const nonce = crypto.randomBytes(16).toString("hex");
+    const nonce = crypto2.randomBytes(16).toString("hex");
     const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';`;
     return `<!DOCTYPE html>
 <html lang="en">
@@ -24086,8 +24618,8 @@ var ScanState = class {
 var vscode13 = __toESM(require("vscode"));
 
 // src/utils/migrateSessionState.ts
-var fs14 = __toESM(require("fs"));
-var path17 = __toESM(require("path"));
+var fs15 = __toESM(require("fs"));
+var path18 = __toESM(require("path"));
 var SESSION_STATE_FILENAME3 = "session-state.json";
 function isStrictPositiveInt2(v) {
   return typeof v === "number" && Number.isInteger(v) && v > 0 && !Number.isNaN(v);
@@ -24174,23 +24706,23 @@ function deriveLegacyTriple(sessions) {
   return { current, total: sessions.length, completed };
 }
 function atomicWriteJson2(filePath, data) {
-  const dir = path17.dirname(filePath);
-  const base = path17.basename(filePath);
-  const tmp = path17.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
-  const fd = fs14.openSync(tmp, "w");
+  const dir = path18.dirname(filePath);
+  const base = path18.basename(filePath);
+  const tmp = path18.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
+  const fd = fs15.openSync(tmp, "w");
   try {
-    fs14.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs14.fsyncSync(fd);
+    fs15.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs15.fsyncSync(fd);
   } finally {
-    fs14.closeSync(fd);
+    fs15.closeSync(fd);
   }
-  fs14.renameSync(tmp, filePath);
+  fs15.renameSync(tmp, filePath);
 }
 function migrateOneSet(setDir, options = {}) {
   const strategy = options.strategy ?? "regex";
   const dryRun = options.dryRun ?? false;
-  const statePath = path17.join(setDir, SESSION_STATE_FILENAME3);
-  if (!fs14.existsSync(statePath)) {
+  const statePath = path18.join(setDir, SESSION_STATE_FILENAME3);
+  if (!fs15.existsSync(statePath)) {
     return {
       setDir,
       action: "skipped-no-state",
@@ -24199,7 +24731,7 @@ function migrateOneSet(setDir, options = {}) {
   }
   let raw;
   try {
-    raw = fs14.readFileSync(statePath, "utf-8");
+    raw = fs15.readFileSync(statePath, "utf-8");
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {
@@ -24252,7 +24784,7 @@ function migrateOneSet(setDir, options = {}) {
       reason: "schemaVersion=3 but sessions[] is missing or not a list; this is a broken v3 file, not a v2 file. Hand-repair or restore from git."
     };
   }
-  const specMdPath = path17.join(setDir, "spec.md");
+  const specMdPath = path18.join(setDir, "spec.md");
   const specTitlesArr = extractSessionTitlesFromSpec(specMdPath);
   const specTitles = new Map(
     specTitlesArr.map((t2) => [t2.number, t2.title])
@@ -24407,8 +24939,8 @@ function handleMigrationResult(set, strategy, result, deps) {
 var vscode14 = __toESM(require("vscode"));
 
 // src/utils/migrateSessionStateV4.ts
-var fs15 = __toESM(require("fs"));
-var path18 = __toESM(require("path"));
+var fs16 = __toESM(require("fs"));
+var path19 = __toESM(require("path"));
 var SESSION_STATE_FILENAME4 = "session-state.json";
 var BACKUP_FILENAME = "session-state.v3.bak.json";
 var SWEEP_BACKUP_FILENAME = "session-state.pre-049-sweep.bak.json";
@@ -24522,38 +25054,38 @@ function buildV4OnDiskShape(normalized, original) {
   return out;
 }
 function atomicWriteJson3(filePath, data) {
-  const dir = path18.dirname(filePath);
-  const base = path18.basename(filePath);
-  const tmp = path18.join(
+  const dir = path19.dirname(filePath);
+  const base = path19.basename(filePath);
+  const tmp = path19.join(
     dir,
     `.${base}.tmp.${process.pid}.${Date.now()}`
   );
-  const fd = fs15.openSync(tmp, "w");
+  const fd = fs16.openSync(tmp, "w");
   try {
-    fs15.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs15.fsyncSync(fd);
+    fs16.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs16.fsyncSync(fd);
   } finally {
-    fs15.closeSync(fd);
+    fs16.closeSync(fd);
   }
   try {
-    fs15.renameSync(tmp, filePath);
+    fs16.renameSync(tmp, filePath);
   } catch (exc) {
     try {
-      fs15.unlinkSync(tmp);
+      fs16.unlinkSync(tmp);
     } catch {
     }
     throw exc;
   }
 }
 function atomicCopyJson(src, dst) {
-  const raw = JSON.parse(fs15.readFileSync(src, "utf-8"));
+  const raw = JSON.parse(fs16.readFileSync(src, "utf-8"));
   atomicWriteJson3(dst, raw);
 }
 function migrateOneSetV4(setDir, options = {}) {
   const dryRun = options.dryRun ?? false;
-  const statePath = path18.join(setDir, SESSION_STATE_FILENAME4);
-  const backupPath = path18.join(setDir, BACKUP_FILENAME);
-  if (!fs15.existsSync(statePath)) {
+  const statePath = path19.join(setDir, SESSION_STATE_FILENAME4);
+  const backupPath = path19.join(setDir, BACKUP_FILENAME);
+  if (!fs16.existsSync(statePath)) {
     return {
       setDir,
       action: "skipped-no-state",
@@ -24562,7 +25094,7 @@ function migrateOneSetV4(setDir, options = {}) {
   }
   let raw;
   try {
-    raw = fs15.readFileSync(statePath, "utf-8");
+    raw = fs16.readFileSync(statePath, "utf-8");
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {
@@ -24622,7 +25154,7 @@ function migrateOneSetV4(setDir, options = {}) {
         after: sweptState
       };
     }
-    const sweepBackupPath = path18.join(setDir, SWEEP_BACKUP_FILENAME);
+    const sweepBackupPath = path19.join(setDir, SWEEP_BACKUP_FILENAME);
     try {
       atomicCopyJson(statePath, sweepBackupPath);
     } catch (exc) {
@@ -24673,7 +25205,7 @@ function migrateOneSetV4(setDir, options = {}) {
       before: state
     };
   }
-  const specMdPath = path18.join(setDir, "spec.md");
+  const specMdPath = path19.join(setDir, "spec.md");
   let normalized;
   try {
     normalized = normalizeToV4Shape(stateObj, specMdPath);
@@ -24862,12 +25394,12 @@ function handleMigrationResultV4(set, result, deps) {
 
 // src/commands/openFile.ts
 var vscode15 = __toESM(require("vscode"));
-var fs16 = __toESM(require("fs"));
-var path19 = __toESM(require("path"));
+var fs17 = __toESM(require("fs"));
+var path20 = __toESM(require("path"));
 function openIfExists(filePath, label) {
-  if (!filePath || !fs16.existsSync(filePath)) {
+  if (!filePath || !fs17.existsSync(filePath)) {
     vscode15.window.showInformationMessage(
-      `${label} does not exist yet: ${filePath ? path19.basename(filePath) : "<unknown>"}`
+      `${label} does not exist yet: ${filePath ? path20.basename(filePath) : "<unknown>"}`
     );
     return;
   }
@@ -24910,8 +25442,8 @@ async function openPrerequisiteSpec(set) {
 function findPlaywrightTests(set) {
   const cfg = vscode15.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
-  const playwrightDir = path19.join(set.root, testDirRel);
-  if (!fs16.existsSync(playwrightDir))
+  const playwrightDir = path20.join(set.root, testDirRel);
+  if (!fs17.existsSync(playwrightDir))
     return [];
   const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
   const testRefs = set.uatSummary?.e2eRefs ?? [];
@@ -24921,12 +25453,12 @@ function findPlaywrightTests(set) {
       return;
     let entries;
     try {
-      entries = fs16.readdirSync(dir, { withFileTypes: true });
+      entries = fs17.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
-      const p2 = path19.join(dir, e.name);
+      const p2 = path20.join(dir, e.name);
       if (e.isDirectory()) {
         if (e.name === "bin" || e.name === "obj" || e.name === "node_modules")
           continue;
@@ -24942,7 +25474,7 @@ function findPlaywrightTests(set) {
       }
       if (testRefs.length > 0) {
         try {
-          const txt = fs16.readFileSync(p2, "utf8");
+          const txt = fs17.readFileSync(p2, "utf8");
           for (const ref of testRefs) {
             const short = String(ref).split(".").pop();
             if (short && txt.includes(short)) {
@@ -25021,8 +25553,8 @@ function registerOpenFileCommands(context) {
         }
         const picked = await vscode15.window.showQuickPick(
           tests.map((p2) => ({
-            label: path19.basename(p2),
-            description: path19.relative(item.set.root, p2),
+            label: path20.basename(p2),
+            description: path20.relative(item.set.root, p2),
             absolute: p2
           })),
           { placeHolder: `Playwright tests matching "${item.set.name}"` }
@@ -25075,8 +25607,8 @@ function registerCopyCommands(context) {
 }
 
 // src/commands/copyPromptCommands.ts
-var fs17 = __toESM(require("fs"));
-var path20 = __toESM(require("path"));
+var fs18 = __toESM(require("fs"));
+var path21 = __toESM(require("path"));
 var vscode17 = __toESM(require("vscode"));
 var REVIEW_CRITERIA_DIRNAME = "review-criteria";
 var REVIEW_CRITERIA_MAX_CHARS = 8e3;
@@ -25085,21 +25617,21 @@ var defaultBuildContext = {
   fileExists: defaultFileExists
 };
 function defaultFileExists(filePath) {
-  return fs17.existsSync(filePath);
+  return fs18.existsSync(filePath);
 }
 function defaultReadReviewCriteria(root, kind) {
-  const candidate = path20.join(root, "docs", REVIEW_CRITERIA_DIRNAME, `${kind}.md`);
+  const candidate = path21.join(root, "docs", REVIEW_CRITERIA_DIRNAME, `${kind}.md`);
   try {
-    if (!fs17.existsSync(candidate))
+    if (!fs18.existsSync(candidate))
       return null;
-    const text = fs17.readFileSync(candidate, "utf8");
+    const text = fs18.readFileSync(candidate, "utf8");
     return text.length > 0 ? text : null;
   } catch {
     return null;
   }
 }
 function relFromRoot(root, abs) {
-  return path20.relative(root, abs).split(path20.sep).join("/");
+  return path21.relative(root, abs).split(path21.sep).join("/");
 }
 function reviewCriteriaTrailer(root, kind, ctx) {
   const content = ctx.readReviewCriteria(root, kind);
@@ -25127,7 +25659,7 @@ First read \`${CROSS_PROVIDER_VERIFICATION_REL_PATH}\` (repo root) \u2014 it car
 function verificationArtifactClose(set, kind) {
   const artifactRel = relFromRoot(
     set.root,
-    path20.join(set.dir, "external-verification.md")
+    path21.join(set.dir, "external-verification.md")
   );
   const scopeLine = kind === "spec" ? ` Because this is a pre-work SPECIFICATION review, put the line \`Scope: specification\` directly under your round header \u2014 a spec-only verdict must not read as work verification.` : "";
   return `Non-negotiable final step: YOU (the reviewing engine) must write your verdict as a new dated round section appended to \`${artifactRel}\` (UTF-8, append-only \u2014 never rewrite earlier rounds).${scopeLine} A verdict that exists only in this chat does not count.`;
@@ -25136,26 +25668,26 @@ function ensureCrossProviderVerificationDoc(extensionPath, root) {
   try {
     const bundle = loadTemplateBundle(resolveBundledTemplateDir(extensionPath));
     const ctx = structureOnlyContext(
-      path20.basename(root),
+      path21.basename(root),
       "lightweight",
       (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
     );
     const rendered = renderCrossProviderVerification(bundle, ctx);
-    const target = path20.join(
+    const target = path21.join(
       root,
       ...CROSS_PROVIDER_VERIFICATION_REL_PATH.split("/")
     );
     let existing = null;
     try {
-      existing = fs17.readFileSync(target, "utf8");
+      existing = fs18.readFileSync(target, "utf8");
     } catch {
       existing = null;
     }
     if (existing !== null && existing.replace(/\r\n/g, "\n") === rendered) {
       return true;
     }
-    fs17.mkdirSync(path20.dirname(target), { recursive: true });
-    fs17.writeFileSync(target, rendered, { encoding: "utf8" });
+    fs18.mkdirSync(path21.dirname(target), { recursive: true });
+    fs18.writeFileSync(target, rendered, { encoding: "utf8" });
     return true;
   } catch {
     return false;
@@ -25420,9 +25952,9 @@ function registerCopyPromptCommands(context) {
 
 // src/commands/troubleshoot.ts
 var vscode18 = __toESM(require("vscode"));
-var fs18 = __toESM(require("fs"));
-var path21 = __toESM(require("path"));
-var cp3 = __toESM(require("child_process"));
+var fs19 = __toESM(require("fs"));
+var path22 = __toESM(require("path"));
+var cp4 = __toESM(require("child_process"));
 function workspaceRoot() {
   return vscode18.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
@@ -25437,8 +25969,8 @@ function checkActivation() {
     ch.show();
     return;
   }
-  const dir = path21.join(root, SESSION_SETS_REL);
-  const exists2 = fs18.existsSync(dir);
+  const dir = path22.join(root, SESSION_SETS_REL);
+  const exists2 = fs19.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
   if (!exists2) {
@@ -25473,7 +26005,7 @@ function checkWorktrees() {
     return;
   }
   try {
-    const out = cp3.execFileSync("git", ["worktree", "list", "--porcelain"], {
+    const out = cp4.execFileSync("git", ["worktree", "list", "--porcelain"], {
       cwd: root,
       encoding: "utf8",
       windowsHide: true,
@@ -25524,15 +26056,15 @@ function checkLayout() {
     return;
   }
   const dirs = [
-    path21.join("docs", "session-sets"),
-    path21.join("docs", "planning"),
+    path22.join("docs", "session-sets"),
+    path22.join("docs", "planning"),
     "ai_router"
   ];
   ch.appendLine(`Expected layout under: ${root}`);
   ch.appendLine("");
   for (const d of dirs) {
-    const full = path21.join(root, d);
-    const exists2 = fs18.existsSync(full);
+    const full = path22.join(root, d);
+    const exists2 = fs19.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
   ch.appendLine("");
@@ -25659,22 +26191,22 @@ function registerCancelLifecycleCommands(context, deps) {
 
 // src/dashboard/CostDashboard.ts
 var vscode20 = __toESM(require("vscode"));
-var fs21 = __toESM(require("fs"));
-var path23 = __toESM(require("path"));
+var fs22 = __toESM(require("fs"));
+var path24 = __toESM(require("path"));
 
 // src/utils/metrics.ts
-var fs20 = __toESM(require("fs"));
+var fs21 = __toESM(require("fs"));
 
 // src/utils/routerConfig.ts
-var fs19 = __toESM(require("fs"));
-var path22 = __toESM(require("path"));
+var fs20 = __toESM(require("fs"));
+var path23 = __toESM(require("path"));
 var YAML = __toESM(require_dist3());
 var DEFAULT_METRICS_FILENAME = "router-metrics.jsonl";
 var DEFAULT_REVIEW_FREQUENCY_DAYS = 30;
 function findAiRouterDir(workspaceRoot2) {
-  const candidate = path22.join(workspaceRoot2, "ai_router");
+  const candidate = path23.join(workspaceRoot2, "ai_router");
   try {
-    if (fs19.existsSync(path22.join(candidate, "router-config.yaml"))) {
+    if (fs20.existsSync(path23.join(candidate, "router-config.yaml"))) {
       return candidate;
     }
   } catch {
@@ -25688,10 +26220,10 @@ function readRouterConfig(workspaceRoot2) {
   const aiRouterDir = findAiRouterDir(workspaceRoot2);
   if (!aiRouterDir)
     return null;
-  const configPath = path22.join(aiRouterDir, "router-config.yaml");
+  const configPath = path23.join(aiRouterDir, "router-config.yaml");
   let doc = {};
   try {
-    doc = YAML.parse(fs19.readFileSync(configPath, "utf8")) ?? {};
+    doc = YAML.parse(fs20.readFileSync(configPath, "utf8")) ?? {};
   } catch {
     doc = {};
   }
@@ -25710,7 +26242,7 @@ function readRouterConfig(workspaceRoot2) {
     aiRouterDir,
     metricsEnabled,
     metricsFilename,
-    metricsPath: path22.join(aiRouterDir, metricsFilename),
+    metricsPath: path23.join(aiRouterDir, metricsFilename),
     pricingReviewed,
     reviewFrequencyDays
   };
@@ -25755,10 +26287,10 @@ function sessionSetDisplayName(raw) {
   return name === "" ? "(no session set)" : name;
 }
 function readMetricsFromPath(metricsPath) {
-  if (!fs20.existsSync(metricsPath))
+  if (!fs21.existsSync(metricsPath))
     return [];
   try {
-    const lines = fs20.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
+    const lines = fs21.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
     return lines.map((line) => {
       try {
         return JSON.parse(line);
@@ -25975,9 +26507,9 @@ var CostDashboard = class _CostDashboard {
     }
     const entries = readMetrics(root);
     const csv = exportToCsv(entries);
-    const outPath = path23.join(root, "ai_router", "cost-export.csv");
+    const outPath = path24.join(root, "ai_router", "cost-export.csv");
     try {
-      fs21.writeFileSync(outPath, csv, "utf8");
+      fs22.writeFileSync(outPath, csv, "utf8");
       vscode20.commands.executeCommand("vscode.open", vscode20.Uri.file(outPath));
     } catch (err) {
       vscode20.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -26036,7 +26568,7 @@ var CostDashboard = class _CostDashboard {
     const banner = stalenessBannerHtml(computeStaleness(info));
     const htmlPath = vscode20.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
     try {
-      let html = fs21.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs22.readFileSync(htmlPath.fsPath, "utf8");
       const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
         ([slug, d]) => `<tr><td>${esc(slug)}</td><td>${d.sessions}</td><td>$${d.cost.toFixed(3)}</td><td>${d.lastRun ? new Date(d.lastRun).toLocaleDateString("en-CA") : "\u2014"}</td></tr>`
       ).join("\n");
@@ -26063,18 +26595,18 @@ function registerCostDashboardCommand(context) {
 }
 
 // src/configEditor/ConfigEditorPanel.ts
-var cp4 = __toESM(require("child_process"));
+var cp5 = __toESM(require("child_process"));
 var vscode21 = __toESM(require("vscode"));
-var fs23 = __toESM(require("fs"));
-var path24 = __toESM(require("path"));
+var fs24 = __toESM(require("fs"));
+var path25 = __toESM(require("path"));
 
 // src/configEditor/yamlReadWrite.ts
 var import_yaml = __toESM(require_dist3());
-var fs22 = __toESM(require("fs"));
+var fs23 = __toESM(require("fs"));
 function readYamlFile(filePath) {
-  if (!fs22.existsSync(filePath))
+  if (!fs23.existsSync(filePath))
     return null;
-  const text = fs22.readFileSync(filePath, "utf8");
+  const text = fs23.readFileSync(filePath, "utf8");
   const doc = parseDocumentFromText(text);
   return { doc, text, parseErrors: collectParseErrors(doc) };
 }
@@ -26383,10 +26915,10 @@ function _checkLocalOverridesAllowlist(localOverrides, routerConfig, errors) {
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-function getByPath(obj, path35) {
+function getByPath(obj, path36) {
   if (!obj)
     return void 0;
-  const parts = path35.split(".");
+  const parts = path36.split(".");
   let cur = obj;
   for (const p2 of parts) {
     if (cur === null || cur === void 0 || typeof cur !== "object")
@@ -26827,9 +27359,9 @@ function collectOverrideRows(localOverrides, state) {
   if (!localOverrides)
     return [];
   const rows = [];
-  walk(localOverrides, [], (path35, value) => {
-    const dotted = path35.join(".");
-    const sharedSource = pickSharedSource(path35[0]);
+  walk(localOverrides, [], (path36, value) => {
+    const dotted = path36.join(".");
+    const sharedSource = pickSharedSource(path36[0]);
     const sharedVal = sharedSource === "routerConfig" ? getByPath(state.routerConfig, dotted) : sharedSource === "budget" ? getByPath(state.budget, dotted) : void 0;
     rows.push({
       path: dotted,
@@ -26861,11 +27393,11 @@ function formatValue(v) {
 }
 function walk(obj, prefix, emit) {
   for (const [k2, v] of Object.entries(obj)) {
-    const path35 = [...prefix, k2];
+    const path36 = [...prefix, k2];
     if (v !== null && typeof v === "object" && !Array.isArray(v)) {
-      walk(v, path35, emit);
+      walk(v, path36, emit);
     } else {
-      emit(path35, v);
+      emit(path36, v);
     }
   }
 }
@@ -27000,40 +27532,40 @@ function applyPatch(routerConfigDoc, budgetDoc, localOverridesDoc, payload) {
   }
   return result;
 }
-function applyOverridableField(routerConfigDoc, localOverridesDoc, path35, value, source, result) {
+function applyOverridableField(routerConfigDoc, localOverridesDoc, path36, value, source, result) {
   if (source === "local") {
-    if (setIfChanged(localOverridesDoc, path35, value)) {
+    if (setIfChanged(localOverridesDoc, path36, value)) {
       result.localOverridesChanged = true;
     }
-    deleteIfPresent(routerConfigDoc, path35, result, "routerConfigChanged");
+    deleteIfPresent(routerConfigDoc, path36, result, "routerConfigChanged");
   } else {
-    if (setIfChanged(routerConfigDoc, path35, value)) {
+    if (setIfChanged(routerConfigDoc, path36, value)) {
       result.routerConfigChanged = true;
     }
-    deleteIfPresent(localOverridesDoc, path35, result, "localOverridesChanged");
+    deleteIfPresent(localOverridesDoc, path36, result, "localOverridesChanged");
   }
 }
-function setIfChanged(doc, path35, value) {
-  const current = doc.getIn(path35);
+function setIfChanged(doc, path36, value) {
+  const current = doc.getIn(path36);
   if (current === value)
     return false;
-  doc.setIn(path35, value);
+  doc.setIn(path36, value);
   return true;
 }
-function deleteIfPresent(doc, path35, result, flag) {
-  if (doc.hasIn(path35)) {
-    doc.deleteIn(path35);
+function deleteIfPresent(doc, path36, result, flag) {
+  if (doc.hasIn(path36)) {
+    doc.deleteIn(path36);
     result[flag] = true;
   }
 }
-function pruneEmptyContainer(doc, path35, result, flag) {
-  if (!doc.hasIn(path35))
+function pruneEmptyContainer(doc, path36, result, flag) {
+  if (!doc.hasIn(path36))
     return;
-  const node = doc.getIn(path35);
+  const node = doc.getIn(path36);
   if (node && typeof node === "object" && "items" in node) {
     const items = node.items;
     if (Array.isArray(items) && items.length === 0) {
-      doc.deleteIn(path35);
+      doc.deleteIn(path36);
       result[flag] = true;
     }
   }
@@ -27140,8 +27672,8 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
     if (!roots?.length)
       return null;
     for (const folder of roots) {
-      const candidate = path24.join(folder.uri.fsPath, "ai_router");
-      if (fs23.existsSync(candidate))
+      const candidate = path25.join(folder.uri.fsPath, "ai_router");
+      if (fs24.existsSync(candidate))
         return candidate;
     }
     return null;
@@ -27153,9 +27685,9 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
       this._validation = null;
       return;
     }
-    const routerConfigPath = path24.join(aiRouterDir, "router-config.yaml");
-    const budgetPath = path24.join(aiRouterDir, "budget.yaml");
-    const localOverridesPath = path24.join(aiRouterDir, "local-overrides.yaml");
+    const routerConfigPath = path25.join(aiRouterDir, "router-config.yaml");
+    const budgetPath = path25.join(aiRouterDir, "budget.yaml");
+    const localOverridesPath = path25.join(aiRouterDir, "local-overrides.yaml");
     const routerResult = readYamlFile(routerConfigPath);
     const budgetResult = readYamlFile(budgetPath);
     const localResult = readYamlFile(localOverridesPath);
@@ -27338,13 +27870,13 @@ ${msgs}`,
     const writeAtomic = (file, target, content) => {
       const tmp = target + ".tmp";
       try {
-        fs23.writeFileSync(tmp, content, "utf8");
-        fs23.renameSync(tmp, target);
+        fs24.writeFileSync(tmp, content, "utf8");
+        fs24.renameSync(tmp, target);
         succeeded.push(file);
       } catch (err) {
         try {
-          if (fs23.existsSync(tmp))
-            fs23.unlinkSync(tmp);
+          if (fs24.existsSync(tmp))
+            fs24.unlinkSync(tmp);
         } catch {
         }
         failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
@@ -27442,13 +27974,13 @@ ${msgs}`,
       }
       const tmp = target + ".tmp";
       try {
-        fs23.writeFileSync(tmp, cachedContent, "utf8");
-        fs23.renameSync(tmp, target);
+        fs24.writeFileSync(tmp, cachedContent, "utf8");
+        fs24.renameSync(tmp, target);
         newSucceeded.push(f.file);
       } catch (err) {
         try {
-          if (fs23.existsSync(tmp))
-            fs23.unlinkSync(tmp);
+          if (fs24.existsSync(tmp))
+            fs24.unlinkSync(tmp);
         } catch {
         }
         stillFailed.push({ file: f.file, reason: err instanceof Error ? err.message : String(err) });
@@ -27515,13 +28047,13 @@ ${msgs}`,
       pendingContents[file] = content;
       const tmp = target + ".tmp";
       try {
-        fs23.writeFileSync(tmp, content, "utf8");
-        fs23.renameSync(tmp, target);
+        fs24.writeFileSync(tmp, content, "utf8");
+        fs24.renameSync(tmp, target);
         succeeded.push(file);
       } catch (err) {
         try {
-          if (fs23.existsSync(tmp))
-            fs23.unlinkSync(tmp);
+          if (fs24.existsSync(tmp))
+            fs24.unlinkSync(tmp);
         } catch {
         }
         failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
@@ -27531,9 +28063,9 @@ ${msgs}`,
     reapply("budget.yaml", this._loaded.budgetPath, this._lastSaveSnapshot.budgetText);
     if (this._lastSaveSnapshot.localOverridesText !== null) {
       reapply("local-overrides.yaml", this._loaded.localOverridesPath, this._lastSaveSnapshot.localOverridesText);
-    } else if (fs23.existsSync(this._loaded.localOverridesPath)) {
+    } else if (fs24.existsSync(this._loaded.localOverridesPath)) {
       try {
-        fs23.unlinkSync(this._loaded.localOverridesPath);
+        fs24.unlinkSync(this._loaded.localOverridesPath);
         succeeded.push("local-overrides.yaml");
       } catch (err) {
         failed.push({
@@ -27594,7 +28126,7 @@ ${msgs}`,
       );
       return;
     }
-    const pythonPath = resolvePythonInterpreter(path24.dirname(aiRouterDir));
+    const pythonPath = resolvePythonInterpreter(path25.dirname(aiRouterDir));
     const script = [
       "import json, sys",
       "try:",
@@ -27605,8 +28137,8 @@ ${msgs}`,
       "  print(json.dumps({'ok': False, 'error': str(e)}))"
     ].join("\n");
     const env8 = { ...process.env, PUSHOVER_API_KEY: apiKeyValue, PUSHOVER_USER_KEY: userKeyValue };
-    const child = cp4.spawn(pythonPath, ["-c", script], {
-      cwd: path24.dirname(aiRouterDir),
+    const child = cp5.spawn(pythonPath, ["-c", script], {
+      cwd: path25.dirname(aiRouterDir),
       env: env8,
       windowsHide: true
     });
@@ -27651,7 +28183,7 @@ ${msgs}`,
     if (!this._loaded)
       return;
     const target = this._loaded.localOverridesPath;
-    if (!fs23.existsSync(target)) {
+    if (!fs24.existsSync(target)) {
       vscode21.window.showInformationMessage(
         "local-overrides.yaml does not exist yet. Save any per-operator override and the file is created automatically."
       );
@@ -28018,7 +28550,7 @@ ${msgs}`,
     </body></html>`;
   }
   _missingFilesHtml(nonce, cspSource, missingFilePath) {
-    const fileName = path24.basename(missingFilePath);
+    const fileName = path25.basename(missingFilePath);
     return `<!DOCTYPE html><html lang="en"><head>
       <meta charset="UTF-8">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline';">
@@ -28044,16 +28576,16 @@ function escapeHtml3(str) {
 
 // src/commands/flagDecisionForReview.ts
 var vscode22 = __toESM(require("vscode"));
-var path26 = __toESM(require("path"));
+var path27 = __toESM(require("path"));
 
 // src/commands/decisionReviewQueue.ts
-var fs24 = __toESM(require("fs"));
-var path25 = __toESM(require("path"));
+var fs25 = __toESM(require("fs"));
+var path26 = __toESM(require("path"));
 var QUEUE_FILENAME = "decision-review-queue.jsonl";
 function appendQueueEntry(sessionSetDir, entry) {
-  const queuePath = path25.join(sessionSetDir, QUEUE_FILENAME);
+  const queuePath = path26.join(sessionSetDir, QUEUE_FILENAME);
   const line = JSON.stringify(entry) + "\n";
-  fs24.appendFileSync(queuePath, line, "utf8");
+  fs25.appendFileSync(queuePath, line, "utf8");
 }
 function findActiveSessionSetDir(provider) {
   const all = provider();
@@ -28104,7 +28636,7 @@ function registerFlagDecisionForReview(context) {
           );
           return;
         }
-        const slug = path26.basename(activeDir);
+        const slug = path27.basename(activeDir);
         vscode22.window.showInformationMessage(
           `Flagged for cross-provider review in ${slug}/${QUEUE_FILENAME}. Will surface in the next session's planning checklist.`
         );
@@ -28115,8 +28647,8 @@ function registerFlagDecisionForReview(context) {
 
 // src/commands/scanAnnotationsForActiveSet.ts
 var vscode23 = __toESM(require("vscode"));
-var fs26 = __toESM(require("fs"));
-var path28 = __toESM(require("path"));
+var fs27 = __toESM(require("fs"));
+var path29 = __toESM(require("path"));
 
 // src/configEditor/annotationParser.ts
 var ANNOTATION_RE = /(?:#|\/\/)\s*@dabbler:outsource-review\(\s*"((?:\\.|[^"\\\r\n])*)"\s*\)/g;
@@ -28194,8 +28726,8 @@ function unescapeReason(raw) {
 }
 
 // src/commands/annotationScanner.ts
-var fs25 = __toESM(require("fs"));
-var path27 = __toESM(require("path"));
+var fs26 = __toESM(require("fs"));
+var path28 = __toESM(require("path"));
 var SCAN_EXTENSIONS = [
   "ts",
   "tsx",
@@ -28229,7 +28761,7 @@ var SCAN_EXCLUDE_GLOB = "{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**
 function toPosixPath(p2) {
   return p2.replace(/\\/g, "/");
 }
-function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs25.readFileSync(p2, "utf8")) {
+function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs26.readFileSync(p2, "utf8")) {
   const out = [];
   for (const abs of files) {
     let text;
@@ -28238,7 +28770,7 @@ function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE_
     } catch {
       continue;
     }
-    const rel = toPosixPath(path27.relative(workspaceRoot2, abs));
+    const rel = toPosixPath(path28.relative(workspaceRoot2, abs));
     const anns = findAnnotations(text, rel, now);
     for (const a of anns)
       out.push(a);
@@ -28246,7 +28778,7 @@ function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE_
   return out;
 }
 function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
-  const candidate = path27.join(workspaceRoot2, "ai_router", "local-overrides.yaml");
+  const candidate = path28.join(workspaceRoot2, "ai_router", "local-overrides.yaml");
   const parsed = readYaml(candidate);
   if (parsed == null)
     return true;
@@ -28258,9 +28790,9 @@ function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
     return v;
   return true;
 }
-function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs25.readFileSync(p2, "utf8")) {
-  const queuePath = path27.join(sessionSetDir, QUEUE_FILENAME);
-  if (!fs25.existsSync(queuePath))
+function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs26.readFileSync(p2, "utf8")) {
+  const queuePath = path28.join(sessionSetDir, QUEUE_FILENAME);
+  if (!fs26.existsSync(queuePath))
     return [];
   let text;
   try {
@@ -28286,7 +28818,7 @@ function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs25.readFil
 
 // src/commands/scanAnnotationsForActiveSet.ts
 function defaultReadYaml(absPath) {
-  if (!fs26.existsSync(absPath))
+  if (!fs27.existsSync(absPath))
     return null;
   try {
     const result = readYamlFile(absPath);
@@ -28314,7 +28846,7 @@ function registerScanAnnotationsForActiveSet(context) {
           return;
         }
         const activeSet = all.find((s) => s.dir === activeDir);
-        const workspaceRoot2 = activeSet?.root ?? path28.dirname(path28.dirname(activeDir));
+        const workspaceRoot2 = activeSet?.root ?? path29.dirname(path29.dirname(activeDir));
         if (!loadHonorAnnotationsToggle(workspaceRoot2, defaultReadYaml)) {
           vscode23.window.showInformationMessage(
             "Annotation scanning is disabled for this project (local-overrides.yaml \u2192 decision_review.honor_annotations: false). No queue entries appended."
@@ -28348,7 +28880,7 @@ function registerScanAnnotationsForActiveSet(context) {
           );
           return;
         }
-        const slug = path28.basename(activeDir);
+        const slug = path29.basename(activeDir);
         vscode23.window.showInformationMessage(
           `Appended ${fresh.length} new annotation(s) to ${slug}/${QUEUE_FILENAME}.`
         );
@@ -28359,14 +28891,14 @@ function registerScanAnnotationsForActiveSet(context) {
 
 // src/commands/openOrchestratorWriterLog.ts
 var vscode24 = __toESM(require("vscode"));
-var fs27 = __toESM(require("fs"));
-var os2 = __toESM(require("os"));
-var path29 = __toESM(require("path"));
+var fs28 = __toESM(require("fs"));
+var os3 = __toESM(require("os"));
+var path30 = __toESM(require("path"));
 function registerOpenOrchestratorWriterLog(context) {
   context.subscriptions.push(
     vscode24.commands.registerCommand("dabbler.openOrchestratorWriterLog", async () => {
-      const logPath = path29.join(os2.homedir(), ".dabbler", "orchestrator-writer.log");
-      if (!fs27.existsSync(logPath)) {
+      const logPath = path30.join(os3.homedir(), ".dabbler", "orchestrator-writer.log");
+      if (!fs28.existsSync(logPath)) {
         vscode24.window.showInformationMessage(
           `No writer log yet \u2014 ${logPath} hasn't been touched. Logged entries appear on every start_session call: successful check-outs, H3 hard-coordination refusals, and --force overrides.`
         );
@@ -28379,9 +28911,9 @@ function registerOpenOrchestratorWriterLog(context) {
 }
 
 // src/commands/regenerateNarrationTemplates.ts
-var cp5 = __toESM(require("child_process"));
-var fs28 = __toESM(require("fs"));
-var path30 = __toESM(require("path"));
+var cp6 = __toESM(require("child_process"));
+var fs29 = __toESM(require("fs"));
+var path31 = __toESM(require("path"));
 var vscode25 = __toESM(require("vscode"));
 var COMMAND_ID = "dabbler.regenerateNarrationTemplates";
 function registerRegenerateNarrationTemplatesCommand(context) {
@@ -28410,10 +28942,10 @@ async function runRegenerate() {
   if (!set)
     return;
   const pythonPath = resolvePythonInterpreter(set.root);
-  const outDir = path30.join(set.dir, "narration-templates");
-  fs28.mkdirSync(outDir, { recursive: true });
-  const claudeOut = path30.join(outDir, "CLAUDE.md");
-  const agentsOut = path30.join(outDir, "AGENTS.md");
+  const outDir = path31.join(set.dir, "narration-templates");
+  fs29.mkdirSync(outDir, { recursive: true });
+  const claudeOut = path31.join(outDir, "CLAUDE.md");
+  const agentsOut = path31.join(outDir, "AGENTS.md");
   const render7 = await vscode25.window.withProgress(
     {
       location: vscode25.ProgressLocation.Notification,
@@ -28446,8 +28978,8 @@ async function runRegenerate() {
     );
     return;
   }
-  const relClaude = path30.relative(set.root, claudeOut).replace(/\\/g, "/");
-  const relAgents = path30.relative(set.root, agentsOut).replace(/\\/g, "/");
+  const relClaude = path31.relative(set.root, claudeOut).replace(/\\/g, "/");
+  const relAgents = path31.relative(set.root, agentsOut).replace(/\\/g, "/");
   const COPY_ACTION = "Copy to consumer workspace\u2026";
   const OPEN_ACTION = "Open Rendered CLAUDE.md";
   const choice = await vscode25.window.showInformationMessage(
@@ -28484,8 +29016,8 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   if (!dirUri || !dirUri.length)
     return;
   const destDir = dirUri[0].fsPath;
-  const destPath = path30.join(destDir, pick2.target);
-  if (fs28.existsSync(destPath)) {
+  const destPath = path31.join(destDir, pick2.target);
+  if (fs29.existsSync(destPath)) {
     const overwrite = await vscode25.window.showWarningMessage(
       `${pick2.target} already exists in the chosen folder. Overwrite?`,
       { modal: true },
@@ -28495,7 +29027,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
       return;
   }
   try {
-    fs28.copyFileSync(pick2.source, destPath);
+    fs29.copyFileSync(pick2.source, destPath);
   } catch (err) {
     vscode25.window.showErrorMessage(
       `Failed to copy ${pick2.target} to ${destDir}: ${err.message}`
@@ -28512,7 +29044,7 @@ async function pickSet(inProgress) {
   const choices = inProgress.map((s) => ({
     label: s.name,
     description: `session ${s.liveSession?.currentSession ?? "?"} of ${s.totalSessions ?? "?"}`,
-    detail: path30.relative(s.root, s.dir).replace(/\\/g, "/"),
+    detail: path31.relative(s.root, s.dir).replace(/\\/g, "/"),
     set: s
   }));
   const picked = await vscode25.window.showQuickPick(choices, {
@@ -28533,7 +29065,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
   ];
   let result;
   try {
-    result = cp5.spawnSync(pythonPath, cliArgs, {
+    result = cp6.spawnSync(pythonPath, cliArgs, {
       cwd: workspaceRoot2,
       encoding: "utf8"
     });
@@ -28559,7 +29091,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
       message: `python -m ai_router.narration exited ${result.status}: ${stderr}`
     };
   }
-  if (!fs28.existsSync(args.outputPath)) {
+  if (!fs29.existsSync(args.outputPath)) {
     return {
       ok: false,
       message: `python -m ai_router.narration exited 0 but did not write ${args.outputPath}`
@@ -28570,8 +29102,8 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
 
 // src/commands/externalVerification.ts
 var vscode26 = __toESM(require("vscode"));
-var fs29 = __toESM(require("fs"));
-var path31 = __toESM(require("path"));
+var fs30 = __toESM(require("fs"));
+var path32 = __toESM(require("path"));
 var FILE_NAME = "external-verification.md";
 function buildExternalVerificationTemplate(setName, date) {
   return `# External Verification \u2014 ${setName}
@@ -28608,14 +29140,14 @@ async function pickSet2(sets) {
   return picked?.set;
 }
 async function openOrCreate(set) {
-  const filePath = path31.join(set.dir, FILE_NAME);
-  if (!fs29.existsSync(filePath)) {
+  const filePath = path32.join(set.dir, FILE_NAME);
+  if (!fs30.existsSync(filePath)) {
     const template = buildExternalVerificationTemplate(
       set.name,
       (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
     );
     try {
-      fs29.writeFileSync(filePath, template, { encoding: "utf-8", flag: "wx" });
+      fs30.writeFileSync(filePath, template, { encoding: "utf-8", flag: "wx" });
     } catch (err) {
       const e = err;
       if (e?.code !== "EEXIST") {
@@ -28769,15 +29301,15 @@ async function presentActions(slug, set) {
 
 // src/commands/upgradeOlderSets.ts
 var vscode28 = __toESM(require("vscode"));
-var cp6 = __toESM(require("child_process"));
-var path32 = __toESM(require("path"));
-var fs30 = __toESM(require("fs"));
+var cp7 = __toESM(require("child_process"));
+var path33 = __toESM(require("path"));
+var fs31 = __toESM(require("fs"));
 var BULK_UPGRADE_MODULES = [
   "ai_router.migrate_session_state",
   "ai_router.migrate_lightweight_to_canonical_v4",
   "ai_router.migrate_v3_to_v4"
 ];
-var SESSION_SETS_REL3 = path32.join("docs", "session-sets");
+var SESSION_SETS_REL3 = path33.join("docs", "session-sets");
 function runMigrator2(pythonPath, module2, cwd) {
   return new Promise((resolve5) => {
     const args = [
@@ -28788,7 +29320,7 @@ function runMigrator2(pythonPath, module2, cwd) {
       "--in-place",
       "--json"
     ];
-    const child = cp6.spawn(pythonPath, args, { cwd, windowsHide: true });
+    const child = cp7.spawn(pythonPath, args, { cwd, windowsHide: true });
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
@@ -28841,7 +29373,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
       "dabblerSessionSets.upgradeOlderSets",
       async () => {
         const roots = discoverRoots().filter(
-          (r2) => fs30.existsSync(path32.join(r2, SESSION_SETS_REL3))
+          (r2) => fs31.existsSync(path33.join(r2, SESSION_SETS_REL3))
         );
         if (roots.length === 0) {
           vscode28.window.showInformationMessage(
@@ -28868,7 +29400,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
             for (const root of roots) {
               const pythonPath = resolvePythonInterpreter(root);
               for (const module2 of BULK_UPGRADE_MODULES) {
-                progress.report({ message: `${path32.basename(root)}: ${module2}` });
+                progress.report({ message: `${path33.basename(root)}: ${module2}` });
                 const res = await runMigrator2(pythonPath, module2, root);
                 if (res.ok) {
                   summaries.push(`${module2}: ${res.detail}`);
@@ -28898,8 +29430,8 @@ function registerUpgradeOlderSetsCommand(context, deps) {
 
 // src/commands/switchTier.ts
 var vscode29 = __toESM(require("vscode"));
-var fs31 = __toESM(require("fs"));
-var path33 = __toESM(require("path"));
+var fs32 = __toESM(require("fs"));
+var path34 = __toESM(require("path"));
 
 // src/utils/tierRewrite.ts
 var CONFIG_BLOCK_RE = /(##\s*Session Set Configuration[\s\S]*?```ya?ml\s*)([\s\S]*?)(```)/i;
@@ -28965,7 +29497,7 @@ async function switchTier(set) {
     return;
   let specText;
   try {
-    specText = fs31.readFileSync(set.specPath, "utf8");
+    specText = fs32.readFileSync(set.specPath, "utf8");
   } catch {
     vscode29.window.showErrorMessage(
       `Could not read ${set.specPath} \u2014 tier not switched.`
@@ -28986,7 +29518,7 @@ async function switchTier(set) {
     return;
   }
   try {
-    fs31.writeFileSync(set.specPath, result.text, "utf8");
+    fs32.writeFileSync(set.specPath, result.text, "utf8");
   } catch {
     vscode29.window.showErrorMessage(
       `Could not write ${set.specPath} \u2014 tier not switched.`
@@ -29007,8 +29539,8 @@ async function switchTier(set) {
     result.previousTier === target ? `Repaired "${set.name}"'s malformed tier declaration \u2014 now explicitly ${target}.` : `Switched "${set.name}" to the ${target} tier.`
   );
   if (target === "full") {
-    const routerConfigExists = fs31.existsSync(
-      path33.join(setRoot, ROUTER_CONFIG_REL2)
+    const routerConfigExists = fs32.existsSync(
+      path34.join(setRoot, ROUTER_CONFIG_REL2)
     );
     for (const warning of switchToFullWarnings(routerConfigExists, process.env)) {
       vscode29.window.showWarningMessage(warning);
@@ -29034,8 +29566,8 @@ function registerSwitchTierCommand(context) {
 
 // src/commands/setupVerification.ts
 var vscode30 = __toESM(require("vscode"));
-var cp7 = __toESM(require("child_process"));
-var fs32 = __toESM(require("fs"));
+var cp8 = __toESM(require("child_process"));
+var fs33 = __toESM(require("fs"));
 
 // src/utils/verificationModeRewrite.ts
 var CONFIG_BLOCK_RE2 = /(##\s*Session Set Configuration[\s\S]*?```ya?ml\s*)([\s\S]*?)(```)/i;
@@ -29159,7 +29691,7 @@ function runChangeWriter(pythonPath, setDir, cwd) {
     });
   }
   return new Promise((resolve5) => {
-    const child = cp7.spawn(pythonPath, buildChangeWriterArgs(setDir), {
+    const child = cp8.spawn(pythonPath, buildChangeWriterArgs(setDir), {
       cwd,
       windowsHide: true
     });
@@ -29246,8 +29778,8 @@ async function applyCompletedSetTransition(set, pythonPath, deps) {
 function realCompletedSetDeps() {
   return {
     runWriter: runChangeWriter,
-    readFile: (p2) => fs32.readFileSync(p2, "utf8"),
-    writeFile: (p2, text) => fs32.writeFileSync(p2, text, "utf8"),
+    readFile: (p2) => fs33.readFileSync(p2, "utf8"),
+    writeFile: (p2, text) => fs33.writeFileSync(p2, text, "utf8"),
     copyToClipboard: (text) => Promise.resolve(vscode30.env.clipboard.writeText(text)),
     showInfo: (m) => void vscode30.window.showInformationMessage(m),
     showWarning: (m) => void vscode30.window.showWarningMessage(m),
@@ -29294,10 +29826,10 @@ async function setupVerification(set) {
     );
     return;
   }
-  if (fs32.existsSync(set.activityPath)) {
+  if (fs33.existsSync(set.activityPath)) {
     let activityLogText = null;
     try {
-      activityLogText = fs32.readFileSync(set.activityPath, "utf8");
+      activityLogText = fs33.readFileSync(set.activityPath, "utf8");
     } catch {
       activityLogText = null;
     }
@@ -29333,7 +29865,7 @@ async function setupVerification(set) {
   }
   let specText;
   try {
-    specText = fs32.readFileSync(set.specPath, "utf8");
+    specText = fs33.readFileSync(set.specPath, "utf8");
   } catch {
     vscode30.window.showErrorMessage(
       `Could not read ${set.specPath} \u2014 verification mode not changed.`
@@ -29354,7 +29886,7 @@ async function setupVerification(set) {
     return;
   }
   try {
-    fs32.writeFileSync(set.specPath, result.text, "utf8");
+    fs33.writeFileSync(set.specPath, result.text, "utf8");
   } catch {
     vscode30.window.showErrorMessage(
       `Could not write ${set.specPath} \u2014 verification mode not changed.`
@@ -29384,7 +29916,7 @@ function registerSetupVerificationCommand(context) {
 }
 
 // src/extension.ts
-var SESSION_SETS_REL4 = path34.join("docs", "session-sets");
+var SESSION_SETS_REL4 = path35.join("docs", "session-sets");
 function evaluateRouterCapabilityContextKey() {
   const folders = vscode31.workspace.workspaceFolders ?? [];
   let routes = false;
@@ -29452,7 +29984,7 @@ function activate(context) {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      const sessionSetsAbs = path34.join(root, SESSION_SETS_REL4);
+      const sessionSetsAbs = path35.join(root, SESSION_SETS_REL4);
       const pattern = new vscode31.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json}"
@@ -29581,7 +30113,7 @@ function activate(context) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs33.existsSync(path34.join(r2, SESSION_SETS_REL4));
+        return fs34.existsSync(path35.join(r2, SESSION_SETS_REL4));
       } catch {
         return false;
       }

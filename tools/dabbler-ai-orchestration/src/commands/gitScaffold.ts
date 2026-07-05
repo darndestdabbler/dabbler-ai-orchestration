@@ -1,13 +1,26 @@
 import * as vscode from "vscode";
+import * as cp from "child_process";
+import * as os from "os";
 import * as path from "path";
 import simpleGit from "simple-git";
 import {
   installAiRouter,
   FileOps,
+  InstallOutcome,
   InstallSource,
   ROUTER_CONFIG_REL,
+  venvPython,
 } from "../utils/aiRouterInstall";
 import { makeSpawner, makeFileOps } from "./installAiRouterCommands";
+import { resolveCopilotCliBinary } from "../utils/copilotCli";
+import {
+  RefreshChildSpawner,
+  SeatSetupOutcome,
+  TransportProfile,
+  deriveSeatId,
+  deriveSeatLabel,
+  performCopilotSeatSetup,
+} from "../utils/copilotSeatSetup";
 import {
   describeMissingPython,
   probePythonPresence,
@@ -334,13 +347,46 @@ function makeScaffoldInstallPrompts() {
  * durable ``.dabbler/verification-mode`` marker + the templated docs).
  * Callers without a pick (the Command Palette) leave it unset and the
  * documented default applies.
+ *
+ * Set 079 S2 (Feature 1): ``transportProfile`` carries the form's
+ * Full-tier seat-profile pick. On ``"copilot-cli"`` — and ONLY after the
+ * existing scaffold sequence (venv → pip install → template render)
+ * reports ``installOk`` (spec Sequencing, critique C2) — the guided
+ * Copilot seat setup runs: a cancellable catalog refresh through the
+ * scaffolded venv's own interpreter, then the ``transport.profile``
+ * template write on ≥2 confirmed providers. Callers without a pick
+ * (the Command Palette, Lightweight builds) leave it unset; ``"api"``
+ * is a no-op — the seeded default already IS api.
+ *
+ * ``seams`` (S2 verification round 2): test-only injection points so the
+ * Layer-2 suite drives THIS function — the real build path — and pins
+ * the scaffold→seat-setup ordering, the venvPath threading, and the
+ * install-failed skip branch without real subprocesses, git, or a
+ * template bundle on disk. Production callers never pass it.
  */
+export interface BuildStructureSeams {
+  probePython?: typeof probePythonPresence;
+  gitInit?: (projectDir: string) => Promise<void>;
+  loadBundle?: () => TemplateBundle;
+  /** Replaces the whole withProgress scaffold step (render + install). */
+  runScaffold?: (
+    ctx: BootstrapContext,
+    bundle: TemplateBundle,
+    pythonPath: string,
+  ) => Promise<{ result: ScaffoldResult; installOutcome: InstallOutcome | null }>;
+  seatSetup?: typeof runCopilotSeatSetupWithProgress;
+  showWarning?: (msg: string) => void;
+  showInfo?: (msg: string) => void;
+}
+
 export async function buildProjectStructureNoPrompt(
   context: vscode.ExtensionContext,
   projectDir: string,
   tier: Tier,
   budget?: BudgetChoice,
   verificationMode?: VerificationMode,
+  transportProfile?: TransportProfile,
+  seams: BuildStructureSeams = {},
 ): Promise<ScaffoldResult | undefined> {
   // Set 077 S3 (A10, Critique-2 M7): the Python pre-flight is the FIRST,
   // side-effect-free step — it runs before git init, the marker writes,
@@ -348,7 +394,7 @@ export async function buildProjectStructureNoPrompt(
   // friendly and leaves NO setup artifacts behind (instead of the venv
   // creation dying later with `spawn python ENOENT` buried in a warning
   // summary after the durable writes already landed).
-  if (!probePythonPresence(projectDir)) {
+  if (!(seams.probePython ?? probePythonPresence)(projectDir)) {
     vscode.window.showErrorMessage(
       describeMissingPython("Build project structure"),
     );
@@ -360,9 +406,13 @@ export async function buildProjectStructureNoPrompt(
   // surfacing a modal here would re-create the dead-end flow UAT
   // rejected on 0.28.0. checkIsRepo failures fall through to init.
   try {
-    const git = simpleGit(projectDir);
-    const isRepo = await git.checkIsRepo().catch(() => false);
-    if (!isRepo) await git.init();
+    if (seams.gitInit) {
+      await seams.gitInit(projectDir);
+    } else {
+      const git = simpleGit(projectDir);
+      const isRepo = await git.checkIsRepo().catch(() => false);
+      if (!isRepo) await git.init();
+    }
   } catch (err) {
     // Non-fatal: the durable deliverable is the rendered artifacts.
     console.warn("[gettingStarted] git init failed — continuing scaffold", err);
@@ -370,7 +420,9 @@ export async function buildProjectStructureNoPrompt(
 
   let bundle: TemplateBundle;
   try {
-    bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
+    bundle = seams.loadBundle
+      ? seams.loadBundle()
+      : loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
   } catch (err) {
     vscode.window.showErrorMessage(
       `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`,
@@ -394,32 +446,47 @@ export async function buildProjectStructureNoPrompt(
   const pythonPath =
     resolveScaffoldBootstrapPython(projectDir) ??
     resolveExplicitPythonPath(projectDir);
-  const result = await vscode.window.withProgress(
-    {
-      location: vscode.ProgressLocation.Notification,
-      title: "Building project structure…",
-      cancellable: false,
-    },
-    async (progress) =>
-      scaffoldConsumerRepo({
-        projectDir,
-        ctx,
-        bundle,
-        fileOps: makeFileOps(),
-        structureOnly: true,
-        budget,
-        reportProgress: (m) => progress.report({ message: m }),
-        installRouter: () =>
-          installAiRouter({
-            workspaceRoot: projectDir,
-            pythonPath,
-            spawner: makeSpawner(),
+  // Set 079 S2: the scaffold step returns the install outcome alongside
+  // the result so the Copilot seat setup below can reuse the SAME venv
+  // the install exercised (its `venvPath`), instead of re-deriving an
+  // interpreter. The whole step sits behind the `runScaffold` seam so
+  // Layer-2 tests can drive the real build path without real
+  // subprocesses (S2 verification round 2).
+  const runScaffold: NonNullable<BuildStructureSeams["runScaffold"]> =
+    seams.runScaffold ??
+    (async (scaffoldCtx, scaffoldBundle, scaffoldPython) => {
+      let installOutcome: InstallOutcome | null = null;
+      const scaffolded = await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Building project structure…",
+          cancellable: false,
+        },
+        async (progress) =>
+          scaffoldConsumerRepo({
+            projectDir,
+            ctx: scaffoldCtx,
+            bundle: scaffoldBundle,
             fileOps: makeFileOps(),
-            prompts: makeScaffoldInstallPrompts(),
+            structureOnly: true,
+            budget,
             reportProgress: (m) => progress.report({ message: m }),
+            installRouter: async () => {
+              installOutcome = await installAiRouter({
+                workspaceRoot: projectDir,
+                pythonPath: scaffoldPython,
+                spawner: makeSpawner(),
+                fileOps: makeFileOps(),
+                prompts: makeScaffoldInstallPrompts(),
+                reportProgress: (m) => progress.report({ message: m }),
+              });
+              return installOutcome;
+            },
           }),
-      }),
-  );
+      );
+      return { result: scaffolded, installOutcome };
+    });
+  const { result, installOutcome } = await runScaffold(ctx, bundle, pythonPath);
 
   // Set 063 S2 (spec D1): name the budget outcome so a kept existing
   // file is reported, not silent (the no-clobber "skip + report" rule).
@@ -434,12 +501,275 @@ export async function buildProjectStructureNoPrompt(
     (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") +
     `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` +
     budgetNote;
+  const showInfo =
+    seams.showInfo ?? ((m: string) => void vscode.window.showInformationMessage(m));
+  const showWarning =
+    seams.showWarning ?? ((m: string) => void vscode.window.showWarningMessage(m));
   if (result.installOk) {
-    vscode.window.showInformationMessage(summary);
+    showInfo(summary);
   } else {
-    vscode.window.showWarningMessage(
+    showWarning(
       `${summary} You can finish the install later with "Dabbler: Install ai-router".`,
     );
   }
+
+  // ---------- Set 079 S2 (Feature 1): the Copilot seat setup ----------
+  // Runs strictly AFTER the scaffold sequence above (venv → pip install →
+  // template render) and only when it succeeded — the refresh imports
+  // `ai_router` from the scaffolded venv, so it cannot be a pre-flight
+  // (spec Sequencing, critique C2). Awaited HERE, before the caller's
+  // possible `vscode.openFolder` (which reloads the extension host and
+  // would kill a still-running refresh mid-probe).
+  const venvPath = installOutcome?.venvPath ?? null;
+  switch (decideCopilotSeatSetup(tier, transportProfile, result.installOk, venvPath)) {
+    case "run":
+      await (seams.seatSetup ?? runCopilotSeatSetupWithProgress)(
+        context,
+        projectDir,
+        venvPath!,
+      );
+      break;
+    case "skip-install-incomplete":
+      // Honest state, not a silent skip: the operator chose the Copilot
+      // seat but the scaffold's install step failed, so the refresh has
+      // no venv to run in. router-config.yaml (if seeded) keeps `api`.
+      showWarning(
+        "Copilot seat setup was skipped because the ai-router install did " +
+          "not complete — the catalog refresh runs inside the scaffolded " +
+          ".venv. Finish the install (\"Dabbler: Install ai-router\"), then " +
+          "run seat setup from the venv: " +
+          rerunRefreshHint(projectDir),
+      );
+      break;
+    case "skip-not-selected":
+      break;
+  }
   return result;
+}
+
+/**
+ * The sequencing gate as a pure decision (S2 verification Major: the
+ * "refresh runs only after a successful scaffold/install" rule must be
+ * pinned by Layer-2 tests, not just implied by call order). Inputs are
+ * exactly the completed scaffold's observable outcome, so by
+ * construction the seat setup cannot be decided — let alone run —
+ * before the scaffold sequence has finished:
+ *   - Copilot not selected (any tier, `api`, or no profile) → nothing runs;
+ *   - selected but the install failed or produced no venv → the honest
+ *     skip warning (the refresh has no interpreter to run in);
+ *   - selected and the install succeeded → run the guided seat setup.
+ */
+export function decideCopilotSeatSetup(
+  tier: Tier,
+  transportProfile: TransportProfile | undefined,
+  installOk: boolean,
+  venvPath: string | null | undefined,
+): "run" | "skip-not-selected" | "skip-install-incomplete" {
+  if (tier !== "full" || transportProfile !== "copilot-cli") {
+    return "skip-not-selected";
+  }
+  if (!installOk || !venvPath) return "skip-install-incomplete";
+  return "run";
+}
+
+/**
+ * The copy-pasteable "re-run just the seat setup" command for failure
+ * messages — the corrected failure story's core promise: fixing the seat
+ * never requires re-scaffolding. Uses the venv-relative interpreter path
+ * so the hint works from a fresh terminal at the project root.
+ */
+function rerunRefreshHint(projectDir: string): string {
+  const venvPy =
+    process.platform === "win32"
+      ? ".venv\\Scripts\\python.exe"
+      : ".venv/bin/python";
+  const seatId = deriveSeatId(os.hostname(), currentUsername());
+  // Escape embedded double quotes — the label is a folder basename and
+  // this string is presented as directly runnable (S2 review Minor 8).
+  const seatLabel = deriveSeatLabel(projectDir).replace(/"/g, '\\"');
+  // Keep the recovery command faithful for custom-path operators (S2
+  // verification nit): when an explicit copilotCliPath drove the run,
+  // the hand re-run needs the same --binary.
+  const binary = resolveCopilotCliBinary(projectDir);
+  const binaryArg = binary ? ` --binary "${binary.replace(/"/g, '\\"')}"` : "";
+  return `${venvPy} -m ai_router.copilot_catalog --refresh --seat-id ${seatId} --seat-label "${seatLabel}"${binaryArg}`;
+}
+
+/** The OS username for seat-id derivation; tolerant of the exotic hosts
+ * where `os.userInfo()` throws (no passwd entry). */
+function currentUsername(): string {
+  try {
+    return os.userInfo().username;
+  } catch {
+    return process.env.USERNAME ?? process.env.USER ?? "user";
+  }
+}
+
+/** Real `child_process.spawn` adapter for the refresh runner. */
+function makeRefreshChildSpawner(): RefreshChildSpawner {
+  return (cmd, args, opts, callbacks) => {
+    const child = cp.spawn(cmd, args, {
+      cwd: opts.cwd,
+      env: process.env,
+      windowsHide: true,
+    });
+    child.stdout?.on("data", (chunk: Buffer) =>
+      callbacks.onStdout(chunk.toString("utf8")),
+    );
+    child.stderr?.on("data", (chunk: Buffer) =>
+      callbacks.onStderr(chunk.toString("utf8")),
+    );
+    child.on("error", (err: Error) => callbacks.onError(err));
+    child.on("close", (code: number | null) => callbacks.onClose(code));
+    return {
+      kill: () => {
+        // S2 review Minor 3: the refresh's python child spawns the
+        // `copilot` binary as a grandchild; a plain kill() signals only
+        // the interpreter and (on Windows especially) orphans the
+        // in-flight probe. Kill the whole tree via taskkill on win32.
+        // POSIX keeps the single kill — the orphaned grandchild is
+        // bounded by its own per-probe timeout; a full process-group
+        // kill is Session 3 failure-matrix scope if the induced-failure
+        // dogfood shows it matters.
+        if (process.platform === "win32" && child.pid) {
+          try {
+            cp.spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+              windowsHide: true,
+            });
+            return;
+          } catch {
+            // fall through to the plain kill
+          }
+        }
+        child.kill();
+      },
+    };
+  };
+}
+
+/**
+ * Injectable seams for {@link runCopilotSeatSetupWithProgress} — the
+ * Layer-2 suite pins the VS Code-layer contract (progress options,
+ * venv-interpreter reuse, subscriptions hygiene, per-outcome messaging)
+ * through these without a live extension host (S2 verification Major).
+ * Production callers omit them and get the real vscode surfaces.
+ */
+export interface SeatSetupProgressSeams {
+  withProgress?: <T>(
+    opts: { location: vscode.ProgressLocation; title: string; cancellable: boolean },
+    task: (
+      progress: { report(v: { message?: string }): void },
+      token: vscode.CancellationToken,
+    ) => Promise<T>,
+  ) => Thenable<T>;
+  perform?: typeof performCopilotSeatSetup;
+  spawn?: RefreshChildSpawner;
+  showInfo?: (msg: string) => void;
+  showWarning?: (msg: string) => void;
+}
+
+/**
+ * VS Code layer over {@link performCopilotSeatSetup}: the cancellable
+ * progress notification (INDETERMINATE — the refresh prints nothing
+ * until its final summary line, so per-model progress is not parseable;
+ * the critique-m2 fallback, decision recorded in copilotSeatSetup.ts),
+ * the teardown disposal hook in `context.subscriptions`, and the
+ * per-outcome operator messaging.
+ */
+export async function runCopilotSeatSetupWithProgress(
+  context: vscode.ExtensionContext,
+  projectDir: string,
+  venvPath: string,
+  seams: SeatSetupProgressSeams = {},
+): Promise<SeatSetupOutcome> {
+  const withProgress =
+    seams.withProgress ??
+    (vscode.window.withProgress.bind(vscode.window) as NonNullable<
+      SeatSetupProgressSeams["withProgress"]
+    >);
+  const perform = seams.perform ?? performCopilotSeatSetup;
+  const showInfo =
+    seams.showInfo ?? ((m: string) => void vscode.window.showInformationMessage(m));
+  const showWarning =
+    seams.showWarning ?? ((m: string) => void vscode.window.showWarningMessage(m));
+
+  const seatId = deriveSeatId(os.hostname(), currentUsername());
+  const seatLabel = deriveSeatLabel(projectDir);
+  const outcome = await withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title:
+        "Setting up the Copilot seat — probing the seat's models (about 1–2 minutes)…",
+      cancellable: true,
+    },
+    (_progress, token) =>
+      perform({
+        venvPythonPath: venvPython(venvPath),
+        projectDir,
+        seatId,
+        seatLabel,
+        explicitBinary: resolveCopilotCliBinary(projectDir),
+        spawn: seams.spawn ?? makeRefreshChildSpawner(),
+        fileOps: makeFileOps(),
+        cancellation: token,
+        registerDisposal: (dispose) => {
+          const d = new vscode.Disposable(dispose);
+          context.subscriptions.push(d);
+          return {
+            // S2 review Minor 4: also splice the Disposable back out of
+            // context.subscriptions when the run settles, so repeated
+            // builds do not accumulate dead entries for the host's
+            // lifetime.
+            dispose: () => {
+              d.dispose();
+              const i = context.subscriptions.indexOf(d);
+              if (i >= 0) context.subscriptions.splice(i, 1);
+            },
+          };
+        },
+      }),
+  );
+
+  const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunRefreshHint(projectDir)}`;
+  switch (outcome.kind) {
+    case "success":
+      showInfo(
+        `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models ` +
+          `confirmed (providers: ${outcome.providers.join(", ")}). ` +
+          "transport.profile: copilot-cli written to ai_router/router-config.yaml.",
+      );
+      break;
+    case "insufficient-providers":
+      showWarning(
+        `Copilot seat setup completed, but only ${outcome.providers.length} ` +
+          `distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) — ` +
+          "routed dispatch would fail closed, so router-config.yaml keeps " +
+          "transport.profile: api. The probe lockfile was kept for " +
+          `inspection at ai_router/copilot-catalog.lock. ${rerun}`,
+      );
+      break;
+    case "refresh-failed":
+      showWarning(
+        `Copilot seat setup failed: ${outcome.detail}. router-config.yaml ` +
+          `keeps transport.profile: api. ${rerun}`,
+      );
+      break;
+    case "cancelled":
+      showWarning(
+        "Copilot seat setup was cancelled — the lockfile was restored to " +
+          "its pre-run state and router-config.yaml keeps " +
+          `transport.profile: api. ${rerun}`,
+      );
+      break;
+    case "config-write-failed":
+      showWarning(
+        `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) ` +
+          "and the lockfile is in place, but writing transport.profile to " +
+          `ai_router/router-config.yaml failed: ${outcome.detail}. Set ` +
+          "`transport:  profile: copilot-cli` in that file by hand — no " +
+          "re-probe is needed.",
+      );
+      break;
+  }
+  return outcome;
 }

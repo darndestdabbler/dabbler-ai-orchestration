@@ -341,6 +341,11 @@
             }
             msg.budgetUsd = check.budgetUsd;
             if (check.budgetUsd === 0) msg.zeroBudgetMethod = check.zeroMethod;
+            // Set 079 S2 (Feature 1): the Full-tier seat-profile pick
+            // rides the build so the host can run the guided Copilot
+            // seat setup after the scaffold succeeds. Omitted on
+            // Lightweight (the sub-choice block is not rendered there).
+            msg.transportProfile = gsState.transportProfile;
           } else {
             // Set 077 S3 (Feature 2): the verification-mode pick rides
             // the Lightweight build so the scaffold seeds the durable

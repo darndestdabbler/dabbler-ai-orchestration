@@ -76,10 +76,10 @@ High
 | 6.   | Full pass; verify; close | `direct:shell`, `session-verification` |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=high (as recommended)
+- Total routed cost: $0.98 (test-generation gemini-pro $0.08; code-review opus $0.42 + gpt-5-4 auto-verify $0.22; session-verification gpt-5-4 3 rounds $0.19 + $0.05 + $0.02)
+- Deviations from recommendation: none on routing. Verification took 3 rounds on one ledger issue (S2-V-001, "integration wiring unpinned"): the fix required adding test seams to buildProjectStructureNoPrompt itself, not just extracting helpers — the verifier correctly held the finding until the REAL build path was exercised.
+- Notes for next-session calibration: Session 3's failure matrix should reuse the S2 outcome union (refresh-failed / insufficient-providers / config-write-failed / cancelled) and the BuildStructureSeams / SeatSetupProgressSeams test seams rather than inventing new harness surface. Named S2 residuals assigned to S3: atomic temp+rename config write; POSIX process-tree kill (win32 already taskkill /T). The DABBLER_*-presence check for honest `api`-fallback copy is the C3 core. Induced-failure dogfood: PATH manipulation or mid-run cancel against the real CLI — the scratch-project ts-node driver from S2 (scratchpad seat_dogfood.ts pattern) is a ready template.
 
 **Next-session orchestrator recommendation (Session 3):**
 Claude Code claude-fable-5 @ effort=high

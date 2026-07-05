@@ -94,6 +94,8 @@ import {
 import { probePythonPresence } from "../utils/pythonInterpreter";
 // Set 079 Session 1 (Feature 1): the Copilot-CLI presence probe.
 import { probeCopilotCliPresence } from "../utils/copilotCli";
+// Set 079 Session 2 (Feature 1): the durable seat-profile seed reader.
+import { readTransportProfile } from "../utils/copilotSeatSetup";
 // Set 060 Session 2: the form's action handlers (D4/D5/D7).
 import {
   GettingStartedHandlers,
@@ -589,10 +591,13 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       (root) => probePythonPresence(root),
       // Set 079 S1 (Feature 1): the Copilot-CLI presence probe (explicit
       // copilotCliPath setting → PATH). Same getting-started-only gating.
-      // The seat-profile seed thunk is deliberately omitted — the durable
-      // source (the scaffold's transport.profile write) lands in Session
-      // 2, so transportProfileSeed stays null until then.
       (root) => probeCopilotCliPresence(root),
+      // Set 079 S2 (Feature 1): the durable seat-profile seed — the
+      // workspace router-config.yaml's transport.profile value (the
+      // durable source the scaffold's config write creates). Tolerant:
+      // missing/unparseable reads as null and the form's volatile
+      // default applies. Same getting-started-only gating.
+      (root) => readTransportProfile(root),
     );
   }
 

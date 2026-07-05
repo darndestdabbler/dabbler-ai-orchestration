@@ -57,7 +57,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   2026-05-01 to avoid duplicate guidance drifting in two places.
 
 ## State The Suite Baseline And Release Contract Up Front In Verification Round 1
-<!-- lesson: id="L-064-10" added-set="062" last-used-set="078" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-10" added-set="062" last-used-set="079" status="archived" scope="portable" -->
 
 - **Promoted.** This lesson now lives at `project-guidance.md` →
   Conventions → Workflow Expectations: *"Open every session-verification

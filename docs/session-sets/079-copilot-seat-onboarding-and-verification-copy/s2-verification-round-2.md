@@ -1,0 +1,5 @@
+ISSUES_FOUND
+
+```json
+{"verdict":"ISSUES_FOUND","issues":[{"severity":"Major","category":"tests","state_violation":"The round-1 Major is only partially fixed: the new Layer-2 suite covers the extracted decision helper and the progress-wrapper helper, but it still does not pin the real gitScaffold.ts build-path integration in buildProjectStructureNoPrompt.","impact":"The critical wiring can still regress without test failure: seat setup could move earlier than scaffold/install completion, buildProjectStructureNoPrompt could stop passing installOutcome.venvPath through to runCopilotSeatSetupWithProgress, or the install-failed/venv-missing skip-warning branch could break, and the new suite would still stay green.","evidence":"The provided new test file imports and exercises only decideCopilotSeatSetup and runCopilotSeatSetupWithProgress. It never calls buildProjectStructureNoPrompt, never stubs scaffoldConsumerRepo/installAiRouter to assert post-install sequencing on the real path, and never asserts the buildProjectStructureNoPrompt warning/skip branch when installOk is false or venvPath is unavailable."}]}
+```

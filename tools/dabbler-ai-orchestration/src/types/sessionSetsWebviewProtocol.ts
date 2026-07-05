@@ -308,6 +308,13 @@ export interface GettingStartedActionMsg {
   // decomposition prompt's exemplar). The webview omits it on Full (the
   // field is inert there); untrusted — the host narrows before use.
   verificationMode?: "dedicated-sessions" | "out-of-band-or-none";
+  // Set 079 S2 (Feature 1): the Full-tier seat-profile pick. Rides
+  // build-structure only — on "copilot-cli" the host runs the guided
+  // Copilot seat setup (catalog refresh + transport.profile write) after
+  // the scaffold succeeds. The webview omits it on Lightweight (the
+  // sub-choice block is not rendered there); untrusted — the host
+  // narrows before use (absent defaults to "api", the seeded default).
+  transportProfile?: "api" | "copilot-cli";
 }
 
 export type WebviewToHost =

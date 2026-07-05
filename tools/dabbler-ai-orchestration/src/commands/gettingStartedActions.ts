@@ -23,6 +23,7 @@ import * as vscode from "vscode";
 import { GettingStartedActionMsg } from "../types/sessionSetsWebviewProtocol";
 import { asTier, buildProjectStructureNoPrompt } from "./gitScaffold";
 import { DEFAULT_VERIFICATION_MODE, Tier } from "../utils/consumerBootstrap";
+import { TransportProfile } from "../utils/copilotSeatSetup";
 import { VerificationMode } from "../types";
 import {
   BudgetChoice,
@@ -38,6 +39,7 @@ export interface GettingStartedHandlers {
     tier: Tier,
     budget?: BudgetChoice,
     verificationMode?: VerificationMode,
+    transportProfile?: TransportProfile,
   ): Promise<void>;
   importPlan(): Promise<void>;
   copyPlanPrompt(): Promise<void>;
@@ -81,6 +83,43 @@ export function resolveVerificationMode(
 ): VerificationMode | undefined {
   if (tier !== "lightweight") return undefined;
   return asVerificationModeRider(msg.verificationMode) ?? DEFAULT_VERIFICATION_MODE;
+}
+
+/**
+ * Set 079 S2 (Feature 1): narrow the untrusted seat-profile rider. Same
+ * posture as {@link asVerificationModeRider}: absent (undefined / null)
+ * returns undefined so callers apply the documented default ("api", the
+ * seeded transport.profile default); a PRESENT-but-unrecognized value
+ * throws (fail-loud — a hostile/buggy webview must not silently launch
+ * or suppress the Copilot seat setup).
+ */
+export function asTransportProfileRider(
+  value: unknown,
+): TransportProfile | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") {
+    const v = value.toLowerCase();
+    if (v === "api" || v === "copilot-cli") return v;
+  }
+  throw new Error(
+    `Unrecognized transportProfile value ${JSON.stringify(value)} — expected ` +
+      `"api" or "copilot-cli".`,
+  );
+}
+
+/**
+ * Resolve the effective seat profile for a build-structure action: the
+ * rider when present, the seeded default ("api") otherwise. Lightweight
+ * drops the rider outright — the sub-choice is Full-only (the block is
+ * not even rendered on Lightweight), mirroring how the budget riders
+ * are dropped there and the verification-mode rider is dropped on Full.
+ */
+export function resolveTransportProfile(
+  msg: GettingStartedActionMsg,
+  tier: Tier,
+): TransportProfile | undefined {
+  if (tier !== "full") return undefined;
+  return asTransportProfileRider(msg.transportProfile) ?? "api";
 }
 
 /**
@@ -129,12 +168,17 @@ export async function routeGettingStartedAction(
       // alongside (Full only; see asBudgetChoice).
       let tier: Tier;
       let verificationMode: VerificationMode | undefined;
+      let transportProfile: TransportProfile | undefined;
       try {
         tier = asTier(msg.tier) ?? "full";
         // Set 077 S3 (Feature 2): the Lightweight verification-mode
         // rider narrows alongside — absent defaults, unrecognized
         // rejects loud (same fail posture as the tier rider).
         verificationMode = resolveVerificationMode(msg, tier);
+        // Set 079 S2 (Feature 1): the Full-tier seat-profile rider —
+        // same narrowing posture (absent defaults to "api" on Full,
+        // dropped on Lightweight, unrecognized rejects loud).
+        transportProfile = resolveTransportProfile(msg, tier);
       } catch (err) {
         // Operator-visible (S2 verifier): a rejected action must not
         // look like a silent no-op from the form.
@@ -160,7 +204,7 @@ export async function routeGettingStartedAction(
         );
         return false;
       }
-      await handlers.buildStructure(tier, budget, verificationMode);
+      await handlers.buildStructure(tier, budget, verificationMode, transportProfile);
       return true;
     }
     case "import-plan":
@@ -228,6 +272,7 @@ export function makeGettingStartedHandlers(
       tier: Tier,
       budget?: BudgetChoice,
       verificationMode?: VerificationMode,
+      transportProfile?: TransportProfile,
     ): Promise<void> {
       const openRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (openRoot) {
@@ -237,6 +282,7 @@ export function makeGettingStartedHandlers(
           tier,
           budget,
           verificationMode,
+          transportProfile,
         );
         return;
       }
@@ -248,12 +294,16 @@ export function makeGettingStartedHandlers(
         title: "Select the folder to build the project structure into",
       });
       if (!picked?.[0]) return;
+      // Set 079 S2: the whole build — INCLUDING the awaited Copilot seat
+      // setup on the copilot-cli path — completes inside this call,
+      // before the vscode.openFolder below reloads the extension host.
       const result = await buildProjectStructureNoPrompt(
         context,
         picked[0].fsPath,
         tier,
         budget,
         verificationMode,
+        transportProfile,
       );
       // S3 code-review Major 1: only open the picked folder when the
       // scaffold actually ran. vscode.openFolder reloads the extension

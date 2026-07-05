@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "issueId": "S2-V-001",
+      "issueType": "standards-departure",
+      "category": "tests",
+      "severity": "Major",
+      "description": "Session 2 Step 5 required Layer-2 tests to pin sequencing order, venv-interpreter reuse, progress reporting, and the config write. The added suite covers seat-id/label derivation and the pure runner/config logic, but it does not exercise gitScaffold.ts or vscode.window.withProgress, so the critical integration wiring is not actually pinned.",
+      "verificationMethod": "Inspected the new test file's imports and call targets against the gitScaffold.ts wiring the spec's Step 5 names.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Extracted decideCopilotSeatSetup (the sequencing gate) as a pure function; exported runCopilotSeatSetupWithProgress with injectable seams; added BuildStructureSeams to buildProjectStructureNoPrompt so the REAL build path is drivable under the vscode stub; new gitScaffoldSeatSetup.test.ts pins the decision matrix, scaffold-before-seat-setup ordering on the real path, venvPython(venvPath) reuse, ProgressLocation.Notification + cancellable:true, subscriptions push/splice hygiene, per-outcome messaging, and the install-failed/venv-missing skip warnings.",
+      "resolved_in_round": 3
+    }
+  ]
+}

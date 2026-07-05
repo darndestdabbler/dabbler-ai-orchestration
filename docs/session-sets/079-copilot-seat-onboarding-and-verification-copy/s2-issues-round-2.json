@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "issueId": "S2-V-001",
+      "issueType": "standards-departure",
+      "category": "tests",
+      "severity": "Major",
+      "description": "Round-2 hold of the same ledger issue (S2-V-001, partially fixed): the new Layer-2 suite covered the extracted decision helper and the progress-wrapper helper, but still did not call buildProjectStructureNoPrompt itself, did not assert post-install sequencing on the real path, and did not assert the install-failed/venv-missing skip-warning branch.",
+      "verificationMethod": "Inspected the round-2 test file: it imported only decideCopilotSeatSetup and runCopilotSeatSetupWithProgress, never buildProjectStructureNoPrompt.",
+      "resolution_status": "fixed",
+      "resolution_notes": "BuildStructureSeams added to buildProjectStructureNoPrompt (probePython / gitInit / loadBundle / runScaffold / seatSetup / show* seams; production defaults unchanged); four new tests drive the REAL function and pin git-init -> scaffold -> seat-setup ordering, installOutcome.venvPath threading, the two honest-skip branches, and the never-runs matrix. Round 3 returned VERIFIED.",
+      "resolved_in_round": 3
+    }
+  ]
+}

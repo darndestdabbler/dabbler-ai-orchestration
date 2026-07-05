@@ -30,6 +30,35 @@ const vscodeStub = {
   // call time; without the enum the panel-lifecycle test dies on a
   // TypeError before reaching its assertions.
   ViewColumn: { One: 1, Two: 2, Three: 3, Active: -1, Beside: -2 },
+  // Set 079 S2: the Copilot seat-setup progress wrapper reads
+  // ProgressLocation and constructs vscode.Disposable teardown hooks.
+  ProgressLocation: { SourceControl: 1, Window: 10, Notification: 15 },
+  Disposable: class Disposable {
+    constructor(fn) { this._fn = fn; this._disposed = false; }
+    dispose() {
+      if (this._disposed) return;
+      this._disposed = true;
+      if (typeof this._fn === "function") this._fn();
+    }
+  },
+  CancellationTokenSource: class CancellationTokenSource {
+    constructor() {
+      const listeners = [];
+      this.token = {
+        isCancellationRequested: false,
+        onCancellationRequested: (cb) => {
+          listeners.push(cb);
+          return { dispose: () => {} };
+        },
+      };
+      this._listeners = listeners;
+    }
+    cancel() {
+      this.token.isCancellationRequested = true;
+      for (const cb of this._listeners) cb();
+    }
+    dispose() {}
+  },
   EventEmitter: class EventEmitter {
     constructor() { this._listeners = []; }
     get event() { return (l) => { this._listeners.push(l); return { dispose: () => {} }; }; }
@@ -60,7 +89,13 @@ const vscodeStub = {
     const folderListeners = [];
     const ws = {
       workspaceFolders: undefined,
-      getConfiguration: () => ({ get: (_k, dflt) => dflt }),
+      getConfiguration: () => ({
+        get: (_k, dflt) => dflt,
+        // Set 079 S2: the copilotCliPath reader distinguishes "operator
+        // set it" from "default fired" via inspect(); the stub models a
+        // workspace with no operator-set values.
+        inspect: () => undefined,
+      }),
       onDidChangeConfiguration: () => ({ dispose: () => {} }),
       onDidChangeWorkspaceFolders: (cb) => {
         folderListeners.push(cb);
@@ -109,8 +144,19 @@ const vscodeStub = {
   window: {
     showInformationMessage: async () => undefined,
     showErrorMessage: async () => undefined,
+    showWarningMessage: async () => undefined,
     showInputBox: async () => undefined,
     showQuickPick: async () => undefined,
+    // Set 079 S2: runs the task immediately with a no-op progress and a
+    // never-cancelled token — the seat-setup wrapper's default UI path.
+    withProgress: (_opts, task) =>
+      task(
+        { report: () => {} },
+        {
+          isCancellationRequested: false,
+          onCancellationRequested: () => ({ dispose: () => {} }),
+        },
+      ),
     createTreeView: () => ({ dispose: () => {} }),
     registerTreeDataProvider: () => ({ dispose: () => {} }),
     // Set 059: the extension registers its Session Sets surface as a webview

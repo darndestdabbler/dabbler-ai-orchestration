@@ -20,16 +20,16 @@
     {
       "number": 2,
       "title": "Wire the happy path (sequencing, subprocess, progress, config write)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-05T02:11:14.637779-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-05T03:21:43.538896-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
         "model": "claude-fable-5",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

@@ -258,8 +258,13 @@ def test_force_bypass_without_disposition(
     # operator sees the gate was bypassed even when --json hides
     # outcome.messages inside the JSON payload.
     assert any("WARNING" in m and "force" in m.lower() for m in outcome.messages)
-    # And the gate-results list is empty under force.
-    assert outcome.gate_results == []
+    # Under force the bookkeeping gates are skipped, but the
+    # verification-integrity check still runs (Set 083 — force bypasses
+    # gates, not evidence). With no disposition there is no claimed
+    # verdict, so the check passes and is the only gate row.
+    assert [(g.check, g.passed) for g in outcome.gate_results] == [
+        ("verification_integrity", True)
+    ]
     # The forensic ``closeout_force_used`` event landed in the ledger
     # alongside ``closeout_requested`` / ``closeout_succeeded``.
     events = [e.event_type for e in read_events(started_session_set)]
@@ -542,13 +547,15 @@ def test_happy_path_skeleton_succeeds(started_with_disposition):
     outcome = run(args)
     assert outcome.result == "succeeded"
     assert outcome.exit_code == 0
-    # All five named gates appear in the output (shape stability).
+    # All six named gates appear in the output (shape stability;
+    # verification_integrity joined in Set 083).
     assert {g.check for g in outcome.gate_results} == {
         "working_tree_clean",
         "pushed_to_remote",
         "activity_log_entry",
         "next_orchestrator_present",
         "change_log_fresh",
+        "verification_integrity",
     }
     assert all(g.passed for g in outcome.gate_results)
 

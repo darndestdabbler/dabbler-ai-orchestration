@@ -1,8 +1,10 @@
 """Deterministic close-out gate checks — Full-tier consumers only.
 
 **Who uses this:** Called by ``close_session.run_gate_checks()`` on every
-close-out attempt. Five predicates: working-tree-clean, pushed-to-remote,
-activity-log-entry, next-orchestrator-present, change-log-fresh.
+close-out attempt. Six predicates: working-tree-clean, pushed-to-remote,
+activity-log-entry, next-orchestrator-present, change-log-fresh, and
+verification-integrity (Set 083 — the one gate ``--force`` does NOT
+bypass; ``--manual-verify`` is its only sanctioned override).
 **See also:** ``close_session.py`` (the gate runner); ``disposition.py``
 (the disposition_present synthetic gate).
 
@@ -13,7 +15,7 @@ tuple. ``passed`` is the boolean verdict; ``remediation`` is a one-line
 hint for the human / orchestrator surfaced when the gate rejects.
 A passing check returns ``""`` (empty remediation).
 
-The five checks land in this module:
+The checks land in this module:
 
 - :func:`check_working_tree_clean` — scoped to the disposition's
   ``files_changed`` allowlist plus a small set of universally-ignored
@@ -38,6 +40,13 @@ The five checks land in this module:
   OR (b) reference the current session number in its body. The double
   predicate handles the "I edited the change log just before
   ``startedAt`` due to clock skew" edge case.
+- :func:`check_verification_integrity` — Set 083: a claimed non-null
+  ``verification_verdict`` must be corroborated by real evidence (a
+  cross-provider ``session-verification`` metrics row + the raw
+  ``sN-verification*.md`` artifact on the ``api`` path; the declared
+  zero-budget tier on the ``manual-via-other-engine`` / ``skipped``
+  paths), and ``verification_method`` must be a legal token. Hard-blocks
+  in both interactive and headless modes; see the function docstring.
 
 Why a separate module
 ---------------------
@@ -68,10 +77,15 @@ from datetime import datetime
 from typing import List, Optional, Tuple
 
 try:
-    from .disposition import Disposition  # type: ignore[import-not-found]
+    from .disposition import (  # type: ignore[import-not-found]
+        Disposition,
+        RETIRED_VERIFICATION_METHODS,
+        VERIFICATION_METHODS,
+    )
     from .progress import (  # type: ignore[import-not-found]
         ProgressView,
         SessionStateInvariantError,
+        normalize_to_v4_shape,
         read_progress,
     )
     from .session_state import (  # type: ignore[import-not-found]
@@ -79,10 +93,15 @@ try:
         validate_next_orchestrator,
     )
 except ImportError:
-    from disposition import Disposition  # type: ignore[no-redef]
+    from disposition import (  # type: ignore[no-redef]
+        Disposition,
+        RETIRED_VERIFICATION_METHODS,
+        VERIFICATION_METHODS,
+    )
     from progress import (  # type: ignore[no-redef]
         ProgressView,
         SessionStateInvariantError,
+        normalize_to_v4_shape,
         read_progress,
     )
     from session_state import (  # type: ignore[no-redef]
@@ -762,6 +781,494 @@ def check_change_log_fresh(
 
 
 # ---------------------------------------------------------------------------
+# check_verification_integrity (Set 083)
+# ---------------------------------------------------------------------------
+
+# Registry name of the verification-integrity check. close_session uses it
+# to (a) bypass the check under --manual-verify (the sanctioned, attested,
+# logged override) and (b) still RUN the check under --force (force bypasses
+# bookkeeping gates, not evidence — Set 083 makes that contract true for
+# verification).
+VERIFICATION_INTEGRITY_CHECK_NAME = "verification_integrity"
+
+SESSION_VERIFICATION_TASK_TYPE = "session-verification"
+
+
+def _project_root_for(session_set_dir: str) -> str:
+    """Best-effort project root: git toplevel, else the layout heuristic.
+
+    ``budget.yaml`` and the venv interpreter live at the project root.
+    Outside a git tree (unit-test fixtures), fall back to the canonical
+    ``<root>/docs/session-sets/<slug>`` layout — three levels up.
+    """
+    root = _repo_root_for(session_set_dir)
+    if root:
+        return root
+    return os.path.abspath(os.path.join(session_set_dir, "..", "..", ".."))
+
+
+def _verify_session_command(session_set_dir: str) -> str:
+    """The exact sanctioned Step 6 invocation for this set.
+
+    The refusal message teaches: the moment an engine hits the blocked
+    path it must learn the one command that produces real evidence.
+    """
+    interp = (
+        ".venv/Scripts/python.exe" if os.name == "nt" else ".venv/bin/python"
+    )
+    root = _project_root_for(session_set_dir)
+    display = session_set_dir
+    try:
+        display = os.path.relpath(os.path.abspath(session_set_dir), root)
+    except ValueError:
+        pass
+    display = display.replace(os.sep, "/")
+    return f"{interp} -m ai_router.verify_session --session-set-dir {display}"
+
+
+def _set_is_lightweight(session_set_dir: str) -> bool:
+    """True when the set runs Lightweight (spec ``tier:`` or env var).
+
+    Lightweight verification is per-set with its own close gates (Set 057
+    Q6 / Set 077); this Full-tier gate is inert there. A resolution error
+    treats the set as Full — an unreadable spec must not disarm the gate.
+    """
+    try:
+        # runtime_mode is a Set 048 module: bare imports are forbidden
+        # (test_production_imports — they silently no-op under
+        # pip-install). Relative first; package-absolute fallback for the
+        # top-level-module context the test harness imports this file under.
+        try:
+            from .runtime_mode import (  # type: ignore[import-not-found]
+                _env_var_truthy,
+                _spec_says_lightweight,
+            )
+        except ImportError:
+            from ai_router.runtime_mode import (  # type: ignore[no-redef]
+                _env_var_truthy,
+                _spec_says_lightweight,
+            )
+        from pathlib import Path as _Path
+
+        return _env_var_truthy() or _spec_says_lightweight(
+            _Path(session_set_dir)
+        )
+    except Exception:
+        return False
+
+
+def _claimed_close_verdict(disposition: Disposition) -> Optional[str]:
+    """The verdict this close would persist — the claim to corroborate.
+
+    Mirrors ``close_session.resolve_close_verdict`` (explicit field wins;
+    ``api``-status-derived fallback; else ``None``) without the stderr
+    notes. Kept in lockstep by a parity test
+    (``test_verification_integrity_gate.py::TestClaimedVerdictParity``);
+    a direct import would be circular (close_session imports this module).
+    A null claim is legal — the Set 068 routed-gate SKIP path records
+    ``skipped`` + no verdict — and leaves this gate inert.
+    """
+    explicit = disposition.verification_verdict
+    if isinstance(explicit, str) and explicit != "":
+        return explicit
+    if disposition.verification_method == "api":
+        if disposition.status == "completed":
+            return "VERIFIED"
+        if disposition.status in ("failed", "requires_review"):
+            return "ISSUES_FOUND"
+    return None
+
+
+def _metrics_log_path() -> Optional[str]:
+    """Resolve ``router-metrics.jsonl`` the way the writer does.
+
+    Env override first (deployment/test seam), then the loaded config's
+    resolution (workspace-discovered base dir or the package default).
+    ``None`` when nothing resolves — the caller fails closed.
+    """
+    override = os.environ.get("AI_ROUTER_METRICS_PATH")
+    if override:
+        return override
+    try:
+        try:
+            from .config import load_config  # type: ignore[import-not-found]
+            from .metrics import _log_path  # type: ignore[import-not-found]
+        except ImportError:
+            from config import load_config  # type: ignore[no-redef]
+            from metrics import _log_path  # type: ignore[no-redef]
+        return str(_log_path(load_config()))
+    except Exception:
+        return None
+
+
+def _models_registry() -> dict:
+    """``router-config.yaml``'s ``models:`` map, or ``{}`` when unloadable."""
+    try:
+        try:
+            from .config import load_config  # type: ignore[import-not-found]
+        except ImportError:
+            from config import load_config  # type: ignore[no-redef]
+        models = load_config().get("models")
+        return models if isinstance(models, dict) else {}
+    except Exception:
+        return {}
+
+
+def _row_provider(row: dict, models: dict) -> Optional[str]:
+    """A metrics row's provider, resolved via the model registry ONLY.
+
+    The spec is explicit ("provider resolved via the model registry;
+    missing identity fails closed"): the row's own ``provider`` string is
+    deliberately NOT trusted — a wrong or hand-edited value there must
+    not satisfy the cross-provider check (S2 round-1 verifier finding).
+    The row's ``model`` is looked up in the loaded registry by key, then
+    by ``model_id``; a row whose model cannot be resolved (or an
+    unloadable registry) cannot corroborate anything.
+    """
+    model = row.get("model")
+    if not isinstance(model, str) or not model:
+        return None
+    entry = models.get(model)
+    if isinstance(entry, dict):
+        reg_provider = entry.get("provider")
+        if isinstance(reg_provider, str) and reg_provider.strip():
+            return reg_provider.strip().lower()
+    for entry in models.values():
+        if isinstance(entry, dict) and entry.get("model_id") == model:
+            reg_provider = entry.get("provider")
+            if isinstance(reg_provider, str) and reg_provider.strip():
+                return reg_provider.strip().lower()
+    return None
+
+
+def _session_verification_providers(
+    metrics_path: str,
+    set_slug: str,
+    session_number: int,
+) -> List[Optional[str]]:
+    """Providers of every ``session-verification`` row for (set, session).
+
+    Slug matching tolerates the historical path-shaped ``session_set``
+    values the same way ``verify_session.round1_verifier_tier`` does
+    (trailing path component). Unreadable rows are skipped; an unreadable
+    FILE is the caller's fail-closed case (it sees no rows).
+    """
+    providers: List[Optional[str]] = []
+    try:
+        with open(metrics_path, "r", encoding="utf-8") as f:
+            raw_lines = f.read().splitlines()
+    except OSError:
+        return providers
+    models = _models_registry()
+    for line in raw_lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(row, dict):
+            continue
+        if row.get("task_type") != SESSION_VERIFICATION_TASK_TYPE:
+            continue
+        if row.get("session_number") != session_number:
+            continue
+        row_set = str(row.get("session_set") or "")
+        row_slug = row_set.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+        if row_slug != set_slug:
+            continue
+        providers.append(_row_provider(row, models))
+    return providers
+
+
+def _read_budget_yaml(project_root: str) -> Tuple[Optional[dict], str]:
+    """Return ``(budget_dict, error)``; exactly one side is meaningful.
+
+    Missing file → ``(None, "<path> not found")``. Unparseable → error
+    text. Both are fail-closed for the manual/skipped arm: a claimed
+    verdict without a readable zero-budget declaration is uncorroborated.
+    """
+    path = os.path.join(project_root, "ai_router", "budget.yaml")
+    if not os.path.isfile(path):
+        return None, f"{path} not found"
+    try:
+        import yaml
+
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except Exception as exc:
+        return None, f"budget.yaml unreadable: {type(exc).__name__}: {exc}"
+    if not isinstance(data, dict):
+        return None, "budget.yaml does not parse to a mapping"
+    return data, ""
+
+
+def check_verification_method_vocabulary(
+    session_set_dir: str,
+    disposition: Optional[Disposition],
+    *,
+    allow_empty_commit: bool = False,
+) -> GateOutcome:
+    """Layer 1 alone: ``verification_method`` must be a legal token.
+
+    Split out of :func:`check_verification_integrity` (S2 round-2
+    verifier finding) so ``--manual-verify`` can bypass the EVIDENCE
+    corroboration while the vocabulary rule stays universal — the
+    incident's retired ``"manual"`` token fails closed on every path,
+    attested or not. Retired/renamed tokens get a naming message; every
+    refusal teaches the sanctioned Step 6 command.
+    """
+    _ = allow_empty_commit
+    if disposition is None:
+        return True, ""
+    method = disposition.verification_method
+    if method in VERIFICATION_METHODS:
+        return True, ""
+    allowed = ", ".join(VERIFICATION_METHODS)
+    retired_note = RETIRED_VERIFICATION_METHODS.get(method)
+    detail = (
+        retired_note
+        if retired_note is not None
+        else f"unknown token (legal: {allowed})"
+    )
+    command = _verify_session_command(session_set_dir)
+    return (
+        False,
+        f"disposition.verification_method {method!r} is illegal: "
+        f"{detail}. For routed verification run: {command}",
+    )
+
+
+def check_verification_integrity(
+    session_set_dir: str,
+    disposition: Optional[Disposition],
+    *,
+    allow_empty_commit: bool = False,
+) -> GateOutcome:
+    """Refuse a close whose claimed verification verdict is uncorroborated.
+
+    Set 083 S2, from the live 2026-07-06 bypass incident: an orchestrator
+    wrote ``verification_method: "manual"`` (not a legal token) plus a
+    self-attested ``VERIFIED`` into ``disposition.json`` and the close
+    accepted both verbatim, because ``resolve_close_verdict()`` treats the
+    disposition as evidence rather than as a claim to corroborate. Two
+    deterministic layers, in the D3 writer-discipline spirit (anti-drift,
+    not anti-adversary):
+
+    1. **Method vocabulary.** ``verification_method`` must be one of
+       :data:`disposition.VERIFICATION_METHODS`; retired/renamed tokens
+       (the incident's ``"manual"``; the Set 026 ``"queue"``) fail with a
+       message naming the replacement.
+    2. **Verdict corroboration.** A **claimed non-null verdict** (explicit
+       field, or the ``api``-status-derived fallback the close would
+       persist) must be backed by evidence:
+
+       * method ``api`` — a ``session-verification`` row in
+         ``router-metrics.jsonl`` for this (set, session) whose verifier
+         provider **differs from the session's orchestrator provider**
+         (orchestrator from the session-state block; missing identity
+         data fails closed — the Q6 precedent), plus an
+         ``sN-verification*.md`` artifact at the set root.
+       * method ``manual-via-other-engine`` / ``skipped`` — the project's
+         ``ai_router/budget.yaml`` must actually declare the zero-budget
+         tier (``threshold_usd: 0``; a declared ``verification_method``
+         there must match the disposition's).
+
+    Scope (documented residuals, spec Overview): a **null**-verdict close
+    is legal (the Set 068 routed-gate SKIP path) and leaves the gate
+    inert; the gate does not re-evaluate the routed-gate predicate
+    post-hoc; Lightweight sets are covered by their own per-set gates.
+
+    Posture: **hard-block in BOTH interactive and headless modes** — the
+    policed actor *is* the headless agent, so a soft warning printed to
+    the offender's own console is toothless (operator-confirmed deviation
+    from the Q6 TTY-block/headless-warn split). ``--manual-verify``
+    (attested, logged) is the only sanctioned bypass, and it bypasses
+    **layer 2 (evidence corroboration) only** — layer 1's vocabulary rule
+    runs on every path via
+    :func:`check_verification_method_vocabulary` (S2 round-2 finding:
+    an attested close must still refuse the incident's illegal token).
+    ``--force`` bypasses NEITHER layer. Every refusal names the exact
+    sanctioned command so the blocked engine learns the easy path.
+    """
+    _ = allow_empty_commit
+
+    if disposition is None:
+        # Nothing is claimed. Disposition presence is enforced elsewhere
+        # (invalid_invocation / disposition_present), and lying by
+        # omission is the documented out-of-scope residual.
+        return True, ""
+
+    command = _verify_session_command(session_set_dir)
+    method = disposition.verification_method
+
+    # Layer 1 — method vocabulary (fail-closed on unknown tokens). This is
+    # the close-time enforcement point for validate_disposition's rule 4:
+    # the incident's exact disposition dies here. The sub-check is also
+    # runnable standalone (check_verification_method_vocabulary) because
+    # --manual-verify bypasses ONLY the evidence layers below, never this.
+    vocab_passed, vocab_remediation = check_verification_method_vocabulary(
+        session_set_dir, disposition,
+    )
+    if not vocab_passed:
+        return False, vocab_remediation
+
+    # Lightweight sets verify per-set through their own close gates
+    # (Set 057 Q6 / Set 077); this Full-tier per-session gate is inert.
+    if _set_is_lightweight(session_set_dir):
+        return True, ""
+
+    # Layer 2 fires only on a claimed non-null verdict. The null-verdict
+    # close (routed-gate SKIP) is legal and stays untouched.
+    claimed = _claimed_close_verdict(disposition)
+    if claimed is None:
+        return True, ""
+
+    if method == "api":
+        state = read_session_state(session_set_dir)
+        if not state:
+            return (
+                False,
+                f"claimed verdict {claimed!r} cannot be corroborated: "
+                "session-state.json missing or unreadable (fails closed). "
+                f"Run the sanctioned Step 6 command: {command}",
+            )
+        view, err = _read_progress_or_none(state, session_set_dir)
+        if view is None:
+            return (
+                False,
+                f"claimed verdict {claimed!r} cannot be corroborated: "
+                f"{err} (fails closed)",
+            )
+        current = _session_in_focus(view)
+        if current is None:
+            return (
+                False,
+                f"claimed verdict {claimed!r} cannot be corroborated: no "
+                "session in flight and none closed (fails closed)",
+            )
+
+        # Evidence artifact: sN-verification*.md at the set root.
+        prefix = f"s{current}-verification"
+        try:
+            artifact_names = [
+                name
+                for name in os.listdir(session_set_dir)
+                if name.startswith(prefix) and name.endswith(".md")
+            ]
+        except OSError:
+            artifact_names = []
+        if not artifact_names:
+            return (
+                False,
+                f"claimed verdict {claimed!r} (method api) has no "
+                f"s{current}-verification*.md artifact in the session-set "
+                f"root. Run the sanctioned Step 6 command: {command}",
+            )
+
+        # Orchestrator identity — missing data fails closed (Q6 precedent).
+        spec_md_path = os.path.join(session_set_dir, "spec.md")
+        try:
+            normalized = normalize_to_v4_shape(state, spec_md_path)
+        except Exception as exc:
+            return (
+                False,
+                f"claimed verdict {claimed!r} cannot be corroborated: "
+                f"session-state.json failed to normalize "
+                f"({type(exc).__name__}: {exc}; fails closed)",
+            )
+        orch_provider: Optional[str] = None
+        for entry in normalized.get("sessions") or []:
+            if isinstance(entry, dict) and entry.get("number") == current:
+                orch = entry.get("orchestrator")
+                if isinstance(orch, dict):
+                    provider = orch.get("provider")
+                    if isinstance(provider, str) and provider.strip():
+                        orch_provider = provider.strip().lower()
+                break
+        if orch_provider is None:
+            return (
+                False,
+                f"claimed verdict {claimed!r} (method api) cannot be "
+                f"corroborated: session {current}'s orchestrator block "
+                "records no provider, so cross-provider verification "
+                "cannot be confirmed (missing identity fails closed). "
+                "Re-run start_session with --provider, then verify via: "
+                f"{command}",
+            )
+
+        metrics_path = _metrics_log_path()
+        providers = (
+            _session_verification_providers(
+                metrics_path, os.path.basename(os.path.abspath(session_set_dir)),
+                current,
+            )
+            if metrics_path
+            else []
+        )
+        if not providers:
+            return (
+                False,
+                f"claimed verdict {claimed!r} (method api) has no "
+                "session-verification row in router-metrics.jsonl for "
+                f"session {current} of this set — the routed verifier "
+                "never ran (or metrics are unreadable; fails closed). "
+                f"Run the sanctioned Step 6 command: {command}",
+            )
+        cross_provider = [
+            p for p in providers if p is not None and p != orch_provider
+        ]
+        if not cross_provider:
+            return (
+                False,
+                f"claimed verdict {claimed!r} (method api) is not "
+                "cross-provider: every session-verification row for "
+                f"session {current} resolves to the orchestrator's own "
+                f"provider ({orch_provider!r}) or to no provider at all "
+                "(fails closed). Re-verify via a different provider: "
+                f"{command}",
+            )
+        return True, ""
+
+    # method in ("manual-via-other-engine", "skipped") with a claimed
+    # verdict: only legal under the operator-authorized zero-budget tier
+    # (Rule 2's exception), which must actually be declared on disk.
+    budget, budget_err = _read_budget_yaml(_project_root_for(session_set_dir))
+    if budget is None:
+        return (
+            False,
+            f"claimed verdict {claimed!r} under method {method!r} requires "
+            f"the zero-budget declaration in ai_router/budget.yaml "
+            f"({budget_err}; fails closed). Either declare the zero-budget "
+            f"tier or run the sanctioned Step 6 command: {command}",
+        )
+    threshold = budget.get("threshold_usd")
+    if threshold != 0:
+        return (
+            False,
+            f"claimed verdict {claimed!r} under method {method!r} is only "
+            f"legal on the zero-budget tier, but ai_router/budget.yaml "
+            f"declares threshold_usd={threshold!r}. Run the sanctioned "
+            f"Step 6 command instead: {command}",
+        )
+    declared_method = budget.get("verification_method")
+    if (
+        isinstance(declared_method, str)
+        and declared_method
+        and declared_method != method
+    ):
+        return (
+            False,
+            f"claimed verdict {claimed!r} under method {method!r} does not "
+            f"match ai_router/budget.yaml's declared verification_method "
+            f"{declared_method!r}. Align the disposition with the budget "
+            f"declaration, or run: {command}",
+        )
+    return True, ""
+
+
+# ---------------------------------------------------------------------------
 # Registry consumed by close_session._run_gate_checks
 # ---------------------------------------------------------------------------
 
@@ -774,4 +1281,5 @@ GATE_CHECKS: Tuple[Tuple[str, "callable"], ...] = (  # type: ignore[name-defined
     ("activity_log_entry", check_activity_log_entry),
     ("next_orchestrator_present", check_next_orchestrator_present),
     ("change_log_fresh", check_change_log_fresh),
+    (VERIFICATION_INTEGRITY_CHECK_NAME, check_verification_integrity),
 )

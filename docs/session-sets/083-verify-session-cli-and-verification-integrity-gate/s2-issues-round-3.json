@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Successful `--force` closes are still recorded as `verification.method = \"skipped\"`, even though this patch makes `--force` use real verification evidence\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** Step 2 requires that `--force` **“does not [bypass] (force bypasses gates, not evidence)”**. The close-session success payload/event surface is explicitly a `verification.method` field, so a forced close that passed the verification-integrity check is not semantically “skipped”.\n    - **Impact:** On a supported `--force` close where the new gate passes because real `api`/manual evidence exists, the audit trail lies: downstream consumers of the JSON output / `closeout_succeeded` event are told verification was **skipped** when it was actually corroborated. For a session whose whole point is verification integrity and auditable evidence, that is merge-blocking.\n    - **Evidence:** In `ai_router/close_session.py`’s `run()` method-selection block, `args.force` still unconditionally does:\n      ```python\n      if args.force:\n          method = \"skipped\"\n      ```\n      But later in the same function, `args.force` no longer skips verification; it explicitly runs `check_verification_integrity(...)` and can succeed on real evidence:\n      ```python\n      if args.force:\n          vi_passed, vi_remediation = check_verification_integrity(...)\n          outcome.gate_results = [GateResult(check=VERIFICATION_INTEGRITY_CHECK_NAME, ...)]\n      ```\n      The updated tests only assert the gate-results shape under `--force`; none checks the emitted `verification.method` / closeout event, so this bad record is currently unguarded.\n    - **Correct answer:** Keep `force` as separate bookkeeping/audit state, but derive the emitted `verification.method` from the actual verified path when the integrity check passes. Do not hard-code `\"skipped\"` for every `--force` success.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

@@ -643,7 +643,7 @@ class TestIntegrationFullCloseout:
         assert succeeded[0].fields.get("forced") is True
         assert "pushed_to_remote" in succeeded[0].fields.get("failed_checks", [])
 
-    def test_passing_gate_end_to_end(self, integration_set):
+    def test_passing_gate_end_to_end(self, integration_set, tmp_path, monkeypatch):
         """Disposition written, committed, pushed → all gates pass and
         the snapshot flips with ``forced=False``."""
         write_disposition(str(integration_set), Disposition(
@@ -655,6 +655,24 @@ class TestIntegrationFullCloseout:
             next_orchestrator=_valid_next_orc(),
             blockers=[],
         ))
+        # Set 083 verification-integrity evidence: the api-derived
+        # VERIFIED claim needs the raw artifact plus a cross-provider
+        # session-verification metrics row.
+        (integration_set / "s1-verification.md").write_text(
+            "VERIFIED\n", encoding="utf-8"
+        )
+        metrics = tmp_path / "gate-metrics.jsonl"
+        metrics.write_text(
+            json.dumps({
+                "task_type": "session-verification",
+                "session_set": integration_set.name,
+                "session_number": 1,
+                "provider": "openai",
+                "model": "gpt-5-4",
+            }) + "\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics))
         _commit_and_push_set(integration_set)
 
         path = mark_session_complete(

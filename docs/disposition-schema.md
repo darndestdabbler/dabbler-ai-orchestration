@@ -59,9 +59,9 @@ the events ledger, not through retained dispositions.
 |---|---|---|---|
 | `status` | string | always | One of `"completed"`, `"failed"`, `"requires_review"`. |
 | `summary` | string | always | Non-empty narrative of what landed in the session. Typically mirrors `change-log.md`'s opening paragraph on the final session. |
-| `verification_method` | string | always | `"api"` (synchronous cross-provider verification), `"manual"` (human-attested out of band), or `"skipped"` (zero-budget choice). |
+| `verification_method` | string | always | `"api"` (synchronous cross-provider verification), `"manual-via-other-engine"` (operator-run cross-provider review — zero-budget tier only), or `"skipped"` (zero-budget choice). The pre-Set-083 `"manual"` token and the retired `"queue"` token are rejected with naming messages. |
 | `files_changed` | list of strings | always | Paths created or modified during the session. May be empty for sessions that produced only artifacts the gate writes itself (rare). |
-| `verification_message_ids` | list of strings | always | Empty list for normal verification paths (`api`, `manual`, `skipped`). |
+| `verification_message_ids` | list of strings | always | Empty list for every legal verification path (`api`, `manual-via-other-engine`, `skipped`). |
 | `next_orchestrator` | object or null | conditional | **Required when `status == "completed"` AND the closing session is not the final session of the set.** Specifies who runs the next session and why. Null for the final session of a set, or for `status: "failed"` / `status: "requires_review"` outcomes that block the set's progress. |
 | `blockers` | list of strings | conditional | **Non-empty when `next_orchestrator.reason.code == "switch-due-to-blocker"`**. Empty in all other cases. |
 | `verification_verdict` | string or omitted | recommended | **Should be set on the `api` verification path** to the verifier's pass/fail outcome: `"VERIFIED"` or `"ISSUES_FOUND"`. Set to the value returned by `parse_verification_response()` in Step 6 of the workflow. `close_session` reads this via `resolve_close_verdict()` (explicit field wins; api-path fallback derives from `status` for backward compat with pre-Set-054 dispositions; otherwise `null`). Normally omit (not `null`) on manual / skipped / `--no-router` paths — `close_session` records `verificationVerdict: null` in those cases. An explicit value on any path is still persisted verbatim. Non-canonical extension tokens are accepted but trigger a stderr warning. |
@@ -78,9 +78,16 @@ the events ledger, not through retained dispositions.
 
 | Value | When to use |
 |---|---|
-| `"api"` | The verifier returned synchronously via the AI router's API call. The verdict is already on disk by the time disposition is authored. The default. |
-| `"manual"` | The operator performed cross-provider verification out of band and attested the result. Requires `--manual-verify` at `close_session` invocation. |
-| `"skipped"` | Verification was explicitly skipped per the project's `budget.yaml` zero-budget choice. |
+| `"api"` | The verifier returned synchronously via the AI router's API call (the canonical path: `python -m ai_router.verify_session`). The verdict is already on disk by the time disposition is authored. The default. |
+| `"manual-via-other-engine"` | The operator performed cross-provider verification out of band (a different AI assistant + the verification template) and recorded the verdict. Legal only when `ai_router/budget.yaml` declares the zero-budget tier; the verification-integrity gate (Set 083) enforces that declaration on any close claiming a verdict under this method. |
+| `"skipped"` | Verification was explicitly skipped. Two legal shapes: a project-level `budget.yaml` zero-budget choice (may carry a claimed verdict only with that declaration), or the per-session Set 068 routed-gate SKIP path — which must record **no** `verification_verdict` (the null-verdict close is the honest record; see Set 080 S1 for the exemplar). |
+
+> **Retired / renamed tokens (Set 083).** `"queue"` (retired Set 026)
+> and `"manual"` (renamed to `"manual-via-other-engine"`; the bare
+> token was the 2026-07-06 live bypass incident's vector) fail
+> disposition validation with a message naming the replacement.
+> Historical closed-set artifacts carrying them at rest are unaffected —
+> validation runs at close time on the active set.
 
 ### `next_orchestrator` shape
 
@@ -121,10 +128,9 @@ the events ledger, not through retained dispositions.
 The close-out gate validates these three relationships:
 
 1. **`verification_method` ↔ `verification_message_ids` pairing.**
-   - `verification_method == "queue"` ⇒ `verification_message_ids`
-     must be non-empty.
    - `verification_method == "api"` ⇒ `verification_message_ids`
-     must be empty.
+     must be empty. (The `"queue"` non-empty rule died with the queue
+     path in Set 026; the token itself is now rejected outright.)
 2. **`status == "completed"` AND not final session ⇒
    `next_orchestrator` required.** The set's next session needs a
    pickup point; an absent `next_orchestrator` on a mid-set
@@ -172,26 +178,28 @@ accurate `next_orchestrator` recommendation.
 
 ## Common variations
 
-### Outsource-last (queue-mediated verification)
+### Routed-gate SKIP (per-session, Set 068 DEMOTE path)
+
+The routed gate said the session's diff may SKIP per-session
+verification. Record `"skipped"` with **no** `verification_verdict` —
+a claimed verdict without a routed run is exactly what the
+verification-integrity gate refuses:
 
 ```json
 {
   "status": "completed",
-  "summary": "Session N: <description>. Verifier queued; awaiting terminal state.",
-  "verification_method": "queue",
+  "summary": "Session N: <description>. Routed gate: SKIP (exit 10) — <triggers summary>.",
+  "verification_method": "skipped",
   "files_changed": ["..."],
-  "verification_message_ids": [
-    "msg-abc123",
-    "msg-def456"
-  ],
+  "verification_message_ids": [],
   "next_orchestrator": { "...": "..." },
   "blockers": []
 }
 ```
 
-`close_session` reads `verification_message_ids` and polls each
-queue row until terminal state (per
-[`ai_router/docs/two-cli-workflow.md`](../ai_router/docs/two-cli-workflow.md)).
+(The queue-mediated "outsource-last" variation that used to live here
+was retired with the queue path in Set 026; `"queue"` is now rejected
+at validation.)
 
 ### Final session of the set
 

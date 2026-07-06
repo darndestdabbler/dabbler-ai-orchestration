@@ -1,7 +1,7 @@
 {
   "sessionSetName": "083-verify-session-cli-and-verification-integrity-gate",
   "createdDate": "2026-07-06T16:35:52.703374+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -104,6 +104,96 @@
       "dateTime": "2026-07-06T12:58:13.009993-04:00",
       "description": "Final suite run before close: 2524 passed, 5 skipped (baseline skips), 0 failed.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/s2.validation",
+      "dateTime": "2026-07-06T13:18:42.993665-04:00",
+      "description": "Disposition validation: legal vocabulary is now (api, manual-via-other-engine, skipped); retired tokens queue (Set 026) and manual (the incident vector, renamed Set 083) rejected with naming messages; dead queue message_ids branch removed; JSON-schema enum + docs/disposition-schema.md brought to parity (L-066-1), stale queue variation section replaced with the routed-gate SKIP exemplar.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/s2.gate",
+      "dateTime": "2026-07-06T13:45:57.322557-04:00",
+      "description": "check_verification_integrity added to gate_checks.py as the sixth GATE_CHECKS entry: layer 1 rejects illegal method tokens (retired queue/manual get naming messages); layer 2 corroborates any claimed non-null verdict (api: cross-provider session-verification metrics row for this set+session with verifier provider != orchestrator provider from the session-state block, missing identity fails closed, plus an sN-verification*.md artifact; manual-via-other-engine/skipped: budget.yaml must declare threshold_usd 0 and a matching method). Null-verdict SKIP closes (Set 080 S1 shape) stay legal. close_session wiring: --manual-verify records the check as passed-with-note (sanctioned, attested bypass); --force now runs this one check even though it skips the bookkeeping gates (force bypasses gates, not evidence); refusal messages print the exact venv verify_session invocation for this set. Hard-block posture in both interactive and headless modes (deterministic gate path exits 1 regardless of TTY).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/s2.tests",
+      "dateTime": "2026-07-06T13:45:57.322557-04:00",
+      "description": "42-test matrix in test_verify_session... test_verification_integrity_gate.py incl. the live incident as a regression fixture through the full close_session.run flow (gate_failed, exit 1, headless), --force-does-not-bypass, --manual-verify sanctioned bypass, no-artifact / same-provider / missing-identity / zero-budget cases, and a 13-row _claimed_close_verdict vs resolve_close_verdict parity matrix. Updated 9 existing fixture files that closed with uncorroborated api claims (seeded real evidence rather than weakening the gate). Full Layer-1 suite: 2566 passed, 5 skipped (baseline), 0 failed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/routed-gate",
+      "dateTime": "2026-07-06T13:46:55.871086-04:00",
+      "description": "Routed gate: REQUIRED (blast-radius: cross-artifact/shared-schema/wiring; multi-module {ai_router, docs}; breadth 19 files) - per-session cross-provider verification runs via the new verify_session CLI (S1 dogfood continues).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/verify-round-1-remediation",
+      "dateTime": "2026-07-06T13:55:59.372510-04:00",
+      "description": "Round 1 (gpt-5-4): ISSUES_FOUND, 3 Major. V1 (Correctness, accepted): _row_provider trusted the metrics rows provider string instead of resolving via the model registry - fixed to registry-only resolution (row provider string deliberately untrusted; unresolvable model/registry fails closed) + 2 regression tests (lying provider string; unresolvable model). V2 (Completeness, accepted): the new test file was untracked so the round-1 diff omitted it (L-064-9 class) - git add -A; round 2 diff carries it. V3 (Completeness, process-order): the session close necessarily happens AFTER Step 6 verification (workflow ordering); the live-gate close dogfood runs immediately after a non-blocking verdict - stated in the round-2 ledger, not fixable within a verification round by construction. Suite after remediation: 2568 passed, 5 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/verify-round-2-remediation",
+      "dateTime": "2026-07-06T14:06:27.455940-04:00",
+      "description": "Round 2 (gpt-5-4): ISSUES_FOUND, 1 Major (accepted): --manual-verify blanket-skipped the whole verification_integrity check, so the incident token could still close under attestation. Fixed: split check_verification_method_vocabulary out of the gate; --manual-verify now bypasses ONLY the evidence-corroboration layer while the vocabulary rule runs on every path (attested close of the exact incident shape now gate_failed; new e2e test pins it, and the sanctioned-bypass test now demonstrates the bypass on a LEGAL token whose evidence would fail). V1/V2 from round 1 remain fixed; V3 remains resolved-by-process-order. Suite: 2569 passed, 5 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/verify-round-3-remediation",
+      "dateTime": "2026-07-06T14:15:11.397895-04:00",
+      "description": "Round 3 (gpt-5-4): ISSUES_FOUND, 1 new Major (accepted): the --force path hard-coded outcome verification.method=skipped even when the disposition carried a legal, gate-corroborated method - the audit surface claimed skipped for a corroborated close. Fixed: force now records the dispositions legal method verbatim (skipped only as the no-usable-disposition fallback); 2 new regression tests (corroborated api under force records api; force without disposition records skipped). All prior ledger items remain RESOLVED; every round has surfaced a NEW distinct defect, all fixed - proceeding to a confirming round 4 per the ledgers no-unresolved-findings state. Suite: 2571 passed, 5 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/verification-verified",
+      "dateTime": "2026-07-06T14:20:20.603520-04:00",
+      "description": "Round 4 (gpt-5-4): VERIFIED, 0 findings. All four rounds ran through the S1 verify_session CLI (live dogfood). Cumulative verification cost $1.29. Cross-round ledger: V1 registry-resolution, V2 untracked-test-file, V4 manual-verify-vocabulary, V5 force-method-record all FIXED with regression tests; V3 resolved-by-process-order (close follows verification by construction).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 1.2897
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/next-orchestrator-rec",
+      "dateTime": "2026-07-06T14:20:20.603520-04:00",
+      "description": "Routed next-orchestrator analysis for Session 3 (gemini-pro, $0.005): Codex CLI gpt-5.4 @ medium (release integrity dictates; split-orchestrator option noted). ai-assignment.md S2 actuals filled.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.0053
+        }
+      ]
     }
   ]
 }

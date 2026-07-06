@@ -9,10 +9,14 @@ what the next orchestrator should be, and any blockers that prevented
 a clean ``completed`` outcome.
 
 Set 026 Session 1 removed the queue-mediated daemon path
-(``verification_method: "queue"``). The surviving methods are
-``"api"`` (synchronous per-call providers), ``"manual"`` (manual
-cross-provider review via the IDE-agent paste path), and ``"skipped"``
-(explicit zero-budget opt-out recorded in ``budget.yaml``).
+(``verification_method: "queue"``). Set 083 Session 2 aligned the
+disposition vocabulary with ``budget.yaml``'s: the legal methods are
+``"api"`` (synchronous per-call providers),
+``"manual-via-other-engine"`` (operator-run cross-provider review —
+the zero-budget path), and ``"skipped"`` (explicit zero-budget opt-out
+recorded in ``budget.yaml``). The pre-083 ``"manual"`` token — the
+live bypass incident's vector — and the retired ``"queue"`` token are
+rejected with naming messages (:data:`RETIRED_VERIFICATION_METHODS`).
 ``verification_message_ids`` is preserved as a list field but is
 expected to be empty in every surviving path.
 
@@ -58,8 +62,28 @@ except ImportError:
 DISPOSITION_FILENAME = "disposition.json"
 
 DISPOSITION_STATUSES = ("completed", "failed", "requires_review")
-VERIFICATION_METHODS = ("api", "manual", "skipped")
+VERIFICATION_METHODS = ("api", "manual-via-other-engine", "skipped")
 CANONICAL_VERDICTS = ("VERIFIED", "ISSUES_FOUND")
+
+# Retired / renamed method tokens, each rejected with a message that names
+# its replacement (Set 083 S2 — the live 2026-07-06 bypass incident wrote
+# the bare "manual" token and a self-attested verdict, and nothing on the
+# close path validated either). Historical closed-set artifacts that carry
+# these tokens at rest (Sets 027/028/046/059 carry "manual") are unaffected:
+# validation runs at close time on the active set, never retroactively.
+RETIRED_VERIFICATION_METHODS = {
+    "queue": (
+        "'queue' was retired in Set 026 Session 1 (the queue-mediated "
+        "daemon path was removed); no surviving close path accepts it"
+    ),
+    "manual": (
+        "'manual' was renamed in Set 083: the sanctioned manual path is "
+        "'manual-via-other-engine' and is valid only when "
+        "ai_router/budget.yaml declares the zero-budget tier (Rule 2's "
+        "operator-authorized exception); for routed verification use "
+        "'api' via python -m ai_router.verify_session"
+    ),
+}
 
 SWITCH_DUE_TO_BLOCKER = "switch-due-to-blocker"
 
@@ -79,9 +103,10 @@ class Disposition:
     - ``files_changed``: list of file paths created or modified during
       the session.
     - ``verification_method``: one of :data:`VERIFICATION_METHODS`.
-      ``api`` is the synchronous per-call provider path; ``manual`` is
-      cross-provider review via the IDE-agent paste path; ``skipped``
-      is the explicit zero-budget opt-out recorded in ``budget.yaml``.
+      ``api`` is the synchronous per-call provider path;
+      ``manual-via-other-engine`` is operator-run cross-provider review
+      (zero-budget tier only); ``skipped`` is the explicit zero-budget
+      opt-out recorded in ``budget.yaml``.
     - ``verification_message_ids``: kept as a list field for schema
       stability; expected to be empty for every surviving method
       (validated by :func:`validate_disposition`).
@@ -363,10 +388,17 @@ def validate_disposition(
     verification_method = data.get("verification_method")
     if verification_method not in VERIFICATION_METHODS:
         allowed = ", ".join(VERIFICATION_METHODS)
-        errors.append(
-            f"verification_method must be one of: {allowed} "
-            f"(got {verification_method!r})"
-        )
+        retired_note = RETIRED_VERIFICATION_METHODS.get(verification_method)
+        if retired_note is not None:
+            errors.append(
+                f"verification_method {verification_method!r} is not a "
+                f"legal token: {retired_note} (legal: {allowed})"
+            )
+        else:
+            errors.append(
+                f"verification_method must be one of: {allowed} "
+                f"(got {verification_method!r})"
+            )
 
     message_ids = data.get("verification_message_ids")
     if not _is_str_list(message_ids):
@@ -374,11 +406,6 @@ def validate_disposition(
             "verification_message_ids must be a list of strings"
         )
     else:
-        if verification_method == "queue" and len(message_ids) == 0:
-            errors.append(
-                "verification_message_ids must be non-empty when "
-                "verification_method == 'queue'"
-            )
         if verification_method == "api" and len(message_ids) > 0:
             errors.append(
                 "verification_message_ids must be empty when "

@@ -27,7 +27,7 @@
       "items": { "type": "string" }
     },
     "verification_method": {
-      "enum": ["api", "manual", "skipped"]
+      "enum": ["api", "manual-via-other-engine", "skipped"]
     },
     "verification_message_ids": {
       "type": "array",

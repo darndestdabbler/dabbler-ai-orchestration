@@ -88,12 +88,38 @@ def _valid_next_orc() -> NextOrchestrator:
     )
 
 
+@pytest.fixture(autouse=True)
+def _corroborated_metrics(tmp_path: Path, monkeypatch):
+    """Set 083: every close in this file claims an api verdict (explicit
+    or status-derived), so the verification-integrity gate demands a
+    cross-provider session-verification metrics row. Seed rows for the
+    fixture slug's sessions so these tests keep exercising the
+    snapshot-flip machinery they were written for."""
+    metrics = tmp_path / "gate-metrics.jsonl"
+    rows = [
+        {
+            "task_type": "session-verification",
+            "session_set": "test-set",
+            "session_number": n,
+            "provider": "openai",
+            "model": "gpt-5-4",
+        }
+        for n in range(1, 6)
+    ]
+    metrics.write_text(
+        "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
+    )
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics))
+
+
 def _build_repo_with_set(
     tmp_path: Path, total_sessions: int,
 ) -> tuple[Path, Path]:
     """Build a real git repo + bare remote, then register session 1.
 
-    Returns (repo_root, set_dir).
+    Returns (repo_root, set_dir). Seeds an ``sN-verification.md``
+    artifact per session — the Set 083 gate's artifact arm — committed
+    by each test's own commit-and-push.
     """
     root = tmp_path / "repo"
     root.mkdir()
@@ -141,6 +167,10 @@ def _build_repo_with_set(
         }, indent=2),
         encoding="utf-8",
     )
+    for n in range(1, total_sessions + 1):
+        (set_dir / f"s{n}-verification.md").write_text(
+            "VERIFIED\n", encoding="utf-8"
+        )
     return root, set_dir
 
 

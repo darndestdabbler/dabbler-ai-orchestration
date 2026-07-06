@@ -76,14 +76,48 @@ def _valid_next_orc() -> NextOrchestrator:
     )
 
 
+def _corroborate_api_close(
+    set_dir: Path,
+    session_number: int,
+    monkeypatch,
+    tmp_path: Path,
+    *,
+    verifier_provider: str = "openai",
+) -> None:
+    """Give an api-method close the evidence the Set 083 gate demands.
+
+    Writes the ``sN-verification.md`` artifact, a one-row metrics file
+    with a cross-provider ``session-verification`` row, and points
+    ``AI_ROUTER_METRICS_PATH`` at it.
+    """
+    (set_dir / f"s{session_number}-verification.md").write_text(
+        "VERIFIED\n", encoding="utf-8"
+    )
+    metrics = tmp_path / "router-metrics.jsonl"
+    metrics.write_text(
+        json.dumps({
+            "task_type": "session-verification",
+            "session_set": set_dir.name,
+            "session_number": session_number,
+            "provider": verifier_provider,
+            "model": "gpt-5-4",
+        }) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics))
+
+
 @pytest.fixture
-def closeable_set(tmp_path: Path) -> Path:
+def closeable_set(tmp_path: Path, monkeypatch) -> Path:
     """A session-set fixture where every gate naturally passes.
 
     Builds a real git repo, wires it to a bare remote, registers a
     non-final session, lands an activity-log entry, and writes a
     disposition with a valid ``next_orchestrator``. The set is then
-    committed and pushed so the working tree is clean.
+    committed and pushed so the working tree is clean. The Set 083
+    verification-integrity gate's evidence (verification artifact +
+    cross-provider metrics row) is seeded too, since the api-method
+    disposition's derived VERIFIED is a claimed verdict.
     """
     root = tmp_path / "repo"
     root.mkdir()
@@ -139,6 +173,7 @@ def closeable_set(tmp_path: Path) -> Path:
         next_orchestrator=_valid_next_orc(),
         blockers=[],
     ))
+    _corroborate_api_close(set_dir, 1, monkeypatch, tmp_path)
     _git(root, "add", "-A")
     _git(root, "commit", "-m", "land set")
     _git(root, "push", "origin", "main")
@@ -296,12 +331,20 @@ def _force_args(closeable_set: Path, tmp_path: Path):
 def test_force_still_bypasses_gates_under_lock(
     closeable_set: Path, tmp_path: Path, monkeypatch
 ):
-    """``--force`` skips gate execution but still acquires the lock."""
+    """``--force`` skips the bookkeeping gates but still acquires the lock.
+
+    Set 083: the verification-integrity check is NOT skipped under
+    ``--force`` (force bypasses gates, not evidence) — it is the single
+    gate row in the output, passing here because the fixture carries
+    real corroborating evidence.
+    """
     monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", "1")
     args = _force_args(closeable_set, tmp_path)
     outcome = close_session.run(args)
     assert outcome.result == "succeeded"
-    assert outcome.gate_results == []
+    assert [(g.check, g.passed) for g in outcome.gate_results] == [
+        ("verification_integrity", True)
+    ]
     assert any("WARNING" in m and "force" in m.lower() for m in outcome.messages)
 
 

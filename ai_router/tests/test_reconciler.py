@@ -438,6 +438,24 @@ def test_reconciler_recovers_stranded_session_via_real_close_session(
         blockers=[],
     ))
 
+    # Set 083 verification-integrity evidence: the api-derived VERIFIED
+    # claim needs the raw artifact plus a cross-provider
+    # session-verification metrics row.
+    (set_dir / "s1-verification.md").write_text(
+        "VERIFIED\n", encoding="utf-8"
+    )
+    metrics = tmp_path / "gate-metrics.jsonl"
+    metrics.write_text(
+        json.dumps({
+            "task_type": "session-verification",
+            "session_set": "stranded",
+            "session_number": 1,
+            "provider": "openai",
+            "model": "gpt-5-4",
+        }) + "\n",
+        encoding="utf-8",
+    )
+
     # Simulate a stranded close-out: append closeout_requested but
     # never the matching closeout_succeeded. Backdate so the
     # reconciler considers it eligible.
@@ -448,10 +466,14 @@ def test_reconciler_recovers_stranded_session_via_real_close_session(
     _git("commit", "-m", "land set")
     _git("push", "origin", "main")
 
-    summary = reconciler.reconcile_sessions(
-        base_dir=str(sets_root),
-        quiet_window_minutes=5,
-    )
+    os.environ["AI_ROUTER_METRICS_PATH"] = str(metrics)
+    try:
+        summary = reconciler.reconcile_sessions(
+            base_dir=str(sets_root),
+            quiet_window_minutes=5,
+        )
+    finally:
+        os.environ.pop("AI_ROUTER_METRICS_PATH", None)
     [entry] = summary.entries
     assert entry.action == "rerun_succeeded", entry
     assert entry.close_session_result == "succeeded"

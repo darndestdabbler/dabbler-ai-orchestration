@@ -224,7 +224,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   alongside the diff so additions are visible.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="082" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="083" status="active" scope="portable" -->
 
 - **Context:** Cross-provider verification of a heavily cross-referenced
   synthesis document — a proposal, design doc, or spec whose central

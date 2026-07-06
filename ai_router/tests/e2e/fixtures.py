@@ -433,7 +433,7 @@ def make_disposition(
     disposition = Disposition(
         status=status,
         summary=summary or f"harness session {session_number} closed",
-        verification_method="manual",
+        verification_method="manual-via-other-engine",
         files_changed=files_changed or [],
         verification_message_ids=[],
         next_orchestrator=None if is_final else _default_next_orchestrator(),

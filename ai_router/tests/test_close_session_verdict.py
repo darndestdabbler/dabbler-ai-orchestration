@@ -136,6 +136,29 @@ def _make_closeable(repo_root: Path, set_dir: Path, disposition: Disposition) ->
     _commit_and_push(repo_root, "land work")
 
 
+def _corroborate_api_close(
+    set_dir: Path, session_number: int, monkeypatch, tmp_path: Path,
+) -> None:
+    """Seed the evidence the Set 083 verification-integrity gate demands
+    for an api-method close claiming a verdict: the raw verification
+    artifact plus a cross-provider session-verification metrics row."""
+    (set_dir / f"s{session_number}-verification.md").write_text(
+        "VERIFIED\n", encoding="utf-8"
+    )
+    metrics = tmp_path / "router-metrics.jsonl"
+    metrics.write_text(
+        json.dumps({
+            "task_type": "session-verification",
+            "session_set": set_dir.name,
+            "session_number": session_number,
+            "provider": "openai",
+            "model": "gpt-5-4",
+        }) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics))
+
+
 # ---------------------------------------------------------------------------
 # resolve_close_verdict — pure function unit tests
 # ---------------------------------------------------------------------------
@@ -206,7 +229,7 @@ class TestResolveCloseVerdict:
         d = Disposition(
             status="completed",
             summary="s",
-            verification_method="manual",
+            verification_method="manual-via-other-engine",
         )
         assert resolve_close_verdict(d) is None
 
@@ -233,7 +256,7 @@ class TestResolveCloseVerdict:
 # ---------------------------------------------------------------------------
 
 class TestCloseSessionPersistsVerdict:
-    def test_api_explicit_verdict_persisted(self, tmp_path: Path):
+    def test_api_explicit_verdict_persisted(self, tmp_path: Path, monkeypatch):
         repo, set_dir = _build_repo_with_set(tmp_path, total_sessions=1)
         _make_closeable(repo, set_dir, Disposition(
             status="completed",
@@ -245,6 +268,8 @@ class TestCloseSessionPersistsVerdict:
             blockers=[],
             verification_verdict="VERIFIED",
         ))
+        _corroborate_api_close(set_dir, 1, monkeypatch, tmp_path)
+        _commit_and_push(repo, "corroborating evidence")
 
         outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
         assert outcome.result == "succeeded", outcome.messages
@@ -256,7 +281,7 @@ class TestCloseSessionPersistsVerdict:
         assert session1 is not None
         assert session1.get("verificationVerdict") == "VERIFIED"
 
-    def test_api_status_derived_verdict_persisted(self, tmp_path: Path):
+    def test_api_status_derived_verdict_persisted(self, tmp_path: Path, monkeypatch):
         repo, set_dir = _build_repo_with_set(tmp_path, total_sessions=1)
         _make_closeable(repo, set_dir, Disposition(
             status="completed",
@@ -268,6 +293,9 @@ class TestCloseSessionPersistsVerdict:
             blockers=[],
             # no explicit verification_verdict → should derive VERIFIED from status
         ))
+        # The derived VERIFIED is a claimed verdict too (Set 083) — seed evidence.
+        _corroborate_api_close(set_dir, 1, monkeypatch, tmp_path)
+        _commit_and_push(repo, "corroborating evidence")
 
         outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
         assert outcome.result == "succeeded", outcome.messages
@@ -284,7 +312,7 @@ class TestCloseSessionPersistsVerdict:
         _make_closeable(repo, set_dir, Disposition(
             status="completed",
             summary="manual verify test",
-            verification_method="manual",
+            verification_method="manual-via-other-engine",
             files_changed=[],
             verification_message_ids=[],
             next_orchestrator=_valid_next_orc(),
@@ -317,7 +345,7 @@ class TestCloseSessionPersistsVerdict:
 # ---------------------------------------------------------------------------
 
 class TestR4VerdicClobberInvariant:
-    def test_flip_with_null_does_not_clobber_stored_verdict(self, tmp_path: Path):
+    def test_flip_with_null_does_not_clobber_stored_verdict(self, tmp_path: Path, monkeypatch):
         """_flip_state_to_closed(verdict=None) must not overwrite an existing
         verdict already stored in session-state.json."""
         repo, set_dir = _build_repo_with_set(tmp_path, total_sessions=1)
@@ -331,6 +359,8 @@ class TestR4VerdicClobberInvariant:
             blockers=[],
             verification_verdict="VERIFIED",
         ))
+        _corroborate_api_close(set_dir, 1, monkeypatch, tmp_path)
+        _commit_and_push(repo, "corroborating evidence")
 
         # First close: persists VERIFIED
         outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
@@ -351,7 +381,7 @@ class TestR4VerdicClobberInvariant:
         session1_after = next((s for s in sessions2 if s.get("number") == 1), None)
         assert session1_after.get("verificationVerdict") == "VERIFIED"
 
-    def test_direct_flip_with_null_does_not_clobber(self, tmp_path: Path):
+    def test_direct_flip_with_null_does_not_clobber(self, tmp_path: Path, monkeypatch):
         """Direct call to ``_flip_state_to_closed(verdict=None)`` on an
         already-stored verdict must not overwrite it via the writer's
         ``if not None`` guard.
@@ -371,6 +401,8 @@ class TestR4VerdicClobberInvariant:
             blockers=[],
             verification_verdict="ISSUES_FOUND",
         ))
+        _corroborate_api_close(set_dir, 1, monkeypatch, tmp_path)
+        _commit_and_push(repo, "corroborating evidence")
 
         # First close stores ISSUES_FOUND
         outcome = close_session.run(_ns(session_set_dir=str(set_dir)))

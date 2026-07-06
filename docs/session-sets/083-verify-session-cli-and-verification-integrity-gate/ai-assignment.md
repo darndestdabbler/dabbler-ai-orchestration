@@ -47,14 +47,14 @@ low
 | 2.5 | Dogfood the gate by closing this session. | Orchestrator runs `close_session`; this session's verification (from S1) will have been routed to a Full-tier cross-provider verifier. |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium
+- Total routed cost: $1.29 (four session-verification rounds on gpt-5-4) + $0.005 analysis
+- Deviations from recommendation: recommended Gemini Code Assist gemini-3-pro @ high; the operator invoked Claude Code (Rule 7 — the human controls orchestrator choice).
+- Notes for next-session calibration: the verifier earned its keep — one new real Major per round across rounds 1–3 (metrics-row provider not registry-resolved; `--manual-verify` laundering the illegal token; `--force` misrecording `verification.method`), each fixed with regression tests before the round-4 VERIFIED. Layer-1 suite 2524 → 2571. Four rounds ≈ $1.29 is the observed price of a gate change on the close-out contract; budget similarly when S3 touches the template bundle every consumer inherits.
 
 **Next-session orchestrator recommendation (Session 3):**
-Claude Code claude-sonnet-4-6 @ effort=medium
-Rationale: Session 3 consists of wide but shallow changes across documentation and configuration files, making a fast and efficient model the right choice.
+Codex CLI gpt-5.4 @ effort=medium
+Rationale (routed, gemini-pro): the high-risk dual-release component must dictate the choice — calibration data (S2) and L-078-1 show less capable models introduce release-blocking, registry-blind errors on procedural release work. The routed analysis also offered a split-orchestrator option (claude-fable-5 @ medium for the wide-shallow doc/template tasks 3.1–3.3, gpt-5.4 @ high for UAT/critique/releases 3.4–3.5) if the operator prefers two conversations; the single-orchestrator form above is the one-session default. This supersedes the pre-set claude-sonnet-4-6 recommendation, which predated the S1/S2 calibration data.
 
 ---
 

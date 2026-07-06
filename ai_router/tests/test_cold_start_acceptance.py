@@ -157,7 +157,7 @@ def test_cold_start_chain(tier: str, tmp_path: Path, monkeypatch):
         Disposition(
             status="completed",
             summary=f"cold-start acceptance ({tier})",
-            verification_method="manual",
+            verification_method="manual-via-other-engine",
             files_changed=["src/feature.py"],
             verification_message_ids=[],
             next_orchestrator=None,

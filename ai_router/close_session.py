@@ -63,10 +63,16 @@ on success::
         {"check": "<name>", "passed": <bool>, "remediation": "<str>"}
       ],
       "verification": {
-        "method": "api" | "manual" | "skipped"
+        "method": "api" | "manual" | "manual-via-other-engine" | "skipped"
       },
       "events_emitted": ["closeout_requested", "closeout_succeeded", ...]
     }
+
+``method: "manual"`` is the ``--manual-verify`` / ``--no-router``
+attestation path's event vocabulary; ``"manual-via-other-engine"``
+flows through verbatim when the disposition declares it (Set 083 —
+the disposition vocabulary is ``api`` / ``manual-via-other-engine`` /
+``skipped``; see ``disposition.py``).
 """
 
 from __future__ import annotations
@@ -107,6 +113,7 @@ if __name__ == "__main__" and __package__ in (None, ""):
 try:
     from disposition import (  # type: ignore[import-not-found]
         Disposition,
+        VERIFICATION_METHODS,
         read_disposition,
     )
     from progress import (  # type: ignore[import-not-found]
@@ -120,7 +127,12 @@ try:
         read_events,
     )
     from session_state import read_session_state  # type: ignore[import-not-found]
-    from gate_checks import GATE_CHECKS  # type: ignore[import-not-found]
+    from gate_checks import (  # type: ignore[import-not-found]
+        GATE_CHECKS,
+        VERIFICATION_INTEGRITY_CHECK_NAME,
+        check_verification_integrity,
+        check_verification_method_vocabulary,
+    )
     from close_lock import (  # type: ignore[import-not-found]
         LockContention,
         acquire_lock,
@@ -133,6 +145,7 @@ try:
 except ImportError:
     from .disposition import (  # type: ignore[no-redef]
         Disposition,
+        VERIFICATION_METHODS,
         read_disposition,
     )
     from .progress import (  # type: ignore[no-redef]
@@ -146,7 +159,12 @@ except ImportError:
         read_events,
     )
     from .session_state import read_session_state  # type: ignore[no-redef]
-    from .gate_checks import GATE_CHECKS  # type: ignore[no-redef]
+    from .gate_checks import (  # type: ignore[no-redef]
+        GATE_CHECKS,
+        VERIFICATION_INTEGRITY_CHECK_NAME,
+        check_verification_integrity,
+        check_verification_method_vocabulary,
+    )
     from .close_lock import (  # type: ignore[no-redef]
         LockContention,
         acquire_lock,
@@ -332,7 +350,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help=(
-            "Bypass all gate checks. Hard-scoped to incident-recovery use "
+            "Bypass the bookkeeping gate checks (NOT the "
+            "verification-integrity check — force bypasses gates, not "
+            "evidence; Set 083). Hard-scoped to incident-recovery use "
             "only: requires AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1 in the "
             "environment AND --reason-file naming the operator's narrative. "
             "Emits a closeout_force_used event to the session-events ledger "
@@ -363,7 +383,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "Treat verification as completed by human attestation. Used "
             "for the zero-budget tier and for any session whose "
             "verification ran out-of-band (e.g., manual cross-provider "
-            "review via the IDE-agent paste path)."
+            "review via the IDE-agent paste path). Also the ONLY "
+            "sanctioned bypass of the Set 083 verification-integrity "
+            "check (requires the written attestation; logged)."
         ),
     )
     p.add_argument(
@@ -477,7 +499,9 @@ def _validate_args(args: argparse.Namespace) -> Optional[str]:
 
     Combination rules:
 
-    * ``--force`` is bypass-everything: incompatible with ``--interactive``
+    * ``--force`` bypasses the bookkeeping gates (but NOT the Set 083
+      verification-integrity check — force bypasses gates, not
+      evidence): incompatible with ``--interactive``
       (which implies a human in the loop is reviewing the gate output)
       and with ``--manual-verify`` (which is a different bypass path with
       its own attestation requirement). Picking one bypass at a time
@@ -787,6 +811,7 @@ def _run_gate_checks(
     disposition: Optional[Disposition],
     *,
     allow_empty_commit: bool,
+    manual_verify: bool = False,
 ) -> List[GateResult]:
     """Run the deterministic gate checks against the session set.
 
@@ -797,9 +822,48 @@ def _run_gate_checks(
     otherwise wedge every set in the repo. The wrapper preserves the
     declared order of :data:`gate_checks.GATE_CHECKS` so the JSON
     output's ``gate_results`` list is shape-stable across runs.
+
+    ``manual_verify`` narrows the verification-integrity check (Set 083)
+    to its vocabulary layer: ``--manual-verify`` is the sanctioned,
+    attested, logged bypass of the EVIDENCE corroboration, but an
+    illegal ``verification_method`` token still fails closed on every
+    path (the S2 round-2 finding — an attested close must not persist
+    the incident's retired token). The result row stays in the list so
+    the JSON shape (and the audit trail of *why* it passed) is stable.
     """
     results: List[GateResult] = []
     for name, predicate in GATE_CHECKS:
+        if manual_verify and name == VERIFICATION_INTEGRITY_CHECK_NAME:
+            try:
+                vocab_passed, vocab_remediation = (
+                    check_verification_method_vocabulary(
+                        session_set_dir,
+                        disposition,
+                        allow_empty_commit=allow_empty_commit,
+                    )
+                )
+            except Exception as exc:  # pragma: no cover — defensive
+                vocab_passed = False
+                vocab_remediation = (
+                    f"gate predicate raised {type(exc).__name__}: {exc}"
+                )
+            results.append(
+                GateResult(
+                    check=name,
+                    passed=bool(vocab_passed),
+                    remediation=(
+                        vocab_remediation
+                        if not vocab_passed
+                        else (
+                            "evidence corroboration bypassed by "
+                            "--manual-verify (sanctioned, attested "
+                            "override; attestation recorded in the events "
+                            "ledger); method vocabulary still enforced"
+                        )
+                    ),
+                )
+            )
+            continue
         try:
             passed, remediation = predicate(
                 session_set_dir,
@@ -1649,11 +1713,12 @@ def run(
         # are satisfied, so ``reason_text`` is always populated here.
         if args.force:
             outcome.messages.append(
-                "WARNING: --force bypassed all close-out gates "
-                "(incident-recovery only). The closeout_force_used "
-                "event has been emitted with the operator's reason; "
-                "session-state.json will record forceClosed=true on "
-                "the next snapshot flip."
+                "WARNING: --force bypassed the bookkeeping close-out gates "
+                "(incident-recovery only). The verification-integrity "
+                "check still runs — force bypasses gates, not evidence "
+                "(Set 083). The closeout_force_used event has been "
+                "emitted with the operator's reason; session-state.json "
+                "will record forceClosed=true on the next snapshot flip."
             )
             _logger.warning(
                 "close_session --force used on %s (reason=%r). "
@@ -1671,12 +1736,26 @@ def run(
 
         # Resolve the verification method from disposition + flags.
         # Set 026 Session 1 removed the queue path; this is now a
-        # synchronous resolution. ``--force`` bypasses everything;
-        # ``--manual-verify`` is the operator-attestation path; otherwise
-        # we honor ``disposition.verification_method`` (``api`` /
-        # ``manual`` / ``skipped``).
+        # synchronous resolution. ``--manual-verify`` is the
+        # operator-attestation path; otherwise we honor
+        # ``disposition.verification_method`` (``api`` /
+        # ``manual-via-other-engine`` / ``skipped`` — Set 083 vocabulary).
         if args.force:
-            method = "skipped"
+            # Force bypasses bookkeeping gates, not evidence (Set 083):
+            # when the disposition declares a legal method, the audit
+            # record reflects it verbatim — the verification-integrity
+            # check above this close has corroborated any claimed
+            # verdict on that method, so recording "skipped" would
+            # falsify the trail (S2 round-3 finding). Only a force
+            # close with no usable disposition method falls back to
+            # "skipped".
+            if (
+                disposition is not None
+                and disposition.verification_method in VERIFICATION_METHODS
+            ):
+                method = disposition.verification_method
+            else:
+                method = "skipped"
         elif args.manual_verify:
             method = "manual"
         elif no_router:
@@ -1711,16 +1790,38 @@ def run(
                 **vc_fields,
             )
 
-        # Gate checks. ``--force`` skips the gate run entirely; we still
-        # record an empty gate_results list so the JSON shape is
-        # unambiguous in that case.
+        # Gate checks. ``--force`` skips the bookkeeping gates but NOT the
+        # verification-integrity check (Set 083): force bypasses gates,
+        # not evidence — an uncorroborated claimed verdict is refused even
+        # on the incident-recovery path. ``--manual-verify`` is that
+        # check's only sanctioned bypass, and it bypasses the EVIDENCE
+        # layer only — the method-vocabulary rule still runs (an attested
+        # close must not persist an illegal token; S2 round-2 finding).
         if args.force:
-            outcome.gate_results = []
+            try:
+                vi_passed, vi_remediation = check_verification_integrity(
+                    session_set_dir,
+                    disposition,
+                    allow_empty_commit=args.allow_empty_commit,
+                )
+            except Exception as exc:  # pragma: no cover — defensive
+                vi_passed = False
+                vi_remediation = (
+                    f"gate predicate raised {type(exc).__name__}: {exc}"
+                )
+            outcome.gate_results = [
+                GateResult(
+                    check=VERIFICATION_INTEGRITY_CHECK_NAME,
+                    passed=bool(vi_passed),
+                    remediation=vi_remediation,
+                )
+            ]
         else:
             outcome.gate_results = _run_gate_checks(
                 session_set_dir,
                 disposition,
                 allow_empty_commit=args.allow_empty_commit,
+                manual_verify=bool(args.manual_verify),
             )
 
         failed = [g for g in outcome.gate_results if not g.passed]

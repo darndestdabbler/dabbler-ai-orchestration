@@ -81,7 +81,7 @@ def _valid_disposition_completed_manual(**overrides) -> Disposition:
     base = dict(
         status="completed",
         summary="Manual cross-provider verification handed back via IDE paste path.",
-        verification_method="manual",
+        verification_method="manual-via-other-engine",
         files_changed=["ai_router/session_state.py"],
         verification_message_ids=[],
         next_orchestrator=_valid_next_orc(),
@@ -507,7 +507,7 @@ class TestPublicSurface:
         }
 
     def test_verification_methods_match_spec(self):
-        assert set(VERIFICATION_METHODS) == {"api", "manual", "skipped"}
+        assert set(VERIFICATION_METHODS) == {"api", "manual-via-other-engine", "skipped"}
 
     def test_filename_constant(self):
         assert DISPOSITION_FILENAME == "disposition.json"

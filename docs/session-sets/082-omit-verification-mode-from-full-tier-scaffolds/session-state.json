@@ -1,15 +1,19 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "082-omit-verification-mode-from-full-tier-scaffolds",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Conditional template line + tier-gated marker",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-06T11:07:00.827777-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5"
+      },
       "verificationVerdict": null
     },
     {

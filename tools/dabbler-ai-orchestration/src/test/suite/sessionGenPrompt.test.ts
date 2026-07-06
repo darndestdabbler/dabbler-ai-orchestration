@@ -255,15 +255,31 @@ suite("buildSessionGenPrompt — verification-mode truth (Set 077 S3)", () => {
     );
   });
 
-  test("full ignores a verificationMode option — exemplar keeps the default", () => {
+  test("full ignores a verificationMode option — exemplar omits the line (Set 082)", () => {
     const prompt = buildSessionGenPrompt(bundle, {
       tier: "full",
       verificationMode: "dedicated-sessions",
     });
-    assert.ok(prompt.includes("verificationMode: out-of-band-or-none"));
-    assert.ok(!prompt.includes("verificationMode: dedicated-sessions"));
+    // The Full exemplar spec carries NO verificationMode line at all —
+    // the field is Lightweight-only and Full scaffolds omit it. The only
+    // rendered `verificationMode` mentions are the hard-requirements
+    // prose scoping the field to Lightweight.
+    assert.ok(
+      !/^verificationMode:/m.test(prompt),
+      "a Full-resolved prompt must not render a verificationMode config line",
+    );
+    assert.ok(prompt.includes("`full` sets OMIT"));
     assert.ok(
       !prompt.includes("The operator selected **dedicated verification sessions**"),
     );
+  });
+
+  // Set 082 pin: the riderless Full prompt (the common palette path)
+  // renders no verificationMode line either — buildSessionGenPrompt
+  // emits the field on Lightweight-resolved prompts only.
+  test("full without a rider: no verificationMode line anywhere (Set 082)", () => {
+    const prompt = buildSessionGenPrompt(bundle, { tier: "full" });
+    assert.ok(!/^verificationMode:/m.test(prompt));
+    assert.ok(prompt.includes("`full` sets OMIT"));
   });
 });

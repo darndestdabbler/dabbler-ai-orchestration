@@ -224,7 +224,7 @@ requiresUAT: false       # true | false | "suggested" — human UAT review requi
 requiresE2E: false       # true | false | "suggested" — E2E test coverage required before notifying
 uatStyle: ad-hoc         # dsl | ad-hoc (only meaningful when requiresUAT: true; default ad-hoc)
 uatScope: per-session    # per-session | per-set | none (only meaningful when requiresUAT: true)
-verificationMode: out-of-band-or-none  # Lightweight only (Set 057); dedicated-sessions | out-of-band-or-none (default). Seeds the once-at-set-start choice.
+verificationMode: out-of-band-or-none  # Lightweight only (Set 057); dedicated-sessions | out-of-band-or-none (default). Seeds the once-at-set-start choice. Omit on Full-tier sets (Set 082).
 pathAwareCritique: none  # tier-orthogonal (Set 066); none | advisory | required (default none). Seeds the once-at-set-start choice.
 prerequisites:           # optional; sets that must complete before this one is workable
   - slug: 047-state-file-schema-v4-audit
@@ -268,7 +268,10 @@ prerequisites:           # optional; sets that must complete before this one is 
   A→B only, gated, recorded as a superseding `verification_mode_change`
   entry; see `docs/ai-led-session-workflow.md` → *Sanctioned Mode A →
   Mode B transition*). The field is inert on Full tier (which
-  keeps automatic, rule-based cross-provider verification).
+  keeps automatic, rule-based cross-provider verification) —
+  **Full-tier specs omit the field entirely** (Set 082: the scaffolder
+  renders the `verificationMode:` line on Lightweight only; omission
+  means the default, so never declare it on a `tier: full` set).
 
   **Session `type` (Set 057).** The `dedicated-sessions` flow appends
   runtime sessions to `session-state.json`'s `sessions[]` carrying a

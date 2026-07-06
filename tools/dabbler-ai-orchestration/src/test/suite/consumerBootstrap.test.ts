@@ -99,6 +99,42 @@ suite("consumerBootstrap — spec.md render", () => {
     assert.strictEqual(findUnsubstitutedTokens(spec).length, 0);
   });
 
+  // Set 082: the verificationMode field is Lightweight-only — a Full
+  // render omits the whole line (omission means the documented default),
+  // with no blank-line residue where the line used to be.
+  test("Full render omits the verificationMode line entirely (Set 082)", () => {
+    const spec = renderSpec(bundle, ctx({ tier: "full" }));
+    assert.ok(
+      !/verificationMode/.test(spec),
+      "a Full-tier spec must not mention verificationMode",
+    );
+    // No blank-line residue: uatStyle is immediately followed by
+    // totalSessions inside the config block.
+    assert.ok(
+      /uatStyle: ad-hoc[^\n]*\ntotalSessions: 3\n/.test(spec),
+      "the omitted line must leave no blank-line residue",
+    );
+    assert.strictEqual(findUnsubstitutedTokens(spec).length, 0);
+  });
+
+  test("Lightweight render keeps the exact line, comment included (Set 082)", () => {
+    const spec = renderSpec(bundle, ctx({ tier: "lightweight" }));
+    assert.ok(
+      spec.includes(
+        "\nverificationMode: out-of-band-or-none  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full\ntotalSessions: 3\n",
+      ),
+      "the Lightweight line (with its comment) must render byte-identically to the pre-082 output",
+    );
+  });
+
+  test("Lightweight render carries a dedicated-sessions pick (Set 082)", () => {
+    const spec = renderSpec(
+      bundle,
+      ctx({ tier: "lightweight", verificationMode: "dedicated-sessions" }),
+    );
+    assert.ok(/^verificationMode: dedicated-sessions  #/m.test(spec));
+  });
+
   test("expands to EXACTLY totalSessions numbered blocks with the right prefixes", () => {
     const spec = renderSpec(bundle, ctx({ totalSessions: 4 }));
     // Exactly N session headers, numbered 1..N, no leftover sample block.

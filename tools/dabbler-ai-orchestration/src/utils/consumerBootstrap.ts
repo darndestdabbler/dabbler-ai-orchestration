@@ -23,7 +23,9 @@
 // The one tier divergence the design lock allows lives in the *caller*
 // (gitScaffold writes ``ai_router/router-config.yaml`` on Full only); the
 // rendered artifacts here are identical across tiers except for the
-// ``tier:`` and ``verificationMode:`` values carried into ``spec.md``.
+// ``tier:`` value carried into ``spec.md`` and the Lightweight-only
+// ``verificationMode:`` line (Set 082: Full-tier scaffolds omit the field
+// entirely — it is Lightweight-only, and absence means the default).
 // Lightweight is router-off, not Python-off — see the tier-model SSoT.
 
 import * as fs from "fs";
@@ -175,6 +177,23 @@ function assertPositiveSessionCount(totalSessions: number): void {
   }
 }
 
+/**
+ * The whole ``verificationMode:`` config line (text + trailing newline) for
+ * the spec template's ``{{VERIFICATION_MODE_LINE}}`` token (Set 082). The
+ * field is Lightweight-only, so a Full-tier scaffold omits the line entirely
+ * — omission is schema-legal (absence means the documented default) and
+ * avoids the phantom "choice" a Full spec would otherwise appear to declare.
+ * The ``{{TOKEN}}`` engine has no conditionals, so the tier branch lives
+ * here: the full current line on ``lightweight``, the empty string on
+ * ``full`` (no blank-line residue — the token sits flush against the next
+ * template line).
+ */
+function verificationModeLine(ctx: BootstrapContext): string {
+  if (ctx.tier !== "lightweight") return "";
+  const mode = ctx.verificationMode || DEFAULT_VERIFICATION_MODE;
+  return `verificationMode: ${mode}  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full\n`;
+}
+
 /** Map a {@link BootstrapContext} to its ``{{TOKEN}}`` -> value table. */
 function tokenTable(ctx: BootstrapContext): Record<string, string> {
   return {
@@ -184,7 +203,7 @@ function tokenTable(ctx: BootstrapContext): Record<string, string> {
     SLUG: ctx.slug,
     CREATED: ctx.created,
     TIER: ctx.tier,
-    VERIFICATION_MODE: ctx.verificationMode || DEFAULT_VERIFICATION_MODE,
+    VERIFICATION_MODE_LINE: verificationModeLine(ctx),
     TOTAL_SESSIONS: String(ctx.totalSessions),
   };
 }

@@ -441,12 +441,13 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
       structureOnly: true,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Nine artifacts: the five Set-060 structure artifacts, the three
-    // Set 064 D7 docs/planning/ guidance-lifecycle starters, and the
-    // Set 077 S4 cross-provider verification doc — plus the two
-    // Set 077 S2 durable markers (.dabbler/tier +
-    // .dabbler/verification-mode).
-    assert.strictEqual(result.written.length, 11);
+    // Ten writes: nine structure artifacts (the five Set-060 structure
+    // artifacts, the three Set 064 D7 docs/planning/ guidance-lifecycle
+    // starters, and the Set 077 S4 cross-provider verification doc)
+    // plus the Set 077 S2 durable tier marker. (The verification-mode
+    // marker is Lightweight-only as of Set 082; this is a Full
+    // scaffold.)
+    assert.strictEqual(result.written.length, 10);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
@@ -497,7 +498,7 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 10); // 8 artifacts + 2 markers
+    assert.strictEqual(result.written.length, 9); // 8 artifacts + tier marker (Full: no verification-mode marker, Set 082)
   });
 });
 

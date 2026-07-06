@@ -1,0 +1,124 @@
+{
+  "sessionSetName": "082-omit-verification-mode-from-full-tier-scaffolds",
+  "createdDate": "2026-07-06T15:07:00.833078+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-06T15:07:00.833078+00:00",
+      "description": "Operator set pathAwareCritique: required.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "required"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 0,
+      "stepKey": "session-001/ai-assignment",
+      "dateTime": "2026-07-06T11:09:05.275946-04:00",
+      "description": "Authored ai-assignment.md via route(task_type=analysis) (gemini-pro, $0.0108).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 3352,
+          "outputTokens": 659,
+          "costUsd": 0.0108
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/s1.template",
+      "dateTime": "2026-07-06T11:21:49.735041-04:00",
+      "description": "Replaced fixed verificationMode line in spec.md.template with whole-line {{VERIFICATION_MODE_LINE}} token; consumerBootstrap.ts renders the full line on lightweight and empty string on full (no blank-line residue); template README token table + never-emit rule updated.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/s1.marker",
+      "dateTime": "2026-07-06T11:21:49.736041-04:00",
+      "description": "gitScaffold.ts: verification-mode marker write gated to tier===lightweight; on Full neither written nor deleted (preserve-across-round-trip documented in code comment); written list adjusted (tier marker stays unconditional).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/s1.sibling-audit",
+      "dateTime": "2026-07-06T11:21:49.736041-04:00",
+      "description": "L-069-1 sibling audit: buildSessionGenPrompt hard-requirements prose rescoped (Full sets OMIT verificationMode); Full exemplar now omits the line via shared renderSpec; pinned with two Layer-2 tests. verificationModeRewrite handles key-absent specs (insert-on-upgrade) - no change. start-here.md.template step-4 prose mention left as named residual (editing it would break the Lightweight byte-identity tripwire; absence-means-default makes it benign). Engine files clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/s1.tests",
+      "dateTime": "2026-07-06T11:21:49.736041-04:00",
+      "description": "Regenerated test-fixtures/cold-start/full (verificationMode line gone from sample spec config block); lightweight fixture byte-identical (git diff clean - scope tripwire held). Updated consumerBootstrap.test.ts (per-tier presence/absence, no-residue, no-unsubstituted-token), gitScaffoldCore.test.ts (marker write matrix: lightweight writes, full skips, full preserves pre-existing), sessionGenPrompt.test.ts (Full prompt renders no verificationMode line), gettingStartedActions.test.ts (structureOnly counts).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/s1.docs",
+      "dateTime": "2026-07-06T11:21:49.736041-04:00",
+      "description": "Omission notes added to docs/spec-md-schema.md (field row + prose: Full-tier scaffolds omit the field, Set 082) and session-set-authoring-guide.md (field semantics + example block comment). Echo grep: no shape-uniformity claims remain; remaining inert-on-Full mentions are accurate.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/build-test",
+      "dateTime": "2026-07-06T11:21:49.737036-04:00",
+      "description": "Layer-2 suite green (1270 passing) incl. regenerated goldens; Layer-1 pytest green (2483 passed, 5 skipped); tsc --noEmit clean; npm run compile refreshed dist bundle. Layer 3 not run: no Explorer-rendering surface touched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/routed-gate",
+      "dateTime": "2026-07-06T11:28:23.522539-04:00",
+      "description": "routed_gate verdict: REQUIRED (triggers: blast-radius [cross-artifact, shared-schema, wiring], multi-module {docs, test-fixtures, tools}, breadth 20 files).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/verification-r1",
+      "dateTime": "2026-07-06T11:28:23.522539-04:00",
+      "description": "Cross-provider verification round 1 (gpt-5-4): ISSUES_FOUND - 1 Major (S082-V1-001, fixture marker deletion claimed missing) + 2 nits. Raw output s1-verification.md; structured findings s1-issues.json.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 11878,
+          "outputTokens": 8605,
+          "costUsd": 0.1588
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-001/verification-r2",
+      "dateTime": "2026-07-06T11:28:23.522539-04:00",
+      "description": "Adjudication: S082-V1-001 is a context gap (no .dabbler file has ever existed under test-fixtures/; golden is render-output-only). record_adjudication logged (context-gap / reverify-reshaped). Nits fixed. Round 2 (gpt-5-4) with reshaped context: VERIFIED; all findings terminally dispositioned. Raw output s1-verification-round-2.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 5875,
+          "outputTokens": 3270,
+          "costUsd": 0.0637
+        }
+      ]
+    }
+  ]
+}

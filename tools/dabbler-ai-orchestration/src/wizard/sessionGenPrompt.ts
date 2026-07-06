@@ -105,8 +105,9 @@ export interface SessionGenPromptOptions {
    * pick — the three-way choice's second dimension. When the tier is
    * Lightweight, the worked exemplar's ``verificationMode:`` renders
    * this value and a guidance line steers the planner to declare it on
-   * each generated set. Ignored on Full (the field is inert there; the
-   * exemplar keeps the documented default). Resolution mirrors ``tier``:
+   * each generated set. Ignored on Full (the field is Lightweight-only;
+   * the Full exemplar omits the line entirely — Set 082). Resolution
+   * mirrors ``tier``:
    * the form rider wins; the riderless palette path falls back to the
    * durable ``.dabbler/verification-mode`` marker.
    */
@@ -131,8 +132,10 @@ export function buildSessionGenPrompt(
   // below names the exemplar's tier as illustrative-only in that case.
   const exemplarTier: Tier = options.tier ?? "full";
   // Set 077 S3 (Feature 2): the exemplar's verificationMode renders the
-  // operator's pick on Lightweight only — the field is inert on Full,
-  // so a Full exemplar always shows the documented default.
+  // operator's pick on Lightweight only. The field is Lightweight-only,
+  // so a Full exemplar carries no verificationMode line at all (Set 082
+  // — renderSpec drops the whole line on Full); the mode passed here is
+  // simply unused on that path.
   const exemplarMode: VerificationMode =
     exemplarTier === "lightweight" && options.verificationMode
       ? options.verificationMode
@@ -193,8 +196,10 @@ For EACH session set, scaffold a folder \`docs/session-sets/<NNN-slug>/\` contai
   prefix then a kebab-case title (e.g. \`001-user-authentication\`, \`002-product-catalog\`).
   Never emit a bare (un-prefixed) slug.
 - **\`spec.md\` Session Set Configuration block** MUST declare \`tier\` (\`full\` |
-  \`lightweight\`) and \`verificationMode\` (\`out-of-band-or-none\` default, or
-  \`dedicated-sessions\`; inert on Full). The tier model is defined once, in the SSoT —
+  \`lightweight\`). \`lightweight\` sets ALSO declare \`verificationMode\`
+  (\`out-of-band-or-none\` default, or \`dedicated-sessions\`); \`full\` sets OMIT
+  \`verificationMode\` entirely — the field is Lightweight-only, and omitting it means
+  the default. The tier model is defined once, in the SSoT —
   do NOT restate it in the spec:
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
 - **One \`### Session K of N\` block per planned session** (progress keys keyed

@@ -65,12 +65,17 @@ snapshot-test failure). Canonical token set:
 | `{{SLUG}}` | full `NNN-`-prefixed set slug | `001-user-authentication` |
 | `{{CREATED}}` | ISO date the set was created | `2026-06-09` |
 | `{{TIER}}` | `full` or `lightweight` | `lightweight` |
-| `{{VERIFICATION_MODE}}` | Lightweight verification mode | `out-of-band-or-none` |
+| `{{VERIFICATION_MODE_LINE}}` | the whole `verificationMode:` config line (Lightweight only) | `verificationMode: out-of-band-or-none  # Lightweight only: …` + newline |
 | `{{TOTAL_SESSIONS}}` | planned session count | `3` |
 
-`{{VERIFICATION_MODE}}` defaults to `out-of-band-or-none` and is inert on
-Full tier (the field is written for shape uniformity but the router ignores it
-on Full). See [`docs/spec-md-schema.md`](../../spec-md-schema.md).
+`{{VERIFICATION_MODE_LINE}}` is a **whole-line** token (Set 082): on
+`lightweight` the writer fills it with the full `verificationMode:` line
+(the context's mode, defaulting to `out-of-band-or-none`, plus its trailing
+newline); on `full` it fills the empty string, so a Full-tier spec **omits
+the field entirely** — the field is Lightweight-only and omission means the
+documented default. The token sits flush against the next template line, so
+the Full render leaves no blank-line residue. See
+[`docs/spec-md-schema.md`](../../spec-md-schema.md).
 
 ## Repeated session blocks (how `{{TOTAL_SESSIONS}}` is honored)
 
@@ -102,9 +107,11 @@ contract, so the templates cannot silently drift from a fixed count.
   [`docs/concepts/tier-model.md`](../../concepts/tier-model.md). Rendered
   consumer artifacts link there too (via a GitHub blob URL, since a fresh
   consumer repo does not have this repo's `docs/` tree checked in).
-- **Never emit `schemaVersion: 2`, a bare (un-prefixed) slug, or a spec
-  missing `tier` / `verificationMode`.** Those are the exact `sessionGenPrompt`
-  drift instances this set removes.
+- **Never emit `schemaVersion: 2`, a bare (un-prefixed) slug, a spec missing
+  `tier`, or a Lightweight spec missing `verificationMode`.** Those are the
+  exact `sessionGenPrompt` drift instances Set 058 removed. (Full-tier specs
+  legitimately omit `verificationMode` — Set 082 — so its presence is a
+  Lightweight-only requirement.)
 <!-- drift-guard:allow-begin (documents the banned-phrase catalogue; see drift_guard.py) -->
 - **Keep the banned Lightweight framing out** (`no Python` / `no venv` /
   `docs-only`). The CI drift guard (Session 3) fails the build if it

@@ -23086,6 +23086,13 @@ function assertPositiveSessionCount(totalSessions) {
     );
   }
 }
+function verificationModeLine(ctx) {
+  if (ctx.tier !== "lightweight")
+    return "";
+  const mode = ctx.verificationMode || DEFAULT_VERIFICATION_MODE;
+  return `verificationMode: ${mode}  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full
+`;
+}
 function tokenTable(ctx) {
   return {
     REPO_NAME: ctx.repoName,
@@ -23094,7 +23101,7 @@ function tokenTable(ctx) {
     SLUG: ctx.slug,
     CREATED: ctx.created,
     TIER: ctx.tier,
-    VERIFICATION_MODE: ctx.verificationMode || DEFAULT_VERIFICATION_MODE,
+    VERIFICATION_MODE_LINE: verificationModeLine(ctx),
     TOTAL_SESSIONS: String(ctx.totalSessions)
   };
 }
@@ -23363,9 +23370,12 @@ async function scaffoldConsumerRepo(deps) {
     written.push(rel);
   }
   writeTierMarker(deps.projectDir, deps.ctx.tier, deps.fileOps);
-  const markerMode = deps.ctx.verificationMode === "dedicated-sessions" ? "dedicated-sessions" : "out-of-band-or-none";
-  writeVerificationModeMarker(deps.projectDir, markerMode, deps.fileOps);
-  written.push(TIER_MARKER_REL, VERIFICATION_MODE_MARKER_REL);
+  written.push(TIER_MARKER_REL);
+  if (deps.ctx.tier === "lightweight") {
+    const markerMode = deps.ctx.verificationMode === "dedicated-sessions" ? "dedicated-sessions" : "out-of-band-or-none";
+    writeVerificationModeMarker(deps.projectDir, markerMode, deps.fileOps);
+    written.push(VERIFICATION_MODE_MARKER_REL);
+  }
   report(
     deps.ctx.tier === "full" ? "Installing dabbler-ai-router (venv + router config)\u2026" : "Installing dabbler-ai-router (venv; router stays off for Lightweight)\u2026"
   );
@@ -23884,8 +23894,10 @@ For EACH session set, scaffold a folder \`docs/session-sets/<NNN-slug>/\` contai
   prefix then a kebab-case title (e.g. \`001-user-authentication\`, \`002-product-catalog\`).
   Never emit a bare (un-prefixed) slug.
 - **\`spec.md\` Session Set Configuration block** MUST declare \`tier\` (\`full\` |
-  \`lightweight\`) and \`verificationMode\` (\`out-of-band-or-none\` default, or
-  \`dedicated-sessions\`; inert on Full). The tier model is defined once, in the SSoT \u2014
+  \`lightweight\`). \`lightweight\` sets ALSO declare \`verificationMode\`
+  (\`out-of-band-or-none\` default, or \`dedicated-sessions\`); \`full\` sets OMIT
+  \`verificationMode\` entirely \u2014 the field is Lightweight-only, and omitting it means
+  the default. The tier model is defined once, in the SSoT \u2014
   do NOT restate it in the spec:
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
 - **One \`### Session K of N\` block per planned session** (progress keys keyed

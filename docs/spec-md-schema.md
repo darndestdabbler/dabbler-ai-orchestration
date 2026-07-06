@@ -107,7 +107,7 @@ requiresUAT: true|false        # required
 requiresE2E: true|false        # required
 uatScope: none | per-session | per-set  # required when requiresUAT: true
 uatStyle: ad-hoc | dsl                  # optional; default ad-hoc
-verificationMode: out-of-band-or-none | dedicated-sessions  # Lightweight only; default out-of-band-or-none; inert on Full
+verificationMode: out-of-band-or-none | dedicated-sessions  # Lightweight only; default out-of-band-or-none; inert on Full (Full-tier scaffolds omit it, Set 082)
 pathAwareCritique: none | advisory | required  # tier-orthogonal (both tiers); default none
 effort: low | medium | high             # optional; orchestrator hint
 totalSessions: <int>                    # optional; canonical session count
@@ -131,7 +131,8 @@ or opts out entirely. `dedicated-sessions` opts in to structured typed
 verification/remediation sessions on a different engine with a
 content-aware close-out gate. The field is **inert on Full tier**
 (which always runs automatic, rule-based cross-provider verification);
-it is written for shape uniformity but the router ignores it there.
+**Full-tier scaffolds omit the field entirely** (Set 082) — omission is
+schema-legal, and every reader applies absence-means-default.
 The field only *seeds* the choice — the durable record is an
 `activity-log.json` entry written once at set start, superseded later
 only by the sanctioned A→B blessed writer

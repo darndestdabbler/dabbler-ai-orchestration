@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Full cold-start fixture regeneration is incomplete: the required `.dabbler/verification-mode` removal is missing from `test-fixtures/cold-start/full` (no deletion under test-fixtures/cold-start/full/** in the diff).",
+      "category": "Completeness",
+      "severity": "Major",
+      "issueId": "S082-V1-001",
+      "issueType": "missing-context",
+      "verificationMethod": "git log --all -- 'test-fixtures/**/.dabbler*' returns empty: no `.dabbler/` file has ever existed under test-fixtures/. The golden fixture is the output of renderConsumerBootstrap only; the markers are written by scaffoldConsumerRepo OUTSIDE the render (coldStartSnapshot.test.ts walks the golden tree and fails on any file the render does not emit). The spec's required end state ('no .dabbler/verification-mode in the fixture's marker set') therefore already holds vacuously, and the Full-tier marker-absence behavior is pinned by the gitScaffoldCore.test.ts write matrix (full skips, full preserves pre-existing) instead of by fixture bytes.",
+      "resolution_status": "not-reproducible",
+      "resolution_notes": "Context gap: the round-1 evidence bundle did not state that the fixture tree has never contained .dabbler markers. There is no file to delete; the deliverable the finding asks for (fixture asserts marker absence) is delivered by the Layer-2 marker write matrix. Re-verified in round 2 with the fixture contract and git-history evidence included."
+    },
+    {
+      "description": "Nit: in gettingStartedActions.test.ts the comment still starts with 'Nine artifacts:' while the assertion expects 10 writes.",
+      "severity": "Minor",
+      "issueId": "S082-V1-002",
+      "resolution_status": "fixed",
+      "resolution_notes": "Comment reworded to 'Ten writes: nine structure artifacts ... plus the tier marker' so the arithmetic is explicit."
+    },
+    {
+      "description": "Nit: in gitScaffoldCore.test.ts the comment still starts with 'Eleven artifacts:' while the assertion expects 12 writes.",
+      "severity": "Minor",
+      "issueId": "S082-V1-003",
+      "resolution_status": "fixed",
+      "resolution_notes": "Comment reworded to 'Twelve writes: eleven artifacts ... plus the tier marker' so the arithmetic is explicit."
+    }
+  ]
+}

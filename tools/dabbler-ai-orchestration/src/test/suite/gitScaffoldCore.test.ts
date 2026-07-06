@@ -123,11 +123,13 @@ suite("scaffoldConsumerRepo — file writes", () => {
       fileOps: ops,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Eleven artifacts: the seven Set-060 artifacts, the three Set 064
-    // D7 docs/planning/ guidance-lifecycle starters, and the Set 077 S4
-    // cross-provider verification doc — plus the two Set 077 S2 durable
-    // markers (.dabbler/tier + .dabbler/verification-mode).
-    assert.strictEqual(result.written.length, 13);
+    // Twelve writes: eleven artifacts (the seven Set-060 artifacts, the
+    // three Set 064 D7 docs/planning/ guidance-lifecycle starters, and
+    // the Set 077 S4 cross-provider verification doc) plus the Set 077
+    // S2 durable tier marker. (The verification-mode marker is
+    // Lightweight-only as of Set 082; this is a Full scaffold, so it is
+    // not written.)
+    assert.strictEqual(result.written.length, 12);
     assert.strictEqual(result.skipped.length, 0);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
@@ -153,7 +155,7 @@ suite("scaffoldConsumerRepo — file writes", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 12); // 10 artifacts + 2 markers
+    assert.strictEqual(result.written.length, 11); // 10 artifacts + tier marker (Full: no verification-mode marker, Set 082)
   });
 });
 
@@ -205,7 +207,7 @@ suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
     });
     assert.strictEqual(result.installOk, false);
     assert.strictEqual(result.installMessage, "pip failed");
-    assert.strictEqual(result.written.length, 13); // artifacts + markers still written
+    assert.strictEqual(result.written.length, 12); // artifacts + tier marker still written (Full)
   });
 });
 
@@ -213,9 +215,13 @@ suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
 // the operator's tier + verification-mode choice as durable markers,
 // written by the same path that shapes the scaffold — and OUTSIDE the
 // no-clobber loop, because they are write-through caches of the latest
-// sanctioned choice, not one-shot seeds.
+// sanctioned choice, not one-shot seeds. Set 082 narrows the
+// verification-mode marker to Lightweight only: the mode machinery is
+// inert on Full, so a Full scaffold records no phantom choice — it
+// neither writes nor deletes the marker (a prior Lightweight pick
+// survives a tier round-trip untouched).
 suite("scaffoldConsumerRepo — durable tier/verification-mode markers", () => {
-  test("Full scaffold writes full + the default verification mode", async () => {
+  test("Full scaffold writes the tier marker but SKIPS the verification-mode marker (Set 082)", async () => {
     const { ops, store } = memFileOps();
     const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
@@ -227,15 +233,36 @@ suite("scaffoldConsumerRepo — durable tier/verification-mode markers", () => {
     assert.strictEqual(store.get("/repo/.dabbler/tier"), "full\n");
     assert.strictEqual(
       store.get("/repo/.dabbler/verification-mode"),
-      "out-of-band-or-none\n",
+      undefined,
+      "a Full scaffold must not write a verification-mode marker",
     );
     assert.ok(result.written.includes(TIER_MARKER_REL));
-    assert.ok(result.written.includes(VERIFICATION_MODE_MARKER_REL));
+    assert.ok(!result.written.includes(VERIFICATION_MODE_MARKER_REL));
+  });
+
+  test("Full scaffold PRESERVES a pre-existing Lightweight marker (Set 082)", async () => {
+    const { ops, store } = memFileOps({
+      "/repo/.dabbler/verification-mode": "dedicated-sessions\n",
+    });
+    const result = await scaffoldConsumerRepo({
+      projectDir: PROJECT,
+      ctx: ctx({ tier: "full" }),
+      bundle,
+      fileOps: ops,
+      installRouter: async () => ({ ok: true, message: "installed" }),
+    });
+    // Neither written nor deleted: the prior Lightweight pick survives a
+    // tier round-trip untouched (the Set 081 "hiding never clears" posture).
+    assert.strictEqual(
+      store.get("/repo/.dabbler/verification-mode"),
+      "dedicated-sessions\n",
+    );
+    assert.ok(!result.written.includes(VERIFICATION_MODE_MARKER_REL));
   });
 
   test("Lightweight scaffold writes lightweight + its declared mode", async () => {
     const { ops, store } = memFileOps();
-    await scaffoldConsumerRepo({
+    const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
       ctx: ctx({ tier: "lightweight", verificationMode: "dedicated-sessions" }),
       bundle,
@@ -247,6 +274,7 @@ suite("scaffoldConsumerRepo — durable tier/verification-mode markers", () => {
       store.get("/repo/.dabbler/verification-mode"),
       "dedicated-sessions\n",
     );
+    assert.ok(result.written.includes(VERIFICATION_MODE_MARKER_REL));
   });
 
   test("re-scaffold with a different tier UPDATES the marker (write-through, not no-clobber)", async () => {

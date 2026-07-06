@@ -16,7 +16,6 @@ requiresUAT: false                     # true | false | "suggested"
 requiresE2E: false                     # true | false | "suggested"
 uatScope: none                         # none | per-session | per-set (only when requiresUAT)
 uatStyle: ad-hoc                       # ad-hoc | dsl (only when requiresUAT)
-verificationMode: out-of-band-or-none  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full
 totalSessions: 3
 # prerequisites:                       # uncomment if this set depends on another
 #   - slug: <prerequisite-slug>

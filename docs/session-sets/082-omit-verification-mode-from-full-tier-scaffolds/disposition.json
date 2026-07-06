@@ -1,0 +1,41 @@
+{
+  "status": "completed",
+  "summary": "Session 1 made Full-tier scaffolds omit verificationMode at both sites: spec.md.template's fixed line became the whole-line {{VERIFICATION_MODE_LINE}} token (consumerBootstrap.ts renders the full pre-082 line on lightweight, empty string on full, no blank-line residue), and gitScaffold.ts gates the .dabbler/verification-mode marker write to Lightweight (on Full it is neither written nor deleted, preserving a prior pick across a tier round-trip). Sibling audit per L-069-1: buildSessionGenPrompt's hard-requirements prose rescoped so Full sets OMIT the field, pinned with two Layer-2 tests; verificationModeRewrite already handles key-absent specs; start-here.md.template's prose mention named as a deferred residual (byte-identity tripwire). Full cold-start fixture regenerated; lightweight fixture byte-identical. Layer-2 suites extended (per-tier line presence, marker write matrix incl. full-preserves, structureOnly counts). Omission notes added to spec-md-schema.md and the authoring guide. Verification: round 1 ISSUES_FOUND (one context-gap Major, adjudicated not-reproducible via reshaped-context re-verify; two nits fixed); round 2 VERIFIED.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "docs/templates/consumer-bootstrap/spec.md.template",
+    "docs/templates/consumer-bootstrap/README.md",
+    "tools/dabbler-ai-orchestration/src/utils/consumerBootstrap.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/src/wizard/sessionGenPrompt.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/consumerBootstrap.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldCore.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionGenPrompt.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
+    "test-fixtures/cold-start/full/docs/session-sets/001-sample-feature/spec.md",
+    "docs/spec-md-schema.md",
+    "docs/planning/session-set-authoring-guide.md",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/spec.md.template",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/README.md",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/ai-assignment.md",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s1-verification.md",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s1-issues.json",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s1-verification-round-2.md",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s1-close-reason.md"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-fable-5",
+    "effort": "medium",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Routed ai-assignment analysis (gemini-pro) recommends Claude Code claude-fable-5 @ medium for Session 2: UAT-checklist prose and release mechanics suit a capable cost-effective model, and same-provider continuity keeps the S1 context for the checklist's source-re-grounded strings."
+    }
+  },
+  "blockers": []
+}

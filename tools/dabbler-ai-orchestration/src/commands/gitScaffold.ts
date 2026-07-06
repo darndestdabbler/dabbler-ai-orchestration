@@ -134,23 +134,35 @@ export async function scaffoldConsumerRepo(
   }
 
   // Set 077 S2 (Feature 1, A1 + Critique-2 M1/M2): persist the operator's
-  // tier + verification-mode choice as durable markers, written by the
-  // same path that shapes the scaffold. Deliberately OUTSIDE the
-  // no-clobber loop above — the markers are write-through caches of the
-  // latest sanctioned choice, so a re-scaffold with a different tier
-  // updates them even though the scaffold artifacts themselves are kept.
+  // choice as durable markers, written by the same path that shapes the
+  // scaffold. Deliberately OUTSIDE the no-clobber loop above — the markers
+  // are write-through caches of the latest sanctioned choice, so a
+  // re-scaffold with a different tier updates them even though the
+  // scaffold artifacts themselves are kept. The tier marker is
+  // tier-agnostic by design and stays unconditional.
   writeTierMarker(deps.projectDir, deps.ctx.tier, deps.fileOps);
-  // Narrow, never cast (S2 review, Minor 4): an unrecognized
-  // ctx.verificationMode would round-trip to null on read, silently
-  // dropping the choice the marker exists to preserve. ctx values come
-  // from internal callers, so normalize to the default rather than
-  // throwing on a caller bug.
-  const markerMode: VerificationMode =
-    deps.ctx.verificationMode === "dedicated-sessions"
-      ? "dedicated-sessions"
-      : "out-of-band-or-none";
-  writeVerificationModeMarker(deps.projectDir, markerMode, deps.fileOps);
-  written.push(TIER_MARKER_REL, VERIFICATION_MODE_MARKER_REL);
+  written.push(TIER_MARKER_REL);
+  // Set 082: the verification-mode marker is Lightweight-only — the mode
+  // machinery is inert on Full, so a Full scaffold has no choice to
+  // record and writes no marker. On Full the marker is neither written
+  // nor deleted: a prior Lightweight pick survives a Full re-scaffold
+  // untouched (the marker's write-through-cache semantics preserve the
+  // latest *sanctioned* choice, and a tier round-trip back to
+  // Lightweight should find it intact — the Set 081 "hiding never
+  // clears" posture).
+  if (deps.ctx.tier === "lightweight") {
+    // Narrow, never cast (S2 review, Minor 4): an unrecognized
+    // ctx.verificationMode would round-trip to null on read, silently
+    // dropping the choice the marker exists to preserve. ctx values come
+    // from internal callers, so normalize to the default rather than
+    // throwing on a caller bug.
+    const markerMode: VerificationMode =
+      deps.ctx.verificationMode === "dedicated-sessions"
+        ? "dedicated-sessions"
+        : "out-of-band-or-none";
+    writeVerificationModeMarker(deps.projectDir, markerMode, deps.fileOps);
+    written.push(VERIFICATION_MODE_MARKER_REL);
+  }
 
   report(
     deps.ctx.tier === "full"

@@ -1,0 +1,105 @@
+{
+  "sessionSetName": "081-budget-input-scoped-to-direct-api",
+  "createdDate": "2026-07-06T01:12:05.129957+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-06T01:12:05.129957+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-1/ai-assignment",
+      "dateTime": "2026-07-05T21:15:19.808440-04:00",
+      "description": "Authored ai-assignment.md via routed analysis (gemini-pro).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 2866,
+          "outputTokens": 559,
+          "costUsd": 0.009173
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.placement",
+      "dateTime": "2026-07-05T21:24:33.302213-04:00",
+      "description": "budgetBlockHtml gated on transportProfile (omit on copilot-cli); block nested as indented child of the Direct-API option row inside transportProfileBlockHtml; standalone render call removed; tree.css gs-option-child indent + separator-restore rules.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "s1.build-gating",
+      "dateTime": "2026-07-05T21:24:33.302213-04:00",
+      "description": "client.js: Build validates/posts budget riders only while Direct-API is selected (transportProfile rider always rides Full); gettingStartedActions.ts: asBudgetChoice drops rider on copilot-cli, fail-closed reject scoped to Full+api; gitScaffold.ts: effectiveBudget caller condition (copilot-cli passes no budget to the scaffold step; writeBudgetYaml unchanged); runScaffold seam carries the effective budget for Layer-2 observability.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "s1.tests",
+      "dateTime": "2026-07-05T21:24:33.302213-04:00",
+      "description": "New Layer-2 suites: placement/visibility (Full+api nested under the api row; Full+copilot omitted incl. no empty child wrapper; Lightweight absent), persistence (typed value + zero-rule pick survive api->copilot->api flip), Build matrix (api+budget threads budget; copilot-cli drops it), action-router matrix (Full+copilot dispatches budgetless; Full+api stays fail-closed). No semantic edits to pre-existing budget parsing / zero-rule / no-clobber tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/routed-gate",
+      "dateTime": "2026-07-05T21:24:33.302213-04:00",
+      "description": "routed_gate verdict REQUIRED (breadth: 8 files >= 4) -> cross-provider session-verification will run.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/build-test",
+      "dateTime": "2026-07-05T21:29:03.500916-04:00",
+      "description": "tsc --noEmit clean; Layer-2 mocha 1265 passing / 0 failing; Layer-3 Playwright 19/19 passed locally (L-064-12 \u2014 Explorer-rendering surface touched).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-1/verification",
+      "dateTime": "2026-07-05T21:34:08.975888-04:00",
+      "description": "Cross-provider session-verification (gpt-5-4): R1 ISSUES_FOUND (one Major, S081-S1-V1-001 evidence-packet gap: path-filtered diff omitted the tracked session-state.json boundary write); R2 narrow re-verify with the complete unfiltered diff -> RESOLVED, no other conclusion changed; R3 wording-only restatement (max_tier pinned, L-064-7) -> VERIFIED. Raw outputs saved, never edited; structured finding in s1-issues.json.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 11309,
+          "outputTokens": 7496,
+          "costUsd": 0.140712
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 237600,
+          "outputTokens": 716,
+          "costUsd": 0.60474
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 1291,
+          "outputTokens": 88,
+          "costUsd": 0.004688
+        }
+      ]
+    }
+  ]
+}

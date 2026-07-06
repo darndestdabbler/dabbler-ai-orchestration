@@ -476,6 +476,19 @@ body.vscode-light, body.vscode-high-contrast-light {
 .gs-option-row + .gs-option-row {
   border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
 }
+/* Set 081 S1: the budget block nests as an indented child of the
+   Direct-API option row (rendered only while that sub-option is
+   selected). The indent clears the radio column so the child reads as
+   belonging to the row above; the sibling rule restores the row
+   separator the child div would otherwise break (when the child is
+   absent the plain adjacent-row rule above applies). */
+.gs-option-child {
+  margin-left: 22px;
+  padding: 0 0 6px;
+}
+.gs-option-child + .gs-option-row {
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
 .gs-option-row input[type="radio"] { margin: 1px 0 0; }
 .gs-option-name {
   font-size: 12px;

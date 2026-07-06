@@ -130,12 +130,21 @@ export function resolveTransportProfile(
  * budget without the required zero-rule pick narrows to undefined too —
  * the host never invents the operator's choice (the writer would refuse
  * it anyway); the scaffold still runs, just without a budget write.
+ *
+ * Set 081 S1: the rider is also dropped outright under the Copilot
+ * seat sub-choice — the budget governs metered provider-API spend,
+ * which the copilot-cli profile excludes by design, and a Copilot-seat
+ * Build writes no budget.yaml (absence has documented compat defaults
+ * in docs/budget-yaml-schema.md). Same posture as the Lightweight
+ * drop above.
  */
 export function asBudgetChoice(
   msg: GettingStartedActionMsg,
   tier: Tier,
+  transportProfile?: TransportProfile,
 ): BudgetChoice | undefined {
   if (tier !== "full") return undefined;
+  if (transportProfile === "copilot-cli") return undefined;
   const thresholdUsd = asBudgetUsd(msg.budgetUsd);
   if (thresholdUsd === undefined) return undefined;
   if (thresholdUsd === 0) {
@@ -190,15 +199,18 @@ export async function routeGettingStartedAction(
         );
         return false;
       }
-      const budget = asBudgetChoice(msg, tier);
-      if (tier === "full" && !budget) {
+      const budget = asBudgetChoice(msg, tier, transportProfile);
+      if (tier === "full" && transportProfile !== "copilot-cli" && !budget) {
         // S2 verifier R1 Major (fail-closed): D1 makes the budget
         // REQUIRED on the Full form path. The webview blocks Build until
         // its riders validate, so a Full action arriving without a
         // narrowable budget is a hostile/buggy webview — reject it
         // rather than scaffolding a Full repo with no budget.yaml. The
         // Command-Palette setupNewProject flow (no webview, no budget
-        // input) stays the only budgetless entry point.
+        // input) stays the only budgetless entry point. Set 081 S1:
+        // scoped to the Direct-API sub-choice — a Copilot-seat Build
+        // legitimately carries no budget riders (the block is not
+        // rendered) and writes no budget.yaml.
         console.warn(
           "[gettingStarted] rejected Full-tier build-structure without a valid budget rider",
         );

@@ -1,15 +1,20 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "081-budget-input-scoped-to-direct-api",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Conditional budget block + Build gating",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-05T21:12:05.077723-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "medium"
+      },
       "verificationVerdict": null
     },
     {

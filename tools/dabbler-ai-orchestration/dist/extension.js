@@ -23511,8 +23511,9 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
     isoDate(),
     verificationMode
   );
+  const effectiveBudget = transportProfile === "copilot-cli" ? void 0 : budget;
   const pythonPath = resolveScaffoldBootstrapPython(projectDir) ?? resolveExplicitPythonPath(projectDir);
-  const runScaffold = seams.runScaffold ?? (async (scaffoldCtx, scaffoldBundle, scaffoldPython) => {
+  const runScaffold = seams.runScaffold ?? (async (scaffoldCtx, scaffoldBundle, scaffoldPython, scaffoldBudget) => {
     let installOutcome2 = null;
     const scaffolded = await vscode6.window.withProgress(
       {
@@ -23526,7 +23527,7 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
         bundle: scaffoldBundle,
         fileOps: makeFileOps(),
         structureOnly: true,
-        budget,
+        budget: scaffoldBudget,
         reportProgress: (m) => progress.report({ message: m }),
         installRouter: async () => {
           installOutcome2 = await installAiRouter({
@@ -23543,7 +23544,12 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
     );
     return { result: scaffolded, installOutcome: installOutcome2 };
   });
-  const { result, installOutcome } = await runScaffold(ctx, bundle, pythonPath);
+  const { result, installOutcome } = await runScaffold(
+    ctx,
+    bundle,
+    pythonPath,
+    effectiveBudget
+  );
   const budgetNote = result.budgetOutcome === "written" ? " Budget saved to ai_router/budget.yaml." : result.budgetOutcome === "skipped-exists" ? " Existing ai_router/budget.yaml kept (budget input not applied)." : "";
   const summary = `Project structure built (${tier} tier): ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote;
   const showInfo = seams.showInfo ?? ((m) => void vscode6.window.showInformationMessage(m));
@@ -24010,8 +24016,10 @@ function resolveTransportProfile(msg, tier) {
     return void 0;
   return asTransportProfileRider(msg.transportProfile) ?? "api";
 }
-function asBudgetChoice(msg, tier) {
+function asBudgetChoice(msg, tier, transportProfile) {
   if (tier !== "full")
+    return void 0;
+  if (transportProfile === "copilot-cli")
     return void 0;
   const thresholdUsd = asBudgetUsd(msg.budgetUsd);
   if (thresholdUsd === void 0)
@@ -24044,8 +24052,8 @@ async function routeGettingStartedAction(msg, handlers) {
         );
         return false;
       }
-      const budget = asBudgetChoice(msg, tier);
-      if (tier === "full" && !budget) {
+      const budget = asBudgetChoice(msg, tier, transportProfile);
+      if (tier === "full" && transportProfile !== "copilot-cli" && !budget) {
         console.warn(
           "[gettingStarted] rejected Full-tier build-structure without a valid budget rider"
         );

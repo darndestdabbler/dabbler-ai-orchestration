@@ -18,6 +18,7 @@ import {
   runCopilotSeatSetupWithProgress,
 } from "../../commands/gitScaffold";
 import { InstallOutcome, venvPython } from "../../utils/aiRouterInstall";
+import { BudgetChoice } from "../../utils/budgetYaml";
 import { TemplateBundle } from "../../utils/consumerBootstrap";
 import {
   RunCatalogRefreshDeps,
@@ -337,6 +338,9 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     seatSetupArgs: { projectDir: string; venvPath: string } | null;
     warnings: string[];
     infos: string[];
+    // Set 081 S1: the EFFECTIVE budget the scaffold step receives
+    // (undefined under copilot-cli — the caller condition under test).
+    scaffoldBudgets: Array<BudgetChoice | undefined>;
   }
 
   function makeBuildSeams(
@@ -348,6 +352,7 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
       seatSetupArgs: null,
       warnings: [],
       infos: [],
+      scaffoldBudgets: [],
     };
     return {
       captured,
@@ -357,8 +362,9 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
           captured.events.push("git-init");
         },
         loadBundle: () => fakeBundle,
-        runScaffold: async () => {
+        runScaffold: async (_ctx, _bundle, _python, scaffoldBudget) => {
           captured.events.push("scaffold");
+          captured.scaffoldBudgets.push(scaffoldBudget);
           return {
             result: scaffoldResult(installOk),
             installOutcome: installOutcome(venv),
@@ -434,6 +440,57 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     assert.ok(
       captured.warnings.some((w) => w.includes("Copilot seat setup was skipped")),
     );
+  });
+
+  // Set 081 S1: the Build write matrix — the scaffold step receives the
+  // budget ONLY under the Direct-API sub-choice. A Copilot-seat Build
+  // passes no budget (so scaffoldConsumerRepo writes no budget.yaml —
+  // the write/skip behavior itself is pinned at that level in
+  // budgetYaml.test.ts; writeBudgetYaml is unchanged).
+  test("build matrix: api+budget passes the budget through to the scaffold step", async () => {
+    const { captured, seams } = makeBuildSeams(true, venvPath);
+    await buildProjectStructureNoPrompt(
+      fakeContext(),
+      projectDir,
+      "full",
+      { thresholdUsd: 25 },
+      undefined,
+      "api",
+      seams,
+    );
+    assert.deepStrictEqual(captured.scaffoldBudgets, [{ thresholdUsd: 25 }]);
+  });
+
+  test("build matrix: copilot-cli drops the budget even when a caller passes one", async () => {
+    const { captured, seams } = makeBuildSeams(true, venvPath);
+    await buildProjectStructureNoPrompt(
+      fakeContext(),
+      projectDir,
+      "full",
+      { thresholdUsd: 25 },
+      undefined,
+      "copilot-cli",
+      seams,
+    );
+    assert.deepStrictEqual(
+      captured.scaffoldBudgets,
+      [undefined],
+      "a Copilot-seat Build must never thread a budget into the scaffold",
+    );
+  });
+
+  test("build matrix: copilot-cli with no budget passes undefined (the normal seat path)", async () => {
+    const { captured, seams } = makeBuildSeams(true, venvPath);
+    await buildProjectStructureNoPrompt(
+      fakeContext(),
+      projectDir,
+      "full",
+      undefined,
+      undefined,
+      "copilot-cli",
+      seams,
+    );
+    assert.deepStrictEqual(captured.scaffoldBudgets, [undefined]);
   });
 
   test("api profile / no profile / lightweight: seat setup never runs and no seat warning fires", async () => {

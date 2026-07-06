@@ -60,6 +60,8 @@ interface CallLog {
   buildStructure: Array<"full" | "lightweight">;
   // Set 063 S2: the narrowed budget rider build-structure forwards.
   buildStructureBudgets: Array<BudgetChoice | undefined>;
+  // Set 081 S1: the narrowed seat-profile rider build-structure forwards.
+  buildStructureProfiles: Array<string | undefined>;
   importPlan: number;
   copyPlanPrompt: number;
   // Set 060 S4: build-session-sets carries (parallel, tier).
@@ -71,15 +73,17 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
     openFolder: 0,
     buildStructure: [],
     buildStructureBudgets: [],
+    buildStructureProfiles: [],
     importPlan: 0,
     copyPlanPrompt: 0,
     buildSessionSets: [],
   };
   const handlers: GettingStartedHandlers = {
     openFolder: async () => void calls.openFolder++,
-    buildStructure: async (tier, budget) => {
+    buildStructure: async (tier, budget, _verificationMode, transportProfile) => {
       calls.buildStructure.push(tier);
       calls.buildStructureBudgets.push(budget);
+      calls.buildStructureProfiles.push(transportProfile);
     },
     importPlan: async () => void calls.importPlan++,
     copyPlanPrompt: async () => void calls.copyPlanPrompt++,
@@ -296,6 +300,108 @@ suite("asBudgetChoice — untrusted budget-rider narrowing", () => {
       asBudgetChoice(msg({ budgetUsd: 25, zeroBudgetMethod: "skipped" }), "full"),
       { thresholdUsd: 25 },
     );
+  });
+});
+
+// ---------- 1c. Set 081 S1: budget rider scoped to the Direct-API ----------
+// sub-choice. The budget governs metered provider-API spend, which the
+// copilot-cli seat profile excludes by design — a Copilot-seat Build
+// legitimately carries no budget riders (the webview never renders the
+// block there) and must NOT be fail-closed rejected, while a budget
+// rider that does arrive under copilot-cli (hostile/buggy webview) is
+// dropped, never written.
+
+suite("asBudgetChoice — Copilot seat drops the budget rider (Set 081 S1)", () => {
+  const msg = (riders: Partial<GettingStartedActionMsg>): GettingStartedActionMsg =>
+    ({
+      type: "gettingStartedAction",
+      action: "build-structure",
+      ...riders,
+    }) as GettingStartedActionMsg;
+
+  test("copilot-cli drops even a valid rider (never writes budget.yaml)", () => {
+    assert.strictEqual(
+      asBudgetChoice(msg({ budgetUsd: 25 }), "full", "copilot-cli"),
+      undefined,
+    );
+    assert.strictEqual(
+      asBudgetChoice(
+        msg({ budgetUsd: 0, zeroBudgetMethod: "skipped" }),
+        "full",
+        "copilot-cli",
+      ),
+      undefined,
+    );
+  });
+
+  test("api / absent profile keep the Set 063 narrowing unchanged", () => {
+    assert.deepStrictEqual(
+      asBudgetChoice(msg({ budgetUsd: 25 }), "full", "api"),
+      { thresholdUsd: 25 },
+    );
+    assert.deepStrictEqual(asBudgetChoice(msg({ budgetUsd: 25 }), "full"), {
+      thresholdUsd: 25,
+    });
+  });
+});
+
+suite("routeGettingStartedAction — Full+copilot build matrix (Set 081 S1)", () => {
+  const post = (
+    handlers: GettingStartedHandlers,
+    riders: Partial<GettingStartedActionMsg>,
+  ) =>
+    routeGettingStartedAction(
+      {
+        type: "gettingStartedAction",
+        action: "build-structure",
+        ...riders,
+      } as GettingStartedActionMsg,
+      handlers,
+    );
+
+  test("Full+copilot WITHOUT budget riders dispatches (no fail-closed reject)", async () => {
+    const { handlers, calls } = recordingHandlers();
+    const handled = await post(handlers, {
+      tier: "full",
+      transportProfile: "copilot-cli",
+    });
+    assert.strictEqual(handled, true, "a Copilot-seat Build has no budget to demand");
+    assert.deepStrictEqual(calls.buildStructure, ["full"]);
+    assert.deepStrictEqual(calls.buildStructureBudgets, [undefined]);
+    assert.deepStrictEqual(calls.buildStructureProfiles, ["copilot-cli"]);
+  });
+
+  test("Full+copilot WITH budget riders dispatches with the budget dropped", async () => {
+    const { handlers, calls } = recordingHandlers();
+    const handled = await post(handlers, {
+      tier: "full",
+      transportProfile: "copilot-cli",
+      budgetUsd: 25,
+    });
+    assert.strictEqual(handled, true);
+    assert.deepStrictEqual(calls.buildStructureBudgets, [undefined]);
+  });
+
+  test("Full+api (explicit or defaulted) without a budget stays REJECTED fail-closed", async () => {
+    const { handlers, calls } = recordingHandlers();
+    assert.strictEqual(
+      await post(handlers, { tier: "full", transportProfile: "api" }),
+      false,
+    );
+    assert.strictEqual(await post(handlers, { tier: "full" }), false);
+    assert.strictEqual(calls.buildStructure.length, 0);
+  });
+
+  test("Full+api with a valid budget still dispatches with both riders", async () => {
+    const { handlers, calls } = recordingHandlers();
+    const handled = await post(handlers, {
+      tier: "full",
+      transportProfile: "api",
+      budgetUsd: 25,
+    });
+    assert.strictEqual(handled, true);
+    assert.deepStrictEqual(calls.buildStructureBudgets, [{ thresholdUsd: 25 }]);
+    assert.deepStrictEqual(calls.buildStructureProfiles, ["api"]);
   });
 });
 

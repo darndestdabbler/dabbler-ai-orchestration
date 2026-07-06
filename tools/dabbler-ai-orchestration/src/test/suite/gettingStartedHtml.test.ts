@@ -1140,3 +1140,121 @@ suite("gettingStartedHtml — sub-choice option rows (Set 080 S1)", () => {
     assertOptionCopy(light, gsHtml.VERIFICATION_MODE_DEDICATED_TEXT);
   });
 });
+
+// ---------- Set 081 S1: budget block scoped to the Direct-API ----------
+// sub-choice. The budget governs metered provider-API verification
+// spend, which the Copilot seat profile excludes by design — so the
+// block nests as an indented child of the "Direct provider API keys"
+// option row and is present ONLY while Full + api are selected. Like
+// the tier gate (Set 063 R1 Minor) the block is OMITTED, not hidden:
+// sub-choice flips re-render the form surface and gsState preserves
+// the typed value, so hiding never clears it.
+
+suite("gettingStartedHtml — budget block scoped to Direct-API (Set 081 S1)", () => {
+  const FULL_API = {
+    tier: "full" as const,
+    parallel: false,
+    transportProfile: "api",
+  };
+  const FULL_COPILOT = {
+    tier: "full" as const,
+    parallel: false,
+    transportProfile: "copilot-cli",
+  };
+
+  test("Full+api: budget block nests inside the transport block, under the Direct-API row", () => {
+    const html = gsHtml.renderGettingStarted(gs(), FULL_API);
+    const blockIdx = html.indexOf("data-gs-transport-profile");
+    const apiRowIdx = html.indexOf('value="api"');
+    const childIdx = html.indexOf("data-gs-option-child");
+    const budgetIdx = html.indexOf("data-gs-budget");
+    const copilotRowIdx = html.indexOf('value="copilot-cli"');
+    assert.ok(blockIdx !== -1 && apiRowIdx !== -1, "transport block + api row render");
+    assert.ok(childIdx !== -1, "the indented child wrapper renders");
+    assert.ok(budgetIdx !== -1, "the budget block renders");
+    assert.ok(
+      blockIdx < apiRowIdx && apiRowIdx < childIdx && childIdx < budgetIdx &&
+        budgetIdx < copilotRowIdx,
+      "budget must sit between the Direct-API row and the Copilot row, " +
+        "inside the child wrapper",
+    );
+    // The full budget block rides along: input, help, zero pair,
+    // validation element (all inside the transport block now).
+    assert.ok(html.includes('name="gs-budget"'));
+    assert.ok(html.includes(gsHtml.BUDGET_LABEL_TEXT));
+    assert.ok(html.includes("data-gs-budget-error"));
+  });
+
+  test("Full+copilot: budget block absent entirely (omitted, not hidden)", () => {
+    const html = gsHtml.renderGettingStarted(gs(), FULL_COPILOT);
+    assert.ok(!html.includes("data-gs-budget"), "budget block must be absent");
+    assert.ok(!html.includes('name="gs-budget"'), "budget input must be absent");
+    assert.ok(!html.includes('name="gs-zero-method"'), "zero-rule pair must be absent");
+    assert.ok(
+      !html.includes("gs-option-child"),
+      "no empty child wrapper — the option rows stay adjacent so the " +
+        "row-separator CSS applies directly",
+    );
+  });
+
+  test("Lightweight: absent regardless of the sub-choice value", () => {
+    const html = gsHtml.renderGettingStarted(gs(), {
+      tier: "lightweight",
+      parallel: false,
+      transportProfile: "api",
+    });
+    assert.ok(!html.includes("data-gs-budget"));
+    assert.strictEqual(
+      gsHtml.budgetBlockHtml({
+        tier: "lightweight",
+        parallel: false,
+        transportProfile: "api",
+      }),
+      "",
+    );
+  });
+
+  test("legacy callers without a transportProfile field still render the block", () => {
+    // The gate keys on the explicit "copilot-cli" value; restoreGsState
+    // guarantees the live form always carries "api" | "copilot-cli", so
+    // this render-open posture only affects direct/legacy callers.
+    assert.ok(gsHtml.budgetBlockHtml(FULL).includes("data-gs-budget"));
+  });
+
+  test("persistence: typed value survives an api → copilot → api flip", () => {
+    const controls = {
+      tier: "full" as const,
+      parallel: false,
+      budget: "42.5",
+      zeroMethod: null,
+      transportProfile: "api",
+    };
+    const before = gsHtml.renderGettingStarted(gs(), controls);
+    assert.ok(/name="gs-budget"[^>]*value="42\.5"/.test(before));
+    controls.transportProfile = "copilot-cli";
+    const hidden = gsHtml.renderGettingStarted(gs(), controls);
+    assert.ok(!hidden.includes('name="gs-budget"'), "flipped away: block omitted");
+    controls.transportProfile = "api";
+    const after = gsHtml.renderGettingStarted(gs(), controls);
+    assert.ok(
+      /name="gs-budget"[^>]*value="42\.5"/.test(after),
+      "flip back must restore the typed value — hiding never clears it",
+    );
+  });
+
+  test("persistence: the $0 zero-rule pick survives the flip round-trip too", () => {
+    const controls = {
+      tier: "full" as const,
+      parallel: false,
+      budget: "0",
+      zeroMethod: "skipped",
+      transportProfile: "api",
+    };
+    controls.transportProfile = "copilot-cli";
+    gsHtml.renderGettingStarted(gs(), controls);
+    controls.transportProfile = "api";
+    const after = gsHtml.renderGettingStarted(gs(), controls);
+    assert.ok(/name="gs-budget"[^>]*value="0"/.test(after));
+    assert.ok(/value="skipped" checked/.test(after));
+  });
+});

@@ -110,7 +110,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 - **Action for future sessions:** Trust the guard for cheap routed work.
 
 ## Persist Routed Output To Disk Before Display Or Logging
-<!-- lesson: id="L-064-3" last-used-set="080" status="active" scope="portable" -->
+<!-- lesson: id="L-064-3" last-used-set="081" status="active" scope="portable" -->
 
 - **Context:** Any routed call on Windows where the default console code page
   is `cp1252`.
@@ -127,7 +127,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 - **Action for future sessions:** Never `print(result.content)` directly.
 
 ## Always Route `ai-assignment.md` And Next-Orchestrator / Next-Set Recommendations
-<!-- lesson: id="L-064-6" last-used-set="080" status="active" scope="portable" -->
+<!-- lesson: id="L-064-6" last-used-set="081" status="active" scope="portable" -->
 
 - **Context:** Authoring `ai-assignment.md` (Step 3.5) or next-orchestrator /
   next-session-set recommendations (Step 8).
@@ -139,7 +139,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 - **Action for future sessions:** Never self-opine on which model is cheaper.
 
 ## Schema-Only Re-Verifies Need `max_tier` Pinned To Block Auto-Escalation
-<!-- lesson: id="L-064-7" last-used-set="080" status="active" scope="portable" -->
+<!-- lesson: id="L-064-7" last-used-set="081" status="active" scope="portable" -->
 
 - **Context:** Round 2 of cross-provider session verification when the
   Round 1 response was substantively correct but used non-standard
@@ -198,7 +198,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   code before routing verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="079" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="081" status="active" scope="portable" -->
 
 - **Context:** Building a cross-provider verification prompt whose
   evidence bundle includes `git diff` / `git diff --stat` output
@@ -269,7 +269,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   push-vs-pull result whose arms used unequal framing as evidence for retiring push.
 
 ## Strong Adversarial Framing Without A Materiality Bar Manufactures Minor-Finding Churn
-<!-- lesson: id="L-071-1" added-set="071" last-used-set="080" status="active" scope="portable" -->
+<!-- lesson: id="L-071-1" added-set="071" last-used-set="081" status="active" scope="portable" -->
 
 - **Context:** A verification surface running at its **strongest adversarial
   framing** (devil's advocate, "assume the work is flawed, a rubber-stamp is a
@@ -567,7 +567,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   failed arm, which the producer already skips.)
 
 ## A Test Layer Nobody Runs Rots Silently — And Fail-Fast Masks How Far
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="080" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="081" status="active" scope="repo-specific" -->
 
 - **Context:** The Layer-3 Playwright suite (the only CI gate that
   exercises the real webview) between Set 047 and the 2026-06-12

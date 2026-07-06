@@ -1,0 +1,41 @@
+{
+  "status": "completed",
+  "summary": "Session 1 of 2 (Conditional budget block + Build gating): the Full-tier budget block now nests as an indented child of the 'Direct provider API keys' option row and renders only while Full + the api sub-option are selected (omitted, not hidden, matching the block's existing tier-gate pattern; sub-choice flips re-render and gsState preserves the typed value, so an api->copilot->api round-trip restores it). Build is honest about the Copilot seat: client.js validates/posts budget riders only while the block is live, gettingStartedActions drops stray riders under copilot-cli and scopes the Set 063 fail-closed reject to the Direct-API path, and gitScaffold's effectiveBudget caller condition passes no budget to the scaffold step on the Copilot path (writeBudgetYaml unchanged; a missing budget.yaml has documented compat defaults). New Layer-2 suites pin placement/visibility, flip persistence, the Build write matrix at the runScaffold seam, and the action-router matrix; zero semantic edits to pre-existing budget parsing / zero-rule / no-clobber tests (the Set 080 tripwire). tsc clean; Layer-2 1265/0; Layer-3 Playwright 19/19 locally.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_notes": "Routed gate: REQUIRED (breadth: 8 files >= 4) over the session diff. Cross-provider verification on gpt-5-4 (openai; orchestrator claude/anthropic). Round 1 ISSUES_FOUND with one Major (S081-S1-V1-001): the evidence packet's diff was path-filtered to media/+src/ and omitted the tracked session-state.json Step-1 boundary write visible in git status --short — the L-064-9 evidence-completeness class extended to path-filtered diffs. Remediated by re-sending the complete unfiltered diff; round 2 (substantive narrow re-verify, no max_tier pin) confirmed RESOLVED, the added hunk is workflow ledger state and no other round-1 conclusion changed. Round 2's verdict token was 'RESOLVED' (outside the binary grammar), so round 3 was a wording-only restatement with max_tier pinned per L-064-7: VERIFIED, empty issues list. Structured finding persisted to s1-issues.json with resolution annotations; raw outputs in s1-verification.md / -round-2.md / -round-3.md, never edited.",
+  "files_changed": [
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
+    "tools/dabbler-ai-orchestration/src/commands/gettingStartedActions.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldSeatSetup.test.ts",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/ai-assignment.md",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-verification.md",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-verification-round-2.md",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-verification-round-3.md",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-issues.json",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-close-reason.md",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/activity-log.json",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/session-state.json",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/session-events.jsonl"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "codex",
+    "provider": "openai",
+    "model": "gpt-5.4",
+    "effort": "low",
+    "reason": {
+      "code": "switch-due-to-cost",
+      "specifics": "Routed ai-assignment recommendation (gemini-pro analysis): Session 2 is procedural UAT-checklist authoring, screenshot, and release mechanics — well-suited to a cheaper orchestrator; no high-end model needed."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": ["L-064-3", "L-064-6", "L-064-7", "L-064-9", "L-064-12", "L-071-1"]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The verification evidence package was incomplete: the tracked file docs/session-sets/081-budget-input-scoped-to-direct-api/session-state.json appeared modified in git status --short but the packet's 'Full diff (tracked files, dist/ excluded)' section carried no hunk for it, so the packet's completeness claim overstated what was actually reviewable.",
+      "category": "completeness",
+      "issueId": "S081-S1-V1-001",
+      "issueType": "standards-departure",
+      "verificationMethod": "Cross-checked the packet's git status --short listing against the paths present in the provided diff.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Verifier labeled it Major (evidence-package completeness, the L-064-9 class extended to path-filtered diffs: the diff was scoped to media/ + src/ and silently omitted the session-set dir, where start_session's Step-1 boundary write had modified session-state.json). Remediation: round 2 re-sent the complete unfiltered git diff plus git status. Round 2 confirmed RESOLVED, the added hunk is session-lifecycle ledger state (status/startedAt/orchestrator), not an undisclosed code deliverable, and no other round-1 conclusion changed. Round 3 was a wording-only restatement (max_tier pinned per L-064-7) returning VERIFIED with an empty issues list.",
+      "resolved_in_round": 2
+    }
+  ]
+}

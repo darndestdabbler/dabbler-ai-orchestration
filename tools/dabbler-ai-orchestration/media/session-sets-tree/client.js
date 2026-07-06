@@ -293,6 +293,11 @@
     // warning and the D6 key warning both key on the selection, and the
     // re-render recomputes their visibility in one pass (radios carry no
     // typing focus to lose — the budget-input concern doesn't apply).
+    // Set 081 S1: the re-render also swaps the budget block in/out under
+    // the Direct-API row (omitted while Copilot is selected). gsState
+    // keeps the typed budget + zero-rule pick across the swap, so an
+    // api → copilot → api round-trip restores the operator's value —
+    // hiding never clears it.
     Array.from(root.querySelectorAll('input[name="gs-transport-profile"]')).forEach(function (input) {
       input.addEventListener("change", function () {
         if (input.checked) {
@@ -329,23 +334,29 @@
         var msg = { type: "gettingStartedAction", action: action };
         if (action === "build-structure") {
           msg.tier = gsState.tier;
-          // Set 063 S2 (spec D1): on Full, Build is blocked until the
-          // budget validates (required amount; $0 additionally needs the
-          // zero-rule pick). Lightweight never renders the input and
-          // posts no budget riders.
           if (gsState.tier !== "lightweight") {
-            var check = gsHtml.validateBudgetControls(gsState);
-            if (!check.ok) {
-              showBudgetError(check.error);
-              return; // button stays enabled; the operator fixes and retries
-            }
-            msg.budgetUsd = check.budgetUsd;
-            if (check.budgetUsd === 0) msg.zeroBudgetMethod = check.zeroMethod;
             // Set 079 S2 (Feature 1): the Full-tier seat-profile pick
             // rides the build so the host can run the guided Copilot
             // seat setup after the scaffold succeeds. Omitted on
             // Lightweight (the sub-choice block is not rendered there).
             msg.transportProfile = gsState.transportProfile;
+            // Set 063 S2 (spec D1) → scoped by Set 081 S1: on Full,
+            // Build is blocked until the budget validates (required
+            // amount; $0 additionally needs the zero-rule pick) — but
+            // ONLY while the budget block is live (the Direct-API
+            // sub-option selected). Under the Copilot seat the block
+            // is not rendered and Build posts no budget riders — a
+            // hidden input must never trip Build validation.
+            // Lightweight never renders the input either.
+            if (gsState.transportProfile !== "copilot-cli") {
+              var check = gsHtml.validateBudgetControls(gsState);
+              if (!check.ok) {
+                showBudgetError(check.error);
+                return; // button stays enabled; the operator fixes and retries
+              }
+              msg.budgetUsd = check.budgetUsd;
+              if (check.budgetUsd === 0) msg.zeroBudgetMethod = check.zeroMethod;
+            }
           } else {
             // Set 077 S3 (Feature 2): the verification-mode pick rides
             // the Lightweight build so the scaffold seeds the durable

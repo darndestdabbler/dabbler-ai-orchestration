@@ -81,7 +81,9 @@ export interface ScaffoldDeps {
    * ``ai_router/budget.yaml`` at scaffold time on the FULL tier only —
    * Lightweight never writes the file (the Set 058 D3 divergence stays
    * the sole one). No-clobber: an existing budget.yaml is kept and the
-   * skip reported via ``budgetOutcome``.
+   * skip reported via ``budgetOutcome``. Set 081 S1: callers gate this
+   * on the Direct-API sub-choice — a Copilot-seat Build passes no
+   * budget, so no budget.yaml is written on that path.
    */
   budget?: BudgetChoice;
   /** Timestamp source for the budget write (injectable for tests). */
@@ -375,11 +377,17 @@ export interface BuildStructureSeams {
   probePython?: typeof probePythonPresence;
   gitInit?: (projectDir: string) => Promise<void>;
   loadBundle?: () => TemplateBundle;
-  /** Replaces the whole withProgress scaffold step (render + install). */
+  /**
+   * Replaces the whole withProgress scaffold step (render + install).
+   * Set 081 S1: receives the EFFECTIVE budget (undefined under the
+   * copilot-cli profile) so Layer-2 tests can assert the caller
+   * condition without running the real install.
+   */
   runScaffold?: (
     ctx: BootstrapContext,
     bundle: TemplateBundle,
     pythonPath: string,
+    budget?: BudgetChoice,
   ) => Promise<{ result: ScaffoldResult; installOutcome: InstallOutcome | null }>;
   seatSetup?: typeof runCopilotSeatSetupWithProgress;
   showWarning?: (msg: string) => void;
@@ -443,6 +451,15 @@ export async function buildProjectStructureNoPrompt(
     isoDate(),
     verificationMode,
   );
+  // Set 081 S1: a Copilot-seat Build writes no budget.yaml — the budget
+  // governs metered provider-API verification spend, which the
+  // copilot-cli profile excludes by design (docs/concepts/tier-model.md),
+  // and absence has documented compat defaults (docs/budget-yaml-schema.md).
+  // Caller-side condition only: writeBudgetYaml itself is unchanged, and
+  // the action handler already drops the rider (this is the last line of
+  // defense for direct callers of this function).
+  const effectiveBudget =
+    transportProfile === "copilot-cli" ? undefined : budget;
   // S3 verification round 1 (Major 1): spawn the SAME interpreter the
   // pre-flight validated — on a python3-only POSIX host the probe
   // passes on `python3`, so the bootstrap must invoke `python3`, not
@@ -461,7 +478,7 @@ export async function buildProjectStructureNoPrompt(
   // subprocesses (S2 verification round 2).
   const runScaffold: NonNullable<BuildStructureSeams["runScaffold"]> =
     seams.runScaffold ??
-    (async (scaffoldCtx, scaffoldBundle, scaffoldPython) => {
+    (async (scaffoldCtx, scaffoldBundle, scaffoldPython, scaffoldBudget) => {
       let installOutcome: InstallOutcome | null = null;
       const scaffolded = await vscode.window.withProgress(
         {
@@ -476,7 +493,7 @@ export async function buildProjectStructureNoPrompt(
             bundle: scaffoldBundle,
             fileOps: makeFileOps(),
             structureOnly: true,
-            budget,
+            budget: scaffoldBudget,
             reportProgress: (m) => progress.report({ message: m }),
             installRouter: async () => {
               installOutcome = await installAiRouter({
@@ -493,7 +510,12 @@ export async function buildProjectStructureNoPrompt(
       );
       return { result: scaffolded, installOutcome };
     });
-  const { result, installOutcome } = await runScaffold(ctx, bundle, pythonPath);
+  const { result, installOutcome } = await runScaffold(
+    ctx,
+    bundle,
+    pythonPath,
+    effectiveBudget,
+  );
 
   // Set 063 S2 (spec D1): name the budget outcome so a kept existing
   // file is reported, not silent (the no-clobber "skip + report" rule).

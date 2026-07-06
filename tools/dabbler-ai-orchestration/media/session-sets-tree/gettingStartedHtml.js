@@ -338,9 +338,24 @@
    * every keystroke would drop focus). The validation element starts
    * hidden; client.js fills and reveals it when a Build click fails
    * validation.
+   *
+   * Set 081 S1: the block is additionally scoped to the Direct-API
+   * sub-choice — the budget governs metered provider-API verification
+   * spend, which the Copilot seat profile excludes by design
+   * (docs/concepts/tier-model.md). OMITTED (not hidden) while the
+   * copilot-cli sub-option is selected, matching the form's existing
+   * conditional pattern for this block: sub-choice flips already
+   * re-render the form surface (the Set 079 S1 radio listener), and
+   * gsState preserves the typed value across the re-render, so hiding
+   * never clears it. The gate keys on the explicit "copilot-cli" value
+   * — restoreGsState guarantees the live form's transportProfile is
+   * always "api" | "copilot-cli", so this is equivalent to requiring
+   * "api" while staying render-open for legacy callers that pass no
+   * transportProfile field.
    */
   function budgetBlockHtml(controls) {
     if (controls.tier === "lightweight") return "";
+    if (controls.transportProfile === "copilot-cli") return "";
     var parsed = parseBudgetInput(controls.budget == null ? "" : controls.budget);
     var zeroVisible = parsed.ok && parsed.value === 0;
     var manualChecked =
@@ -458,11 +473,18 @@
    * Copilot option is selected and the probe failed
    * (`copilotCliPresent === false`).
    * Set 080 S1: options render as {@link optionRowHtml} rows.
+   * Set 081 S1: the budget block ({@link budgetBlockHtml}) nests as an
+   * indented child of the Direct-API option row — present only while
+   * that sub-option is selected (the builder returns "" on
+   * copilot-cli, and then no child wrapper renders at all, keeping the
+   * two option rows adjacent so tree.css's `.gs-option-row +
+   * .gs-option-row` separator applies directly).
    */
   function transportProfileBlockHtml(controls, copilotCliPresent) {
     if (controls.tier === "lightweight") return "";
     var copilot = controls.transportProfile === "copilot-cli";
     var warningVisible = copilot && copilotCliPresent === false;
+    var budget = budgetBlockHtml(controls);
     return (
       '<div class="gs-transport-profile" data-gs-transport-profile>' +
         '<div class="gs-transport-profile-label">' +
@@ -474,6 +496,11 @@
           !copilot,
           TRANSPORT_PROFILE_API_TEXT,
         ) +
+        (budget
+          ? '<div class="gs-option-child" data-gs-option-child="api">' +
+              budget +
+            "</div>"
+          : "") +
         optionRowHtml(
           "gs-transport-profile",
           "copilot-cli",
@@ -544,7 +571,9 @@
    * providerKeyPresent); `controls` is the webview-local control
    * state `{ tier: "full"|"lightweight", parallel: boolean,
    * budget: string, zeroMethod: string|null }` so re-renders keep the
-   * operator's picks (Set 060 S2; budget controls Set 063 S2).
+   * operator's picks (Set 060 S2; budget controls Set 063 S2). Set 081
+   * S1: the budget block renders inside the transport-profile block
+   * (nested under the Direct-API option row), not as a sibling.
    */
   function renderGettingStarted(gs, controls) {
     var fullChecked = controls.tier === "lightweight" ? "" : " checked";
@@ -573,7 +602,6 @@
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="lightweight"' + lightChecked + '> Lightweight</label>' +
       '</div>' +
       transportProfileBlockHtml(controls, gs.copilotCliPresent) +
-      budgetBlockHtml(controls) +
       verificationModeBlockHtml(controls) +
       '<button class="gs-button" type="button" data-gs-action="build-structure">' +
         'Build project structure' +

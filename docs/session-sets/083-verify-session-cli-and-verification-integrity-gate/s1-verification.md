@@ -1,0 +1,21 @@
+## ISSUES FOUND
+
+- **Issue 1:** The L-064-7 guard compares against the latest verification tier it can find, not the **round-1 verifier's tier** the spec requires.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Details:**
+    - **Location:** `ai_router/verify_session.py`, `round1_verifier_tier()` and its caller in `run()`; reinforced by `ai_router/tests/test_verify_session.py::TestTierPin::test_round1_verifier_tier_reads_last_matching_row`.
+    - **Violation:** The task requires: `the CLI refuses a --max-tier below the round-1 verifier's tier on a --round >= 2 call without --wording-only`.
+    - **Impact:** On round 3+ substantive re-verifies, this can silently allow a lower tier than round 1 if round 2 used a lower tier. That defeats the exact protection L-064-7 is supposed to enforce, so a reviewer should not merge it as-is.
+    - **Evidence:** `round1_verifier_tier()` explicitly returns the "most recent session-verification row" and overwrites `tier` on every match (`tier = row_tier  # last matching row wins`). It matches only on `(task_type, session_set, session_number)`, with no way to isolate round 1. The test suite codifies that behavior with “Last matching row wins.” `run()` then uses that value for every `round_number >= 2`. That is not the same as “round-1 verifier's tier.”
+    - **Correct answer:** Read or persist the actual round-1 verifier tier and compare against that value only; do not use the last matching verification row.
+
+- **Issue 2:** The new pytest suite is not wired to the new module it is supposed to validate.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Details:**
+    - **Location:** `ai_router/tests/test_verify_session.py`, top-level import.
+    - **Violation:** The deliverable is `ai_router/verify_session.py` and the session requires its “Layer-1 pytest” suite. The tests need to exercise that module.
+    - **Impact:** As written, the coverage claim for the new CLI is unsubstantiated: the suite may fail to import, or it may exercise some other `verify_session` module if one exists on `sys.path`. Either way, a reasonable reviewer cannot trust this as proof that the shipped `ai_router.verify_session` CLI is tested.
+    - **Evidence:** The test file imports `verify_session as vs`, but the only new implementation added in this diff is `ai_router/verify_session.py`. The diff adds no top-level `verify_session.py` shim or alias.
+    - **Correct answer:** Import the actual target explicitly, e.g. `import ai_router.verify_session as vs` or `from ai_router import verify_session as vs`.

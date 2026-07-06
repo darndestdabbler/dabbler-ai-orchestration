@@ -1,0 +1,109 @@
+{
+  "sessionSetName": "083-verify-session-cli-and-verification-integrity-gate",
+  "createdDate": "2026-07-06T16:35:52.703374+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-06T16:35:52.704374+00:00",
+      "description": "Operator set pathAwareCritique: required.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "required"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 0,
+      "stepKey": "session-1/ai-assignment",
+      "dateTime": "2026-07-06T12:48:48.606164-04:00",
+      "description": "Routed ai-assignment.md analysis (gemini-pro, $0.0162) and saved it to the set folder.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "inputTokens": 4710,
+          "outputTokens": 1032,
+          "costUsd": 0.0162
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "s1.cli",
+      "dateTime": "2026-07-06T12:48:48.606164-04:00",
+      "description": "Implemented ai_router/verify_session.py: the Step-6 verify_session CLI (evidence assembly with git status + full diff and default generated-bundle exclusions, verification.md template fill, cross-provider route(task_type=session-verification), raw sN-verification*.md write-before-display, sN-issues*.json envelope on findings, classify_blocking wiring, raw-JSON disposition patch, L-064-7 tier-pin refusal, --dry-run). --help documents the contract.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "s1.tests",
+      "dateTime": "2026-07-06T12:48:48.606164-04:00",
+      "description": "Layer-1 pytest suite ai_router/tests/test_verify_session.py: 39 tests covering untracked-file visibility, exclusion defaults/overrides, artifact naming across rounds, idempotent field-preserving disposition patch, blocking classification wiring (exit 0/4), dry-run writes-nothing-routes-nothing, tier-pin refusal matrix, route-failure path. Full suite: 2522 passed, 5 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "s1.dogfood",
+      "dateTime": "2026-07-06T12:53:16.339728-04:00",
+      "description": "Dogfood round 1: routed gate REQUIRED (blast-radius, multi-module, breadth); ran this session's own Step 6 via the new CLI. Verifier gpt-5-4 returned ISSUES_FOUND with 2 Major findings ($0.229): (1) round1_verifier_tier read the LAST matching metrics row (would compare the L-064-7 pin against round 2's tier on a round-3 call) - accepted, fixed to first-matching-row + added a regression test; (2) bare 'import verify_session' in the test suite - context-gap vs the documented conftest sys.path convention, but accepted anyway (conftest supports either form; package-qualified import makes the target unambiguous). CLI wrote s1-verification.md, s1-issues.json, and the disposition patch exactly per contract; suite now 40 passed.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.229052
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "s1.dogfood",
+      "dateTime": "2026-07-06T12:55:59.730864-04:00",
+      "description": "Dogfood round 2 ($0.185, gpt-5-4): 1 new Major - the round-1 fix could still fall through to a later round's tier when the round-1 metrics row exists but its tier is unreadable (fail-open contract violated). Accepted, fixed: the first matching row IS round 1 unconditionally; unreadable tier returns None. Added regression test test_unreadable_round1_row_fails_open_not_through. Suite: 41 passed.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.18498
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "s1.dogfood",
+      "dateTime": "2026-07-06T12:58:13.009993-04:00",
+      "description": "Dogfood round 3 ($0.079, gpt-5-4): VERIFIED - the unreadable-round-1-row fix confirmed, no regressions. Dogfood complete: all three Step-6 rounds of this session ran through the new CLI itself. Total routed cost this session ~ $0.51.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.079047
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/build-test",
+      "dateTime": "2026-07-06T12:58:13.009993-04:00",
+      "description": "Final suite run before close: 2524 passed, 5 skipped (baseline skips), 0 failed.",
+      "status": "complete"
+    }
+  ]
+}

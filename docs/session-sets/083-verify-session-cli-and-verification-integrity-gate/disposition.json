@@ -1,0 +1,41 @@
+{
+  "status": "completed",
+  "summary": "Set 083 S1: shipped ai_router/verify_session.py, the Step-6 verify_session CLI (deterministic evidence bundle with git status + full diff and default generated-bundle exclusions, verification.md template fill, cross-provider route(task_type=session-verification), raw sN-verification*.md write-before-display, sN-issues*.json envelope on findings, classify_blocking wiring, idempotent field-preserving disposition patch, L-064-7 tier-pin refusal, --dry-run) plus its 41-test Layer-1 suite. Dogfooded per spec: this session's own Step 6 ran through the new CLI for all three rounds (routed gate REQUIRED); gpt-5-4 found 3 real Majors across rounds 1-2 (tier guard last-row vs round-1-row, test import target, unreadable-round-1-row fallthrough), all fixed with regression tests; round 3 VERIFIED.",
+  "files_changed": [
+    "ai_router/verify_session.py",
+    "ai_router/tests/test_verify_session.py",
+    "docs/planning/lessons-learned.md",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/ai-assignment.md",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/activity-log.json",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/session-state.json",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/session-events.jsonl",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s1-verification.md",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s1-verification-round-2.md",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s1-verification-round-3.md",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s1-issues.json",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s1-issues-round-2.json",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s1-close-reason.md",
+    "docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/disposition.json"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "gemini-code-assist",
+    "provider": "google",
+    "model": "gemini-3-pro",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "The routed ai-assignment.md analysis (gemini-pro, Step 3.5) recommends Gemini Code Assist gemini-3-pro @ high for Session 2: surgical modification of existing gate/validation modules (close_session.py, gate_checks.py, disposition.py) plus a comprehensive edge-case test matrix, which the analysis rated a core strength for codebase-aware surgical work."
+    }
+  },
+  "blockers": [],
+  "verification_verdict": "VERIFIED",
+  "lessons_cited": [
+    "L-064-3",
+    "L-064-7",
+    "L-064-9",
+    "L-071-1",
+    "L-079-1"
+  ]
+}

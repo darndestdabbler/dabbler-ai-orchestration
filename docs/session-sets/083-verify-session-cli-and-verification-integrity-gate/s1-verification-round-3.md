@@ -1,0 +1,3 @@
+## VERIFIED
+
+I checked the only round-3 target: `ai_router/verify_session.py::round1_verifier_tier()` now treats the **first matching** `session-verification` row as round 1 unconditionally and returns `None` immediately when that row’s `tier` is unreadable, so it can no longer fall through to a later round’s tier. The added regression test `test_unreadable_round1_row_fails_open_not_through` exercises exactly the malformed-round-1 / later-valid-round-2 case, and the surrounding existing tests still cover readable first-row, later-lower-tier, bool-tier, missing-file, and slug/path matching behavior, so I do not see a regression from this fix.

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "083-verify-session-cli-and-verification-integrity-gate",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "The verify_session CLI",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "The verification-integrity close gate",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "Instruction surfaces, UAT, and the two releases",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

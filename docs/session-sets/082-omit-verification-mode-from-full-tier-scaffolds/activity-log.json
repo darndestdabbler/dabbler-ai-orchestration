@@ -167,6 +167,14 @@
           "costUsd": 0.062152
         }
       ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "s2.release",
+      "dateTime": "2026-07-06T12:29:46.847665-04:00",
+      "description": "Release published: Test run 28806467299 green on e9bbfae; operator authorized the tag push; tag vsix-v0.38.0 pushed; publish-vscode.yml run 28806840851 completed success (extension 0.38.0 live on the Marketplace). repository-reference.md row and version-walk entry flipped to Published with run links.",
+      "status": "complete"
     }
   ]
 }

@@ -6,15 +6,15 @@
     {
       "number": 1,
       "title": "Conditional template line + tier-gated marker",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-06T11:07:00.827777-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-06T11:28:50.486851-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-fable-5"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

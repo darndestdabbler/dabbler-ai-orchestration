@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "081-budget-input-scoped-to-direct-api",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-07-05T22:40:25.565841-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "VERIFIED",
+      "summary": "I reviewed the actual Session 1 implementation and evidence across the changed source, tests, and supporting docs: the webview HTML/client files (`media/session-sets-tree/gettingStartedHtml.js`, `client.js`, `tree.css`), the host/build path (`src/commands/gettingStartedActions.ts`, `gitScaffold.ts`), the new/updated Layer-2 suites (`gettingStartedHtml.test.ts`, `gettingStartedActions.test.ts`, `gitScaffoldSeatSetup.test.ts`), the protocol contract (`src/types/sessionSetsWebviewProtocol.ts`), and the set spec plus verification artifacts. The code on disk matches the set's load-bearing claims: the budget block is omitted unless Full+api, the client only validates/posts budget riders while that block is live, the action router drops/scopes budget enforcement correctly on the copilot path, and the scaffold seam receives no budget under `copilot-cli`; the tests explicitly cover placement, omission, persistence, and the build/action matrices, and I did not find a blocking correctness or contract-drift defect in the shipped changes.",
+      "findings": []
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the changes for the session set \"Budget Input Scoped To The Direct-API Sub-Choice Spec\" by inspecting the changed files on disk. The implementation correctly matches the summary and spec.\n\nI verified the following claims against the code:\n1.  **UI Correctness**: In `tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js`, the `budgetBlockHtml` function now correctly returns an empty string (omitting the block) if the tier is 'lightweight' or if `transportProfile` is 'copilot-cli'. The `transportProfileBlockHtml` function nests the budget block's output inside a `.gs-option-child` div immediately following the 'Direct provider API keys' option row, confirming the specified UI restructuring.\n2.  **Build Gating**: In `tools/dabbler-ai-orchestration/src/commands/gettingStartedActions.ts`, `asBudgetChoice` now correctly returns `undefined` when `transportProfile` is 'copilot-cli', preventing budget data from being processed for Copilot-seat builds. The fail-closed check for a missing budget in `routeGettingStartedAction` has been correctly scoped to only apply when `transportProfile` is not 'copilot-cli'.\n3.  **Scaffold Logic**: In `tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts`, `buildProjectStructureNoPrompt` correctly computes an `effectiveBudget` which is `undefined` for 'copilot-cli', ensuring that `runScaffold` (and by extension `writeBudgetYaml`) is not passed a budget for Copilot-based projects, thus preventing `budget.yaml` from being written.\n4.  **Test Coverage**: The new and modified test suites in `src/test/suite/` confirm these changes. Specifically, `gettingStartedHtml.test.ts` asserts the conditional rendering, `gettingStartedActions.test.ts` pins the backend routing logic, and `gitScaffoldSeatSetup.test.ts` verifies the build matrix, ensuring `budget.yaml` is only written for the Direct-API path.\n\nThe implementation is correct, complete, and consistent with its documentation.",
+      "findings": []
+    }
+  ]
+}

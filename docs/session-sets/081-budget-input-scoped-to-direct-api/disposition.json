@@ -1,41 +1,36 @@
 {
   "status": "completed",
-  "summary": "Session 1 of 2 (Conditional budget block + Build gating): the Full-tier budget block now nests as an indented child of the 'Direct provider API keys' option row and renders only while Full + the api sub-option are selected (omitted, not hidden, matching the block's existing tier-gate pattern; sub-choice flips re-render and gsState preserves the typed value, so an api->copilot->api round-trip restores it). Build is honest about the Copilot seat: client.js validates/posts budget riders only while the block is live, gettingStartedActions drops stray riders under copilot-cli and scopes the Set 063 fail-closed reject to the Direct-API path, and gitScaffold's effectiveBudget caller condition passes no budget to the scaffold step on the Copilot path (writeBudgetYaml unchanged; a missing budget.yaml has documented compat defaults). New Layer-2 suites pin placement/visibility, flip persistence, the Build write matrix at the runScaffold seam, and the action-router matrix; zero semantic edits to pre-existing budget parsing / zero-rule / no-clobber tests (the Set 080 tripwire). tsc clean; Layer-2 1265/0; Layer-3 Playwright 19/19 locally.",
+  "summary": "Session 2 of 2 (UAT, screenshot, and release): authored the per-set ad-hoc UAT checklist to the Set 078/079/080 bar (5 walks; literal source-re-grounded strings; fresh suite counts quoted per walk: Set 081 S1 grep 12/12, build matrix 7/7, restoreGsState 26/26, writeBudgetYaml 3/3, full Layer-2 1265/0, tsc clean; every non-judgment functional item carries ProgrammaticVerification; two REAL cold-start Builds, one per sub-option, asserting the budget.yaml write matrix per L-079-3). Operator walked it clean: all 6 functional/judgment items PASS. The one 'Other' finding (the 'Build project structure' button read as belonging to the last sub-option row) was remediated CSS-only in-session -- one tree.css rule closes BOTH sub-choice groups (border-bottom + margin-bottom; the Lightweight verification group had the identical class of issue, L-069-1) -- and the operator re-checked against a rebuilt VSIX; the resolution is recorded inline in the checklist's Other row per the Set 080 attribution precedent. Operator captured the refreshed getting-started.png. Advisory end-of-set path-aware critique produced via the first-party pull_critique producer (openai:gpt-5.4 + google:gemini-2.5-pro over the repo-root sandbox with the whole-set diff exposed): BOTH arms VERIFIED, zero findings; artifact saved raw. Release prep: extension bumped 0.37.0 (package.json + package-lock.json -- the lockfile had silently sat at 0.34.0 through two releases; npm version realigned it), CHANGELOG 0.37.0 entry, repository-reference updated with honest publish-pending phrasing (L-078-1) to flip to Published after the operator-preauthorized tag push.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
-  "verification_notes": "Routed gate: REQUIRED (breadth: 8 files >= 4) over the session diff. Cross-provider verification on gpt-5-4 (openai; orchestrator claude/anthropic). Round 1 ISSUES_FOUND with one Major (S081-S1-V1-001): the evidence packet's diff was path-filtered to media/+src/ and omitted the tracked session-state.json Step-1 boundary write visible in git status --short — the L-064-9 evidence-completeness class extended to path-filtered diffs. Remediated by re-sending the complete unfiltered diff; round 2 (substantive narrow re-verify, no max_tier pin) confirmed RESOLVED, the added hunk is workflow ledger state and no other round-1 conclusion changed. Round 2's verdict token was 'RESOLVED' (outside the binary grammar), so round 3 was a wording-only restatement with max_tier pinned per L-064-7: VERIFIED, empty issues list. Structured finding persisted to s1-issues.json with resolution annotations; raw outputs in s1-verification.md / -round-2.md / -round-3.md, never edited.",
+  "verification_notes": "Routed gate: REQUIRED (blast-radius: cross-artifact+index; multi-module {docs, tools}; breadth 10 files >= 4; build-ci-config: package.json + package-lock.json). Cross-provider verification on gpt-5-4 (openai; orchestrator claude/anthropic): VERIFIED in round 1, no blocking findings. Two NITS (non-blocking per L-071-1, no remediation round opened): (1) the evidence prose said the lockfile went 0.36.0->0.37.0 when the diff shows 0.34.0->0.37.0 -- a write-up slip, the file change itself is correct (the lockfile version had drifted through the 0.35.0/0.36.0 releases and is now realigned); (2) the divider remediation + operator re-check was recorded in prose/activity-log but not inline in the checklist -- addressed post-verdict by appending the attributed resolution note to the checklist's Other row (Set 080 precedent). Raw output in s2-verification.md, never edited. Evidence bundle included the complete unfiltered working-tree diff AND git status --short so the untracked checklist was visible (L-064-9); the S1 cost lesson held (round 1 cost $0.19 vs S1's $0.60 overcorrection).",
   "files_changed": [
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
     "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
-    "tools/dabbler-ai-orchestration/src/commands/gettingStartedActions.ts",
-    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldSeatSetup.test.ts",
-    "tools/dabbler-ai-orchestration/dist/extension.js",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/media/getting-started.png",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/package-lock.json",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "docs/repository-reference.md",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/081-budget-input-scoped-to-direct-api-uat-checklist.json",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/path-aware-critique.json",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/s2-verification.md",
+    "docs/session-sets/081-budget-input-scoped-to-direct-api/s2-close-reason.md",
     "docs/session-sets/081-budget-input-scoped-to-direct-api/ai-assignment.md",
-    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-verification.md",
-    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-verification-round-2.md",
-    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-verification-round-3.md",
-    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-issues.json",
-    "docs/session-sets/081-budget-input-scoped-to-direct-api/s1-close-reason.md",
     "docs/session-sets/081-budget-input-scoped-to-direct-api/activity-log.json",
     "docs/session-sets/081-budget-input-scoped-to-direct-api/session-state.json",
     "docs/session-sets/081-budget-input-scoped-to-direct-api/session-events.jsonl"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
-    "engine": "codex",
-    "provider": "openai",
-    "model": "gpt-5.4",
-    "effort": "low",
+    "engine": "gemini",
+    "provider": "google",
+    "model": "gemini-2.5-pro",
+    "effort": "high",
     "reason": {
-      "code": "switch-due-to-cost",
-      "specifics": "Routed ai-assignment recommendation (gemini-pro analysis): Session 2 is procedural UAT-checklist authoring, screenshot, and release mechanics — well-suited to a cheaper orchestrator; no high-end model needed."
+      "code": "switch-due-to-fit",
+      "specifics": "Routed ai-assignment recommendation (gemini-pro analysis, authored at S1): the next session set will likely revert to complex implementation work requiring a more capable model."
     }
   },
   "blockers": [],
-  "lessons_cited": ["L-064-3", "L-064-6", "L-064-7", "L-064-9", "L-064-12", "L-071-1"]
+  "lessons_cited": ["L-064-3", "L-064-9", "L-064-12", "L-069-1", "L-071-1", "L-078-1", "L-079-3"]
 }

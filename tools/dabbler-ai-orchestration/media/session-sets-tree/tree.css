@@ -489,6 +489,15 @@ body.vscode-light, body.vscode-high-contrast-light {
 .gs-option-child + .gs-option-row {
   border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
 }
+/* Set 081 S2 (UAT feedback): close each sub-choice group with the same
+   light rule that separates its rows, so the "Build project structure"
+   button below the group does not read as belonging to the last option
+   row. One rule covers both groups (only one renders per tier). */
+.gs-transport-profile,
+.gs-verification-mode {
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  margin-bottom: 6px;
+}
 .gs-option-row input[type="radio"] { margin: 1px 0 0; }
 .gs-option-name {
   font-size: 12px;

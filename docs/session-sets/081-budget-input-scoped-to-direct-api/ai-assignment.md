@@ -53,10 +53,26 @@ moderate
 | 4    | Run advisory critique and prepare final commit | Route Tier 2 |
 
 ### Actuals (filled after the session)
-- Orchestrator used:
-- Total routed cost:
-- Deviations from recommendation:
-- Notes for next-session calibration:
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium
+- Total routed cost: $0.1942 metered (cross-provider `session-verification`
+  on gpt-5-4, VERIFIED round 1) + the two pull-critique arms
+  (openai:gpt-5.4, google:gemini-2.5-pro), which the pull executor does
+  not record as routed-call rows in router-metrics.jsonl
+- Deviations from recommendation: the operator started the session on
+  Claude Code rather than the recommended Codex CLI (orchestrator choice
+  is the human's; workflow Rule 7). Checklist authoring, the CSS
+  remediation, and the release-prep edits were orchestrator-direct
+  rather than routed Tier-2 calls — each was mechanical/spec-dictated
+  (the same Set 080/081-S1 precedent); the critique and verification
+  steps routed as planned.
+- Notes for next-session calibration: the routed gate tripped on the
+  release diff exactly as S1 predicted (build-ci-config via package.json
+  + package-lock.json, plus blast-radius/multi-module/breadth). The S1
+  evidence-bundle lesson held: complete unfiltered diff + git status,
+  no dist/ bundle — round-1 VERIFIED at $0.19 (vs S1's $0.76 three-round
+  loop). One latent-drift find: package-lock.json had sat at 0.34.0
+  through two releases; `npm version <ver> --no-git-tag-version` keeps
+  the pair aligned and should be the standard bump command.
 
 **Next-session orchestrator recommendation (Session 3):** Gemini Code Assist gemini-2.5-pro @ effort=high
 Rationale: The next session set will likely revert to complex implementation work requiring a more capable model.

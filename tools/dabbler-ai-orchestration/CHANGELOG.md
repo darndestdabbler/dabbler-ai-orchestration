@@ -5,6 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.37.0] — 2026-07-05 (Set 081 — budget input scoped to the Direct-API sub-choice)
+
+Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero
+`ai_router/` changes in this set).
+
+### Changed
+
+- **The Full-tier verification-budget block is scoped to the "Direct
+  provider API keys" sub-option.** The budget label, input, help text,
+  $0 zero-rule radio pair, and validation element now render as an
+  indented child of the Direct-API option row inside the "Provider
+  access (how routed calls run)" group — present only while the Full
+  tier AND that sub-option are selected. With "GitHub Copilot CLI seat"
+  selected the block is omitted from the DOM entirely (the form's
+  existing conditional pattern — hiding never clears state), because
+  the budget governs metered provider-API verification spend, which the
+  `copilot-cli` seat profile excludes by design (seat billing is not
+  locally meterable; see `docs/concepts/tier-model.md`). Requested by
+  the operator during the Set 080 UAT walk. Wording (label, help,
+  placeholder, $0 copy), the `budget.yaml` schema, the zero-rule
+  semantics, and the Lightweight tier are all unchanged; a typed budget
+  value survives sub-choice flips and window reloads.
+- **Build is honest about the scoping.** A Full + Copilot-seat Build
+  never validates the (absent) budget input and writes **no**
+  `ai_router/budget.yaml` — absence is a documented, supported state
+  with compat defaults (`docs/budget-yaml-schema.md`), keeping a later
+  flip back to the api profile clean (the operator authors a budget
+  then, informed by real usage). The budget rider is dropped at both
+  defense lines (action handler and the scaffold caller;
+  `writeBudgetYaml` itself is unchanged). The Direct-API Build path is
+  byte-identical to 0.36.0: validate, write `budget.yaml` no-clobber,
+  report the outcome in the completion notification.
+- **Each sub-choice group now closes with a bottom rule** (UAT-walk
+  feedback in this set): the same light `--vscode-panel-border` line
+  that separates option rows also separates the group from the "Build
+  project structure" button below it, so the button no longer reads as
+  belonging to the last option row. Applies to both groups (Full's
+  provider access, Lightweight's verification mode).
+- **README screenshot refreshed.** `getting-started.png` shows the
+  budget block nested under the Direct-API row with the new group
+  divider (operator-captured against a locally built 0.37.0-candidate
+  VSIX).
+
 ## [0.36.0] — 2026-07-05 (Set 080 — Getting Started sub-choice legibility)
 
 Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero

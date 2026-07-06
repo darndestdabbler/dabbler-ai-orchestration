@@ -64,9 +64,32 @@ can learn it.
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
 | `dabbler-ai-router` | `0.28.0` | **Published.** Sequenced per the release-ordering invariant: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437` — the commit where the 0.27.0 version bump landed, before Set 078 bumped further), then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`). Both confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.36.0` | **Published.** Set 080 (Getting Started sub-choice legibility; extension-only — `ai_router` untouched, router stays `0.28.0`). Presentation-only row layout for both step-1 sub-choice groups + README screenshot refresh. Per-set UAT walked and attested clean by the requesting operator 2026-07-05: all five items PASS, including both legibility judgment items (the set's declared gate); Walk 1's functional checkbox was initially saved unchecked by oversight and attested PASS via chat (resolution note recorded in the checklist; tracked as S080-S2-V1-001). Published 2026-07-05 (tag `vsix-v0.36.0`, tagged commit `2efaa92`, publish-vscode.yml run [28760570916](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28760570916)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.37.0` | **Version bump committed; publish pending operator-authorized tag push.** Set 081 (budget input scoped to the Direct-API sub-choice; extension-only — `ai_router` untouched, router stays `0.28.0`). The Full-tier verification-budget block nests as an indented child of the "Direct provider API keys" option row and renders only while Full + that sub-option are selected; a Copilot-seat Build skips budget validation and writes no `budget.yaml` (absence has documented compat defaults); each sub-choice group closes with a bottom rule (this set's UAT-walk feedback). Per-set UAT walked and attested 2026-07-05: all six functional/judgment items PASS across five walks including one REAL cold-start Build per sub-option (L-079-3); the one Other finding (group/button divider) was remediated CSS-only and operator re-checked. This row flips to **Published** with the run link once the `vsix-v0.37.0` tag push completes. | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
+
+- **Extension `0.37.0`** — Set 081, budget input scoped to the
+  Direct-API sub-choice. Extension-only (`ai_router` untouched; router
+  stays `0.28.0`). The Full-tier verification-budget block (label,
+  input, help, $0 zero-rule pair, validation element) moves from below
+  the provider-access group to an indented child of the "Direct
+  provider API keys" option row, rendered only while Full + that
+  sub-option are selected — omitted (not hidden) on the Copilot seat
+  pick, matching the form's existing conditional pattern; a typed value
+  survives sub-choice flips and window reloads. Build honesty: a
+  Copilot-seat Build validates no budget and writes no
+  `ai_router/budget.yaml` (absence has documented compat defaults;
+  `verification_method` → `api` when absent), with the rider dropped at
+  both the action handler and the scaffold caller (`writeBudgetYaml`
+  unchanged); the Direct-API Build path is unchanged. UAT-walk feedback
+  in this set added a closing bottom rule under both sub-choice groups
+  so the "Build project structure" button no longer reads as part of
+  the last option row. README `getting-started.png` refreshed
+  (operator-captured). Operator-requested during the Set 080 UAT walk;
+  per-set UAT walked 2026-07-05 with one REAL cold-start Build per
+  sub-option asserting the `budget.yaml` write matrix (L-079-3).
+  **Publish pending** — this entry gains the tag/run details once the
+  operator-authorized `vsix-v0.37.0` tag push completes.
 
 - **Extension `0.36.0`** — Set 080, Getting Started sub-choice
   legibility. Extension-only (`ai_router` untouched; router stays

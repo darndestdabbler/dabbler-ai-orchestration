@@ -423,7 +423,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   done. Record the resolved installed version in the close-out, not just the new floor.
 
 ## A Rollback Recipe Naming A Pinned Version Must Confirm That Version Is Actually Available
-<!-- lesson: id="L-078-1" added-set="078" last-used-set="079" status="active" scope="portable" -->
+<!-- lesson: id="L-078-1" added-set="078" last-used-set="081" status="active" scope="portable" -->
 
 - **Context:** Writing a rollback/downgrade recipe as part of a release-prep session,
   before the referenced versions have actually published (Set 078 S5's `copilot-cli`
@@ -501,7 +501,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   stated intent before any session work runs.
 
 ## Dogfood The True Cold Start — A Pre-Seeded Fixture Masks First-Run Defects
-<!-- lesson: id="L-079-3" added-set="079" last-used-set="079" status="active" scope="portable" -->
+<!-- lesson: id="L-079-3" added-set="079" last-used-set="081" status="active" scope="portable" -->
 
 - **Context:** Live dogfoods of onboarding / scaffold / install / first-run
   flows — any deliverable whose job is to provision state from nothing.

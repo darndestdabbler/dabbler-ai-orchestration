@@ -1,7 +1,7 @@
 {
   "sessionSetName": "081-budget-input-scoped-to-direct-api",
   "createdDate": "2026-07-06T01:12:05.129957+00:00",
-  "totalSessions": 0,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -100,6 +100,71 @@
           "costUsd": 0.004688
         }
       ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "s2.uat",
+      "dateTime": "2026-07-05T21:48:22.936103-04:00",
+      "description": "Authored 081-budget-input-scoped-to-direct-api-uat-checklist.json to the Set 078/079/080 bar: 5 walks (placement Full+api incl. one judgment item; absence on Full+copilot and Lightweight; persistence across flip round-trip + window reload; one REAL cold-start Build per sub-option asserting the budget.yaml write matrix, L-079-3). Every quoted string re-grounded against current source; fresh suite counts quoted per walk (Set 081 S1 grep 12/12, build matrix 7/7, restoreGsState 26/26, writeBudgetYaml 3/3, full Layer-2 1265/0, tsc clean). Ad-hoc mechanical floor validated: every non-judgment functional item carries ProgrammaticVerification. Local VSIX packaged for the walk (dabbler-ai-orchestration-0.36.0.vsix, contains Set 081 S1 changes). Session paused for the operator walk.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "s2.uat",
+      "dateTime": "2026-07-05T22:24:19.182009-04:00",
+      "description": "Operator walk complete: all 6 functional/judgment items PASS across the 5 walks (both cold-start Builds included). One Other finding (Walk 4): the Build project structure button reads as belonging to the last sub-option row; wants a divider between the group and the button. Remediated CSS-only per simplicity-first: one tree.css rule closes BOTH sub-choice groups (.gs-transport-profile, .gs-verification-mode { border-bottom + margin-bottom }) -- the Lightweight verification group is the same class of issue (L-069-1). Gates re-run: Layer-2 1265/0, tsc clean, Layer-3 Playwright 18 passed + 1 flake (blocked-by-prereqs triggerRefresh timing; passes 4/4 in isolation -- not a regression, spec is unrelated to the form). VSIX rebuilt for the operator divider re-check.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/path-aware-critique",
+      "dateTime": "2026-07-05T22:40:50.407880-04:00",
+      "description": "Advisory end-of-set path-aware critique produced via python -m ai_router.pull_critique (first-party producer; default provider pair openai:gpt-5.4 + google:gemini-2.5-pro; sandbox = repo root; --diff-base bba3826 exposing the whole set diff). BOTH arms VERIFIED with zero findings; artifact saved raw to path-aware-critique.json (level advisory, matching the recorded set-start policy).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "s2.screenshot",
+      "dateTime": "2026-07-05T22:45:39.586269-04:00",
+      "description": "Operator captured refreshed getting-started.png against the rebuilt candidate VSIX (budget block nested under the Direct-API row + the new group-closing divider).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/routed-gate",
+      "dateTime": "2026-07-05T22:45:39.586269-04:00",
+      "description": "routed_gate verdict REQUIRED (blast-radius cross-artifact+index; multi-module docs+tools; breadth 10 files >= 4; build-ci-config package.json + package-lock.json) -> cross-provider session-verification ran.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/verification",
+      "dateTime": "2026-07-05T22:45:39.586269-04:00",
+      "description": "Cross-provider session-verification (gpt-5-4): VERIFIED round 1, no blocking findings; two non-blocking NITS (lockfile-version prose slip; checklist-inline remediation note, appended post-verdict with attribution). Raw output s2-verification.md, never edited. Evidence: complete unfiltered diff + git status (L-064-9), no dist/ bundle.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 14197,
+          "outputTokens": 10578,
+          "costUsd": 0.194163
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "s2.release",
+      "dateTime": "2026-07-05T22:45:39.586269-04:00",
+      "description": "Release prep: extension 0.36.0 -> 0.37.0 (npm version; realigned the drifted 0.34.0 lockfile), CHANGELOG 0.37.0 entry, repository-reference status row + version walk (honest publish-pending phrasing per L-078-1). Lessons cited via cite_lessons --set 81. Tag push preauthorized by the operator; publish details flip in the final close-out commit.",
+      "status": "in-progress"
     }
   ]
 }

@@ -64,7 +64,7 @@ can learn it.
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
 | `dabbler-ai-router` | `0.28.0` | **Published.** Sequenced per the release-ordering invariant: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437` — the commit where the 0.27.0 version bump landed, before Set 078 bumped further), then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`). Both confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.36.0` | **Version-bumped; publish pending the operator-authorized `vsix-v0.36.0` tag push.** Set 080 (Getting Started sub-choice legibility; extension-only — `ai_router` untouched, router stays `0.28.0`). Presentation-only row layout for both step-1 sub-choice groups + README screenshot refresh. Per-set UAT walked and attested clean by the requesting operator 2026-07-05: all five items PASS, including both legibility judgment items (the set's declared gate); Walk 1's functional checkbox was initially saved unchecked by oversight and attested PASS via chat (resolution note recorded in the checklist; tracked as S080-S2-V1-001). Prior release `0.35.0` (Set 079) published 2026-07-05 (tag `vsix-v0.35.0`, tagged commit `c2ed2b4`, publish-vscode.yml run [28751504260](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28751504260)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.36.0` | **Published.** Set 080 (Getting Started sub-choice legibility; extension-only — `ai_router` untouched, router stays `0.28.0`). Presentation-only row layout for both step-1 sub-choice groups + README screenshot refresh. Per-set UAT walked and attested clean by the requesting operator 2026-07-05: all five items PASS, including both legibility judgment items (the set's declared gate); Walk 1's functional checkbox was initially saved unchecked by oversight and attested PASS via chat (resolution note recorded in the checklist; tracked as S080-S2-V1-001). Published 2026-07-05 (tag `vsix-v0.36.0`, tagged commit `2efaa92`, publish-vscode.yml run [28760570916](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28760570916)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
 
@@ -84,9 +84,14 @@ can learn it.
   so already-attested Set 079 walks did not need re-walking;
   operator-requested during that set's UAT, and the same operator
   attested the legibility judgment in this set's per-set UAT walk
-  (2026-07-05). Publish state: version-bumped; `vsix-v0.36.0` tag push
-  held for operator authorization (this entry updates with the run link
-  once published).
+  (2026-07-05). **Published 2026-07-05** (tag `vsix-v0.36.0`, tagged
+  commit `2efaa92`, publish-vscode.yml run
+  [28760570916](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28760570916)).
+  Follow-up queued: Set 081 (scope/condition the Full-tier verification-
+  budget input to the "Direct provider API keys" sub-choice,
+  operator-requested during this set's UAT walk — the budget is inert
+  under the Copilot seat profile, whose cost-keyed guards are excluded
+  by design).
 
 - **Extension `0.35.0`** — Set 079, Copilot seat-profile onboarding and
   verification-mode copy. Extension-only (`ai_router` untouched; router

@@ -47,7 +47,24 @@ low
 | 4 | Version bump, CHANGELOG, repository-reference, commit, push, tag | Orchestrator direct action (`local_exec`): run sequence of file edits (using Tier 1 `file_patch` tasks) and git/npm CLI commands. |
 
 ### Actuals (filled after the session)
-- Orchestrator used:
-- Total routed cost:
-- Deviations from recommendation:
-- Notes for next-session calibration:
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium
+- Total routed cost: $0.1224 (two `session-verification` calls, gpt-5-4:
+  R1 $0.0823 + narrow R2 re-verify $0.0385, plus a small routed
+  `documentation` call for change-log generation)
+- Deviations from recommendation: the operator started the session on
+  Claude Code rather than the recommended Codex CLI (orchestrator choice
+  is the human's; workflow Rule 7). The UAT checklist was authored
+  directly by the orchestrator rather than routed as `text_gen` —
+  matching the Set 079 precedent: the Set 078 bar requires re-grounding
+  every literal string against current source and re-running the cited
+  Layer-2 suites during authoring, which a snippet-fed routed call
+  cannot do. Step 4's file edits and git/CLI work were orchestrator
+  direct action as recommended.
+- Notes for next-session calibration: the routed gate tripped on the
+  release diff exactly as S1 predicted (package.json build-ci-config +
+  multi-module), and the cross-provider verifier earned its cost —
+  R1 caught a real doc-consistency overclaim (S080-S2-V1-001) between
+  the repository-reference wording and the checklist's saved walk
+  state. For future UAT-and-release sessions: commit the checklist
+  BEFORE the walk, and expect one wording-consistency round when the
+  walk state and release metadata are written in the same session.

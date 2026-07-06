@@ -64,9 +64,29 @@ can learn it.
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
 | `dabbler-ai-router` | `0.28.0` | **Published.** Sequenced per the release-ordering invariant: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437` — the commit where the 0.27.0 version bump landed, before Set 078 bumped further), then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`). Both confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.35.0` | **Published.** Set 079 (guided Full-tier Copilot seat-profile onboarding + simplified verification-mode copy; extension-only — `ai_router` untouched, router stays `0.28.0`). UAT-gated release: the operator's first walk failed walks 4–5 on a real pre-existing defect (the cp1252 config-seed crash left fresh Windows scaffolds with no `ai_router/router-config.yaml`), fixed and re-verified in-session (rounds 3–4), re-walk attested PASS; walk 3 operator-waived with recorded rationale. Published 2026-07-05 (tag `vsix-v0.35.0`, tagged commit `c2ed2b4`, publish-vscode.yml run [28751504260](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28751504260)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.36.0` | **Version-bumped; publish pending the operator-authorized `vsix-v0.36.0` tag push.** Set 080 (Getting Started sub-choice legibility; extension-only — `ai_router` untouched, router stays `0.28.0`). Presentation-only row layout for both step-1 sub-choice groups + README screenshot refresh. Per-set UAT walked by the requesting operator 2026-07-05: both legibility judgment items (the set's declared gate) and every other item attested PASS except Walk 1's functional item, which is recorded `false` with no feedback — operator confirmation pending (accidental unchecked box vs. real finding); the tag push is held behind that confirmation plus explicit authorization. Prior release `0.35.0` (Set 079) published 2026-07-05 (tag `vsix-v0.35.0`, tagged commit `c2ed2b4`, publish-vscode.yml run [28751504260](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28751504260)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
+
+- **Extension `0.36.0`** — Set 080, Getting Started sub-choice
+  legibility. Extension-only (`ai_router` untouched; router stays
+  `0.28.0`). Presentation-only: both step-1 sub-choice groups (Full's
+  "Provider access (how routed calls run)", Lightweight's "Verification
+  (per session set)") render each option as a separated
+  radio | bold name | description row via a shared `optionRowHtml`
+  helper, columns aligned across rows, a light
+  `--vscode-panel-border` rule between rows; copy constants split at
+  their first em-dash for presentation only (wording, radio values,
+  `data-gs-*` attributes, warning logic, and persistence all unchanged —
+  no Layer-2 placement/persistence test needed a semantic edit). README
+  `getting-started.png` refreshed (operator-captured; the old capture
+  predated the provider-access group entirely). Deferred out of 0.35.0
+  so already-attested Set 079 walks did not need re-walking;
+  operator-requested during that set's UAT, and the same operator
+  attested the legibility judgment in this set's per-set UAT walk
+  (2026-07-05). Publish state: version-bumped; `vsix-v0.36.0` tag push
+  held for operator authorization (this entry updates with the run link
+  once published).
 
 - **Extension `0.35.0`** — Set 079, Copilot seat-profile onboarding and
   verification-mode copy. Extension-only (`ai_router` untouched; router

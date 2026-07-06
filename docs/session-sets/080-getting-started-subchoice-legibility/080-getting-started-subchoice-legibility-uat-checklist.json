@@ -1,7 +1,7 @@
 {
   "ProjectName": "Dabbler AI Orchestration",
   "ReleaseLabel": "Extension pre-0.36.0 (Set 080 'Getting Started Sub-Choice Legibility', Session 2 of 2)",
-  "DocumentDate": "7/5/2026, 4:24:38 PM",
+  "DocumentDate": "7/5/2026, 8:14:45 PM",
   "Notes": "Ad-hoc per-set UAT for Set 080, a PRESENTATION-ONLY change you yourself requested during the Set 079 walk ('it isn't super-easy to see where the first option ends and the second option begins'): the two second-level radio groups in the Getting Started form -- Full tier's 'Provider access (how routed calls run)' and Lightweight tier's 'Verification (per session set)' -- now render each option as a visually separated row with three aligned parts: the radio button, a short bold option name, and the description. NO wording changed, NO radio values changed, NO persistence behavior changed -- only markup and layout. Authored to the Set 078/079 bar: every quoted string was re-grounded against CURRENT source during authoring (gettingStartedHtml.js constants at lines 80-120, tree.css .gs-option-row rules at lines 462-488), and every cited Layer-2 suite was re-run fresh during authoring with the exact pass count quoted per walk. UAT runs against a LOCALLY BUILT VSIX ONLY (the Set 058 lesson) -- the orchestrator built one for you during authoring; see the stop message in chat for the exact file path, or build it yourself: in a terminal at tools/dabbler-ai-orchestration run `npx vsce package`, then in VS Code run 'Extensions: Install from VSIX...' and pick the produced .vsix. All three walks are webview walks that cannot be driven headless from this environment; the row markup, exact copy, default-checked state, and persistence precedence are fully pinned at Layer 2 (suites quoted per walk), so the genuinely operator-only portions are: the real rendered webview (including the row separator painting correctly in your theme), the real setState/getState round-trip across an actual window reload, and the two JUDGMENT items -- whether the rows now read clearly, which is the entire point of this set and only you (the requesting operator) can attest it. If you happen to use both a dark and a light theme, the row separator should read as a subtle line in each (it uses the VS Code theme variable --vscode-panel-border); a one-theme check is acceptable -- name the theme in feedback if you want it recorded. After the walk, this set also needs you to capture the refreshed getting-started.png README screenshot -- instructions are in the chat stop message, not in this checklist (it is not a pass/fail verification item).",
   "Configuration": {
     "reviewWidths": [
@@ -30,7 +30,7 @@
       "Expectation": "At a glance -- without reading the text -- you can tell where the first option ends and the second begins, and the layout matches the table-like presentation you asked for. Pass only if YOU find it easy; this row exists precisely for your judgment, not for a mechanical check.",
       "IsJudgmentItem": true,
       "JudgmentJustification": "Whether the row separation 'reads clearly' is an aesthetic legibility call only the requesting operator can attest; the mechanical structure behind it is covered by the functional item above.",
-      "Passes": false
+      "Passes": true
     },
     {
       "FunctionalArea": "Getting Started form",
@@ -39,7 +39,7 @@
       "HumanAction": "In the same form, click the radio labeled exactly \"Lightweight\". Look at the radio group that appears in place of the provider-access group, labeled exactly: \"Verification (per session set)\".",
       "Expectation": "The group shows exactly two option rows in the SAME visual pattern as Walk 1 (radio | bold name | lighter description, aligned columns, a single light line between the rows):\nRow 1: radio (PRE-CHECKED) | \"Manual review (default)\" | \"paste a review prompt into a second AI assistant yourself and record what it says.\"\nRow 2: radio (unchecked) | \"Separate verification sessions\" | \"a dedicated session on a different AI engine or provider reviews the work before the set can close.\"\nNote the \"(default)\" marker sits INSIDE row 1's bold name here (that is where it has always been in this group's copy -- unchanged). The \"Provider access (how routed calls run)\" group is NOT shown anywhere while Lightweight is selected. Clicking \"Full\" again swaps the groups back.",
       "ProgrammaticVerification": "Same fresh `npm run test:unit -- --grep \"Set 080 S1\"` run (6/6): 'both groups render exactly two option rows in the same pattern' asserts this group renders through the SAME optionRowHtml helper as Walk 1's. Also fresh: `npm run test:unit -- --grep \"verification-mode block\"` 5/5 passing, including 'pins the simplified verification-mode copy (Set 079 S4)' (asserts both exact strings above survive the new structure) and 'renders both radios on Lightweight with the default checked'. Both copy strings are quoted verbatim from gettingStartedHtml.js:83-88 (VERIFICATION_MODE_OUT_OF_BAND_TEXT / VERIFICATION_MODE_DEDICATED_TEXT), re-read moments before this checklist was written. The real rendered webview is the operator portion.",
-      "Passes": false
+      "Passes": true
     },
     {
       "FunctionalArea": "Getting Started form",
@@ -49,7 +49,7 @@
       "Expectation": "At a glance you can tell where the first option ends and the second begins, and the Lightweight group visibly follows the same row pattern as the Full group. Pass only if YOU find it easy.",
       "IsJudgmentItem": true,
       "JudgmentJustification": "Same aesthetic legibility call as Walk 1, on the second of the two groups the set restyles; only the requesting operator can attest it.",
-      "Passes": false
+      "Passes": true
     },
     {
       "FunctionalArea": "Getting Started form",
@@ -58,7 +58,37 @@
       "HumanAction": "1. Click \"Full\". In the \"Provider access (how routed calls run)\" group, click directly on the DESCRIPTION TEXT of row 2 (the words \"calls run through your Copilot subscription's command-line tool...\") -- not on the radio button itself.\n2. Confirm the row-2 radio becomes checked. (A warning banner about a missing Copilot CLI may appear if the copilot command is not on this machine's PATH -- that is pre-existing Set 079 behavior, not part of this walk; ignore it either way.)\n3. Collapse/hide the Session Set Explorer view and re-expand it. Confirm \"GitHub Copilot CLI seat\" is still checked.\n4. Run 'Developer: Reload Window' from the command palette and re-open the Getting Started form. Confirm \"Full\" and \"GitHub Copilot CLI seat\" are still checked.\n5. Now click \"Lightweight\", and in the \"Verification (per session set)\" group click anywhere on row 2 (\"Separate verification sessions...\"). Run 'Developer: Reload Window' once more and re-open the form.\n6. Confirm \"Lightweight\" and \"Separate verification sessions\" are still checked. Cleanup: click \"Full\" and \"Direct provider API keys\" back if you plan to reuse this folder.",
       "Expectation": "Clicking the description text (or anywhere else in a row) selects that row's radio -- the whole row is one clickable label. Every explicit pick survives both the view re-expand and the full window reload in BOTH groups: nothing snaps back to the default. Behavior is exactly as it was in 0.35.0 -- this set changed only the layout, not the selection wiring or persistence.",
       "ProgrammaticVerification": "Whole-row selection is pinned by 'the radio sits inside its row label so the whole row stays clickable' in the fresh 6/6 'Set 080 S1' run (the radio input nests inside the <label class=\"gs-option-row\">, so the label-activation contract is structural). Persistence precedence (seed vs dirty-flip vs reload) is pinned by the fresh `npm run test:unit -- --grep \"restoreGsState\"` run during authoring: 26/26 passing across the Set 077 S2 base suite, the Set 077 S3 verification-mode seed suite, and the Set 079 S1 seat-profile seed suite -- all of which passed UNCHANGED against the new markup (Session 1's scope-smell tripwire: no semantic test edits were needed). client.js wiring is untouched by this set (it selects input[name=...] and [data-gs-*] block attributes, all preserved -- see s1-close-reason.md). The real vscode setState/getState round-trip across an actual window reload is inherently untestable on the vscode-stub and is the operator portion.",
-      "Passes": false
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Getting Started form",
+      "Subarea": "Walk 1 -- Full tier 'Provider access' options as separated rows",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Getting Started form",
+      "Subarea": "Walk 2 -- Lightweight tier 'Verification' options as separated rows",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Getting Started form",
+      "Subarea": "Walk 3 -- selection and persistence still work in the new rows",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
     }
   ]
 }

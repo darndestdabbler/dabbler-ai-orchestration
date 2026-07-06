@@ -93,6 +93,54 @@
       "dateTime": "2026-07-05T16:26:50.432955-04:00",
       "description": "Built local VSIX for the operator walk (Set 058 lesson: locally built only): npx vsce package -> tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.35.0.vsix (36 files, 1.08 MB, built 2026-07-05 16:26 from master with the S1 row layout; version string still 0.35.0 - the 0.36.0 bump lands at the release step after UAT).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "s2.screenshot",
+      "dateTime": "2026-07-05T20:28:02.672024-04:00",
+      "description": "Operator walked the UAT checklist (judgment items + all functional items PASS except Walk 1 functional checkbox, recorded false with no feedback - operator confirmation requested in chat) and captured the refreshed getting-started.png (42755 -> 80441 bytes), staged for commit.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "s2.release",
+      "dateTime": "2026-07-05T20:28:02.672024-04:00",
+      "description": "Release prep: package.json 0.35.0 -> 0.36.0, CHANGELOG 0.36.0 entry (extension-only, presentation-only), repository-reference release-status row + version-walk entry (publish state recorded honestly as tag-push-held). Full Layer-2 suite fresh: 1250 passing; tsc clean; vsce package clean. Tag push held for operator confirmation + authorization.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/routed-gate",
+      "dateTime": "2026-07-05T20:28:02.672024-04:00",
+      "description": "routed_gate verdict REQUIRED (exit 0): 8 files, modules {docs, tools}, triggers blast-radius/multi-module/breadth/build-ci-config (package.json) - as predicted at S1 close; cross-provider session-verification run per Set 068 DEMOTE policy.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/verification",
+      "dateTime": "2026-07-05T20:28:02.672024-04:00",
+      "description": "Cross-provider verification (gpt-5-4, openai): Round 1 returned one unlabeled-severity finding (S080-S2-V1-001: repository-reference UAT-closure overclaim vs the Walk 1 false checkbox) - treated as blocking per L-071-1 anti-laundering; wording remediated, echoes swept per L-065-1, structured finding persisted to s2-issues.json. Round 2 (narrow re-verify, same tier, no max_tier pin per L-064-7) returned VERIFIED. Raw outputs: s2-verification.md, s2-verification-round-2.md.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 9844,
+          "outputTokens": 3849,
+          "costUsd": 0.082345
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 2017,
+          "outputTokens": 2233,
+          "costUsd": 0.0385375
+        }
+      ]
     }
   ]
 }

@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.36.0] — 2026-07-05 (Set 080 — Getting Started sub-choice legibility)
+
+Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero
+`ai_router/` changes in this set). Presentation-only — no wording, radio
+value, schema, or persistence change anywhere in the set.
+
+### Changed
+
+- **Both Getting Started sub-choice groups render as separated rows.**
+  The Full tier's "Provider access (how routed calls run)" pair and the
+  Lightweight tier's "Verification (per session set)" pair now render
+  each option as a table-like row — radio button | short bold option
+  name | description — with the three parts aligned as columns across
+  rows and a light theme-variable rule (`--vscode-panel-border`)
+  separating adjacent rows. Requested by the operator during the Set
+  079 UAT walk ("it isn't super-easy to see where the first option ends
+  and the second option begins") and attested legible by the same
+  operator in this set's UAT walk. The existing copy constants are
+  split at their first em-dash for presentation only — wording
+  (including each "(default)" marker's position), radio names/values,
+  `data-gs-*` block attributes, warning placement/visibility, and the
+  seed/dirty/reload persistence contract are all byte-identical to
+  0.35.0, and the whole row is one clickable label.
+- **README screenshot refreshed.** `getting-started.png` now shows the
+  current form — including the Full-tier "Provider access" group, which
+  postdates the previous capture — with the new row layout (operator-
+  captured against a locally built 0.36.0-candidate VSIX).
+
 ## [0.35.0] — 2026-07-05 (Set 079 — Copilot seat-profile onboarding and verification-mode copy)
 
 Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero

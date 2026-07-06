@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Session 2 evidence is internally inconsistent: the committed UAT checklist still records Walk 1's main functional item as Passes: false with no feedback, but the release metadata (docs/repository-reference.md, 0.36.0 release-status row) says Set 080's per-set UAT was already 'walked and attested' - the repo docs overstate UAT closure until that checkbox is clarified.",
+      "category": "correctness",
+      "issueId": "S080-S2-V1-001",
+      "issueType": "standards-departure",
+      "verificationMethod": "Cross-checked the checklist's inline Passes values against the repository-reference 0.36.0 row wording in the same session diff.",
+      "resolution_status": "fixed",
+      "resolution_notes": "Verifier returned no severity label; treated as blocking per the L-071-1 anti-laundering rule. Remediation: repository-reference 0.36.0 row rewritten to state the actual walk state (judgment items + 4/5 items attested PASS; one Walk 1 functional checkbox recorded false with no feedback, operator confirmation pending; tag push held behind that confirmation plus explicit authorization). The checkbox itself is operator-owned and was already surfaced to the operator in chat before this round; its resolution is gated on the operator's answer, and the tag push is held regardless. CHANGELOG and version-walk echoes checked per L-065-1: both scope their claim to the legibility judgment items, which are attested true, so no other echo needed the fix.",
+      "resolved_in_round": 2
+    }
+  ]
+}

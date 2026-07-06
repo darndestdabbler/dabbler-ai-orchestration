@@ -145,3 +145,20 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   Convention. Collapsed to this pointer to avoid duplicate guidance and relieve the
   active-lessons ceiling.
 
+
+## Dogfood The True Cold Start — A Pre-Seeded Fixture Masks First-Run Defects
+<!-- lesson: id="L-079-3" added-set="079" last-used-set="082" status="archived" scope="portable" -->
+
+- **Promoted to `project-guidance.md` → Conventions → Workflow Expectations on
+  2026-07-06** after instrumental application across Sets 079 (origin: the
+  install-time config-seed defect that survived three sessions of cross-provider
+  verification and a path-aware critique, caught only by the operator's
+  empty-folder UAT walk), 081 (the `budget.yaml` write-matrix cold-start
+  Builds), and 082 (the marker-set cold-start Builds plus the
+  Full-over-Lightweight preservation re-Build). The durable rule — any set
+  shipping provisioning (scaffold, install, seed, migrate-from-empty) includes
+  at least one dogfood/UAT walk starting from the exact cold-start state (fresh
+  empty folder, no pre-seeded config), asserting the provisioned artifacts
+  afterward and named in the spec's "Ends with" line — now lives in the
+  Convention. Collapsed to this pointer to avoid duplicate guidance and relieve
+  the active-lessons ceiling.

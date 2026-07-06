@@ -77,6 +77,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 | L-066-1 | `project-guidance.md` -> Conventions -> Code Style (pure-Python validator parity) |
 | L-069-1 | `project-guidance.md` -> Conventions -> Code Style (fix every sibling site) |
 | L-070-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (iterative dogfood is evidence) |
+| L-079-3 | `project-guidance.md` -> Conventions -> Workflow Expectations (dogfood the true cold start) |
 
 ## Truncation Detection: `stop_reason` Alone Is Not Sufficient
 <!-- lesson: id="L-064-1" last-used-set="077" status="active" scope="portable" -->
@@ -176,6 +177,14 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   succeeded. The rule: a substantive re-verify must stay on (or above)
   the Round-1 verifier's tier — `max_tier` pinning is for wording-only
   re-verifies, and even then only to the verifier's *own* tier, never lower.
+- **Recurring trigger (Sets 081–082).** gpt-5-4 as the session-verification
+  verifier has twice returned a format-shortfall response on a **clean**
+  review — Set 081: non-standard verdict wording needing a wording-only R3;
+  Set 082: a bare `No defects found.` with no verdict token and no
+  what-was-checked statement, despite the templated Response Format. When
+  the verifier is gpt-5-4 and the work is likely clean, budget for one
+  wording-only re-run (~$0.05–0.06); the remedy is exactly this lesson's
+  pin (`max_tier=<verifier tier>`, gpt-5-4 = 3).
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
 <!-- lesson: id="L-064-8" added-set="063" last-used-set="069" status="active" scope="portable" -->
@@ -499,28 +508,6 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   confirm each has the matching config-block flag; at the first
   `start_session` of a set, confirm the recorded policy matches the spec's
   stated intent before any session work runs.
-
-## Dogfood The True Cold Start — A Pre-Seeded Fixture Masks First-Run Defects
-<!-- lesson: id="L-079-3" added-set="079" last-used-set="082" status="active" scope="portable" -->
-
-- **Context:** Live dogfoods of onboarding / scaffold / install / first-run
-  flows — any deliverable whose job is to provision state from nothing.
-- **Failure or friction:** Set 079 S2's real-seat dogfood drove the seat
-  setup against a scratch project whose `router-config.yaml` **already
-  existed**, so the install-time seeding path (the part that was broken —
-  see L-079-1) never executed; the Layer-2 suites stubbed the same spawn.
-  The defect passed three sessions of cross-provider verification and a
-  path-aware critique, and was caught only when the operator's UAT walk
-  started from a genuinely empty folder.
-- **Lesson:** A dogfood that starts from a partially-provisioned fixture
-  validates the steady state, not the first run — and provisioning code is
-  exactly where silent fail-open paths hide. "Ran it for real" is not the
-  same property as "ran it from the same nothing the user starts from."
-- **Action for future sessions:** For any set shipping provisioning
-  (scaffold, install, seed, migrate-from-empty), at least one dogfood must
-  begin from the exact cold-start state (fresh empty folder, no pre-seeded
-  config) and assert the provisioned artifacts exist afterward. Name the
-  cold-start dogfood explicitly in the spec's "Ends with" line.
 
 ---
 

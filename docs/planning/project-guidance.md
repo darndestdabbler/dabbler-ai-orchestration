@@ -213,6 +213,19 @@ alternative was not possible.
   justifies another round. Promoted from `lessons-learned.md` (L-070-1) on 2026-06-19
   after application across Sets 070 (origin), 071, and 072 (the S4 path-aware dogfood
   caught + fixed a real Major in the S3 aggregator, then converged on no-new-code).
+- **Any set shipping provisioning must dogfood the true cold start.** A dogfood
+  or UAT walk that starts from a partially-provisioned fixture validates the
+  steady state, not the first run — and provisioning code is exactly where
+  silent fail-open paths hide (the Set 079 config-seed defect survived three
+  verified sessions and a path-aware critique; only the operator's empty-folder
+  walk caught it). For any set shipping provisioning (scaffold, install, seed,
+  migrate-from-empty), at least one dogfood/UAT walk must begin from the exact
+  cold-start state — a fresh empty folder, no pre-seeded config — and assert
+  the provisioned artifacts exist (or are correctly absent) afterward; name the
+  cold-start walk explicitly in the spec's "Ends with" line. Promoted from
+  `lessons-learned.md` (L-079-3) on 2026-07-06 after instrumental application
+  across Sets 079 (origin), 081 (budget.yaml write-matrix walks), and 082
+  (marker-set walks).
 - **Obey the spec's Session Set Configuration block at runtime.** Rules are
   conditional on the spec's `requiresUAT` and `requiresE2E` flags. Do not
   re-litigate those flags during a session — if a flag is wrong, surface it

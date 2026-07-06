@@ -149,6 +149,30 @@
       "dateTime": "2026-07-05T20:38:41.778943-04:00",
       "description": "Operator attested UAT clean via chat (the Walk 1 functional checkbox was an accidental unchecked box: 'The UAT is clean. I just didn't check everything'); Passes flipped with a resolution note per the Set 079 chat-attestation precedent, repository-reference echo updated (S080-S2-V1-001 fully resolved). Operator also authorized the release flow and requested follow-up Set 081 (budget input scoped/conditional to the Direct provider API keys sub-choice).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/change-log",
+      "dateTime": "2026-07-05T20:48:54.306678-04:00",
+      "description": "Routed change-log.md generation (documentation, gemini-pro) with router auto-verification (gpt-5-4-mini) - supplemental entry appended post-close to reconcile the cost report delta (router-metrics.jsonl is canonical: 5 calls, $0.1713 total for the set).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "documentation",
+          "inputTokens": 5906,
+          "outputTokens": 589,
+          "costUsd": 0.0132725
+        },
+        {
+          "model": "gpt-5-4-mini",
+          "taskType": "documentation-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.0274
+        }
+      ]
     }
   ]
 }

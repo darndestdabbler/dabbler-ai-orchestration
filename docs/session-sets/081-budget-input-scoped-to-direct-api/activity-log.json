@@ -163,8 +163,8 @@
       "stepNumber": 7,
       "stepKey": "s2.release",
       "dateTime": "2026-07-05T22:45:39.586269-04:00",
-      "description": "Release prep: extension 0.36.0 -> 0.37.0 (npm version; realigned the drifted 0.34.0 lockfile), CHANGELOG 0.37.0 entry, repository-reference status row + version walk (honest publish-pending phrasing per L-078-1). Lessons cited via cite_lessons --set 81. Tag push preauthorized by the operator; publish details flip in the final close-out commit.",
-      "status": "in-progress"
+      "description": "Release prep: extension 0.36.0 -> 0.37.0 (npm version; realigned the drifted 0.34.0 lockfile), CHANGELOG 0.37.0 entry, repository-reference status row + version walk (honest publish-pending phrasing per L-078-1). Lessons cited via cite_lessons --set 81. Tag push preauthorized by the operator; publish details flip in the final close-out commit. PUBLISHED: Test run 28764463565 green on bc3b43f; tag vsix-v0.37.0 pushed (operator-preauthorized); publish-vscode.yml run 28764677942 success; repository-reference + change-log flipped to Published.",
+      "status": "complete"
     }
   ]
 }

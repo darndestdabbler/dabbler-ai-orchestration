@@ -48,7 +48,7 @@ Everything in this list is identical whether the project is `full` or
 | **Close-out gate** | The same `close_session` gate (disposition required, `change-log.md` on the final session, idempotent writes). |
 | **Engine files** | All three — `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` — because the next session's orchestrator may be a different engine. |
 | **Cold-start operative doc** | `docs/dabbler/start-here.md` (generated, never hand-edited). |
-| **Spec shape** | One canonical `spec.md` template (schemaVersion 4, `NNN-` slug, required `tier` + `verificationMode`). |
+| **Spec shape** | One canonical `spec.md` template (schemaVersion 4, `NNN-` slug, required `tier`; Lightweight sets also declare `verificationMode` — Full-tier specs omit the field entirely, Set 082). |
 | **Session Set Explorer** | Same activity-bar view, same bucket transitions, same per-session orchestrator block. |
 | **Folder layout** | Same `docs/session-sets/<slug>/` artifact set. |
 

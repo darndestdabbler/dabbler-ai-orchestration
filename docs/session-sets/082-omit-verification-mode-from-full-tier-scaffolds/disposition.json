@@ -1,41 +1,23 @@
 {
   "status": "completed",
-  "summary": "Session 1 made Full-tier scaffolds omit verificationMode at both sites: spec.md.template's fixed line became the whole-line {{VERIFICATION_MODE_LINE}} token (consumerBootstrap.ts renders the full pre-082 line on lightweight, empty string on full, no blank-line residue), and gitScaffold.ts gates the .dabbler/verification-mode marker write to Lightweight (on Full it is neither written nor deleted, preserving a prior pick across a tier round-trip). Sibling audit per L-069-1: buildSessionGenPrompt's hard-requirements prose rescoped so Full sets OMIT the field, pinned with two Layer-2 tests; verificationModeRewrite already handles key-absent specs; start-here.md.template's prose mention named as a deferred residual (byte-identity tripwire). Full cold-start fixture regenerated; lightweight fixture byte-identical. Layer-2 suites extended (per-tier line presence, marker write matrix incl. full-preserves, structureOnly counts). Omission notes added to spec-md-schema.md and the authoring guide. Verification: round 1 ISSUES_FOUND (one context-gap Major, adjudicated not-reproducible via reshaped-context re-verify; two nits fixed); round 2 VERIFIED.",
+  "summary": "Session 2 (final) closed Set 082 with UAT, critique, and release prep. The per-set UAT checklist was authored to the Set 078-081 bar (literal copy-pasteable actions; every quoted string re-grounded against current source; fresh suite counts quoted per walk: Set 082 grep 7/7, marker matrix 4/4, cold-start snapshot 2/2, full Layer-2 1270/0, tsc clean) with one honest documented adaptation: both real Build entry points are structure-only since Set 060, so the spec's '001-sample-feature spec.md' assertion is pinned by the golden-snapshot suite and the operator walks the step-3 session-set prompt's worked example (same shared renderSpec writer) instead. Operator walked 2026-07-06: all 5 functional items PASS across 3 walks (Full cold-start Build: tier marker only, no verification-mode file; Full prompt exemplar omits the line; Lightweight cold-start Build: both markers, exact pre-082 line; Full-over-Lightweight re-Build preserves the prior marker). Required path-aware critique ran via pull_critique (google/gemini-2.5-pro VERIFIED, 0 findings; openai/gpt-5.4 one Major: docs/concepts/tier-model.md line 51 still claimed 'required tier + verificationMode'). Adjudication: accepted-and-fixed in-session (line now scopes verificationMode to Lightweight; repo-wide echo sweep found no other live-doc drift); artifact kept raw/pre-fix per L-070-1. Release prep: extension 0.38.0 (package.json/package-lock), CHANGELOG 0.38.0 entry, repository-reference row + version walk honest about pending publish (L-078-1). Routed gate on the session diff: REQUIRED (blast-radius, multi-module, breadth, build-config); cross-provider verification on gpt-5-4: R1 format-noncompliant bare verdict (saved raw), R2 wording-compliance re-run (max_tier=3 per L-064-7) VERIFIED. Publish (tag vsix-v0.38.0) follows green Test + operator authorization; the repository-reference row flips to Published with run links at that point.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "docs/templates/consumer-bootstrap/spec.md.template",
-    "docs/templates/consumer-bootstrap/README.md",
-    "tools/dabbler-ai-orchestration/src/utils/consumerBootstrap.ts",
-    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
-    "tools/dabbler-ai-orchestration/src/wizard/sessionGenPrompt.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/consumerBootstrap.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldCore.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/sessionGenPrompt.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
-    "test-fixtures/cold-start/full/docs/session-sets/001-sample-feature/spec.md",
-    "docs/spec-md-schema.md",
-    "docs/planning/session-set-authoring-guide.md",
-    "tools/dabbler-ai-orchestration/dist/extension.js",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map",
-    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/spec.md.template",
-    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/README.md",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/082-omit-verification-mode-from-full-tier-scaffolds-uat-checklist.json",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/path-aware-critique.json",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s2-verification.md",
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s2-verification-round-2.md",
     "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/ai-assignment.md",
-    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s1-verification.md",
-    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s1-issues.json",
-    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s1-verification-round-2.md",
-    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/s1-close-reason.md"
+    "docs/session-sets/082-omit-verification-mode-from-full-tier-scaffolds/activity-log.json",
+    "docs/concepts/tier-model.md",
+    "docs/repository-reference.md",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/package-lock.json",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "docs/planning/lessons-learned.md"
   ],
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-fable-5",
-    "effort": "medium",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Routed ai-assignment analysis (gemini-pro) recommends Claude Code claude-fable-5 @ medium for Session 2: UAT-checklist prose and release mechanics suit a capable cost-effective model, and same-provider continuity keeps the S1 context for the checklist's source-re-grounded strings."
-    }
-  },
+  "lessons_cited": ["L-079-3", "L-065-1", "L-064-7", "L-064-9", "L-078-1"],
   "blockers": []
 }

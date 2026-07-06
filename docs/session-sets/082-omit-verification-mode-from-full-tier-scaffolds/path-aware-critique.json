@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "082-omit-verification-mode-from-full-tier-scaffolds",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-07-06T12:16:20.174835-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Reviewed the actual scaffold template/writer path (`docs/templates/consumer-bootstrap/spec.md.template`, `src/utils/consumerBootstrap.ts`), marker-write path (`src/commands/gitScaffold.ts`), prompt generation (`src/wizard/sessionGenPrompt.ts`), the added Layer-2 tests, the regenerated full cold-start fixture, and the doc updates in `docs/spec-md-schema.md` and `docs/planning/session-set-authoring-guide.md`. The implementation and tests consistently omit `verificationMode` on Full-tier scaffolds, but the canonical tier-model doc still states the opposite, leaving a load-bearing contract drift in shipped documentation.",
+      "findings": [
+        {
+          "description": "Major contract drift: the implementation now treats `verificationMode` as omitted on Full-tier scaffolds, but the repository's tier-model SSoT still documents it as required. Violation: `docs/concepts/tier-model.md` says the shared spec shape is 'One canonical `spec.md` template (schemaVersion 4, `NNN-` slug, required `tier` + `verificationMode`).' Impact: this is the central doc other surfaces are told to trust, so it now teaches spec authors and cold-start operators the wrong contract and directly undercuts this set's stated behavior change; a reasonable reviewer should block until the SSoT matches the shipped scaffold. Evidence: the real scaffold template replaced the fixed line with `{{VERIFICATION_MODE_LINE}}` (`docs/templates/consumer-bootstrap/spec.md.template`), `verificationModeLine()` in `tools/dabbler-ai-orchestration/src/utils/consumerBootstrap.ts` returns an empty string on `full`, the regenerated full fixture omits the field, and `buildSessionGenPrompt()` explicitly says '`full` sets OMIT `verificationMode` entirely' while `docs/concepts/tier-model.md` still says it is required. Fix: update `docs/concepts/tier-model.md` (and any docs that point to it as canonical wording) so Full-tier specs omit `verificationMode` and only Lightweight specs declare it.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the changes for omitting `verificationMode` from Full-tier scaffolds. My review covered the template changes in `docs/templates/consumer-bootstrap/spec.md.template`, the conditional rendering logic in `tools/dabbler-ai-orchestration/src/utils/consumerBootstrap.ts`, and the tier-gated marker file logic in `tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts`. I also inspected the corresponding test suites (`consumerBootstrap.test.ts`, `gitScaffoldCore.test.ts`), the updated full cold-start fixture, and the schema documentation in `docs/spec-md-schema.md`.\n\nThe implementation correctly addresses the goal. The use of a whole-line token `{{VERIFICATION_MODE_LINE}}` cleanly removes the `verificationMode` line from Full-tier specs without leaving residue. The logic in `gitScaffold.ts` correctly gates the `.dabbler/verification-mode` marker write to the Lightweight tier only and correctly preserves any existing marker when scaffolding a Full-tier project. These changes are thoroughly validated by new and updated tests that cover per-tier rendering and the full marker write/skip/preserve matrix. The documentation and fixtures have been updated consistently. All claims in the summary were confirmed against the code.",
+      "findings": []
+    }
+  ]
+}

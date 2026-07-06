@@ -1,0 +1,117 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "Extension pre-0.38.0 (Set 082 'Omit VerificationMode From Full-Tier Scaffolds', Session 2 of 2)",
+  "DocumentDate": "7/6/2026, 12:04:44 PM",
+  "Notes": "Ad-hoc per-set UAT for Set 082, the fix for a live misreading you reported: your GitHub Copilot session read a fresh Full scaffold and reported 'tier: full, verificationMode: out-of-band-or-none' -- the exact wrong message, since automatic cross-provider verification is the Full tier's defining feature. The fix is removal, not addition (simplicity-first): a Full-tier scaffold now OMITS the verificationMode field and the .dabbler/verification-mode marker entirely (omission is schema-legal; absence means the default), while Lightweight output is byte-identical to 0.37.0 (the golden-snapshot tripwire). ONE HONEST ADAPTATION FROM THE SPEC'S WORDING: the spec's Full-walk line names 'the rendered docs/session-sets/001-sample-feature/spec.md' -- that path is the Layer-2 golden FIXTURE, not a Build output. Both real Build entry points (the form button and the palette command) are structure-only since Set 060 and write NO docs/session-sets/ set at all, so no cold-start Build can produce that file. The fixture assertion is pinned mechanically by the fresh cold-start golden-snapshot suite quoted in Walk 2; the surface where YOU can see the rendered spec config block for real is step 3's 'Copy prompt to build session sets' worked example, which renders through the SAME shared renderSpec writer -- Walks 1 and 2 each include a prompt item for exactly that. SCOPE WARNING (the spec calls this out explicitly): do NOT judge the Full walk by grepping the whole scaffolded repo for 'out-of-band-or-none' -- the scaffolded docs/dabbler/start-here.md legitimately mentions it in Lightweight-scoped prose, and that is fine. The assertion is scoped to (a) the .dabbler marker set and (b) config-block-shaped 'verificationMode:' lines. Authored to the Set 078-081 bar: every quoted string was re-grounded against CURRENT source during authoring (the Lightweight line is verbatim consumerBootstrap.ts:194 verificationModeLine; the marker gate is gitScaffold.ts:153-165; marker file format is tierMarkerStore.ts:104-113, single word + trailing newline; form copy from gettingStartedHtml.js:80-88 and 597-631; the prompt's hard-requirements bullet from sessionGenPrompt.ts:198-204), and every cited suite was re-run FRESH during authoring with exact counts quoted per walk (full Layer-2 suite fresh: 1270 passing / 0 failing; npx tsc --noEmit clean). UAT runs against a LOCALLY BUILT VSIX ONLY: the orchestrator built one for you during authoring at tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.37.0.vsix (it CONTAINS the Set 082 S1 changes; the version bump to 0.38.0 happens at release, after this walk). Install via 'Extensions: Install from VSIX...' -- or rebuild it yourself: in a terminal at tools/dabbler-ai-orchestration run `npx vsce package`. Walks 1 and 2 are the REAL cold-start Builds the spec names (L-079-3): one per tier, each from a genuinely FRESH EMPTY folder (no pre-seeded config) -- exactly what the Layer-2 seams cannot prove, because the stub never runs the real venv/pip/template subprocesses. Each Build takes a few minutes (venv + pip install). Walk 3 re-uses Walk 2's folder to check the preserve-across-tier-round-trip choice (Set 081 'hiding never clears' posture) on the real disk.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start): no phantom verification-mode marker",
+      "ItemLabel": "A Full Build writes .dabbler/tier but NO .dabbler/verification-mode file",
+      "HumanAction": "1. Install the locally built VSIX (see Notes).\n2. Create a brand-new EMPTY folder (example: C:\\temp\\uat-082-full) -- do not copy anything into it; the cold start is the point.\n3. Open that folder in VS Code (File > Open Folder...), click the Dabbler AI Orchestration icon in the Activity Bar, and look at the Getting Started form's step 1.\n4. Leave the radio labeled exactly \"Full\" checked and leave \"Direct provider API keys\" selected. Type exactly 25 in the input labeled \"Verification budget (USD, not-to-exceed)\".\n5. Click the button labeled exactly \"Build project structure\" and wait for the progress notification \"Building project structure…\" to finish (a few minutes: it creates a venv and pip-installs the router).\n6. Read the completion notification.\n7. In the folder, open the .dabbler directory (it is a hidden-style dot-folder; use the VS Code Explorer) and list every file in it. Open each of the two marker files.",
+      "Expectation": "The completion notification starts \"Project structure built (full tier): \". The .dabbler directory contains a file named tier whose entire content is the single word:\nfull\nand a file named install-method (written by the router install; its content is not this walk's verdict). There is NO file named verification-mode -- on 0.37.0 this exact Build wrote .dabbler/verification-mode containing \"out-of-band-or-none\", the phantom 'choice' your Copilot session read back at you; it must be gone. (ai_router/budget.yaml exists with your 25 -- unchanged Set 063/081 behavior, not this walk's verdict. Per the Notes scope warning: do not repo-grep for 'out-of-band-or-none'; docs/dabbler/start-here.md legitimately mentions it in Lightweight-scoped prose.)",
+      "ProgrammaticVerification": "Orchestrator ran `npm run test:unit -- --grep \"Set 082\"` fresh during authoring: 7/7 passing, including 'Full scaffold writes the tier marker but SKIPS the verification-mode marker (Set 082)' (gitScaffoldCore.test.ts:224, asserting no write and no delete at the scaffoldConsumerRepo seam) and the structure-only write count 'result.written.length === 9 // 8 artifacts + tier marker (Full: no verification-mode marker, Set 082)' (gettingStartedActions.test.ts:501). The gate itself is gitScaffold.ts:153-165 (tier === \"lightweight\" guards writeVerificationModeMarker; .dabbler/tier stays unconditional at line 143). What Layer 2 CANNOT prove is the real end-to-end subprocess Build from a genuinely empty folder (L-079-3: a pre-seeded fixture masks first-run defects) -- exactly this walk.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build session sets prompt",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start): no phantom verification-mode marker",
+      "ItemLabel": "The step-3 prompt's Full worked example renders NO verificationMode line, and its rules say full sets OMIT the field",
+      "HumanAction": "1. Still in the Walk-1 folder's VS Code window, go to the Getting Started form's step 3 (\"Build session sets\") and click the button labeled exactly \"Copy prompt to build session sets\".\n2. Open a new untitled editor tab (Ctrl+N) and paste (Ctrl+V).\n3. Press Ctrl+F and search for: verificationMode",
+      "Expectation": "The pasted prompt contains the heading \"## Worked example — `spec.md` for a 3-session Full set (`001-example-feature`)\". In that example's yaml config block the first line starts \"tier: full\" and NO line anywhere in the pasted prompt begins with \"verificationMode:\" -- in the example block, the \"uatStyle: ad-hoc\" line is followed directly by \"totalSessions: 3\" with no verificationMode line and no blank line between them. Every Ctrl+F hit for 'verificationMode' is inside the rules prose -- the bullet that reads: \"`lightweight` sets ALSO declare `verificationMode` (`out-of-band-or-none` default, or `dedicated-sessions`); `full` sets OMIT `verificationMode` entirely — the field is Lightweight-only, and omitting it means the default.\" -- never a rendered config line.",
+      "ProgrammaticVerification": "Pinned in the same fresh `npm run test:unit -- --grep \"Set 082\"` run (7/7): 'full ignores a verificationMode option — exemplar omits the line (Set 082)' and 'full without a rider: no verificationMode line anywhere (Set 082)' (sessionGenPrompt.test.ts:258, 280 -- both assert !/^verificationMode:/m over the whole prompt and that '`full` sets OMIT' is present). The exemplar renders through the SAME shared renderSpec writer the scaffold uses (sessionGenPrompt.ts:133-144), so the prompt cannot drift from scaffold output. The operator portion is the real clipboard from the real webview button.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 2 -- REAL Lightweight Build, fresh empty folder (cold start): both markers still written",
+      "ItemLabel": "A Lightweight Build still writes BOTH markers: tier = lightweight, verification-mode = out-of-band-or-none",
+      "HumanAction": "1. Create a second brand-new EMPTY folder (example: C:\\temp\\uat-082-light).\n2. Open it in VS Code and open the Dabbler Getting Started form.\n3. In step 1, click the radio labeled exactly \"Lightweight\". Confirm the group labeled exactly \"Verification (per session set)\" appears, with the first radio pre-checked, labeled exactly: \"Manual review (default) — paste a review prompt into a second AI assistant yourself and record what it says.\" Leave it on that default. Confirm no budget input appears anywhere (it is Full-only).\n4. Click \"Build project structure\" and wait for it to finish.\n5. Read the completion notification.\n6. Open the .dabbler directory and open both marker files.",
+      "Expectation": "The completion notification starts \"Project structure built (lightweight tier): \". The .dabbler directory contains tier whose entire content is the single word:\nlightweight\nAND a file named verification-mode whose entire content is the single word:\nout-of-band-or-none\nThis is byte-for-byte what 0.37.0 wrote -- the Lightweight scaffold must be COMPLETELY UNCHANGED by this set (any difference here means the Full-only conditional leaked, which is the set's stop-the-session tripwire).",
+      "ProgrammaticVerification": "Orchestrator ran `npm run test:unit -- --grep \"durable tier/verification-mode markers\"` fresh during authoring: 4/4 passing, including 'Lightweight scaffold writes lightweight + its declared mode'. The byte-identity tripwire is the fresh `npm run test:unit -- --grep \"cold-start golden snapshot\"` run: 2/2 passing -- 'rendered lightweight bundle matches the committed golden', and the committed lightweight golden is untouched by Set 082 (git shows no diff under test-fixtures/cold-start/lightweight/). The rendered line's source is consumerBootstrap.ts:191-195 (verificationModeLine returns the full line on lightweight); marker content format (single word + trailing newline) is tierMarkerStore.ts:104-113. What Layer 2 CANNOT prove is the real cold-start subprocess Build (L-079-3) -- this walk.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build session sets prompt",
+      "Subarea": "Walk 2 -- REAL Lightweight Build, fresh empty folder (cold start): both markers still written",
+      "ItemLabel": "The step-3 prompt's Lightweight worked example still carries the exact verificationMode line, comment included",
+      "HumanAction": "1. Still in the Walk-2 folder's VS Code window, go to the Getting Started form's step 3 and click \"Copy prompt to build session sets\".\n2. Open a new untitled editor tab (Ctrl+N) and paste (Ctrl+V).\n3. Press Ctrl+F and search for: verificationMode:",
+      "Expectation": "The pasted prompt contains the heading \"## Worked example — `spec.md` for a 3-session Lightweight set (`001-example-feature`)\", and that example's yaml config block contains, between the \"uatStyle: ad-hoc\" line and the \"totalSessions: 3\" line, exactly this line (character for character, including the double space before the #):\nverificationMode: out-of-band-or-none  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full\nThis is the unchanged 0.37.0 line -- Lightweight keeps declaring the field; only Full omits it.",
+      "ProgrammaticVerification": "Pinned in the fresh `npm run test:unit -- --grep \"Set 082\"` run (7/7): 'Lightweight render keeps the exact line, comment included (Set 082)' (consumerBootstrap.test.ts:120, asserting the full literal line against the render), plus 'lightweight without a pick: exemplar keeps the default, no mode guidance' in the Set 077 S3 prompt suite (sessionGenPrompt.test.ts:249, part of the fresh full-suite 1270/0). The quoted line is verbatim consumerBootstrap.ts:194, re-read moments before this checklist was written. The operator portion is the real clipboard content.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 3 -- Full re-Build over the Walk-2 folder: prior Lightweight pick preserved",
+      "ItemLabel": "Re-building the Lightweight repo as Full flips the tier marker but neither rewrites nor deletes verification-mode",
+      "HumanAction": "1. Stay in the Walk-2 folder's VS Code window (C:\\temp\\uat-082-light -- already scaffolded as Lightweight).\n2. In the Getting Started form's step 1, click the radio labeled exactly \"Full\". The \"Verification (per session set)\" group disappears and the \"Provider access (how routed calls run)\" group appears with \"Direct provider API keys\" pre-checked. Type exactly 25 in the budget input.\n3. Click \"Build project structure\" again and wait for it to finish (faster this time -- existing files are kept).\n4. Open the .dabbler directory again and open both marker files.",
+      "Expectation": "The completion notification starts \"Project structure built (full tier): \" and reports existing files kept (\"N existing kept\"). In .dabbler: tier now contains the single word:\nfull\n(the write-through cache follows the latest sanctioned choice) BUT verification-mode STILL EXISTS with its content untouched:\nout-of-band-or-none\nA Full Build must neither write nor delete the marker -- your earlier Lightweight pick survives the tier round-trip, so switching back to Lightweight later would find it intact (the Set 081 'hiding never clears' posture).",
+      "ProgrammaticVerification": "Pinned in the fresh `npm run test:unit -- --grep \"Set 082\"` run (7/7): 'Full scaffold PRESERVES a pre-existing Lightweight marker (Set 082)' (gitScaffoldCore.test.ts:243 -- seeds .dabbler/verification-mode, runs a Full scaffold, asserts the file still exists with identical content), and 're-scaffold with a different tier UPDATES the marker (write-through, not no-clobber)' in the fresh 4/4 marker-matrix run covers the tier flip. The preserve choice is documented in the gitScaffold.ts:145-152 code comment. What Layer 2 CANNOT prove is the real re-Build subprocess path over a real prior scaffold on disk -- this walk.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start): no phantom verification-mode marker",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build session sets prompt",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start): no phantom verification-mode marker",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 2 -- REAL Lightweight Build, fresh empty folder (cold start): both markers still written",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build session sets prompt",
+      "Subarea": "Walk 2 -- REAL Lightweight Build, fresh empty folder (cold start): both markers still written",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 3 -- Full re-Build over the Walk-2 folder: prior Lightweight pick preserved",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    }
+  ]
+}

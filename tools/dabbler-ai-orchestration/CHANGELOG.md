@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.38.0] — 2026-07-06 (Set 082 — omit verificationMode from Full-tier scaffolds)
+
+Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero
+`ai_router/` changes in this set).
+
+### Changed
+
+- **Full-tier scaffolds omit `verificationMode` entirely — field and
+  marker.** The field is Lightweight-only (Set 057) and the mode
+  machinery is inert on Full, yet a fresh Full scaffold carried
+  `verificationMode: out-of-band-or-none` in the session-set prompt's
+  worked example and a `.dabbler/verification-mode` marker claiming the
+  same — phantom "choices" no Full surface ever made or reads. A live
+  operator Copilot session read a fresh Full scaffold back as
+  "tier: full, verificationMode: out-of-band-or-none" — the exact wrong
+  message, since automatic cross-provider verification is the Full
+  tier's defining feature. Per the simplicity-first principle the fix
+  is omission, not a sentinel: omission is already schema-legal
+  (`docs/spec-md-schema.md` lists the field as optional with a
+  documented default, and every reader applies absence-means-default).
+  - `spec.md.template`'s fixed `verificationMode:` line became the
+    whole-line `{{VERIFICATION_MODE_LINE}}` token: the writer renders
+    the full pre-082 line (comment included) on `lightweight` and the
+    empty string on `full`, with no blank-line residue.
+  - `scaffoldConsumerRepo` writes the `.dabbler/verification-mode`
+    marker on Lightweight only. On Full the marker is **neither written
+    nor deleted** — a prior Lightweight pick survives a tier round-trip
+    untouched (the Set 081 "hiding never clears" posture; the marker
+    stays a write-through cache of the latest *sanctioned* choice).
+    `.dabbler/tier` stays unconditional (tier-agnostic by design).
+  - `buildSessionGenPrompt`'s hard-requirements prose is rescoped:
+    `lightweight` sets declare `verificationMode`; `full` sets OMIT it.
+    The Full worked example renders no `verificationMode:` line (shared
+    `renderSpec` writer, so the prompt cannot drift from scaffold
+    output).
+  - Lightweight output is byte-identical to 0.37.0 (golden-snapshot
+    tripwire); the Full cold-start golden regenerated without the line.
+  Per-set UAT walked 2026-07-06: one REAL cold-start Build per tier
+  from fresh empty folders (L-079-3) plus a Full-over-Lightweight
+  re-Build asserting marker preservation — all items PASS.
+
 ## [0.37.0] — 2026-07-05 (Set 081 — budget input scoped to the Direct-API sub-choice)
 
 Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero

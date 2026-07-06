@@ -1,7 +1,7 @@
 {
   "sessionSetName": "082-omit-verification-mode-from-full-tier-scaffolds",
   "createdDate": "2026-07-06T15:07:00.833078+00:00",
-  "totalSessions": 0,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -117,6 +117,54 @@
           "inputTokens": 5875,
           "outputTokens": 3270,
           "costUsd": 0.0637
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "s2.uat",
+      "dateTime": "2026-07-06T11:39:58.302285-04:00",
+      "description": "Authored 082 UAT checklist to the Set 078-081 bar (5 functional items across 3 walks: Full cold-start Build marker absence + Full prompt exemplar, Lightweight cold-start Build both-markers + Lightweight prompt exemplar line, Full-over-Lightweight re-Build marker preservation). All literals re-grounded against current source; fresh suite runs quoted per walk (Set 082 grep 7/7, marker matrix 4/4, cold-start snapshot 2/2, full Layer-2 1270/0, tsc clean). VSIX 0.37.0 built with S1 changes for the operator walk. Ad-hoc floor validated: every functional item declares ProgrammaticVerification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "s2.uat",
+      "dateTime": "2026-07-06T12:05:37.524262-04:00",
+      "description": "Operator UAT walk complete 2026-07-06: all 5 functional items PASS across 3 walks (Full cold-start Build: no verification-mode marker + Full prompt exemplar omits the line; Lightweight cold-start Build: both markers written, exact pre-082 line in exemplar; Full re-Build preserves the prior Lightweight marker). No findings; no remediation needed. Results saved inline in the checklist JSON by the operator.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "s2.release",
+      "dateTime": "2026-07-06T12:17:50.374379-04:00",
+      "description": "Required end-of-set path-aware critique produced via pull_critique (diff-base 6d1d5bc): google/gemini-2.5-pro VERIFIED with no findings; openai/gpt-5.4 ISSUES_FOUND with one Major (contract drift: docs/concepts/tier-model.md line 51 still said the canonical spec shape has required tier + verificationMode). Adjudication: accepted (real missed echo, L-065-1 class); fixed in-session (line 51 now scopes verificationMode to Lightweight, Full omits \u2014 Set 082). Repo-wide echo sweep re-run: no other live doc claims Full requires the field. Per L-070-1 the artifact stays as written (pre-fix evidence); no re-run round (doc-only fix, no new code defect). Release prep: package.json 0.38.0, CHANGELOG 0.38.0 entry, repository-reference row + version walk (publish pending tag push).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "s2.release",
+      "dateTime": "2026-07-06T12:21:08.146955-04:00",
+      "description": "Routed gate on the session-2 diff: REQUIRED (blast-radius, multi-module, breadth, build-ci-config: package.json/package-lock.json). Cross-provider session-verification run on gpt-5-4: round 1 returned a format-noncompliant bare 'No defects found.' (no verdict token; saved raw as s2-verification.md); round 2 (wording-compliance re-run, max_tier pinned 3 per L-064-7) returned VERIFIED with a substantive what-was-checked statement (s2-verification-round-2.md). No issues found in either round; no s2-issues.json (presence means findings).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.104148
+        },
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "costUsd": 0.062152
         }
       ]
     }

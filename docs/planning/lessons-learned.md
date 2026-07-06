@@ -139,7 +139,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 - **Action for future sessions:** Never self-opine on which model is cheaper.
 
 ## Schema-Only Re-Verifies Need `max_tier` Pinned To Block Auto-Escalation
-<!-- lesson: id="L-064-7" last-used-set="081" status="active" scope="portable" -->
+<!-- lesson: id="L-064-7" last-used-set="082" status="active" scope="portable" -->
 
 - **Context:** Round 2 of cross-provider session verification when the
   Round 1 response was substantively correct but used non-standard
@@ -198,7 +198,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   code before routing verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="081" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="082" status="active" scope="portable" -->
 
 - **Context:** Building a cross-provider verification prompt whose
   evidence bundle includes `git diff` / `git diff --stat` output
@@ -215,7 +215,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   alongside the diff so additions are visible.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="080" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="082" status="active" scope="portable" -->
 
 - **Context:** Cross-provider verification of a heavily cross-referenced
   synthesis document — a proposal, design doc, or spec whose central
@@ -423,7 +423,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   done. Record the resolved installed version in the close-out, not just the new floor.
 
 ## A Rollback Recipe Naming A Pinned Version Must Confirm That Version Is Actually Available
-<!-- lesson: id="L-078-1" added-set="078" last-used-set="081" status="active" scope="portable" -->
+<!-- lesson: id="L-078-1" added-set="078" last-used-set="082" status="active" scope="portable" -->
 
 - **Context:** Writing a rollback/downgrade recipe as part of a release-prep session,
   before the referenced versions have actually published (Set 078 S5's `copilot-cli`
@@ -501,7 +501,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   stated intent before any session work runs.
 
 ## Dogfood The True Cold Start — A Pre-Seeded Fixture Masks First-Run Defects
-<!-- lesson: id="L-079-3" added-set="079" last-used-set="081" status="active" scope="portable" -->
+<!-- lesson: id="L-079-3" added-set="079" last-used-set="082" status="active" scope="portable" -->
 
 - **Context:** Live dogfoods of onboarding / scaffold / install / first-run
   flows — any deliverable whose job is to provision state from nothing.

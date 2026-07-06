@@ -64,10 +64,29 @@ can learn it.
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
 | `dabbler-ai-router` | `0.28.0` | **Published.** Sequenced per the release-ordering invariant: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437` — the commit where the 0.27.0 version bump landed, before Set 078 bumped further), then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`). Both confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.37.0` | **Published.** Set 081 (budget input scoped to the Direct-API sub-choice; extension-only — `ai_router` untouched, router stays `0.28.0`). The Full-tier verification-budget block nests as an indented child of the "Direct provider API keys" option row and renders only while Full + that sub-option are selected; a Copilot-seat Build skips budget validation and writes no `budget.yaml` (absence has documented compat defaults); each sub-choice group closes with a bottom rule (this set's UAT-walk feedback). Per-set UAT walked and attested 2026-07-05: all six functional/judgment items PASS across five walks including one REAL cold-start Build per sub-option (L-079-3); the one Other finding (group/button divider) was remediated CSS-only and operator re-checked. Published 2026-07-05 (tag `vsix-v0.37.0`, tagged commit `bc3b43f`, publish-vscode.yml run [28764677942](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28764677942)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.38.0` | **Release prep complete; publish pending operator-authorized tag push.** Set 082 (omit `verificationMode` from Full-tier scaffolds; extension-only — `ai_router` untouched, router stays `0.28.0`). A Full-tier scaffold no longer renders a `verificationMode:` config line (whole-line `{{VERIFICATION_MODE_LINE}}` token; Lightweight renders the exact pre-082 line, comment included) and no longer writes the `.dabbler/verification-mode` marker (Lightweight-only; on Full the marker is neither written nor deleted, so a prior Lightweight pick survives a tier round-trip). `buildSessionGenPrompt` hard-requirements rescoped: `full` sets OMIT the field. Lightweight scaffold output byte-identical to 0.37.0 (golden-snapshot tripwire). Per-set UAT walked and attested 2026-07-06: all 5 functional items PASS across 3 walks incl. one REAL cold-start Build per tier from fresh empty folders (L-079-3) and a Full-over-Lightweight re-Build asserting marker preservation. This row flips to Published with run links at set close-out. Previous: `0.37.0` (Set 081) published 2026-07-05 (tag `vsix-v0.37.0`, tagged commit `bc3b43f`, publish-vscode.yml run [28764677942](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28764677942)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
 
+- **Extension `0.38.0`** — Set 082, omit `verificationMode` from
+  Full-tier scaffolds. Extension-only (`ai_router` untouched; router
+  stays `0.28.0`). A Full-tier scaffold omits the phantom
+  Lightweight-only field at both sites: the spec template's fixed line
+  became the whole-line `{{VERIFICATION_MODE_LINE}}` token (full line
+  with comment on `lightweight`, empty string on `full`, no blank-line
+  residue), and the `.dabbler/verification-mode` marker is written on
+  Lightweight only (on Full neither written nor deleted — a prior
+  Lightweight pick survives a tier round-trip; `.dabbler/tier` stays
+  unconditional). `buildSessionGenPrompt` hard-requirements rescoped
+  (`full` sets OMIT the field; Full worked example carries no line).
+  Lightweight scaffold output byte-identical to 0.37.0 (golden-snapshot
+  tripwire). Fix for a live operator-reported Copilot misreading of a
+  fresh Full scaffold ("tier: full, verificationMode:
+  out-of-band-or-none"). Per-set UAT walked 2026-07-06: one REAL
+  cold-start Build per tier from fresh empty folders (L-079-3) plus a
+  Full-over-Lightweight re-Build asserting marker preservation — all 5
+  functional items PASS. **Publish pending operator-authorized tag
+  push** (this entry gains run links at set close-out).
 - **Extension `0.37.0`** — Set 081, budget input scoped to the
   Direct-API sub-choice. Extension-only (`ai_router` untouched; router
   stays `0.28.0`). The Full-tier verification-budget block (label,

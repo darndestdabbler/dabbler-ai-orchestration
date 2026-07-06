@@ -50,7 +50,19 @@ moderate
 | 3 | Run critique, version bump, author CHANGELOG, update reference, commit, and push. | routed (path_aware_critique) then direct orchestrator file-work |
 
 ### Actuals (filled after the session)
-- Orchestrator used:
-- Total routed cost:
-- Deviations from recommendation:
-- Notes for next-session calibration:
+- Orchestrator used: Claude Code claude-fable-5 @ effort=medium (matches recommendation)
+- Total routed cost: $0.1663 metered (cross-provider `session-verification` on
+  gpt-5-4: R1 $0.1041 format-noncompliant bare verdict + R2 $0.0622
+  wording-compliance re-run, max_tier pinned 3 per L-064-7, VERIFIED) + the two
+  pull-critique arms (openai:gpt-5.4, google:gemini-2.5-pro), which the pull
+  executor does not record as routed-call rows in router-metrics.jsonl
+- Deviations from recommendation: none on orchestrator. The routed gate tripped
+  on the release-prep diff (package.json/package-lock.json = build-config
+  trigger + breadth), so session-verification ran even though the session
+  shipped no production code.
+- Notes for next-session calibration: final session — no next session. For
+  future release sessions: gpt-5-4 returned a bare 'No defects found.' on a
+  clean review despite the templated Response Format; the wording-only re-run
+  cost an extra $0.06. The critique's one Major (tier-model.md echo) shows the
+  L-065-1 echo-sweep should include docs/concepts/ when a set changes a
+  spec-schema contract.

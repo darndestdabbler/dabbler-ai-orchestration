@@ -155,6 +155,60 @@ def _default_route(prompt: str, session_set: str, session_number: int,
     )
 
 
+def _backstop_conventions(round_number: int) -> str:
+    """The up-front conventions block for a backstop verification round.
+
+    The project-guidance Convention (promoted L-064-10) requires every
+    session-verification prompt to open with the agreed baseline so
+    Round 1 spends findings on real defects. Two facts are structural
+    to the backstop and produce guaranteed false positives when
+    omitted (this set's own dogfood rounds 1–2 demonstrated both):
+
+    - the verification runs IN-PROCESS during the very close it
+      verifies, so the evidence necessarily shows an in-progress
+      session (no ``closeout_succeeded`` yet, live lifecycle lock
+      files) — the close completes mechanically only if this round's
+      verdict is non-blocking, so "the close is not finished" is the
+      expected mid-close view, never a finding;
+    - the close/verdict contract is severity-derived (workflow Step
+      6/7, L-071-1): the close proceeds on VERIFIED or a Minor-only
+      (nits-only) ISSUES_FOUND and refuses on >=1 Critical/Major —
+      the bare verdict token is not the blocking predicate.
+
+    This block is factual context in the Original Task slot — the
+    canonical adversarial template itself is untouched (L-069-2) and
+    the F3 stamp still binds the row to it.
+    """
+    lines = [
+        "- This verification is the Set 084 close backstop running "
+        "IN-PROCESS during the very close it verifies "
+        "(ai_router/docs/close-out.md Section 3, step 6b). The "
+        "evidence therefore necessarily shows the session still "
+        "in-progress (no closeout_succeeded event yet; lifecycle lock "
+        "files present) -- that is the expected mid-close view. The "
+        "close completes mechanically only if THIS round's verdict is "
+        "non-blocking, so 'the close has not finished' is never "
+        "itself a finding.",
+        "- Blocking discipline (docs/ai-led-session-workflow.md Step "
+        "6/7; L-071-1; explicitly preserved by the active spec's "
+        "non-goals): the close proceeds on VERIFIED or on a "
+        "Minor-only ISSUES_FOUND, and refuses on >=1 Critical/Major. "
+        "Severity, not the bare verdict token, is the blocking "
+        "predicate.",
+    ]
+    if round_number > 1:
+        lines.append(
+            f"- This is verification round {round_number}: earlier "
+            "rounds' blocking findings were remediated (see the "
+            "session's sN-issues*.json ledger and the remediation "
+            "commits in the diff). Re-verification rounds stay narrow "
+            "-- confirm the fixes and look for regressions they "
+            "introduce; do not re-open a settled point under fresh "
+            "wording."
+        )
+    return "\n".join(lines)
+
+
 def _session_started_at(
     session_set_dir: Path, session_number: int
 ) -> Optional[str]:
@@ -376,7 +430,10 @@ def run_close_backstop(
                 f"backstop could not assemble the evidence bundle: {exc}"
             ),
         )
-    prompt = _vs.build_prompt(evidence, session_number, round_number)
+    prompt = _vs.build_prompt(
+        evidence, session_number, round_number,
+        conventions=_backstop_conventions(round_number),
+    )
     review_path = _vs.verification_artifact_path(
         set_dir, session_number, round_number
     )

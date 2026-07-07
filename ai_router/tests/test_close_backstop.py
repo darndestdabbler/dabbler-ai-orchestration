@@ -703,6 +703,24 @@ class TestBackstopMechanics:
         base = resolve_backstop_diff_base(set_dir, 1)
         assert base == baseline_sha
 
+    def test_backstop_prompt_opens_with_the_conventions_block(
+        self, closeable, fake_route,
+    ):
+        """The promoted L-064-10 Convention: every session-verification
+        prompt opens with the agreed baseline. The backstop's built-in
+        block names the two structural facts a mid-close verifier
+        cannot otherwise know (the in-process view; the severity-derived
+        blocking predicate) — this set's own dogfood rounds 1–2 showed
+        both produce guaranteed false positives when omitted."""
+        root, set_dir = closeable
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "succeeded", outcome.messages
+        prompt = fake_route.calls[0]["prompt"]
+        assert "Conventions and baseline (read first)" in prompt
+        assert "IN-PROCESS during the very close it verifies" in prompt
+        assert "L-071-1" in prompt
+
     def test_run_close_backstop_direct_verified_outcome(
         self, closeable, fake_route,
     ):

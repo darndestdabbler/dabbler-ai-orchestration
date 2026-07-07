@@ -340,8 +340,11 @@ returns the corresponding exit code without touching downstream state.
     `sN-verification*.md` / `sN-issues*.json` artifacts, the same
     disposition patch, and a metrics row stamped
     `source: "close_session_backstop"` (F3). Then:
-    - **VERIFIED / Minor-only** → the close proceeds; the fresh stamped
-      row satisfies the evidence gate below. The backstop's own
+    - **VERIFIED / Minor-only** → the close proceeds (the workflow's
+      severity-derived blocking predicate, L-071-1 — a Minor-only round
+      is effectively VERIFIED for the loop and never blocks; the active
+      spec's non-goals preserve this discipline explicitly); the fresh
+      stamped row satisfies the evidence gate below. The backstop's own
       artifacts are close-out bookkeeping written mid-close (the
       `session-events.jsonl` precedent): the working-tree gate
       tolerates them for this one close and the operator commits them

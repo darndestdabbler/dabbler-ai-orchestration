@@ -1,0 +1,9 @@
+**VERIFIED** — I checked the material deltas the operator revisions actually made binding: the mandatory `verify_session` → `close_session` surfaces, `routed_gate` retirement semantics, the null-verdict gate change and its tests, the revised/waived UAT artifact, the required `path-aware-critique.json`, and the Set 084 spec/assignment handoff. I also re-checked the previously raised blocker classes against the current diff and did not find a remaining Major/Critical defect; the remaining inconsistencies are non-blocking wording/audit-noise only.
+
+#### NITS
+
+- **Nit:** A few explanatory surfaces still say “Step 6 verification command” even though the scaffolded `start-here.md` now puts `verify_session` in **Step 5** and `close_session` in **Step 6**. Locations include `docs/templates/consumer-bootstrap/getting-started.md.template`, its dist/cold-start copies, and `docs/spec-md-schema.md`. This is non-blocking because the actual runbook (`start-here.md.template`) and canonical workflow doc are correct, but the wording is slightly confusing.
+
+- **Nit:** `docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/activity-log.json` retains an earlier `s3.surfaces` entry claiming the template teaches `routed_gate -> verify_session -> close_session`, while the later operator-revision entry and final files correctly show the retired two-command flow. The later correction makes this audit-trail noise rather than a merge blocker.
+
+- **Nit:** The opening sentences in `README.md` and `tools/dabbler-ai-orchestration/README.md` say “mandatory cross-provider verification” before immediately scoping that to **Full tier** later in the body. The later clarification is enough, so this is not blocking.

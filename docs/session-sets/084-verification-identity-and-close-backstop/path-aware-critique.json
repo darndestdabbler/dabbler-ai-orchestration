@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "084-verification-identity-and-close-backstop",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-07-07T07:05:35.506774-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Reviewed the Set 084 implementation across ai_router/verification_stamp.py, close_backstop.py, verify_session.py, gate_checks.py, close_session.py, ai_router/docs/close-out.md, and the new/updated tests. I found one blocking contract-drift issue in the shipped close-out reference: it still documents CLI flags, exit codes, and JSON fields that the current close_session implementation no longer supports, so operators following the canonical doc will invoke a non-existent interface and mis-handle results.",
+      "findings": [
+        {
+          "description": "Violation: ai_router/docs/close-out.md calls itself the 'single source of truth' and says `python -m ai_router.close_session --help echoes Section 2 of this document verbatim`, but Section 2 still documents a `--timeout` flag, exit code `4` for `verification_timeout`, and JSON fields `verification.message_ids` / `verification.wait_outcome` (`ai_router/docs/close-out.md:221-279`). Impact: this is a merge-blocking contract drift because operators and tooling reading the canonical close-out reference will use a CLI/API surface that does not exist, and downstream parsers may expect result values/fields that close_session never emits. Evidence: the actual parser in ai_router/close_session.py defines no `--timeout` argument (`_build_parser`), RESULT_TO_EXIT_CODE maps code 4 to `aborted_at_soft_gate` rather than any verification timeout, and CloseoutOutcome.to_dict() emits only `verification.method` with no `message_ids` or `wait_outcome`. Fix: update Section 2 (and any mirrored prose) to match the live parser/output contract, or restore the documented interface if it is still intended.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "ISSUES_FOUND",
+      "summary": "The verification stamp and backstop logic are well-implemented, but a critical integration flaw in `close_session.py` causes it to bypass the backstop on a `--force` close, directly contradicting a primary deliverable of the change set.",
+      "findings": [
+        {
+          "description": "**Violation**: The change summary explicitly claims that the close backstop polices `--force` closes, stating: \"`--force` gets no special treatment -- an unverified force-close receives the same in-process verification (I-084-S2-1)\".\n\n**Impact**: The implementation in `close_session.py` explicitly skips the backstop when the `--force` flag is used. This means an operator can use `--force` to attempt a close without triggering the in-process verification meant to be the ultimate safety net. While the close will likely still be blocked by `check_verification_integrity` if evidence is missing, this is not the claimed behavior. The feature as described — to automatically run verification on a forced close — is not implemented, breaking the specified workflow and failing to deliver on a key remediation. This would change a reasonable reviewer's merge decision, as a critical feature is missing.\n\n**Evidence**: In `ai_router/close_session.py`, the `run()` function contains the following conditional block to invoke the backstop: `if not args.force and not args.manual_verify and not is_lightweight:`. The `not args.force` condition ensures the backstop is never called when `--force` is specified. Further, a comment at the start of this block reads: \"A --force or --manual-verify close bypasses the backstop by design\", directly contradicting the change summary provided for this review.",
+          "severity": "Major",
+          "category": "Correctness"
+        }
+      ]
+    }
+  ]
+}

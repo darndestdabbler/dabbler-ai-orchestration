@@ -132,7 +132,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   ceiling.
 
 ## An Iterative Dogfood Keeps Its Own Gate Artifact "Pre-Fix" — Frame It As Evidence, Not A Clean Snapshot
-<!-- lesson: id="L-070-1" added-set="070" last-used-set="079" status="archived" scope="portable" -->
+<!-- lesson: id="L-070-1" added-set="070" last-used-set="084" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Workflow Expectations on
   2026-06-19** after application across Sets 070 (origin: the path-aware critique
@@ -147,7 +147,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
 
 
 ## Dogfood The True Cold Start — A Pre-Seeded Fixture Masks First-Run Defects
-<!-- lesson: id="L-079-3" added-set="079" last-used-set="083" status="archived" scope="portable" -->
+<!-- lesson: id="L-079-3" added-set="079" last-used-set="084" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Workflow Expectations on
   2026-07-06** after instrumental application across Sets 079 (origin: the

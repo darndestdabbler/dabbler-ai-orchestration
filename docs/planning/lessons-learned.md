@@ -187,7 +187,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   pin (`max_tier=<verifier tier>`, gpt-5-4 = 3).
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="069" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="084" status="active" scope="portable" -->
 
 - **Context:** Authoring a doc that supersedes or replaces a retired one
   (Set 063 S3: `docs/budget-yaml-schema.md` replacing the schema section
@@ -407,7 +407,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   not move it* — especially when k is small and one property cuts the other way.
 
 ## A Dependency-Pin Bump Is Not Enablement Until The Target Venv Is Upgraded And The Entrypoint Confirmed
-<!-- lesson: id="L-075-1" added-set="075" last-used-set="083" status="active" scope="portable" -->
+<!-- lesson: id="L-075-1" added-set="075" last-used-set="084" status="active" scope="portable" -->
 
 - **Context:** Rolling a new tool/version floor out to consumer repos — bumping a
   `requirements.txt` (or equivalent) pin so a downstream session can run a newly-shipped
@@ -432,7 +432,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   done. Record the resolved installed version in the close-out, not just the new floor.
 
 ## A Rollback Recipe Naming A Pinned Version Must Confirm That Version Is Actually Available
-<!-- lesson: id="L-078-1" added-set="078" last-used-set="082" status="active" scope="portable" -->
+<!-- lesson: id="L-078-1" added-set="078" last-used-set="084" status="active" scope="portable" -->
 
 - **Context:** Writing a rollback/downgrade recipe as part of a release-prep session,
   before the referenced versions have actually published (Set 078 S5's `copilot-cli`

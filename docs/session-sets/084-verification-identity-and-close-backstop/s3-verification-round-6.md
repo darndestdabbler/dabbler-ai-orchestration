@@ -1,0 +1,5 @@
+**VERIFIED**
+
+I have audited the submitted work against the session plan and found it to be correct and complete. The documentation updates across all specified surfaces accurately reflect the new machinery for identity, verifier exclusion, and the close backstop. The authored UAT checklist is comprehensive, correctly identifying and mitigating the environment trap (L-075-1) that invalidated prior walks, and its steps faithfully reproduce the target incident against the new controls. The release preparation artifacts—version bumps and combined changelogs—are correct.
+
+The single code modification in `ai_router/close_session.py` is the removal of an obsolete `--timeout` argument and its validation, a correct consequence of the now-synchronous verification flow, not the introduction of new production logic. The work is internally consistent and fully delivers on the session's stated goals.

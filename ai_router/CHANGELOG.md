@@ -3,7 +3,13 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] (Set 083 — verify_session CLI, verification-integrity gate, mandatory verification)
+## [0.29.0] — 2026-07-07 (Sets 083 + 084 — verify_session CLI, verification-integrity gate, mandatory verification; identity + dynamic exclusion, stamped evidence, the close backstop)
+
+> Combined release. Set 083's changes below never reached PyPI on their own
+> (its release was superseded by Set 084, per 083 spec Revision 2); both sets
+> ship under `0.29.0`. The Set 084 section follows the Set 083 section.
+
+### Set 083 — verify_session CLI, verification-integrity gate, mandatory verification
 
 ### Added
 
@@ -55,6 +61,115 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     `close_session` with no gate step and no skip branch; "automatic"
     claims about Full verification are removed from all instruction
     surfaces.
+
+### Set 084 — identity is the underlying model, dynamic verifier exclusion, stamped evidence, the close backstop
+
+Closes the identity/provenance holes behind the third live verification
+bypass (2026-07-06). Verifier identity, verifier selection, evidence, and
+the last word at close are all moved out of the orchestrator's self-report.
+
+#### Added
+
+- **`ai_router/orchestrator_identity.py` — one shared identity resolver
+  (F1).** Given a session-state orchestrator block it returns the
+  **effective provider** by model-registry lookup on `model` (never the
+  free-text `provider` seat label), classifies `identityProvenance`
+  (`direct` for single-vendor engines, `asserted` for `github-copilot` /
+  `copilot` seats), and fails closed on a missing / registry-unknown model
+  for a multi-provider engine. The close gate, verifier selection, and
+  `start_session` validation all consume this one helper (L-069-1).
+- **`identityProvenance` orchestrator-block field** (additive, omit-null;
+  enum `direct | asserted`) — writer-validated and mirrored in the schema,
+  JSON schema, and pure-Python validator (L-066-1). Absent on every pre-084
+  block.
+- **`ai_router/verification_stamp.py` — the evidence stamp (F3).**
+  `record_call` writes additive, null-on-historical-rows stamp fields to
+  each `session-verification` row: `source`
+  (`verify_session_cli` / `close_session_backstop`), `evidence_sha256`,
+  `template_id` + pinned normalized `template_sha256`, `verifier_model`,
+  `orchestrator_effective_provider`, artifact path + byte-exact
+  `artifact_sha256`, `package_version`, `evidence_base`, `work_diff_sha256`,
+  and the `verdict` (re-derived from the hash-validated artifact bytes on
+  read). Template ids are minted in code with immutable pinned hashes so the
+  canonical adversarial template stays byte-identical (L-069-2) and an
+  operator template change is an explicit version bump, never an accidental
+  pass. Documented as **drift/affordance control, not cryptography.**
+- **`ai_router/close_backstop.py` — the close backstop (the structural
+  move).** On a Full-tier close with no valid stamped evidence,
+  `close_session` runs the verification itself **in-process** through the
+  same F1/F2/F3 machinery (evidence assembled against the last commit before
+  the session's `startedAt`, canonical template, registry-resolved provider
+  exclusion, stamped row, raw artifacts, disposition patch), then proceeds
+  on `VERIFIED` / Minor-only, refuses with the findings on blocking
+  `ISSUES_FOUND`, and blocks explicitly on `verification_unavailable` or a
+  double transport failure — never a pass. Respects `budget.yaml`
+  (zero-budget passthrough untouched), the two-attempt ladder, and the close
+  lock (idempotent); `verify_session` pre-empts it; `--manual-verify`
+  remains the attested bypass; `--force` gets no special treatment (an
+  unverified force-close receives the same in-process verification).
+
+#### Changed
+
+- **`start_session` requires `--model` for multi-provider engines (F1).**
+  `--engine github-copilot` / `--engine copilot` is refused (exit non-zero,
+  remediation names the flag) without a registry-known `--model`; any
+  supplied model is registry-validated for every engine; a model whose
+  resolved provider contradicts `--provider` prints a "model wins" advisory.
+  Single-vendor engines keep `--model` optional.
+- **Verifier selection dynamically excludes the orchestrator's effective
+  provider (F2).** `verify_session` and `route(task_type="session-verification")`
+  (given session context) pass the resolved effective provider as
+  `exclude_providers`. The static `session-verification:` model pin in
+  `router-config.yaml` is demoted to a preference that can never override the
+  exclusion. When the exclusion leaves no different-provider verifier
+  (e.g. a single-family Copilot catalog), the outcome is
+  **`verification_unavailable`** — a hard blocked state (no verdict written),
+  resolvable only by the operator-attested `--manual-verify` path.
+- **The verification-integrity close gate accepts only stamped evidence
+  (F3).** A `session-verification` row corroborates a close only if it
+  carries a valid, internally consistent stamp; a bare `route()` row (the
+  incident-3 shape), a template-hash mismatch, an edited artifact, a copied
+  stamp, or a same-effective-provider verifier all fail closed with named
+  reasons. Shared `find_session_verification_evidence` /
+  `validate_stamped_row` serve both the gate and the backstop (one path,
+  L-069-1).
+- **Docs:** `docs/session-state-schema.md`, `ai_router/docs/close-out.md`
+  (the backstop contract, the stamp in the evidence gate, and the
+  `--manual-verify` attestation contents), `docs/ai-led-session-workflow.md`
+  (Step 6 identity/exclusion/stamp/backstop, Step 8), `docs/concepts/tier-model.md`
+  (Copilot-seat `--model` requirement + backstop), and the consumer-bootstrap
+  template bundle (`start-here.md`, `AGENTS.md` Copilot guidance,
+  `getting-started.md`) describe the new machinery; cold-start fixtures and
+  the extension dist bundle regenerated.
+
+#### Fixed
+
+- **Windows drive-letter case-sensitivity in the close/verification path
+  (Set 084 S3 UAT).** A real Copilot orchestrator passing
+  `--session-set-dir c:\...` (lowercase drive) while git reports `C:\...`
+  (uppercase) hit spurious refusals: the stamp's artifact-path check
+  (`verification_stamp.validate_stamped_row`) rejected a legitimate stamp
+  ("does not sit at the session-set root"), and the working-tree-clean gate
+  mis-scoped in-session-set files — together forcing the close backstop to
+  re-run redundant verification rounds. Every two-source path comparison in
+  the close/verify path now case-folds both sides with `os.path.normcase`
+  (a no-op on POSIX, which is correctly case-sensitive): the stamp
+  artifact-dir check, the working-tree in-scope match, the `cost_report`
+  metrics-row match, and the metrics-row slug reducers. Regression tests in
+  `test_windows_path_case.py`.
+
+### Rollback
+
+If a hotfix-grade defect surfaces in the verification-identity / dynamic
+exclusion / stamp / close-backstop machinery, pin back to the last version
+without any of it: `pip install dabbler-ai-router==0.28.0` (confirmed live on
+PyPI at this writing — see `docs/repository-reference.md`). **Effect:** `0.28.0`
+predates Sets 083 and 084, so it has no `verify_session` CLI, no
+verification-integrity close gate, and no close backstop — a consumer rolled
+back to it returns to the pre-083 routed-gate flow and loses mandatory
+Full-tier verification. Prefer a forward fix; use this only as an incident
+escape. (There is no config-level escape for this release: the identity /
+exclusion / backstop behavior is code, not a `transport:` toggle.)
 
 ## [0.28.0] — 2026-07-04 (Set 078 — Copilot CLI hybrid tier)
 

@@ -78,10 +78,14 @@ it.
 
 ## Reference notes
 
-- **Push arm** = the routed `session-verification` task type. In this repo's
-  `router-config.yaml` it pins to `gpt-5-4` for a Claude/Anthropic orchestrator
-  (a different provider = cross-provider). Snippet/diff-fed, single-shot, no
-  repository access; uses `prompt-templates/verification.md`.
+- **Push arm** = the routed `session-verification` task type. For a
+  Claude/Anthropic orchestrator it resolves to `gpt-5-4` (a different provider =
+  cross-provider). Since Set 084 the verifier is chosen by **dynamically
+  excluding the orchestrator's model-derived effective provider**, not by the
+  static `router-config.yaml` `session-verification:` pin (now only a
+  preference) — for a Claude orchestrator the exclusion still lands on the
+  cheapest non-Anthropic verifier, i.e. `gpt-5-4`. Snippet/diff-fed,
+  single-shot, no repository access; uses `prompt-templates/verification.md`.
 - **Pull arm** = `pull_route` over the repo at the committed state, agentic
   tool loop, uses `path-aware-critique.md`. Gated by the durable
   `pathAwareCritique` record (Set 066), which defaults to `none` (gate skips).

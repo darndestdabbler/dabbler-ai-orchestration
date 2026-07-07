@@ -86,6 +86,17 @@ spec, so the *same command* is correct on both tiers:
 # POSIX: .venv/bin/python -m ai_router.start_session ...
 ```
 
+> **Copilot seats must pass `--model`.** A GitHub Copilot seat
+> (`--engine github-copilot` or `--engine copilot`) relays whatever model
+> the picker selected, so the seat *label* is not an identity — the
+> **underlying model is** (Set 084). `start_session` therefore **refuses a
+> multi-provider engine without a registry-known `--model`** (e.g.
+> `--model claude-sonnet-4.6`) and records `identityProvenance: asserted`.
+> The effective provider used to pick a *different-provider* verifier is
+> derived from that model, never from `--provider`. Single-vendor engines
+> (`claude-code`, `codex`, `gemini`) may omit `--model`; the writer records
+> `identityProvenance: direct`.
+
 > **"No module named ai_router" is not a missing-keys problem** — it almost
 > always means you ran a bare `python` instead of the **venv** interpreter.
 > Always invoke `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python`
@@ -126,6 +137,13 @@ round has findings, patches `disposition.json`, and prints the next action.
 If it reports blocking findings, fix them and re-run the verifier round per
 the workflow doc.
 
+The verifier is chosen by **excluding the orchestrator's effective provider**
+(derived from the session's `model`, not the seat label). If no
+different-provider verifier can be reached — e.g. a Copilot seat whose catalog
+serves only one provider family — the outcome is **`verification_unavailable`**:
+a hard blocked state with **no verdict written**, resolvable only by the
+operator-attested `--manual-verify` path (never a silent same-provider pass).
+
 The only exception is operator-declared, never per-session: a repo whose
 `ai_router/budget.yaml` sets `threshold_usd: 0` (the zero-budget tier) uses
 the manual verification path documented there instead.
@@ -139,11 +157,20 @@ the manual verification path documented there instead.
 
 The gate is the same on both tiers: it requires a disposition, requires
 `change-log.md` on the **final** session, writes idempotently, and emits the
-schema-drift advisory as a soft note. On Full, the close gate **refuses** a
-close whose verification verdict is missing or uncorroborated (no verifier
-metrics row, no `sN-verification*.md` artifact, or a verifier from the
-orchestrator's own provider); on Lightweight, the per-set `verificationMode`
-flow governs how verification is attested.
+schema-drift advisory as a soft note. On Full, the close gate corroborates the
+verification verdict against a **stamped** cross-provider metrics row — one the
+`verify_session` CLI wrote (`source: verify_session_cli`) **or** the close
+backstop wrote (`source: close_session_backstop`) — **and** the raw
+`sN-verification*.md` artifact; a bare `route()` row no longer corroborates a
+close, and a verifier from the orchestrator's own (model-derived) effective
+provider is rejected. **If you reach close-out
+unverified, `close_session` runs the verification itself** (the Set 084 close
+backstop): it assembles the evidence, picks a different-provider verifier by the
+same exclusion, then proceeds on `VERIFIED` / refuses with the findings on
+`ISSUES_FOUND` / blocks on `verification_unavailable`. You **cannot skip**
+verification — you can only **pre-empt** the backstop by running `verify_session`
+yourself first. On Lightweight, the per-set `verificationMode` flow governs how
+verification is attested.
 
 ---
 

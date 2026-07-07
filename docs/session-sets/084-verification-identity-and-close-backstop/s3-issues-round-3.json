@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The CHANGELOG makes a false safety claim contradicted by the implementation and the session's own critique artifacts\n\n-   **Category:** Correctness\n-   **Severity:** Major\n-   **Details:**\n    -   **Violation:** The `ai_router/CHANGELOG.md` claims: \"`--force` gets no special treatment (an unverified force-close receives the same in-process verification).\" The session's explicit \"Already-adjudicated points\" context reinforces this, stating a finding to the contrary is a \"HALLUCINATION.\"\n    -   **Impact:** This is a critical misrepresentation. An operator reading the release notes will believe the verification backstop cannot be bypassed with `--force`. In reality, using `--force` *does* bypass the backstop, re-opening the exact class of vulnerability this set was meant to close. This would change any reasonable reviewer's merge decision, as a core safety guarantee is not met.\n    -   **Evidence:**\n        1.  The session's own `path-aware-critique.json` deliverable discovers this exact bug, stating: \"In `ai_router/close_session.py`, the `run()` function contains the following conditional block to invoke the backstop: `if not args.force ...`. The `not args.force` condition ensures the backstop is never called when `--force` is specified.\"\n        2.  The diff for `ai_router/close_session.py` shows only docstring changes, not application logic changes, proving the bug was not remediated.\n        3.  The response's own `s3-issues-round-2.json` file confirms this contradiction, noting \"the release notes promise a guardrail that is not there.\"\n        4.  The context document is therefore incorrect; the finding is real, not a hallucination, and the changelog is false.\n\n###",
+      "category": "Correctness",
+      "severity": "Major"
+    },
+    {
+      "description": "Documentation contract drift was incompletely remediated\n\n-   **Category:** Correctness\n-   **Severity:** Major\n-   **Details:**\n    -   **Violation:** The context claims \"The close-out.md ... drift is FULLY removed.\"\n    -   **Impact:** The `ai_router/docs/close-out.md` file is described as the \"single source of truth\" for the `close_session` contract. It still documents a `message_ids` field in its example JSON output that the implementation does not produce. This will break downstream tooling and mislead operators who build integrations based on the canonical documentation.\n    -   **Evidence:**\n        1.  The diff for `ai_router/docs/close-out.md` shows that `wait_outcome` and `--timeout` were removed, but the line `\"message_ids\": [\"<id>\"],` remains in the JSON example.\n        2.  This exact incomplete fix is noted in the delivered `s3-issues-round-2.json` file.\n\n###",
+      "category": "Correctness",
+      "severity": "Major"
+    },
+    {
+      "description": "The UAT checklist is undermined by a false positive in the session's own review artifacts\n\n-   **Category:** False Positive\n-   **Severity:** Major\n-   **Details:**\n    -   **Violation:** The delivered artifact `docs/session-sets/084-verification-identity-and-close-backstop/s3-issues-round-2.json` claims the UAT checklist \"fails to meet the specification's requirement for testing the real failure mode, substituting a weaker dry-run check.\"\n    -   **Impact:** This creates a contradiction within the set of deliverables. An operator reviewing the session's own work products would be misled into believing the UAT is insufficient, potentially blocking the release or causing unnecessary rework, when in fact the UAT appears to be correctly implemented per the spec.\n    -   **Evidence:** The delivered `docs/.../084-...-uat-checklist.json` file for item \"Dynamic verifier exclusion (F2)\" contains a `HumanAction` with step 3: \"THEN run the REAL verification...\". Its `Expectation` section explicitly describes the outcome of this \"real run,\" including the hard \"REFUSES\" state. This directly contradicts the finding asserted in `s3-issues-round-2.json`.",
+      "category": "False Positive",
+      "severity": "Major"
+    }
+  ]
+}

@@ -37,7 +37,12 @@ the GitHub Copilot CLI must be installed on your machine. When you
 pick the Copilot option, the Build step configures and checks the
 seat automatically: it confirms the seat can dispatch models from at
 least two different provider families, and tells you honestly if it
-cannot (some enterprise-managed seats expose only one). For more
+cannot (some enterprise-managed seats expose only one). One thing to
+know when running sessions on a Copilot seat: because a seat can relay
+any provider's model, each session must name its model
+(`start_session --model …`) so verification can pick a genuinely
+different provider — the orchestrator docs cover this and the tool
+refuses a Copilot start without it. For more
 information on either option, see the tier model documentation:
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
 

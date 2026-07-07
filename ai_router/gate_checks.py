@@ -398,9 +398,15 @@ def check_working_tree_clean(
         abs_path = os.path.abspath(os.path.join(repo_root, path_part))
         norm_rel = os.path.normcase(os.path.normpath(path_part))
 
+        # Windows drive-letter case: git emits an uppercase drive
+        # (``C:\...``) while the CLI ``--session-set-dir`` arg may be
+        # lowercase (``c:\...``). Compare case-folded (normcase is a
+        # no-op on POSIX, which is correctly case-sensitive).
+        nc_abs_path = os.path.normcase(abs_path)
+        nc_abs_set_dir = os.path.normcase(abs_set_dir)
         in_session_set = (
-            abs_path == abs_set_dir
-            or abs_path.startswith(abs_set_dir + os.sep)
+            nc_abs_path == nc_abs_set_dir
+            or nc_abs_path.startswith(nc_abs_set_dir + os.sep)
         )
         in_declared = norm_rel in declared
         if disposition is not None and not (in_session_set or in_declared):
@@ -978,7 +984,7 @@ def _session_verification_rows(
             continue
         row_set = str(row.get("session_set") or "")
         row_slug = row_set.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
-        if row_slug != set_slug:
+        if os.path.normcase(row_slug) != os.path.normcase(set_slug):
             continue
         rows.append(row)
     return rows

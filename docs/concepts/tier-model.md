@@ -206,6 +206,24 @@ guarantees** — never as byte-equivalent to the direct-API Full tier:
   model-discovery command or first-party `provider` field, so provenance is
   derived from a model-name-prefix heuristic (`claude-*` / `gpt-*` /
   `gemini-*`) recorded in a seat-local catalog, not read off an API.
+- **A seat's identity is its underlying model, and the seat must declare it
+  (Set 084 F1).** A Copilot seat relays whatever model the picker selected, so
+  the seat *label* is never an identity. `start_session` **refuses** a Copilot
+  start (`--engine github-copilot` / `copilot`) without a registry-known
+  `--model` and records `identityProvenance: asserted` (vs. `direct` for
+  single-vendor engines). Every downstream identity consumer — the
+  verification-integrity close gate and verifier selection — derives the
+  **effective provider** by registry lookup on that model, never from the
+  free-text `--provider` label. Verifier selection then **excludes** that
+  effective provider (applied against the seat's catalog lockfile), so a seat
+  can never verify its own work under the same provider. If the seat's catalog
+  serves no different-provider verifier, the session yields
+  **`verification_unavailable`** — a hard blocked state (no verdict written),
+  resolvable only by the operator-attested `--manual-verify` path, never a
+  silent same-provider pass. And a Full-tier close that arrives unverified runs
+  the **close backstop** (Set 084): `close_session` performs the verification
+  itself in-process through the same exclusion, so the seat's orchestrator never
+  holds the last word.
 - **Seat billing is not locally meterable.** The only usage signal is a
   per-call count (`result.usage.premiumRequests`) — no token cost, no dollar
   figure, no remaining balance. Cost-keyed guards (dollar/token budgets,

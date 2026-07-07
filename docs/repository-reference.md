@@ -404,11 +404,22 @@ it is non-negotiable: `session-verification` always routes, even under
 the `— maxout <engine>` suffix that lifts every other cost cap.
 
 Verifier selection in [ai_router/verification.py](../ai_router/verification.py)
-is rule-based: different provider, enabled as a verifier, matches the
-generator's tier (or one tier higher), cheapest output price wins. The
+is rule-based and, since Set 084, **dynamically excludes the orchestrator's
+effective provider** — derived by registry lookup on the session's `model`
+(`ai_router/orchestrator_identity.py`), not the free-text `provider` seat
+label. Among the remaining providers it picks an enabled verifier that matches
+the generator's tier (or one tier higher), cheapest output price wins; the old
+static `session-verification:` model pin is only a preference that cannot
+override the exclusion. If the exclusion leaves no different-provider verifier,
+the outcome is **`verification_unavailable`** — a hard blocked state (no verdict
+written), resolvable only by the operator-attested `--manual-verify` path. The
 verifier returns a structured JSON verdict
 (`{"verdict": "VERIFIED" | "ISSUES_FOUND", "issues": [...]}`) so the
-result is parseable rather than a free paragraph.
+result is parseable rather than a free paragraph. Only a **`verify_session`- or
+backstop-stamped** metrics row corroborates a close (Set 084 F3) — a bare
+`route()` row does not — and on a Full-tier close that arrives unverified,
+`close_session` **runs the verification itself in-process** (the close
+backstop) rather than trusting the orchestrator's word.
 
 When the orchestrator **disagrees** with a finding, it does not
 unilaterally dismiss it and does not poll a second AI for a vote. The

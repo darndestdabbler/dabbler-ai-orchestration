@@ -218,8 +218,8 @@ Exit codes:
   `disposition.json` outside `--force` / `--repair`).
 - `3` — lock contention (another close-out is running on the same
   session set).
-- `4` — timeout waiting on a verification path that still uses the legacy
-  wait loop.
+- `4` — aborted at a soft gate (Set 077 S4: the operator declined a
+  soft-gate prompt in `--interactive` mode; nothing was written).
 - `5` — repair drift detected and not applied (`--repair` without
   `--apply`).
 
@@ -228,7 +228,7 @@ parse it without branching on success:
 
 ```json
 {
-  "result": "succeeded | noop_already_closed | gate_failed | invalid_invocation | lock_contention | verification_timeout | repair_drift",
+  "result": "succeeded | noop_already_closed | gate_failed | invalid_invocation | lock_contention | aborted_at_soft_gate | repair_drift",
   "exit_code": 0,
   "session_set_dir": "<absolute path>",
   "session_number": 3,
@@ -237,9 +237,7 @@ parse it without branching on success:
     {"check": "<name>", "passed": true, "remediation": ""}
   ],
   "verification": {
-    "method": "api | manual | manual-via-other-engine | skipped",
-    "message_ids": ["<id>"],
-    "wait_outcome": "completed | failed | timed_out"
+    "method": "api | manual | manual-via-other-engine | skipped"
   },
   "events_emitted": ["closeout_requested", "closeout_succeeded"]
 }
@@ -258,7 +256,6 @@ Flag summary:
 | `--manual-verify` | Attested operator override for the verification-evidence layer. Requires `--interactive` or `--reason-file`. Method vocabulary is still enforced; illegal disposition tokens still fail. |
 | `--repair` | Diagnostic mode: walk the session set's state and report drift. |
 | `--apply` | When combined with `--repair`, apply corrections to detected drift. |
-| `--timeout MINUTES` | Maximum minutes for legacy verification wait loops (default 60). The canonical `verify_session` path is synchronous before close-out. |
 
 Flag combination rules (validated up front; failure exits 2):
 
@@ -276,7 +273,6 @@ Flag combination rules (validated up front; failure exits 2):
   An operator who genuinely has nothing to say can put a one-line
   reason in a file; silent bypass is refused so the audit trail stays
   honest.
-- `--timeout` must be positive.
 
 Orchestrator attribution (post-Set-049). On every successful close,
 `close_session` **preserves** the `orchestrator` block on the
@@ -684,6 +680,25 @@ The disposition method vocabulary is still enforced: `"manual"` remains an
 illegal disposition token; use `"manual-via-other-engine"` for the zero-budget
 manual path. Method `"manual"` is recorded only in close-out's JSON/event
 output to mark that the operator override was used.
+
+This is also the **only** sanctioned resolution when the Set 084 backstop
+blocks on `verification_unavailable` (the exclusion left no different-provider
+verifier — e.g. a single-family Copilot catalog). Because the attestation
+stands in for the stamped evidence the automated path would have produced, it
+must name what that evidence would have carried, so the audit trail is not
+weaker than a normal close:
+
+- the **verifying surface** (which engine/CLI/chat ran the review);
+- the **verifier model** and its **effective provider** (which must differ
+  from the orchestrator's model-derived effective provider — the exclusion the
+  automated path would have enforced);
+- the **template** used (the canonical adversarial `session-verification`
+  template, so a diluted hand-rolled review is not laundered in);
+- a **timestamp**; and
+- a pointer to the **raw verification artifact** the review produced.
+
+An attestation that omits these is an unaudited bypass, not a Mode-B
+verification — record them in the `--reason-file` (or interactively).
 
 **`--repair`** — diagnostic mode. Walks the session set's state
 (`session-state.json`, `activity-log.json`, `session-events.jsonl`,

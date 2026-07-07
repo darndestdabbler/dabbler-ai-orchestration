@@ -534,9 +534,6 @@ def _validate_args(args: argparse.Namespace) -> Optional[str]:
       attestation). Refusing the silent-bypass case keeps the audit
       trail honest; an operator who genuinely has nothing to say can
       put a one-line reason in a file.
-    * ``--timeout`` must be positive (a zero or negative timeout would
-      either skip the wait entirely or hang forever depending on
-      implementation; both are footguns).
     """
     if args.force and args.interactive:
         return "--force and --interactive are incompatible"

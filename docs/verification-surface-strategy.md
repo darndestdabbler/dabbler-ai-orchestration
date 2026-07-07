@@ -588,7 +588,10 @@ in the study:
 - **Provider × surface interact (the headline).** Gemini: strong on push, *quiet on
   pull*. GPT: reliable on both. Anthropic: highest ceiling, lowest reliability. The
   study calls our live default (`push = gpt-5-4` / `pull = gemini-2.5-pro`) the **single
-  weakest pull configuration**.
+  weakest pull configuration**. (Since Set 084 the push verifier is chosen by dynamic
+  exclusion of the orchestrator's effective provider rather than a static pin; `gpt-5-4`
+  remains the resolved push verifier for a Claude/Anthropic orchestrator, so the study's
+  characterization stands.)
 
 So the strategy must now record an honest correction: **surface is *not* fully orthogonal
 to provider.** §5.2's equal-arms mode held provider constant precisely to keep its RETIRE

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "s were found in key deliverables, one of which directly contradicts the central security principle of the changes being shipped.\n\n### Issues"
+    },
+    {
+      "description": "Hardcoded absolute path in UAT checklist deliverable**\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The session plan explicitly requires the UAT checklist to use a placeholder for the local checkout path: \"...the checklist's install step names the exact `pip install -e <this-checkout>` command\". The delivered checklist violates this requirement.\n  - **Impact:** The UAT checklist is a key deliverable for operator sign-off. By hardcoding a developer's local absolute path, it is not portable. An operator on any other machine cannot follow the setup instructions verbatim and must manually edit the command, increasing the risk of error during a critical pre-release check. This is a clear defect in a formal deliverable that must be fixed before it can be executed by an operator.\n  - **Evidence:** The file `docs/session-sets/084-verification-identity-and-close-backstop/084-verification-identity-and-close-backstop-uat-checklist.json` contains the hardcoded absolute path `D:\\\\Projects\\\\dabbler-ai-orchestration` in three places (the `Notes` field and twice in the `Walk 0` item). It should use a placeholder like `<path-to-this-checkout>` as specified in the plan.",
+      "category": "Correctness",
+      "severity": "Major"
+    },
+    {
+      "description": "Contradictory documentation for verification guardrail**\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The session plan required a \"grep for stale echoes of the old identity/selection claims across docs\". The central principle of Set 084 is that identity is derived from the `--model`, not the free-text `--provider` label. A key documentation file makes the opposite claim for one of the verification modes.\n  - **Impact:** This documentation is dangerously misleading for a security-critical feature. It explicitly tells users that for \"Mode B\" verification, the \"guardrail keys on the `--provider` **label**\". An orchestrator following this guidance could believe they can satisfy the cross-provider requirement by simply changing a text label while using the same underlying model provider, re-introducing the exact class of verification bypass that this set was created to eliminate. This incorrect documentation undermines the entire security posture of the changes.\n  - **Evidence:** The file `docs/templates/consumer-bootstrap/engine-file.agents-tail.md` (and its regenerated copies in `test-fixtures` and `tools/.../dist`) contains the sentence: \"The Mode-B cross-provider guardrail keys on the `--provider` **label**\". This claim is a stale echo of the old identity model and directly contradicts the new, model-based identity principle that is the cornerstone of this release.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

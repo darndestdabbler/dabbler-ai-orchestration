@@ -574,9 +574,14 @@ def validate_stamped_row(
             f"artifact_path {artifact_path!r} does not name an "
             f"{expected_prefix}*.md artifact"
         )
-    if os.path.abspath(os.path.dirname(resolved)) != os.path.abspath(
-        session_set_dir
-    ):
+    # Windows drive-letter case: ``resolved`` is anchored on the
+    # git-derived ``repo_root`` (uppercase ``C:``) while
+    # ``session_set_dir`` comes from the CLI arg (possibly lowercase
+    # ``c:``). Compare case-folded so a legitimate stamp is not rejected
+    # (normcase is a no-op on POSIX, which is correctly case-sensitive).
+    if os.path.normcase(
+        os.path.abspath(os.path.dirname(resolved))
+    ) != os.path.normcase(os.path.abspath(session_set_dir)):
         return False, (
             f"artifact_path {artifact_path!r} does not sit at the "
             "session-set root"

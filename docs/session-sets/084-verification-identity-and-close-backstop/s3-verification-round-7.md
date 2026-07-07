@@ -1,0 +1,3 @@
+**VERIFIED**
+
+I have reviewed the provided work against the task specification, acting as an adversarial verifier. The work is correct and complete. I cross-referenced the documentation and template changes against the required feature descriptions, validated the release preparation artifacts (`pyproject.toml`, `package.json`, changelogs) against the session plan, and scrutinized the Windows path-case bug fix, including its new regression tests. The deliverables fully implement the session plan.

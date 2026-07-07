@@ -289,7 +289,7 @@ def round1_verifier_tier(
         # Metrics rows are slug-keyed at the write boundary, but older
         # rows carry path shapes; match on the trailing slug component.
         row_slug = row_set.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
-        if row_slug != session_set_name:
+        if os.path.normcase(row_slug) != os.path.normcase(session_set_name):
             continue
         # First matching row = round 1, unconditionally. Readable tier
         # -> return it; unreadable -> fail open (never fall through to a

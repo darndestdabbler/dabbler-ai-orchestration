@@ -180,6 +180,54 @@
       "dateTime": "2026-07-07T06:19:40.437329-04:00",
       "description": "Dogfood round 8 (LIVE, $0.4216, gpt-5-4): two Majors, both fixed. I-084-S2-11: build_stamp's drifted-template refusal now surfaces as a controlled fail-closed outcome on both producer paths (verify_session exit 3 with remediation; backstop gate_failed naming the version bump; no metered call; integration regressions added). I-084-S2-12: the round>1 conventions paragraph no longer asserts remediation the backstop cannot know happened -- facts only (round history on disk; judge the current state; re-report remaining defects, do not re-open what the evidence shows resolved), so an unremediated rerun cannot suppress repeat findings. Suite 2731 passed. Round 9 decides.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "s3.surfaces",
+      "dateTime": "2026-07-07T06:28:01.534868-04:00",
+      "description": "Session 3 start: instruction surfaces (templates + canonical docs + cold-start fixtures + stale-echo grep) for effective-provider identity, the stamp, verification_unavailable, --model requirement, and the close backstop.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "s3.uat",
+      "dateTime": "2026-07-07T06:59:01.157834-04:00",
+      "description": "Authored per-set UAT checklist (2 walks, 7 real items) reproducing incident 3 against the new machinery: version gate (L-075-1), cold-start Full Build (L-079-3) confirming shipped surfaces teach backstop + --model, and the Copilot-seat incident-3 reproduction (refusal w/o --model, asserted provenance, dry-run exclusion of effective provider, backstop-governed unverified close). Release prep: pyproject 0.29.0 + combined CHANGELOG. Literal strings dogfooded live in C:/temp/uat-084-scratch.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "s3.uat",
+      "dateTime": "2026-07-07T06:59:01.158817-04:00",
+      "description": "Step 6 start: cross-provider session verification of the S3 diff (26 files, docs/templates/fixtures/version). Orchestrator claude-code/anthropic -> anthropic excluded by resolution (F2 dogfood on this session too).",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "s3.surfaces",
+      "dateTime": "2026-07-07T07:02:31.855926-04:00",
+      "description": "Extension release prep: package.json 0.38.0->0.39.0 + combined 083+084 CHANGELOG (ships updated consumer-bootstrap template bundle in VSIX). repository-reference Published-status update deferred to actual publish (L-078-1). Remediates S3 R1 finding-3 repo side.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "s3.release",
+      "dateTime": "2026-07-07T07:34:29.324027-04:00",
+      "description": "Release PREP (correct progress key; supersedes the s3.uat/s3.surfaces keys used on the earlier release-prep step entries -- activity-log is append-only). Router dabbler-ai-router bumped to 0.29.0 (pyproject) with the combined Sets 083+084 CHANGELOG section and an L-078-1 Rollback naming the registry-live 0.28.0 fallback; extension dabbler-ai-orchestration bumped to 0.39.0 (package.json) with the combined 083+084 CHANGELOG. Actual PyPI/Marketplace PUBLISH and the repository-reference Published-status update remain operator-authorized (tag-driven CI: v0.29.0 -> release.yml, vsix-v0.39.0 -> publish-vscode.yml).",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "s3.uat",
+      "dateTime": "2026-07-07T07:40:22.191620-04:00",
+      "description": "Step 6 VERIFIED (round 6, gemini-pro, anthropic excluded via F2). Rounds 1-3 were false-positive cascades from the session own verification/critique process-records being in the diff; fixed by --exclude-ing them (round 4+). Corrected verification found 4 genuine improvements (close-out --timeout drift, UAT dry-run->real refusal, UAT hardcoded path->placeholder, agents-tail Mode-B framing, activity-log s3.release key), all fixed. openai 429-limited throughout; ran on gemini-pro via out-of-tree AI_ROUTER_CONFIG. Path-aware critique: finding A fixed, finding B false-positive (--force runs backstop; tests prove it). Full disposition authored (VERIFIED).",
+      "status": "complete"
     }
   ]
 }

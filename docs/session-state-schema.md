@@ -790,7 +790,8 @@ attribution.
       "completedAt": "2026-05-12T10:15:00-04:00",
       "orchestrator": {
         "engine": "claude", "provider": "anthropic",
-        "model": "claude-opus-4-7", "effort": "high"
+        "model": "claude-opus-4-7", "effort": "high",
+        "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED" },
     { "number": 2, "title": "Wire the wizard into onboarding",

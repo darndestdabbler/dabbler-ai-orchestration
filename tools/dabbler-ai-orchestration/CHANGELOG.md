@@ -3,13 +3,17 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] (Set 083 — mandatory Full-tier verification in the scaffold bundle)
+## [0.39.0] — 2026-07-07 (Sets 083 + 084 — mandatory verification in the scaffold bundle; identity, exclusion, stamped evidence, close backstop taught in the shipped docs)
+
+> The extension ships the consumer-bootstrap template bundle in the VSIX.
+> This minor bundles the Set 083 scaffold changes (which never shipped on
+> their own) with the Set 084 template + doc updates.
 
 ### Changed
 
-- **Scaffolded `start-here.md` teaches mandatory verification with no skip
-  branch.** Step 5 is now `python -m ai_router.verify_session` on every
-  Full-tier session (the routed-gate step and its "if SKIP, record the
+- **(Set 083) Scaffolded `start-here.md` teaches mandatory verification with
+  no skip branch.** Step 5 is now `python -m ai_router.verify_session` on
+  every Full-tier session (the routed-gate step and its "if SKIP, record the
   null-verdict skip" instruction are gone — the Set 068 SKIP path is
   retired by operator decision after the 2026-07-06 UAT incident); Step 6
   closes via `close_session`, and the text states the close gate refuses an
@@ -20,6 +24,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   verification anywhere in the bundle. Cold-start goldens regenerated for
   both tiers. Requires `dabbler-ai-router` >= 0.29.0 in consumer venvs for
   the matching CLI + close-gate behavior.
+- **(Set 084) The shipped bundle teaches identity-from-model, dynamic
+  exclusion, and the close backstop.** The scaffolded `start-here.md` now
+  notes that a Copilot seat must pass `--model` at `start_session` (the
+  seat's identity is the underlying model, not the label), that the verifier
+  is chosen by excluding the orchestrator's effective provider with a hard
+  `verification_unavailable` blocked state, and that a close reached
+  unverified triggers the **close backstop** (`close_session` runs the
+  verification itself). `AGENTS.md`'s Copilot guidance names the `--model`
+  requirement for both Mode-B verification and the `copilot-cli` Full-tier
+  profile; `getting-started.md` notes the per-session `--model` on a Copilot
+  seat. Cold-start goldens and the bundled dist templates regenerated.
 
 ## [0.38.0] — 2026-07-06 (Set 082 — omit verificationMode from Full-tier scaffolds)
 

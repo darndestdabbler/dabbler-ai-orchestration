@@ -906,8 +906,11 @@ override the `ai-assignment.md` recommendations for that session and
 push routing to the named engine's frontier model. "maxout" upgrades
 the tier and removes cost-saving caps; **it never eliminates the
 cross-provider verification step or routes verification back to the
-orchestrator's own provider.** `session-verification` is always
-cross-provider — that is the one constraint that survives any maxout.
+orchestrator's own (model-derived) effective provider** — the Set 084
+exclusion still applies, and a maxout that leaves no different-provider
+verifier still yields `verification_unavailable` rather than a
+same-provider pass. `session-verification` is always cross-provider —
+that is the one constraint that survives any maxout.
 
 ### Reading the Session Set Configuration
 
@@ -1520,6 +1523,44 @@ the configured generated-bundle exclusions), fills
 `sN-issues*.json` when the round bears findings, classifies blockingness with
 `is_blocking_verdict`, and patches `disposition.json` with
 `verification_method: "api"` plus the verifier's exact verdict token.
+
+#### Identity, dynamic exclusion, the stamp, and the close backstop (Set 084)
+
+The "different provider" above is now resolved and enforced by machinery, not
+by a static config pin or the orchestrator's own labels:
+
+- **Identity is the underlying model (F1).** The verifier that must *differ*
+  from the orchestrator is chosen against the orchestrator's **effective
+  provider**, derived by registry lookup on the session's `model` field
+  (`ai_router/orchestrator_identity.py`), never the free-text `provider` seat
+  label. Multi-provider engines (`github-copilot`, `copilot`) must therefore
+  pass `--model` at `start_session` (refused otherwise); `identityProvenance`
+  (`direct` / `asserted`) records how identity was established.
+- **Dynamic exclusion (F2).** `verify_session` (and a bare
+  `route(task_type="session-verification")` given session context) passes that
+  effective provider as `exclude_providers`, so verifier selection can never
+  land on the orchestrator's own provider. The old static
+  `session-verification:` model pin in `router-config.yaml` is demoted to a
+  preference that cannot override the exclusion. When the exclusion leaves **no
+  different-provider verifier** (e.g. a single-family Copilot catalog), the
+  outcome is **`verification_unavailable`** — a hard blocked state, no verdict
+  written, resolvable only by the operator-attested `--manual-verify` path.
+- **Only stamped evidence corroborates (F3).** The verification metrics row is
+  stamped (`source: "verify_session_cli"` or `"close_session_backstop"`,
+  evidence hash, canonical template id + normalized hash, verifier/orchestrator
+  identities, artifact path + byte-exact hash, package version, and the
+  verdict). The Set 083 close gate accepts **only** a row with a valid,
+  internally consistent stamp — a bare `route()` row no longer corroborates a
+  close. The stamp is **drift/affordance control, not cryptography**.
+- **The close backstop.** On a Full-tier close with no valid stamped evidence,
+  `close_session` does not merely refuse — it **runs the verification itself,
+  in-process**, through the same exclusion machinery, then proceeds on
+  `VERIFIED` / refuses with the findings on blocking `ISSUES_FOUND` / blocks on
+  `verification_unavailable`. The orchestrator no longer holds the last word;
+  `verify_session` remains the sanctioned way to **pre-empt** the backstop with
+  an iterative remediation round. Full contract:
+  [`ai_router/docs/close-out.md`](../ai_router/docs/close-out.md) → Section 3
+  step 6b and step 7.
 
 Manual `route()` composition is a fallback only, for environments where the
 CLI cannot run. If you use the fallback, you must reproduce the CLI contract:
@@ -2203,7 +2244,12 @@ close-out script is the **sole synchronization barrier** between
 session work and the session being marked complete: it runs
 deterministic gate checks (including `check_pushed_to_remote`,
 which enforces that the push already landed), waits on
-verification, emits ledger events, and writes idempotent state
+verification — and on a Full-tier close that arrives without valid
+stamped verification evidence, **runs the verification itself
+in-process (the Set 084 close backstop)** before the gate chain,
+blocking on `verification_unavailable` and never passing an
+unverified close (see `ai_router/docs/close-out.md` Section 3 step
+6b) — emits ledger events, and writes idempotent state
 (cost report sourcing, `ai-assignment.md` actuals, next-orchestrator
 recommendation every session, change-log generation on the last
 session, `mark_session_complete`). It does **not** run git commit /
@@ -3009,11 +3055,15 @@ This is the authoritative rules list. Instruction files (`CLAUDE.md`,
 `AGENTS.md`, `GEMINI.md`) reference this section rather than duplicating it.
 
 1. **One session only.** Never execute more than the assigned session.
-2. **Never skip verification.** Every session must be independently verified
-   by a different AI provider via `route(task_type="session-verification")`.
-   `session-verification` ALWAYS routes — this is the one constraint that
-   survives any maxout suffix or orchestrator-model-matches-routing-target
-   shortcut.
+2. **Never skip verification.** Every Full-tier session must be independently
+   verified by a **different-provider** verifier via
+   `python -m ai_router.verify_session` (the orchestrator's model-derived
+   effective provider is excluded; a bare `route()` fallback must reproduce the
+   same contract and stamp). You cannot skip it — reach close-out unverified and
+   `close_session` runs the verification itself (the Set 084 backstop).
+   `session-verification` ALWAYS routes cross-provider — this is the one
+   constraint that survives any maxout suffix or
+   orchestrator-model-matches-routing-target shortcut.
 3. **Never edit session review files.** They are the verifier's raw output.
 4. **Log every step** via `log.log_step()` — including build, test, and
    verification.

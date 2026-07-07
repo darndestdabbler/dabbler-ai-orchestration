@@ -162,10 +162,13 @@ The agent then:
    reasoning tasks (code review, architecture, analysis) to
    `route(task_type=...)` which selects the right model and logs the cost
    (Steps 4–5).
-4. **Verifies** — routes the session's output to a *different* AI provider for
-   independent review via `route(task_type="session-verification")`.
-   A `VERIFIED` or `ISSUES_FOUND` verdict comes back. The agent fixes any
-   Major/Critical issues and re-verifies (Steps 6–7).
+4. **Verifies** — runs `python -m ai_router.verify_session`, which routes the
+   session's output to a verifier from a **different provider** (chosen by
+   excluding the orchestrator's model-derived effective provider) for
+   independent review. A `VERIFIED` or `ISSUES_FOUND` verdict comes back; the
+   agent fixes any Major/Critical issues and re-verifies (Steps 6–7). This is
+   mandatory on Full — if the agent reaches close-out unverified,
+   `close_session` runs the verification itself (the close backstop).
 5. **Closes out** — authors `disposition.json` (the per-session outcome
    record), commits and pushes, runs `python -m ai_router.close_session`,
    and fires a completion notification (Step 8).
@@ -206,7 +209,7 @@ Sessions on different sets can run in parallel using worktrees — see
 - [ ] **Provider API keys set** — `DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` must be in your
   environment for the cross-provider verification step
-  (`route(task_type="session-verification")`) to work. These hold the normal
+  (`python -m ai_router.verify_session`) to work. These hold the normal
   provider-issued keys from Anthropic, Google, and OpenAI; only the environment
   variable names are Dabbler-prefixed.
   Optional: `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` for completion notifications.
@@ -236,9 +239,9 @@ and say:
    VS Code Explorer will show the set as in-progress (Step 1–3).
 3. Implements the session plan from `spec.md` — writes code, edits files,
    runs `dotnet build` / `pytest` or equivalent (Steps 4–5).
-4. Routes the output to a cross-provider verifier via
-   `route(task_type="session-verification")` and handles any findings
-   (Steps 6–7).
+4. Runs `python -m ai_router.verify_session` — routes the output to a
+   different-provider verifier (the orchestrator's effective provider is
+   excluded) and handles any findings (Steps 6–7).
 5. Authors `docs/session-sets/<slug>/disposition.json` ([schema](disposition-schema.md)),
    commits and pushes, then runs:
    ```bash

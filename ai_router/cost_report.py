@@ -93,11 +93,13 @@ def _matches_session_set(record_value: Optional[str],
     if not record_value:
         return False
     rec_canon = _canonicalize_session_set_path(record_value) or ""
-    if rec_canon == target_canon:
+    # Windows drive-letter case: a row written with ``C:\...`` must match
+    # a target passed as ``c:\...`` (normcase is a no-op on POSIX).
+    if os.path.normcase(rec_canon) == os.path.normcase(target_canon):
         return True
     if target_basename:
         rec_base = os.path.basename(rec_canon)
-        if rec_base == target_basename:
+        if os.path.normcase(rec_base) == os.path.normcase(target_basename):
             return True
     return False
 

@@ -1,0 +1,147 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "Router 0.29.0 (combined Sets 083 + 084) / Extension 0.39.0 (Set 084 'Verification Identity And Close Backstop', Session 3 of 3)",
+  "DocumentDate": "7/7/2026, 8:21:55 AM",
+  "Notes": "Per-set UAT for Set 084 Session 3. This set exists because THREE live verification bypasses reached close on a Copilot seat; the whole point of this walk is to REPRODUCE incident 3 against the new machinery and watch it fail closed. Two walks. Walk 1 is a REAL cold-start Full Build from an EMPTY folder (L-079-3) that confirms the shipped instruction surfaces teach the new rules. Walk 2 is a REAL Copilot-seat session that reproduces incident 3. CRITICAL install trap (L-075-1 -- this exact trap invalidated BOTH prior walks): the router version the walk exercises must be >= 0.29.0, and 0.29.0 has NOT published to PyPI yet (it ships from this set's own Step 3). So BEFORE either walk, install the router FROM THIS CHECKOUT (<this-checkout> = the absolute path to your local dabbler-ai-orchestration clone) into the target .venv and CONFIRM the installed version -- and because a pre-existing editable/PyPI install can leave STALE version metadata behind (observed during authoring: `pip install -e` alone reported 0.27.0 until the old dist-info was removed), you must UNINSTALL first: `<venv>\\Scripts\\pip.exe uninstall dabbler-ai-router -y` then `<venv>\\Scripts\\pip.exe install -e <this-checkout>`, then `<venv>\\Scripts\\pip.exe show dabbler-ai-router` and confirm `Version: 0.29.0`. If it shows anything lower, STOP -- the walk is invalid (this is exactly the 0.28.0/0.27.0 skew that broke the prior walks). For Walk 1 install the locally built VSIX first (`npx vsce package` from `tools\\dabbler-ai-orchestration` if not already built, then install the .vsix via VS Code Extensions > ... > Install from VSIX). Walk 2's routed steps (2c is non-metered; 2d makes ONE real cross-provider verification call) need working provider access: either the operator's real GitHub Copilot seat (`transport.profile: copilot-cli`, the faithful incident-3 environment) or `DABBLER_*` API keys with a normal `api` router-config. The deterministic steps (refusal, provenance, dry-run exclusion) need neither a seat nor keys -- only the installed router.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "16%",
+      "32%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Install / version gate",
+      "Subarea": "Walk 0 -- version trap closed BEFORE trusting anything (L-075-1)",
+      "ItemLabel": "The router the walk exercises resolves to >= 0.29.0 from this checkout",
+      "HumanAction": "1. Decide the target .venv: for Walk 1 it is the folder the extension Build scaffolds (do Walk 1 step 1 first, then return here); for Walk 2 it is your scratch repo's .venv.\n2. In that venv, run exactly:\n   <venv>\\Scripts\\pip.exe uninstall dabbler-ai-router -y\n   <venv>\\Scripts\\pip.exe install -e <this-checkout>\n3. Run exactly:\n   <venv>\\Scripts\\pip.exe show dabbler-ai-router\n4. Read the line beginning `Version:`.",
+      "Expectation": "The `pip show` output contains exactly `Version: 0.29.0` and an `Editable project location: <this-checkout>` line (the absolute path of your local clone). If the version is 0.28.0, 0.27.0, or anything below 0.29.0, STOP and do not trust any later step -- that is the L-075-1 skew that invalidated both prior walks; redo the uninstall + editable install until `pip show` reports 0.29.0.",
+      "ProgrammaticVerification": "During authoring, this exact trap reproduced: `pip install -e .` alone reported `Version: 0.27.0` (stale editable dist-info); only `pip uninstall` + removing the old `.pth`/dist-info + reinstall reported `Version: 0.29.0`. pyproject.toml is bumped to 0.29.0 in this session's diff. The human step confirms the operator's own venv resolves 0.29.0, which is the one thing automation cannot check for the operator's machine.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start)",
+      "ItemLabel": "The rendered docs/dabbler/start-here.md teaches mandatory verify_session -> close_session (no skip, no automatic-verification claim) AND the Set 084 close backstop + Copilot --model requirement",
+      "HumanAction": "1. Install the locally built VSIX (see Notes).\n2. Create a brand-new EMPTY folder (example: C:\\temp\\uat-084-full) -- do not copy anything into it.\n3. Open that folder in VS Code (File > Open Folder...), click the Dabbler AI Orchestration icon in the Activity Bar, and look at the Getting Started form's step 1.\n4. Leave the radio labeled exactly \"Full\" checked and leave \"Direct provider API keys\" selected. Type exactly 25 in the input labeled \"Verification budget (USD, not-to-exceed)\".\n5. Click the button labeled exactly \"Build project structure\" and wait for the progress notification beginning \"Building project structure\" to finish.\n6. Open docs/dabbler/start-here.md in the scaffolded folder.\n7. Read the sections headed \"Step 3\", \"Step 5\", and \"Step 6\".\n8. Press Ctrl+F and search the file for: backstop\n9. Press Ctrl+F and search the file for: Copilot seats must pass\n10. Press Ctrl+F and search the file for: automatic\n11. Press Ctrl+F and search the file for: routed_gate",
+      "Expectation": "Step 5 is headed \"Run cross-provider verification (Full tier: mandatory; ...)\", states \"There is no skip\", and shows `python -m ai_router.verify_session`; it names the `verification_unavailable` blocked state resolvable only by `--manual-verify`. Step 6 shows `python -m ai_router.close_session` and states, in words, \"If you reach close-out unverified, `close_session` runs the verification itself\" (the close backstop) and that you can only pre-empt it by running `verify_session` first. Step 3 (start_session) contains a note beginning \"Copilot seats must pass `--model`\" explaining the seat's identity is the underlying model. The search for `backstop` has at least one hit; the search for `Copilot seats must pass` has a hit; the search for `routed_gate` has ZERO hits; the search for `automatic` has no hit claiming Full-tier verification happens automatically (a hit describing `--no-router` mode resolved automatically from `tier: lightweight` is OK -- that is mode resolution, not verification).",
+      "ProgrammaticVerification": "Fresh checks during authoring: `npx mocha ... src/test/suite/coldStartSnapshot.test.ts` -> 2 passing after UPDATE_GOLDEN regeneration and 2 passing in normal (compare) mode; `python -m pytest ai_router/tests/test_cold_start_acceptance.py` (boots the golden render and walks the chain). `grep -c` on the rendered fixture test-fixtures/cold-start/full/docs/dabbler/start-here.md confirms the `backstop` / `verification_unavailable` / `Copilot seats must pass` strings are present and `routed_gate` is absent. The esbuild dist bundle (tools/.../dist/templates/consumer-bootstrap) was resynced from the source templates. The real VSIX Build from an empty folder is the human-only first-run check.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session lifecycle CLI",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start)",
+      "ItemLabel": "start_session prints the mandatory-verification advisory naming verify_session before close_session",
+      "HumanAction": "1. In the scaffolded Walk 1 folder (after the version gate above resolves 0.29.0 in its .venv), create a tiny session set folder docs/session-sets/001-uat-084-scratch containing a spec.md with a Session Set Configuration block: `tier: full`, `requiresUAT: false`, `requiresE2E: false`, `totalSessions: 1`, and an activity-log.json with the set name and `\"entries\": []`.\n2. From that folder root run exactly:\n   .venv\\Scripts\\python.exe -m ai_router.start_session --session-set-dir docs/session-sets/001-uat-084-scratch --engine claude-code --provider anthropic\n3. Read the terminal output printed to stderr after the command returns.",
+      "Expectation": "The command exits successfully and prints a line beginning `[dabbler] Verification is mandatory on Full tier (no skip):` that names `.venv/Scripts/python.exe -m ai_router.verify_session --session-set-dir <this-set>` and says this happens before `close_session`. It does NOT mention `routed_gate`. A separate schema-drift advisory may also print; that is not this walk's verdict.",
+      "ProgrammaticVerification": "Fresh checks during authoring: this exact advisory printed during the live Session-3 orchestrator's own `start_session` and during the scratch dogfood (`[dabbler] Verification is mandatory on Full tier (no skip): run .venv/Scripts/python.exe -m ai_router.verify_session ...`). `python -m pytest ai_router/tests/test_start_session.py` covers the advisory text. The human walk checks the real terminal text outside the pytest capture harness.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Copilot-seat identity (F1)",
+      "Subarea": "Walk 2 -- REAL Copilot-seat session reproducing incident 3",
+      "ItemLabel": "start_session REFUSES a Copilot seat with no --model (the seat label is not an identity)",
+      "HumanAction": "1. In a scratch repo whose .venv resolves router 0.29.0 (do the version gate above first), create docs/session-sets/001-uat-084 with a spec.md (Session Set Configuration: `tier: full`, `requiresUAT: false`, `requiresE2E: false`, `totalSessions: 1`) and an activity-log.json with the set name and `\"entries\": []`.\n2. From the repo root run exactly (NOTE: deliberately NO --model):\n   .venv\\Scripts\\python.exe -m ai_router.start_session --session-set-dir docs/session-sets/001-uat-084 --engine github-copilot --provider openai\n3. Read the stderr line and note the process exit code.",
+      "Expectation": "The command FAILS (non-zero exit; exit code 2) and prints to stderr exactly:\n`start_session: refused -- engine 'github-copilot' is a multi-provider seat; its identity is the underlying model, resolved through the model registry, never the seat label (Set 084 F1). Re-run with --model <registry-known model id>, e.g. --model claude-sonnet-4.6.`\nNo session-state.json is written for the seat, and no in-progress session is created.",
+      "ProgrammaticVerification": "Reproduced live during authoring in C:\\temp\\uat-084-scratch: the command above returned exit 2 with that exact stderr string. `python -m pytest ai_router/tests/test_start_session.py ai_router/tests/test_orchestrator_identity.py` covers the multi-provider-without-model refusal and the registry-validation path.",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Copilot-seat identity (F1)",
+      "Subarea": "Walk 2 -- REAL Copilot-seat session reproducing incident 3",
+      "ItemLabel": "start_session with --model succeeds and records identityProvenance: asserted (the model, not the label, is the identity)",
+      "HumanAction": "1. In the same scratch repo, run exactly:\n   .venv\\Scripts\\python.exe -m ai_router.start_session --session-set-dir docs/session-sets/001-uat-084 --engine github-copilot --provider anthropic --model claude-sonnet-4.6\n2. Open docs/session-sets/001-uat-084/session-state.json and read the `orchestrator` block of session 1.",
+      "Expectation": "The command exits successfully (and prints the mandatory-verification advisory). The session-1 `orchestrator` block reads exactly:\n  \"engine\": \"github-copilot\",\n  \"provider\": \"anthropic\",\n  \"model\": \"claude-sonnet-4.6\",\n  \"identityProvenance\": \"asserted\"\nThe `identityProvenance` is `asserted` (never `direct` for a Copilot seat), and `model` is present.",
+      "ProgrammaticVerification": "Reproduced live during authoring: the block above was written verbatim (identityProvenance: asserted) by the real start_session on the scratch set. Covered by test_start_session.py / test_orchestrator_identity.py (provenance classification + omit-null write).",
+      "Passes": true,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Dynamic verifier exclusion (F2)",
+      "Subarea": "Walk 2 -- REAL Copilot-seat session reproducing incident 3",
+      "ItemLabel": "A same-provider verification is REFUSED, not merely planned around -- the effective provider (anthropic) is excluded and a real verify_session never runs under it",
+      "HumanAction": "1. In the same scratch repo, with the seat session started under --model claude-sonnet-4.6 (effective provider anthropic), make one small TRACKED change so there is a diff to verify (e.g. create work.txt with a line, then `git add work.txt`), and commit the session-start files so HEAD exists.\n2. FIRST, the non-metered pre-check -- run exactly (this routes NOTHING and spends NOTHING):\n   .venv\\Scripts\\python.exe -m ai_router.verify_session --session-set-dir docs/session-sets/001-uat-084 --dry-run\n   Read the `orchestrator:` and `excluded providers:` lines.\n3. THEN run the REAL verification (this actually attempts to select and route a verifier):\n   .venv\\Scripts\\python.exe -m ai_router.verify_session --session-set-dir docs/session-sets/001-uat-084\n   Read the terminal output. If it writes an s1-verification.md, open it and read the `Reviewed by:` / verifier-model line.",
+      "Expectation": "Step 2 (dry-run) prints:\n`  orchestrator:       anthropic (via model-registry; provenance=asserted)`\n`  excluded providers: anthropic`\n-- proving the verifier is selected by EXCLUDING the orchestrator's effective provider (anthropic, derived from the model via the registry, NOT the `--provider` label).\nStep 3 (real run) then proves the exclusion is ENFORCED, not just planned, and the outcome depends on the seat's catalog:\n- On a **single-provider-family** seat (only anthropic reachable -- the genuine incident-3 environment), the real run REFUSES: it prints `verify_session: VERIFICATION UNAVAILABLE -- no eligible verifier exists outside the orchestrator's effective provider (anthropic)`, exits non-zero, and writes NO verdict and NO s1-verification.md. This is the hard blocked state resolvable only by the operator-attested `--manual-verify` path -- exactly the incident-3 refusal.\n- On a **multi-provider-family** seat / `api` keys, the real run SUCCEEDS but the verifier it chose is a genuinely DIFFERENT provider: the written s1-verification.md names a non-anthropic verifier model (e.g. a `gpt-*` or `gemini-*` model), never a `claude-*` model. Either way, anthropic never verifies its own work -- a same-provider verification is impossible.\nEITHER outcome passes this item; a real run that verified under a `claude-*` model would FAIL it (that is the incident-3 bug).",
+      "ProgrammaticVerification": "Reproduced live during authoring in the scratch repo: the dry-run printed `orchestrator: anthropic (via model-registry; provenance=asserted)` and `excluded providers: anthropic`. The real VERIFICATION UNAVAILABLE refusal on a single-provider-family (anthropic-only) verifier catalog was reproduced by running `verify_session` against a config with every non-anthropic model's `is_enabled_as_verifier: false`; the literal string above is emitted verbatim by ai_router/verify_session.py and is covered end-to-end by the no-diverse-catalog fixtures in test_verify_session.py / test_orchestrator_identity.py and by the backstop's own verification_unavailable path in test_close_backstop.py. The human walk is the operator's independent reproduction on their real seat.",
+      "Passes": false,
+      "Feedback": "I didn't run this"
+    },
+    {
+      "FunctionalArea": "The close backstop (structural)",
+      "Subarea": "Walk 2 -- REAL Copilot-seat session reproducing incident 3",
+      "ItemLabel": "Closing UNVERIFIED makes close_session run the verification ITSELF, and its verdict governs the close (the orchestrator no longer holds the last word)",
+      "HumanAction": "1. In the same scratch repo, ensure the .venv has working provider access: either a real Copilot seat (`transport.profile: copilot-cli` in ai_router/router-config.yaml) OR `DABBLER_*` API keys with a normal `api` router-config, plus an ai_router/budget.yaml with a non-zero threshold. Keep the small tracked change from the previous step as the session's work.\n2. Author a minimal disposition.json for the session (status: completed, a one-line summary, verification_method: \"api\", verification_verdict: \"VERIFIED\", next_orchestrator omitted for a single-session set / blockers: []). DO NOT run verify_session -- deliberately leave the session unverified.\n3. Commit and push (or set the local-only marker: `.venv\\Scripts\\python.exe -m ai_router.local_only --enable`).\n4. Run exactly:\n   .venv\\Scripts\\python.exe -m ai_router.close_session --session-set-dir docs/session-sets/001-uat-084\n5. Read the full terminal output (the `close_session:` result line, the `messages:` list, and any `gate_results:`). Then open router-metrics.jsonl and read the LAST row.",
+      "Expectation": "You did NOT run verify_session, yet close_session performed the verification itself. The `messages:` list contains a line indicating the close backstop ran (contains `close backstop ran`), a fresh `sN-verification*.md` artifact now exists, and the LAST router-metrics.jsonl row carries `\"source\": \"close_session_backstop\"` and `\"task_type\": \"session-verification\"` with `\"provider\"` NOT equal to anthropic. The verdict the backstop produced GOVERNS the close: if the backstop returned VERIFIED (a trivial diff usually does), `close_session:` reports success and the session closes; if it found a blocking Critical/Major, `close_session:` reports `gate_failed` with `verification_backstop` in the failed checks and the disposition now records the TRUE verdict -- either way the close outcome was decided by the framework's own verification, not by the VERIFIED you hand-wrote in the disposition. (If provider access is unavailable, the backstop blocks with a remediation containing `BLOCKED` and `--manual-verify` -- never a silent pass.)",
+      "ProgrammaticVerification": "The Session-2 close of THIS set ran the backstop LIVE nine times (rounds 1-9, documented in disposition.json) -- round 1 refused this set's own close with 3 Major findings, the live proof the framework holds the last word. `python -m pytest ai_router/tests/test_close_backstop.py` reproduces all three live incidents end-to-end (incident-1 self-attested VERIFIED with no row -> backstop runs and governs; incident-3 bare-route row + diluted template -> row rejected, backstop runs with exclusion) and asserts the `close backstop ran` message, the `close_session_backstop` stamp, the ISSUES_FOUND refusal, and the verification_unavailable `BLOCKED`/`--manual-verify` remediation. The human walk is the operator's independent reproduction on their real seat.",
+      "Passes": false,
+      "Feedback": "I didn't run this."
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start)",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Copilot-seat identity (F1)",
+      "Subarea": "Walk 2 -- REAL Copilot-seat session reproducing incident 3",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "The close backstop (structural)",
+      "Subarea": "Walk 2 -- REAL Copilot-seat session reproducing incident 3",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Install / version gate",
+      "Subarea": "Walk 0 -- version trap closed BEFORE trusting anything (L-075-1)",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session lifecycle CLI",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start)",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Dynamic verifier exclusion (F2)",
+      "Subarea": "Walk 2 -- REAL Copilot-seat session reproducing incident 3",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    }
+  ]
+}

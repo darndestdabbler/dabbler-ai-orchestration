@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Incorrect Progress Keys in Activity Log\n\n-   **Category:** Completeness\n-   **Severity:** Major\n-   **Details:**\n    -   **Violation:** The session plan specifies the progress keys to be used for tracking work: \"`Progress keys: s3.surfaces, s3.uat, s3.release`\". The work for \"the two releases\" is part of the final step, corresponding to `s3.release`. The AI failed to use the `s3.release` key, instead logging the release preparation work under other keys.\n    -   **Impact:** The `activity-log.json` provides an incorrect audit trail of the session's execution. It misattributes the release preparation work, which would cause any automated or human audit against the session plan to fail. An accurate audit trail is a primary requirement of the workflow; this deviation undermines its integrity and would require correction before this session set could be considered verifiably complete. This changes the merge decision from \"approve\" to \"fix the log\".\n    -   **Evidence:** The `diff` for `docs/session-sets/084-verification-identity-and-close-backstop/activity-log.json` shows that the Python package release prep is described in step 2 under `stepKey: \"s3.uat\"`, and the extension release prep is described in step 4 under `stepKey: \"s3.surfaces\"`. No log entry uses the required `s3.release` key, directly contradicting the session plan.",
+      "category": "Completeness",
+      "severity": "Major"
+    }
+  ]
+}

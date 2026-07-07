@@ -52,5 +52,5 @@
     "The backstop lives in close_session.run only; the mark_session_complete python API path still refuses an unverified close via the tightened gate (floor holds by refusal, not by in-process verification) -- acceptable because every sanctioned close path goes through close_session.",
     "A determined orchestrator forging the full stamped artifact set remains out of scope (spec residual 2) -- the stamp raises the floor from lazy shortcut to deliberate multi-artifact forgery."
   ],
-  "verification_verdict": "ISSUES_FOUND"
+  "verification_verdict": "VERIFIED"
 }

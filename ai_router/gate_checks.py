@@ -923,24 +923,26 @@ def _row_provider(row: dict, models: dict) -> Optional[str]:
     missing identity fails closed"): the row's own ``provider`` string is
     deliberately NOT trusted — a wrong or hand-edited value there must
     not satisfy the cross-provider check (S2 round-1 verifier finding).
-    The row's ``model`` is looked up in the loaded registry by key, then
-    by ``model_id``; a row whose model cannot be resolved (or an
-    unloadable registry) cannot corroborate anything.
+
+    Set 084 (F1): delegates to the ONE shared resolution helper
+    (``orchestrator_identity.resolve_model_provider`` — registry key,
+    ``model_id``, normalized dot/dash token, then the Copilot CLI's
+    documented model universe), so the row side and the orchestrator
+    side of the != check resolve identically (L-069-1). A row whose
+    model resolves nowhere cannot corroborate anything.
     """
     model = row.get("model")
     if not isinstance(model, str) or not model:
         return None
-    entry = models.get(model)
-    if isinstance(entry, dict):
-        reg_provider = entry.get("provider")
-        if isinstance(reg_provider, str) and reg_provider.strip():
-            return reg_provider.strip().lower()
-    for entry in models.values():
-        if isinstance(entry, dict) and entry.get("model_id") == model:
-            reg_provider = entry.get("provider")
-            if isinstance(reg_provider, str) and reg_provider.strip():
-                return reg_provider.strip().lower()
-    return None
+    try:
+        from .orchestrator_identity import (  # type: ignore[import-not-found]
+            resolve_model_provider,
+        )
+    except ImportError:
+        from orchestrator_identity import (  # type: ignore[no-redef]
+            resolve_model_provider,
+        )
+    return resolve_model_provider(model, models)
 
 
 def _session_verification_providers(
@@ -1070,10 +1072,12 @@ def check_verification_integrity(
        * method ``api`` — the claimed verdict must be non-null and backed
          by a ``session-verification`` row in ``router-metrics.jsonl``
          for this (set, session) whose verifier provider **differs from
-         the session's orchestrator provider** (orchestrator from the
-         session-state block; missing identity data fails closed — the
-         Q6 precedent), plus an ``sN-verification*.md`` artifact at the
-         set root.
+         the session's orchestrator EFFECTIVE provider** (Set 084 F1:
+         registry-resolved from the orchestrator block's ``model`` via
+         ``orchestrator_identity.resolve_orchestrator_identity``; the
+         free-text seat label is only the single-vendor fallback;
+         missing/unresolvable identity fails closed — the Q6 precedent),
+         plus an ``sN-verification*.md`` artifact at the set root.
        * method ``manual-via-other-engine`` / ``skipped`` (with or
          without a verdict) — the project's ``ai_router/budget.yaml``
          must actually declare the zero-budget tier (``threshold_usd:
@@ -1203,24 +1207,43 @@ def check_verification_integrity(
                 f"session-state.json failed to normalize "
                 f"({type(exc).__name__}: {exc}; fails closed)",
             )
-        orch_provider: Optional[str] = None
+        orch_block: Optional[dict] = None
         for entry in normalized.get("sessions") or []:
             if isinstance(entry, dict) and entry.get("number") == current:
                 orch = entry.get("orchestrator")
                 if isinstance(orch, dict):
-                    provider = orch.get("provider")
-                    if isinstance(provider, str) and provider.strip():
-                        orch_provider = provider.strip().lower()
+                    orch_block = orch
                 break
-        if orch_provider is None:
+        # Set 084 (F1): the orchestrator side of the != check is the
+        # EFFECTIVE provider — registry-resolved from the block's model
+        # through the shared helper, never the free-text seat label
+        # (which stays second choice for single-vendor engines only).
+        # Unresolvable identity fails closed, remediation names the
+        # exact flag (start_session --model).
+        try:
+            try:
+                from .orchestrator_identity import (  # type: ignore[import-not-found]
+                    IdentityResolutionError,
+                    resolve_orchestrator_identity,
+                )
+            except ImportError:
+                from orchestrator_identity import (  # type: ignore[no-redef]
+                    IdentityResolutionError,
+                    resolve_orchestrator_identity,
+                )
+            identity = resolve_orchestrator_identity(
+                orch_block, models_registry=_models_registry() or None
+            )
+            orch_provider = identity.effective_provider
+        except IdentityResolutionError as exc:
             return (
                 False,
                 f"claimed verdict {claimed!r} (method api) cannot be "
-                f"corroborated: session {current}'s orchestrator block "
-                "records no provider, so cross-provider verification "
-                "cannot be confirmed (missing identity fails closed). "
-                "Re-run start_session with --provider, then verify via: "
-                f"{command}",
+                f"corroborated: session {current}'s orchestrator "
+                f"identity is unresolvable — {exc} Cross-provider "
+                "verification cannot be confirmed against an unresolved "
+                "identity (fails closed). Re-run start_session with "
+                f"--model, then verify via: {command}",
             )
 
         metrics_path = _metrics_log_path()

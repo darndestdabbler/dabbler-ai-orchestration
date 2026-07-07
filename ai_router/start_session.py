@@ -210,9 +210,13 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Orchestrator model id (e.g. claude-opus-4-7). Set 049: "
-            "now optional. Callers that cannot authoritatively declare "
-            "a model omit the flag and the writer drops the key from "
-            "the orchestrator block per the P2 omit-null contract."
+            "optional for single-vendor engines. Callers that cannot "
+            "authoritatively declare a model omit the flag and the "
+            "writer drops the key from the orchestrator block per the "
+            "P2 omit-null contract. Set 084 (F1): REQUIRED for "
+            "multi-provider engines (github-copilot / copilot) and "
+            "validated against the model registry — a Copilot seat's "
+            "identity is the underlying model, never the seat label."
         ),
     )
     p.add_argument(
@@ -230,7 +234,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Orchestrator provider name (e.g. anthropic, openai, "
-            "google). Optional."
+            "google). Optional. Set 084 (F1): for identity purposes "
+            "this is a seat DESCRIPTOR only — the effective provider "
+            "is always derived by registry lookup on --model; the "
+            "label is the explicit second choice for single-vendor "
+            "engines that recorded no model."
         ),
     )
     p.add_argument(
@@ -587,6 +595,101 @@ def _refuse_same_pair_verification(
     )
 
 
+def _refuse_unresolvable_identity(args: argparse.Namespace) -> Optional[str]:
+    """Set 084 (F1): the start-time identity boundary.
+
+    Returns the refusal message (caller exits non-zero) when:
+
+    - the engine is multi-provider (``github-copilot`` / ``copilot``)
+      and ``--model`` was not supplied — the seat label alone is never
+      an identity; or
+    - the engine is multi-provider and the supplied ``--model`` does
+      not resolve in the model registry — an unresolvable model would
+      fail closed at every downstream consumer (the close gate,
+      verifier exclusion), so it is refused here, where the operator
+      can still fix it.
+
+    - ANY engine supplied a ``--model`` that does not resolve in the
+      registry (R2 remediation I-084-S1-4: the spec's "validates any
+      supplied model against the registry" is engine-independent — a
+      typoed model on a single-vendor engine must fail loud at the
+      boundary, not silently defer identity to the free-text label).
+
+    Single-vendor engines keep ``--model`` optional (the provider field
+    is the explicit second choice when NO model was supplied). When a
+    supplied model resolves to a provider that CONTRADICTS the declared
+    ``--provider``, a stderr advisory notes that the model wins at use
+    time — the label is a seat descriptor, not an identity (never a
+    refusal: the label stays useful for humans).
+    """
+    try:
+        try:
+            from .orchestrator_identity import (
+                is_multi_provider_engine,
+                resolve_model_provider,
+            )
+        except ImportError:
+            from ai_router.orchestrator_identity import (  # type: ignore[no-redef]
+                is_multi_provider_engine,
+                resolve_model_provider,
+            )
+    except Exception:
+        return None  # validation must never add a failure mode of its own
+
+    engine = getattr(args, "engine", None)
+    model = getattr(args, "model", None)
+    provider = getattr(args, "provider", None)
+    multi = is_multi_provider_engine(engine)
+
+    if multi and (not isinstance(model, str) or not model.strip()):
+        return (
+            f"refused -- engine {engine!r} is a multi-provider seat; its "
+            "identity is the underlying model, resolved through the model "
+            "registry, never the seat label (Set 084 F1). Re-run with "
+            "--model <registry-known model id>, e.g. --model "
+            "claude-sonnet-4.6."
+        )
+
+    resolved = resolve_model_provider(model) if model else None
+
+    model_supplied = isinstance(model, str) and bool(model.strip())
+    if model_supplied and resolved is None:
+        # Engine-independent (I-084-S1-4): a supplied model that resolves
+        # nowhere must fail loud HERE — persisting it would make every
+        # downstream identity consumer either fail closed (multi-provider)
+        # or silently defer to the free-text label (single-vendor), and
+        # the label is a descriptor, not an identity.
+        return (
+            f"refused -- --model {model!r} does not resolve in the model "
+            "registry (router-config.yaml models: keys/model_ids or the "
+            "Copilot CLI model universe), so it cannot serve as an "
+            "identity (Set 084 F1). Pass a registry-known --model"
+            + (
+                ""
+                if multi
+                else ", or omit --model to record engine+provider only"
+            )
+            + ". To register a new orchestrator model, add a disabled "
+            "entry (is_enabled: false) under models: in "
+            "router-config.yaml."
+        )
+
+    if (
+        resolved is not None
+        and isinstance(provider, str)
+        and provider.strip()
+        and provider.strip().lower() != resolved
+    ):
+        print(
+            f"start_session: NOTE -- --provider {provider!r} is recorded "
+            f"as the seat label only; the model {model!r} resolves to "
+            f"{resolved!r} and the registry-resolved provider wins at "
+            "every identity consumer (Set 084 F1).",
+            file=sys.stderr,
+        )
+    return None
+
+
 def _log_session_start(
     session_set_dir: str,
     session_number: int,
@@ -704,6 +807,16 @@ def run(args: argparse.Namespace) -> int:
     # still see the notice so the deprecation eventually surfaces.
     if getattr(args, "chat_session_id", None) is not None:
         _warn_chat_session_id_ignored()
+
+    # Set 084 (F1) boundary enforcement: a multi-provider engine's
+    # identity is the underlying model resolved through the registry,
+    # so it cannot start without one. Runs before the lifecycle lock
+    # (pure validation, no state read) and covers every writer path —
+    # work, typed, and handoff sessions alike (L-069-1).
+    identity_refusal = _refuse_unresolvable_identity(args)
+    if identity_refusal is not None:
+        print(f"start_session: {identity_refusal}", file=sys.stderr)
+        return EXIT_USAGE
 
     # Acquire the per-set lifecycle lock around the entire
     # read/check/write window. The lock serializes against any

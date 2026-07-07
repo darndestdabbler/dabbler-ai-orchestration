@@ -73,7 +73,13 @@ class TestRegisterTypedSessionStart:
         new = out["sessions"][2]
         assert new["type"] == "verification"
         assert new["status"] == SESSION_STATUS_IN_PROGRESS
-        assert new["orchestrator"] == {"engine": "gpt-5-4", "provider": "openai"}
+        # Set 084 (F1): the shared block builder stamps identityProvenance
+        # (gpt-5-4 is a single-vendor engine -> "direct").
+        assert new["orchestrator"] == {
+            "engine": "gpt-5-4",
+            "provider": "openai",
+            "identityProvenance": "direct",
+        }
         # Derived totalSessions grows by exactly one.
         norm = normalize_to_v4_shape(out, d / "spec.md")
         assert norm["totalSessions"] == 3

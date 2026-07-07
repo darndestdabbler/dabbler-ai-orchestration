@@ -135,6 +135,20 @@ from .verification import (
     LEDGER_RESOLVED, LEDGER_UNRESOLVED,
     pick_copilot_cli_verifier, CopilotCliVerifierSelection,
     ProvenanceUnavailable, walk_role_prefer,
+    VerificationUnavailableError,
+)
+# Set 084 (F1/F2): shared orchestrator-identity resolution — the close
+# gate, verifier exclusion, and start_session validation all resolve the
+# effective provider through this one helper.
+from .orchestrator_identity import (
+    IdentityResolutionError,
+    OrchestratorIdentity,
+    MULTI_PROVIDER_ENGINES,
+    classify_identity_provenance,
+    is_multi_provider_engine,
+    resolve_model_provider,
+    resolve_orchestrator_identity,
+    resolve_session_orchestrator_identity,
 )
 # Set 078 S3: the copilot-cli transport profile's routing integration.
 # cli_transport.py / copilot_catalog.py (Set 078 S2) are already
@@ -483,6 +497,10 @@ def evaluate_cost_guard(guard: str, config: dict) -> CostGuardSkipDecision:
 
 _VERIFICATION_UNAVAILABLE_VERDICT = "verification_unavailable"
 
+# The one task type whose selection is governed by dynamic orchestrator
+# exclusion (Set 084 F2). Mirrors gate_checks / verify_session.
+SESSION_VERIFICATION_TASK_TYPE = "session-verification"
+
 
 def _build_verification_unavailable_stub(
     generator_model_id: str, generator_provider: str, reason: str
@@ -513,17 +531,20 @@ def _build_verification_unavailable_stub(
 
 
 def _resolve_copilot_generator(
-    config: dict, catalog: "CopilotCatalog"
+    config: dict, catalog: "CopilotCatalog",
+    exclude_providers: frozenset = frozenset(),
 ) -> tuple[Optional[str], Optional[str], Optional[str]]:
     """Resolve the ``generator`` role against the seat-local catalog.
 
     Returns ``(model_id, provider, failure_reason)`` — ``failure_reason`` is
     ``None`` on success. Walks ``transports.copilot-cli.roles.generator.
     prefer`` in declared order; the first entry that is ``confirmed`` on the
-    live catalog and whose provider is in ``require_provider_in`` (when set)
-    wins. Never raises — the caller decides how loud to be about a failure
-    (unlike the verifier role, there is no "generation unavailable" fallback:
-    without a generator there is nothing to route).
+    live catalog, whose provider is in ``require_provider_in`` (when set),
+    and whose provider is not in *exclude_providers* (Set 084 F2 — the
+    session orchestrator's effective provider, for session-verification
+    dispatch) wins. Never raises — the caller decides how loud to be about
+    a failure (unlike the verifier role, there is no "generation
+    unavailable" fallback: without a generator there is nothing to route).
     """
     roles_cfg = (
         (config.get("transports") or {}).get("copilot-cli") or {}
@@ -532,14 +553,45 @@ def _resolve_copilot_generator(
     prefer = gen_cfg.get("prefer") or []
     require_provider_in = set(gen_cfg.get("require_provider_in") or [])
 
-    survivor = next(walk_role_prefer(catalog, prefer, require_provider_in), None)
+    survivor = next(
+        walk_role_prefer(
+            catalog, prefer, require_provider_in, exclude_providers
+        ),
+        None,
+    )
     if survivor is not None:
         return survivor.id, survivor.provider, None
+
+    # R3 remediation (I-084-S1-6): when an EXCLUSION is active (a Set 084
+    # session-verification dispatch), the spec's contract is "exclusion is
+    # applied against the catalog lockfile's CONFIRMED ENTRIES; no
+    # different-provider candidate -> verification_unavailable" — the
+    # prefer list is a preference ORDER, not the candidate universe. So
+    # before declaring nothing resolvable, fall back to any confirmed
+    # catalog entry (in catalog order) whose provider is allowed and not
+    # excluded. verification_unavailable may then fire only when the
+    # confirmed catalog truly has no surviving different-provider
+    # candidate. Without an exclusion the pre-084 contract is unchanged:
+    # the generator role resolves from prefer alone.
+    if exclude_providers:
+        for entry in catalog.confirmed_models():
+            if require_provider_in and entry.provider not in require_provider_in:
+                continue
+            if entry.provider in exclude_providers:
+                continue
+            return entry.id, entry.provider, None
 
     return None, None, (
         f"no confirmed catalog entry in the generator role's prefer list "
         f"{prefer!r} resolves to a provider in require_provider_in="
         f"{sorted(require_provider_in)!r}"
+        + (
+            f" outside excluded providers {sorted(exclude_providers)!r} "
+            "(the full confirmed catalog was also scanned — no "
+            "different-provider candidate exists on this seat)"
+            if exclude_providers
+            else ""
+        )
     )
 
 
@@ -611,17 +663,41 @@ def _route_via_copilot_cli(
     context: str,
     session_set: Optional[str],
     session_number: Optional[int],
+    exclude_providers: Optional[list] = None,
 ) -> "RouteResult":
     """route()'s entire copilot-cli-profile body. Task typing (the prompt
     template lookup) is unchanged; tier/complexity-based model selection is
     replaced by late-bound catalog-role resolution (Architecture section) —
     there is exactly one generator role, not a 3-tier ladder, so there is no
     escalation loop under this profile.
+
+    Set 084 (F2): *exclude_providers* (the session orchestrator's
+    registry-resolved effective provider, for session-verification
+    dispatch) is applied against the seat catalog's CONFIRMED entries.
+    A seat that cannot serve any different-provider candidate raises
+    :class:`VerificationUnavailableError` — the explicit blocked state,
+    never a silent same-provider verification.
     """
+    exclusion = frozenset(
+        str(p).strip().lower() for p in (exclude_providers or []) if p
+    )
     model_id, provider, failure_reason = _resolve_copilot_generator(
-        _config, _copilot_catalog
+        _config, _copilot_catalog, exclude_providers=exclusion
     )
     if model_id is None:
+        if exclusion:
+            raise VerificationUnavailableError(
+                f"copilot-cli profile: no confirmed catalog entry "
+                f"resolves to a provider outside the exclusion "
+                f"{sorted(exclusion)!r} (the session orchestrator's "
+                f"effective provider): {failure_reason}. This is the "
+                "hard verification_unavailable outcome — no verdict is "
+                "written and the close stays blocked. The sanctioned "
+                "resolution is the operator-attested manual path: "
+                "close_session --manual-verify with an attestation "
+                "naming the verifying surface, model, effective "
+                "provider, template used, timestamp, and raw artifact."
+            )
         raise CopilotCliRoutingError(
             f"copilot-cli profile: could not resolve a generator role: "
             f"{failure_reason}"
@@ -844,6 +920,7 @@ def route(
     max_tier: int = 3,
     session_set: Optional[str] = None,
     session_number: Optional[int] = None,
+    exclude_providers: Optional[list] = None,
 ) -> RouteResult:
     """
     Route a task to the best model based on complexity estimation.
@@ -858,8 +935,25 @@ def route(
         max_tier: Maximum tier to use (for cost-capped runs).
         session_set: Optional path or slug identifying the active session set.
                      Passed through to the metrics log so reports can group
-                     by session set.
-        session_number: Optional session number (1, 2, ...) for metrics.
+                     by session set. For ``task_type="session-verification"``
+                     this is ALSO the session context the dynamic exclusion
+                     below resolves against (Set 084 F2).
+        session_number: Optional session number (1, 2, ...) for metrics
+                        (and for the exclusion resolution).
+        exclude_providers: Providers barred from model selection — a hard
+                     constraint no pin or escalation can override
+                     (Set 084 F2). On a ``session-verification`` call
+                     that carries session context, route() ALWAYS
+                     resolves the session orchestrator's
+                     registry-resolved effective provider itself and
+                     UNIONS it into this set (a caller-supplied list can
+                     add exclusions but never remove the session-derived
+                     one) — so the ``verify_session`` CLI and a bare
+                     ``route()`` call have identical semantics.
+                     Unresolvable identity raises
+                     :class:`IdentityResolutionError` (fails closed);
+                     an exclusion that leaves no eligible candidate
+                     raises :class:`VerificationUnavailableError`.
 
     Returns:
         RouteResult with the AI response and metadata.
@@ -888,6 +982,33 @@ def route(
 
     _init()
 
+    # Set 084 (F2): dynamic verifier exclusion. A session-verification
+    # call that carries session context ALWAYS resolves the session
+    # orchestrator's EFFECTIVE provider (registry lookup on the
+    # orchestrator block's model — orchestrator_identity) and excludes
+    # it from selection, replacing the static task_type_overrides pin
+    # as the cross-provider guarantee. route() applies this itself so a
+    # bare call and the verify_session CLI cannot diverge. A
+    # caller-supplied exclude_providers is UNIONED with the
+    # session-derived exclusion, never substituted for it (R1
+    # remediation I-084-S1-3: an explicit list that omitted the
+    # orchestrator's provider would reopen same-provider verification
+    # at the bare API boundary). Unresolvable identity FAILS CLOSED
+    # (IdentityResolutionError) — never a verification whose exclusion
+    # target is unknown.
+    if task_type == SESSION_VERIFICATION_TASK_TYPE and session_set:
+        identity = resolve_session_orchestrator_identity(
+            session_set, session_number
+        )
+        exclude_providers = sorted(
+            {
+                str(p).strip().lower()
+                for p in (exclude_providers or [])
+                if p
+            }
+            | {identity.effective_provider}
+        )
+
     # Set 078 S3: the copilot-cli profile is a fully separate body — see
     # _route_via_copilot_cli's docstring for why this branches here rather
     # than threading through the api-path escalation loop below.
@@ -895,6 +1016,7 @@ def route(
         return _route_via_copilot_cli(
             content=content, task_type=task_type, context=context,
             session_set=session_set, session_number=session_number,
+            exclude_providers=exclude_providers,
         )
 
     # 1. Estimate complexity
@@ -906,8 +1028,26 @@ def route(
         config=_config["complexity"]
     )
 
-    # 2. Pick model
-    model_name = pick_model(score, max_tier, task_type, _config)
+    # 2. Pick model. exclude_providers is a hard constraint (Set 084
+    # F2): the task_type_overrides pin is only a preference against it,
+    # and an exclusion that leaves no candidate is the explicit
+    # verification_unavailable outcome, never a same-provider pick.
+    model_name = pick_model(
+        score, max_tier, task_type, _config,
+        exclude_providers=exclude_providers,
+    )
+    if model_name is None:
+        raise VerificationUnavailableError(
+            f"no enabled model in router-config.yaml survives the "
+            f"provider exclusion {sorted(set(exclude_providers or []))!r} "
+            f"(task_type={task_type!r}, max_tier={max_tier}). This is "
+            "the hard verification_unavailable outcome — no verdict is "
+            "written and the close stays blocked. The sanctioned "
+            "resolution is the operator-attested manual path: "
+            "close_session --manual-verify with an attestation naming "
+            "the verifying surface, model, effective provider, template "
+            "used, timestamp, and raw artifact."
+        )
     model_cfg = _config["models"][model_name]
 
     if task_type == "session-verification":
@@ -960,9 +1100,14 @@ def route(
         if _config["escalation"]["enabled"] and should_escalate(
             result, _config["escalation"]
         ):
+            # Set 084 (F2): escalation honors the same provider
+            # exclusion as the initial pick — the short-response
+            # heuristic must never cross back onto the excluded
+            # (orchestrator's own) provider.
             next_model = get_escalation_model(
                 current_model_name, _config,
-                len(escalation_history)
+                len(escalation_history),
+                exclude_providers=exclude_providers,
             )
             if next_model:
                 reason = _classify_escalation_reason(result, _config)

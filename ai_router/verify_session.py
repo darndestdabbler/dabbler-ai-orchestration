@@ -30,8 +30,13 @@ What it does, in order:
    (``dist/`` etc.) on by default and overridable.
 3. Fills ``ai_router/prompt-templates/verification.md`` (which carries
    the structured verdict schema) and routes
-   ``task_type="session-verification"`` -- cross-provider selection is
-   the router's existing rule set; this CLI never picks a verifier.
+   ``task_type="session-verification"``. Set 084 (F2): the CLI resolves
+   the session orchestrator's EFFECTIVE provider (registry lookup on
+   the orchestrator block's model, via ``orchestrator_identity``) and
+   passes it as a hard ``exclude_providers`` constraint -- the verifier
+   can never be the orchestrator's own provider; the config's
+   ``session-verification`` pin is only a preference below that
+   constraint. The CLI still never picks a concrete verifier model.
 4. Writes ``sN-verification.md`` / ``sN-verification-round-<R>.md`` RAW,
    before any display (L-064-3), and ``sN-issues[-round-<R>].json`` when
    the round bears findings (Set 055 envelope).
@@ -58,6 +63,9 @@ Exit codes:
 - ``4``  -- verification ran; result is BLOCKING (>=1 Critical/Major or
   unknown-severity finding). Artifacts are written; remediate and re-run.
 - ``6``  -- the routed call itself failed (provider/transport error).
+- ``7``  -- verification UNAVAILABLE (Set 084 F2): the orchestrator's
+  effective-provider exclusion left no eligible verifier. No verdict
+  written; close stays blocked; operator-attested manual path only.
 
 Output is ASCII-only (the cp1252 console convention); artifacts are
 written ``encoding="utf-8"``.
@@ -112,6 +120,11 @@ EXIT_USAGE = 2
 EXIT_STATE = 3
 EXIT_BLOCKING = 4
 EXIT_ROUTE_FAILED = 6
+# Set 084 (F2): the hard verification_unavailable outcome — dynamic
+# exclusion left no eligible different-provider verifier. No verdict is
+# written; the close stays blocked; the only sanctioned resolution is
+# the operator-attested manual path (close_session --manual-verify).
+EXIT_VERIFICATION_UNAVAILABLE = 7
 
 SESSION_VERIFICATION_TASK_TYPE = "session-verification"
 DEFAULT_COMPLEXITY_HINT = 70
@@ -703,7 +716,8 @@ def _resolve_metrics_path() -> Optional[Path]:
 
 
 def _default_route(prompt: str, session_set: str, session_number: int,
-                   complexity_hint: int, max_tier: Optional[int]):
+                   complexity_hint: int, max_tier: Optional[int],
+                   exclude_providers: Optional[List[str]] = None):
     """Production route() invocation (injectable seam for tests)."""
     from ai_router import route  # lazy: keeps --dry-run and tests hermetic
 
@@ -716,7 +730,48 @@ def _default_route(prompt: str, session_set: str, session_number: int,
     )
     if max_tier is not None:
         kwargs["max_tier"] = max_tier
+    if exclude_providers is not None:
+        # Set 084 (F2): the CLI resolves the orchestrator's effective
+        # provider itself and passes the exclusion explicitly. route()
+        # would resolve the identical exclusion from session context —
+        # the explicit pass keeps the CLI's printed exclusion the one
+        # that actually governed selection.
+        kwargs["exclude_providers"] = exclude_providers
     return route(**kwargs)
+
+
+def resolve_orchestrator_exclusion(
+    session_set_dir: Path, session_number: int
+) -> "object":
+    """The session orchestrator's resolved identity (Set 084 F1/F2).
+
+    Thin wrapper over the shared
+    :func:`ai_router.orchestrator_identity.resolve_session_orchestrator_identity`
+    so the CLI and ``route()`` resolve through ONE path. Raises
+    :class:`VerifySessionError` (state error) on unresolvable identity —
+    fail closed: a verification whose exclusion target is unknown must
+    not run.
+    """
+    try:
+        from orchestrator_identity import (  # type: ignore[import-not-found]
+            IdentityResolutionError,
+            resolve_session_orchestrator_identity,
+        )
+    except ImportError:
+        from .orchestrator_identity import (  # type: ignore[no-redef]
+            IdentityResolutionError,
+            resolve_session_orchestrator_identity,
+        )
+    try:
+        return resolve_session_orchestrator_identity(
+            str(session_set_dir), session_number
+        )
+    except IdentityResolutionError as exc:
+        raise VerifySessionError(
+            f"the session orchestrator's identity is unresolvable, so "
+            f"the cross-provider exclusion cannot be applied (fails "
+            f"closed): {exc}"
+        ) from exc
 
 
 def run(args: argparse.Namespace, route_fn=None) -> int:
@@ -751,6 +806,24 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
     except VerifySessionError as exc:
         print(f"verify_session: {exc}", file=sys.stderr)
         return EXIT_USAGE
+
+    # -- Set 084 (F2): resolve the orchestrator's EFFECTIVE provider
+    #    (registry lookup on the orchestrator block's model — the shared
+    #    orchestrator_identity path) and exclude it from verifier
+    #    selection. Unresolvable identity fails closed BEFORE any
+    #    metered call: the remediation is start_session --model.
+    try:
+        identity = resolve_orchestrator_exclusion(
+            session_set_dir, session_number
+        )
+    except VerifySessionError as exc:
+        print(
+            f"verify_session: {exc}\nRe-run start_session with --model, "
+            "then retry.",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
+    exclude_providers = [identity.effective_provider]
 
     # -- L-064-7 tier-pin guard (before any metered call).
     if args.max_tier is not None and round_number >= 2 and not args.wording_only:
@@ -816,6 +889,10 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         print(f"  session set:        {set_name}")
         print(f"  session:            {session_number}")
         print(f"  round:              {round_number}")
+        print(f"  orchestrator:       {identity.effective_provider} "
+              f"(via {identity.source}; provenance="
+              f"{identity.provenance or 'unlabeled'})")
+        print(f"  excluded providers: {', '.join(exclude_providers)}")
         print(f"  diff base:          {args.diff_base}")
         print(f"  diff exclusions:    {', '.join(excludes) or '(none)'}")
         print(f"  evidence diff:      {len(evidence.diff)} chars")
@@ -826,9 +903,26 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         print(f"  max tier:           {args.max_tier if args.max_tier is not None else '(router default)'}")
         return EXIT_OK
 
-    # -- Route to the cross-provider verifier.
+    # -- Route to the cross-provider verifier (orchestrator's effective
+    #    provider excluded -- Set 084 F2).
     if route_fn is None:
         route_fn = _default_route
+    # R1 remediation (I-084-S1-2): the except clause below must catch the
+    # CLASS OBJECT route() actually raises. _default_route resolves route
+    # through the ai_router package, whose module raises
+    # ai_router.verification.VerificationUnavailableError — so this import
+    # is package-relative FIRST (same module object), with the
+    # package-absolute form as the only fallback. A bare
+    # ``from verification import …`` could bind a DISTINCT class object
+    # under sys.path-shim contexts and silently miss the except.
+    try:
+        from .verification import (  # type: ignore[import-not-found]
+            VerificationUnavailableError,
+        )
+    except ImportError:
+        from ai_router.verification import (  # type: ignore[no-redef]
+            VerificationUnavailableError,
+        )
     try:
         result = route_fn(
             prompt,
@@ -836,7 +930,31 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             session_number,
             args.complexity_hint,
             args.max_tier,
+            exclude_providers,
         )
+    except VerificationUnavailableError as exc:
+        # The hard blocked state: no verdict, no artifact, no
+        # disposition patch. Only the operator-attested manual path
+        # resolves it -- never a silent same-provider verification,
+        # never an engine-facing skip (Set 083 operator mandate).
+        print(
+            "verify_session: VERIFICATION UNAVAILABLE -- no eligible "
+            "verifier exists outside the orchestrator's effective "
+            f"provider ({', '.join(exclude_providers)}).\n"
+            f"Reason: {exc}\n"
+            "No verdict was written; the close stays BLOCKED. This state "
+            "is resolvable only by the operator (never the engine): run "
+            "the verification manually on a different-provider surface "
+            "using ai_router/prompt-templates/verification.md, save the "
+            "raw output, then close with the attested manual path:\n"
+            "  python -m ai_router.close_session --session-set-dir "
+            f"{session_set_dir} --manual-verify --interactive\n"
+            "The attestation must name the verifying surface, model, "
+            "effective provider, template used, timestamp, and the raw "
+            "artifact path.",
+            file=sys.stderr,
+        )
+        return EXIT_VERIFICATION_UNAVAILABLE
     except Exception as exc:  # noqa: BLE001 -- report any transport failure
         print(
             f"verify_session: routed verification call failed: {exc}\n"
@@ -863,6 +981,8 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
     # -- Report (ASCII-only).
     truncated = bool(getattr(result, "truncated", False))
     print(f"verify_session: session {session_number}, round {round_number}")
+    print(f"  excluded providers: {', '.join(exclude_providers)} "
+          f"(orchestrator effective provider via {identity.source})")
     print(f"  verifier model:     {result.model_name}")
     print(f"  verdict:            {verdict}")
     print(f"  blocking:           {'YES' if classification.blocking else 'no'}"

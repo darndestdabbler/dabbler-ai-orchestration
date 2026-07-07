@@ -273,14 +273,15 @@ instead of being overwritten by the next session's start.
 
 ### Per-session orchestrator block — historical attribution
 
-A populated `sessions[N].orchestrator` block carries up to 4 fields:
+A populated `sessions[N].orchestrator` block carries up to 5 fields:
 
 | Field | Type | Purpose |
 |---|---|---|
 | `engine` | string | Orchestrator engine name (`claude`, `gpt-5-4`, `gemini-pro`, `codex`, etc.). |
-| `provider` | string | Provider keying the API or IDE surface (`anthropic`, `openai`, `google`). |
-| `model` | string | Model id (`claude-opus-4-7`, `gpt-5.4`, etc.). |
+| `provider` | string | Seat label / descriptor (`anthropic`, `openai`, `google`). **Set 084 (F1): not an identity.** The effective provider every identity consumer (the verification-integrity close gate, verifier exclusion) uses is *derived at use time* by registry lookup on `model` via `ai_router/orchestrator_identity.py`; this free-text label is the explicit second choice, consulted only for single-vendor engines that recorded no resolvable model. |
+| `model` | string | Model id (`claude-opus-4-7`, `gpt-5.4`, etc.). **Set 084 (F1): required at `start_session` for multi-provider engines** (`github-copilot`, `copilot`) and validated against the model registry (`router-config.yaml` `models:` keys/model_ids plus the Copilot CLI's documented model universe). This is the identity-bearing field. |
 | `effort` | string | Effort level: `low` / `medium` / `high` / `fast` / `normal`. |
+| `identityProvenance` | string or absent | **Set 084 (F1, additive, omit-null).** How identity was established, derived from the engine and never a free choice: `asserted` for multi-provider engines (a Copilot seat relays whatever model the picker selected, so the model claim is the orchestrator's assertion), `direct` for single-vendor engines. Absent on every pre-084 block and when no engine is derivable. Readers treat absence as "unlabeled (pre-084)". The enum is exactly `direct \| asserted` — writer-validated (`session_state.build_orchestrator_block`) and mirrored in the schema example, per the L-066-1 both-directions parity rule. |
 
 **Omit-null on disk (Set 049 T3).** Writers MUST omit any field they
 cannot declare authoritatively rather than writing `null` or a
@@ -299,10 +300,15 @@ migrator run (apply mode writes `session-state.pre-049-sweep.bak.json`
 as the rollback affordance). A v4 reader tolerates their presence on
 un-swept files but does not consult them.
 
-### Writer Contract (Set 049 T3)
+### Writer Contract (Set 049 T3; Set 084 F1)
 
 `start_session` builds the `sessions[N].orchestrator` block from the
-caller's CLI arguments, applying omit-null:
+caller's CLI arguments, applying omit-null. Set 084 adds two rules on
+top: a **multi-provider engine** (`github-copilot`, `copilot`) is
+refused (exit non-zero) without a registry-resolvable `--model`, and
+every writer site stamps `identityProvenance` (`direct` / `asserted`)
+derived from the engine via the shared
+`session_state.build_orchestrator_block` helper:
 
 - The caller passes the fields it can declare authoritatively
   (`--engine claude --provider anthropic --model claude-opus-4-7
@@ -1206,7 +1212,20 @@ rows (Complete / Cancelled).
 ## Drift check
 
 The v4 example file at `docs/session-state-schema-example.json` is
-the canonical reference. A future drift check will regenerate it
-from the live schema constants and fail-loud when the documented
-example and the live writer disagree. Until then, keep them in sync
-by hand when either changes.
+the canonical reference, regenerated from the live schema constants by
+`ai_router/scripts/dump_session_state_schema.py` (`--check` fails loud
+when the committed example and the live writer disagree; the example's
+orchestrator blocks are built through the live
+`session_state.build_orchestrator_block` writer helper so field drift
+surfaces on the next check).
+
+**Machine-readable JSON Schema (Set 084 S1):**
+[`ai_router/schemas/session-state.schema.json`](../ai_router/schemas/session-state.schema.json)
+is the JSON-Schema contract for what a v4 writer may emit — the
+canonical known-plan shape, the plan-less carve-out, the per-session
+enums, and the orchestrator block including the `identityProvenance`
+enum (`direct | asserted`). Parity with the live writer and the
+pure-Python validation is pinned in both directions by
+`ai_router/tests/test_orchestrator_identity.py::TestSessionStateSchemaParity`
+(writer output validates against the schema; the schema rejects the
+enum values the writer refuses — L-066-1).

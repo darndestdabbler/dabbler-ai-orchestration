@@ -623,6 +623,27 @@ class CopilotCliVerifierSelection:
     provider: str
 
 
+class VerificationUnavailableError(RuntimeError):
+    """Set 084 (F2): the hard ``verification_unavailable`` outcome.
+
+    Raised when dynamic verifier exclusion (the session orchestrator's
+    registry-resolved effective provider is excluded from selection)
+    leaves NO eligible different-provider candidate — e.g. a Copilot
+    seat whose catalog lockfile confirms only one provider's models.
+    This is an explicit blocked state: no verdict is written, the close
+    stays blocked, and the only sanctioned resolution is the
+    operator-attested manual path (``close_session --manual-verify``
+    with an attestation naming the verifying surface, model, effective
+    provider, template used, timestamp, and the raw artifact). Never a
+    silent same-provider verification; never an engine-facing skip
+    (operator mandate, Set 083).
+    """
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
 @dataclass(frozen=True)
 class ProvenanceUnavailable:
     """Fail-closed result when no confirmed catalog entry in the verifier

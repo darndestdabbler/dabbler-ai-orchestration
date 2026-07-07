@@ -243,6 +243,30 @@ models:
     generation_params:
       reasoning_effort: medium
 
+  # --- Identity-registry-only entries (Set 084 F1) --------------------------
+  # Orchestrator models that are NOT part of the routed generator/verifier
+  # pool but must resolve in the identity registry so start_session can
+  # validate them and the close gate / verifier exclusion can derive their
+  # effective provider (orchestrator_identity.resolve_model_provider walks
+  # models: keys and model_ids). is_enabled: false keeps them out of every
+  # selection path — pick_model, verifier selection, and escalation all
+  # skip disabled entries. Add a sibling entry here whenever a new
+  # orchestrator model appears that neither the routed pool nor the Copilot
+  # CLI's documented model universe covers.
+  claude-sonnet-5:
+    provider: anthropic
+    model_id: claude-sonnet-5
+    is_enabled: false
+    is_enabled_as_verifier: false
+    notes: "Identity registry only: Claude Code orchestrator sessions."
+  gemini-3-pro:
+    provider: google
+    model_id: gemini-3-pro
+    is_enabled: false
+    is_enabled_as_verifier: false
+    notes: "Identity registry only: Gemini Code Assist orchestrator
+      sessions (the Set 084 S2 ai-assignment recommendation)."
+
 # --- Routing Thresholds ---
 # Complexity score 1-100 mapped to tiers.
 routing:
@@ -274,16 +298,22 @@ routing:
     # on heuristic scoring to land there indirectly.
     uat-plan-generation: opus
     uat-coverage-review: opus
-    # End-of-session cross-provider verification. Pinned to gpt-5-4
-    # (OpenAI) so a Claude (Anthropic) orchestrator gets a genuinely
-    # cross-provider review by calling route() per the workflow doc
-    # verbatim — without this override, route() would default to opus
-    # (Anthropic = the orchestrator's own provider) and miss the
-    # cross-provider intent. Calibrated for the Claude orchestrator;
-    # if a Codex (OpenAI) or Gemini (Google) orchestrator runs a
-    # session, swap this value so it lands on a different-provider
-    # Tier-3 model (opus for Codex/Gemini, gpt-5-4 stays correct for
-    # Claude). See docs/planning/lessons-learned.md.
+    # End-of-session cross-provider verification. Set 084 (F2): this
+    # pin is a PREFERENCE ONLY — it can never override the dynamic
+    # orchestrator exclusion. route(task_type="session-verification")
+    # with session context resolves the session orchestrator's
+    # EFFECTIVE provider (registry lookup on the orchestrator block's
+    # model, via ai_router/orchestrator_identity.py) and excludes it
+    # from selection as a hard constraint; when this pinned model's
+    # provider is excluded, selection falls through to the cheapest
+    # surviving same-tier model from another provider, and an exclusion
+    # that leaves NO candidate is the explicit verification_unavailable
+    # outcome (never a silent same-provider verification). The pre-084
+    # hand-tuned static pin ("swap this value if a different
+    # orchestrator runs sessions") was the incident-3 hole: it
+    # dispatched a Copilot-seat verification to the orchestrator's own
+    # underlying model. gpt-5-4 stays as the preferred verifier when it
+    # survives the exclusion (the common Claude-orchestrator case).
     session-verification: gpt-5-4
     # Fresh close-out turn. The orchestrator routes a new turn with
     # task_type=session-close-out after disposition.json reports

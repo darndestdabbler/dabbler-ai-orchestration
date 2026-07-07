@@ -143,16 +143,19 @@ class TestRegisterSessionStartV4Shape:
         assert session1["completedAt"] is None
         assert session1["verificationVerdict"] is None
         orch = session1["orchestrator"]
-        # Set 049: orchestrator block is a 4-field omit-null dict; the
+        # Set 049: orchestrator block is an omit-null dict; the
         # coordination-era fields (chatSessionId / checkedOutAt /
         # lastActivityAt) are dropped from both the writer parameter
-        # surface and the on-disk shape.
+        # surface and the on-disk shape. Set 084 (F1): the block also
+        # carries identityProvenance, derived from the engine ("direct"
+        # for single-vendor engines like claude).
         assert isinstance(orch, dict)
         assert orch == {
             "engine": "claude",
             "provider": "anthropic",
             "model": "claude-opus-4-7",
             "effort": "high",
+            "identityProvenance": "direct",
         }
 
     def test_orchestrator_block_applies_omit_null(
@@ -169,7 +172,9 @@ class TestRegisterSessionStartV4Shape:
         )
         raw = _read_raw(session_set_dir)
         orch = raw["sessions"][0]["orchestrator"]
-        assert orch == {"engine": "claude"}
+        # Set 084 (F1): identityProvenance is always derivable from the
+        # engine, so it is present even on an otherwise-minimal block.
+        assert orch == {"engine": "claude", "identityProvenance": "direct"}
 
     def test_not_started_sessions_have_null_metadata(self, session_set_dir, spec_md):
         register_session_start(

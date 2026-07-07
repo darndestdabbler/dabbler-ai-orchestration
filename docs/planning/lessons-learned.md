@@ -207,7 +207,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   code before routing verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="083" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="084" status="active" scope="portable" -->
 
 - **Context:** Building a cross-provider verification prompt whose
   evidence bundle includes `git diff` / `git diff --stat` output
@@ -224,7 +224,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   alongside the diff so additions are visible.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="083" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="084" status="active" scope="portable" -->
 
 - **Context:** Cross-provider verification of a heavily cross-referenced
   synthesis document — a proposal, design doc, or spec whose central
@@ -278,7 +278,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   push-vs-pull result whose arms used unequal framing as evidence for retiring push.
 
 ## Strong Adversarial Framing Without A Materiality Bar Manufactures Minor-Finding Churn
-<!-- lesson: id="L-071-1" added-set="071" last-used-set="083" status="active" scope="portable" -->
+<!-- lesson: id="L-071-1" added-set="071" last-used-set="084" status="active" scope="portable" -->
 
 - **Context:** A verification surface running at its **strongest adversarial
   framing** (devil's advocate, "assume the work is flawed, a rubber-stamp is a

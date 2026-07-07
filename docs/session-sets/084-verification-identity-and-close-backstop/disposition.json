@@ -1,0 +1,54 @@
+{
+  "status": "completed",
+  "summary": "Set 084 Session 1 (F1 + F2) complete and VERIFIED (round 4). F1: identity is the underlying model resolved through the model registry end to end -- new shared helper ai_router/orchestrator_identity.py (effective provider by registry lookup on the orchestrator block's model: config models keys/model_ids, normalized dot/dash tokens, claude-*-scoped dated-alias stripping, the Copilot CLI documented model universe; provider label demoted to a single-vendor-only second choice); start_session refuses a multi-provider engine without a registry-known --model AND any supplied model that does not resolve (every engine); all three writer sites stamp the additive omit-null identityProvenance (direct/asserted, derived from the engine); schema parity in both directions (schema doc, regenerated example built THROUGH the live writer helper, new machine-readable ai_router/schemas/session-state.schema.json with a both-directions parity test class); the Set 083 close gate resolves the orchestrator side of the != check through the shared helper and fails closed on unresolvable identity naming start_session --model. F2: verify_session and bare route(task_type=session-verification) with session context resolve the session orchestrator's effective provider through ONE shared path and exclude it as a hard constraint (unioned with any caller-supplied exclusions); the router-config session-verification pin is demoted to a preference that can never override the exclusion; escalation cannot cross back into an excluded provider; under copilot-cli the exclusion is applied against the seat catalog's FULL confirmed entries (prefer is order, not universe) and a seat with no diverse confirmed candidate yields the hard verification_unavailable outcome (typed error; verify_session exit 7; no verdict written; operator-attested --manual-verify named as the only resolution). Layer-1 matrix: 90 tests in test_orchestrator_identity.py incl. the incident-3 regression, arbitrary-label, missing-model, single-vendor back-compat, and no-diverse-catalog fixtures. Suite: 2653 passed, 5 skipped, 11 e2e passed. Cross-provider verification: 4 rounds, 6 Major findings fixed (ledger I-084-S1-1..6, zero resurrections), round 4 VERIFIED with zero findings. Dogfood: every round's verifier was selected by the new exclusion path (claude-fable-5 resolved to anthropic via the registry; gpt-5-4 verified).",
+  "files_changed": [
+    "ai_router/orchestrator_identity.py",
+    "ai_router/schemas/session-state.schema.json",
+    "ai_router/session_state.py",
+    "ai_router/start_session.py",
+    "ai_router/gate_checks.py",
+    "ai_router/verify_session.py",
+    "ai_router/__init__.py",
+    "ai_router/models.py",
+    "ai_router/utils.py",
+    "ai_router/verification.py",
+    "ai_router/router-config.yaml",
+    "ai_router/scripts/dump_session_state_schema.py",
+    "ai_router/tests/test_orchestrator_identity.py",
+    "ai_router/tests/test_verification_integrity_gate.py",
+    "ai_router/tests/test_verify_session.py",
+    "ai_router/tests/test_cross_provider_gate_extension.py",
+    "ai_router/tests/test_pending_verification.py",
+    "ai_router/tests/test_session_state_v4_writers.py",
+    "ai_router/tests/test_typed_session_writer.py",
+    "docs/session-state-schema.md",
+    "docs/session-state-schema-example.json"
+  ],
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "gemini-code-assist",
+    "provider": "google",
+    "model": "gemini-3-pro",
+    "effort": "high",
+    "reason": {
+      "code": "other",
+      "specifics": "Adopting the routed ai-assignment.md recommendation for Session 2 (stamped evidence + the close backstop): Gemini Code Assist gemini-3-pro @ effort=high -- the recommendation cites Gemini's strength in surgical modification of core lifecycle logic and exhaustive incident-regression test generation, plus cross-provider calibration value on the set's most sensitive code. gemini-3-pro is now identity-registry-resolvable (Set 084 S1 added the disabled registry entry), so the S2 start passes the new boundary."
+    }
+  },
+  "blockers": [],
+  "deferred_issues": [],
+  "lessons_cited": [
+    "L-069-1",
+    "L-066-1",
+    "L-064-9",
+    "L-064-10",
+    "L-065-1",
+    "L-071-1"
+  ],
+  "residuals": [
+    "Read-side single-vendor provider-label fallback for a supplied-but-unresolvable model is retained as legacy tolerance for pre-084 state files (this repo's history carries claude-sonnet-5 and dated snapshot ids); the start_session boundary prevents new occurrences.",
+    "model remains self-reported (spec residual 1); the compensating controls are the registry constraint + the identityProvenance label. F3 stamping and the close backstop land in Session 2."
+  ]
+}

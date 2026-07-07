@@ -73,8 +73,18 @@ def get_escalation_model(
     current_model: str,
     config: dict,
     escalation_count: int,
+    exclude_providers=None,
 ) -> str | None:
-    """Return the next-tier model, or None if max escalations reached."""
+    """Return the next-tier model, or None if max escalations reached.
+
+    Set 084 (F2): *exclude_providers* is the same hard constraint
+    ``pick_model`` honors — an escalation must never land on an
+    excluded provider (the short-response escalation heuristic was one
+    of the paths that could silently cross back onto the orchestrator's
+    own provider). When the next tier's assignment is excluded, the
+    cheapest surviving enabled model at that tier is used instead;
+    when nothing at that tier survives, escalation stops (``None``).
+    """
     max_esc = config["escalation"]["max_escalations"]
     if escalation_count >= max_esc:
         return None
@@ -83,10 +93,39 @@ def get_escalation_model(
     next_tier = current_tier + 1
 
     assignments = config["routing"]["tier_assignments"]
-    if next_tier in assignments:
-        return assignments[next_tier]
+    if next_tier not in assignments:
+        return None
 
-    return None
+    exclude = {
+        str(p).strip().lower() for p in (exclude_providers or []) if p
+    }
+    candidate = assignments[next_tier]
+    if not exclude:
+        return candidate
+
+    def _provider_of(name: str) -> str:
+        entry = (config.get("models") or {}).get(name) or {}
+        return str(entry.get("provider") or "").strip().lower()
+
+    def _survives(name: str) -> bool:
+        cfg = (config.get("models") or {}).get(name)
+        if not isinstance(cfg, dict) or not cfg.get("is_enabled", True):
+            return False
+        return _provider_of(name) not in exclude
+
+    if _survives(candidate):
+        return candidate
+    survivors = [
+        (float(cfg.get("output_cost_per_1m") or 0.0), name)
+        for name, cfg in (config.get("models") or {}).items()
+        if isinstance(cfg, dict)
+        and cfg.get("tier") == next_tier
+        and _survives(name)
+    ]
+    if not survivors:
+        return None
+    survivors.sort()
+    return survivors[0][1]
 
 
 # ----------------------------------------------------------------------

@@ -262,6 +262,9 @@ def test_start_session_guardrail_blocks_same_identity(tmp_path, capsys):
         "--type", "verification",
         "--engine", "copilot",
         "--provider", "anthropic",
+        # Set 084 F1: multi-provider engines require a registry-known
+        # --model at start; the 077 guardrail under test fires after it.
+        "--model", "claude-sonnet-4.6",
     ])
     assert exit_code == start_session.EXIT_BOUNDARY
     stderr = capsys.readouterr().err
@@ -279,6 +282,9 @@ def test_start_session_guardrail_blocks_undeclared_provider_same_engine(tmp_path
         "--session-set-dir", str(set_dir),
         "--type", "verification",
         "--engine", "copilot",
+        # Set 084 F1 boundary passes (model given); the 077 guardrail's
+        # undeclared-provider arm is what this test exercises.
+        "--model", "claude-sonnet-4.6",
     ])
     assert exit_code == start_session.EXIT_BOUNDARY
     stderr = capsys.readouterr().err
@@ -307,6 +313,8 @@ def test_start_session_guardrail_allows_different_provider(tmp_path):
         "--type", "verification",
         "--engine", "copilot",
         "--provider", "openai",
+        # Set 084 F1 boundary: registry-known model matching the label.
+        "--model", "gpt-5.4",
     ])
     assert exit_code == start_session.EXIT_OK
     assert _session_count(set_dir) == 2
@@ -322,6 +330,8 @@ def test_start_session_guardrail_allows_no_baseline(tmp_path):
         "--type", "verification",
         "--engine", "copilot",
         "--provider", "openai",
+        # Set 084 F1 boundary: registry-known model matching the label.
+        "--model", "gpt-5.4",
     ])
     assert exit_code == start_session.EXIT_OK
     assert _session_count(set_dir) == 2
@@ -346,6 +356,9 @@ def test_start_session_handoff_guardrail_blocks_same_identity(tmp_path, capsys):
         "--handoff",
         "--engine", "copilot",
         "--provider", "anthropic",
+        # Set 084 F1: multi-provider engines require a registry-known
+        # --model at start; the 077 guardrail under test fires after it.
+        "--model", "claude-sonnet-4.6",
     ])
     assert exit_code == start_session.EXIT_BOUNDARY
     assert "does not differ from the work sessions" in capsys.readouterr().err

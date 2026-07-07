@@ -96,24 +96,31 @@ def _make_set(
     return set_dir
 
 
-def _strip_provider_from_state(set_dir: Path) -> None:
-    """Remove the in-flight session's orchestrator ``provider`` field.
+def _strip_orchestrator_field(set_dir: Path, field_name: str) -> None:
+    """Remove *field_name* from every session's orchestrator block.
 
     ``register_session_start`` requires enough identity to start, so the
-    missing-identity case is produced by editing the written state — the
-    same shape a pre-Set-077 legacy file (or an omit-null start with no
-    provider signal) presents at close time.
+    missing-identity cases are produced by editing the written state — the
+    same shapes legacy files (or omit-null starts) present at close time.
     """
     state_path = set_dir / "session-state.json"
     state = json.loads(state_path.read_text(encoding="utf-8"))
     for entry in state.get("sessions") or []:
         orch = entry.get("orchestrator")
         if isinstance(orch, dict):
-            orch.pop("provider", None)
+            orch.pop(field_name, None)
     state_path.write_text(
         json.dumps(state, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
+
+
+def _strip_provider_from_state(set_dir: Path) -> None:
+    _strip_orchestrator_field(set_dir, "provider")
+
+
+def _strip_model_from_state(set_dir: Path) -> None:
+    _strip_orchestrator_field(set_dir, "model")
 
 
 def _write_metrics(
@@ -325,8 +332,12 @@ class TestApiCorroboration:
     def test_missing_orchestrator_identity_fails_closed(
         self, tmp_path, monkeypatch
     ):
+        """Set 084 (F1): identity is unresolvable only when the block has
+        neither a registry-resolvable model NOR a provider label. Both
+        are stripped here; the remediation names start_session --model."""
         set_dir = _make_set(tmp_path)
         _strip_provider_from_state(set_dir)
+        _strip_model_from_state(set_dir)
         _write_artifact(set_dir)
         _write_metrics(tmp_path, monkeypatch, [_verification_row(set_dir)])
         passed, remediation = check_verification_integrity(
@@ -334,6 +345,23 @@ class TestApiCorroboration:
         )
         assert not passed
         assert "fails closed" in remediation
+        assert "--model" in remediation
+
+    def test_missing_provider_label_resolves_via_model_registry(
+        self, tmp_path, monkeypatch
+    ):
+        """Set 084 (F1): a stripped provider LABEL no longer breaks the
+        gate when the block's model resolves through the registry — the
+        effective provider is derived from the model (claude-fable-5 ->
+        anthropic), and a cross-provider gpt-5-4 row corroborates."""
+        set_dir = _make_set(tmp_path)
+        _strip_provider_from_state(set_dir)
+        _write_artifact(set_dir)
+        _write_metrics(tmp_path, monkeypatch, [_verification_row(set_dir)])
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert passed, remediation
 
     def test_wrong_session_number_row_does_not_corroborate(
         self, tmp_path, monkeypatch

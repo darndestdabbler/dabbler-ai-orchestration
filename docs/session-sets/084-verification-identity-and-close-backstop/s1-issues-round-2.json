@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** `start_session` does not validate every supplied `--model`; single-vendor sessions can persist an unresolvable model and silently fall back to the free-text provider label\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The session plan requires: **“`start_session` … validates any supplied model against the registry”** and Step 1 makes the registry-resolved model the authoritative identity. The implementation explicitly does not do that for single-vendor engines.\n    - **Impact:** A normal supported CLI path can write `session-state.json` with a typoed/arbitrary `model` on a single-vendor engine. Downstream identity consumers then ignore that bad model and trust the free-text `provider` label instead of failing loud at the boundary. That breaks the F1 identity contract on real inputs and can miscompute the cross-provider gate/exclusion, which is merge-blocking because this session’s core deliverable is identity hardening.\n    - **Evidence:**\n      - In `ai_router/start_session.py`, `_refuse_unresolvable_identity()` only rejects `resolved is None` when `multi` is true:\n        ```python\n        if multi and resolved is None:\n            return ...\n        ```\n      - The same function’s docstring says the opposite of the spec:\n        ```python\n        Single-vendor engines keep their existing contract: ... an unrecognized model string is accepted as a label.\n        ```\n      - In `ai_router/orchestrator_identity.py`, `resolve_orchestrator_identity()` explicitly falls back on an unresolvable model for single-vendor engines:\n        ```python\n        # Single-vendor engine with an unresolvable model string: fall\n        # through to the provider-field second choice below\n        ```\n      - The new tests lock this behavior in as expected:\n        `ai_router/tests/test_orchestrator_identity.py::TestResolveOrchestratorIdentity::test_single_vendor_unresolvable_model_falls_back_to_label`.\n    - **Correct answer:** Refuse any supplied model that does not resolve in the registry at `start_session`, not just for multi-provider engines. If provider-field fallback is kept for back-compat, it should be limited to the case where a known single-vendor engine omitted `model`, not where a `model` was supplied and failed to resolve.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

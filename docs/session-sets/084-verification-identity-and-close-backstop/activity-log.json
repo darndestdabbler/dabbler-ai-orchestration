@@ -1,0 +1,89 @@
+{
+  "sessionSetName": "084-verification-identity-and-close-backstop",
+  "createdDate": "2026-07-07T06:05:41.749801+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-07T06:05:41.749801+00:00",
+      "description": "Operator set pathAwareCritique: required.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "required"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-1/s1.identity",
+      "dateTime": "2026-07-07T02:41:24.289465-04:00",
+      "description": "Created ai_router/orchestrator_identity.py: shared identity resolution (effective provider by registry lookup on model -- config models keys/model_ids + normalized dot/dash token + the Copilot CLI documented model universe; provider label as explicit second choice for single-vendor engines), identityProvenance classification (direct/asserted derived from the engine, MULTI_PROVIDER_ENGINES module constant), typed fail-closed IdentityResolutionError, and the shared session-level resolver resolve_session_orchestrator_identity.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-1/s1.identity",
+      "dateTime": "2026-07-07T02:41:24.289465-04:00",
+      "description": "Boundary enforcement: start_session refuses a multi-provider engine without --model (exit 2, remediation names the flag) and refuses a registry-unknown model; contradicting seat labels get a stderr note (model wins at use time). Writer: session_state.build_orchestrator_block stamps identityProvenance at all three writer sites (work/typed/handoff -- L-069-1). Schema parity both directions (L-066-1): docs/session-state-schema.md 5-field block table + writer contract, dump_session_state_schema builds its example THROUGH the live writer helper, docs/session-state-schema-example.json regenerated, drift check green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-1/s1.identity",
+      "dateTime": "2026-07-07T02:41:24.289465-04:00",
+      "description": "Gate consumes the helper: check_verification_integrity resolves the orchestrator side of the != check via resolve_orchestrator_identity (registry-resolved effective provider, never the free-text label); _row_provider delegates to the same shared resolve_model_provider; unresolvable identity fails closed naming start_session --model.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-1/s1.exclusion",
+      "dateTime": "2026-07-07T02:41:24.289465-04:00",
+      "description": "Dynamic verifier exclusion (F2): verify_session resolves the session orchestrator's effective provider and passes exclude_providers into routing; route(task_type=session-verification) with session context applies the identical exclusion itself via the shared resolver. pick_model/get_escalation_model treat exclusion as a hard constraint (the router-config session-verification pin demoted to a preference); copilot-cli generator-role resolution applies the exclusion against the catalog lockfile's confirmed entries; no diverse candidate raises the typed VerificationUnavailableError -- verify_session exits 7, writes no verdict, and names the operator-attested --manual-verify path.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-1/s1.tests",
+      "dateTime": "2026-07-07T02:41:24.290465-04:00",
+      "description": "Layer-1 pytest matrix: ai_router/tests/test_orchestrator_identity.py (67 tests) -- incident-3 regression (copilot + claude-sonnet-4.6: same-provider row refused, selection never picks anthropic under exclusion), arbitrary-label fixture (model wins over seat label), missing-model multi-provider fixture (start_session refuses; gate fails closed), single-vendor back-compat fixture (existing sets keep closing), no-diverse-catalog fixture (verification_unavailable). Updated legacy fixtures to the F1 contract (copilot invocations gain --model; block-shape assertions gain identityProvenance; the stripped-provider gate case split into fails-closed [model also stripped] and resolves-via-model). Full suite green: 2632 passed + 11 e2e passed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-1/s1.tests",
+      "dateTime": "2026-07-07T02:53:13.337100-04:00",
+      "description": "Verification round 1 (gpt-5-4, selected under the new anthropic exclusion) returned ISSUES_FOUND with 3 Major findings; all three accepted and fixed. I-084-S1-1: shipped the machine-readable ai_router/schemas/session-state.schema.json (the spec's named Touches surface) + TestSessionStateSchemaParity (writer output validates; the schema rejects bad identityProvenance tokens; plan-less carve-out and pre-084 blocks accepted) and pointed docs/session-state-schema.md at it. I-084-S1-2: verify_session now imports VerificationUnavailableError package-relative first so the except clause catches the exact class route() raises (the distinct-class miss reproduced live in tests before the fix). I-084-S1-3: route() now ALWAYS resolves the session-derived exclusion for session-verification with session context and UNIONS it with any caller-supplied list (a bare caller can add exclusions, never remove the orchestrator's). Full suite green: 2642 passed, 5 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-1/s1.tests",
+      "dateTime": "2026-07-07T03:03:17.357749-04:00",
+      "description": "Verification round 2 (gpt-5-4 under exclusion) confirmed the R1 fixes and found 1 NEW Major (I-084-S1-4): start_session only validated supplied models for multi-provider engines, so a typoed model on a single-vendor engine could persist and silently defer identity to the free-text label. Accepted and fixed: the boundary now refuses ANY supplied model that does not resolve (every engine); registry coverage added for current orchestrator-only models via disabled (is_enabled: false) router-config entries (claude-sonnet-5, gemini-3-pro) plus dated-snapshot-id normalization (claude-haiku-4-5-20251001 -> claude-haiku-4-5); the read-side single-vendor fallback is retained ONLY as legacy tolerance for pre-084 files (documented residual \u2014 this repo's history carries claude-sonnet-5 and dated ids) since the boundary prevents new occurrences. Cross-round ledger: I-084-S1-1..3 RESOLVED (no resurrections), I-084-S1-4 fixed. Suite green: 2646 passed, 5 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-1/s1.tests",
+      "dateTime": "2026-07-07T03:11:28.384548-04:00",
+      "description": "Verification round 3 (gpt-5-4 under exclusion) confirmed rounds 1-2 fixes (no resurrections) and found 2 NEW Majors, both accepted and fixed. I-084-S1-5: the dated-snapshot normalization was unscoped, so an INVENTED dated variant of any provider's id (gpt-5.4-20251001) normalized onto a real registry entry and slipped the boundary -- the -YYYYMMDD strip is now scoped to the claude-* family (Anthropic's dated-alias convention); invented dated variants of other providers now fail to resolve and are refused. I-084-S1-6: under copilot-cli the exclusion was judged against the generator prefer list only, so verification_unavailable could fire while the seat catalog held a confirmed different-provider model outside prefer -- _resolve_copilot_generator now falls back to scanning the FULL confirmed catalog (provider allowed + not excluded) when an exclusion is active; verification_unavailable fires only when the confirmed catalog truly has no diverse candidate; the no-exclusion pre-084 prefer-only contract is unchanged. Suite green: 2653 passed, 5 skipped. Ledger: I-084-S1-1..4 RESOLVED, -5/-6 fixed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-1/s1.tests",
+      "dateTime": "2026-07-07T03:15:36.437406-04:00",
+      "description": "Verification round 4 (gpt-5-4 under the anthropic exclusion): VERIFIED, 0 findings, 0 nits. The dogfood premise held every round: the verifier was selected by the new dynamic exclusion (orchestrator claude-fable-5 resolved to anthropic via the model registry, anthropic excluded by resolution). Four rounds total, six Major findings found and fixed (I-084-S1-1..6), zero resurrections. Routed verification cost: R1 $0.28 + R2 $0.42 + R3 $0.37 + R4 $0.39 = $1.46.",
+      "status": "complete"
+    }
+  ]
+}

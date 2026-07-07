@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/darndestdabbler/dabbler-ai-orchestration/ai_router/schemas/session-state.schema.json",
+  "title": "session-state.json (v4 on-disk write shape)",
+  "description": "Machine-readable contract for the v4 session-state.json files the ai_router writers emit (Set 084 S1). Documents the canonical known-plan shape AND the plan-less carve-out (no sessions[] key). Readers stay tolerant of pre-v4 files via the normalize shim; this schema covers what a v4 WRITER may produce. The prose reference is docs/session-state-schema.md; the generated example is docs/session-state-schema-example.json. Parity with the pure-Python writer/validator is pinned by ai_router/tests/test_orchestrator_identity.py::TestSessionStateSchemaParity (L-066-1: both directions).",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 4,
+      "description": "v4 since Set 047. Older versions are read-normalized, never written."
+    },
+    "sessionSetName": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Basename of the session-set directory."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["not-started", "in-progress", "complete", "cancelled"],
+      "description": "Canonical top-level lifecycle state. Aliases (completed/done) are read-tolerated, never written."
+    },
+    "sessions": {
+      "type": "array",
+      "description": "The canonical per-session ledger. Absent only in the plan-less carve-out (totalSessions unresolvable at first start).",
+      "items": { "$ref": "#/$defs/sessionRecord" }
+    },
+    "startedAt": {
+      "type": "string",
+      "description": "Plan-less carve-out passthrough only; the canonical known-plan shape carries startedAt per session."
+    },
+    "orchestrator": {
+      "$ref": "#/$defs/orchestratorBlock",
+      "description": "Plan-less carve-out passthrough only; the canonical known-plan shape carries the block per session."
+    },
+    "nextOrchestrator": {
+      "type": ["object", "null"],
+      "description": "Recommendation for the next session (written at close). Shape owned by session_state.NextOrchestrator; not re-specified here."
+    },
+    "forceClosed": {
+      "type": "boolean",
+      "description": "Opaque passthrough set by close_session --force; preserved across rewrites."
+    },
+    "preCancelStatus": {
+      "type": "string",
+      "description": "Opaque passthrough captured by cancel_session_set; preserved across rewrites."
+    }
+  },
+  "required": ["schemaVersion", "sessionSetName", "status"],
+  "$defs": {
+    "sessionRecord": {
+      "type": "object",
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["not-started", "in-progress", "complete"],
+          "description": "Per-session 'cancelled' is reserved for a future schema and rejected in v4."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["verification", "remediation"],
+          "description": "Set 057 typed sessions. Absent means 'work'; the writer persists only non-work values."
+        },
+        "startedAt": { "type": ["string", "null"] },
+        "completedAt": { "type": ["string", "null"] },
+        "orchestrator": {
+          "oneOf": [
+            { "$ref": "#/$defs/orchestratorBlock" },
+            { "type": "null" }
+          ]
+        },
+        "verificationVerdict": {
+          "type": ["string", "null"],
+          "description": "Canonical tokens are VERIFIED / ISSUES_FOUND; operators have shipped extension tokens (prefix-matched by readers), so this is typed string, not an enum."
+        }
+      },
+      "required": ["number", "title", "status"]
+    },
+    "orchestratorBlock": {
+      "type": "object",
+      "description": "Omit-null (Set 049 P2): missing keys are valid; null values and 'unknown' placeholders are not. Set 084 (F1): identityProvenance is derived from the engine by the shared writer (session_state.build_orchestrator_block) and is never a free choice. The 'provider' field is a seat DESCRIPTOR; the effective provider is derived at use time by registry lookup on 'model' (ai_router/orchestrator_identity.py). additionalProperties stays true because pre-Set-049 blocks preserved across rewrites may carry retired coordination fields readers tolerate.",
+      "properties": {
+        "engine": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "effort": { "type": "string", "minLength": 1 },
+        "identityProvenance": {
+          "type": "string",
+          "enum": ["direct", "asserted"],
+          "description": "Set 084 (F1, additive): how identity was established. 'asserted' for multi-provider engines (Copilot seats), 'direct' for single-vendor engines. Absent on pre-084 blocks."
+        }
+      },
+      "required": ["engine"]
+    }
+  }
+}

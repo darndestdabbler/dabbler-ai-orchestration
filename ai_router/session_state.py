@@ -570,6 +570,57 @@ def _validate_sessions_or_raise(
     )
 
 
+def build_orchestrator_block(
+    orchestrator_engine: str,
+    orchestrator_provider: Optional[str] = None,
+    orchestrator_model: Optional[str] = None,
+    orchestrator_effort: Optional[str] = None,
+) -> dict:
+    """Build the per-session orchestrator block (single writer surface).
+
+    Set 049's omit-null contract (P2): only fields the caller declared
+    are emitted — no ``null`` values, no ``"unknown"`` placeholders.
+
+    Set 084 (F1): the block additionally carries ``identityProvenance``,
+    derived from the engine and never a free choice — ``asserted`` for
+    multi-provider engines (Copilot seats), ``direct`` for single-vendor
+    engines, omitted when nothing is derivable. The writer validates the
+    derived value against the canonical enum before emitting (the
+    pure-Python half of the schema parity contract, L-066-1). All three
+    writer sites (work start, typed start, typed handoff) build their
+    block here so the field can never drift per-site (L-069-1).
+    """
+    try:
+        from .orchestrator_identity import (
+            IDENTITY_PROVENANCE_VALUES,
+            classify_identity_provenance,
+        )
+    except ImportError:  # pragma: no cover - bare/test context
+        from orchestrator_identity import (  # type: ignore[import-not-found]
+            IDENTITY_PROVENANCE_VALUES,
+            classify_identity_provenance,
+        )
+
+    block: dict = {"engine": orchestrator_engine}
+    if orchestrator_provider is not None:
+        block["provider"] = orchestrator_provider
+    if orchestrator_model is not None:
+        block["model"] = orchestrator_model
+    if orchestrator_effort is not None:
+        block["effort"] = orchestrator_effort
+    provenance = classify_identity_provenance(orchestrator_engine)
+    if provenance is not None:
+        if provenance not in IDENTITY_PROVENANCE_VALUES:
+            raise SessionStateInvariantError(
+                2,
+                f"derived identityProvenance {provenance!r} is not in the "
+                f"canonical enum {sorted(IDENTITY_PROVENANCE_VALUES)!r} — "
+                "writer/schema drift (L-066-1).",
+            )
+        block["identityProvenance"] = provenance
+    return block
+
+
 def register_session_start(
     session_set: str,
     session_number: int,
@@ -850,14 +901,15 @@ def register_session_start(
     # The hook / CLI caller decides which of provider / model / effort
     # it can authoritatively declare and omits the rest (T3 in the
     # spec); the writer trusts the caller and emits the omit-null block
-    # without "unknown" fallbacks.
-    orchestrator_block: dict = {"engine": orchestrator_engine}
-    if orchestrator_provider is not None:
-        orchestrator_block["provider"] = orchestrator_provider
-    if orchestrator_model is not None:
-        orchestrator_block["model"] = orchestrator_model
-    if orchestrator_effort is not None:
-        orchestrator_block["effort"] = orchestrator_effort
+    # without "unknown" fallbacks. Set 084: built via the shared
+    # build_orchestrator_block so identityProvenance is stamped
+    # identically at every writer site.
+    orchestrator_block = build_orchestrator_block(
+        orchestrator_engine,
+        orchestrator_provider=orchestrator_provider,
+        orchestrator_model=orchestrator_model,
+        orchestrator_effort=orchestrator_effort,
+    )
 
     if sessions is None:
         # Set 046 Session 2 plan-less write carve-out, Set 047 Session
@@ -1018,13 +1070,12 @@ def register_typed_session_start(
 
     new_number = len(prior_sessions) + 1
 
-    orchestrator_block: dict = {"engine": orchestrator_engine}
-    if orchestrator_provider is not None:
-        orchestrator_block["provider"] = orchestrator_provider
-    if orchestrator_model is not None:
-        orchestrator_block["model"] = orchestrator_model
-    if orchestrator_effort is not None:
-        orchestrator_block["effort"] = orchestrator_effort
+    orchestrator_block = build_orchestrator_block(
+        orchestrator_engine,
+        orchestrator_provider=orchestrator_provider,
+        orchestrator_model=orchestrator_model,
+        orchestrator_effort=orchestrator_effort,
+    )
 
     if title is None:
         # Round = count of prior same-typed sessions + 1, giving a stable,
@@ -1224,13 +1275,12 @@ def register_typed_session_handoff(
     closing_number = closing.get("number")
     new_number = len(prior_sessions) + 1
 
-    orchestrator_block: dict = {"engine": orchestrator_engine}
-    if orchestrator_provider is not None:
-        orchestrator_block["provider"] = orchestrator_provider
-    if orchestrator_model is not None:
-        orchestrator_block["model"] = orchestrator_model
-    if orchestrator_effort is not None:
-        orchestrator_block["effort"] = orchestrator_effort
+    orchestrator_block = build_orchestrator_block(
+        orchestrator_engine,
+        orchestrator_provider=orchestrator_provider,
+        orchestrator_model=orchestrator_model,
+        orchestrator_effort=orchestrator_effort,
+    )
 
     if title is None:
         prior_same = sum(

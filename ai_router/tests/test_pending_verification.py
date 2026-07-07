@@ -325,6 +325,9 @@ def _start_args(set_dir: Path, extra: Optional[List[str]] = None):
         "--session-set-dir", str(set_dir),
         "--engine", "copilot",
         "--provider", "anthropic",
+        # Set 084 F1: multi-provider engines require a registry-known
+        # --model at start_session.
+        "--model", "claude-sonnet-4.6",
     ] + (extra or [])
     return parser.parse_args(argv)
 
@@ -358,6 +361,7 @@ def test_banner_fires_under_no_router_flag(repo: Path, capsys):
             "--session-set-dir", str(new_set),
             "--engine", "copilot",
             "--provider", "anthropic",
+            "--model", "claude-sonnet-4.6",
             "--no-router",
         ]
     )

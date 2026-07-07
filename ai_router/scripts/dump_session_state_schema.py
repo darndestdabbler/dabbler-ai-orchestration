@@ -123,18 +123,33 @@ def build_example_state() -> dict:
     # post-rip shape every fresh writer emits — callers that cannot
     # authoritatively declare provider / model / effort simply omit
     # the key rather than emitting null or "unknown" placeholders.
-    s1_orch = {
-        "engine": "claude-code",
-        "provider": "anthropic",
-        "model": "claude-opus-4-7",
-        "effort": "high",
-    }
-    s2_orch = {
-        "engine": "claude-code",
-        "provider": "anthropic",
-        "model": "claude-opus-4-7",
-        "effort": "high",
-    }
+    # Set 084 (F1): the block additionally carries identityProvenance
+    # (direct | asserted), derived from the engine by the shared writer
+    # helper (session_state.build_orchestrator_block) — never a free
+    # choice. The example is built THROUGH that helper so the committed
+    # reference can never drift from what the live writer emits (the
+    # L-066-1 parity rule applied to this schema surface).
+    try:
+        from session_state import (  # type: ignore[import-not-found]
+            build_orchestrator_block,
+        )
+    except ImportError:  # pragma: no cover — package-style import path
+        from ..session_state import (  # type: ignore[no-redef]
+            build_orchestrator_block,
+        )
+
+    s1_orch = build_orchestrator_block(
+        "claude-code",
+        orchestrator_provider="anthropic",
+        orchestrator_model="claude-opus-4-7",
+        orchestrator_effort="high",
+    )
+    s2_orch = build_orchestrator_block(
+        "claude-code",
+        orchestrator_provider="anthropic",
+        orchestrator_model="claude-opus-4-7",
+        orchestrator_effort="high",
+    )
     return {
         "schemaVersion": SCHEMA_VERSION,
         "sessionSetName": "example-session-set",

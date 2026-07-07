@@ -13,7 +13,8 @@
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-4-7",
-        "effort": "high"
+        "effort": "high",
+        "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED"
     },
@@ -27,7 +28,8 @@
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-opus-4-7",
-        "effort": "high"
+        "effort": "high",
+        "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED"
     }

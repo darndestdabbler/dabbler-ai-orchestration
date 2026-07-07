@@ -87,8 +87,8 @@ TEMPLATE_HASHES = {
     ),
 }
 
-# The nine stamp fields, in the order they appear on the row. The
-# metrics writer and the gate validator both key off this tuple.
+# The stamp fields, in the order they appear on the row. The metrics
+# writer and the gate validator both key off this tuple.
 STAMP_FIELDS = (
     "source",
     "evidence_sha256",
@@ -99,6 +99,43 @@ STAMP_FIELDS = (
     "artifact_path",
     "artifact_sha256",
     "package_version",
+    # I-084-S2-5 (the dogfood's own round-3 finding): bind the row to
+    # the REPO STATE it verified, so evidence produced at commit A can
+    # never settle a close performed after further work landed.
+    # ``evidence_base`` is the resolved sha the evidence diff was taken
+    # against; ``work_diff_sha256`` hashes the canonical work diff
+    # (base -> working tree, under WORK_DIFF_EXCLUDES) — recomputable
+    # at close time because the sanctioned flows land exactly the
+    # reviewed tree: any post-verification work change makes the
+    # recomputation mismatch and the row goes stale (fails closed; the
+    # backstop then runs a fresh round).
+    "evidence_base",
+    "work_diff_sha256",
+)
+
+# Git's well-known empty-tree object — the diff base for a session in a
+# repo with no pre-session commit (a fresh repo's first session): the
+# session's work IS the whole tree, and diffing against the empty tree
+# hands the verifier exactly that instead of a silently empty bundle
+# (I-084-S2-6).
+GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+# The canonical exclusion set for the work-diff freshness hash. These
+# are the close-out bookkeeping surfaces the sanctioned flows
+# legitimately touch AFTER the verification reviewed the work (the
+# session set's own artifacts/state, the metrics ledger, the guidance
+# citation trailers) plus the generated-bundle exclusions the evidence
+# diff already applies. Everything else binds: a post-verification
+# change to any real file makes the row stale. One tuple, used by the
+# producers, the consumer, and the test fixtures alike (L-069-1).
+WORK_DIFF_BASE_EXCLUDES = (
+    "dist",
+    "out",
+    "node_modules",
+    ".venv",
+    "__pycache__",
+    "*.vsix",
+    "docs/planning",
 )
 
 _HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -175,6 +212,8 @@ def build_stamp(
     evidence_sha256: str,
     orchestrator_effective_provider: str,
     artifact_path: str,
+    evidence_base: str,
+    work_diff_sha256: str,
     template_text: Optional[str] = None,
 ) -> dict:
     """Assemble the producer-side stamp (pre-route).
@@ -212,6 +251,8 @@ def build_stamp(
         "orchestrator_effective_provider": orchestrator_effective_provider,
         "artifact_path": artifact_path,
         "package_version": package_version(),
+        "evidence_base": evidence_base,
+        "work_diff_sha256": work_diff_sha256,
     }
 
 
@@ -227,6 +268,68 @@ def complete_stamp(
         response_content.encode("utf-8")
     )
     return completed
+
+
+def resolve_commitish(repo_root: Path, ref: str) -> Optional[str]:
+    """Resolve *ref* to a full sha in *repo_root*, or None.
+
+    Accepts the empty-tree hash verbatim (it is a tree, not a commit,
+    so ``rev-parse <sha>^{commit}`` would refuse it).
+    """
+    if ref == GIT_EMPTY_TREE:
+        return GIT_EMPTY_TREE
+    import subprocess
+
+    proc = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "--verify",
+         f"{ref}^{{commit}}"],
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return None
+    sha = proc.stdout.decode("utf-8", errors="replace").strip()
+    return sha or None
+
+
+def compute_work_diff_sha256(
+    session_set_dir: Path, base: str
+) -> Optional[str]:
+    """The freshness hash: SHA-256 of the canonical work diff.
+
+    ``git diff <base>`` over the working tree, excluding the session
+    set's own directory and :data:`WORK_DIFF_BASE_EXCLUDES` (plus the
+    metrics ledger) — the bookkeeping surfaces close-out legitimately
+    touches after verification. Deterministic flags so the producer's
+    hash and the consumer's recomputation byte-match on the same repo
+    state. Returns ``None`` when the repo/diff cannot be resolved —
+    the caller fails closed.
+    """
+    import subprocess
+
+    repo_root: Optional[Path] = None
+    cur = Path(session_set_dir).resolve()
+    for candidate in (cur, *cur.parents):
+        if (candidate / ".git").exists():
+            repo_root = candidate
+            break
+    if repo_root is None:
+        return None
+    set_rel = repo_relative_posix(cur, repo_root)
+    excludes = [set_rel, "*router-metrics.jsonl", *WORK_DIFF_BASE_EXCLUDES]
+    pathspecs = [".", *(f":(exclude){pattern}" for pattern in excludes)]
+    proc = subprocess.run(
+        [
+            "git", "-C", str(repo_root), "-c", "core.quotepath=false",
+            "diff", "--no-color", "--no-ext-diff", "--no-textconv",
+            base, "--", *pathspecs,
+        ],
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return None
+    return sha256_hex(proc.stdout)
 
 
 def repo_relative_posix(path: Path, repo_root: Path) -> str:
@@ -421,6 +524,29 @@ def validate_stamped_row(
         "package_version"
     ):
         return False, "package_version is missing (fails closed)"
+
+    # 8. Freshness — the row must have verified THE repo state being
+    # closed (I-084-S2-5). Recompute the canonical work-diff hash from
+    # the stamped base against the tree as it stands now: the
+    # sanctioned flows land exactly the reviewed work, so a match means
+    # this evidence covers this close; any post-verification work
+    # change (or an unresolvable base) mismatches and the row goes
+    # stale — the close backstop then runs a fresh round.
+    current_work_diff = compute_work_diff_sha256(
+        Path(session_set_dir), str(row.get("evidence_base")),
+    )
+    if current_work_diff is None:
+        return False, (
+            f"the stamped evidence_base {row.get('evidence_base')!r} "
+            "cannot be diffed against the current tree (fails closed)"
+        )
+    if current_work_diff != row.get("work_diff_sha256"):
+        return False, (
+            "the session's work changed after this row was stamped "
+            "(work_diff_sha256 no longer matches the tree diffed from "
+            f"evidence_base {str(row.get('evidence_base'))[:12]}) — "
+            "stale evidence cannot settle this close; re-verify"
+        )
 
     return True, ""
 

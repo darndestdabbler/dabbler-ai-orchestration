@@ -132,6 +132,14 @@
       "dateTime": "2026-07-07T04:38:00.318952-04:00",
       "description": "Dogfood round 2 (LIVE, $0.3509, gpt-5-4): refused again with 2 Major findings; both trace to one genuine class omission, fixed as I-084-S2-4: the backstop sent no up-front conventions block (the promoted L-064-10 Convention). Without it a mid-close verifier structurally reports 'the close is not finished' (the evidence cannot contain closeout_succeeded during the verification that gates it) and re-litigates the severity-derived blocking predicate (L-071-1, preserved by the spec's non-goals; Minor-only proceeds). run_close_backstop now builds a built-in conventions preamble (mid-close view, L-071-1 discipline, narrow re-verify rounds) in the Original Task slot; the canonical template is untouched and the F3 template binding unchanged; close-out.md grounds the Minor-only-proceeds contract in L-071-1. Ledger: no resurrections -- I-084-S2-1..3 fixes stand; round-2 Issue 1 is the structural mid-flight view (context, not defect) and Issue 2 the bare-token reading (context), both addressed by giving the verifier the context. Round 3 decides.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "s2.backstop",
+      "dateTime": "2026-07-07T04:57:15.344154-04:00",
+      "description": "Dogfood round 3 (LIVE, $0.4213, gpt-5-4, conventions block in play): the mid-flight false positives are gone; two NEW genuine Majors found and fixed (ledger, zero resurrections). I-084-S2-5: stale stamped evidence could settle a later close -- the stamp now carries evidence_base (resolved diff-base sha) + work_diff_sha256 (a canonical-exclusion work-diff hash; producers compute it, validate_stamped_row recomputes it against the tree being closed, so any post-verification work change makes the row stale and the backstop runs a fresh round; one shared path covers the gate, the backstop skip-check, and the fixtures). I-084-S2-6: the fresh-repo / missing-startedAt fallback silently degraded evidence to a HEAD diff -- no pre-session commit now diffs from git's empty tree, and missing startedAt fails closed naming verify_session --diff-base. Nit accepted: earlier ledger entries' test counts are superseded -- test_close_backstop.py now carries 25 tests; suite 2717+ passed. Round 4 decides.",
+      "status": "complete"
     }
   ]
 }

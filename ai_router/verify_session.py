@@ -900,23 +900,51 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         from .verification_stamp import (  # type: ignore[import-not-found]
             STAMP_SOURCE_VERIFY_SESSION,
             build_stamp,
+            compute_work_diff_sha256,
             repo_relative_posix,
+            resolve_commitish,
             sha256_hex,
         )
     except ImportError:
         from verification_stamp import (  # type: ignore[no-redef]
             STAMP_SOURCE_VERIFY_SESSION,
             build_stamp,
+            compute_work_diff_sha256,
             repo_relative_posix,
+            resolve_commitish,
             sha256_hex,
         )
+    # I-084-S2-5: the stamp binds to the repo state under review — the
+    # resolved diff base plus the canonical work-diff hash the close
+    # gate recomputes at close time. Unresolvable state fails closed
+    # BEFORE any metered call.
+    repo_root = repo_root_for(session_set_dir)
+    evidence_base = resolve_commitish(repo_root, args.diff_base)
+    if evidence_base is None:
+        print(
+            f"verify_session: --diff-base {args.diff_base!r} does not "
+            "resolve to a commit; the evidence stamp cannot bind to the "
+            "repo state (fails closed).",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
+    work_diff_sha256 = compute_work_diff_sha256(
+        session_set_dir, evidence_base
+    )
+    if work_diff_sha256 is None:
+        print(
+            "verify_session: could not compute the work-diff freshness "
+            "hash (fails closed).",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
     stamp = build_stamp(
         source=STAMP_SOURCE_VERIFY_SESSION,
         evidence_sha256=sha256_hex(prompt.encode("utf-8")),
         orchestrator_effective_provider=identity.effective_provider,
-        artifact_path=repo_relative_posix(
-            review_path, repo_root_for(session_set_dir)
-        ),
+        artifact_path=repo_relative_posix(review_path, repo_root),
+        evidence_base=evidence_base,
+        work_diff_sha256=work_diff_sha256,
     )
 
     if args.dry_run:

@@ -68,9 +68,12 @@ try:
     )
     import verify_session as _vs  # type: ignore[import-not-found]
     from verification_stamp import (  # type: ignore[import-not-found]
+        GIT_EMPTY_TREE,
         STAMP_SOURCE_CLOSE_BACKSTOP,
         build_stamp,
+        compute_work_diff_sha256,
         repo_relative_posix,
+        resolve_commitish,
         sha256_hex,
     )
 except ImportError:
@@ -91,9 +94,12 @@ except ImportError:
     )
     from . import verify_session as _vs  # type: ignore[no-redef]
     from .verification_stamp import (  # type: ignore[no-redef]
+        GIT_EMPTY_TREE,
         STAMP_SOURCE_CLOSE_BACKSTOP,
         build_stamp,
+        compute_work_diff_sha256,
         repo_relative_posix,
+        resolve_commitish,
         sha256_hex,
     )
 
@@ -231,26 +237,29 @@ def _session_started_at(
 
 def resolve_backstop_diff_base(
     session_set_dir: Path, session_number: int
-) -> str:
+) -> Optional[str]:
     """The git ref the backstop's evidence diff is taken against.
 
     The close-out ownership contract has the caller commit and push
     before ``close_session`` runs, so a plain ``HEAD`` diff at close
     time is empty — it would hand the verifier nothing. The backstop
-    instead diffs against the last commit **before the session's
+    diffs against the last commit **before the session's
     ``startedAt``**, so the evidence bundle is the session's actual
-    work (committed and uncommitted alike). Falls back to ``HEAD``
-    when no ``startedAt`` is recorded or no pre-session commit exists
-    (a fresh repo) — a thin bundle beats a refused close here, and the
-    verifier sees the working tree + git status either way.
+    work (committed and uncommitted alike). When no pre-session commit
+    exists (a fresh repo's first session), the base is git's empty
+    tree — the session's work IS the whole tree (I-084-S2-6). Returns
+    ``None`` — the caller FAILS CLOSED — when ``startedAt`` is missing
+    or the repo cannot be resolved: silently verifying a thin/empty
+    bundle is exactly the degraded evidence the round-3 finding
+    refused.
     """
     started_at = _session_started_at(session_set_dir, session_number)
     if not started_at:
-        return "HEAD"
+        return None
     try:
         repo_root = _vs.repo_root_for(session_set_dir)
     except _vs.VerifySessionError:
-        return "HEAD"
+        return None
     proc = subprocess.run(
         [
             "git", "-C", str(repo_root), "rev-list", "--max-count=1",
@@ -260,9 +269,13 @@ def resolve_backstop_diff_base(
         check=False,
     )
     if proc.returncode != 0:
-        return "HEAD"
+        return None
     sha = proc.stdout.decode("utf-8", errors="replace").strip()
-    return sha if re.fullmatch(r"[0-9a-f]{7,40}", sha) else "HEAD"
+    if re.fullmatch(r"[0-9a-f]{7,40}", sha):
+        return sha
+    # No commit predates startedAt: the whole tree is the session's
+    # work — diff from the empty tree, never a silently empty bundle.
+    return GIT_EMPTY_TREE
 
 
 def _latest_issues_envelope(
@@ -417,6 +430,22 @@ def run_close_backstop(
     # --- raw artifacts -> disposition patch.
     exclude_providers = [identity.effective_provider]
     diff_base = resolve_backstop_diff_base(set_dir, session_number)
+    if diff_base is None:
+        try:
+            from .gate_checks import _verify_session_command
+        except ImportError:
+            from gate_checks import _verify_session_command  # type: ignore[no-redef]
+        return BackstopOutcome(
+            status=STATUS_ROUTE_FAILED,
+            remediation=(
+                "the backstop cannot determine the session's evidence "
+                "base (no recorded startedAt, or the repo is "
+                "unresolvable) and refuses to verify a degraded bundle "
+                "(fails closed — I-084-S2-6). Run the sanctioned Step 6 "
+                "command with an explicit --diff-base instead: "
+                f"{_verify_session_command(str(set_dir))}"
+            ),
+        )
     try:
         round_number = _vs.resolve_round(set_dir, session_number, None)
         evidence = _vs.assemble_evidence(
@@ -444,11 +473,31 @@ def run_close_backstop(
         repo_root = _vs.repo_root_for(set_dir)
     except _vs.VerifySessionError:
         repo_root = set_dir
+    # I-084-S2-5: bind the stamp to the repo state under close. The
+    # base is already resolved (rev-list sha or the empty tree);
+    # resolve_commitish normalizes it and the freshness hash is what
+    # the close gate recomputes.
+    evidence_base = resolve_commitish(repo_root, diff_base)
+    work_diff_sha256 = (
+        compute_work_diff_sha256(set_dir, evidence_base)
+        if evidence_base
+        else None
+    )
+    if not evidence_base or not work_diff_sha256:
+        return BackstopOutcome(
+            status=STATUS_ROUTE_FAILED,
+            remediation=(
+                "the backstop could not bind the evidence stamp to the "
+                f"repo state (base {diff_base!r}); fails closed."
+            ),
+        )
     stamp = build_stamp(
         source=STAMP_SOURCE_CLOSE_BACKSTOP,
         evidence_sha256=sha256_hex(prompt.encode("utf-8")),
         orchestrator_effective_provider=identity.effective_provider,
         artifact_path=repo_relative_posix(review_path, repo_root),
+        evidence_base=evidence_base,
+        work_diff_sha256=work_diff_sha256,
     )
 
     if route_fn is None:

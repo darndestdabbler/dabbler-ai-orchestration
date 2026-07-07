@@ -57,6 +57,8 @@ class TestStampAssembly:
             evidence_sha256=sha256_hex(b"evidence"),
             orchestrator_effective_provider="anthropic",
             artifact_path="docs/session-sets/x/s1-verification.md",
+            evidence_base="a" * 40,
+            work_diff_sha256=sha256_hex(b"work diff"),
         )
 
     def test_build_stamp_refuses_unknown_source(self):

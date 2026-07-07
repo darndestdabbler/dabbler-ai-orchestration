@@ -703,6 +703,66 @@ class TestBackstopMechanics:
         base = resolve_backstop_diff_base(set_dir, 1)
         assert base == baseline_sha
 
+    def test_stale_evidence_does_not_settle_a_later_close(
+        self, closeable, fake_route,
+    ):
+        """I-084-S2-5 (the dogfood's round-3 finding): evidence stamped
+        at repo state A cannot settle a close performed after further
+        work landed — the freshness binding mismatches and the backstop
+        runs a fresh round over the state actually being closed."""
+        root, set_dir = closeable
+        row = write_stamped_evidence(set_dir)  # binds to state A
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        # New session work lands AFTER the verification row.
+        (root / "post_verification_work.py").write_text(
+            "changed = True\n", encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "succeeded", outcome.messages
+        assert len(fake_route.calls) == 1  # stale row did NOT stand it down
+
+    def test_fresh_repo_first_session_diffs_from_the_empty_tree(
+        self, closeable,
+    ):
+        """I-084-S2-6: with no pre-session commit, the evidence base is
+        git's empty tree — the session's work IS the whole tree, never
+        a silently empty bundle."""
+        root, set_dir = closeable
+        # Make every commit postdate startedAt.
+        state_path = set_dir / "session-state.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["sessions"][0]["startedAt"] = "2001-01-01T00:00:00+00:00"
+        state_path.write_text(
+            json.dumps(state, indent=2) + "\n", encoding="utf-8"
+        )
+        from verification_stamp import GIT_EMPTY_TREE
+
+        assert resolve_backstop_diff_base(set_dir, 1) == GIT_EMPTY_TREE
+
+    def test_missing_started_at_fails_closed_not_thin_bundle(
+        self, closeable, fake_route,
+    ):
+        """I-084-S2-6: no recorded startedAt means the evidence base is
+        unknowable — the backstop refuses rather than verifying a
+        degraded HEAD-diff bundle."""
+        root, set_dir = closeable
+        state_path = set_dir / "session-state.json"
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["sessions"][0]["startedAt"] = None
+        state_path.write_text(
+            json.dumps(state, indent=2) + "\n", encoding="utf-8"
+        )
+        disposition = _api_disposition(verdict="VERIFIED")
+        write_disposition(str(set_dir), disposition)
+        outcome = run_close_backstop(str(set_dir), 1, disposition)
+        assert outcome.status == "route_failed"
+        assert "--diff-base" in outcome.remediation
+        assert fake_route.calls == []
+
     def test_backstop_prompt_opens_with_the_conventions_block(
         self, closeable, fake_route,
     ):

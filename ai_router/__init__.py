@@ -664,6 +664,7 @@ def _route_via_copilot_cli(
     session_set: Optional[str],
     session_number: Optional[int],
     exclude_providers: Optional[list] = None,
+    verification_stamp: Optional[dict] = None,
 ) -> "RouteResult":
     """route()'s entire copilot-cli-profile body. Task typing (the prompt
     template lookup) is unchanged; tier/complexity-based model selection is
@@ -739,6 +740,18 @@ def _route_via_copilot_cli(
         verification=None,
     )
 
+    # Set 084 S2 (F3): same stamp completion as the api path — the seat
+    # transport's session-verification rows corroborate a close under
+    # the identical consistency rules.
+    completed_stamp = None
+    if verification_stamp is not None:
+        from .verification_stamp import complete_stamp
+
+        completed_stamp = complete_stamp(
+            verification_stamp,
+            verifier_model=model_id,
+            response_content=result.content,
+        )
     record_call(
         _config,
         call_type="route",
@@ -760,6 +773,7 @@ def _route_via_copilot_cli(
         local_invocations=_copilot_invocation_count,
         attempts=1,
         billed_usage_unavailable=True,
+        stamp=completed_stamp,
     )
 
     v_config = _config.get("verification", {})
@@ -921,6 +935,7 @@ def route(
     session_set: Optional[str] = None,
     session_number: Optional[int] = None,
     exclude_providers: Optional[list] = None,
+    verification_stamp: Optional[dict] = None,
 ) -> RouteResult:
     """
     Route a task to the best model based on complexity estimation.
@@ -954,6 +969,20 @@ def route(
                      :class:`IdentityResolutionError` (fails closed);
                      an exclusion that leaves no eligible candidate
                      raises :class:`VerificationUnavailableError`.
+        verification_stamp: Set 084 S2 (F3) — the producer-side
+                     evidence stamp built by
+                     ``verification_stamp.build_stamp`` (only the
+                     sanctioned surfaces — the ``verify_session`` CLI
+                     and the ``close_session`` backstop — pass this).
+                     route() completes it at record time
+                     (``verifier_model`` = the model that actually
+                     answered, post-escalation; ``artifact_sha256`` =
+                     the hash of the response the producer will write
+                     raw) and writes it onto the metrics row. Only
+                     legal on ``task_type="session-verification"``
+                     (ValueError otherwise); a bare call without it
+                     writes an unstamped row that no longer
+                     corroborates a close.
 
     Returns:
         RouteResult with the AI response and metadata.
@@ -979,6 +1008,20 @@ def route(
 
     if is_no_router_mode():
         return _build_no_router_route_stub()
+
+    # Set 084 S2 (F3): the stamp is only meaningful on the one task type
+    # whose rows the close gate consumes. Refusing it elsewhere fails
+    # loud on a mis-wired producer rather than writing a stamp the gate
+    # would never look at.
+    if (
+        verification_stamp is not None
+        and task_type != SESSION_VERIFICATION_TASK_TYPE
+    ):
+        raise ValueError(
+            "verification_stamp is only legal on "
+            f"task_type={SESSION_VERIFICATION_TASK_TYPE!r} "
+            f"(got {task_type!r})"
+        )
 
     _init()
 
@@ -1017,6 +1060,7 @@ def route(
             content=content, task_type=task_type, context=context,
             session_set=session_set, session_number=session_number,
             exclude_providers=exclude_providers,
+            verification_stamp=verification_stamp,
         )
 
     # 1. Estimate complexity
@@ -1151,7 +1195,21 @@ def route(
         verification=None
     )
 
-    # 6a. Record generator-call metrics (best-effort; never blocks)
+    # 6a. Record generator-call metrics (best-effort; never blocks).
+    # Set 084 S2 (F3): a sanctioned producer's stamp is completed here —
+    # verifier_model is the model that actually answered
+    # (post-escalation) and artifact_sha256 hashes the response the
+    # producer writes raw — so the stamp and the row can never disagree
+    # about which model produced which artifact.
+    completed_stamp = None
+    if verification_stamp is not None:
+        from .verification_stamp import complete_stamp
+
+        completed_stamp = complete_stamp(
+            verification_stamp,
+            verifier_model=current_model_name,
+            response_content=result.content,
+        )
     record_call(
         _config,
         call_type="route",
@@ -1169,6 +1227,7 @@ def route(
         stop_reason=result.stop_reason,
         session_set=session_set,
         session_number=session_number,
+        stamp=completed_stamp,
     )
 
     # 7. Auto-verify if this task type is configured for it

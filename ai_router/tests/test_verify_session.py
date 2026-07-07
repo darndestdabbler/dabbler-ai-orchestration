@@ -137,7 +137,8 @@ class FakeRoute:
     calls: list = field(default_factory=list)
 
     def __call__(self, prompt, session_set, session_number,
-                 complexity_hint, max_tier, exclude_providers=None):
+                 complexity_hint, max_tier, exclude_providers=None,
+                 verification_stamp=None):
         self.calls.append(
             {
                 "prompt": prompt,
@@ -146,6 +147,7 @@ class FakeRoute:
                 "complexity_hint": complexity_hint,
                 "max_tier": max_tier,
                 "exclude_providers": exclude_providers,
+                "verification_stamp": verification_stamp,
             }
         )
         return FakeRouteResult(content=self.response)

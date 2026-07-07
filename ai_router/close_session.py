@@ -812,6 +812,7 @@ def _run_gate_checks(
     *,
     allow_empty_commit: bool,
     manual_verify: bool = False,
+    extra_clean_ignore: Optional[List[str]] = None,
 ) -> List[GateResult]:
     """Run the deterministic gate checks against the session set.
 
@@ -830,6 +831,12 @@ def _run_gate_checks(
     path (the S2 round-2 finding — an attested close must not persist
     the incident's retired token). The result row stays in the list so
     the JSON shape (and the audit trail of *why* it passed) is stable.
+
+    ``extra_clean_ignore`` (Set 084 S2): paths the close backstop wrote
+    mid-close (artifacts, issues envelope, the patched disposition).
+    They are close-out bookkeeping — the same category as
+    ``session-events.jsonl`` — tolerated by the working-tree gate for
+    THIS close and committed in the follow-up close-out commit.
     """
     results: List[GateResult] = []
     for name, predicate in GATE_CHECKS:
@@ -865,10 +872,13 @@ def _run_gate_checks(
             )
             continue
         try:
+            predicate_kwargs = {"allow_empty_commit": allow_empty_commit}
+            if extra_clean_ignore and name == "working_tree_clean":
+                predicate_kwargs["extra_ignore_paths"] = extra_clean_ignore
             passed, remediation = predicate(
                 session_set_dir,
                 disposition,
-                allow_empty_commit=allow_empty_commit,
+                **predicate_kwargs,
             )
         except Exception as exc:  # pragma: no cover — defensive
             passed = False
@@ -1734,6 +1744,94 @@ def run(
                 reason=reason_text,
             )
 
+        # Set 084 S2 — the close backstop (the structural move). On a
+        # Full-tier close with no valid stamped verification evidence,
+        # the framework runs Step 6 itself, in-process, through the
+        # same F1/F2/F3 machinery as verify_session, and its verdict
+        # governs: proceed on VERIFIED (the fresh stamped row satisfies
+        # the evidence gate below), refuse with the findings on a
+        # blocking ISSUES_FOUND, block explicitly on
+        # verification_unavailable / provider failure — never a pass.
+        # Scope: the normal close path only. --manual-verify is the
+        # attested operator bypass; --force bypasses bookkeeping gates
+        # (the verification-integrity check still refuses an
+        # unverified force-close, so the floor holds without metering
+        # a surprise call on the incident-recovery path); Lightweight
+        # closes have their own per-set gates; the zero-budget tier is
+        # honored inside the backstop itself.
+        backstop_written_paths: List[str] = []
+        if not args.force and not args.manual_verify and not no_router:
+            try:
+                from close_backstop import (  # type: ignore[import-not-found]
+                    BACKSTOP_CHECK_NAME,
+                    STATUS_BLOCKING,
+                    STATUS_IDENTITY_UNRESOLVABLE,
+                    STATUS_ROUTE_FAILED,
+                    STATUS_UNAVAILABLE,
+                    STATUS_VERIFIED,
+                    run_close_backstop,
+                )
+            except ImportError:
+                from .close_backstop import (  # type: ignore[no-redef]
+                    BACKSTOP_CHECK_NAME,
+                    STATUS_BLOCKING,
+                    STATUS_IDENTITY_UNRESOLVABLE,
+                    STATUS_ROUTE_FAILED,
+                    STATUS_UNAVAILABLE,
+                    STATUS_VERIFIED,
+                    run_close_backstop,
+                )
+
+            backstop = run_close_backstop(
+                session_set_dir, outcome.session_number, disposition,
+            )
+            outcome.messages.extend(backstop.messages)
+            if backstop.status in (
+                STATUS_BLOCKING,
+                STATUS_UNAVAILABLE,
+                STATUS_ROUTE_FAILED,
+                STATUS_IDENTITY_UNRESOLVABLE,
+            ):
+                outcome.result = "gate_failed"
+                outcome.gate_results = [
+                    GateResult(
+                        check=BACKSTOP_CHECK_NAME,
+                        passed=False,
+                        remediation=backstop.remediation,
+                    )
+                ]
+                outcome.messages.append(
+                    f"gate {BACKSTOP_CHECK_NAME} failed: "
+                    f"{backstop.remediation}"
+                )
+                _emit_event(
+                    session_set_dir,
+                    "closeout_failed",
+                    outcome.session_number,
+                    outcome,
+                    failed_checks=[BACKSTOP_CHECK_NAME],
+                    backstop_status=backstop.status,
+                )
+                return outcome
+            if backstop.status == STATUS_VERIFIED:
+                # The backstop's artifacts + disposition patch are
+                # close-out bookkeeping written mid-close (the
+                # session-events.jsonl precedent): the working-tree
+                # gate tolerates them for THIS close, and the operator
+                # commits them in the close-out commit.
+                backstop_written_paths = list(backstop.written_paths)
+                disposition = _read_disposition_or_none(session_set_dir)
+                verdict = resolve_close_verdict(disposition)
+                _emit_event(
+                    session_set_dir,
+                    "verification_completed",
+                    outcome.session_number,
+                    outcome,
+                    method="api",
+                    source="close_session_backstop",
+                    verdict=verdict,
+                )
+
         # Resolve the verification method from disposition + flags.
         # Set 026 Session 1 removed the queue path; this is now a
         # synchronous resolution. ``--manual-verify`` is the
@@ -1822,6 +1920,7 @@ def run(
                 disposition,
                 allow_empty_commit=args.allow_empty_commit,
                 manual_verify=bool(args.manual_verify),
+                extra_clean_ignore=backstop_written_paths,
             )
 
         failed = [g for g in outcome.gate_results if not g.passed]

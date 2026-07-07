@@ -295,6 +295,7 @@ def check_working_tree_clean(
     disposition: Optional[Disposition],
     *,
     allow_empty_commit: bool = False,
+    extra_ignore_paths: Optional[List[str]] = None,
 ) -> GateOutcome:
     """Verify the session-set tree is clean for the declared file surface.
 
@@ -321,6 +322,15 @@ def check_working_tree_clean(
     (an empty commit is about whether close-out *creates* a commit,
     not about whether the tree is clean), but is kept in the signature
     so future tightening doesn't require a call-site change.
+
+    ``extra_ignore_paths`` (Set 084 S2): paths the close backstop wrote
+    mid-close (its raw verification artifacts, the findings envelope,
+    the patched ``disposition.json``). Like ``session-events.jsonl``,
+    they are close-out machinery bookkeeping that legitimately appears
+    dirty during the close itself and is committed in the follow-up
+    close-out commit — the caller (``close_session.run``) passes them
+    for the one close the backstop just verified, never as standing
+    policy.
     """
     _ = allow_empty_commit
 
@@ -353,6 +363,12 @@ def check_working_tree_clean(
     if disposition is not None:
         for p in disposition.files_changed:
             declared.add(os.path.normcase(os.path.normpath(p)))
+    # Set 084 S2: absolute-path set of backstop-written bookkeeping the
+    # gate tolerates for this one close (see the docstring).
+    backstop_ignored = {
+        os.path.normcase(os.path.abspath(p))
+        for p in (extra_ignore_paths or [])
+    }
 
     for line in out.splitlines():
         if len(line) < 4:
@@ -365,6 +381,13 @@ def check_working_tree_clean(
         path_part = path_part.strip().strip('"')
 
         if _is_ignored_pattern(path_part):
+            continue
+        if backstop_ignored and (
+            os.path.normcase(
+                os.path.abspath(os.path.join(repo_root, path_part))
+            )
+            in backstop_ignored
+        ):
             continue
 
         # Filter by relevance: in-scope when the path is under the
@@ -916,54 +939,29 @@ def _models_registry() -> dict:
         return {}
 
 
-def _row_provider(row: dict, models: dict) -> Optional[str]:
-    """A metrics row's provider, resolved via the model registry ONLY.
-
-    The spec is explicit ("provider resolved via the model registry;
-    missing identity fails closed"): the row's own ``provider`` string is
-    deliberately NOT trusted — a wrong or hand-edited value there must
-    not satisfy the cross-provider check (S2 round-1 verifier finding).
-
-    Set 084 (F1): delegates to the ONE shared resolution helper
-    (``orchestrator_identity.resolve_model_provider`` — registry key,
-    ``model_id``, normalized dot/dash token, then the Copilot CLI's
-    documented model universe), so the row side and the orchestrator
-    side of the != check resolve identically (L-069-1). A row whose
-    model resolves nowhere cannot corroborate anything.
-    """
-    model = row.get("model")
-    if not isinstance(model, str) or not model:
-        return None
-    try:
-        from .orchestrator_identity import (  # type: ignore[import-not-found]
-            resolve_model_provider,
-        )
-    except ImportError:
-        from orchestrator_identity import (  # type: ignore[no-redef]
-            resolve_model_provider,
-        )
-    return resolve_model_provider(model, models)
-
-
-def _session_verification_providers(
+def _session_verification_rows(
     metrics_path: str,
     set_slug: str,
     session_number: int,
-) -> List[Optional[str]]:
-    """Providers of every ``session-verification`` row for (set, session).
+) -> List[dict]:
+    """Every ``session-verification`` row for (set, session), verbatim.
 
     Slug matching tolerates the historical path-shaped ``session_set``
     values the same way ``verify_session.round1_verifier_tier`` does
     (trailing path component). Unreadable rows are skipped; an unreadable
     FILE is the caller's fail-closed case (it sees no rows).
+
+    Set 084 S2 (F3): rows are returned whole — the caller validates the
+    evidence stamp (``verification_stamp.find_valid_stamped_rows``)
+    rather than reading a bare provider list, so an unstamped bare
+    ``route()`` row can no longer corroborate a close.
     """
-    providers: List[Optional[str]] = []
+    rows: List[dict] = []
     try:
         with open(metrics_path, "r", encoding="utf-8") as f:
             raw_lines = f.read().splitlines()
     except OSError:
-        return providers
-    models = _models_registry()
+        return rows
     for line in raw_lines:
         line = line.strip()
         if not line:
@@ -982,8 +980,52 @@ def _session_verification_providers(
         row_slug = row_set.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
         if row_slug != set_slug:
             continue
-        providers.append(_row_provider(row, models))
-    return providers
+        rows.append(row)
+    return rows
+
+
+def find_session_verification_evidence(
+    session_set_dir: str,
+    session_number: int,
+    orchestrator_effective_provider: str,
+) -> Tuple[List[dict], List[dict], List[str]]:
+    """Return ``(all_rows, valid_stamped_rows, rejection_reasons)``.
+
+    The Set 084 F3 evidence resolution, shared by the close gate and the
+    ``close_session`` backstop's skip predicate (one path — L-069-1):
+    collect every ``session-verification`` row for (set, session), then
+    keep only rows whose evidence stamp is present, internally
+    consistent, and cross-provider against
+    *orchestrator_effective_provider*. A missing/unreadable metrics file
+    yields ``([], [], [])`` — the caller's fail-closed case.
+    """
+    metrics_path = _metrics_log_path()
+    if not metrics_path:
+        return [], [], []
+    rows = _session_verification_rows(
+        metrics_path,
+        os.path.basename(os.path.abspath(session_set_dir)),
+        session_number,
+    )
+    if not rows:
+        return [], [], []
+    try:
+        from .verification_stamp import (  # type: ignore[import-not-found]
+            find_valid_stamped_rows,
+        )
+    except ImportError:
+        from verification_stamp import (  # type: ignore[no-redef]
+            find_valid_stamped_rows,
+        )
+    valid, reasons = find_valid_stamped_rows(
+        rows,
+        session_set_dir=session_set_dir,
+        session_number=session_number,
+        orchestrator_effective_provider=orchestrator_effective_provider,
+        models_registry=_models_registry() or None,
+        repo_root=_repo_root_for(session_set_dir),
+    )
+    return rows, valid, reasons
 
 
 def _read_budget_yaml(project_root: str) -> Tuple[Optional[dict], str]:
@@ -1078,6 +1120,13 @@ def check_verification_integrity(
          free-text seat label is only the single-vendor fallback;
          missing/unresolvable identity fails closed — the Q6 precedent),
          plus an ``sN-verification*.md`` artifact at the set root.
+         Set 084 S2 (F3): the row must additionally carry a **valid
+         evidence stamp** (``verification_stamp.validate_stamped_row``
+         — sanctioned source, evidence hash, canonical-template id +
+         normalized hash, verifier-model consistency, the applied
+         exclusion, artifact path + content hash, package version;
+         any missing or inconsistent field fails closed). A bare
+         ``route()`` row no longer corroborates a close.
        * method ``manual-via-other-engine`` / ``skipped`` (with or
          without a verdict) — the project's ``ai_router/budget.yaml``
          must actually declare the zero-budget tier (``threshold_usd:
@@ -1246,16 +1295,12 @@ def check_verification_integrity(
                 f"--model, then verify via: {command}",
             )
 
-        metrics_path = _metrics_log_path()
-        providers = (
-            _session_verification_providers(
-                metrics_path, os.path.basename(os.path.abspath(session_set_dir)),
-                current,
+        all_rows, valid_rows, rejections = (
+            find_session_verification_evidence(
+                session_set_dir, current, orch_provider,
             )
-            if metrics_path
-            else []
         )
-        if not providers:
+        if not all_rows:
             return (
                 False,
                 f"claimed verdict {claimed!r} (method api) has no "
@@ -1264,17 +1309,22 @@ def check_verification_integrity(
                 "never ran (or metrics are unreadable; fails closed). "
                 f"Run the sanctioned Step 6 command: {command}",
             )
-        cross_provider = [
-            p for p in providers if p is not None and p != orch_provider
-        ]
-        if not cross_provider:
+        if not valid_rows:
+            # Set 084 S2 (F3): rows exist but none carries a valid,
+            # internally consistent evidence stamp — a bare route() row
+            # (the incident-3 shape) or a tampered/mismatched stamp no
+            # longer corroborates a close. Surface the first rejection
+            # reason so the refusal is diagnosable, and keep naming the
+            # sanctioned command.
+            first_reason = rejections[0] if rejections else "no stamp"
             return (
                 False,
-                f"claimed verdict {claimed!r} (method api) is not "
-                "cross-provider: every session-verification row for "
-                f"session {current} resolves to the orchestrator's own "
-                f"provider ({orch_provider!r}) or to no provider at all "
-                "(fails closed). Re-verify via a different provider: "
+                f"claimed verdict {claimed!r} (method api) has "
+                f"{len(all_rows)} session-verification row(s) for session "
+                f"{current}, but none carries a valid evidence stamp "
+                f"(Set 084 F3 — first rejection: {first_reason}). Only "
+                "verify_session-stamped rows (or the close backstop's) "
+                "corroborate a close; run the sanctioned Step 6 command: "
                 f"{command}",
             )
         return True, ""

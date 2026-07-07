@@ -1,0 +1,539 @@
+"""Set 084 S2 — the close backstop: the framework holds the last word.
+
+**Who uses this:** ``close_session.run`` only, on Full-tier closes.
+**See also:** ``verify_session.py`` (the sanctioned mid-session Step 6
+tool this reuses wholesale); ``verification_stamp.py`` (F3);
+``gate_checks.check_verification_integrity`` (the evidence gate the
+backstop's stamped row satisfies).
+
+The structural move (spec Session 2 step 3): on a Full-tier close where
+no valid stamped verification evidence exists for the session,
+``close_session`` does not merely refuse — it **runs the verification
+itself**, in-process, through the same F1/F2/F3 machinery the
+``verify_session`` CLI uses: the same evidence assembly, the same
+canonical adversarial template, the same registry-resolved
+orchestrator-provider exclusion, the same raw artifacts, and the same
+stamped metrics row (``source: "close_session_backstop"``). The policed
+actor no longer holds the pen on the last word — ``verify_session``
+remains the sanctioned tool for iterative remediation rounds; the
+backstop guarantees the floor.
+
+What the backstop respects (all spec-locked):
+
+- **budget.yaml** — the operator-declared zero-budget tier
+  (``threshold_usd: 0``) skips the backstop entirely; the existing
+  manual/attested flow is untouched.
+- **Method vocabulary** — an illegal ``verification_method`` token
+  skips the backstop (the vocabulary gate refuses that close anyway;
+  a metered call against a doomed close would be waste).
+- **The two-attempt ladder** — one retry on a transport failure; a
+  second failure blocks the close (never a pass).
+- **``verification_unavailable``** — an exclusion that leaves no
+  eligible verifier blocks the close explicitly; the only resolution
+  is the operator-attested ``--manual-verify`` path.
+- **The close lock** — the backstop runs inside ``close_session``'s
+  lock, and its stamped evidence makes a re-run skip it (idempotent).
+
+Evidence base: the caller commits and pushes BEFORE invoking
+``close_session`` (the Section 1 ownership contract), so a
+working-tree-vs-HEAD diff at close time is empty. The backstop diffs
+against the last commit **before the session's ``startedAt``** so the
+verifier reviews the session's actual work.
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable, List, Optional
+
+try:
+    from disposition import Disposition  # type: ignore[import-not-found]
+    from gate_checks import (  # type: ignore[import-not-found]
+        _claimed_close_verdict,
+        _project_root_for,
+        _read_budget_yaml,
+        check_verification_method_vocabulary,
+        find_session_verification_evidence,
+    )
+    from progress import normalize_to_v4_shape  # type: ignore[import-not-found]
+    from session_state import read_session_state  # type: ignore[import-not-found]
+    from verification import (  # type: ignore[import-not-found]
+        classify_blocking,
+        is_blocking_verdict,
+        parse_verification_response,
+    )
+    import verify_session as _vs  # type: ignore[import-not-found]
+    from verification_stamp import (  # type: ignore[import-not-found]
+        STAMP_SOURCE_CLOSE_BACKSTOP,
+        build_stamp,
+        repo_relative_posix,
+        sha256_hex,
+    )
+except ImportError:
+    from .disposition import Disposition  # type: ignore[no-redef]
+    from .gate_checks import (  # type: ignore[no-redef]
+        _claimed_close_verdict,
+        _project_root_for,
+        _read_budget_yaml,
+        check_verification_method_vocabulary,
+        find_session_verification_evidence,
+    )
+    from .progress import normalize_to_v4_shape  # type: ignore[no-redef]
+    from .session_state import read_session_state  # type: ignore[no-redef]
+    from .verification import (  # type: ignore[no-redef]
+        classify_blocking,
+        is_blocking_verdict,
+        parse_verification_response,
+    )
+    from . import verify_session as _vs  # type: ignore[no-redef]
+    from .verification_stamp import (  # type: ignore[no-redef]
+        STAMP_SOURCE_CLOSE_BACKSTOP,
+        build_stamp,
+        repo_relative_posix,
+        sha256_hex,
+    )
+
+
+# Backstop outcome statuses. ``skipped_*`` means the close proceeds to
+# the normal gate chain untouched; the other statuses carry the
+# backstop's own verdict on the close.
+STATUS_SKIPPED_EVIDENCE_PRESENT = "skipped_evidence_present"
+STATUS_SKIPPED_ZERO_BUDGET = "skipped_zero_budget"
+STATUS_SKIPPED_VOCABULARY = "skipped_illegal_vocabulary"
+STATUS_VERIFIED = "verified"
+STATUS_BLOCKING = "blocking_findings"
+STATUS_UNAVAILABLE = "verification_unavailable"
+STATUS_ROUTE_FAILED = "route_failed"
+STATUS_IDENTITY_UNRESOLVABLE = "identity_unresolvable"
+
+# The gate-result / closeout_failed check names the backstop surfaces
+# through close_session's output shape.
+BACKSTOP_CHECK_NAME = "verification_backstop"
+
+_DEFAULT_COMPLEXITY_HINT = _vs.DEFAULT_COMPLEXITY_HINT
+
+
+@dataclass
+class BackstopOutcome:
+    """What the backstop did, for ``close_session`` to act on."""
+
+    status: str
+    messages: List[str] = field(default_factory=list)
+    # Paths the backstop wrote during the close (artifacts, issues
+    # envelope, the patched disposition). close_session feeds these to
+    # the working-tree gate as close-out bookkeeping — written mid-close
+    # by design, committed in the follow-up close-out commit, exactly
+    # like session-events.jsonl.
+    written_paths: List[str] = field(default_factory=list)
+    verdict: Optional[str] = None
+    blocking: bool = False
+    cost_usd: float = 0.0
+    remediation: str = ""
+
+    @property
+    def skipped(self) -> bool:
+        return self.status.startswith("skipped_")
+
+
+def _default_route(prompt: str, session_set: str, session_number: int,
+                   complexity_hint: int, max_tier: Optional[int],
+                   exclude_providers: Optional[List[str]] = None,
+                   verification_stamp: Optional[dict] = None):
+    """Production route() invocation (injectable seam for tests).
+
+    Identical contract to ``verify_session._default_route`` — the
+    backstop IS Step 6, run by the framework instead of the
+    orchestrator's hand.
+    """
+    return _vs._default_route(
+        prompt, session_set, session_number, complexity_hint, max_tier,
+        exclude_providers, verification_stamp,
+    )
+
+
+def _session_started_at(
+    session_set_dir: Path, session_number: int
+) -> Optional[str]:
+    """The session's ``startedAt`` from the normalized v4 ledger, or None."""
+    state = read_session_state(str(session_set_dir))
+    if not state:
+        return None
+    try:
+        normalized = normalize_to_v4_shape(
+            state, str(session_set_dir / "spec.md")
+        )
+    except Exception:
+        return None
+    for entry in normalized.get("sessions") or []:
+        if isinstance(entry, dict) and entry.get("number") == session_number:
+            started = entry.get("startedAt")
+            return started if isinstance(started, str) and started else None
+    return None
+
+
+def resolve_backstop_diff_base(
+    session_set_dir: Path, session_number: int
+) -> str:
+    """The git ref the backstop's evidence diff is taken against.
+
+    The close-out ownership contract has the caller commit and push
+    before ``close_session`` runs, so a plain ``HEAD`` diff at close
+    time is empty — it would hand the verifier nothing. The backstop
+    instead diffs against the last commit **before the session's
+    ``startedAt``**, so the evidence bundle is the session's actual
+    work (committed and uncommitted alike). Falls back to ``HEAD``
+    when no ``startedAt`` is recorded or no pre-session commit exists
+    (a fresh repo) — a thin bundle beats a refused close here, and the
+    verifier sees the working tree + git status either way.
+    """
+    started_at = _session_started_at(session_set_dir, session_number)
+    if not started_at:
+        return "HEAD"
+    try:
+        repo_root = _vs.repo_root_for(session_set_dir)
+    except _vs.VerifySessionError:
+        return "HEAD"
+    proc = subprocess.run(
+        [
+            "git", "-C", str(repo_root), "rev-list", "--max-count=1",
+            f"--before={started_at}", "HEAD",
+        ],
+        capture_output=True,
+        check=False,
+    )
+    if proc.returncode != 0:
+        return "HEAD"
+    sha = proc.stdout.decode("utf-8", errors="replace").strip()
+    return sha if re.fullmatch(r"[0-9a-f]{7,40}", sha) else "HEAD"
+
+
+def _latest_issues_envelope(
+    session_set_dir: Path, session_number: int
+) -> Optional[dict]:
+    """The highest-round ``sN-issues*.json`` envelope on disk, or None."""
+    import json
+
+    latest: Optional[Path] = None
+    round_number = 1
+    while True:
+        candidate = _vs.issues_artifact_path(
+            session_set_dir, session_number, round_number
+        )
+        if not candidate.exists():
+            # Rounds are written in order; the first hole ends the walk
+            # (but round 1 may be absent while round 2 exists only if
+            # round 1 was clean — check one round past the hole).
+            probe = _vs.issues_artifact_path(
+                session_set_dir, session_number, round_number + 1
+            )
+            if not probe.exists():
+                break
+        else:
+            latest = candidate
+        round_number += 1
+    if latest is None:
+        return None
+    try:
+        data = json.loads(latest.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _existing_evidence_settles_the_close(
+    session_set_dir: Path,
+    session_number: int,
+    disposition: Disposition,
+    orchestrator_provider: str,
+) -> bool:
+    """True when valid stamped evidence already covers this close.
+
+    ``verify_session`` pre-empts the backstop by producing exactly this
+    state. Two shapes qualify:
+
+    - a valid stamped row + a claimed ``VERIFIED``;
+    - a valid stamped row + a claimed ``ISSUES_FOUND`` whose latest
+      findings envelope is **non-blocking** (Minor-only — effectively
+      VERIFIED for the loop, L-071-1). A blocking or envelope-less
+      ``ISSUES_FOUND`` claim does NOT settle it: the backstop runs a
+      fresh round so its verdict, not the stale one, governs.
+    """
+    _all, valid, _reasons = find_session_verification_evidence(
+        str(session_set_dir), session_number, orchestrator_provider,
+    )
+    if not valid:
+        return False
+    claimed = _claimed_close_verdict(disposition)
+    if claimed == "VERIFIED":
+        return True
+    if claimed == "ISSUES_FOUND":
+        envelope = _latest_issues_envelope(session_set_dir, session_number)
+        if envelope is None:
+            return False  # anti-laundering: no findings list -> blocking
+        issues = envelope.get("issues")
+        if not isinstance(issues, list):
+            return False
+        return not is_blocking_verdict("ISSUES_FOUND", issues)
+    return False
+
+
+def run_close_backstop(
+    session_set_dir: str,
+    session_number: Optional[int],
+    disposition: Optional[Disposition],
+    *,
+    route_fn: Optional[Callable] = None,
+    complexity_hint: int = _DEFAULT_COMPLEXITY_HINT,
+) -> BackstopOutcome:
+    """Run the Set 084 close backstop for one Full-tier close attempt.
+
+    The caller (``close_session.run``) has already excluded the
+    ``--force`` / ``--manual-verify`` / Lightweight paths and holds the
+    close lock. This function decides skip-vs-run, performs the
+    verification when owed, writes the artifacts + stamped row + the
+    disposition patch, and reports what happened; the caller maps the
+    outcome onto the close (proceed / ``gate_failed``).
+    """
+    set_dir = Path(session_set_dir)
+
+    if disposition is None or session_number is None:
+        # Nothing to police here: the missing-disposition refusal (and
+        # the no-session shape) belongs to the invocation layer.
+        return BackstopOutcome(
+            status=STATUS_SKIPPED_VOCABULARY,
+            messages=["backstop skipped: no disposition/session to close"],
+        )
+
+    # An illegal verification_method token dooms this close at the
+    # vocabulary gate regardless of evidence — running a metered
+    # verification first would be pure waste.
+    vocab_ok, _ = check_verification_method_vocabulary(
+        str(set_dir), disposition,
+    )
+    if not vocab_ok:
+        return BackstopOutcome(
+            status=STATUS_SKIPPED_VOCABULARY,
+            messages=[
+                "backstop skipped: disposition.verification_method is "
+                "illegal; the vocabulary gate refuses this close"
+            ],
+        )
+
+    # The operator-declared zero-budget tier keeps its existing manual /
+    # attested flow, untouched (spec-locked). Only threshold_usd == 0
+    # counts; an absent or unreadable budget.yaml is the api default.
+    budget, _err = _read_budget_yaml(_project_root_for(str(set_dir)))
+    if budget is not None and budget.get("threshold_usd") == 0:
+        return BackstopOutcome(
+            status=STATUS_SKIPPED_ZERO_BUDGET,
+            messages=[
+                "backstop skipped: ai_router/budget.yaml declares the "
+                "zero-budget tier (threshold_usd: 0); the manual/attested "
+                "flow governs this close"
+            ],
+        )
+
+    # F1: resolve the orchestrator identity through the one shared path.
+    # Unresolvable identity fails closed BEFORE any metered call.
+    try:
+        identity = _vs.resolve_orchestrator_exclusion(
+            set_dir, session_number
+        )
+    except _vs.VerifySessionError as exc:
+        return BackstopOutcome(
+            status=STATUS_IDENTITY_UNRESOLVABLE,
+            remediation=(
+                f"{exc} Re-run start_session with --model, then close "
+                "again."
+            ),
+        )
+
+    # Skip when verify_session already produced settling evidence.
+    if _existing_evidence_settles_the_close(
+        set_dir, session_number, disposition, identity.effective_provider,
+    ):
+        return BackstopOutcome(status=STATUS_SKIPPED_EVIDENCE_PRESENT)
+
+    # --- The backstop runs. Same machinery as verify_session, end to
+    # --- end: evidence -> template -> exclusion -> stamped row ->
+    # --- raw artifacts -> disposition patch.
+    exclude_providers = [identity.effective_provider]
+    diff_base = resolve_backstop_diff_base(set_dir, session_number)
+    try:
+        round_number = _vs.resolve_round(set_dir, session_number, None)
+        evidence = _vs.assemble_evidence(
+            set_dir, session_number, diff_base,
+            list(_vs.DEFAULT_DIFF_EXCLUDES),
+        )
+    except _vs.VerifySessionError as exc:
+        return BackstopOutcome(
+            status=STATUS_ROUTE_FAILED,
+            remediation=(
+                f"backstop could not assemble the evidence bundle: {exc}"
+            ),
+        )
+    prompt = _vs.build_prompt(evidence, session_number, round_number)
+    review_path = _vs.verification_artifact_path(
+        set_dir, session_number, round_number
+    )
+    issues_path = _vs.issues_artifact_path(
+        set_dir, session_number, round_number
+    )
+    try:
+        repo_root = _vs.repo_root_for(set_dir)
+    except _vs.VerifySessionError:
+        repo_root = set_dir
+    stamp = build_stamp(
+        source=STAMP_SOURCE_CLOSE_BACKSTOP,
+        evidence_sha256=sha256_hex(prompt.encode("utf-8")),
+        orchestrator_effective_provider=identity.effective_provider,
+        artifact_path=repo_relative_posix(review_path, repo_root),
+    )
+
+    if route_fn is None:
+        route_fn = _default_route
+
+    # Catch VerificationUnavailableError under EVERY module identity it
+    # can carry (the I-084-S1-2 lesson, taken one step further): the
+    # package-qualified class is what a production route() raises, but
+    # under the sys.path-shim context the sibling bare module binds a
+    # DISTINCT class object — an except clause naming only one silently
+    # misses the other and the hard blocked state degrades to a generic
+    # transport failure.
+    unavailable_classes = []
+    try:
+        from ai_router.verification import (  # type: ignore[import-not-found]
+            VerificationUnavailableError as _PkgUnavailable,
+        )
+        unavailable_classes.append(_PkgUnavailable)
+    except ImportError:
+        pass
+    try:
+        from verification import (  # type: ignore[no-redef]
+            VerificationUnavailableError as _BareUnavailable,
+        )
+        if _BareUnavailable not in unavailable_classes:
+            unavailable_classes.append(_BareUnavailable)
+    except ImportError:
+        pass
+    unavailable = tuple(unavailable_classes)
+
+    result = None
+    last_error: Optional[Exception] = None
+    for attempt in (1, 2):  # the existing two-attempt ladder, preserved
+        try:
+            result = route_fn(
+                prompt,
+                str(set_dir),
+                session_number,
+                complexity_hint,
+                None,
+                exclude_providers,
+                stamp,
+            )
+            break
+        except unavailable as exc:
+            # The hard blocked state — no retry can conjure a diverse
+            # provider. No verdict, no artifact, no disposition patch.
+            return BackstopOutcome(
+                status=STATUS_UNAVAILABLE,
+                remediation=(
+                    "the close backstop found no eligible verifier "
+                    "outside the orchestrator's effective provider "
+                    f"({identity.effective_provider}): {exc} The close "
+                    "stays BLOCKED. The only sanctioned resolution is "
+                    "the operator-attested manual path: close_session "
+                    "--manual-verify with an attestation naming the "
+                    "verifying surface, model, effective provider, "
+                    "template used, timestamp, and raw artifact."
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001 — transport failures
+            last_error = exc
+            if attempt == 1:
+                print(
+                    "close_session backstop: verification attempt 1 "
+                    f"failed ({type(exc).__name__}: {exc}); retrying "
+                    "once.",
+                    file=sys.stderr,
+                )
+    if result is None:
+        try:
+            from .gate_checks import _verify_session_command
+        except ImportError:
+            from gate_checks import _verify_session_command  # type: ignore[no-redef]
+        return BackstopOutcome(
+            status=STATUS_ROUTE_FAILED,
+            remediation=(
+                "the close backstop's verification call failed twice "
+                f"(last: {type(last_error).__name__}: {last_error}). "
+                "Provider unavailability at close BLOCKS the close — "
+                "never a pass. Re-run close_session when the provider "
+                "recovers, or run the sanctioned Step 6 command "
+                f"yourself: {_verify_session_command(str(set_dir))}"
+            ),
+        )
+
+    # Persist RAW before display/parsing (L-064-3); newline="" keeps the
+    # on-disk bytes equal to the stamped artifact_sha256's input.
+    review_path.write_text(result.content, encoding="utf-8", newline="")
+    written = [str(review_path)]
+
+    verdict, issues = parse_verification_response(result.content)
+    classification = classify_blocking(verdict, issues)
+    if issues:
+        _vs.write_issues_artifact(
+            issues_path, session_number, round_number, verdict, issues
+        )
+        written.append(str(issues_path))
+
+    disposition_path = _vs.patch_disposition(set_dir, verdict)
+    written.append(str(disposition_path))
+
+    cost = float(getattr(result, "total_cost_usd", 0.0) or 0.0)
+    messages = [
+        "close backstop ran the session verification in-process "
+        f"(Set 084): round {round_number}, verifier "
+        f"{getattr(result, 'model_name', '?')}, excluded provider(s) "
+        f"{', '.join(exclude_providers)}, diff base {diff_base}, "
+        f"verdict {verdict}, cost ${cost:.4f}",
+        f"backstop artifacts: {review_path.name}"
+        + (f", {issues_path.name}" if issues else "")
+        + "; disposition.json patched (verification_method=api, "
+        f"verification_verdict={verdict}) — commit these in the "
+        "close-out commit",
+    ]
+
+    if classification.blocking:
+        findings = "; ".join(
+            str(i.get("description", i))[:160]
+            for i in classification.blocking_issues[:3]
+        )
+        return BackstopOutcome(
+            status=STATUS_BLOCKING,
+            messages=messages,
+            written_paths=written,
+            verdict=verdict,
+            blocking=True,
+            cost_usd=cost,
+            remediation=(
+                f"the backstop verification found BLOCKING issues "
+                f"({len(classification.blocking_issues)} Critical/Major): "
+                f"{findings}. Remediate, then re-verify with "
+                "verify_session (the sanctioned remediation loop) and "
+                "close again."
+            ),
+        )
+
+    return BackstopOutcome(
+        status=STATUS_VERIFIED,
+        messages=messages,
+        written_paths=written,
+        verdict=verdict,
+        blocking=False,
+        cost_usd=cost,
+    )

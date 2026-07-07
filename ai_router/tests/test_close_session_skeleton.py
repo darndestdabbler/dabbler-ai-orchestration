@@ -49,6 +49,22 @@ from session_state import register_session_start
 # Fixtures
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def _backstop_stands_down(monkeypatch):
+    """This file tests close-out FLOW (idempotency, JSON shape, events,
+    locking) with the gate runner stubbed — the Set 084 close backstop
+    is out of scope here (covered by test_close_backstop.py), so it is
+    stubbed to its evidence-present skip for every test in this file."""
+    import close_backstop
+
+    monkeypatch.setattr(
+        close_backstop, "run_close_backstop",
+        lambda *_a, **_kw: close_backstop.BackstopOutcome(
+            status=close_backstop.STATUS_SKIPPED_EVIDENCE_PRESENT,
+        ),
+    )
+
+
 @pytest.fixture
 def session_set_dir(tmp_path: Path) -> str:
     """A bare session-set directory with spec.md but no state yet."""

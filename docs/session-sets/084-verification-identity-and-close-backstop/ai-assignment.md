@@ -50,14 +50,14 @@ low
 | 2.5 | Dogfood the backstop by closing this session unverified. | Orchestrator runs `close_session`; the backstop logic within `close_session` makes the routed verification call. |
 
 ### Actuals (filled after the session)
-- Orchestrator used: (pending)
-- Total routed cost: (pending)
-- Deviations from recommendation: (pending)
-- Notes for next-session calibration: (pending)
+- Orchestrator used: Claude Code claude-fable-5 @ effort=high
+- Total routed cost: $0.0034 implementation-side (one routed analysis call for this ledger); the dogfood close backstop's own cross-provider verification call lands at close-out and is recorded in router-metrics.jsonl under this session.
+- Deviations from recommendation: the recommendation was Gemini Code Assist gemini-3-pro @ high; the operator started the session under Claude Code (engine choice is the operator's at session start). All 2.1–2.5 work executed orchestrator-direct as planned.
+- Notes for next-session calibration (routed): Claude Code claude-fable-5 proved fully capable of the high-effort surgical code modifications and extensive test generation originally scoped for gemini-3-pro, validating fable-5 as a high-tier orchestrator for core logic implementation. The new close backstop now provides built-in cross-provider verification via gpt-5-4, reducing single-provider risk on work from any orchestrator.
 
-**Next-session orchestrator recommendation (Session 3):**
+**Next-session orchestrator recommendation (Session 3, routed — confirmed):**
 Codex CLI gpt-5.4 @ effort=medium
-Rationale: Session 3 is dominated by precise procedural work: documentation updates, structured UAT checklist generation, and a dual-release workflow. Calibration warns that release mechanics fail under less-capable models. Codex CLI's proficiency with procedural execution and structured data is ideal for ensuring error-free releases.
+Rationale: Session 3 requires high procedural precision for documentation updates, structured UAT checklist authoring, and dual-release mechanics across multiple file types (MD, JSON, TOML) — the calibrated strength of Codex CLI gpt-5.4 for multi-step procedural execution where less-capable models have previously failed; medium effort reflects the procedural (not novel-code) nature of the tasks.
 
 ---
 

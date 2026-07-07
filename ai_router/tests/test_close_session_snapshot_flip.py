@@ -28,6 +28,7 @@ test files do not develop a fixture-sharing coupling.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -35,6 +36,7 @@ import pytest
 
 import close_session
 from disposition import Disposition, write_disposition
+from stamp_fixtures import write_stamped_evidence
 from session_events import (
     SessionLifecycleState,
     current_lifecycle_state,
@@ -89,27 +91,17 @@ def _valid_next_orc() -> NextOrchestrator:
 
 
 @pytest.fixture(autouse=True)
-def _corroborated_metrics(tmp_path: Path, monkeypatch):
-    """Set 083: every close in this file claims an api verdict (explicit
-    or status-derived), so the verification-integrity gate demands a
-    cross-provider session-verification metrics row. Seed rows for the
-    fixture slug's sessions so these tests keep exercising the
-    snapshot-flip machinery they were written for."""
-    metrics = tmp_path / "gate-metrics.jsonl"
-    rows = [
-        {
-            "task_type": "session-verification",
-            "session_set": "test-set",
-            "session_number": n,
-            "provider": "openai",
-            "model": "gpt-5-4",
-        }
-        for n in range(1, 6)
-    ]
-    metrics.write_text(
-        "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
+def _metrics_path(tmp_path: Path, monkeypatch):
+    """Set 083/084: every close in this file claims an api verdict
+    (explicit or status-derived), so the verification-integrity gate
+    demands a STAMPED cross-provider session-verification row (Set 084
+    F3 — a bare row no longer corroborates). The rows are written by
+    ``_build_repo_with_set`` (the stamp binds to on-disk artifacts,
+    which don't exist yet here); this fixture only pins the metrics
+    path both sides use."""
+    monkeypatch.setenv(
+        "AI_ROUTER_METRICS_PATH", str(tmp_path / "gate-metrics.jsonl")
     )
-    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics))
 
 
 def _build_repo_with_set(
@@ -167,10 +159,15 @@ def _build_repo_with_set(
         }, indent=2),
         encoding="utf-8",
     )
-    for n in range(1, total_sessions + 1):
-        (set_dir / f"s{n}-verification.md").write_text(
-            "VERIFIED\n", encoding="utf-8"
-        )
+    # Set 084 (F3): stamped artifact + row per session — settled
+    # evidence also stands the close backstop down.
+    rows = [
+        write_stamped_evidence(set_dir, session_number=n)
+        for n in range(1, total_sessions + 1)
+    ]
+    Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+        "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
+    )
     return root, set_dir
 
 

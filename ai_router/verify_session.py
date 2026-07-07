@@ -717,7 +717,8 @@ def _resolve_metrics_path() -> Optional[Path]:
 
 def _default_route(prompt: str, session_set: str, session_number: int,
                    complexity_hint: int, max_tier: Optional[int],
-                   exclude_providers: Optional[List[str]] = None):
+                   exclude_providers: Optional[List[str]] = None,
+                   verification_stamp: Optional[dict] = None):
     """Production route() invocation (injectable seam for tests)."""
     from ai_router import route  # lazy: keeps --dry-run and tests hermetic
 
@@ -737,6 +738,12 @@ def _default_route(prompt: str, session_set: str, session_number: int,
         # the explicit pass keeps the CLI's printed exclusion the one
         # that actually governed selection.
         kwargs["exclude_providers"] = exclude_providers
+    if verification_stamp is not None:
+        # Set 084 S2 (F3): the producer-side stamp; route() completes
+        # it (verifier_model + artifact_sha256) at record time so the
+        # metrics row this call writes is the corroborating evidence
+        # the close gate accepts.
+        kwargs["verification_stamp"] = verification_stamp
     return route(**kwargs)
 
 
@@ -884,6 +891,34 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         session_set_dir, session_number, round_number
     )
 
+    # -- Set 084 S2 (F3): build the producer-side evidence stamp. The
+    #    evidence hash binds the row to the exact filled prompt the
+    #    verifier reviews; the template id + normalized hash bind it to
+    #    the canonical adversarial template; route() completes the
+    #    verifier_model / artifact_sha256 halves at record time.
+    try:
+        from .verification_stamp import (  # type: ignore[import-not-found]
+            STAMP_SOURCE_VERIFY_SESSION,
+            build_stamp,
+            repo_relative_posix,
+            sha256_hex,
+        )
+    except ImportError:
+        from verification_stamp import (  # type: ignore[no-redef]
+            STAMP_SOURCE_VERIFY_SESSION,
+            build_stamp,
+            repo_relative_posix,
+            sha256_hex,
+        )
+    stamp = build_stamp(
+        source=STAMP_SOURCE_VERIFY_SESSION,
+        evidence_sha256=sha256_hex(prompt.encode("utf-8")),
+        orchestrator_effective_provider=identity.effective_provider,
+        artifact_path=repo_relative_posix(
+            review_path, repo_root_for(session_set_dir)
+        ),
+    )
+
     if args.dry_run:
         print("verify_session: DRY RUN -- nothing written, nothing routed")
         print(f"  session set:        {set_name}")
@@ -901,6 +936,10 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         print(f"  would write:        {review_path.name}"
               f" (+ {issues_path.name} if findings)")
         print(f"  max tier:           {args.max_tier if args.max_tier is not None else '(router default)'}")
+        print(f"  evidence stamp:     source={stamp['source']}, "
+              f"template={stamp['template_id']} "
+              f"({stamp['template_sha256'][:12]}...), "
+              f"evidence={stamp['evidence_sha256'][:12]}...")
         return EXIT_OK
 
     # -- Route to the cross-provider verifier (orchestrator's effective
@@ -931,6 +970,7 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             args.complexity_hint,
             args.max_tier,
             exclude_providers,
+            stamp,
         )
     except VerificationUnavailableError as exc:
         # The hard blocked state: no verdict, no artifact, no
@@ -966,7 +1006,11 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         return EXIT_ROUTE_FAILED
 
     # -- Persist RAW output BEFORE any display or parsing (L-064-3).
-    review_path.write_text(result.content, encoding="utf-8")
+    #    newline="" disables newline translation so the on-disk bytes
+    #    equal content.encode("utf-8") — the exact bytes the Set 084 F3
+    #    stamp's artifact_sha256 hashed at record time. A translated
+    #    CRLF write would break the artifact binding on Windows.
+    review_path.write_text(result.content, encoding="utf-8", newline="")
 
     verdict, issues = parse_verification_response(result.content)
     classification = classify_blocking(verdict, issues)

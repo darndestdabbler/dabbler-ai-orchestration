@@ -111,7 +111,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 - **Action for future sessions:** Trust the guard for cheap routed work.
 
 ## Persist Routed Output To Disk Before Display Or Logging
-<!-- lesson: id="L-064-3" last-used-set="083" status="active" scope="portable" -->
+<!-- lesson: id="L-064-3" last-used-set="084" status="active" scope="portable" -->
 
 - **Context:** Any routed call on Windows where the default console code page
   is `cp1252`.

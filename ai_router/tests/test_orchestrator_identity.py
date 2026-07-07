@@ -518,11 +518,17 @@ class TestGateIncident3:
         """Incident 3, exactly: copilot seat on claude-sonnet-4.6; the
         'cross-provider' verification also ran on claude-sonnet-4.6.
         The row resolves anthropic via the registry, the orchestrator
-        resolves anthropic via the registry — same provider, refused."""
+        resolves anthropic via the registry — same provider, refused.
+        (Stamped per Set 084 F3 so the refusal isolates the provider
+        arm, not the missing stamp.)"""
         set_dir = _make_gate_set(tmp_path, dict(INCIDENT3_BLOCK))
+        from stamp_fixtures import write_stamped_evidence
+
         _write_metrics(
             tmp_path, monkeypatch,
-            [_row("claude-sonnet-4.6", provider="openai")],
+            [write_stamped_evidence(
+                set_dir, model="claude-sonnet-4.6", provider="openai",
+            )],
         )
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition()
@@ -549,7 +555,11 @@ class TestGateIncident3:
         self, tmp_path, monkeypatch
     ):
         set_dir = _make_gate_set(tmp_path, dict(INCIDENT3_BLOCK))
-        _write_metrics(tmp_path, monkeypatch, [_row("gpt-5-4")])
+        from stamp_fixtures import write_stamped_evidence
+
+        _write_metrics(
+            tmp_path, monkeypatch, [write_stamped_evidence(set_dir)]
+        )
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition()
         )
@@ -572,11 +582,16 @@ class TestGateIncident3:
         self, tmp_path, monkeypatch
     ):
         """Existing sets (engine + label, no model) keep closing when
-        the verification row is genuinely cross-provider."""
+        the verification row is genuinely cross-provider (and stamped —
+        Set 084 F3)."""
         set_dir = _make_gate_set(
             tmp_path, {"engine": "claude-code", "provider": "anthropic"}
         )
-        _write_metrics(tmp_path, monkeypatch, [_row("gpt-5-4")])
+        from stamp_fixtures import write_stamped_evidence
+
+        _write_metrics(
+            tmp_path, monkeypatch, [write_stamped_evidence(set_dir)]
+        )
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition()
         )
@@ -727,8 +742,12 @@ class _RecordingRoute:
         self.calls = []
 
     def __call__(self, prompt, session_set, session_number,
-                 complexity_hint, max_tier, exclude_providers=None):
-        self.calls.append({"exclude_providers": exclude_providers})
+                 complexity_hint, max_tier, exclude_providers=None,
+                 verification_stamp=None):
+        self.calls.append({
+            "exclude_providers": exclude_providers,
+            "verification_stamp": verification_stamp,
+        })
 
         class _R:
             content = self.response

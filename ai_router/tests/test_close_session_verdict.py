@@ -27,6 +27,7 @@ from session_state import (
     read_session_state,
     register_session_start,
 )
+from stamp_fixtures import write_stamped_evidence
 
 
 # ---------------------------------------------------------------------------
@@ -138,25 +139,37 @@ def _make_closeable(repo_root: Path, set_dir: Path, disposition: Disposition) ->
 
 def _corroborate_api_close(
     set_dir: Path, session_number: int, monkeypatch, tmp_path: Path,
+    *, verdict: str = "VERIFIED",
 ) -> None:
-    """Seed the evidence the Set 083 verification-integrity gate demands
-    for an api-method close claiming a verdict: the raw verification
-    artifact plus a cross-provider session-verification metrics row."""
-    (set_dir / f"s{session_number}-verification.md").write_text(
-        "VERIFIED\n", encoding="utf-8"
+    """Seed the evidence the Set 083/084 verification-integrity gate
+    demands for an api-method close claiming a verdict: the raw
+    verification artifact plus a STAMPED cross-provider
+    session-verification metrics row (Set 084 F3 — a bare row no
+    longer corroborates, and an unsettled close triggers the
+    backstop). An ``ISSUES_FOUND`` claim additionally gets a
+    Minor-only findings envelope so the claim reads as non-blocking
+    (effectively VERIFIED for the loop, L-071-1) and the backstop
+    stands down."""
+    row = write_stamped_evidence(
+        set_dir, session_number=session_number, content=f"{verdict}\n",
     )
     metrics = tmp_path / "router-metrics.jsonl"
-    metrics.write_text(
-        json.dumps({
-            "task_type": "session-verification",
-            "session_set": set_dir.name,
-            "session_number": session_number,
-            "provider": "openai",
-            "model": "gpt-5-4",
-        }) + "\n",
-        encoding="utf-8",
-    )
+    metrics.write_text(json.dumps(row) + "\n", encoding="utf-8")
     monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics))
+    if verdict == "ISSUES_FOUND":
+        (set_dir / f"s{session_number}-issues.json").write_text(
+            json.dumps({
+                "schemaVersion": 1,
+                "sessionNumber": session_number,
+                "verificationRound": 1,
+                "verificationVerdict": "ISSUES_FOUND",
+                "issues": [{
+                    "severity": "Minor",
+                    "description": "nit recorded for the ledger",
+                }],
+            }, indent=2) + "\n",
+            encoding="utf-8",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +414,9 @@ class TestR4VerdicClobberInvariant:
             blockers=[],
             verification_verdict="ISSUES_FOUND",
         ))
-        _corroborate_api_close(set_dir, 1, monkeypatch, tmp_path)
+        _corroborate_api_close(
+            set_dir, 1, monkeypatch, tmp_path, verdict="ISSUES_FOUND",
+        )
         _commit_and_push(repo, "corroborating evidence")
 
         # First close stores ISSUES_FOUND

@@ -26,6 +26,8 @@ import importlib
 import sys
 from pathlib import Path
 
+import pytest
+
 AI_ROUTER_DIR = Path(__file__).resolve().parent.parent
 if str(AI_ROUTER_DIR) not in sys.path:
     sys.path.insert(0, str(AI_ROUTER_DIR))
@@ -41,6 +43,13 @@ if str(AI_ROUTER_DIR) not in sys.path:
 SCRIPTS_DIR = AI_ROUTER_DIR / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
+
+# Set 084 S2: shared test-fixture helpers live beside the tests
+# (``stamp_fixtures.py``) and are imported by bare filename like the
+# package modules, so the tests dir itself joins sys.path too.
+TESTS_DIR = Path(__file__).resolve().parent
+if str(TESTS_DIR) not in sys.path:
+    sys.path.insert(0, str(TESTS_DIR))
 
 # Set 048 modules with module-level cache state must share a single
 # module-object identity between the bare-name (test convention) and
@@ -75,3 +84,35 @@ for _name in _SHARED_MODULE_NAMES:
             "package init code, etc.)."
         )
     sys.modules[_name] = _pkg
+
+
+@pytest.fixture(autouse=True)
+def _no_live_backstop_routing(monkeypatch):
+    """Set 084 S2: the close backstop can issue a METERED routed call
+    from inside ``close_session.run`` — a surface no pre-084 test had
+    to guard against. This autouse fixture replaces the backstop's
+    default route seam with a loud refusal on BOTH module identities
+    (bare test-convention name and package-qualified name), so a test
+    that reaches the backstop without valid stamped evidence fails
+    fast instead of spending real provider dollars. Tests that
+    exercise the backstop deliberately monkeypatch
+    ``close_backstop._default_route`` (or pass ``route_fn``) with
+    their own fake on top of this guard.
+    """
+
+    def _refuse_live_routing(*_args, **_kwargs):
+        raise RuntimeError(
+            "close backstop attempted a LIVE routed verification inside "
+            "the test suite (no valid stamped evidence for the close "
+            "under test). Either give the fixture stamped evidence "
+            "(tests/stamp_fixtures.py) or monkeypatch "
+            "close_backstop._default_route with a fake."
+        )
+
+    for module_name in ("close_backstop", "ai_router.close_backstop"):
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError:
+            continue
+        monkeypatch.setattr(module, "_default_route", _refuse_live_routing)
+    yield

@@ -33,6 +33,7 @@ from session_state import (
     NextOrchestratorReason,
     register_session_start,
 )
+from stamp_fixtures import write_stamped_evidence
 
 
 # ---------------------------------------------------------------------------
@@ -84,26 +85,19 @@ def _corroborate_api_close(
     *,
     verifier_provider: str = "openai",
 ) -> None:
-    """Give an api-method close the evidence the Set 083 gate demands.
+    """Give an api-method close the evidence the Set 083/084 gate demands.
 
     Writes the ``sN-verification.md`` artifact, a one-row metrics file
-    with a cross-provider ``session-verification`` row, and points
-    ``AI_ROUTER_METRICS_PATH`` at it.
+    with a STAMPED cross-provider ``session-verification`` row (Set 084
+    F3 — a bare row no longer corroborates, and settled evidence stands
+    the close backstop down), and points ``AI_ROUTER_METRICS_PATH`` at
+    it.
     """
-    (set_dir / f"s{session_number}-verification.md").write_text(
-        "VERIFIED\n", encoding="utf-8"
+    row = write_stamped_evidence(
+        set_dir, session_number=session_number, provider=verifier_provider,
     )
     metrics = tmp_path / "router-metrics.jsonl"
-    metrics.write_text(
-        json.dumps({
-            "task_type": "session-verification",
-            "session_set": set_dir.name,
-            "session_number": session_number,
-            "provider": verifier_provider,
-            "model": "gpt-5-4",
-        }) + "\n",
-        encoding="utf-8",
-    )
+    metrics.write_text(json.dumps(row) + "\n", encoding="utf-8")
     monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics))
 
 
@@ -241,7 +235,9 @@ def test_uncommitted_file_triggers_gate_failed(closeable_set: Path):
     assert "working_tree_clean" in failed_names
 
 
-def test_missing_change_log_triggers_gate_failed_on_final_session(tmp_path: Path):
+def test_missing_change_log_triggers_gate_failed_on_final_session(
+    tmp_path: Path, monkeypatch,
+):
     """The final session of a set with no change-log.md fails change_log_fresh."""
     root = tmp_path / "repo"
     root.mkdir()
@@ -296,6 +292,9 @@ def test_missing_change_log_triggers_gate_failed_on_final_session(tmp_path: Path
         next_orchestrator=None,
         blockers=[],
     ))
+    # Set 084: settle the verification evidence so the close backstop
+    # stands down and change_log_fresh stays the gate under test.
+    _corroborate_api_close(set_dir, 2, monkeypatch, tmp_path)
     _git(root, "add", "-A")
     _git(root, "commit", "-m", "land final set")
     _git(root, "push", "origin", "main")

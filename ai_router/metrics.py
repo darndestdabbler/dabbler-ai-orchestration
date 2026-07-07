@@ -50,6 +50,21 @@ Schema per line:
     "billed_usage_unavailable":   bool or null  (true whenever cost_usd
          is not billing-authoritative for this record -- always true for
          "copilot-cli" records, always null/absent for "api" ones)
+    # Set 084 S2 (F3) -- the verification-evidence stamp. All nine are
+    # null on every historical row and on every row a sanctioned
+    # producer (verify_session / the close backstop) did not write.
+    # The close gate accepts ONLY rows whose stamp is present and
+    # internally consistent; a bare route() row no longer corroborates
+    # a close. Field semantics: ai_router/verification_stamp.py.
+    "source":                          str or null
+    "evidence_sha256":                 str or null
+    "template_id":                     str or null
+    "template_sha256":                 str or null
+    "verifier_model":                  str or null
+    "orchestrator_effective_provider": str or null
+    "artifact_path":                   str or null
+    "artifact_sha256":                 str or null
+    "package_version":                 str or null
   }
 
 Adjudication records (call_type = "adjudication") are written by
@@ -155,6 +170,11 @@ def record_call(
     local_invocations: Optional[int] = None,
     attempts: Optional[int] = None,
     billed_usage_unavailable: Optional[bool] = None,
+    # Set 084 S2 (F3) -- the verification-evidence stamp, passed as one
+    # dict by the sanctioned producers via route(verification_stamp=...).
+    # None (every other caller) writes all nine stamp fields as null,
+    # keeping historical and bare-route rows schema-compatible.
+    stamp: Optional[dict] = None,
 ) -> None:
     """Append a single record to the metrics log. Never raises — if
     writing fails (disk full, permission), we silently skip rather
@@ -220,6 +240,17 @@ def record_call(
         "attempts": attempts,
         "billed_usage_unavailable": billed_usage_unavailable,
     }
+
+    # Set 084 S2 (F3) — the verification-evidence stamp. Written as nine
+    # individual top-level keys (additive; all None when no stamp) so
+    # the close gate and jq-style readers never have to unwrap a nested
+    # object on historical lines.
+    try:
+        from .verification_stamp import STAMP_FIELDS
+    except ImportError:
+        from verification_stamp import STAMP_FIELDS  # type: ignore[no-redef]
+    for stamp_field in STAMP_FIELDS:
+        record[stamp_field] = (stamp or {}).get(stamp_field)
 
     try:
         path = _log_path(config)

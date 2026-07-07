@@ -327,6 +327,49 @@ returns the corresponding exit code without touching downstream state.
    Must exist with `status: "completed"`. Missing or non-`completed`
    → gate failure unless `--force` or `--repair` is set.
 6. **Emit `closeout_requested`** to `session-events.jsonl`.
+6b. **The close backstop** (Set 084 — the structural move; implemented
+    in `ai_router/close_backstop.py`, wired here before the gate
+    chain). On a Full-tier close with **no valid stamped verification
+    evidence** for the session, `close_session` does not merely refuse
+    — it **runs the verification itself**, in-process, through the
+    same machinery the `verify_session` CLI uses: the same evidence
+    assembly (diffed against the last commit **before the session's
+    `startedAt`**, since the caller has already committed and pushed),
+    the same canonical adversarial template, the same registry-resolved
+    orchestrator-provider exclusion (F1/F2), the same raw
+    `sN-verification*.md` / `sN-issues*.json` artifacts, the same
+    disposition patch, and a metrics row stamped
+    `source: "close_session_backstop"` (F3). Then:
+    - **VERIFIED / Minor-only** → the close proceeds; the fresh stamped
+      row satisfies the evidence gate below. The backstop's own
+      artifacts are close-out bookkeeping written mid-close (the
+      `session-events.jsonl` precedent): the working-tree gate
+      tolerates them for this one close and the operator commits them
+      in the close-out commit. The verification cost is printed.
+    - **Blocking ISSUES_FOUND** → the close is refused with the
+      findings (`gate_failed`, `failed_checks:
+      ["verification_backstop"]`); the disposition now records the
+      TRUE verdict. Remediate, then re-verify with `verify_session`
+      (the sanctioned remediation loop) and close again.
+    - **`verification_unavailable`** (the exclusion leaves no
+      different-provider verifier) or a **double transport failure**
+      (the two-attempt ladder is preserved) → the close BLOCKS
+      explicitly — never a pass. The only sanctioned resolution for
+      the unavailable state is the operator-attested `--manual-verify`
+      path.
+    Scope and skips: `verify_session` **pre-empts** the backstop (valid
+    stamped evidence with a `VERIFIED` — or Minor-only-settled
+    `ISSUES_FOUND` — claim stands it down); the operator-declared
+    zero-budget tier (`ai_router/budget.yaml`, `threshold_usd: 0`)
+    keeps its existing manual/attested flow with no metered call;
+    `--manual-verify` is the attested bypass; `--force` triggers **no**
+    metered call and still cannot pass unverified (the
+    verification-integrity check below refuses); Lightweight closes
+    keep their own per-set gates; an illegal `verification_method`
+    token skips the backstop because the vocabulary gate refuses that
+    close anyway. The backstop runs inside the close lock and is
+    idempotent: a re-run after a backstop-verified close finds the
+    stamped evidence and skips.
 7. **Run deterministic gate checks** (`ai_router.gate_checks`):
    - `check_working_tree_clean` — `git status` is clean (or only
      ignored patterns remain). Catches "agent forgot to commit".
@@ -347,7 +390,17 @@ returns the corresponding exit code without touching downstream state.
      longer passes). On `api`, close-out requires a non-null verdict backed
      by both a cross-provider `session-verification` row in
      `router-metrics.jsonl` for this set/session and a root
-     `sN-verification*.md` artifact. On `manual-via-other-engine` or
+     `sN-verification*.md` artifact — and, Set 084 (F3), the row must
+     carry a **valid evidence stamp** (sanctioned `source`
+     — `verify_session_cli` or `close_session_backstop` — evidence
+     hash, canonical-template id + normalized hash, verifier-model
+     consistency, the applied orchestrator-provider exclusion, artifact
+     path + byte-exact content hash, package version; any missing or
+     inconsistent field fails closed). A bare `route()` row no longer
+     corroborates a close. The stamp is **drift/affordance control,
+     not cryptography** — it raises the floor from "lazy shortcut" to
+     "deliberate multi-artifact forgery" and must never be described
+     as tamper-proof. On `manual-via-other-engine` or
      `skipped` — with or without a claimed verdict — the project
      `ai_router/budget.yaml` must declare the zero-budget tier and the
      matching method (the operator-authorized exception; never an engine's
@@ -397,8 +450,9 @@ returns the corresponding exit code without touching downstream state.
      skips. Fail-open in the non-block direction.
 8. **Resolve verification outcome**:
    - **API mode** — `verify_session` has already run synchronously and patched
-     the disposition; the verification-integrity gate corroborates the metrics
-     row and artifact before state changes.
+     the disposition (or the Set 084 close backstop just produced the same
+     evidence in-process at step 6b); the verification-integrity gate
+     corroborates the stamped metrics row and artifact before state changes.
    - **Manual-via-other-engine / skipped** — legal only under the zero-budget
      declaration, with or without a claimed verdict (Set 083: a null-verdict
      Full-tier close is no longer legal outside that declaration).

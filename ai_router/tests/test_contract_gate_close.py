@@ -148,6 +148,17 @@ def _stub_gates(monkeypatch):
     monkeypatch.setattr(
         session_state, "_flip_state_to_closed", lambda *_a, **_kw: None
     )
+    # Set 084: the close backstop is out of scope here (covered by
+    # test_close_backstop.py) — stand it down so the flow reaches the
+    # gate under test without a routed verification.
+    import close_backstop
+
+    monkeypatch.setattr(
+        close_backstop, "run_close_backstop",
+        lambda *_a, **_kw: close_backstop.BackstopOutcome(
+            status=close_backstop.STATUS_SKIPPED_EVIDENCE_PRESENT,
+        ),
+    )
     yield
 
 

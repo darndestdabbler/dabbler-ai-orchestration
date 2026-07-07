@@ -1,54 +1,55 @@
 {
   "status": "completed",
-  "summary": "Set 084 Session 1 (F1 + F2) complete and VERIFIED (round 4). F1: identity is the underlying model resolved through the model registry end to end -- new shared helper ai_router/orchestrator_identity.py (effective provider by registry lookup on the orchestrator block's model: config models keys/model_ids, normalized dot/dash tokens, claude-*-scoped dated-alias stripping, the Copilot CLI documented model universe; provider label demoted to a single-vendor-only second choice); start_session refuses a multi-provider engine without a registry-known --model AND any supplied model that does not resolve (every engine); all three writer sites stamp the additive omit-null identityProvenance (direct/asserted, derived from the engine); schema parity in both directions (schema doc, regenerated example built THROUGH the live writer helper, new machine-readable ai_router/schemas/session-state.schema.json with a both-directions parity test class); the Set 083 close gate resolves the orchestrator side of the != check through the shared helper and fails closed on unresolvable identity naming start_session --model. F2: verify_session and bare route(task_type=session-verification) with session context resolve the session orchestrator's effective provider through ONE shared path and exclude it as a hard constraint (unioned with any caller-supplied exclusions); the router-config session-verification pin is demoted to a preference that can never override the exclusion; escalation cannot cross back into an excluded provider; under copilot-cli the exclusion is applied against the seat catalog's FULL confirmed entries (prefer is order, not universe) and a seat with no diverse confirmed candidate yields the hard verification_unavailable outcome (typed error; verify_session exit 7; no verdict written; operator-attested --manual-verify named as the only resolution). Layer-1 matrix: 90 tests in test_orchestrator_identity.py incl. the incident-3 regression, arbitrary-label, missing-model, single-vendor back-compat, and no-diverse-catalog fixtures. Suite: 2653 passed, 5 skipped, 11 e2e passed. Cross-provider verification: 4 rounds, 6 Major findings fixed (ledger I-084-S1-1..6, zero resurrections), round 4 VERIFIED with zero findings. Dogfood: every round's verifier was selected by the new exclusion path (claude-fable-5 resolved to anthropic via the registry; gpt-5-4 verified).",
+  "summary": "Set 084 Session 2 (F3 + the close backstop). F3 -- only stamped evidence corroborates: new ai_router/verification_stamp.py defines the nine additive stamp fields (source, evidence_sha256, template_id + normalized template_sha256, verifier_model, orchestrator_effective_provider, artifact_path + byte-exact artifact_sha256, package_version; null on all historical rows). The template id is minted in code (session-verification-v1) so the canonical adversarial template stays byte-identical (L-069-2) and an operator template change is an explicit version bump, never an accidental pass. record_call writes the stamp; route() completes it at record time (verifier model post-escalation; artifact hash over the exact bytes the producer writes with newline='') on BOTH the api and copilot-cli paths, and refuses a stamp outside task_type=session-verification; verify_session builds and passes the stamp. The Set 083 close gate's api arm now accepts ONLY rows with a valid, internally consistent stamp (shared find_session_verification_evidence + validate_stamped_row -- one path for the gate and the backstop, L-069-1): template mismatch, missing fields, edited artifacts, copied stamps, and same-provider verifiers all fail closed with named reasons; a bare route() row (the incident-3 shape) no longer corroborates; refusals keep naming the venv-qualified sanctioned command. The stamp is documented as drift/affordance control, not cryptography. THE CLOSE BACKSTOP (structural): new ai_router/close_backstop.py wired into close_session.run before the gate chain -- on a Full-tier close without settling stamped evidence, the framework runs the verification itself in-process through the S1 F1/F2 machinery (evidence assembled against the last commit before the session's startedAt, canonical template, registry-resolved provider exclusion, stamped row, raw artifacts, disposition patch), then proceeds on VERIFIED / Minor-only, refuses with findings on blocking ISSUES_FOUND, and blocks explicitly on verification_unavailable or double transport failure -- never a pass. Respects budget.yaml (zero-budget passthrough untouched), the two-attempt ladder, and the close lock (idempotent); verify_session pre-empts it; --manual-verify remains the attested bypass; --force triggers no metered call and still cannot pass unverified; backstop-written artifacts are close-out bookkeeping the working-tree gate tolerates for that one close (the session-events.jsonl precedent). Layer-1 matrix: all three live incidents as end-to-end regressions in test_close_backstop.py (20 tests), 12 producer-side stamp unit tests, 11 new stamp-layer gate tests; existing close-path fixtures upgraded to stamped evidence via shared tests/stamp_fixtures.py; a conftest autouse guard refuses live routed calls from the backstop under pytest. Fixed a live I-084-S1-2-class defect found by the new tests: the backstop catches VerificationUnavailableError under both module identities. Suite: 2713 passed, 5 skipped; e2e: 11 passed. Dogfood (spec step 2.5): this session's own close deliberately ran close_session WITHOUT a manual verify_session -- the backstop produced the verification and its stamped row corroborated its own close.",
   "files_changed": [
-    "ai_router/orchestrator_identity.py",
-    "ai_router/schemas/session-state.schema.json",
-    "ai_router/session_state.py",
-    "ai_router/start_session.py",
-    "ai_router/gate_checks.py",
-    "ai_router/verify_session.py",
+    "ai_router/verification_stamp.py",
+    "ai_router/close_backstop.py",
+    "ai_router/metrics.py",
     "ai_router/__init__.py",
-    "ai_router/models.py",
-    "ai_router/utils.py",
-    "ai_router/verification.py",
-    "ai_router/router-config.yaml",
-    "ai_router/scripts/dump_session_state_schema.py",
-    "ai_router/tests/test_orchestrator_identity.py",
+    "ai_router/verify_session.py",
+    "ai_router/gate_checks.py",
+    "ai_router/close_session.py",
+    "ai_router/docs/close-out.md",
+    "ai_router/tests/stamp_fixtures.py",
+    "ai_router/tests/test_verification_stamp.py",
+    "ai_router/tests/test_close_backstop.py",
+    "ai_router/tests/conftest.py",
     "ai_router/tests/test_verification_integrity_gate.py",
     "ai_router/tests/test_verify_session.py",
-    "ai_router/tests/test_cross_provider_gate_extension.py",
-    "ai_router/tests/test_pending_verification.py",
-    "ai_router/tests/test_session_state_v4_writers.py",
-    "ai_router/tests/test_typed_session_writer.py",
-    "docs/session-state-schema.md",
-    "docs/session-state-schema-example.json"
+    "ai_router/tests/test_close_session_verdict.py",
+    "ai_router/tests/test_close_session_snapshot_flip.py",
+    "ai_router/tests/test_close_session_integration.py",
+    "ai_router/tests/test_close_session_skeleton.py",
+    "ai_router/tests/test_mark_session_complete_gate.py",
+    "ai_router/tests/test_reconciler.py",
+    "ai_router/tests/test_orchestrator_identity.py",
+    "ai_router/tests/test_path_aware_critique_close_gate.py",
+    "ai_router/tests/test_contract_gate_close.py",
+    "docs/session-sets/084-verification-identity-and-close-backstop/ai-assignment.md"
   ],
   "verification_method": "api",
-  "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "next_orchestrator": {
-    "engine": "gemini-code-assist",
-    "provider": "google",
-    "model": "gemini-3-pro",
-    "effort": "high",
+    "engine": "codex-cli",
+    "provider": "openai",
+    "model": "gpt-5.4",
+    "effort": "medium",
     "reason": {
       "code": "other",
-      "specifics": "Adopting the routed ai-assignment.md recommendation for Session 2 (stamped evidence + the close backstop): Gemini Code Assist gemini-3-pro @ effort=high -- the recommendation cites Gemini's strength in surgical modification of core lifecycle logic and exhaustive incident-regression test generation, plus cross-provider calibration value on the set's most sensitive code. gemini-3-pro is now identity-registry-resolvable (Set 084 S1 added the disabled registry entry), so the S2 start passes the new boundary."
+      "specifics": "Adopting the routed ai-assignment.md recommendation for Session 3 (instruction surfaces, incident-3 reproduction UAT, the two releases): Codex CLI gpt-5.4 @ effort=medium -- high procedural precision for documentation updates, structured UAT checklist authoring, and dual-release mechanics across MD/JSON/TOML, the calibrated strength where less-capable models have previously failed on release mechanics; medium effort reflects the procedural (not novel-code) nature of the tasks."
     }
   },
   "blockers": [],
   "deferred_issues": [],
   "lessons_cited": [
     "L-069-1",
-    "L-066-1",
-    "L-064-9",
-    "L-064-10",
-    "L-065-1",
-    "L-071-1"
+    "L-071-1",
+    "L-064-3",
+    "L-064-9"
   ],
   "residuals": [
-    "Read-side single-vendor provider-label fallback for a supplied-but-unresolvable model is retained as legacy tolerance for pre-084 state files (this repo's history carries claude-sonnet-5 and dated snapshot ids); the start_session boundary prevents new occurrences.",
-    "model remains self-reported (spec residual 1); the compensating controls are the registry constraint + the identityProvenance label. F3 stamping and the close backstop land in Session 2."
+    "evidence_sha256 binds the row to the exact filled prompt but cannot be recomputed at close (the working tree has moved on) -- the consumer-side check is presence + well-formedness; the recomputable half of the binding is the artifact hash (deliberate design, documented in verification_stamp.py).",
+    "The backstop lives in close_session.run only; the mark_session_complete python API path still refuses an unverified close via the tightened gate (floor holds by refusal, not by in-process verification) -- acceptable because every sanctioned close path goes through close_session.",
+    "A determined orchestrator forging the full stamped artifact set remains out of scope (spec residual 2) -- the stamp raises the floor from lazy shortcut to deliberate multi-artifact forgery."
   ]
 }

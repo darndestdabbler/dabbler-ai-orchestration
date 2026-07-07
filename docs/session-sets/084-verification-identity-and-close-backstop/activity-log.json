@@ -1,7 +1,7 @@
 {
   "sessionSetName": "084-verification-identity-and-close-backstop",
   "createdDate": "2026-07-07T06:05:41.749801+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -83,6 +83,38 @@
       "stepKey": "session-1/s1.tests",
       "dateTime": "2026-07-07T03:15:36.437406-04:00",
       "description": "Verification round 4 (gpt-5-4 under the anthropic exclusion): VERIFIED, 0 findings, 0 nits. The dogfood premise held every round: the verifier was selected by the new dynamic exclusion (orchestrator claude-fable-5 resolved to anthropic via the model registry, anthropic excluded by resolution). Four rounds total, six Major findings found and fixed (I-084-S1-1..6), zero resurrections. Routed verification cost: R1 $0.28 + R2 $0.42 + R3 $0.37 + R4 $0.39 = $1.46.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "s2.stamp",
+      "dateTime": "2026-07-07T04:15:10.232838-04:00",
+      "description": "F3 row stamping: new ai_router/verification_stamp.py (sanctioned sources, code-minted versioned template id session-verification-v1, normalized template hash, evidence hash, byte-exact artifact binding, package version; producer build_stamp + route-time complete_stamp + consumer validate_stamped_row). record_call writes the nine additive stamp fields (null on historical rows); route() completes and records the stamp on both the api and copilot-cli paths (ValueError outside session-verification); verify_session builds and passes the stamp and writes artifacts newline='' so on-disk bytes equal the stamped hash.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "s2.stamp",
+      "dateTime": "2026-07-07T04:15:10.232838-04:00",
+      "description": "Gate tightening: check_verification_integrity's api arm now accepts ONLY rows with a valid, internally consistent stamp (shared find_session_verification_evidence path; template-hash mismatch, missing fields, edited artifacts, copied stamps, same-provider verifiers all fail closed with named reasons). Bare route() rows no longer corroborate; refusals keep naming the venv-qualified sanctioned command.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "s2.backstop",
+      "dateTime": "2026-07-07T04:15:10.232838-04:00",
+      "description": "The close backstop: new ai_router/close_backstop.py wired into close_session.run before the gate chain. On a Full-tier close without settling stamped evidence the framework runs the verification itself in-process through the S1 F1/F2 machinery (same evidence assembly with a pre-session diff base resolved from startedAt, same canonical template, same exclusion, stamped row + raw artifacts + disposition patch), then proceeds on VERIFIED / refuses with findings on blocking ISSUES_FOUND / blocks explicitly on verification_unavailable or double transport failure (never a pass). Respects budget.yaml zero-budget passthrough, the two-attempt ladder, the close lock (idempotent); --manual-verify stays the attested bypass; --force triggers no metered call and still cannot pass unverified. Backstop-written artifacts are close-out bookkeeping the working-tree gate tolerates for that one close (session-events.jsonl precedent).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "s2.tests",
+      "dateTime": "2026-07-07T04:15:10.232838-04:00",
+      "description": "Layer-1 matrix: test_close_backstop.py (20 tests: incident-1 self-attested close -- backstop verdict governs both ways; incident-2 null-verdict close verified-or-blocked; incident-3 bare-route row rejected + backstop runs with anthropic excluded; verification_unavailable blocks naming --manual-verify; two-attempt ladder; zero-budget passthrough; force/manual-verify neither triggers the backstop; Minor-only settled claims stand it down; idempotent re-close; pre-session diff base), test_verification_stamp.py (12 producer-side unit tests), 11 new stamp-layer gate tests (template-hash mismatch, per-field missing-stamp matrix, edited artifact, copied stamp, exclusion mismatch, backstop source). Existing close-path fixtures upgraded to stamped evidence via shared tests/stamp_fixtures.py; conftest autouse guard refuses live routed calls from the backstop in tests. Fixed a live I-084-S1-2-class defect: the backstop catches VerificationUnavailableError under both module identities. Full suite: 2713 passed, 5 skipped; e2e: 11 passed.",
       "status": "complete"
     }
   ]

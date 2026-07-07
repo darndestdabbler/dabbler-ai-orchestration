@@ -58,6 +58,7 @@ from session_state import (
     NextOrchestratorReason,
     register_session_start,
 )
+from stamp_fixtures import write_stamped_evidence
 
 
 # ---------------------------------------------------------------------------
@@ -145,9 +146,10 @@ def _verification_row(
     session_number: int = 1,
     task_type: str = "session-verification",
 ) -> dict:
-    """A realistic metrics row. The gate resolves the provider from the
-    MODEL via the registry (S2 round-1 fix); the row's ``provider``
-    string is carried for realism but deliberately not trusted."""
+    """A BARE (unstamped) metrics row — the pre-084 shape. Set 084 S2
+    (F3): this row no longer corroborates a close; kept as the
+    incident-3 regression shape. Corroborating fixtures use
+    ``write_stamped_evidence`` (which also writes the paired artifact)."""
     return {
         "task_type": task_type,
         "session_set": set_dir.name,
@@ -243,8 +245,9 @@ class TestMethodVocabulary:
 class TestApiCorroboration:
     def test_full_evidence_passes(self, tmp_path, monkeypatch):
         set_dir = _make_set(tmp_path)
-        _write_artifact(set_dir)
-        _write_metrics(tmp_path, monkeypatch, [_verification_row(set_dir)])
+        _write_metrics(
+            tmp_path, monkeypatch, [write_stamped_evidence(set_dir)]
+        )
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition()
         )
@@ -283,10 +286,9 @@ class TestApiCorroboration:
 
     def test_same_provider_row_fails(self, tmp_path, monkeypatch):
         set_dir = _make_set(tmp_path, orchestrator_provider="anthropic")
-        _write_artifact(set_dir)
         _write_metrics(
             tmp_path, monkeypatch,
-            [_verification_row(
+            [write_stamped_evidence(
                 set_dir, provider="anthropic", model="sonnet",
             )],
         )
@@ -301,10 +303,11 @@ class TestApiCorroboration:
         ("openai") but whose model resolves to the orchestrator's own
         provider via the registry must not corroborate."""
         set_dir = _make_set(tmp_path, orchestrator_provider="anthropic")
-        _write_artifact(set_dir)
         _write_metrics(
             tmp_path, monkeypatch,
-            [_verification_row(set_dir, provider="openai", model="sonnet")],
+            [write_stamped_evidence(
+                set_dir, provider="openai", model="sonnet",
+            )],
         )
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition()
@@ -317,10 +320,9 @@ class TestApiCorroboration:
         identity — it cannot corroborate (fails closed), regardless of
         what its provider string claims."""
         set_dir = _make_set(tmp_path, orchestrator_provider="anthropic")
-        _write_artifact(set_dir)
         _write_metrics(
             tmp_path, monkeypatch,
-            [_verification_row(
+            [write_stamped_evidence(
                 set_dir, provider="openai", model="mystery-model",
             )],
         )
@@ -356,8 +358,9 @@ class TestApiCorroboration:
         anthropic), and a cross-provider gpt-5-4 row corroborates."""
         set_dir = _make_set(tmp_path)
         _strip_provider_from_state(set_dir)
-        _write_artifact(set_dir)
-        _write_metrics(tmp_path, monkeypatch, [_verification_row(set_dir)])
+        _write_metrics(
+            tmp_path, monkeypatch, [write_stamped_evidence(set_dir)]
+        )
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition()
         )
@@ -408,10 +411,175 @@ class TestApiCorroboration:
         self, tmp_path, monkeypatch
     ):
         set_dir = _make_set(tmp_path)
-        (set_dir / "s1-verification-round-2.md").write_text(
-            "VERIFIED\n", encoding="utf-8"
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [write_stamped_evidence(set_dir, round_number=2)],
         )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert passed, remediation
+
+
+# ---------------------------------------------------------------------------
+# The Set 084 S2 (F3) stamp layer
+# ---------------------------------------------------------------------------
+
+class TestStampedEvidenceLayer:
+    """Only verify_session-stamped rows (or the backstop's) corroborate.
+
+    The incident-3 regression class: a bare ``route()`` row — exactly
+    what the 2026-07-06 hand-diluted-prompt bypass produced — carries no
+    stamp and no longer satisfies the evidence layer; neither does any
+    row whose stamp is internally inconsistent.
+    """
+
+    def test_bare_route_row_no_longer_corroborates(
+        self, tmp_path, monkeypatch
+    ):
+        """Incident 3: cross-provider row, artifact present — the
+        pre-084 gate passed this; the stamp layer refuses it."""
+        set_dir = _make_set(tmp_path)
+        _write_artifact(set_dir)
         _write_metrics(tmp_path, monkeypatch, [_verification_row(set_dir)])
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "evidence stamp" in remediation
+        assert "route()" in remediation
+        assert "ai_router.verify_session" in remediation
+
+    def test_backstop_source_corroborates(self, tmp_path, monkeypatch):
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [write_stamped_evidence(
+                set_dir, source="close_session_backstop",
+            )],
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert passed, remediation
+
+    def test_unknown_source_fails(self, tmp_path, monkeypatch):
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [write_stamped_evidence(set_dir, source="my-own-script")],
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "evidence stamp" in remediation
+
+    def test_template_hash_mismatch_fails_closed(
+        self, tmp_path, monkeypatch
+    ):
+        """A row stamped against a diluted / changed template — the
+        consensus 'missing half of F3' — fails closed."""
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [write_stamped_evidence(
+                set_dir, template_sha256="0" * 64,
+            )],
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "template" in remediation
+
+    def test_template_id_mismatch_fails_closed(self, tmp_path, monkeypatch):
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [write_stamped_evidence(
+                set_dir, template_id="session-verification-v999",
+            )],
+        )
+        passed, _ = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+
+    @pytest.mark.parametrize("missing_field", [
+        "evidence_sha256",
+        "template_id",
+        "template_sha256",
+        "verifier_model",
+        "orchestrator_effective_provider",
+        "artifact_path",
+        "artifact_sha256",
+        "package_version",
+    ])
+    def test_any_missing_stamp_field_fails_closed(
+        self, tmp_path, monkeypatch, missing_field
+    ):
+        set_dir = _make_set(tmp_path)
+        row = write_stamped_evidence(set_dir, **{missing_field: None})
+        _write_metrics(tmp_path, monkeypatch, [row])
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "evidence stamp" in remediation
+
+    def test_edited_artifact_fails_closed(self, tmp_path, monkeypatch):
+        """Verification artifacts are never edited — an artifact whose
+        bytes no longer hash to the stamp is refused."""
+        set_dir = _make_set(tmp_path)
+        row = write_stamped_evidence(set_dir)
+        (set_dir / "s1-verification.md").write_text(
+            "VERIFIED (edited after the fact)\n",
+            encoding="utf-8", newline="",
+        )
+        _write_metrics(tmp_path, monkeypatch, [row])
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "edited" in remediation
+
+    def test_verifier_model_row_model_mismatch_fails(
+        self, tmp_path, monkeypatch
+    ):
+        """A stamp copied onto a different row's model is inconsistent."""
+        set_dir = _make_set(tmp_path)
+        row = write_stamped_evidence(set_dir, verifier_model="gemini-pro")
+        _write_metrics(tmp_path, monkeypatch, [row])
+        passed, _ = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+
+    def test_stamped_exclusion_mismatch_fails(self, tmp_path, monkeypatch):
+        """The stamp must record the SAME effective provider the gate
+        itself resolves for the session orchestrator."""
+        set_dir = _make_set(tmp_path)  # orchestrator resolves anthropic
+        row = write_stamped_evidence(
+            set_dir, orchestrator_provider="google",
+        )
+        _write_metrics(tmp_path, monkeypatch, [row])
+        passed, _ = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+
+    def test_one_valid_row_among_bare_rows_corroborates(
+        self, tmp_path, monkeypatch
+    ):
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [
+                _verification_row(set_dir),
+                write_stamped_evidence(set_dir, round_number=2),
+            ],
+        )
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition()
         )
@@ -749,19 +917,10 @@ class TestCloseSessionEndToEnd:
             verification_verdict="VERIFIED",
             next_orchestrator=_valid_next_orc(),
         ))
-        (incident_repo / "s1-verification.md").write_text(
-            "VERIFIED\n", encoding="utf-8"
-        )
+        stamped_row = write_stamped_evidence(incident_repo)
         metrics = tmp_path / "metrics.jsonl"
         metrics.write_text(
-            json.dumps({
-                "task_type": "session-verification",
-                "session_set": incident_repo.name,
-                "session_number": 1,
-                "provider": "openai",
-                "model": "gpt-5-4",
-            }) + "\n",
-            encoding="utf-8",
+            json.dumps(stamped_row) + "\n", encoding="utf-8",
         )
         monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics))
         _git(repo_root, "add", "-A")

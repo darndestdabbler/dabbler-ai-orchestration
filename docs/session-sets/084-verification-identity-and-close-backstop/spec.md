@@ -153,7 +153,7 @@ confidence).
 tiers' Mode A/B machinery, the zero-budget exception's semantics, or the
 Set 078 transport dispatch mechanics beyond verifier-role exclusion. No
 git hooks (consensus: bypassable, undistributable). Consumer-repo floor
-bumps (`dabbler-ai-router>=0.30.0` + L-075-1 venv-upgrade-and-confirm)
+bumps (`dabbler-ai-router>=0.29.0` + L-075-1 venv-upgrade-and-confirm)
 happen in the consumer repos' own sessions.
 
 ---
@@ -327,7 +327,8 @@ the orchestrator's hand.
 `docs/repository-reference.md`.
 **Ends with:** UAT attested with the incident-3 reproduction passing
 against the new machinery, required critique artifact valid, router
-0.30.0 and the extension minor published on operator authorization.
+0.29.0 (the combined Set 083 + 084 release) and the extension minor
+published on operator authorization.
 **Progress keys:** `s3.surfaces`, `s3.uat`, `s3.release`
 
 ---

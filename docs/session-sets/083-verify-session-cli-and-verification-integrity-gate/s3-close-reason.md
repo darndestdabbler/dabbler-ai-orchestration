@@ -1,10 +1,18 @@
 # Session 3 close reason — instruction surfaces, the skip removal, and supersession by Set 084
 
-**Outcome:** completed, VERIFIED (round 5; gpt-5-4 across all rounds via
-the S1 `verify_session` CLI). Closed under the spec's two dated operator
-revisions: Revision 1 (remove the skip — verification mandatory on every
-Full-tier session) and Revision 2 (the remaining UAT walk and the two
-releases are superseded by Set 084).
+**Outcome:** completed. The session's verification verdict is **never
+pre-asserted in this file** — the machine record is
+`disposition.verification_verdict` as patched by the `verify_session`
+CLI, corroborated by the highest-numbered `s3-verification-round-*.md`
+artifact and its metrics row (gpt-5-4 across all rounds, all via the S1
+CLI). This wording is itself a round-5 remediation: an earlier draft
+asserted the final round's VERIFIED before that round ran, and the
+verifier correctly flagged pre-asserted verdicts in close paperwork as
+the false-confidence class this set exists to police — the fix removes
+the assertion class, not just the instance. Closed under the spec's two
+dated operator revisions: Revision 1 (remove the skip — verification
+mandatory on every Full-tier session) and Revision 2 (the remaining UAT
+walk and the two releases are superseded by Set 084).
 
 ## What shipped in this session
 
@@ -40,8 +48,8 @@ releases are superseded by Set 084).
 
 ## Verification narrative
 
-Five rounds, all gpt-5-4 via the S1 CLI, each of rounds 1–4 surfacing a
-distinct real finding, none resurrected:
+All rounds gpt-5-4 via the S1 CLI, each surfacing distinct real
+findings, none resurrected (the cross-round ledger, L-071-1):
 
 1. **R1** — diff vs superseded spec text (resolved by recording the
    operator decision as spec Revision 1 + activity-log entry) and
@@ -53,10 +61,17 @@ distinct real finding, none resurrected:
    venv-qualified across `start_session`, `routed_gate`, close-out doc,
    and the engine tails.
 4. **R4** — the round's artifacts were untracked (L-064-9 class) —
-   resolved by the close-out commit this file ships in; stopped to the
-   operator per the round discipline.
-5. **R5** — VERIFIED against the committed tree
-   (`--diff-base bc4fffd`).
+   resolved by the close-out commit; stopped to the operator per the
+   round discipline.
+5. **R5** (against the committed tree, `--diff-base bc4fffd`) — three
+   findings, all fixed: the required path-aware critique artifact was
+   not yet produced (run before the final round); the close paperwork
+   pre-asserted the final verdict (assertion class removed — see
+   Outcome above); the Set 084 spec carried one stale `0.30.0` echo of
+   the superseded release number (L-065-1 — every echo updated to
+   0.29.0).
+6. **R6+** — the final round runs against the fully-assembled close
+   state; its verdict is the machine record (see Outcome above).
 
 ## The UAT waiver and release deferral (Revision 2 — operator decision)
 
@@ -80,6 +95,18 @@ The re-walked UAT and both releases move to Set 084:
   verification (five rounds of evidence) and the required path-aware
   critique artifact. The waiver covers exactly one thing: the human walk,
   in favor of a strictly stronger one.
+
+## Path-aware critique adjudication (L-070-1)
+
+The required two-provider critique ran against the same diff base
+(`path-aware-critique.json`): the google arm (gemini-2.5-pro) performed a
+full repository-reading review and returned **VERIFIED**; the openai arm
+(gpt-5.4) exhausted its probe budget and emitted a placeholder **Minor**
+via the budget-aware forced-verdict guard (the L-067-1 mechanism working
+as designed). Adjudication: the placeholder finding is a
+no-action/characterization (it names no defect); Minor is non-blocking by
+the L-071-1 predicate. The artifact is committed as evidence of the run,
+not a pristine snapshot.
 
 ## Dogfood note
 

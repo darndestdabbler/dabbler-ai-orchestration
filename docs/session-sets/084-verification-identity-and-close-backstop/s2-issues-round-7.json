@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 7,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The stamped `verdict` is still trusted from the metrics row instead of being validated against the artifact bytes it is supposed to be derived from\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The task requires the evidence layer to accept only rows with “**internally consistent stamp fields — any missing or inconsistent field fails closed**,” and the round-4 fix claims the stamp now carries “**the VERDICT parsed at record time from the artifact-bound bytes**” so the row “**must corroborate its own close**.” That consistency is not actually enforced on read.\n  - **Impact:** A blocking verification can still be laundered into a passing close by editing the metrics row’s `verdict` field (and matching `disposition.verification_verdict`) without changing the artifact. The gate and the backstop will trust the forged favorable verdict, so the “framework holds the last word” guarantee is still breakable in a way that should change a merge decision.\n  - **Evidence:**\n    - `ai_router/verification_stamp.py` → `validate_stamped_row()`:\n      - verifies `artifact_sha256` against the artifact bytes;\n      - but for `verdict` it only does:\n        ```python\n        if row.get(\"verdict\") not in (\"VERIFIED\", \"ISSUES_FOUND\"):\n        ```\n        There is **no** re-parse of the artifact to confirm that `row[\"verdict\"]` matches the artifact content whose hash was just validated.\n    - `ai_router/gate_checks.py` → `check_verification_integrity()`:\n      - chooses `authoritative = valid_rows[-1]`;\n      - then trusts `authoritative.get(\"verdict\")` for the claim match.\n    - `ai_router/close_backstop.py` → `_existing_evidence_settles_the_close()`:\n      - also trusts `authoritative.get(\"verdict\")` when deciding whether existing evidence settles the close.\n    - No code in this diff reparses `sN-verification*.md` during validation/settlement to prove the stamped `verdict` still matches the artifact bytes.\n  - **Correct answer:** In validation/settlement, parse the verified artifact bytes and require that parsed verdict to equal the row’s stamped `verdict` (or stop trusting the row field and use the parsed artifact verdict directly). Add a regression test for a tampered metrics-row verdict over an unchanged `ISSUES_FOUND` artifact.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

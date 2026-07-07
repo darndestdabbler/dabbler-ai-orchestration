@@ -601,15 +601,31 @@ def validate_stamped_row(
     ):
         return False, "package_version is missing (fails closed)"
 
-    # 8. Verdict token (I-084-S2-7): the stamped verdict — parsed at
-    # record time from the same bytes the artifact hash binds — must be
-    # a legal token. The claim-vs-stamp equality check lives with the
-    # consumers (the close gate and the backstop's skip predicate),
-    # which know the disposition's claim.
+    # 8. Verdict binding (I-084-S2-7/-10): the stamped verdict is not
+    # merely a legal token — it must RE-DERIVE from the artifact bytes
+    # whose hash was just validated, so editing the metrics row's
+    # verdict field (without touching the artifact) fails closed. The
+    # claim-vs-stamp equality check lives with the consumers (the close
+    # gate and the backstop's skip predicate), which know the
+    # disposition's claim.
     if row.get("verdict") not in ("VERIFIED", "ISSUES_FOUND"):
         return False, (
             f"stamped verdict {row.get('verdict')!r} is not a legal "
             "token (fails closed)"
+        )
+    try:
+        from .verification import parse_verification_response
+    except ImportError:
+        from verification import parse_verification_response  # type: ignore[no-redef]
+    artifact_verdict, _artifact_issues = parse_verification_response(
+        artifact_bytes.decode("utf-8", errors="replace")
+    )
+    if row.get("verdict") != artifact_verdict:
+        return False, (
+            f"stamped verdict {row.get('verdict')!r} does not re-derive "
+            f"from the artifact's own content ({artifact_verdict!r}) — "
+            "a row-level verdict edit cannot outrank the hash-bound "
+            "artifact (fails closed)"
         )
 
     # 9. Freshness — the row must have verified THE repo state being

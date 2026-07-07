@@ -600,6 +600,22 @@ class TestStampedEvidenceLayer:
         )
         assert passed, remediation
 
+    def test_tampered_row_verdict_over_unchanged_artifact_fails(
+        self, tmp_path, monkeypatch,
+    ):
+        """I-084-S2-10 (round-7 finding): editing the metrics row's
+        verdict field cannot outrank the hash-bound artifact — the
+        validator re-derives the verdict from the artifact bytes."""
+        set_dir = _make_set(tmp_path)
+        row = write_stamped_evidence(set_dir, content="ISSUES_FOUND\n")
+        row["verdict"] = "VERIFIED"  # the forged row-level flip
+        _write_metrics(tmp_path, monkeypatch, [row])
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition(verdict="VERIFIED")
+        )
+        assert not passed
+        assert "re-derive" in remediation
+
     def test_cherry_picking_an_older_favorable_row_is_refused(
         self, tmp_path, monkeypatch,
     ):

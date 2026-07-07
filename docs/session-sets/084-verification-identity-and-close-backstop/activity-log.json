@@ -164,6 +164,14 @@
       "dateTime": "2026-07-07T05:53:40.622932-04:00",
       "description": "Dogfood round 6 (LIVE, $0.5042, gpt-5-4): one Major, fixed (I-084-S2-9): the evidence-present skip path now rediscovers the settling row's bookkeeping paths (artifact, paired issues envelope, patched disposition) and keeps them tolerated by working_tree_clean, so a backstop-VERIFIED run whose close fails on a LATER gate stays idempotent on rerun (no manual commit demanded outside the close-out flow). Regression: backstop VERIFIED -> change_log_fresh failure -> rerun skips the backstop, fails only the same later gate (also closes the round-6 nit: the skip path is now exercised). Suite 2728 passed. Round 7 decides.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "s2.backstop",
+      "dateTime": "2026-07-07T06:05:42.682299-04:00",
+      "description": "Dogfood round 7 (LIVE, $0.4064, gpt-5-4): one Major, fixed (I-084-S2-10): validate_stamped_row now re-derives the verdict from the hash-validated artifact bytes -- a hand-edited metrics-row verdict over an unchanged artifact fails closed (regression test: forged VERIFIED flip over an ISSUES_FOUND artifact refused). CORRECTION NOTE for this ledger (append-only; supersedes step 3's wording): --force does NOT skip the backstop -- since the I-084-S2-1 remediation an unverified force-close receives the same in-process verification; step 3's 'force triggers no metered call' described the pre-R1 design. Field-count prose everywhere now points at STAMP_FIELDS instead of hardcoding a number. Suite 2729 passed. Round 8 decides.",
+      "status": "complete"
     }
   ]
 }

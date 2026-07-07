@@ -67,10 +67,25 @@ STAMP_SOURCES = (STAMP_SOURCE_VERIFY_SESSION, STAMP_SOURCE_CLOSE_BACKSTOP)
 # Versioned template id, minted in CODE so the canonical template file
 # stays byte-identical (L-069-2 — the hash protects the framing; the id
 # never rides inside it). An operator who deliberately revises the
-# template bumps this constant in the same change — the paired hash
-# check below makes an unbumped edit fail closed rather than pass
+# template bumps this constant in the same change — the PINNED hash
+# registry below makes an unbumped edit fail closed rather than pass
 # accidentally.
 TEMPLATE_ID = "session-verification-v1"
+
+# The immutable id -> normalized-hash registry (I-084-S2-2): each
+# version id pins exactly one normalized content hash, recorded here at
+# the moment the version is minted. This — not a comparison against
+# whatever the template file currently says — is what makes "an
+# operator template change is an explicit version bump, never an
+# accidental pass" true for NEWLY produced rows too: an edited template
+# under an unbumped id mismatches its pin, so the producer refuses to
+# stamp against it and the consumer refuses rows claiming it. Revising
+# the template = new TEMPLATE_ID + new pinned entry, in one change.
+TEMPLATE_HASHES = {
+    "session-verification-v1": (
+        "9d7c1f0cb474498187a2210076b8631dd3a0642a53375cea17e404088dfc45de"
+    ),
+}
 
 # The nine stamp fields, in the order they appear on the row. The
 # metrics writer and the gate validator both key off this tuple.
@@ -174,11 +189,26 @@ def build_stamp(
         raise ValueError(
             f"stamp source must be one of {STAMP_SOURCES!r} (got {source!r})"
         )
+    # I-084-S2-2: the producer refuses to stamp against a template whose
+    # normalized hash does not match TEMPLATE_ID's pinned entry — an
+    # edited-but-unbumped template fails LOUD at production time, never
+    # producing a row that claims the unbumped version.
+    current_hash = template_sha256(template_text)
+    pinned_hash = TEMPLATE_HASHES.get(TEMPLATE_ID)
+    if current_hash != pinned_hash:
+        raise ValueError(
+            f"the verification template's normalized hash ({current_hash}) "
+            f"does not match the hash pinned for {TEMPLATE_ID!r} "
+            f"({pinned_hash}). The template changed without an explicit "
+            "version bump — mint a new TEMPLATE_ID with a new pinned "
+            "entry in TEMPLATE_HASHES (one change), or restore the "
+            "canonical template. Refusing to stamp (fails closed)."
+        )
     return {
         "source": source,
         "evidence_sha256": evidence_sha256,
         "template_id": TEMPLATE_ID,
-        "template_sha256": template_sha256(template_text),
+        "template_sha256": current_hash,
         "orchestrator_effective_provider": orchestrator_effective_provider,
         "artifact_path": artifact_path,
         "package_version": package_version(),
@@ -268,12 +298,29 @@ def validate_stamped_row(
     if not is_hex_sha256(row.get("evidence_sha256")):
         return False, "evidence_sha256 is not a well-formed SHA-256"
 
-    # 3. Template binding.
+    # 3. Template binding — against the PINNED id -> hash registry
+    # (I-084-S2-2), not merely the file on disk: a row must claim the
+    # current canonical version, its stamped hash must equal that
+    # version's immutable pin, and the on-disk template must still
+    # match its pin (a drifted template invalidates closes until the
+    # version is explicitly bumped and re-pinned).
     if row.get("template_id") != TEMPLATE_ID:
         return False, (
             f"template_id {row.get('template_id')!r} does not match the "
             f"canonical {TEMPLATE_ID!r} — a template change is an "
             "explicit version bump, never an accidental pass"
+        )
+    pinned_hash = TEMPLATE_HASHES.get(TEMPLATE_ID)
+    if not pinned_hash:
+        return False, (
+            f"{TEMPLATE_ID!r} has no pinned hash in TEMPLATE_HASHES "
+            "(fails closed)"
+        )
+    if row.get("template_sha256") != pinned_hash:
+        return False, (
+            "template_sha256 does not match the hash pinned for "
+            f"{TEMPLATE_ID!r} — the row was stamped against a diluted or "
+            "drifted template; re-verify against the canonical template"
         )
     try:
         current_hash = template_sha256()
@@ -283,12 +330,13 @@ def validate_stamped_row(
             f"({type(exc).__name__}) — cannot confirm template binding "
             "(fails closed)"
         )
-    if row.get("template_sha256") != current_hash:
+    if current_hash != pinned_hash:
         return False, (
-            "template_sha256 does not match the canonical template's "
-            "normalized hash — the template changed since this row was "
-            "stamped (or the row was stamped against a diluted template); "
-            "re-verify against the canonical template"
+            "the on-disk verification template's normalized hash does "
+            f"not match the hash pinned for {TEMPLATE_ID!r} — the "
+            "template changed without an explicit version bump; mint a "
+            "new TEMPLATE_ID + pinned entry (or restore the canonical "
+            "template) before any close can corroborate"
         )
 
     # 4. Verifier model consistency + registry resolution.

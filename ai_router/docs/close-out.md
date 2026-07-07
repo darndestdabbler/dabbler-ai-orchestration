@@ -362,14 +362,16 @@ returns the corresponding exit code without touching downstream state.
     `ISSUES_FOUND` — claim stands it down); the operator-declared
     zero-budget tier (`ai_router/budget.yaml`, `threshold_usd: 0`)
     keeps its existing manual/attested flow with no metered call;
-    `--manual-verify` is the attested bypass; `--force` triggers **no**
-    metered call and still cannot pass unverified (the
-    verification-integrity check below refuses); Lightweight closes
-    keep their own per-set gates; an illegal `verification_method`
-    token skips the backstop because the vocabulary gate refuses that
-    close anyway. The backstop runs inside the close lock and is
-    idempotent: a re-run after a backstop-verified close finds the
-    stamped evidence and skips.
+    `--manual-verify` is the attested bypass. `--force` gets **no**
+    special treatment (I-084-S2-1 — "force bypasses neither evidence
+    layer" means force closes receive the same in-process verification,
+    not merely the same refusal); incident recovery under a dead
+    provider goes through the attested `--manual-verify` path.
+    Lightweight closes keep their own per-set gates; an illegal
+    `verification_method` token skips the backstop because the
+    vocabulary gate refuses that close anyway. The backstop runs inside
+    the close lock and is idempotent: a re-run after a
+    backstop-verified close finds the stamped evidence and skips.
 7. **Run deterministic gate checks** (`ai_router.gate_checks`):
    - `check_working_tree_clean` — `git status` is clean (or only
      ignored patterns remain). Catches "agent forgot to commit".

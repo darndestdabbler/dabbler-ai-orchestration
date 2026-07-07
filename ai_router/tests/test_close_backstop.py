@@ -519,13 +519,14 @@ class TestBackstopSkips:
         assert fake_route.calls == []
         assert any("zero-budget" in m for m in outcome.messages)
 
-    def test_force_path_never_triggers_the_backstop(
+    def test_force_path_also_gets_the_backstop(
         self, closeable, fake_route, tmp_path, monkeypatch,
     ):
-        """--force bypasses bookkeeping gates, not evidence: no backstop
-        call is metered on the incident-recovery path, and the
-        verification-integrity check still refuses the unverified
-        close — the floor holds by refusal, not by surprise spend."""
+        """I-084-S2-1 (this set's own backstop round-1 finding): --force
+        bypasses bookkeeping gates, NEITHER evidence layer — an
+        unverified force-close receives the same in-process
+        verification, and the fresh stamped row then satisfies the
+        verification-integrity check the force path still runs."""
         root, set_dir = closeable
         _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
         monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", "1")
@@ -537,8 +538,34 @@ class TestBackstopSkips:
             force=True,
             reason_file=str(reason),
         ))
+        assert outcome.result == "succeeded", outcome.messages
+        assert len(fake_route.calls) == 1
+        assert (set_dir / "s1-verification.md").exists()
+
+    def test_force_close_with_blocking_backstop_verdict_is_refused(
+        self, closeable, tmp_path, monkeypatch,
+    ):
+        """Force cannot outrank the backstop's verdict either."""
+        root, set_dir = closeable
+        fake = FakeBackstopRoute(
+            response=(
+                "ISSUES_FOUND\n\n"
+                "Issue 1: Broken deliverable.\nSeverity: Major\n"
+            ),
+        )
+        monkeypatch.setattr(close_backstop, "_default_route", fake)
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+        monkeypatch.setenv("AI_ROUTER_ALLOW_FORCE_CLOSE_OUT", "1")
+        reason = tmp_path / "reason.md"
+        reason.write_text("incident recovery\n", encoding="utf-8")
+
+        outcome = close_session.run(_ns(
+            session_set_dir=str(set_dir),
+            force=True,
+            reason_file=str(reason),
+        ))
         assert outcome.result == "gate_failed"
-        assert fake_route.calls == []
+        assert len(fake.calls) == 1
 
     def test_manual_verify_path_never_triggers_the_backstop(
         self, closeable, fake_route, tmp_path,

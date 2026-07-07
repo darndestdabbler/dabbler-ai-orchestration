@@ -116,6 +116,14 @@
       "dateTime": "2026-07-07T04:15:10.232838-04:00",
       "description": "Layer-1 matrix: test_close_backstop.py (20 tests: incident-1 self-attested close -- backstop verdict governs both ways; incident-2 null-verdict close verified-or-blocked; incident-3 bare-route row rejected + backstop runs with anthropic excluded; verification_unavailable blocks naming --manual-verify; two-attempt ladder; zero-budget passthrough; force/manual-verify neither triggers the backstop; Minor-only settled claims stand it down; idempotent re-close; pre-session diff base), test_verification_stamp.py (12 producer-side unit tests), 11 new stamp-layer gate tests (template-hash mismatch, per-field missing-stamp matrix, edited artifact, copied stamp, exclusion mismatch, backstop source). Existing close-path fixtures upgraded to stamped evidence via shared tests/stamp_fixtures.py; conftest autouse guard refuses live routed calls from the backstop in tests. Fixed a live I-084-S1-2-class defect: the backstop catches VerificationUnavailableError under both module identities. Full suite: 2713 passed, 5 skipped; e2e: 11 passed.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "s2.backstop",
+      "dateTime": "2026-07-07T04:25:24.019320-04:00",
+      "description": "Dogfood round 1 (LIVE): close_session invoked with no manual verify_session; the backstop ran the verification in-process (verifier gpt-5-4, anthropic excluded by resolution, diff base = last pre-session commit 4649a63, $0.2537) and REFUSED the close with 3 Major findings -- the live proof the framework holds the last word. All three accepted and remediated (ledger, zero resurrections): I-084-S2-1 --force no longer skips the backstop (an unverified force-close gets the same in-process verification; incident recovery under a dead provider is the attested --manual-verify path); I-084-S2-2 TEMPLATE_HASHES pins each template id to an immutable normalized hash, enforced at stamp production AND consumption, plus a tripwire test that fails on any unbumped template edit; I-084-S2-3 the disposition/ledger dogfood narrative rewritten to stay within its evidence (L-073-1). Re-close lets the backstop run round 2 live; its verdict governs.",
+      "status": "complete"
     }
   ]
 }

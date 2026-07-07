@@ -73,6 +73,24 @@ class TestStampAssembly:
         assert stamp["template_sha256"] == template_sha256()
         assert stamp["package_version"]
 
+    def test_current_template_matches_its_pinned_hash(self):
+        """The shipping template must hash to TEMPLATE_ID's pinned entry
+        — this test IS the explicit-version-bump tripwire: anyone who
+        edits the template sees this fail until they mint a new id +
+        pin (I-084-S2-2)."""
+        assert template_sha256() == vstamp.TEMPLATE_HASHES[TEMPLATE_ID]
+
+    def test_build_stamp_refuses_a_drifted_template(self, monkeypatch):
+        """An edited-but-unbumped template fails LOUD at production
+        time — the producer never stamps a row claiming the unbumped
+        version (I-084-S2-2)."""
+        monkeypatch.setattr(
+            vstamp, "load_canonical_template",
+            lambda: "A diluted, friendlier review template.",
+        )
+        with pytest.raises(ValueError, match="version bump"):
+            self._stamp()
+
     def test_complete_stamp_fills_the_route_time_halves(self):
         content = "VERIFIED -- tried hard, found nothing.\n"
         completed = complete_stamp(

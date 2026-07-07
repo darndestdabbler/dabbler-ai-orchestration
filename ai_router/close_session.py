@@ -1752,15 +1752,17 @@ def run(
         # the evidence gate below), refuse with the findings on a
         # blocking ISSUES_FOUND, block explicitly on
         # verification_unavailable / provider failure — never a pass.
-        # Scope: the normal close path only. --manual-verify is the
-        # attested operator bypass; --force bypasses bookkeeping gates
-        # (the verification-integrity check still refuses an
-        # unverified force-close, so the floor holds without metering
-        # a surprise call on the incident-recovery path); Lightweight
-        # closes have their own per-set gates; the zero-budget tier is
-        # honored inside the backstop itself.
+        # Scope: every Full-tier close INCLUDING --force (I-084-S2-1,
+        # this set's own backstop round-1 finding: "--force bypasses
+        # neither evidence layer" means force closes get the same
+        # in-process verification, not just the same refusal —
+        # incident recovery under a dead provider goes through the
+        # attested --manual-verify path instead). --manual-verify is
+        # that attested operator bypass; Lightweight closes have their
+        # own per-set gates; the zero-budget tier is honored inside
+        # the backstop itself.
         backstop_written_paths: List[str] = []
-        if not args.force and not args.manual_verify and not no_router:
+        if not args.manual_verify and not no_router:
             try:
                 from close_backstop import (  # type: ignore[import-not-found]
                     BACKSTOP_CHECK_NAME,

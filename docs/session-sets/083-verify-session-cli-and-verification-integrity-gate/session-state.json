@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "083-verify-session-cli-and-verification-integrity-gate",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -34,16 +34,16 @@
     {
       "number": 3,
       "title": "Instruction surfaces, UAT, and the two releases",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-06T17:11:02.935411-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-06T22:19:29.129999-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "claude-fable-5",
         "effort": "high"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

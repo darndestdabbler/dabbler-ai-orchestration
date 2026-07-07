@@ -46,5 +46,8 @@
 > surfaces + the skip removal + consensus + Set 084 authoring (VERIFIED,
 > 5 rounds). Suites at set close: Layer-1 pytest **2575 passed / 5
 > baseline skips**; Layer-2 mocha **1270 passing**. Every session's own
-> Step 6 and close ran through the machinery the set built (live
-> dogfood).
+> Step 6 ran through the `verify_session` CLI the set built; S1's and
+> S2's closes ran through the new gate live, and S3's close — the last
+> act of the set, immediately after its final verification round — runs
+> through the strictest form of that gate (mandatory verification, no
+> null-verdict close). The recorded proof is `session-events.jsonl`.

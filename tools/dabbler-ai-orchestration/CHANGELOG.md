@@ -21,6 +21,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   both tiers. Requires `dabbler-ai-router` >= 0.29.0 in consumer venvs for
   the matching CLI + close-gate behavior.
 
+## [0.38.0] — 2026-07-06 (Set 082 — omit verificationMode from Full-tier scaffolds)
+
 Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero
 `ai_router/` changes in this set).
 

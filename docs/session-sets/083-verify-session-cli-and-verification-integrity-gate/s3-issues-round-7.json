@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 7,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The set change log still pre-asserts a VERIFIED outcome for Session 3**\n  - **Category:** False Positive\n  - **Severity:** Major\n  - **Details:**\n    - **Violation** — The governing round ledger says this exact class was fixed: **“V2 (R5.2, pre-asserted verdict in close paperwork): RESOLVED … The ABSENCE of a prose ‘VERIFIED’ is the fix, not an omission.”** The prompt also says this round is verifying **“the corrected change-log wording.”**\n    - **Impact** — This leaves a durable false-confidence claim in a close artifact for the very set whose purpose is verification integrity. A reasonable reviewer should block on that: the repository would still advertise Session 3 as VERIFIED even though the machine record and committed raw evidence do not say that.\n    - **Evidence** — `docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/change-log.md` still says: **“S3 instruction surfaces + the skip removal + consensus + Set 084 authoring (VERIFIED, 5 rounds).”** But the current machine record in `docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/disposition.json` is **`\"verification_verdict\": \"ISSUES_FOUND\"`**, and the committed latest raw review artifact `s3-verification-round-6.md` is **ISSUES FOUND**. The “5 rounds” wording is also stale on its face because round 6 artifacts are present.\n    - **Correct answer** — Remove the prose verdict from `change-log.md` and defer to `disposition.verification_verdict`, or update the change log only after a real final verification round exists and patches the machine record to the matching final verdict.",
+      "category": "False Positive",
+      "severity": "Major"
+    }
+  ]
+}

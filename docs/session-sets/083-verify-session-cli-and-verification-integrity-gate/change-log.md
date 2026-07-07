@@ -40,11 +40,14 @@
 > published nothing. The 083 checklist's two text assertions migrate
 > verbatim into the 084 cold-start walk.
 >
-> **Sessions:** S1 the `verify_session` CLI (VERIFIED, 3 rounds);
-> S2 the verification-integrity gate, 47-test matrix incl. the incident
-> as a regression fixture (VERIFIED, 4 rounds, $1.29); S3 instruction
-> surfaces + the skip removal + consensus + Set 084 authoring (VERIFIED,
-> 5 rounds). Suites at set close: Layer-1 pytest **2575 passed / 5
+> **Sessions:** S1 the `verify_session` CLI (VERIFIED, 3 rounds, per its
+> recorded close); S2 the verification-integrity gate, 47-test matrix
+> incl. the incident as a regression fixture (VERIFIED, 4 rounds, $1.29,
+> per its recorded close); S3 instruction surfaces + the skip removal +
+> consensus + Set 084 authoring — S3's verdict is the machine record
+> (`disposition.verification_verdict` as patched by the CLI, and the
+> `verificationVerdict` the close writes to `session-state.json`), never
+> asserted in this prose. Suites at set close: Layer-1 pytest **2575 passed / 5
 > baseline skips**; Layer-2 mocha **1270 passing**. Every session's own
 > Step 6 ran through the `verify_session` CLI the set built; S1's and
 > S2's closes ran through the new gate live, and S3's close — the last

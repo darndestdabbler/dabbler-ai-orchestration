@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "085-guidance-slimming-and-preload-ceilings",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -36,9 +36,9 @@
     {
       "number": 3,
       "title": "Session 3",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-07T14:42:31.549267-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-07T15:59:22.849017-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -46,7 +46,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

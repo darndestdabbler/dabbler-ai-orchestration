@@ -32,8 +32,10 @@ Follow these links in order; each step hands you the input for the next:
    Configuration* block.
 5. **Run `start_session`** (routed for Full, `--no-router` for Lightweight —
   the resolver does this for you from `tier:`).
-6. **Do the session's work**, then verify and close (`verify_session` —
-  mandatory on Full tier — then `close_session`).
+6. **Do the session's work**, then verify and close — on **Full**,
+  `verify_session` (mandatory, every session) then `close_session`; on
+  **Lightweight**, verification is per-set per `verificationMode`
+  (Step 5 tells you which branch applies), then `close_session`.
 
 ---
 
@@ -98,12 +100,18 @@ reset).
 Follow the active spec's step list for the current session. Log progress;
 make file edits, run tests, commit at the end.
 
-## Step 5 — Run cross-provider verification (mandatory on Full tier)
+## Step 5 — Run cross-provider verification (Full tier: mandatory; Lightweight: skip to Step 6)
 
-Every Full-tier session verifies before it closes. **There is no skip** — an
-engine cannot decide a diff is "too small to verify", and the close gate
-hard-refuses a Full-tier close with no corroborated verification evidence.
-Run:
+> **Tier branch (from Step 2):** this step's command is **Full-tier
+> only**. On `tier: lightweight` do **not** run it — the Lightweight
+> contract is zero metered API calls, and verification is **per-set**
+> per the set's `verificationMode` (see the workflow doc's Lightweight
+> verification section). Go straight to Step 6.
+
+Every **Full-tier** session verifies before it closes. **There is no
+skip** — an engine cannot decide a diff is "too small to verify", and
+the close gate hard-refuses a Full-tier close with no corroborated
+verification evidence. Run:
 
 ```bash
 .venv/Scripts/python.exe -m ai_router.verify_session \

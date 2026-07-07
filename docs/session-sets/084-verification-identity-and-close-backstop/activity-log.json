@@ -156,6 +156,14 @@
       "dateTime": "2026-07-07T05:40:16.532005-04:00",
       "description": "Dogfood round 5 (LIVE, $0.3935, gpt-5-4): converged to ONE Major, fixed (I-084-S2-8): claim-in-set membership let a claim cherry-pick an older favorable stamped row past a later refusing verification. The LATEST valid stamped row is now the single authoritative result in both the close gate and the backstop skip predicate, and the Minor-only settlement check reads the findings envelope paired to that row's own round (derived from its stamped artifact path). Regression tests both directions (older-VERIFIED/latest-ISSUES_FOUND refused; latest-VERIFIED corroborates). Suite 2727 passed. Round 6 decides.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "s2.backstop",
+      "dateTime": "2026-07-07T05:53:40.622932-04:00",
+      "description": "Dogfood round 6 (LIVE, $0.5042, gpt-5-4): one Major, fixed (I-084-S2-9): the evidence-present skip path now rediscovers the settling row's bookkeeping paths (artifact, paired issues envelope, patched disposition) and keeps them tolerated by working_tree_clean, so a backstop-VERIFIED run whose close fails on a LATER gate stays idempotent on rerun (no manual commit demanded outside the close-out flow). Regression: backstop VERIFIED -> change_log_fresh failure -> rerun skips the backstop, fails only the same later gate (also closes the round-6 nit: the skip path is now exercised). Suite 2728 passed. Round 7 decides.",
+      "status": "complete"
     }
   ]
 }

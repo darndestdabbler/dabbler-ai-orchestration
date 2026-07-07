@@ -316,8 +316,9 @@ def _existing_evidence_settles_the_close(
     session_number: int,
     disposition: Disposition,
     orchestrator_provider: str,
-) -> bool:
-    """True when valid stamped evidence already covers this close.
+) -> Optional[dict]:
+    """The authoritative settling row when valid stamped evidence
+    already covers this close, else ``None``.
 
     ``verify_session`` pre-empts the backstop by producing exactly this
     state. Two shapes qualify:
@@ -333,7 +334,7 @@ def _existing_evidence_settles_the_close(
         str(session_set_dir), session_number, orchestrator_provider,
     )
     if not valid:
-        return False
+        return None
     claimed = _claimed_close_verdict(disposition)
     # I-084-S2-7/-8: the LATEST valid stamped row is the one
     # authoritative result (rows append chronologically) — the claim
@@ -342,20 +343,56 @@ def _existing_evidence_settles_the_close(
     # later verification refused.
     authoritative = valid[-1]
     if claimed != authoritative.get("verdict"):
-        return False
+        return None
     if claimed == "VERIFIED":
-        return True
+        return authoritative
     if claimed == "ISSUES_FOUND":
         envelope = _issues_envelope_for_artifact(
             session_set_dir, authoritative.get("artifact_path")
         )
         if envelope is None:
-            return False  # anti-laundering: no findings list -> blocking
+            return None  # anti-laundering: no findings list -> blocking
         issues = envelope.get("issues")
         if not isinstance(issues, list):
-            return False
-        return not is_blocking_verdict("ISSUES_FOUND", issues)
-    return False
+            return None
+        if is_blocking_verdict("ISSUES_FOUND", issues):
+            return None
+        return authoritative
+    return None
+
+
+def _settling_bookkeeping_paths(
+    session_set_dir: Path, authoritative: dict
+) -> List[str]:
+    """The corroborating evidence's on-disk bookkeeping for one close.
+
+    I-084-S2-9 (the dogfood's round-6 finding): a backstop-VERIFIED run
+    whose close later fails a different gate leaves its artifacts
+    uncommitted; the RERUN skips the backstop, so the working-tree gate
+    must keep tolerating exactly those files — rediscovered from the
+    authoritative row, never remembered from a prior process.
+    """
+    paths: List[str] = [str(session_set_dir / "disposition.json")]
+    artifact_path = authoritative.get("artifact_path")
+    if not artifact_path:
+        return paths
+    resolved = (
+        Path(artifact_path)
+        if os.path.isabs(str(artifact_path))
+        else Path(session_set_dir) / os.path.basename(str(artifact_path))
+    )
+    paths.append(str(resolved))
+    match = re.fullmatch(
+        r"s(\d+)-verification(?:-round-(\d+))?\.md",
+        os.path.basename(str(artifact_path)),
+    )
+    if match:
+        envelope = _vs.issues_artifact_path(
+            session_set_dir, int(match.group(1)), int(match.group(2) or 1)
+        )
+        if envelope.exists():
+            paths.append(str(envelope))
+    return paths
 
 
 def run_close_backstop(
@@ -429,11 +466,21 @@ def run_close_backstop(
             ),
         )
 
-    # Skip when verify_session already produced settling evidence.
-    if _existing_evidence_settles_the_close(
+    # Skip when settling evidence already exists (verify_session — or a
+    # prior backstop round — pre-empted this run). The skip outcome
+    # still carries the corroborating evidence's bookkeeping paths so a
+    # rerun after a later gate failure keeps tolerating the uncommitted
+    # artifacts a prior backstop round wrote (I-084-S2-9).
+    settling_row = _existing_evidence_settles_the_close(
         set_dir, session_number, disposition, identity.effective_provider,
-    ):
-        return BackstopOutcome(status=STATUS_SKIPPED_EVIDENCE_PRESENT)
+    )
+    if settling_row is not None:
+        return BackstopOutcome(
+            status=STATUS_SKIPPED_EVIDENCE_PRESENT,
+            written_paths=_settling_bookkeeping_paths(
+                set_dir, settling_row
+            ),
+        )
 
     # --- The backstop runs. Same machinery as verify_session, end to
     # --- end: evidence -> template -> exclusion -> stamped row ->

@@ -1815,13 +1815,17 @@ def run(
                     backstop_status=backstop.status,
                 )
                 return outcome
+            # The backstop's artifacts + disposition patch are close-out
+            # bookkeeping written mid-close (the session-events.jsonl
+            # precedent): the working-tree gate tolerates them for THIS
+            # close, and the operator commits them in the close-out
+            # commit. On the evidence-present SKIP path the same paths
+            # are rediscovered from the settling row (I-084-S2-9), so a
+            # rerun after a later gate failure stays idempotent instead
+            # of tripping working_tree_clean on a prior round's
+            # uncommitted artifacts.
+            backstop_written_paths = list(backstop.written_paths)
             if backstop.status == STATUS_VERIFIED:
-                # The backstop's artifacts + disposition patch are
-                # close-out bookkeeping written mid-close (the
-                # session-events.jsonl precedent): the working-tree
-                # gate tolerates them for THIS close, and the operator
-                # commits them in the close-out commit.
-                backstop_written_paths = list(backstop.written_paths)
                 disposition = _read_disposition_or_none(session_set_dir)
                 verdict = resolve_close_verdict(disposition)
                 _emit_event(

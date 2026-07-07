@@ -374,7 +374,11 @@ returns the corresponding exit code without touching downstream state.
     `verification_method` token skips the backstop because the
     vocabulary gate refuses that close anyway. The backstop runs inside
     the close lock and is idempotent: a re-run after a
-    backstop-verified close finds the stamped evidence and skips.
+    backstop-verified close finds the stamped evidence and skips — and
+    the skip rediscovers that evidence's bookkeeping paths (artifact,
+    findings envelope, patched disposition) so the working-tree gate
+    keeps tolerating them when a prior round's close failed on a LATER
+    gate and the artifacts are still uncommitted (I-084-S2-9).
 7. **Run deterministic gate checks** (`ai_router.gate_checks`):
    - `check_working_tree_clean` — `git status` is clean (or only
      ignored patterns remain). Catches "agent forgot to commit".

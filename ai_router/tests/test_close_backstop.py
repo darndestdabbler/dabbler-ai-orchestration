@@ -674,6 +674,93 @@ class TestBackstopMechanics:
         assert second.result == "noop_already_closed"
         assert len(fake_route.calls) == 1
 
+    def test_rerun_after_later_gate_failure_stays_idempotent(
+        self, tmp_path, monkeypatch,
+    ):
+        """I-084-S2-9 (round-6 finding): backstop VERIFIED -> a LATER
+        gate fails -> the rerun skips the backstop AND still tolerates
+        the prior round's uncommitted bookkeeping — the rerun fails on
+        the same later gate, never on working_tree_clean."""
+        monkeypatch.setenv(
+            "AI_ROUTER_METRICS_PATH", str(tmp_path / "metrics.jsonl")
+        )
+        fake = FakeBackstopRoute()
+        monkeypatch.setattr(close_backstop, "_default_route", fake)
+        root = tmp_path / "repo"
+        root.mkdir()
+        _git(root, "init", "-b", "main")
+        _git(root, "config", "user.email", "t@example.invalid")
+        _git(root, "config", "user.name", "T")
+        _git(root, "config", "commit.gpgsign", "false")
+        (root / "README.md").write_text("baseline\n", encoding="utf-8")
+        _git(root, "add", "README.md")
+        _git(root, "commit", "-m", "baseline")
+        bare = tmp_path / "repo.git"
+        bare.mkdir()
+        _git(bare, "init", "--bare", "-b", "main")
+        _git(root, "remote", "add", "origin", str(bare))
+        _git(root, "push", "-u", "origin", "main")
+        set_dir = root / "docs" / "session-sets" / "final-set"
+        set_dir.mkdir(parents=True)
+        (set_dir / "spec.md").write_text("# spec\n", encoding="utf-8")
+        register_session_start(
+            session_set=str(set_dir),
+            session_number=1,
+            total_sessions=1,  # final session; change-log.md is owed
+            orchestrator_engine="claude-code",
+            orchestrator_model="claude-fable-5",
+            orchestrator_effort="high",
+            orchestrator_provider="anthropic",
+        )
+        (set_dir / "activity-log.json").write_text(
+            json.dumps({
+                "sessionSetName": "final-set",
+                "createdDate": "2026-07-07T00:00:00-04:00",
+                "totalSessions": 1,
+                "entries": [{
+                    "sessionNumber": 1, "stepNumber": 1,
+                    "stepKey": "session-1/work",
+                    "dateTime": "2026-07-07T01:00:00-04:00",
+                    "description": "did work", "status": "complete",
+                    "routedApiCalls": [],
+                }],
+            }, indent=2),
+            encoding="utf-8",
+        )
+        write_disposition(str(set_dir), Disposition(
+            status="completed",
+            summary="rerun idempotency",
+            verification_method="api",
+            files_changed=[],
+            verification_message_ids=[],
+            next_orchestrator=None,
+            blockers=[],
+            verification_verdict="VERIFIED",
+        ))
+        _git(root, "add", "-A")
+        _git(root, "commit", "-m", "land work (no change-log yet)")
+        _git(root, "push", "origin", "main")
+
+        # Run 1: backstop verifies live, then change_log_fresh fails.
+        first = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert first.result == "gate_failed", first.messages
+        assert len(fake.calls) == 1
+        failed_first = {
+            g.check for g in first.gate_results if not g.passed
+        }
+        assert failed_first == {"change_log_fresh"}, failed_first
+
+        # Run 2: the backstop skips on the existing evidence, its
+        # uncommitted bookkeeping stays tolerated, and only the same
+        # later gate fails again.
+        second = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert second.result == "gate_failed", second.messages
+        assert len(fake.calls) == 1  # no second verification
+        failed_second = {
+            g.check for g in second.gate_results if not g.passed
+        }
+        assert failed_second == {"change_log_fresh"}, failed_second
+
     def test_diff_base_is_the_last_pre_session_commit(self, closeable):
         """The caller commits before close, so a HEAD diff is empty —
         the backstop diffs from the last commit before startedAt so the

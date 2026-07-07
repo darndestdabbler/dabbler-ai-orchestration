@@ -1,0 +1,19 @@
+## ISSUES FOUND
+
+**Issue 1: Template-hash/version-bump failure is not handled as a controlled fail-closed path**
+- **Category:** Correctness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The task explicitly requires **“template-hash mismatch fails closed”** (Session 2 step 4), and the backstop contract says `close_session` should **“continue the close on `VERIFIED` / refuse with findings on `ISSUES_FOUND` / block explicitly on `verification_unavailable`.”**  
+  - **Impact:** One of the named fail-closed scenarios is not surfaced through a deterministic CLI/close outcome. If the canonical template changes without the required version bump, `verify_session` and the live close backstop can blow up with an uncaught exception instead of returning a controlled refusal/gate failure with remediation. That is merge-blocking because this set specifically claims to have hardened template drift/versioning, but the real user path is not actually handled.
+  - **Evidence:** `ai_router/verification_stamp.py` `build_stamp()` raises `ValueError` when the on-disk template hash does not match the pinned hash. `ai_router/verify_session.py` calls `stamp = build_stamp(...)` with no `try/except` around it. `ai_router/close_backstop.py` also calls `build_stamp(...)` with no catch. `ai_router/close_session.py` calls `run_close_backstop(...)` without wrapping that failure into the documented `gate_failed` path. The tests only cover `build_stamp` itself (`test_build_stamp_refuses_a_drifted_template`); there is no integration test proving `verify_session` or `close_session` converts this into the required fail-closed outcome.
+  - **Correct answer:** Catch `ValueError` from `build_stamp()` in both `verify_session` and the backstop path, and turn it into a deterministic refusal/block with remediation instead of letting the command unwind.
+
+**Issue 2: The backstop injects false “findings were remediated” context on every round >1**
+- **Category:** Correctness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** `ai_router/close_backstop.py` says the conventions block is **“factual context in the Original Task slot.”** But `_backstop_conventions()` unconditionally adds: **“earlier rounds' blocking findings were remediated ... do not re-open a settled point”** for every `round_number > 1`.
+  - **Impact:** A user can rerun `close_session` after a blocking backstop result without fixing anything, and the next verifier prompt will still falsely say the earlier blockers were remediated and instruct the verifier not to reopen settled points. That can suppress repeat findings on still-unfixed defects, directly weakening the backstop’s governing verdict. A reasonable reviewer would block on a verification prompt that can lie about remediation status.
+  - **Evidence:** In `ai_router/close_backstop.py`, `_backstop_conventions(round_number)` appends the remediation/narrow-reverify paragraph solely based on `round_number > 1`. In the same file, `run_close_backstop()` gets `round_number` from `_vs.resolve_round(...)`; there is no check for intervening fixes, commits, or any other remediation evidence before injecting that claim.
+  - **Correct answer:** Only emit the “earlier rounds were remediated / do not re-open” language when remediation can be proven, or remove that assertion and limit the conventions block to facts the backstop actually knows.

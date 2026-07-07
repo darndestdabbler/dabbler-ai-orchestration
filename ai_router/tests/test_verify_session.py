@@ -623,6 +623,27 @@ class TestRun:
         assert not (set_dir / "disposition.json").exists()
         assert "escalation ladder" in capsys.readouterr().err
 
+    def test_drifted_template_refuses_before_any_call(
+        self, repo: Path, capsys, monkeypatch,
+    ):
+        """I-084-S2-11: an unbumped template edit is a controlled
+        fail-closed exit (state error + remediation), never an
+        unwinding traceback — and no metered call is made."""
+        import ai_router.verification_stamp as vstamp
+
+        monkeypatch.setattr(
+            vstamp, "load_canonical_template",
+            lambda: "A diluted, friendlier review template.",
+        )
+        set_dir = _set_dir(repo)
+        fake = FakeRoute(response="VERIFIED -- checked.")
+        rc = vs.run(_args(set_dir), route_fn=fake)
+        assert rc == vs.EXIT_STATE
+        assert fake.calls == []
+        err = capsys.readouterr().err
+        assert "version bump" in err
+        assert not (set_dir / "s1-verification.md").exists()
+
     def test_route_receives_session_metadata_and_prompt(self, repo: Path):
         set_dir = _set_dir(repo)
         fake = FakeRoute(response="VERIFIED -- checked.")

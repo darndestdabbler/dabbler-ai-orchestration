@@ -938,14 +938,24 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             file=sys.stderr,
         )
         return EXIT_STATE
-    stamp = build_stamp(
-        source=STAMP_SOURCE_VERIFY_SESSION,
-        evidence_sha256=sha256_hex(prompt.encode("utf-8")),
-        orchestrator_effective_provider=identity.effective_provider,
-        artifact_path=repo_relative_posix(review_path, repo_root),
-        evidence_base=evidence_base,
-        work_diff_sha256=work_diff_sha256,
-    )
+    try:
+        stamp = build_stamp(
+            source=STAMP_SOURCE_VERIFY_SESSION,
+            evidence_sha256=sha256_hex(prompt.encode("utf-8")),
+            orchestrator_effective_provider=identity.effective_provider,
+            artifact_path=repo_relative_posix(review_path, repo_root),
+            evidence_base=evidence_base,
+            work_diff_sha256=work_diff_sha256,
+        )
+    except ValueError as exc:
+        # I-084-S2-11: a drifted-template refusal is a controlled
+        # fail-closed exit with remediation, never an unwinding
+        # traceback — nothing was written, nothing was routed.
+        print(
+            f"verify_session: refused to stamp (fails closed): {exc}",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
 
     if args.dry_run:
         print("verify_session: DRY RUN -- nothing written, nothing routed")

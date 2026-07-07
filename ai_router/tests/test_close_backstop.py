@@ -872,6 +872,27 @@ class TestBackstopMechanics:
 
         assert resolve_backstop_diff_base(set_dir, 1) == GIT_EMPTY_TREE
 
+    def test_drifted_template_blocks_the_close_controlled(
+        self, closeable, fake_route, monkeypatch,
+    ):
+        """I-084-S2-11 (round-8 finding): an unbumped template edit
+        surfaces as a deterministic gate_failed with remediation —
+        never an unwinding traceback, never a metered call."""
+        import verification_stamp as vstamp
+
+        root, set_dir = closeable
+        monkeypatch.setattr(
+            vstamp, "load_canonical_template",
+            lambda: "A diluted, friendlier review template.",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "gate_failed"
+        [gate] = outcome.gate_results
+        assert "version bump" in gate.remediation
+        assert fake_route.calls == []
+
     def test_missing_started_at_fails_closed_not_thin_bundle(
         self, closeable, fake_route,
     ):

@@ -172,6 +172,14 @@
       "dateTime": "2026-07-07T06:05:42.682299-04:00",
       "description": "Dogfood round 7 (LIVE, $0.4064, gpt-5-4): one Major, fixed (I-084-S2-10): validate_stamped_row now re-derives the verdict from the hash-validated artifact bytes -- a hand-edited metrics-row verdict over an unchanged artifact fails closed (regression test: forged VERIFIED flip over an ISSUES_FOUND artifact refused). CORRECTION NOTE for this ledger (append-only; supersedes step 3's wording): --force does NOT skip the backstop -- since the I-084-S2-1 remediation an unverified force-close receives the same in-process verification; step 3's 'force triggers no metered call' described the pre-R1 design. Field-count prose everywhere now points at STAMP_FIELDS instead of hardcoding a number. Suite 2729 passed. Round 8 decides.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "s2.backstop",
+      "dateTime": "2026-07-07T06:19:40.437329-04:00",
+      "description": "Dogfood round 8 (LIVE, $0.4216, gpt-5-4): two Majors, both fixed. I-084-S2-11: build_stamp's drifted-template refusal now surfaces as a controlled fail-closed outcome on both producer paths (verify_session exit 3 with remediation; backstop gate_failed naming the version bump; no metered call; integration regressions added). I-084-S2-12: the round>1 conventions paragraph no longer asserts remediation the backstop cannot know happened -- facts only (round history on disk; judge the current state; re-report remaining defects, do not re-open what the evidence shows resolved), so an unremediated rerun cannot suppress repeat findings. Suite 2731 passed. Round 9 decides.",
+      "status": "complete"
     }
   ]
 }

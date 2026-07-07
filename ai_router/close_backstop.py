@@ -204,14 +204,21 @@ def _backstop_conventions(round_number: int) -> str:
         "predicate.",
     ]
     if round_number > 1:
+        # Facts only (I-084-S2-12): the backstop cannot know whether
+        # remediation actually happened between rounds, so it never
+        # asserts it — it points at the on-disk round history and
+        # instructs the verifier to judge the CURRENT state: re-report
+        # what is still broken, do not re-open what the evidence shows
+        # resolved.
         lines.append(
-            f"- This is verification round {round_number}: earlier "
-            "rounds' blocking findings were remediated (see the "
-            "session's sN-issues*.json ledger and the remediation "
-            "commits in the diff). Re-verification rounds stay narrow "
-            "-- confirm the fixes and look for regressions they "
-            "introduce; do not re-open a settled point under fresh "
-            "wording."
+            f"- This is verification round {round_number}. Earlier "
+            "rounds' raw outputs and findings envelopes are on disk in "
+            "the session set (sN-verification*.md / sN-issues*.json), "
+            "and any remediation is visible in the evidence diff. "
+            "Judge the CURRENT state on its merits: a defect that "
+            "remains present MUST be re-reported; a point the current "
+            "evidence shows resolved is settled and is not re-opened "
+            "under fresh wording."
         )
     return "\n".join(lines)
 
@@ -548,14 +555,25 @@ def run_close_backstop(
                 f"repo state (base {diff_base!r}); fails closed."
             ),
         )
-    stamp = build_stamp(
-        source=STAMP_SOURCE_CLOSE_BACKSTOP,
-        evidence_sha256=sha256_hex(prompt.encode("utf-8")),
-        orchestrator_effective_provider=identity.effective_provider,
-        artifact_path=repo_relative_posix(review_path, repo_root),
-        evidence_base=evidence_base,
-        work_diff_sha256=work_diff_sha256,
-    )
+    try:
+        stamp = build_stamp(
+            source=STAMP_SOURCE_CLOSE_BACKSTOP,
+            evidence_sha256=sha256_hex(prompt.encode("utf-8")),
+            orchestrator_effective_provider=identity.effective_provider,
+            artifact_path=repo_relative_posix(review_path, repo_root),
+            evidence_base=evidence_base,
+            work_diff_sha256=work_diff_sha256,
+        )
+    except ValueError as exc:
+        # I-084-S2-11: a drifted-template refusal (or any stamp
+        # assembly refusal) is a CONTROLLED fail-closed block, never an
+        # unwinding traceback — no metered call is made.
+        return BackstopOutcome(
+            status=STATUS_ROUTE_FAILED,
+            remediation=(
+                f"the backstop refused to stamp (fails closed): {exc}"
+            ),
+        )
 
     if route_fn is None:
         route_fn = _default_route

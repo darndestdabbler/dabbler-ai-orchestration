@@ -576,34 +576,28 @@ escalation:
 # checks the work of the original model to catch provider-specific
 # blind spots and biases.
 #
-# Verification-surface policy (Set 068 — DEMOTE, CUT OVER S6):
-# Experiments A+B settled that per-session routed verification should be DEMOTED
-# from mandatory-every-session to a blast-radius/coupling-gated check, with the
-# end-of-set path-aware critique + the S5 contract-test gate as the primary
-# surface. The S4 transition guard held the cut-over until the S5 contract-test
-# gate was live and stable; that floor shipped in Set 068 S5, so S6 EXECUTES the
-# cut-over: per-session routed verification is now GATED, fired only when the
-# deterministic routed_gate predicate (below) trips on the session diff. Full
-# record: docs/session-sets/068-cadence-study-and-contract-gate/routed-fate-decision.md;
+# Verification-surface policy (Set 083 — MANDATORY, reversing the Set 068
+# DEMOTE): per-session cross-provider verification runs on EVERY Full-tier
+# session before close_session. The Set 068 routed-gate SKIP path is retired
+# (operator decision after the 2026-07-06 UAT incident: the gating predicate's
+# verdict was only as honest as the path list the policed actor fed it, and an
+# engine offered a skip affordance will eventually take it). The end-of-set
+# path-aware critique + the S5 contract-test gate remain as additional
+# surfaces, not replacements. The only exception is the operator-declared
+# zero-budget tier (ai_router/budget.yaml, threshold_usd: 0) — never an
+# engine's own call. Historical record of the demote-and-reversal:
+# docs/session-sets/068-cadence-study-and-contract-gate/routed-fate-decision.md;
 # policy: docs/ai-led-session-workflow.md -> "Verification-surface policy".
 verification:
   enabled: true
 
-  # --- Per-session routed-verification gate (Set 068 S6 cut-over) ---
-  # The DEMOTE decision retains per-session routed verification but GATES it on a
-  # programmatic blast-radius / coupling predicate over the session diff
-  # (ai_router/routed_gate.py -> evaluate_routed_gate). The S4 consensus required
-  # this to be a DETERMINISTIC heuristic, not an operator's per-session feeling
-  # (the most dangerous sessions are the ones whose risk is under-recognized at
-  # the time). The orchestrator runs it at Step 6:
-  #   python -m ai_router.routed_gate $(git diff --name-only <base>...HEAD)
-  # Exit 0 = REQUIRED (run the routed call), 10 = may SKIP. The predicate is
-  # biased toward REQUIRED; the three operator overrides can only RAISE the
-  # verdict, never lower it. These knobs are documentation of the defaults baked
-  # into routed_gate.py (the CLI accepts --breadth-threshold to override).
+  # --- Per-session routed-verification gate (Set 068 S6) — RETIRED (Set 083)
+  # The routed_gate CLI is kept only so pre-083 scaffolds keep working; it now
+  # always answers REQUIRED (exit 0) and its predicate is informational. The
+  # knobs below document the historical defaults; they no longer gate anything.
   routed_gate:
     enabled: true
-    breadth_threshold: 4        # distinct-file count that trips the breadth trigger
+    breadth_threshold: 4        # informational only since the Set 083 retirement
 
   # Verifier selection is RULE-BASED, not map-based. A candidate
   # verifier must be:

@@ -80,7 +80,7 @@ the events ledger, not through retained dispositions.
 |---|---|
 | `"api"` | The verifier returned synchronously via the AI router's API call (the canonical path: `python -m ai_router.verify_session`). The verdict is already on disk by the time disposition is authored. The default. |
 | `"manual-via-other-engine"` | The operator performed cross-provider verification out of band (a different AI assistant + the verification template) and recorded the verdict. Legal only when `ai_router/budget.yaml` declares the zero-budget tier; the verification-integrity gate (Set 083) enforces that declaration on any close claiming a verdict under this method. |
-| `"skipped"` | Verification was explicitly skipped. Two legal shapes: a project-level `budget.yaml` zero-budget choice (may carry a claimed verdict only with that declaration), or the per-session Set 068 routed-gate SKIP path — which must record **no** `verification_verdict` (the null-verdict close is the honest record; see Set 080 S1 for the exemplar). |
+| `"skipped"` | Verification was skipped under the **operator-declared zero-budget tier only** (`ai_router/budget.yaml`, `threshold_usd: 0`, matching `verification_method`). The per-session Set 068 routed-gate SKIP shape is **retired** (Set 083): per-session cross-provider verification is mandatory on Full tier, and the verification-integrity gate refuses any `"skipped"` close — with or without a verdict — that the zero-budget declaration does not cover. |
 
 > **Retired / renamed tokens (Set 083).** `"queue"` (retired Set 026)
 > and `"manual"` (renamed to `"manual-via-other-engine"`; the bare
@@ -178,17 +178,21 @@ accurate `next_orchestrator` recommendation.
 
 ## Common variations
 
-### Routed-gate SKIP (per-session, Set 068 DEMOTE path)
+### Zero-budget skip (operator-declared, the only legal skip)
 
-The routed gate said the session's diff may SKIP per-session
-verification. Record `"skipped"` with **no** `verification_verdict` —
-a claimed verdict without a routed run is exactly what the
-verification-integrity gate refuses:
+> **Retired shape (Set 083):** the per-session routed-gate SKIP variation
+> that used to live here (Set 068 DEMOTE; `"skipped"` + null verdict on the
+> gate's say-so) is no longer legal — per-session cross-provider
+> verification is mandatory on Full tier, and the verification-integrity
+> gate refuses a null-verdict close. `"skipped"` is now legal **only** when
+> `ai_router/budget.yaml` declares the zero-budget tier (`threshold_usd: 0`
+> with a matching `verification_method`) — an operator declaration, never a
+> per-session choice:
 
 ```json
 {
   "status": "completed",
-  "summary": "Session N: <description>. Routed gate: SKIP (exit 10) — <triggers summary>.",
+  "summary": "Session N: <description>. Zero-budget tier declared in ai_router/budget.yaml; verification per that declaration.",
   "verification_method": "skipped",
   "files_changed": ["..."],
   "verification_message_ids": [],

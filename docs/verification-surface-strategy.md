@@ -29,12 +29,14 @@ The framework verifies AI-led work on **three layers**, chosen by a single
    **replayable, execution-backed evidence** (not just read-only commentary) and
    pay reproduced probeable defects back into the floor under a quality gate — see
    §6.
-3. **Targeted — per-session routed verification, now gated** (Set 068 S4 +
-   S6). The every-session cross-provider review is **demoted**: it fires only
-   when a deterministic blast-radius / coupling predicate trips on the session
-   diff (`ai_router/routed_gate.py`). Its retained, demonstrated value is
-   **early interception of migrating cross-file coupling defects at their
-   introduction**.
+3. **Targeted — per-session routed verification, MANDATORY again** (Set 083,
+   reversing the Set 068 S4 + S6 demote). The every-session cross-provider
+   review runs on every Full-tier session with no skip: the 2026-07-06 UAT
+   incident showed the gating predicate's verdict was only as honest as the
+   path list the policed actor fed it. The predicate
+   (`ai_router/routed_gate.py`) survives as an informational trigger report
+   only. The layer's demonstrated value remains **early interception of
+   migrating cross-file coupling defects at their introduction**.
 
 All three layers, plus the `pathAwareCritique` set-level gate, are governed by
 **one** core predicate (§4) — *does the work change cross-artifact contracts,
@@ -146,18 +148,19 @@ executed in S6. The verification surface is now:
   opt-in, multi-provider (≥2 distinct providers), repository-reading, end-of-set.
   Produced manually or by the automated `python -m ai_router.pull_critique`
   producer over the Set 067 read-only adapter.
-- **Targeted — per-session routed, gated** (`ai_router/routed_gate.py`).
-  Demoted from mandatory-every-session to fire only when the predicate (§4)
-  trips on the session diff. The orchestrator runs it at Step 6 of
-  [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md); the gate
-  verdict (and its triggers) is logged whether or not the routed call runs, so a
-  skipped call is an auditable decision, not a silent omission. As of Set 070 the
+- **Targeted — per-session routed, mandatory** (`python -m
+  ai_router.verify_session`; Set 083, reversing the Set 068 demote). Runs on
+  every Full-tier session at Step 6 of
+  [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md) — no skip;
+  the verification-integrity close gate refuses an unverified close, and the
+  old gating predicate (`ai_router/routed_gate.py`) is informational only.
+  As of Set 070 the
   push template it uses (`prompt-templates/verification.md`) runs at **strong
   adversarial framing** (§5.2), and as of Set 071 that strong framing ships with a
   **materiality "so what?" gate** plus a **Minor-non-blocking re-verify loop
   discipline** (§7) — the calibration layer the steelman-push framing needed so it
-  catches real defects without manufacturing nit-churn. So the retained gated layer
-  is measured and deployed at its strongest *and* best-calibrated form.
+  catches real defects without manufacturing nit-churn. So the per-session routed
+  layer is measured and deployed at its strongest *and* best-calibrated form.
 
 The execution substrate for the floor and for any test-running pull review is
 the Set 068 S1 **disposable-worktree `run_test` cage**
@@ -200,6 +203,14 @@ SKIP silently drops the safety net).
 ---
 
 ## 5. What is still open (reopenable on telemetry)
+
+> **Overtaken by Set 083.** The question below assumed the demoted (gated)
+> policy would run long enough to collect telemetry; instead the demote was
+> reversed and per-session routed verification is **mandatory** again. The
+> RETIRE question is closed in the opposite direction — the direction of
+> travel was toward *more* per-session verification, not less. This section
+> is preserved as the historical framing of what the demote-era open
+> question was.
 
 **RETIRE** of per-session routed verification was rejected *now*, not forever.
 Reopen it only after the demoted policy has run long enough to collect, under the

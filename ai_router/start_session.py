@@ -138,6 +138,16 @@ except ImportError:
     from .check_migrations import summarize_drift  # type: ignore[no-redef]
     from .guidance_report import summarize_overhead  # type: ignore[no-redef]
 
+# Set 048 modules must never be bare-imported in production code (the
+# test_production_imports guard): the bare form only resolves under the
+# test conftest's sys.path shim and raises ModuleNotFoundError under
+# pip-install. Relative-first with a package-absolute fallback, matching
+# gate_checks._set_is_lightweight.
+try:
+    from .runtime_mode import is_no_router_mode  # type: ignore[import-not-found]
+except ImportError:
+    from ai_router.runtime_mode import is_no_router_mode  # type: ignore[no-redef]
+
 
 EXIT_OK = 0
 EXIT_USAGE = 2
@@ -921,6 +931,34 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     # session start. Advisory only: stderr, never blocks, never changes
     # the exit status; fires on both tiers with no router config.
     _print_pending_verification_banner(session_set_dir)
+
+    # Set 083 Session 3: Full-tier Step-6 affordance. Verification is
+    # not implicit and not skippable — the Set 068 routed-gate SKIP path
+    # is retired (operator decision after the 2026-07-06 UAT incident);
+    # the orchestrator must run the verify_session CLI before
+    # close_session on every Full-tier session. This is advisory-only,
+    # stderr-only, and fail-open like the drift advisory below.
+    # Lightweight stays quiet because its verification path is governed
+    # by the set's verificationMode.
+    try:
+        if not is_no_router_mode():
+            # Venv-qualified on purpose: a bare `python` often resolves
+            # to a system interpreter without ai_router (or with a stale
+            # PyPI version) — the exact skew behind the 2026-07-06 UAT
+            # failure. Matches gate_checks._verify_session_command.
+            interp = (
+                ".venv/Scripts/python.exe"
+                if os.name == "nt"
+                else ".venv/bin/python"
+            )
+            print(
+                "[dabbler] Verification is mandatory on Full tier (no "
+                f"skip): run `{interp} -m ai_router.verify_session "
+                "--session-set-dir <this-set>` before close_session.",
+                file=sys.stderr,
+            )
+    except Exception:
+        pass
 
     # Set 053: schema-drift advisory riding the session lifecycle. Because
     # every orchestrator (Claude, Copilot, Codex, human) runs start_session

@@ -3,9 +3,23 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [Unreleased] (Set 083 — mandatory Full-tier verification in the scaffold bundle)
 
-## [0.38.0] — 2026-07-06 (Set 082 — omit verificationMode from Full-tier scaffolds)
+### Changed
+
+- **Scaffolded `start-here.md` teaches mandatory verification with no skip
+  branch.** Step 5 is now `python -m ai_router.verify_session` on every
+  Full-tier session (the routed-gate step and its "if SKIP, record the
+  null-verdict skip" instruction are gone — the Set 068 SKIP path is
+  retired by operator decision after the 2026-07-06 UAT incident); Step 6
+  closes via `close_session`, and the text states the close gate refuses an
+  unverified Full-tier close. The engine bootstrap tails
+  (`AGENTS.md`/`GEMINI.md`) now say cross-provider verification is
+  mandatory before every close; `getting-started.md` no longer conditions
+  verification on the routed gate. No "automatic" claims about Full
+  verification anywhere in the bundle. Cold-start goldens regenerated for
+  both tiers. Requires `dabbler-ai-router` >= 0.29.0 in consumer venvs for
+  the matching CLI + close-gate behavior.
 
 Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero
 `ai_router/` changes in this set).
@@ -20,8 +34,9 @@ Extension-only release: `dabbler-ai-router` stays at 0.28.0 (zero
   same — phantom "choices" no Full surface ever made or reads. A live
   operator Copilot session read a fresh Full scaffold back as
   "tier: full, verificationMode: out-of-band-or-none" — the exact wrong
-  message, since automatic cross-provider verification is the Full
-  tier's defining feature. Per the simplicity-first principle the fix
+  message, since Full verification is governed by the routed-gate /
+  `verify_session` path rather than a Lightweight mode choice. Per the
+  simplicity-first principle the fix
   is omission, not a sentinel: omission is already schema-legal
   (`docs/spec-md-schema.md` lists the field as optional with a
   documented default, and every reader applies absence-means-default).

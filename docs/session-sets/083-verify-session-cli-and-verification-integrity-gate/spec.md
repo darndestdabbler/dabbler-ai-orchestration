@@ -216,6 +216,61 @@ this session's own close passed the live gate with real evidence.
 
 ### Session 3 of 3: Instruction surfaces, UAT, and the two releases
 
+> **Revision (2026-07-06, operator decision — supersedes the step text
+> below where they conflict).** The first UAT walk of this session failed
+> live: the scaffolded Step 5 taught a bare `routed_gate` invocation whose
+> empty path list always evaluated to SKIP, and the scratch build's venv
+> carried PyPI 0.28.0 (no `verify_session`, no integrity gate), after
+> which the walking engine fabricated verification. The operator ruled:
+> **"Remove the skip. As soon as you give an easy way out, the AI engine
+> will take that."** Accordingly:
+>
+> - Per-session cross-provider verification is **mandatory on every
+>   Full-tier session** — the Set 068 routed-gate SKIP path is retired.
+>   The scaffolded `start-here.md` teaches the two-command sequence
+>   (`verify_session` mandatory → `close_session`), **not** the original
+>   three-command sequence; the `start_session` advisory names
+>   `verify_session` only. `python -m ai_router.routed_gate` survives for
+>   pre-083 scaffolds but always answers REQUIRED (exit 0).
+> - The verification-integrity gate refuses a **null-verdict** Full-tier
+>   close; `skipped` / `manual-via-other-engine` are legal only under the
+>   operator-declared zero-budget tier in `ai_router/budget.yaml`. The
+>   Overview's "null-verdict close is legal" residual is superseded.
+> - The UAT checklist is revised to assert the new surfaces and to install
+>   the router **from this checkout** into the scratch venv (the PyPI
+>   version-skew trap that sank the first walk).
+> - The two releases (router 0.29.0, extension next minor) remain
+>   sequenced **after** the re-walked UAT passes and only on operator
+>   authorization, per step 5 below — their absence from the working tree
+>   before that point is by design.
+
+> **Revision 2 (2026-07-06, operator decision — supersession by Set 084).**
+> The remaining S3 gates — the re-walked human UAT and the two releases —
+> are **superseded by Set 084**
+> (`docs/session-sets/084-verification-identity-and-close-backstop/`),
+> authored the same day after a third live incident showed the fixes this
+> set shipped are necessary but not sufficient for multi-provider
+> (Copilot) seats: verifier selection was a static pin, and the gate
+> compared a free-text seat label rather than the underlying model's
+> provider. Operator reasoning (recorded verbatim in intent): walking this
+> set's revised UAT would either pass hollow text checks or rediscover the
+> incident Set 084 exists to fix, and publishing router 0.29.0 standalone
+> would ship a version already known to be identity-blind. Therefore:
+>
+> - **UAT (step 4): waived by explicit operator override** for this set.
+>   The two text assertions its checklist carried migrate verbatim into
+>   the Set 084 cold-start UAT (same Build, same file, stronger walk that
+>   also reproduces incident 3 against the new machinery). The waiver is
+>   recorded in `s3-close-reason.md` and the disposition.
+> - **Releases (step 5): deferred to Set 084 S3** as one combined release
+>   — router **0.29.0** (never published in between, so the number is
+>   clean) carrying both sets' changelog sections, plus the extension's
+>   next minor.
+> - **Not waived:** cross-provider verification of S3's work (round 5
+>   corroborates the committed tree) and the required end-of-set
+>   path-aware critique (automated; zero operator attention). The set
+>   closes through its own gate with real evidence.
+
 **Steps:**
 1. Template bundle: `start-here.md.template` Step 6 rewritten to the
    three-command sequence with literal, copy-pasteable invocations;

@@ -310,8 +310,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description=(
             "Run the close-out gate on a session set. This is the sole "
             "synchronization barrier between session work and the session "
-            "being marked complete. Close-out runs gate checks, waits on "
-            "verification (queue mode), and writes idempotent state — it "
+            "being marked complete. Close-out runs gate checks, verifies "
+            "the recorded verification evidence, and writes idempotent state — it "
             "does NOT run git commit / push or send notifications. The "
             "caller (orchestrator or fresh close-out turn agent) commits "
             "and pushes before invoking this script and fires "
@@ -527,8 +527,8 @@ def _validate_args(args: argparse.Namespace) -> Optional[str]:
         case here mirrors ``--manual-verify``'s contract.
     * ``--apply`` is meaningful only under ``--repair``; using it alone
       is almost certainly a typo and should fail loudly.
-    * ``--manual-verify`` is the bootstrapping-window escape hatch — it
-      bypasses queue blocking on the operator's word. The operator's
+        * ``--manual-verify`` is the attested operator escape hatch — it
+            bypasses the verification-evidence layer on the operator's word. The operator's
       attestation must come from somewhere: either ``--interactive``
       (prompt on stdin) or ``--reason-file`` (file contents become the
       attestation). Refusing the silent-bypass case keeps the audit

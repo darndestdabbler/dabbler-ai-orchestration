@@ -76,9 +76,10 @@ three engine files, `start-here.md`, the templated `spec.md`) is identical.
 
 ### 2. Verification: who/what reviews the session's work
 
-- **Full** runs the router's automatic, rule-based **cross-provider
-  verification** at the end of each session (a model from a *different*
-  provider reviews the work; the verdict is recorded; issues are remediated).
+- **Full** runs the router-backed, rule-based **cross-provider
+  verification** command on **every session — mandatory, no skip** (a model
+  from a *different* provider reviews the work; the verdict is recorded;
+  issues are remediated; the close gate refuses an unverified close).
 - **Lightweight** makes **zero metered API calls**, so the router cannot
   auto-verify. Verification on Lightweight is **per-set, not per-session**,
   and follows the `verificationMode` chosen once at set start (Set 057;

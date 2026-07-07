@@ -31,9 +31,9 @@ Follow these links in order; each step hands you the input for the next:
 4. **Read `tier` + `verificationMode`** from that spec's *Session Set
    Configuration* block.
 5. **Run `start_session`** (routed for Full, `--no-router` for Lightweight —
-   the resolver does this for you from `tier:`).
-6. **Do the session's work**, then **close via the shared gate**
-   (`close_session`).
+  the resolver does this for you from `tier:`).
+6. **Do the session's work**, then verify and close (`verify_session` —
+  mandatory on Full tier — then `close_session`).
 
 ---
 
@@ -60,8 +60,10 @@ set" check will already be red).
 Open the active set's `spec.md` and read its *Session Set Configuration*
 block:
 
-- **`tier: full`** → the session runs through the AI router; verification is
-  the automatic cross-provider step at session end.
+- **`tier: full`** → the session runs through the AI router; run the Step 5
+  verification command below before close-out. Verification is **mandatory
+  on every Full-tier session** — there is no skip, and the close gate
+  refuses an unverified close.
 - **`tier: lightweight`** → the session makes **zero metered API calls**;
   verification is **per-set** per `verificationMode`
   (`out-of-band-or-none` default, or `dedicated-sessions`). See the workflow
@@ -96,7 +98,31 @@ reset).
 Follow the active spec's step list for the current session. Log progress;
 make file edits, run tests, commit at the end.
 
-## Step 5 — Close via the shared gate
+## Step 5 — Run cross-provider verification (mandatory on Full tier)
+
+Every Full-tier session verifies before it closes. **There is no skip** — an
+engine cannot decide a diff is "too small to verify", and the close gate
+hard-refuses a Full-tier close with no corroborated verification evidence.
+Run:
+
+```bash
+.venv/Scripts/python.exe -m ai_router.verify_session \
+  --session-set-dir docs/session-sets/<active-slug>
+# POSIX: .venv/bin/python -m ai_router.verify_session ...
+```
+
+The command assembles the session evidence (spec excerpt, `git status`, the
+complete working-tree diff), routes it to a verifier from a **different
+provider**, writes `sN-verification*.md`, writes `sN-issues*.json` when the
+round has findings, patches `disposition.json`, and prints the next action.
+If it reports blocking findings, fix them and re-run the verifier round per
+the workflow doc.
+
+The only exception is operator-declared, never per-session: a repo whose
+`ai_router/budget.yaml` sets `threshold_usd: 0` (the zero-budget tier) uses
+the manual verification path documented there instead.
+
+## Step 6 — Close via the shared gate
 
 ```bash
 .venv/Scripts/python.exe -m ai_router.close_session \
@@ -105,9 +131,11 @@ make file edits, run tests, commit at the end.
 
 The gate is the same on both tiers: it requires a disposition, requires
 `change-log.md` on the **final** session, writes idempotently, and emits the
-schema-drift advisory as a soft note. On Full, the cross-provider
-verification verdict is recorded before close; on Lightweight, the per-set
-`verificationMode` flow governs how verification is attested.
+schema-drift advisory as a soft note. On Full, the close gate **refuses** a
+close whose verification verdict is missing or uncorroborated (no verifier
+metrics row, no `sN-verification*.md` artifact, or a verifier from the
+orchestrator's own provider); on Lightweight, the per-set `verificationMode`
+flow governs how verification is attested.
 
 ---
 

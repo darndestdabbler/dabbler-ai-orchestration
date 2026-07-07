@@ -1,0 +1,57 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "Router 0.29.0 / Extension pre-next-minor (Set 083 'Verify-Session CLI And Verification-Integrity Gate', Session 3 of 3)",
+  "DocumentDate": "7/6/2026",
+  "Notes": "Ad-hoc per-set UAT for Set 083 Session 3, REVISED after the first walk failed. First-walk failure causes, both fixed: (1) the scaffolded start-here.md taught a bare `routed_gate` call whose empty path list always evaluated to SKIP — the skip path is now removed entirely (verification is mandatory on every Full-tier session, operator decision); (2) the scaffolded venv installed dabbler-ai-router from PyPI (0.28.0), which contains neither `verify_session` nor the verification-integrity gate — the walk below now installs the router FROM THIS CHECKOUT into the scratch venv. The operator-facing behavior to check: a fresh Full scaffold must teach mandatory `verify_session` -> `close_session` with NO skip branch and no automatic-verification claim; a real `start_session` run must print the mandatory-verification advisory. Install the locally built VSIX for this checkout before walking (`npx vsce package` from `tools/dabbler-ai-orchestration` if not yet built). CRITICAL environment step for BOTH walks: after the Build scaffolds the folder (or in the scratch repo), run `<scaffold>\\.venv\\Scripts\\pip.exe install -e D:\\Projects\\dabbler-ai-orchestration` so the venv carries the unreleased 0.29.0 router; without this the walk exercises PyPI 0.28.0 and repeats the first failure.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start)",
+      "ItemLabel": "The rendered docs/dabbler/start-here.md teaches mandatory verify_session -> close_session with no skip branch and no automatic-verification claim",
+      "HumanAction": "1. Install the locally built VSIX (see Notes).\n2. Create a brand-new EMPTY folder (example: C:\\temp\\uat-083-full) -- do not copy anything into it.\n3. Open that folder in VS Code (File > Open Folder...), click the Dabbler AI Orchestration icon in the Activity Bar, and look at the Getting Started form's step 1.\n4. Leave the radio labeled exactly \"Full\" checked and leave \"Direct provider API keys\" selected. Type exactly 25 in the input labeled \"Verification budget (USD, not-to-exceed)\".\n5. Click the button labeled exactly \"Build project structure\" and wait for the progress notification beginning \"Building project structure\" to finish.\n6. Open docs/dabbler/start-here.md in the scaffolded folder.\n7. Read the sections headed \"Step 5\" and \"Step 6\".\n8. Press Ctrl+F and search the file for: automatic\n9. Press Ctrl+F and search the file for: routed_gate\n10. Press Ctrl+F and search the file for: SKIP",
+      "Expectation": "Step 5 is headed \"Run cross-provider verification (mandatory on Full tier)\", states \"There is no skip\", and shows `python -m ai_router.verify_session --session-set-dir docs/session-sets/<active-slug>`; it says the command writes `sN-verification*.md`, writes `sN-issues*.json` when findings exist, patches `disposition.json`, and prints the next action. Step 6 shows `python -m ai_router.close_session --session-set-dir docs/session-sets/<active-slug>` and says the close gate refuses a close whose verification verdict is missing or uncorroborated. The search for `routed_gate` has ZERO hits. The search for `SKIP` has zero hits offering a skip of Full-tier verification. The search for `automatic` has no hit that claims Full-tier verification happens automatically (hits such as `--no-router mode is resolved automatically from tier: lightweight` are OK because they describe mode resolution, not verification).",
+      "ProgrammaticVerification": "Fresh checks during authoring: `python -m pytest ai_router/tests/test_start_session.py ai_router/tests/test_cold_start_acceptance.py` -> 31 passed; `npx mocha ... src/test/suite/coldStartSnapshot.test.ts` -> 2 passed after UPDATE_GOLDEN regeneration and 2 passed in normal mode; `python -m pytest ai_router/tests/test_drift_guard.py -k dist_in_sync` -> 5 passed. These prove the canonical template, generated cold-start fixtures, dist bundle, and boot-chain tests carry the new command path and no current template/fixture automatic-verification claim. The real VSIX Build from an empty folder is the human-only first-run check.",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session lifecycle CLI",
+      "Subarea": "Walk 2 -- REAL start_session advisory on a scratch set",
+      "ItemLabel": "start_session prints the mandatory-verification advisory naming verify_session before close_session",
+      "HumanAction": "1. In any scratch repo, install the router from this checkout into its `.venv`: `.venv\\Scripts\\pip.exe install -e D:\\Projects\\dabbler-ai-orchestration` (see Notes -- PyPI 0.28.0 does not carry this behavior). Then create a tiny session set folder at docs/session-sets/001-uat-083-scratch with a spec.md containing a Session Set Configuration block with `tier: full`, `requiresUAT: false`, `requiresE2E: false`, and `totalSessions: 1`.\n2. From that scratch repo root, run: `.venv/Scripts/python.exe -m ai_router.start_session --session-set-dir docs/session-sets/001-uat-083-scratch --engine github-copilot --provider openai`\n3. Read the terminal output printed to stderr after the command returns.",
+      "Expectation": "The command exits successfully and prints a line beginning `[dabbler] Verification is mandatory on Full tier (no skip):`. That line names `python -m ai_router.verify_session --session-set-dir <this-set>` and says this happens before `close_session`. It does NOT mention `routed_gate`. A schema-drift advisory may also print; that is separate and not this walk's verdict.",
+      "ProgrammaticVerification": "Fresh checks during authoring: `python -m pytest ai_router/tests/test_start_session.py ai_router/tests/test_cold_start_acceptance.py ai_router/tests/test_verification_integrity_gate.py` -> 78 passed. The new `test_start_session_full_mode_prints_step6_advisory` pins the stderr text and the verification-integrity suite confirms the close gate teaches the `verify_session` remediation when evidence is missing. The human walk checks the real terminal text outside the pytest capture harness.",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Build project structure",
+      "Subarea": "Walk 1 -- REAL Full Build, fresh empty folder (cold start)",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Session lifecycle CLI",
+      "Subarea": "Walk 2 -- REAL start_session advisory on a scratch set",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    }
+  ]
+}

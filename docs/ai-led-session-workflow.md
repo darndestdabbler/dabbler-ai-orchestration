@@ -75,9 +75,9 @@ Orchestrator (Claude / Codex / Gemini)
   |-- runs repo build && test suite (TODO: set build command in
   |                                    CLAUDE.md / AGENTS.md / GEMINI.md)
   |
-  |-- GATED (Set 068 DEMOTE): end-of-session verification
-  |     |-- runs `python -m ai_router.routed_gate` on the session diff;
-  |     |   runs the routed call only when the predicate trips
+  |-- MANDATORY (Set 083): end-of-session verification, every session
+  |     |-- runs `python -m ai_router.verify_session` (no skip; the
+  |     |   Set 068 routed-gate SKIP path is retired)
   |     |-- sends all work to a DIFFERENT AI provider
   |     |-- saves raw verifier output (never edited)
   |     +-- fixes issues if found (max 2 retries)
@@ -244,11 +244,10 @@ Session 2 of 5, etc.). Each session:
 
 - Has a defined list of steps in `spec.md`
 - Is executed by exactly one orchestrator in one conversation
-- Ends with cross-provider verification **when the Set 068 routed-gate predicate
-  trips on the session diff** (the DEMOTE cut-over; see *Verification-surface
-  policy* and Step 6) — always run for a multi-file/coupling/contract change, and
-  the end-of-set path-aware critique + contract-test gate remain the primary
-  surface for the rest
+- Ends with cross-provider verification on **every Full-tier session**
+  (Set 083 — mandatory, no skip; see *Verification-surface policy* and
+  Step 6), with the end-of-set path-aware critique + contract-test gate as
+  additional surfaces
 - Produces a commit on completion
 
 If a session creates or refreshes a checklist for later human UAT execution,
@@ -269,19 +268,33 @@ review, or documentation itself. The router:
 
 ### Cross-Provider Verification
 
-A session ends with an independent verification step **when the Set 068
-routed-gate predicate trips on its diff** (the DEMOTE cut-over — see
-*Verification-surface policy* immediately below; before Set 068 this ran on
-every session). When it runs, the orchestrator sends its work to a model from a
-**different AI provider** than the one that did the work. This catches
-provider-specific biases and blind spots:
+Every Full-tier session ends with an independent verification step
+(Set 083 — mandatory, no skip; between Sets 068 and 083 this was gated on a
+diff predicate, and before Set 068 it was mandatory — the mandate is
+restored). The orchestrator sends its work to a model from a **different AI
+provider** than the one that did the work. This catches provider-specific
+biases and blind spots:
 
 - If the orchestrator is Claude and used Gemini for routing, verification
   goes to Opus or Sonnet (Anthropic)
 - If the orchestrator is Codex/Gemini, verification goes to an Anthropic model
 - The verifier's raw output is saved and never edited
 
-### Verification-surface policy (Set 068 — DEMOTE, cut over S6)
+### Verification-surface policy (Set 083 — MANDATORY, reversing the Set 068 DEMOTE)
+
+> **Current policy (Set 083, operator decision).** Per-session
+> cross-provider verification is **mandatory on every Full-tier session**.
+> The Set 068 routed-gate SKIP path is retired: the 2026-07-06 UAT incident
+> showed the gating predicate's verdict is only as honest as the path list
+> the policed actor feeds it, and a skip affordance presented to an engine
+> will eventually be taken. The end-of-set path-aware critique and the
+> contract-test gate remain **additional** surfaces; the only exception is
+> the operator-declared zero-budget tier (`ai_router/budget.yaml`,
+> `threshold_usd: 0`) — never an engine's per-session call. The Set 083
+> verification-integrity close gate enforces this: a Full-tier close with
+> no corroborated verification verdict is hard-refused in both interactive
+> and headless modes. The rest of this section is preserved as the
+> historical record of the Set 068 DEMOTE experiment and its rationale.
 
 Set 067–068 ran two pre-registered experiments to settle whether the
 every-session per-session routed verification above is the right **default**
@@ -318,15 +331,13 @@ The **target state**:
   (`--contract-uncovered`, `--high-blast`, `--post-failed-loop`), each of which
   can only **raise** the verdict to REQUIRED.
 
-> **Transition guard — CLEARED; the demotion is now in effect (S6).** The cut-over
-> waited on the S5 contract-test gate being **live and stable**; that floor
-> shipped in Set 068 S5, so S6 wired the predicate (`routed_gate.py`), flipped
-> the workflow default (Step 6 is now gated, not mandatory), and flipped the
-> `router-config.yaml` `verification:` anchor. Per-session routed verification is
-> **gated, not gone** — a tripped predicate is the only path to a routed call,
-> and the end-of-set path-aware critique + contract-test gate are the primary
-> surface for the rest. RETIRE was rejected as premature and is reopenable later
-> only on telemetry (`routed-fate-decision.md` §5).
+> **Transition guard — historical; the demotion has since been REVERSED
+> (Set 083).** The S6 cut-over ran as described above from Set 068 until
+> Set 083, when the operator restored mandatory per-session verification
+> after a live incident demonstrated the gate's input-honesty flaw (see the
+> current-policy note at the top of this section). `routed_gate.py` remains
+> importable and its CLI runnable for pre-083 scaffolds, but it always
+> answers REQUIRED; the predicate's verdict is informational only.
 
 ### Significance flagging
 
@@ -1463,37 +1474,26 @@ dotnet test
 
 Log the result with `log.log_step()`.
 
-### Step 6: End-of-Session Verification (GATED — Set 068 DEMOTE)
+### Step 6: End-of-Session Verification (MANDATORY — Set 083)
 
 **The orchestrator must not verify its own work.** The `route()` function
 dispatches to a different AI provider for independent review.
 
-> **Note (Set 068 DEMOTE — CUT OVER as of S6).** This step is no longer run on
-> *every* session. The Set 068 S4 decision demoted per-session routed
-> verification to a **blast-radius / coupling-gated** check (see
-> *Verification-surface policy* under Key Concepts); the S5 contract-test gate —
-> the deterministic replacement floor the transition guard waited on — is now
-> live, so S6 executed the cut-over. **Run this step when, and only when, the
-> deterministic gate trips on the session diff:**
->
-> ```bash
-> python -m ai_router.routed_gate $(git diff --name-only <base>...HEAD)
-> # exit 0 = REQUIRED (run this step); exit 10 = may SKIP. Add
-> # --contract-uncovered / --high-blast / --post-failed-loop to RAISE to
-> # REQUIRED for the facts the diff cannot show (those flags only raise, never
-> # lower). --json prints the verdict + the triggers that fired.
-> ```
->
-> The predicate fires on a multi-file/multi-module diff, a public
-> API/schema/contract change, a cross-module refactor, a build/CI/config change,
-> a surface with no contract probe, or a high-blast/post-failed-loop session
-> (`ai_router/routed_gate.py`). A small, single-module, probe-covered diff
-> bypasses the routed call — its safety net is the end-of-set path-aware critique
-> + the contract-test gate. When the gate trips, run this step **exactly as
-> written below**; record the gate verdict (and the triggers) in the session log
-> either way, so a skipped routed call is an auditable decision, not a silent
-> omission. The verifier still routes to a **different provider** than the
-> orchestrator.
+> **Note (Set 083 — MANDATORY, reversing the Set 068 DEMOTE).** This step
+> runs on **every Full-tier session, with no skip**. The Set 068 routed-gate
+> SKIP path is retired by operator decision after the 2026-07-06 UAT
+> incident: the gating predicate's verdict was only as honest as the path
+> list the policed actor fed it (an empty argument list evaluated as a
+> zero-file diff and printed SKIP), and a skip affordance presented to an
+> engine will eventually be taken. `python -m ai_router.routed_gate` still
+> exists so pre-083 scaffolds keep working, but it now always answers
+> REQUIRED; its predicate output is informational only. The end-of-set
+> path-aware critique + the contract-test gate remain **additional**
+> surfaces, not substitutes. The only exception is operator-declared, never
+> per-session: the zero-budget tier in `ai_router/budget.yaml`
+> (`threshold_usd: 0`). The verifier always routes to a **different
+> provider** than the orchestrator, and the Set 083 verification-integrity
+> close gate hard-refuses a Full-tier close with no corroborated verdict.
 
 When this step terminates with a `VERIFIED` verdict and
 `disposition.json` reports `status: "completed"`, the orchestration
@@ -1503,51 +1503,53 @@ the instructions are needed. Hook failures (provider outage, transient
 lock contention) are non-fatal; the reconciler sweeps stranded
 sessions on the next orchestrator startup and re-runs close-out.
 
+The canonical path is the first-class CLI:
+
+```bash
+.venv/Scripts/python.exe -m ai_router.verify_session \
+   --session-set-dir docs/session-sets/<slug>
+# POSIX: .venv/bin/python -m ai_router.verify_session ...
+```
+
+`verify_session` resolves the in-progress session number, assembles the
+evidence bundle (spec excerpt, `git status --short`, the complete diff, and
+the configured generated-bundle exclusions), fills
+`ai_router/prompt-templates/verification.md`, routes
+`task_type="session-verification"` to a different provider, writes the raw
+`sN-verification*.md` artifact before printing, writes
+`sN-issues*.json` when the round bears findings, classifies blockingness with
+`is_blocking_verdict`, and patches `disposition.json` with
+`verification_method: "api"` plus the verifier's exact verdict token.
+
+Manual `route()` composition is a fallback only, for environments where the
+CLI cannot run. If you use the fallback, you must reproduce the CLI contract:
+
 1. Collect all files created or modified during the session.
-2. Build a verification prompt with: spec excerpt + file contents +
-   build results. **The prompt must include the structured JSON
-   response schema** (defined in
-   `ai_router/prompt-templates/verification.md`) so the verifier
-   returns `{"verdict": "VERIFIED" | "ISSUES_FOUND", "issues": [...]}`
-   rather than a bare paragraph. Bare-paragraph verdicts have caused
-   parser failures and silent ISSUES_FOUND-misclassified-as-VERIFIED
-   regressions; the schema requirement closes that hole.
-3. Execute:
-   ```python
-   result = route(
-       content=verification_prompt,
-       task_type="session-verification",
-       complexity_hint=70,
-       session_set=str(SESSION_SET),
-       session_number=N,
-   )
-   review_path = SESSION_SET / f"s{N}-verification.md"
-   review_path.write_text(result.content, encoding="utf-8")
-   ```
-4. **Never edit the saved review file.** If verification is retried,
-   save each follow-up pass as a sibling root file such as
-   `sN-verification-round-2.md`, not under `session-reviews/`.
-5. **Persist the structured findings if the round is not `VERIFIED`.**
-   The verifier also returns a structured `issues` list. When the
-   verdict is `ISSUES_FOUND` (the list is non-empty), write that list to
-   the root-level `sN-issues.json` artifact (round 1) or
-   `sN-issues-round-<M>.json` (later findings-bearing retries) using the
-   envelope in [`docs/session-issues-schema.md`](session-issues-schema.md).
-   A `VERIFIED` round writes **no** issue file — the clean result is
-   already preserved in `sN-verification.md`. This artifact has no
-   runtime reader; it is durable persistence for later analysis only.
-   Do not revive `issue-logs/`.
+2. Build a verification prompt with: spec excerpt + `git status --short` +
+  complete diff + build results. **The prompt must include the structured
+  JSON response schema** (defined in
+  `ai_router/prompt-templates/verification.md`) so the verifier returns
+  `{"verdict": "VERIFIED" | "ISSUES_FOUND", "issues": [...]}` rather than a
+  bare paragraph.
+3. Execute `route(content=..., task_type="session-verification", ...)`, then
+  write `result.content` to `sN-verification*.md` **before** displaying or
+  logging it.
+4. **Never edit the saved review file.** If verification is retried, save each
+  follow-up pass as a sibling root file such as `sN-verification-round-2.md`,
+  not under `session-reviews/`.
+5. **Persist the structured findings if the round is not `VERIFIED`.** When the
+  verdict is `ISSUES_FOUND`, write the issue list to `sN-issues.json` or
+  `sN-issues-round-<M>.json` using
+  [`docs/session-issues-schema.md`](session-issues-schema.md). A `VERIFIED`
+  round writes no issue file.
 6. Log the verification step.
-7. **Record the verdict in `disposition.json`.** Set
-   `verification_verdict` to the verifier's `"VERIFIED"` or
-   `"ISSUES_FOUND"` value before authoring the rest of the
-   disposition. `close_session` reads this via `resolve_close_verdict()`
-   and writes it to `session-state.json`'s per-session
-   `verificationVerdict`. On the `api` path, `close_session` also has
-   a backward-compat status-derived fallback for older dispositions
-   that omit this field (`completed`→`"VERIFIED"`, `failed`→`"ISSUES_FOUND"`),
-   but setting the field explicitly is the recommended practice and the
-   only path that preserves the exact verifier token.
+7. **Record the verdict in `disposition.json`.** Set `verification_method` to
+  `"api"` and `verification_verdict` to the verifier's `"VERIFIED"` or
+  `"ISSUES_FOUND"` token. `close_session` reads this via
+  `resolve_close_verdict()` and writes it to `session-state.json`'s
+  per-session `verificationVerdict`. The Set 083 verification-integrity gate
+  then corroborates the claimed verdict against a cross-provider
+  `session-verification` metrics row and the raw verification artifact.
 
 **Two-attempt verifier fallback.** If the first-choice verifier fails
 at the HTTPS layer (provider outage, timeout, garbled response), the

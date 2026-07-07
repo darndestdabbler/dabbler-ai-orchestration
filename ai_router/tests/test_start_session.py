@@ -632,13 +632,29 @@ def test_start_session_emits_drift_warning_but_stays_exit_ok(tmp_path: Path, cap
 
 
 def test_start_session_silent_when_no_drift(tmp_path: Path, capsys):
-    """No sub-current sibling -> no drift line on stderr (silent when clean)."""
+    """No sub-current sibling -> no drift line on stderr when clean."""
     set_dir = _fresh_set(tmp_path)
 
     rc = start_session.run(_args(set_dir))
 
     assert rc == start_session.EXIT_OK
-    assert "[dabbler]" not in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "below the current schema" not in err
+
+
+def test_start_session_full_mode_prints_step6_advisory(tmp_path: Path, capsys):
+    """Full-tier starts teach that verify_session is mandatory (Set 083:
+    no routed-gate step, no skip)."""
+    set_dir = _fresh_set(tmp_path)
+
+    rc = start_session.run(_args(set_dir))
+
+    assert rc == start_session.EXIT_OK
+    err = capsys.readouterr().err
+    assert "mandatory" in err
+    assert "no skip" in err
+    assert "ai_router.verify_session" in err
+    assert "ai_router.routed_gate" not in err
 
 
 def test_start_session_drift_scan_error_is_non_fatal(tmp_path: Path, monkeypatch):

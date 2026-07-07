@@ -1,0 +1,22 @@
+**ISSUES FOUND**
+
+- **Issue 1:** The round’s new audit artifacts are not actually part of the patch; they exist only as untracked working-tree files.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Details:**
+    - **Violation:** The in-scope round required the revised UAT checklist, and the verification flow requires the raw review artifacts to be saved as durable evidence. The prompt says to **judge the diff** against the operator addendum; untracked files are not in that diff.
+    - **Impact:** A reviewer cannot inspect or merge the required checklist or the current session’s raw verification evidence from this change set. If this lands as presented, the repository still lacks the versioned UAT checklist and the `s3-verification*` / `s3-issues*` audit trail that the session state and activity log now rely on. That is merge-blocking for a round whose explicit deliverables are revised instruction/UAT surfaces plus verification evidence.
+    - **Evidence:** `git status --short` shows:
+      - `?? docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/083-verify-session-cli-and-verification-integrity-gate-uat-checklist.json`
+      - `?? docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s3-issues.json`
+      - `?? docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s3-issues-round-2.json`
+      - `?? docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s3-issues-round-3.json`
+      - `?? docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s3-verification.md`
+      - `?? docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s3-verification-round-2.md`
+      - `?? docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/s3-verification-round-3.md`
+      
+      None of these files appear in the provided diff. The only evidence for their contents is indirect prose in `activity-log.json`, which is not a substitute for the actual artifacts.
+
+#### NITS
+
+- **Nit:** `docs/session-sets/083-verify-session-cli-and-verification-integrity-gate/activity-log.json` still contains a completed `s3.surfaces` entry claiming `start-here.md.template now teaches routed_gate -> verify_session -> close_session`, which is superseded by the later operator-revision entry and contradicted by the final template diff. The later correction prevents this from being a blocker, but the audit trail is noisier than it should be.

@@ -1,5 +1,17 @@
 """Set 068 S6 -- the per-session routed-verification gating predicate.
 
+.. warning:: **RETIRED as a skip authority (Set 083, operator decision).**
+   Per-session cross-provider verification is now **mandatory** on every
+   Full-tier session. The 2026-07-06 UAT incident showed why: the
+   predicate's verdict is only as honest as the path list the policed
+   actor feeds it (an empty argument list evaluated as a zero-file diff
+   and printed SKIP), and any skip affordance presented to an engine
+   will eventually be taken. The CLI below is kept only so scaffolds
+   generated before Set 083 keep working -- it now **always** answers
+   REQUIRED (exit 0) and names the ``verify_session`` command. The
+   predicate itself (:func:`evaluate_routed_gate`) is retained as an
+   informational trigger report; its verdict authorizes nothing.
+
 The Set 068 S4 keep/demote/retire decision
 (``docs/session-sets/068-cadence-study-and-contract-gate/routed-fate-decision.md``)
 **DEMOTED** per-session routed verification from mandatory-on-every-session to a
@@ -45,16 +57,17 @@ CLI::
     python -m ai_router.routed_gate --high-blast <path> ...
     python -m ai_router.routed_gate --post-failed-loop <path> ...
 
-The CLI exits ``0`` when routed verification is REQUIRED and ``10`` when it may
-be SKIPPED, so a Step-6 wrapper can branch on the exit code (``--json`` always
-exits 0; read the ``required`` field). The paths are typically
-``git diff --name-only <base>...HEAD`` for the session under review.
+Since the Set 083 retirement the CLI **always exits 0 (REQUIRED)**; the
+historical ``10`` (may-SKIP) exit code is never returned. ``--json`` reports
+``"required": true`` unconditionally, with the historical predicate's verdict
+preserved under ``"predicate_required"`` for the audit trail.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
@@ -128,7 +141,9 @@ _BUILD_CI_CONFIG_SIGNALS = (
     ".pre-commit-config",
 )
 
-# Exit codes for the CLI branch-on-code contract.
+# Exit codes for the CLI branch-on-code contract. EXIT_SKIP is retained
+# for import back-compat only -- since the Set 083 retirement the CLI
+# never returns it (verification is mandatory; there is no skip).
 EXIT_REQUIRED = 0
 EXIT_SKIP = 10
 
@@ -379,10 +394,43 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         breadth_threshold=args.breadth_threshold,
     )
     if args.json:
-        print(json.dumps(_result_to_dict(result), indent=2))
+        # "required" is the answer callers act on -- unconditionally true
+        # since the Set 083 retirement. The historical predicate verdict
+        # moves to "predicate_required" so audits can still see what the
+        # Set 068 heuristic would have said.
+        payload = _result_to_dict(result)
+        payload["predicate_required"] = payload["required"]
+        payload["required"] = True
+        payload["retired"] = True
+        print(json.dumps(payload, indent=2))
         return 0
-    print(result.render())
-    return EXIT_REQUIRED if result.required else EXIT_SKIP
+    predicate = "REQUIRED" if result.required else "SKIP"
+    triggers = ", ".join(result.triggers) if result.triggers else "(none)"
+    # Venv-qualified on purpose: a bare `python` often resolves to a
+    # system interpreter without ai_router (or with a stale PyPI
+    # version) -- the exact skew behind the 2026-07-06 UAT failure.
+    # Matches gate_checks._verify_session_command.
+    interp = (
+        ".venv/Scripts/python.exe"
+        if os.name == "nt"
+        else ".venv/bin/python"
+    )
+    print(
+        "Per-session routed-verification gate -- RETIRED as a skip "
+        "authority (Set 083)\n"
+        "  Verdict: REQUIRED (always)\n"
+        "  Per-session cross-provider verification is MANDATORY on every\n"
+        "  Full-tier session; the Set 068 SKIP bypass is retired. The only\n"
+        "  exception is the operator-declared zero-budget tier in\n"
+        "  ai_router/budget.yaml -- never an engine's own call.\n"
+        "  ACTION: run the Step 6 verifier before close_session:\n"
+        f"    {interp} -m ai_router.verify_session --session-set-dir "
+        "<active-set>\n"
+        f"  (Historical predicate, informational only: {predicate}; "
+        f"triggers: {triggers}; "
+        f"{result.files} file(s) across {len(result.modules)} module(s).)"
+    )
+    return EXIT_REQUIRED
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry

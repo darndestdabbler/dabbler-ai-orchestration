@@ -3,7 +3,58 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [Unreleased] (Set 083 — verify_session CLI, verification-integrity gate, mandatory verification)
+
+### Added
+
+- **`python -m ai_router.verify_session` — Step 6 as a first-class CLI.**
+  Resolves the in-progress session, assembles the evidence bundle (spec
+  excerpt, `git status --short`, the complete unfiltered working-tree diff
+  vs `--diff-base`, generated-bundle exclusions on by default), fills the
+  adversarial `prompt-templates/verification.md` verbatim, routes
+  `task_type="session-verification"` cross-provider, writes the raw
+  `sN-verification*.md` / `sN-issues*.json` artifacts before display,
+  classifies blockingness, patches `disposition.json`, and prints the next
+  action. `--dry-run`, `--round`, `--max-tier` (with the L-064-7 tier-pin
+  refusal) supported.
+- **Verification-integrity close gate** (sixth deterministic gate).
+  Layer 1: `verification_method` must be a legal token (`api`,
+  `manual-via-other-engine`, `skipped`; the 2026-07-06 incident's bare
+  `"manual"` and the retired `"queue"` are rejected with naming messages on
+  every close path, `--manual-verify` and `--force` included). Layer 2: an
+  `api` close requires a cross-provider `session-verification` metrics row
+  for this (set, session) — verifier provider resolved via the model
+  registry, orchestrator identity from the session-state block, missing
+  identity fails closed — plus a root `sN-verification*.md` artifact;
+  `manual-via-other-engine` / `skipped` require the operator's zero-budget
+  declaration in `ai_router/budget.yaml`. Hard-block in BOTH interactive
+  and headless modes; every refusal prints the exact `verify_session`
+  remediation. `--manual-verify` (attested, logged) bypasses the evidence
+  layer only; `--force` bypasses neither layer.
+
+### Changed
+
+- **Per-session cross-provider verification is MANDATORY on every
+  Full-tier session (operator decision, reversing the Set 068 DEMOTE).**
+  The routed-gate SKIP path is retired: the 2026-07-06 UAT incident showed
+  the gating predicate's verdict is only as honest as the path list the
+  policed actor feeds it (an empty argument list evaluated as a zero-file
+  diff and printed SKIP). Concretely:
+  - `python -m ai_router.routed_gate` always answers REQUIRED (exit 0) and
+    names the `verify_session` command; the historical exit 10 is never
+    returned, and `--json` reports `"required": true` unconditionally with
+    the predicate's verdict preserved as `"predicate_required"`. The module
+    and its exports remain importable for pre-083 scaffolds.
+  - The verification-integrity gate refuses a **null-verdict** Full-tier
+    close: `skipped` / `manual-via-other-engine` closes — with or without a
+    verdict — are legal only under the zero-budget declaration; the Set 068
+    "skipped + no verdict" shape (Set 080 S1) no longer passes.
+  - `start_session` (Full tier) prints a mandatory-verification advisory
+    (stderr, non-blocking, fail-open) naming the `verify_session` command;
+    the scaffolded `start-here.md` teaches `verify_session` →
+    `close_session` with no gate step and no skip branch; "automatic"
+    claims about Full verification are removed from all instruction
+    surfaces.
 
 ## [0.28.0] — 2026-07-04 (Set 078 — Copilot CLI hybrid tier)
 

@@ -17,8 +17,8 @@ option and then click **Build project structure**.
 **Full tier.** The full tier uses an AI router to "outsource" much of
 the work via AI APIs. By outsourcing most of the work, you pay more
 money but you are less subject to AI capacity limitations. The full
-tier needs access to more than one AI provider family, so that work
-done under one provider is automatically cross-verified by a
+tier needs access to more than one AI provider family, so the Step 6
+verification command can send work done under one provider to a
 different one.
 
 There are two ways to give the router that access. The default is
@@ -67,10 +67,10 @@ have seamless continuity across chat sessions, a project plan is
 broken down into session sets. Each session set has a `spec.md` file
 that describes what will be done in each session.
 
-For the full tier option, work within each session is automatically
-cross-verified with a different provider. For the lightweight tier
-option, each session set has some follow-on sessions for
-cross-provider verification.
+For the full tier option, every session runs the router's `verify_session`
+command for cross-provider verification before it closes — verification is
+mandatory, not optional. For the lightweight tier option, each session set
+has some follow-on sessions for cross-provider verification.
 
 Note that the AI orchestration does support parallel session sets
 (but not parallel sessions within the same set). If you would like

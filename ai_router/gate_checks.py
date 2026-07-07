@@ -865,8 +865,10 @@ def _claimed_close_verdict(disposition: Disposition) -> Optional[str]:
     notes. Kept in lockstep by a parity test
     (``test_verification_integrity_gate.py::TestClaimedVerdictParity``);
     a direct import would be circular (close_session imports this module).
-    A null claim is legal — the Set 068 routed-gate SKIP path records
-    ``skipped`` + no verdict — and leaves this gate inert.
+    A null claim is no longer inert: since the Set 083 S3 operator
+    decision retired the Set 068 routed-gate SKIP path, a Full-tier
+    close with no verdict fails the gate unless the operator-declared
+    zero-budget tier covers it (see :func:`check_verification_integrity`).
     """
     explicit = disposition.verification_verdict
     if isinstance(explicit, str) and explicit != "":
@@ -1060,25 +1062,30 @@ def check_verification_integrity(
        :data:`disposition.VERIFICATION_METHODS`; retired/renamed tokens
        (the incident's ``"manual"``; the Set 026 ``"queue"``) fail with a
        message naming the replacement.
-    2. **Verdict corroboration.** A **claimed non-null verdict** (explicit
-       field, or the ``api``-status-derived fallback the close would
-       persist) must be backed by evidence:
+    2. **Verdict corroboration.** Per-session cross-provider verification
+       is **mandatory** on every Full-tier close (Set 083 S3 operator
+       decision, reversing the Set 068 DEMOTE — the routed-gate SKIP
+       bypass is retired). Concretely:
 
-       * method ``api`` — a ``session-verification`` row in
-         ``router-metrics.jsonl`` for this (set, session) whose verifier
-         provider **differs from the session's orchestrator provider**
-         (orchestrator from the session-state block; missing identity
-         data fails closed — the Q6 precedent), plus an
-         ``sN-verification*.md`` artifact at the set root.
-       * method ``manual-via-other-engine`` / ``skipped`` — the project's
-         ``ai_router/budget.yaml`` must actually declare the zero-budget
-         tier (``threshold_usd: 0``; a declared ``verification_method``
-         there must match the disposition's).
+       * method ``api`` — the claimed verdict must be non-null and backed
+         by a ``session-verification`` row in ``router-metrics.jsonl``
+         for this (set, session) whose verifier provider **differs from
+         the session's orchestrator provider** (orchestrator from the
+         session-state block; missing identity data fails closed — the
+         Q6 precedent), plus an ``sN-verification*.md`` artifact at the
+         set root.
+       * method ``manual-via-other-engine`` / ``skipped`` (with or
+         without a verdict) — the project's ``ai_router/budget.yaml``
+         must actually declare the zero-budget tier (``threshold_usd:
+         0``; a declared ``verification_method`` there must match the
+         disposition's). This is the operator-authorized exception, not
+         an engine's choice.
+       * anything else with a **null** verdict — refused. A close that
+         never verified is exactly the lazy path this gate exists to
+         block; the refusal names the sanctioned ``verify_session``
+         command.
 
-    Scope (documented residuals, spec Overview): a **null**-verdict close
-    is legal (the Set 068 routed-gate SKIP path) and leaves the gate
-    inert; the gate does not re-evaluate the routed-gate predicate
-    post-hoc; Lightweight sets are covered by their own per-set gates.
+    Scope: Lightweight sets are covered by their own per-set gates.
 
     Posture: **hard-block in BOTH interactive and headless modes** — the
     policed actor *is* the headless agent, so a soft warning printed to
@@ -1119,11 +1126,29 @@ def check_verification_integrity(
     if _set_is_lightweight(session_set_dir):
         return True, ""
 
-    # Layer 2 fires only on a claimed non-null verdict. The null-verdict
-    # close (routed-gate SKIP) is legal and stays untouched.
+    # Layer 2 — evidence. Per-session cross-provider verification is
+    # MANDATORY on Full tier (Set 083 S3 operator decision; the Set 068
+    # routed-gate SKIP path is retired). A null verdict no longer leaves
+    # this gate inert: the only paths that do not require corroborated
+    # api evidence are the operator-declared zero-budget tier below and
+    # the attested --manual-verify override (applied by the caller).
+    # (Defensive: with today's vocabulary ``api`` always derives a claim
+    # from status and the other two legal methods fall through to the
+    # zero-budget arm below — this refusal guards any future method token
+    # that derives no claim, so mandatory verification cannot be dodged
+    # by a null-verdict close under a new method.)
     claimed = _claimed_close_verdict(disposition)
-    if claimed is None:
-        return True, ""
+    if claimed is None and method not in (
+        "manual-via-other-engine",
+        "skipped",
+    ):
+        return (
+            False,
+            f"the close records no verification verdict (method "
+            f"{method!r}) — per-session cross-provider verification is "
+            "mandatory on Full tier; there is no skip. Run the "
+            f"sanctioned Step 6 command: {command}",
+        )
 
     if method == "api":
         state = read_session_state(session_set_dir)
@@ -1231,14 +1256,20 @@ def check_verification_integrity(
             )
         return True, ""
 
-    # method in ("manual-via-other-engine", "skipped") with a claimed
-    # verdict: only legal under the operator-authorized zero-budget tier
-    # (Rule 2's exception), which must actually be declared on disk.
+    # method in ("manual-via-other-engine", "skipped"), with or without
+    # a claimed verdict: only legal under the operator-authorized
+    # zero-budget tier (Rule 2's exception), which must actually be
+    # declared on disk. This is an OPERATOR declaration — an engine
+    # cannot unilaterally record "skipped" and walk past verification.
+    claim_desc = (
+        f"claimed verdict {claimed!r}" if claimed is not None
+        else "the no-verdict close"
+    )
     budget, budget_err = _read_budget_yaml(_project_root_for(session_set_dir))
     if budget is None:
         return (
             False,
-            f"claimed verdict {claimed!r} under method {method!r} requires "
+            f"{claim_desc} under method {method!r} requires "
             f"the zero-budget declaration in ai_router/budget.yaml "
             f"({budget_err}; fails closed). Either declare the zero-budget "
             f"tier or run the sanctioned Step 6 command: {command}",
@@ -1247,7 +1278,7 @@ def check_verification_integrity(
     if threshold != 0:
         return (
             False,
-            f"claimed verdict {claimed!r} under method {method!r} is only "
+            f"{claim_desc} under method {method!r} is only "
             f"legal on the zero-budget tier, but ai_router/budget.yaml "
             f"declares threshold_usd={threshold!r}. Run the sanctioned "
             f"Step 6 command instead: {command}",
@@ -1260,7 +1291,7 @@ def check_verification_integrity(
     ):
         return (
             False,
-            f"claimed verdict {claimed!r} under method {method!r} does not "
+            f"{claim_desc} under method {method!r} does not "
             f"match ai_router/budget.yaml's declared verification_method "
             f"{declared_method!r}. Align the disposition with the budget "
             f"declaration, or run: {command}",

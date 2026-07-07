@@ -1,7 +1,7 @@
 # Dabbler AI Orchestration
 
 An AI-led coding-session workflow for VS Code. Manage structured AI
-sessions, automatic cross-provider verification, cost tracking, and
+sessions, mandatory cross-provider verification, cost tracking, and
 git-worktree-aware session-set state — all from the activity bar, in
 two tiers that let you trade API spend against your own attention.
 
@@ -18,7 +18,7 @@ in what each one costs you:
 
 |  | **Full tier** | **Lightweight tier** |
 |---|---|---|
-| Verification | Automatic at every session end — the router picks a model from a *different provider* and runs the review for you | Copyable review prompts — you paste them into a second AI chat and record the verdict yourself |
+| Verification | Mandatory on every session — `verify_session` picks a model from a *different provider* and runs the review for you before each close | Copyable review prompts — you paste them into a second AI chat and record the verdict yourself |
 | API spend | Metered, capped by your not-to-exceed budget (a 3-session set typically totals $0.15–$2.50) | **$0** — the router makes no API calls |
 | Your attention | Mostly at session boundaries. Run **several projects at once** while you sit in meetings, answer email, or do other work — the workflow carries itself between check-ins | More hands-on: you drive each verification, so multitasking is more constrained. More than one project at a time still works — each just needs more of you |
 | Best for | Parallel project streams; "start it, check in later" operation | Cost-sensitive work; learning the workflow; environments where API spend isn't an option |
@@ -63,10 +63,11 @@ cost.
   The Lightweight tier skips the router entirely — that's the $0
   column in the table above.
 
-- **Cross-provider verification at every session close.** On the
-  Full tier it's automatic: a model from a *different provider* than
-  the one that did the work reviews the session and returns a
-  structured verdict; disagreements surface for human adjudication
+- **Cross-provider verification at session close.** On the
+  Full tier, every session is reviewed before it closes — no skip: a model
+  from a *different provider* than the one that did the work reviews the session and returns a
+  structured verdict, and the close gate refuses an unverified close;
+  disagreements surface for human adjudication
   rather than being silently merged or dismissed. On the Lightweight
   tier the same step is a copyable review prompt you paste into a
   second AI chat and a verdict you record yourself.

@@ -248,7 +248,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   round.
 
 ## Measure A Verification Surface At Its Strongest Framing Before Demoting Or Retiring It
-<!-- lesson: id="L-069-2" added-set="069" last-used-set="075" status="active" scope="portable" -->
+<!-- lesson: id="L-069-2" added-set="069" last-used-set="083" status="active" scope="portable" -->
 
 - **Context:** Comparing two verification surfaces (e.g. snippet-fed *push* /
   routed vs. repository-reading *pull* / path-aware) to decide whether one earns
@@ -407,7 +407,7 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
   not move it* — especially when k is small and one property cuts the other way.
 
 ## A Dependency-Pin Bump Is Not Enablement Until The Target Venv Is Upgraded And The Entrypoint Confirmed
-<!-- lesson: id="L-075-1" added-set="075" last-used-set="075" status="active" scope="portable" -->
+<!-- lesson: id="L-075-1" added-set="075" last-used-set="083" status="active" scope="portable" -->
 
 - **Context:** Rolling a new tool/version floor out to consumer repos — bumping a
   `requirements.txt` (or equivalent) pin so a downstream session can run a newly-shipped

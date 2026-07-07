@@ -1615,14 +1615,13 @@ from .contract_gate import (
     CONTRACT_FLOOR_RESULT_FILENAME,
 )
 
-# Set 068 S6: the per-session routed-verification gating predicate. The S4
-# keep/demote/retire decision DEMOTED routed verification from mandatory-every-
-# session to a programmatic blast-radius/coupling-gated check; this is the
-# cut-over the transition guard deferred to S6 (now that the S5 contract-test
-# gate -- the replacement floor -- is live). evaluate_routed_gate() builds on
-# blast_radius.classify_paths plus the S4 section-3 session-level triggers and is
-# DETERMINISTIC (the consensus required a programmatic heuristic, not a per-
-# session feeling). See routed_gate.py + docs/ai-led-session-workflow.md ->
+# Set 068 S6: the per-session routed-verification gating predicate — RETIRED
+# as a skip authority by Set 083 (operator decision after the 2026-07-06 UAT
+# incident: the predicate's verdict is only as honest as the path list the
+# policed actor feeds it). Per-session cross-provider verification is now
+# MANDATORY on every Full-tier session; the CLI always answers REQUIRED. The
+# exports stay for import back-compat and the informational trigger report.
+# See routed_gate.py + docs/ai-led-session-workflow.md ->
 # "Verification-surface policy".
 from .routed_gate import (
     evaluate_routed_gate,

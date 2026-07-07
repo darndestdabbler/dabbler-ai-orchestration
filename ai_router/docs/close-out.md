@@ -156,9 +156,11 @@ Step 8 in the workflow doc could lower agent compliance.
 
 Close-out's responsibilities are deliberately narrow:
 
-- Lifecycle gate checks (`gate_checks.GATE_CHECKS`)
-- Verification-wait (queue mode) / verification-result inspection (api
-  mode)
+- Lifecycle gate checks (`gate_checks.GATE_CHECKS`), including the Set 083
+  verification-integrity gate that corroborates claimed verdicts
+- Verification-result inspection from `disposition.json` (`api`,
+  `manual-via-other-engine`, or `skipped`; `--manual-verify` is the attested
+  operator override)
 - Idempotent state writes (`mark_session_complete`, ledger events,
   `change-log.md` and the next-orchestrator recommendation in
   `ai-assignment.md`)
@@ -216,7 +218,8 @@ Exit codes:
   `disposition.json` outside `--force` / `--repair`).
 - `3` — lock contention (another close-out is running on the same
   session set).
-- `4` — timeout waiting on queued verification.
+- `4` — timeout waiting on a verification path that still uses the legacy
+  wait loop.
 - `5` — repair drift detected and not applied (`--repair` without
   `--apply`).
 
@@ -234,7 +237,7 @@ parse it without branching on success:
     {"check": "<name>", "passed": true, "remediation": ""}
   ],
   "verification": {
-    "method": "api | queue | manual | skipped",
+    "method": "api | manual | manual-via-other-engine | skipped",
     "message_ids": ["<id>"],
     "wait_outcome": "completed | failed | timed_out"
   },
@@ -249,13 +252,13 @@ Flag summary:
 | `--session-set-dir PATH` | Path to the session set directory. Defaults to active session set in CWD. |
 | `--json` | Emit a single JSON object on stdout instead of human-readable lines. |
 | `--interactive` | Opt in to interactive prompts. Default is non-interactive — never blocks on stdin. |
-| `--force` | Bypass all gate checks. **Hard-scoped to incident recovery only**: requires `AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1` in the environment AND `--reason-file`. Emits `closeout_force_used` to the events ledger and writes `forceClosed: true` to `session-state.json`. See Section 5. |
+| `--force` | Bypass bookkeeping gate checks, but **not** verification integrity. **Hard-scoped to incident recovery only**: requires `AI_ROUTER_ALLOW_FORCE_CLOSE_OUT=1` in the environment AND `--reason-file`. Emits `closeout_force_used` to the events ledger and writes `forceClosed: true` to `session-state.json`. See Section 5. |
 | `--allow-empty-commit` | Permit close-out for a session that produced no commits. |
 | `--reason-file PATH` | File containing narrative fields (close-out reason, manual-verify attestation). |
-| `--manual-verify` | Skip queue verification blocking; treat verifications as completed by human attestation (bootstrapping window only). Requires `--interactive` or `--reason-file`. |
+| `--manual-verify` | Attested operator override for the verification-evidence layer. Requires `--interactive` or `--reason-file`. Method vocabulary is still enforced; illegal disposition tokens still fail. |
 | `--repair` | Diagnostic mode: walk the session set's state and report drift. |
 | `--apply` | When combined with `--repair`, apply corrections to detected drift. |
-| `--timeout MINUTES` | Maximum minutes to wait for queued verifications to reach a terminal state (default 60). |
+| `--timeout MINUTES` | Maximum minutes for legacy verification wait loops (default 60). The canonical `verify_session` path is synchronous before close-out. |
 
 Flag combination rules (validated up front; failure exits 2):
 
@@ -336,6 +339,21 @@ returns the corresponding exit code without touching downstream state.
      drift from the workflow's "always route, never self-opine" rule.
    - `check_change_log_fresh` — last-session-only: the change log was
      updated in the same commit window (timestamp within tolerance).
+   - `check_verification_method_vocabulary` / `check_verification_integrity`
+     — Set 083: `verification_method` must be a legal disposition token
+     (`api`, `manual-via-other-engine`, `skipped`), and per-session
+     cross-provider verification is **mandatory** on every Full-tier close
+     (the Set 068 routed-gate SKIP path is retired; a null-verdict close no
+     longer passes). On `api`, close-out requires a non-null verdict backed
+     by both a cross-provider `session-verification` row in
+     `router-metrics.jsonl` for this set/session and a root
+     `sN-verification*.md` artifact. On `manual-via-other-engine` or
+     `skipped` — with or without a claimed verdict — the project
+     `ai_router/budget.yaml` must declare the zero-budget tier and the
+     matching method (the operator-authorized exception; never an engine's
+     own call). The refusal message names the exact venv-qualified
+     `.venv/Scripts/python.exe -m ai_router.verify_session
+     --session-set-dir ...` remediation.
    Each gate returns `(passed: bool, remediation: str)`. The first
    failing gate stops the phase; the script emits `closeout_failed`
    with the remediation and exits 1.
@@ -377,12 +395,17 @@ returns the corresponding exit code without touching downstream state.
      interactive TTY (`failed_checks: ["contract_gate"]`) and **soft-warns**
      headless / `--accept-suggestions`; `advisory` always soft-warns; `none`
      skips. Fail-open in the non-block direction.
-8. **Wait for verification to terminate** (bounded by `--timeout`):
-   - **API mode** — verification is already synchronous; this is a
-     no-op flagged as `method: "api"`.
-   - **Manual mode** (`--manual-verify`) — record the attestation
-     text from stdin or `--reason-file` and proceed. Method
-     `"manual"`.
+8. **Resolve verification outcome**:
+   - **API mode** — `verify_session` has already run synchronously and patched
+     the disposition; the verification-integrity gate corroborates the metrics
+     row and artifact before state changes.
+   - **Manual-via-other-engine / skipped** — legal only under the zero-budget
+     declaration, with or without a claimed verdict (Set 083: a null-verdict
+     Full-tier close is no longer legal outside that declaration).
+   - **Manual override** (`--manual-verify`) — record the attestation text from
+     stdin or `--reason-file` and proceed through the evidence layer. The
+     disposition method vocabulary still runs, so the retired `"manual"` and
+     `"queue"` tokens cannot be laundered by attestation.
 9. **Idempotent writes.** Each of these is safe to retry:
    - `_flip_state_to_closed(session_set_dir, verification_verdict=verdict)` —
      flips `session-state.json` from `in-progress` to `complete`,
@@ -481,10 +504,24 @@ confirming no other close-out is running.
 
 **Manual-verify silent bypass refused** — exit 2 with the validation
 message `"--manual-verify requires either --interactive ... or
---reason-file ..."`. By design: an operator who skips queue
-verification must record *why* somewhere durable. Either add
+--reason-file ..."`. By design: an operator who uses the attested
+verification override must record *why* somewhere durable. Either add
 `--interactive` (prompted on stdin) or write a one-line reason to a
 file and pass `--reason-file <path>`.
+
+**Verification-integrity gate failed** — exit 1 with a remediation that names
+the venv-qualified `.venv/Scripts/python.exe -m ai_router.verify_session
+--session-set-dir <set>` (POSIX: `.venv/bin/python …`). Common causes:
+`disposition.verification_method` uses a retired token (`"manual"` or
+`"queue"`), `verification_verdict` claims `VERIFIED` / `ISSUES_FOUND` without
+the corresponding `sN-verification*.md` artifact, the metrics row is missing,
+or the verifier provider matches the orchestrator provider. Remediation: run
+the printed `verify_session` command, fix any blocking findings, commit and
+push the resulting artifacts, then re-run close-out. If an operator truly
+performed out-of-band review, use the legal `"manual-via-other-engine"` token
+and ensure the project's `ai_router/budget.yaml` declares the zero-budget
+manual path; otherwise use `--manual-verify` with a reason file for the
+sanctioned attested override.
 
 **Stranded check-out (Set 033 Session 6).** A session set whose
 holder crashed, lost network, or abandoned the workstation BEFORE
@@ -537,8 +574,9 @@ in the default non-interactive mode. Use this when an operator is
 running close-out from a terminal and wants to confirm sensitive
 actions.
 
-**`--force`** — bypass all gate checks. **Hard-scoped to incident
-recovery only** (Set 9 Session 3, drift item D-2 in
+**`--force`** — bypass bookkeeping gate checks, but not the Set 083
+verification-integrity check. **Hard-scoped to incident recovery only** (Set 9
+Session 3, drift item D-2 in
 `docs/proposals/2026-04-30-combined-design-alignment-audit.md`). The
 flag is rejected by default; opting in requires both:
 
@@ -576,11 +614,13 @@ repair path) to use `force=True` deliberately. The CLI's
 the function-level path is for internal use only and is exercised by
 `test_mark_session_complete_gate.py`.
 
-**`--manual-verify`** — skip API verification and record a human
-attestation that verification happened out of band. Requires
-`--interactive` or `--reason-file` so the attestation lands in the
-audit trail. Method `"manual"` is recorded in the JSON output and the
-`closeout_succeeded` event payload.
+**`--manual-verify`** — record a human attestation that verification happened
+out of band and bypass only the verification-evidence layer. Requires
+`--interactive` or `--reason-file` so the attestation lands in the audit trail.
+The disposition method vocabulary is still enforced: `"manual"` remains an
+illegal disposition token; use `"manual-via-other-engine"` for the zero-budget
+manual path. Method `"manual"` is recorded only in close-out's JSON/event
+output to mark that the operator override was used.
 
 **`--repair`** — diagnostic mode. Walks the session set's state
 (`session-state.json`, `activity-log.json`, `session-events.jsonl`,

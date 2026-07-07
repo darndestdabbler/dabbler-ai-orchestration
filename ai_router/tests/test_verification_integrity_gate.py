@@ -16,8 +16,9 @@ Matrix (spec Session 2 step 4):
 - the no-artifact case;
 - the same-provider case;
 - the missing-orchestrator-identity case (fails closed);
-- the legal SKIP / null-verdict case (gate inert — the Set 080 S1
-  shape);
+- the null-verdict skipped close (Set 083: the old Set 068 routed-gate
+  SKIP shape is RETIRED — fails without the zero-budget declaration,
+  passes with it);
 - the ``--manual-verify`` override (sanctioned bypass);
 - ``--force`` does NOT bypass (force bypasses gates, not evidence);
 - the zero-budget-declared manual case (passes);
@@ -394,16 +395,43 @@ class TestApiCorroboration:
 # ---------------------------------------------------------------------------
 
 class TestZeroBudgetArm:
-    def test_skip_with_null_verdict_is_inert(self, tmp_path):
-        """The legal Set 068 routed-gate SKIP shape (Set 080 S1): method
-        skipped, no verdict — the gate never fires, no budget.yaml
-        needed."""
+    def test_skip_with_null_verdict_requires_zero_budget(self, tmp_path):
+        """Set 083 (operator decision): the old Set 068 routed-gate SKIP
+        shape — method skipped, no verdict, no budget declaration — is
+        RETIRED. Verification is mandatory; an undeclared skip fails."""
         set_dir = _make_set(tmp_path)
         d = Disposition(
             status="completed", summary="s", verification_method="skipped",
         )
         passed, remediation = check_verification_integrity(str(set_dir), d)
+        assert not passed
+        assert "zero-budget" in remediation
+        assert "verify_session" in remediation
+
+    def test_skip_with_null_verdict_passes_under_zero_budget(self, tmp_path):
+        """The one legal skip: the operator-declared zero-budget tier
+        covers a no-verdict skipped close."""
+        set_dir = _make_set(tmp_path)
+        _write_budget(
+            tmp_path, "threshold_usd: 0\nverification_method: \"skipped\"\n",
+        )
+        d = Disposition(
+            status="completed", summary="s", verification_method="skipped",
+        )
+        passed, remediation = check_verification_integrity(str(set_dir), d)
         assert passed, remediation
+
+    def test_manual_with_null_verdict_requires_zero_budget(self, tmp_path):
+        """Set 083: a no-verdict manual-via-other-engine close is likewise
+        only legal under the operator's zero-budget declaration."""
+        set_dir = _make_set(tmp_path)
+        d = Disposition(
+            status="completed", summary="s",
+            verification_method="manual-via-other-engine",
+        )
+        passed, remediation = check_verification_integrity(str(set_dir), d)
+        assert not passed
+        assert "zero-budget" in remediation
 
     def test_claimed_verdict_without_budget_yaml_fails(self, tmp_path):
         set_dir = _make_set(tmp_path)

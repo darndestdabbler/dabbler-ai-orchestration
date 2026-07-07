@@ -17,10 +17,10 @@ tiers install Python + `dabbler-ai-router`, run `start_session` /
 `close_session`, and share the same state file, close-out gate, and Session
 Set Explorer.
 
-**Full** — the AI router is on: cost-minded routing of reasoning tasks and
-automatic cross-provider verification at each session's end, plus metrics and
-cost reports. Two active consumer repos use Full: `dabbler-platform` and
-`dabbler-access-harvester`.
+**Full** — the AI router is on: cost-minded routing of reasoning tasks and the
+mandatory Step 6 cross-provider verification command on every session,
+plus metrics and cost reports. Two active consumer repos use Full:
+`dabbler-platform` and `dabbler-access-harvester`.
 
 **Lightweight** — zero metered API calls (`tier: lightweight` flips
 `--no-router`). Same Python lifecycle as Full; the only setup difference is no

@@ -1,7 +1,7 @@
 # Dabbler AI Orchestration
 
 An AI-led coding-session workflow for VS Code. Structured AI sessions
-with cross-provider verification, automatic cost tracking, git-
+with mandatory cross-provider verification, automatic cost tracking, git-
 worktree-aware session-set state, and a Session Set Explorer in the
 activity bar.
 
@@ -55,9 +55,10 @@ deeper feature descriptions live at
   gates (370 calls) — see
   [docs/sample-reports/](docs/sample-reports/) for the full reports.
   [Deep dive](docs/repository-reference.md#2-cost-minded-orchestration).
-- **Cross-provider verification** — Every session ends with a
-  mandatory independent verification by a model from a different
-  provider. The verifier returns structured JSON
+- **Cross-provider verification** — Every Full-tier session ends with
+  `verify_session`, which sends the work to an independent
+  model from a different provider (mandatory — the close gate refuses an
+  unverified close). The verifier returns structured JSON
   (`{"verdict": "VERIFIED" | "ISSUES_FOUND", "issues": [...]}`); the
   orchestrator surfaces disagreements for human adjudication rather
   than self-resolving.
@@ -88,8 +89,9 @@ deeper feature descriptions live at
   the AI router makes metered API calls. **Lightweight is router-off,
   not Python-off:** both tiers use a `.venv` + `dabbler-ai-router`, the
   same `session-state.json` lifecycle, the same close-out gate, and the
-  same Session Set Explorer. Full adds cost-minded routing and automatic
-  cross-provider verification; Lightweight makes zero metered calls and
+  same Session Set Explorer. Full adds cost-minded routing and the
+  mandatory Step 6 cross-provider verification command on every session;
+  Lightweight makes zero metered calls and
   verifies per-set (copyable review prompts pasted into a different
   assistant, a dedicated different-engine verification session, or opt
   out). On either tier, `start_session` prints a loud, non-blocking

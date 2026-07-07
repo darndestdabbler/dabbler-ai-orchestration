@@ -278,7 +278,23 @@ def make_session_set(
     _git(repo_root, "config", "commit.gpgsign", "false")
 
     (repo_root / "README.md").write_text("baseline\n", encoding="utf-8")
-    _git(repo_root, "add", "README.md")
+
+    # The harness repo makes zero metered API calls and closes every
+    # session as manual-via-other-engine (drive_close_session), so it
+    # declares the zero-budget tier — the operator-authorized exception
+    # the Set 083 verification-integrity gate requires now that
+    # per-session verification is mandatory (a null-verdict
+    # manual/skipped close without this declaration is refused, --force
+    # included: force bypasses gates, not evidence).
+    budget_dir = repo_root / "ai_router"
+    budget_dir.mkdir()
+    (budget_dir / "budget.yaml").write_text(
+        "threshold_usd: 0\n"
+        'verification_method: "manual-via-other-engine"\n',
+        encoding="utf-8",
+    )
+
+    _git(repo_root, "add", "README.md", "ai_router/budget.yaml")
     _git(repo_root, "commit", "-m", "baseline")
 
     # Bare remote alongside the working tree; main branch tracks it.

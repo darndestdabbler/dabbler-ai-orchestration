@@ -70,6 +70,10 @@ files share the body above — only this tail differs.
   `.venv/bin/python -m ai_router.<module>` on POSIX. A bare `python` often
   resolves to a system interpreter without `ai_router` installed — that is an
   interpreter problem, not a missing-keys problem.
-- **Cross-provider verification stays cross-provider.** When the active set is
-  `tier: full`, end-of-session verification routes to a *different* provider
-  than the one running the session — never back to your own model.
+- **Cross-provider verification stays cross-provider — and is mandatory.**
+  When the active set is `tier: full`, run
+  `.venv/Scripts/python.exe -m ai_router.verify_session` (POSIX:
+  `.venv/bin/python -m ai_router.verify_session`) before every
+  `close_session`; there is no skip, and the close gate refuses an
+  unverified close. The command routes to a *different* provider than the
+  one running the session — never back to your own model.

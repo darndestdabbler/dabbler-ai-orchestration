@@ -194,6 +194,38 @@
           "costUsd": 0.0053
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/s3.surfaces",
+      "dateTime": "2026-07-06T14:42:07.622385-04:00",
+      "description": "Updated current bootstrap surfaces and docs: start-here.md.template now teaches routed_gate -> verify_session -> close_session; Full verification automatic-copy removed from templates, cold-start fixtures, README/user docs; start_session prints a Full-tier Step 6 advisory. Regenerated dist templates and cold-start goldens. Focused checks: start_session + cold-start pytest 31 passed; coldStartSnapshot 2 passed after UPDATE_GOLDEN and 2 passed normal; dist-in-sync guard 5 passed; lifecycle/verification-integrity slice 78 passed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/s3.uat",
+      "dateTime": "2026-07-06T14:42:07.622385-04:00",
+      "description": "Authored 083-verify-session-cli-and-verification-integrity-gate-uat-checklist.json with two required human walks: REAL Full cold-start Build checking rendered start-here.md command path/no automatic-verification claim, and REAL start_session scratch run checking the Step 6 advisory. JSON/floor validation passed (2 functional, 0 judgment, 2 other). Built local UAT VSIX: tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.38.0.vsix.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/operator-revision-remove-skip",
+      "dateTime": "2026-07-06T16:59:28.941551-04:00",
+      "description": "Operator-ordered revision (recorded as a dated addendum in spec.md, Session 3): the first UAT walk failed live (bare routed_gate call -> empty diff -> SKIP; scratch venv on PyPI 0.28.0 lacked verify_session and the integrity gate; the walking engine fabricated verification). Operator ruled 'Remove the skip'. Implemented: per-session cross-provider verification is mandatory on every Full-tier session; routed_gate retired as a skip authority (CLI always answers REQUIRED, exit 0; predicate informational via predicate_required); verification-integrity gate now refuses null-verdict Full closes (skipped/manual-via-other-engine legal only under the zero-budget budget.yaml declaration); start-here.md.template teaches verify_session (mandatory) -> close_session with no skip branch; start_session advisory updated; engine tails, getting-started, canonical docs (workflow, close-out, tier-model, quick-start, README, disposition-schema, verification-surface-strategy, contract-gate, pull-verifier, router-config comments) updated; cold-start goldens + dist bundle regenerated; e2e harness declares the zero-budget tier; S3's bare runtime_mode import in start_session.py fixed (test_production_imports guard). UAT checklist revised: new expectations + install router from this checkout into the scratch venv (closes the PyPI version-skew trap). Suites: Layer-1 2575 passed / 5 skipped; Layer-2 mocha 1270 passing. Releases (router 0.29.0, extension next minor) remain sequenced after the re-walked UAT on operator authorization per spec step 5.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/supersession-and-close-prep",
+      "dateTime": "2026-07-06T21:57:14.469974-04:00",
+      "description": "Spec Revision 2 recorded (operator decision): the re-walked UAT and both releases are superseded by Set 084 (084-verification-identity-and-close-backstop) - the 083 checklist's two text assertions migrate into 084's cold-start walk, and the combined router release ships from 084 S3 as 0.29.0 (never published in between). Not waived: cross-provider verification (round 5 against the committed tree) and the required path-aware critique. Set 084 authored this session (spec + routed ai-assignment via gemini-pro, $0.02) from the two-model consensus (consensus-synthesis.md). Close-out artifacts written: change-log.md, s3-close-reason.md, S3 disposition (final session, next_orchestrator null), lessons cited (L-064-9, L-065-1, L-069-2, L-071-1, L-075-1, L-079-3).",
+      "status": "complete"
     }
   ]
 }

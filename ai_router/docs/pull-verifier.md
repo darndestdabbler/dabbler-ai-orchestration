@@ -175,11 +175,11 @@ Set 067 left these to Set 068; they are now built:
   [`../../docs/contract-gate.md`](../../docs/contract-gate.md)), the floor for
   the ~95%-probeable defect bulk.
 - **Experiment B** (the cadence study) ran, and the routed **keep / demote /
-  retire** decision was made: **DEMOTE**. Per-session routed verification is no
-  longer mandatory on every session — it is **gated** on a deterministic
-  blast-radius / coupling predicate (`ai_router/routed_gate.py`). The end-of-set
-  path-aware critique (this adapter) + the contract-test gate are now the primary
-  verification surface. Full strategy:
+  retire** decision was made: **DEMOTE** — later **reversed by Set 083**, which
+  made per-session cross-provider verification mandatory again on every
+  Full-tier session (the gating predicate in `ai_router/routed_gate.py` is now
+  informational only). The end-of-set path-aware critique (this adapter) + the
+  contract-test gate are additional surfaces. Full strategy:
   [`../../docs/verification-surface-strategy.md`](../../docs/verification-surface-strategy.md).
 
 ---

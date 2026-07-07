@@ -203,23 +203,40 @@ class TestRenderAscii:
 
 
 class TestCli:
+    """Set 083: the CLI is retired as a skip authority. It always answers
+    REQUIRED (exit 0) regardless of the predicate; the predicate's verdict
+    survives only as informational output (text + ``predicate_required``).
+    """
+
     def test_cli_required_exits_zero(self, capsys):
         code = rg.main(["ai_router/close_session.py"])
         assert code == rg.EXIT_REQUIRED == 0
         out = capsys.readouterr().out
-        assert "REQUIRED" in out
+        assert "REQUIRED (always)" in out
+        assert "verify_session" in out
 
-    def test_cli_skip_exits_ten(self, capsys):
-        code = rg.main(["ai_router/leaf.py"])
-        assert code == rg.EXIT_SKIP == 10
-        out = capsys.readouterr().out
-        assert "SKIP" in out
+    def test_cli_predicate_skip_still_exits_zero_required(self, capsys):
+        # The 2026-07-06 incident shape: a diff the predicate would have
+        # skipped (or an empty path list) must NOT authorize a skip.
+        for argv in (["ai_router/leaf.py"], []):
+            code = rg.main(argv)
+            assert code == rg.EXIT_REQUIRED == 0
+            out = capsys.readouterr().out
+            assert "REQUIRED (always)" in out
+            assert "mandatory" in out.lower()
+
+    def test_cli_output_is_ascii(self, capsys):
+        code = rg.main([])
+        assert code == 0
+        capsys.readouterr().out.encode("ascii")
 
     def test_cli_json_always_exits_zero(self, capsys):
         code = rg.main(["--json", "ai_router/leaf.py"])
         assert code == 0
         payload = json.loads(capsys.readouterr().out)
-        assert payload["required"] is False
+        assert payload["required"] is True
+        assert payload["retired"] is True
+        assert payload["predicate_required"] is False
         assert payload["files"] == 1
         assert payload["triggers"] == []
 
@@ -228,6 +245,7 @@ class TestCli:
         assert code == 0
         payload = json.loads(capsys.readouterr().out)
         assert payload["required"] is True
+        assert payload["predicate_required"] is True
         assert rg.TRIGGER_BLAST_RADIUS in payload["triggers"]
         assert rg.TRIGGER_MULTI_MODULE in payload["triggers"]
 

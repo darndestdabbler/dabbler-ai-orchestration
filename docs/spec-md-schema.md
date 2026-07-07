@@ -87,8 +87,9 @@ are required, two more are optional but recommended:
 
 The `Workflow:` line is a human-readable echo of the machine-parsed
 `tier:` field in the configuration block below. **Full** runs the AI
-router (cost-minded routing + automatic cross-provider verification);
-**Lightweight** is **router-off, not Python-off** — it makes zero
+router (cost-minded routing + the mandatory Step 6 cross-provider
+verification command on every session); **Lightweight** is
+**router-off, not Python-off** — it makes zero
 metered API calls but uses the *same* Python lifecycle (`.venv`,
 `start_session` / `close_session`, the blessed state-file writer, the
 close-out gate). Verification on Lightweight is per-set, governed by

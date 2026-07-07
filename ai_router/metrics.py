@@ -50,12 +50,15 @@ Schema per line:
     "billed_usage_unavailable":   bool or null  (true whenever cost_usd
          is not billing-authoritative for this record -- always true for
          "copilot-cli" records, always null/absent for "api" ones)
-    # Set 084 S2 (F3) -- the verification-evidence stamp. All nine are
-    # null on every historical row and on every row a sanctioned
-    # producer (verify_session / the close backstop) did not write.
-    # The close gate accepts ONLY rows whose stamp is present and
-    # internally consistent; a bare route() row no longer corroborates
-    # a close. Field semantics: ai_router/verification_stamp.py.
+    # Set 084 S2 (F3) -- the verification-evidence stamp (one key per
+    # verification_stamp.STAMP_FIELDS entry -- that tuple is the
+    # authoritative field list). All are null on every historical row
+    # and on every row a sanctioned producer (verify_session / the
+    # close backstop) did not write. The close gate accepts ONLY rows
+    # whose stamp is present and internally consistent; a bare route()
+    # row no longer corroborates a close. A stamped row's "verdict"
+    # lands on the shared verdict column above (same meaning as on
+    # verify-call rows). Field semantics: ai_router/verification_stamp.py.
     "source":                          str or null
     "evidence_sha256":                 str or null
     "template_id":                     str or null
@@ -65,6 +68,8 @@ Schema per line:
     "artifact_path":                   str or null
     "artifact_sha256":                 str or null
     "package_version":                 str or null
+    "evidence_base":                   str or null
+    "work_diff_sha256":                str or null
   }
 
 Adjudication records (call_type = "adjudication") are written by
@@ -172,8 +177,8 @@ def record_call(
     billed_usage_unavailable: Optional[bool] = None,
     # Set 084 S2 (F3) -- the verification-evidence stamp, passed as one
     # dict by the sanctioned producers via route(verification_stamp=...).
-    # None (every other caller) writes all nine stamp fields as null,
-    # keeping historical and bare-route rows schema-compatible.
+    # None (every other caller) leaves every stamp field null, keeping
+    # historical and bare-route rows schema-compatible.
     stamp: Optional[dict] = None,
 ) -> None:
     """Append a single record to the metrics log. Never raises — if
@@ -241,16 +246,24 @@ def record_call(
         "billed_usage_unavailable": billed_usage_unavailable,
     }
 
-    # Set 084 S2 (F3) — the verification-evidence stamp. Written as nine
-    # individual top-level keys (additive; all None when no stamp) so
-    # the close gate and jq-style readers never have to unwrap a nested
-    # object on historical lines.
+    # Set 084 S2 (F3) — the verification-evidence stamp. Written as
+    # individual top-level keys (one per STAMP_FIELDS entry; additive —
+    # all None when no stamp) so the close gate and jq-style readers
+    # never have to unwrap a nested object on historical lines. The
+    # stamp's ``verdict`` deliberately lands on the row's existing
+    # ``verdict`` column (same meaning as on verify-call rows);
+    # ``setdefault`` on the no-stamp path keeps a verify call's own
+    # verdict intact.
     try:
         from .verification_stamp import STAMP_FIELDS
     except ImportError:
         from verification_stamp import STAMP_FIELDS  # type: ignore[no-redef]
-    for stamp_field in STAMP_FIELDS:
-        record[stamp_field] = (stamp or {}).get(stamp_field)
+    if stamp:
+        for stamp_field in STAMP_FIELDS:
+            record[stamp_field] = stamp.get(stamp_field)
+    else:
+        for stamp_field in STAMP_FIELDS:
+            record.setdefault(stamp_field, None)
 
     try:
         path = _log_path(config)

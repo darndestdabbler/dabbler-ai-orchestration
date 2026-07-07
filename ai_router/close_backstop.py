@@ -332,9 +332,13 @@ def _existing_evidence_settles_the_close(
     _all, valid, _reasons = find_session_verification_evidence(
         str(session_set_dir), session_number, orchestrator_provider,
     )
+    claimed = _claimed_close_verdict(disposition)
+    # I-084-S2-7: only rows whose STAMPED verdict matches the claim can
+    # settle the close — a hand-flipped claim finds no matching row and
+    # the backstop runs its own round.
+    valid = [row for row in valid if row.get("verdict") == claimed]
     if not valid:
         return False
-    claimed = _claimed_close_verdict(disposition)
     if claimed == "VERIFIED":
         return True
     if claimed == "ISSUES_FOUND":

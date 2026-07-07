@@ -14,6 +14,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from verification import parse_verification_response
 from verification_stamp import (
     GIT_EMPTY_TREE,
     STAMP_SOURCE_VERIFY_SESSION,
@@ -113,6 +114,9 @@ def write_stamped_evidence(
         "package_version": "0.0-test",
         "evidence_base": evidence_base,
         "work_diff_sha256": work_diff_sha256,
+        # I-084-S2-7: the verdict is stamped from the same bytes the
+        # artifact hash binds — parse it exactly like complete_stamp.
+        "verdict": parse_verification_response(content)[0],
     }
     row.update(field_overrides)
     return row

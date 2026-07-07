@@ -15,10 +15,12 @@ as regression fixtures against ``close_session.run``:
 
 Plus: backstop-unavailable blocks; provider failure blocks (never a
 pass) with the two-attempt ladder preserved; zero-budget passthrough;
-force / manual-verify interplay unchanged (neither triggers the
-backstop); evidence-present and Minor-only skips; the working-tree
-gate tolerating the backstop's own mid-close artifacts; the
-pre-session diff base.
+the flag interplay — ``--manual-verify`` (the attested bypass) never
+triggers the backstop while ``--force`` deliberately DOES receive it
+(I-084-S2-1: force bypasses bookkeeping gates, neither evidence
+layer); evidence-present and Minor-only skips; staleness re-runs;
+the working-tree gate tolerating the backstop's own mid-close
+artifacts; the pre-session / empty-tree diff base.
 
 Template-hash / stamp-field fail-closed cases live in
 ``test_verification_integrity_gate.py`` (the gate consumes the stamp;
@@ -702,6 +704,24 @@ class TestBackstopMechanics:
         )
         base = resolve_backstop_diff_base(set_dir, 1)
         assert base == baseline_sha
+
+    def test_hand_flipped_claim_triggers_a_fresh_backstop_round(
+        self, closeable, fake_route,
+    ):
+        """I-084-S2-7: an ISSUES_FOUND stamped row cannot stand the
+        backstop down for a hand-flipped VERIFIED claim — the framework
+        re-verifies and ITS verdict governs."""
+        root, set_dir = closeable
+        row = write_stamped_evidence(set_dir, content="ISSUES_FOUND\n")
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        # The orchestrator hand-claims VERIFIED over the refusing row.
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "succeeded", outcome.messages
+        assert len(fake_route.calls) == 1  # the row did NOT settle it
 
     def test_stale_evidence_does_not_settle_a_later_close(
         self, closeable, fake_route,

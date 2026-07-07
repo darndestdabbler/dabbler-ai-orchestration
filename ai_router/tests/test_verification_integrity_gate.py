@@ -569,6 +569,61 @@ class TestStampedEvidenceLayer:
         )
         assert not passed
 
+    def test_hand_flipped_claim_cannot_ride_an_issues_found_row(
+        self, tmp_path, monkeypatch,
+    ):
+        """I-084-S2-7 (the dogfood's round-4 finding): the stamped
+        verdict — parsed at record time from the bytes the artifact
+        hash binds — must MATCH the disposition's claim. An
+        ISSUES_FOUND row cannot corroborate a hand-flipped VERIFIED."""
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [write_stamped_evidence(set_dir, content="ISSUES_FOUND\n")],
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition(verdict="VERIFIED")
+        )
+        assert not passed
+        assert "does not match any stamped verification verdict" in remediation
+
+    def test_claim_matching_the_stamped_verdict_corroborates(
+        self, tmp_path, monkeypatch,
+    ):
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [write_stamped_evidence(set_dir, content="ISSUES_FOUND\n")],
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition(verdict="ISSUES_FOUND")
+        )
+        assert passed, remediation
+
+    def test_stale_row_after_new_work_fails_closed(
+        self, tmp_path, monkeypatch,
+    ):
+        """I-084-S2-5: a row stamped at repo state A cannot corroborate
+        after further tracked work landed — the freshness recompute
+        mismatches."""
+        set_dir = _make_set(tmp_path)
+        row = write_stamped_evidence(set_dir)
+        _write_metrics(tmp_path, monkeypatch, [row])
+        # Land substantive tracked work AFTER the row was stamped.
+        work = tmp_path / "src_change.py"
+        work.write_text("x = 1\n", encoding="utf-8")
+        import subprocess as _sp
+
+        _sp.run(["git", "-C", str(tmp_path), "add", "-A"],
+                capture_output=True, check=False)
+        _sp.run(["git", "-C", str(tmp_path), "commit", "-m", "more work"],
+                capture_output=True, check=False)
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "stale" in remediation or "work changed" in remediation
+
     def test_one_valid_row_among_bare_rows_corroborates(
         self, tmp_path, monkeypatch
     ):

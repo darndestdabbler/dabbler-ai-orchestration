@@ -1327,6 +1327,23 @@ def check_verification_integrity(
                 "corroborate a close; run the sanctioned Step 6 command: "
                 f"{command}",
             )
+        # I-084-S2-7: the CLAIM must match what a verifier actually
+        # said. The stamped verdict is parsed at record time from the
+        # same bytes the artifact hash binds, so a hand-edited
+        # disposition (e.g. ISSUES_FOUND flipped to VERIFIED) finds no
+        # matching row and the close is refused.
+        stamped_verdicts = {r.get("verdict") for r in valid_rows}
+        if claimed not in stamped_verdicts:
+            return (
+                False,
+                f"claimed verdict {claimed!r} (method api) does not "
+                "match any stamped verification verdict for session "
+                f"{current} (stamped: "
+                f"{', '.join(sorted(str(v) for v in stamped_verdicts))}). "
+                "The verifier's recorded verdict — not the disposition's "
+                "claim — is the evidence; re-verify via the sanctioned "
+                f"Step 6 command: {command}",
+            )
         return True, ""
 
     # method in ("manual-via-other-engine", "skipped"), with or without

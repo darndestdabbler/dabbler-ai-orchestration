@@ -140,6 +140,14 @@
       "dateTime": "2026-07-07T04:57:15.344154-04:00",
       "description": "Dogfood round 3 (LIVE, $0.4213, gpt-5-4, conventions block in play): the mid-flight false positives are gone; two NEW genuine Majors found and fixed (ledger, zero resurrections). I-084-S2-5: stale stamped evidence could settle a later close -- the stamp now carries evidence_base (resolved diff-base sha) + work_diff_sha256 (a canonical-exclusion work-diff hash; producers compute it, validate_stamped_row recomputes it against the tree being closed, so any post-verification work change makes the row stale and the backstop runs a fresh round; one shared path covers the gate, the backstop skip-check, and the fixtures). I-084-S2-6: the fresh-repo / missing-startedAt fallback silently degraded evidence to a HEAD diff -- no pre-session commit now diffs from git's empty tree, and missing startedAt fails closed naming verify_session --diff-base. Nit accepted: earlier ledger entries' test counts are superseded -- test_close_backstop.py now carries 25 tests; suite 2717+ passed. Round 4 decides.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "s2.backstop",
+      "dateTime": "2026-07-07T05:26:14.928828-04:00",
+      "description": "Dogfood round 4 (LIVE, $0.5014, gpt-5-4): two NEW Majors, both fixed. I-084-S2-7: the stamp now carries the VERDICT parsed at record time from the artifact-bound bytes; the close gate and the backstop skip predicate both require the disposition's claim to equal a stamped verdict -- a hand-flipped VERIFIED cannot ride an ISSUES_FOUND row. I-084-S2-5 (refinement; previously incomplete): freshness exclusions narrowed from whole-set-dir + docs/planning to the exact bookkeeping files, and the freshness primitive became a content DIGEST (path + blob hash of all files differing from base, tracked or untracked) -- stable across the untracked-to-tracked commit transition (L-064-9's diff-invisible new deliverables) while any content change stales the row. Lock files and the workflow-generated change-log.md classified as bookkeeping. Both nits fixed. Suite 2724 passed. Round 5 decides.",
+      "status": "complete"
     }
   ]
 }

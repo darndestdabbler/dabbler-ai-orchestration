@@ -224,8 +224,22 @@ def test_stale_lock_is_reclaimed_during_close_out(closeable_set: Path):
 # Real gate failure
 # ---------------------------------------------------------------------------
 
-def test_uncommitted_file_triggers_gate_failed(closeable_set: Path):
-    """An uncommitted file under the set triggers the working-tree gate."""
+def test_uncommitted_file_triggers_gate_failed(closeable_set: Path, monkeypatch):
+    """An uncommitted file under the set triggers the working-tree gate.
+
+    The Set 084 backstop is stood down here: a stray uncommitted file
+    also (correctly) stales the freshness binding and would re-run the
+    verification first — that behavior is covered in
+    test_close_backstop.py; this test isolates the working-tree gate.
+    """
+    import close_backstop
+
+    monkeypatch.setattr(
+        close_backstop, "run_close_backstop",
+        lambda *_a, **_kw: close_backstop.BackstopOutcome(
+            status=close_backstop.STATUS_SKIPPED_EVIDENCE_PRESENT,
+        ),
+    )
     (closeable_set / "stray.txt").write_text("dirty\n", encoding="utf-8")
     args = _ns(close_session, session_set_dir=str(closeable_set))
     outcome = close_session.run(args)

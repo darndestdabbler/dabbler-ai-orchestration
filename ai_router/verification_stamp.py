@@ -9,7 +9,8 @@ field set and the hashing rules (L-069-1).
 
 What the stamp is
 -----------------
-Nine additive fields on a ``session-verification`` metrics row (all
+Additive fields on a ``session-verification`` metrics row (one per
+:data:`STAMP_FIELDS` entry — that tuple is the authoritative list; all
 ``None`` on historical rows — the Set 078 additive-schema pattern):
 
 - ``source`` — which sanctioned surface produced the row:
@@ -104,13 +105,19 @@ STAMP_FIELDS = (
     # never settle a close performed after further work landed.
     # ``evidence_base`` is the resolved sha the evidence diff was taken
     # against; ``work_diff_sha256`` hashes the canonical work diff
-    # (base -> working tree, under WORK_DIFF_EXCLUDES) — recomputable
-    # at close time because the sanctioned flows land exactly the
-    # reviewed tree: any post-verification work change makes the
-    # recomputation mismatch and the row goes stale (fails closed; the
-    # backstop then runs a fresh round).
+    # (base -> working tree, under the work-diff exclusions) —
+    # recomputable at close time because the sanctioned flows land
+    # exactly the reviewed tree: any post-verification work change
+    # makes the recomputation mismatch and the row goes stale (fails
+    # closed; the backstop then runs a fresh round).
     "evidence_base",
     "work_diff_sha256",
+    # I-084-S2-7 (round 4): the VERDICT is part of the evidence. It is
+    # parsed from the same response bytes artifact_sha256 binds, at
+    # record time, so a hand-flipped disposition claim can never ride a
+    # row whose verifier actually said otherwise — the close gate
+    # requires claim == stamped verdict.
+    "verdict",
 )
 
 # Git's well-known empty-tree object — the diff base for a session in a
@@ -120,14 +127,25 @@ STAMP_FIELDS = (
 # (I-084-S2-6).
 GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
-# The canonical exclusion set for the work-diff freshness hash. These
-# are the close-out bookkeeping surfaces the sanctioned flows
-# legitimately touch AFTER the verification reviewed the work (the
-# session set's own artifacts/state, the metrics ledger, the guidance
-# citation trailers) plus the generated-bundle exclusions the evidence
-# diff already applies. Everything else binds: a post-verification
-# change to any real file makes the row stale. One tuple, used by the
-# producers, the consumer, and the test fixtures alike (L-069-1).
+# The canonical exclusion sets for the work-diff freshness hash,
+# deliberately NARROW (I-084-S2-5, round-4 refinement: excluding the
+# whole session-set tree or all of docs/planning let substantive work
+# in those locations ride stale evidence). Two layers:
+#
+# - WORK_DIFF_BASE_EXCLUDES — repo-wide generated bundles (the evidence
+#   diff's own exclusions) plus the metrics ledger.
+# - WORK_DIFF_SET_BOOKKEEPING — the exact per-set files the sanctioned
+#   flows legitimately touch AFTER the verification reviewed the work:
+#   the raw verification artifacts + findings envelopes (written from
+#   the routed response after evidence assembly), the disposition
+#   (verdict-patched), the lifecycle ledgers (events appended during
+#   close; steps logged at boundaries), and the state snapshot (flipped
+#   at close). Everything else in the set dir — spec.md,
+#   ai-assignment.md, change-log.md, UAT checklists — is session WORK
+#   and binds: a post-verification change makes the row stale.
+#
+# One definition, used by the producers, the consumer, and the test
+# fixtures alike (L-069-1).
 WORK_DIFF_BASE_EXCLUDES = (
     "dist",
     "out",
@@ -135,7 +153,24 @@ WORK_DIFF_BASE_EXCLUDES = (
     ".venv",
     "__pycache__",
     "*.vsix",
-    "docs/planning",
+)
+
+WORK_DIFF_SET_BOOKKEEPING = (
+    "s*-verification*.md",
+    "s*-issues*.json",
+    "disposition.json",
+    "session-events.jsonl",
+    "session-state.json",
+    "activity-log.json",
+    # Generated at close-out by the workflow itself ("on last session:
+    # generates change-log.md") and policed by its own dedicated gate
+    # (change_log_fresh) — close-out bookkeeping, not reviewed work.
+    "change-log.md",
+    # The close lock exists exactly while the close (and therefore the
+    # freshness recompute) runs — same tolerance the working-tree
+    # gate's ignore patterns give it.
+    ".lifecycle.lock",
+    ".close_session.lock",
 )
 
 _HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -259,14 +294,25 @@ def build_stamp(
 def complete_stamp(
     stamp: dict, *, verifier_model: str, response_content: str
 ) -> dict:
-    """Return the record-time stamp: producer fields + the two
-    route()-filled fields (``verifier_model``; ``artifact_sha256`` over
-    the response's UTF-8 bytes — the exact bytes the producer writes)."""
+    """Return the record-time stamp: producer fields + the
+    route()-filled fields — ``verifier_model``, ``artifact_sha256``
+    over the response's UTF-8 bytes (the exact bytes the producer
+    writes), and the ``verdict`` parsed from those same bytes
+    (I-084-S2-7: the verdict is stamped from the content the artifact
+    hash binds, so a later hand-flipped disposition claim can never
+    ride this row)."""
+    try:
+        from .verification import parse_verification_response
+    except ImportError:
+        from verification import parse_verification_response  # type: ignore[no-redef]
+
     completed = dict(stamp)
     completed["verifier_model"] = verifier_model
     completed["artifact_sha256"] = sha256_hex(
         response_content.encode("utf-8")
     )
+    verdict, _issues = parse_verification_response(response_content)
+    completed["verdict"] = verdict
     return completed
 
 
@@ -295,14 +341,20 @@ def resolve_commitish(repo_root: Path, ref: str) -> Optional[str]:
 def compute_work_diff_sha256(
     session_set_dir: Path, base: str
 ) -> Optional[str]:
-    """The freshness hash: SHA-256 of the canonical work diff.
+    """The freshness digest: SHA-256 over the session's work state.
 
-    ``git diff <base>`` over the working tree, excluding the session
-    set's own directory and :data:`WORK_DIFF_BASE_EXCLUDES` (plus the
-    metrics ledger) — the bookkeeping surfaces close-out legitimately
-    touches after verification. Deterministic flags so the producer's
-    hash and the consumer's recomputation byte-match on the same repo
-    state. Returns ``None`` when the repo/diff cannot be resolved —
+    A canonical content digest — one ``path\\0blob-hash`` line per file
+    that differs from *base* (tracked changes AND untracked additions;
+    a deletion digests as a marker), under the work-diff exclusions —
+    rather than raw ``git diff`` bytes: an untracked deliverable is
+    invisible to ``git diff`` (L-064-9) but becomes diff-visible the
+    moment the sanctioned flow commits it, so a raw-diff hash would go
+    stale on every session that creates a new file. The content digest
+    is stable across the untracked→tracked transition and changes
+    exactly when any bound file's CONTENT changes — which is the
+    staleness the check exists to catch (I-084-S2-5).
+
+    Returns ``None`` when the repo cannot be resolved or git fails —
     the caller fails closed.
     """
     import subprocess
@@ -316,20 +368,44 @@ def compute_work_diff_sha256(
     if repo_root is None:
         return None
     set_rel = repo_relative_posix(cur, repo_root)
-    excludes = [set_rel, "*router-metrics.jsonl", *WORK_DIFF_BASE_EXCLUDES]
+    excludes = [
+        *(f"{set_rel}/{name}" for name in WORK_DIFF_SET_BOOKKEEPING),
+        "*router-metrics.jsonl",
+        *WORK_DIFF_BASE_EXCLUDES,
+    ]
     pathspecs = [".", *(f":(exclude){pattern}" for pattern in excludes)]
-    proc = subprocess.run(
-        [
-            "git", "-C", str(repo_root), "-c", "core.quotepath=false",
-            "diff", "--no-color", "--no-ext-diff", "--no-textconv",
-            base, "--", *pathspecs,
-        ],
-        capture_output=True,
-        check=False,
+
+    def _git_z(*args: str) -> Optional[List[str]]:
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), "-c", "core.quotepath=false",
+             *args],
+            capture_output=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return None
+        out = proc.stdout.decode("utf-8", errors="replace")
+        return [p for p in out.split("\0") if p]
+
+    changed = _git_z(
+        "diff", "--name-only", "-z", "--no-ext-diff", base, "--", *pathspecs,
     )
-    if proc.returncode != 0:
+    untracked = _git_z(
+        "ls-files", "--others", "--exclude-standard", "-z", "--",
+        *pathspecs,
+    )
+    if changed is None or untracked is None:
         return None
-    return sha256_hex(proc.stdout)
+
+    lines: List[str] = []
+    for rel in sorted(set(changed) | set(untracked)):
+        target = repo_root / rel
+        try:
+            file_hash = sha256_hex(target.read_bytes())
+        except OSError:
+            file_hash = "deleted"
+        lines.append(f"{rel}\0{file_hash}")
+    return sha256_hex("\n".join(lines).encode("utf-8"))
 
 
 def repo_relative_posix(path: Path, repo_root: Path) -> str:
@@ -525,7 +601,18 @@ def validate_stamped_row(
     ):
         return False, "package_version is missing (fails closed)"
 
-    # 8. Freshness — the row must have verified THE repo state being
+    # 8. Verdict token (I-084-S2-7): the stamped verdict — parsed at
+    # record time from the same bytes the artifact hash binds — must be
+    # a legal token. The claim-vs-stamp equality check lives with the
+    # consumers (the close gate and the backstop's skip predicate),
+    # which know the disposition's claim.
+    if row.get("verdict") not in ("VERIFIED", "ISSUES_FOUND"):
+        return False, (
+            f"stamped verdict {row.get('verdict')!r} is not a legal "
+            "token (fails closed)"
+        )
+
+    # 9. Freshness — the row must have verified THE repo state being
     # closed (I-084-S2-5). Recompute the canonical work-diff hash from
     # the stamped base against the tree as it stands now: the
     # sanctioned flows land exactly the reviewed work, so a match means

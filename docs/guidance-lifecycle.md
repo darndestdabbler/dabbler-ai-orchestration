@@ -142,7 +142,7 @@ guidance:
       - path: docs/session-constitution.md
         ceiling_tokens: 4000
       - path: docs/planning/project-guidance.md
-        ceiling_tokens: 3528
+        ceiling_tokens: 3499
       # ... one entry per required-reading file
 ```
 

@@ -246,9 +246,15 @@ operator has reviewed and applied the lessons triage.
 1. **Verifier context audit.** Review what `verify_session` and the
    canonical adversarial template actually assemble as verifier
    context. The verifier's evidence should be the diff, test output,
-   gate outcomes, the spec, and the constitution — not the full
-   process manual (a manual-fed verifier produces process-heavy
-   critiques and inflates round counts). The template's adversarial
+   gate outcomes, and the spec — not the full process manual (a
+   manual-fed verifier produces process-heavy critiques and inflates
+   round counts). *(Amended 2026-07-07, operator adjudication of
+   I-085-S3-1: the sentence as authored appended "and the
+   constitution" to the consensus-adopted scope list
+   (`consensus-synthesis.md`); the operator affirmed the consensus
+   list — the constitution is a process doc and is deliberately not
+   fed. See `disposition.json` → `verifier_scope_adjudication`.)*
+   The template's adversarial
    framing is untouched (L-069-2); if the current assembly is already
    scoped, record no-change-needed in the disposition rather than
    inventing an edit (prefer removal over addition).

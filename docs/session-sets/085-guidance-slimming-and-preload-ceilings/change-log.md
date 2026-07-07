@@ -54,7 +54,8 @@
 > → ratchet), carrying the consensus "allow cheap mistakes" limits
 > verbatim and the A/B signals to watch. Router `0.30.0` (the manifest
 > machinery) and extension `0.40.0` (template bundle links the
-> constitution) prepared; **publish pending operator authorization**.
+> constitution) prepared; **publish operator-authorized on clean close
+> (2026-07-07 adjudication)**.
 
 ## Session 3 (this session) — verifier scope, playbook, dogfood, release prep
 
@@ -69,9 +70,12 @@
   five-item list, whose "and the constitution" was appended at
   authoring time; the routed second opinion
   (`s3-verifier-scope-audit.txt`) is internally split (top-line:
-  add it; reasoned answer: omission is the better state) and the
-  adjudication packet is in `disposition.json` for the operator.
-  `verify_session.py` and the templates untouched pending that call.
+  add it; reasoned answer: omission is the better state). The fork
+  stopped to the operator per the bounded-round rule, and the operator
+  **adjudicated ACCEPT (2026-07-07)**: the consensus scope list is
+  affirmed, the spec sentence is amended (inline note), and
+  `verify_session.py` and the templates stay untouched by design
+  (`disposition.json` → `verifier_scope_adjudication`).
 - **Bundled-default manifest guard** (Major portability defect, found
   in release prep, fixed before it could ship): the packaged
   `router-config.yaml` declares *this repo's* manifest, and a
@@ -83,13 +87,23 @@
   `guidance-lifecycle.md`.
 - **Live dogfood recorded** (first A/B datapoint, in
   `disposition.json`): the session ran from the slimmed ~10.7k preload
-  alone; four on-demand docs opened at their trigger moments
+  alone; six on-demand docs opened at their trigger moments
   (guidance-lifecycle, CONTRIBUTING, the workflow doc's critique-stage
-  section, the disposition schema); the workflow doc was never opened
-  for the happy path.
-- **Releases prepared, not published:** router `0.30.0` + extension
-  `0.40.0` (version bumps, CHANGELOGs, repository-reference rows);
-  rollback text names only registry-live `0.29.0` / `0.39.0`.
+  section, the disposition schema, and — on the resume — the
+  session-state schema's repair recourse and `close_session --help`'s
+  repair-flag matrix); the workflow doc was never opened for the happy
+  path.
+- **Verification: 4 rounds (gpt-5-4), final verdict VERIFIED.** R1–R2
+  stopped to the operator on the verifier-scope fork per the
+  bounded-round rule; after the ACCEPT adjudication, R3 surfaced 2 new
+  Majors (a `startedAt` refresh from the sanctioned re-attach —
+  repaired to the ledger's `work_started` time; a stray screenshot
+  accidentally staged in `f44a32f` — removed), and R4 landed VERIFIED
+  with zero findings.
+- **Releases prepared; operator authorized publishing on clean close:**
+  router `0.30.0` + extension `0.40.0` (version bumps, CHANGELOGs,
+  repository-reference rows); rollback text names only registry-live
+  `0.29.0` / `0.39.0`.
 
 ## Suite state at set close
 

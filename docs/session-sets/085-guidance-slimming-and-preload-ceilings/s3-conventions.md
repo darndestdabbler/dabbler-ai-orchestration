@@ -47,9 +47,20 @@ manifest guard), and prepares — but does not publish — the router
 
 ## By-design decisions (settled by the spec / operator — do not re-litigate)
 
-- **Verifier-scope audit outcome — no tool change; the literal-list
-  deviation is explicit and adjudicated, not silently claimed compliant
-  (round-1 ledger: I-085-S3-1).** The audited facts are unchanged:
+- **Verifier-scope audit outcome — no tool change; SETTLED BY OPERATOR
+  ADJUDICATION (I-085-S3-1, closed 2026-07-07).** Per the constitution's
+  bounded-round rule, rounds 1–2's unfixed Major on this
+  spec-interpretation fork stopped to the operator with the four-option
+  adjudication packet (`disposition.json` →
+  `verifier_scope_adjudication`). **The operator chose ACCEPT: the
+  consensus-adopted scope list (diff, test output, gate outcomes, spec)
+  is affirmed as the contract, and the spec sentence in Session 3
+  Step 1 is amended accordingly** (inline amendment note in `spec.md`
+  citing the adjudication; the constitution is a process doc and is
+  deliberately not fed). This is a settled human decision under the
+  workflow's verifiers-flag / humans-adjudicate rule — it is no longer
+  an open finding, and re-raising it re-litigates a closed
+  adjudication. The audited facts are unchanged:
   `assemble_evidence`/`build_prompt` feed the spec excerpt +
   `git status --short` + the complete diff + the up-front conventions
   block into `prompt-templates/verification.md`; **no process manual is
@@ -75,11 +86,11 @@ manifest guard), and prepares — but does not publish — the router
     a process doc to the verifier re-invites the process-heavy-critique
     failure mode the requirement exists to prevent (prefer removal over
     addition). The deviation, both readings of the spec sentence, and
-    the split routed opinion below are recorded in `disposition.json`
-    for **operator adjudication**, and the spec-sentence ambiguity is
-    surfaced at the Step 9 review — the operator settles the canonical
-    scope list. `verify_session.py` and the templates are deliberately
-    untouched pending that adjudication.
+    the split routed opinion below were recorded in `disposition.json`
+    and stopped to the operator; **the operator adjudicated ACCEPT
+    (2026-07-07)** — the consensus scope list is the contract, the spec
+    sentence is amended (this round's diff carries the amendment), and
+    `verify_session.py` and the templates stay untouched by design.
   - **The routed second opinion (`s3-verifier-scope-audit.txt`) is
     internally split and is cited as such:** its top-line answer 1 says
     "Unscoped… Required Edit: Add `session-constitution.md` to the
@@ -125,6 +136,34 @@ manifest guard), and prepares — but does not publish — the router
 - `start_session` registered 14:42:31 EDT; first task action (S3.1
   evidence reads) ~14:46 — **~4 min** including Steps 3/3.5 (prereqs,
   ai-assignment block, routed next-set analysis).
+
+## Round-3 findings — remediated in this diff (round-4 context)
+
+- **R3 Issue 1 (session-3 chronology):** root cause — the S3-resume
+  conversation re-ran `start_session` (the sanctioned re-attach after
+  the operator-adjudication stop), which refreshed
+  `session-state.json`'s `startedAt` to the re-attach time (15:39)
+  without appending a ledger event, post-dating the already-logged
+  work. `close_session --repair` reports no drift (it checks
+  status-level drift, not timestamps), so per the schema doc's
+  operator hand-edit recourse, `startedAt` was restored to
+  `2026-07-07T14:42:31.549267-04:00` — exactly the ledger's
+  session-3 `work_started` event. State, events, activity log, and
+  the disposition dogfood record now agree on the timeline.
+- **R3 Issue 2 (stray screenshot):** `tools/dabbler-ai-orchestration/
+  media/Screenshot 2026-07-07 152310.png` was an accidental staging in
+  commit `f44a32f` — nothing references it (no package.json, README,
+  or doc link). Removed via `git rm` (recoverable from `f44a32f`);
+  the extension release is again template-bundle-only as claimed.
+- **R3 nit (manifest example 3528 vs 3499):** the
+  `guidance-lifecycle.md` example now matches the live manifest
+  (3499).
+- **R3 nit (activity-log step-10 status token):** normalized
+  `"completed"` → `"complete"` to the file's convention.
+- **R3 nit (s1-next-orchestrator-analysis.json is fenced Markdown):**
+  recorded, deliberately not churned — it is a saved S1 session
+  artifact; rewriting historical artifacts to fix a filename/format
+  nit is riskier than the nit (raw records stand).
 
 ## What to scrutinize
 

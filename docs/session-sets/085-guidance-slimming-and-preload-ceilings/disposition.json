@@ -1,6 +1,6 @@
 {
-  "status": "requires_review",
-  "summary": "Set 085 Session 3 (F4): verifier-scope audit, portable playbook, live dogfood, release prep. Audit facts: verify_session assembles the spec excerpt + git status --short + the complete diff + the up-front conventions block (test/gate outcomes ride there, mandated by promoted convention L-064-10) into the adversarial template; no process manual is fed. The constitution is deliberately not fed - a recorded deviation from the spec sentence's literal five-item list, adjudicated to the operator (see verifier_scope_adjudication). Authored docs/guidance-slimming-playbook.md (measure -> admission-test classify -> prose->gate->archive demotion -> constitution -> manifest -> ratchet; consensus cheap-mistakes limits verbatim; A/B signals). Fixed a Major portability defect found in release prep: the packaged router-config.yaml declares this repo's preload manifest, and a pip-installed consumer with no workspace config would inherit it via the bundled-default fallback (guidance_report --check hard-failing on foreign files); bundled-default resolution is now 'no config' for guidance purposes, workspace/--repo-root/AI_ROUTER_CONFIG keep enforcing; 4 new tests; documented in guidance-lifecycle.md. Releases prepared, publish pending operator authorization: router 0.30.0 (pyproject + CHANGELOG incl. rollback pinning registry-live 0.29.0) and extension 0.40.0 (package.json + CHANGELOG, template-bundle-only; rollback names registry-live 0.39.0); repository-reference rows + version walk updated. Suite: pytest 2816 passed / 5 skipped (S2 baseline + 4 guard tests); tsc clean; TS unit 1270 passing; guidance_report --check green (10,673/12,000); validate_guidance_meta OK. Verification (gpt-5-4): R1 1 Major + R2 2 Major. The R2 sequencing finding (change-log written in completed tense before disposition dogfood fields and the critique artifact existed) and both nits are remediated in this close prep (this disposition carries the dogfood record; the number reconciliation landed in change-log.md; the 'concurs' overstatement was corrected by an appended activity-log entry - the raw earlier entry stands per append-only discipline). The verifier-scope finding (I-085-S3-1) is an unfixed Major after two rounds on a genuine spec-interpretation fork - per the constitution's bounded-round rule the session STOPS TO THE OPERATOR with the adjudication packet instead of grinding a third round; status requires_review, close_session deliberately not run, notification deliberately not fired.",
+  "status": "completed",
+  "summary": "Set 085 Session 3 (F4): verifier-scope audit, portable playbook, live dogfood, release prep. Audit facts: verify_session assembles the spec excerpt + git status --short + the complete diff + the up-front conventions block (test/gate outcomes ride there, mandated by promoted convention L-064-10) into the adversarial template; no process manual is fed. The constitution is deliberately not fed - a recorded deviation from the spec sentence's literal five-item list, adjudicated to the operator (see verifier_scope_adjudication). Authored docs/guidance-slimming-playbook.md (measure -> admission-test classify -> prose->gate->archive demotion -> constitution -> manifest -> ratchet; consensus cheap-mistakes limits verbatim; A/B signals). Fixed a Major portability defect found in release prep: the packaged router-config.yaml declares this repo's preload manifest, and a pip-installed consumer with no workspace config would inherit it via the bundled-default fallback (guidance_report --check hard-failing on foreign files); bundled-default resolution is now 'no config' for guidance purposes, workspace/--repo-root/AI_ROUTER_CONFIG keep enforcing; 4 new tests; documented in guidance-lifecycle.md. Releases prepared, publish pending operator authorization: router 0.30.0 (pyproject + CHANGELOG incl. rollback pinning registry-live 0.29.0) and extension 0.40.0 (package.json + CHANGELOG, template-bundle-only; rollback names registry-live 0.39.0); repository-reference rows + version walk updated. Suite: pytest 2816 passed / 5 skipped (S2 baseline + 4 guard tests); tsc clean; TS unit 1270 passing; guidance_report --check green (10,673/12,000); validate_guidance_meta OK. Verification (gpt-5-4): R1 1 Major + R2 2 Major. The R2 sequencing finding (change-log written in completed tense before disposition dogfood fields and the critique artifact existed) and both nits are remediated in this close prep (this disposition carries the dogfood record; the number reconciliation landed in change-log.md; the 'concurs' overstatement was corrected by an appended activity-log entry - the raw earlier entry stands per append-only discipline). The verifier-scope finding (I-085-S3-1) was an unfixed Major after two rounds on a genuine spec-interpretation fork - per the constitution's bounded-round rule the session stopped to the operator with the adjudication packet. RESOLUTION (S3 resumed 2026-07-07): the operator adjudicated ACCEPT - the consensus scope list (diff, test output, gate outcomes, spec) affirmed, the spec sentence amended with an inline adjudication note, verify_session/templates untouched by design. Round 3 (gpt-5-4, $0.62) did not re-raise the settled fork but found 2 new Majors, both remediated: (1) the start_session re-attach had refreshed session-state.json startedAt past the logged work - restored to the ledger's work_started time per the schema doc's operator hand-edit recourse (close_session --repair checks status-level drift only); (2) a stray screenshot accidentally staged in f44a32f was git rm'd, restoring the template-bundle-only extension release claim. Nits: manifest example number reconciled (3499), activity-log status token normalized, the s1-next-orchestrator-analysis.json format nit recorded-not-churned. Round 4 (gpt-5-4, $0.54): VERIFIED, zero findings. Operator authorized publishing router 0.30.0 + extension 0.40.0 on clean close.",
   "files_changed": [
     "ai_router/guidance_report.py",
     "ai_router/tests/test_guidance_preload_manifest.py",
@@ -16,11 +16,15 @@
     "docs/session-sets/085-guidance-slimming-and-preload-ceilings/s3-next-set-analysis.txt",
     "docs/session-sets/085-guidance-slimming-and-preload-ceilings/s3-verifier-scope-audit.txt",
     "docs/session-sets/085-guidance-slimming-and-preload-ceilings/change-log.md",
-    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/path-aware-critique.json"
+    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/path-aware-critique.json",
+    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/spec.md",
+    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/session-state.json",
+    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/activity-log.json",
+    "tools/dabbler-ai-orchestration/media/Screenshot 2026-07-07 152310.png"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
-  "verification_verdict": "ISSUES_FOUND",
+  "verification_verdict": "VERIFIED",
   "next_orchestrator": null,
   "blockers": [],
   "lessons_cited": [
@@ -41,7 +45,8 @@
       "RE-VERIFY RESHAPED: same evidence, with the adjudication framing presented as settled operator context.",
       "SECOND OPINION: route the same question to a third provider before deciding."
     ],
-    "status": "pending-operator"
+    "status": "operator-accepted",
+    "operator_decision": "ACCEPT the deviation (2026-07-07, in-session adjudication at S3 resume): the consensus scope list (diff, test output, gate outcomes, spec) is affirmed as the contract; the constitution is a process doc and is deliberately not fed. The spec sentence in Session 3 Step 1 is amended to drop 'and the constitution', with an inline amendment note citing this adjudication. verify_session and the templates remain deliberately untouched. Re-verification round 3 runs with this affirmation stated as a settled operator decision."
   },
   "path_aware_critique_adjudication": {
     "artifact": "path-aware-critique.json (pull_critique, providers google gemini-2.5-pro + openai gpt-5.4, diff-base 5ce3b3a, run after verification round 2)",
@@ -53,7 +58,7 @@
       },
       {
         "critic": "openai gpt-5.4 #2 (Major: verifier evidence omits the constitution / conventions block optional, vs the spec sentence's literal list)",
-        "adjudication": "duplicate of I-085-S3-1 - the same spec-interpretation fork the verification rounds surfaced, independently corroborated on the path-aware surface; pending-operator per verifier_scope_adjudication above. No code change pending that call."
+        "adjudication": "duplicate of I-085-S3-1 - the same spec-interpretation fork the verification rounds surfaced, independently corroborated on the path-aware surface; RESOLVED by the operator's ACCEPT adjudication (see verifier_scope_adjudication.operator_decision): consensus scope list affirmed, spec sentence amended, no code change by design."
       },
       {
         "critic": "google gemini-2.5-pro",
@@ -86,14 +91,22 @@
       {
         "doc": "docs/disposition-schema.md",
         "trigger": "Step 8: authoring disposition.json"
+      },
+      {
+        "doc": "docs/session-state-schema.md",
+        "trigger": "S3 resume: round-3 chronology finding needed the sanctioned repair recourse for session-state.json (the operator hand-edit path, after close_session --repair reported no status-level drift)"
+      },
+      {
+        "doc": "ai_router/docs/close-out.md (--repair flag semantics via close_session --help)",
+        "trigger": "S3 resume: choosing the blessed repair path for the round-3 state-chronology finding"
       }
     ],
     "session_registered_at": "2026-07-07T14:42:31-04:00",
     "first_task_action_at_approx": "2026-07-07T14:46:00-04:00",
     "time_to_first_task_action_minutes_approx": 4,
     "time_to_first_task_action_note": "measured from start_session registration to the first S3.1 evidence read; the ~4 minutes included Step 3 prereq checks and the Step 3.5 ai-assignment block + routed next-set analysis",
-    "verification_rounds": 2,
-    "verification_rounds_note": "R1 1 Major, R2 2 Major; loop stopped at the bounded-round rule on a spec-interpretation fork (adjudication above) rather than ground further - contrast S1's 12 rounds under the pre-slimming corpus",
+    "verification_rounds": 4,
+    "verification_rounds_note": "R1 1 Major, R2 2 Major; loop stopped at the bounded-round rule on a spec-interpretation fork rather than grind further; after the operator adjudicated ACCEPT, R3 surfaced 2 new Majors (both remediated same-session: state-chronology repair after the sanctioned re-attach, stray-screenshot removal) and R4 landed VERIFIED with zero findings - contrast S1's 12 rounds under the pre-slimming corpus",
     "gate_failures": 0,
     "gate_failures_note": "guidance_report --check, pytest, tsc, and TS unit all green on first post-change run; no close gate reached this session (close deliberately deferred to the operator adjudication)"
   }

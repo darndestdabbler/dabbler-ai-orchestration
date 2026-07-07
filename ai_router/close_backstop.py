@@ -43,6 +43,7 @@ verifier reviews the session's actual work.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
@@ -278,34 +279,33 @@ def resolve_backstop_diff_base(
     return GIT_EMPTY_TREE
 
 
-def _latest_issues_envelope(
-    session_set_dir: Path, session_number: int
+def _issues_envelope_for_artifact(
+    session_set_dir: Path, artifact_path: Optional[str]
 ) -> Optional[dict]:
-    """The highest-round ``sN-issues*.json`` envelope on disk, or None."""
+    """The ``sN-issues*.json`` envelope PAIRED with one verification
+    artifact (same round suffix), or None.
+
+    I-084-S2-8: the Minor-only settlement check must read the findings
+    of the authoritative row's own round — a global "latest envelope"
+    could pair a different round's findings with the row's verdict.
+    """
     import json
 
-    latest: Optional[Path] = None
-    round_number = 1
-    while True:
-        candidate = _vs.issues_artifact_path(
-            session_set_dir, session_number, round_number
-        )
-        if not candidate.exists():
-            # Rounds are written in order; the first hole ends the walk
-            # (but round 1 may be absent while round 2 exists only if
-            # round 1 was clean — check one round past the hole).
-            probe = _vs.issues_artifact_path(
-                session_set_dir, session_number, round_number + 1
-            )
-            if not probe.exists():
-                break
-        else:
-            latest = candidate
-        round_number += 1
-    if latest is None:
+    if not artifact_path:
         return None
+    basename = os.path.basename(str(artifact_path))
+    match = re.fullmatch(
+        r"s(\d+)-verification(?:-round-(\d+))?\.md", basename
+    )
+    if not match:
+        return None
+    session_number = int(match.group(1))
+    round_number = int(match.group(2) or 1)
+    envelope_path = _vs.issues_artifact_path(
+        session_set_dir, session_number, round_number
+    )
     try:
-        data = json.loads(latest.read_text(encoding="utf-8"))
+        data = json.loads(envelope_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) else None
@@ -332,17 +332,23 @@ def _existing_evidence_settles_the_close(
     _all, valid, _reasons = find_session_verification_evidence(
         str(session_set_dir), session_number, orchestrator_provider,
     )
-    claimed = _claimed_close_verdict(disposition)
-    # I-084-S2-7: only rows whose STAMPED verdict matches the claim can
-    # settle the close — a hand-flipped claim finds no matching row and
-    # the backstop runs its own round.
-    valid = [row for row in valid if row.get("verdict") == claimed]
     if not valid:
+        return False
+    claimed = _claimed_close_verdict(disposition)
+    # I-084-S2-7/-8: the LATEST valid stamped row is the one
+    # authoritative result (rows append chronologically) — the claim
+    # must match IT, so neither a hand-flipped claim nor a cherry-pick
+    # of an earlier favorable row can stand the backstop down after a
+    # later verification refused.
+    authoritative = valid[-1]
+    if claimed != authoritative.get("verdict"):
         return False
     if claimed == "VERIFIED":
         return True
     if claimed == "ISSUES_FOUND":
-        envelope = _latest_issues_envelope(session_set_dir, session_number)
+        envelope = _issues_envelope_for_artifact(
+            session_set_dir, authoritative.get("artifact_path")
+        )
         if envelope is None:
             return False  # anti-laundering: no findings list -> blocking
         issues = envelope.get("issues")

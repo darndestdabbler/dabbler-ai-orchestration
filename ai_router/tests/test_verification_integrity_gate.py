@@ -585,7 +585,7 @@ class TestStampedEvidenceLayer:
             str(set_dir), _api_disposition(verdict="VERIFIED")
         )
         assert not passed
-        assert "does not match any stamped verification verdict" in remediation
+        assert "does not match the LATEST stamped verification verdict" in remediation
 
     def test_claim_matching_the_stamped_verdict_corroborates(
         self, tmp_path, monkeypatch,
@@ -597,6 +597,46 @@ class TestStampedEvidenceLayer:
         )
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition(verdict="ISSUES_FOUND")
+        )
+        assert passed, remediation
+
+    def test_cherry_picking_an_older_favorable_row_is_refused(
+        self, tmp_path, monkeypatch,
+    ):
+        """I-084-S2-8 (round-5 finding): when valid rows disagree, the
+        LATEST is the one authoritative result — a claim cannot ride an
+        earlier VERIFIED row past a later refusing verification."""
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [
+                write_stamped_evidence(set_dir, content="VERIFIED\n"),
+                write_stamped_evidence(
+                    set_dir, round_number=2, content="ISSUES_FOUND\n",
+                ),
+            ],
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition(verdict="VERIFIED")
+        )
+        assert not passed
+        assert "LATEST" in remediation
+
+    def test_claim_matching_the_latest_row_corroborates(
+        self, tmp_path, monkeypatch,
+    ):
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch,
+            [
+                write_stamped_evidence(set_dir, content="ISSUES_FOUND\n"),
+                write_stamped_evidence(
+                    set_dir, round_number=2, content="VERIFIED\n",
+                ),
+            ],
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition(verdict="VERIFIED")
         )
         assert passed, remediation
 

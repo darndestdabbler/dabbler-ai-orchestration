@@ -705,6 +705,28 @@ class TestBackstopMechanics:
         base = resolve_backstop_diff_base(set_dir, 1)
         assert base == baseline_sha
 
+    def test_cherry_picked_older_verified_row_does_not_settle(
+        self, closeable, fake_route,
+    ):
+        """I-084-S2-8: a later refusing round is the authoritative
+        result — flipping the claim back to an earlier VERIFIED row's
+        verdict triggers a fresh backstop round, not a quiet close."""
+        root, set_dir = closeable
+        rows = [
+            write_stamped_evidence(set_dir, content="VERIFIED\n"),
+            write_stamped_evidence(
+                set_dir, round_number=2, content="ISSUES_FOUND\n",
+            ),
+        ]
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "succeeded", outcome.messages
+        assert len(fake_route.calls) == 1  # older row did NOT settle it
+
     def test_hand_flipped_claim_triggers_a_fresh_backstop_round(
         self, closeable, fake_route,
     ):

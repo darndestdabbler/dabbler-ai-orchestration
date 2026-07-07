@@ -148,6 +148,14 @@
       "dateTime": "2026-07-07T05:26:14.928828-04:00",
       "description": "Dogfood round 4 (LIVE, $0.5014, gpt-5-4): two NEW Majors, both fixed. I-084-S2-7: the stamp now carries the VERDICT parsed at record time from the artifact-bound bytes; the close gate and the backstop skip predicate both require the disposition's claim to equal a stamped verdict -- a hand-flipped VERIFIED cannot ride an ISSUES_FOUND row. I-084-S2-5 (refinement; previously incomplete): freshness exclusions narrowed from whole-set-dir + docs/planning to the exact bookkeeping files, and the freshness primitive became a content DIGEST (path + blob hash of all files differing from base, tracked or untracked) -- stable across the untracked-to-tracked commit transition (L-064-9's diff-invisible new deliverables) while any content change stales the row. Lock files and the workflow-generated change-log.md classified as bookkeeping. Both nits fixed. Suite 2724 passed. Round 5 decides.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "s2.backstop",
+      "dateTime": "2026-07-07T05:40:16.532005-04:00",
+      "description": "Dogfood round 5 (LIVE, $0.3935, gpt-5-4): converged to ONE Major, fixed (I-084-S2-8): claim-in-set membership let a claim cherry-pick an older favorable stamped row past a later refusing verification. The LATEST valid stamped row is now the single authoritative result in both the close gate and the backstop skip predicate, and the Minor-only settlement check reads the findings envelope paired to that row's own round (derived from its stamped artifact path). Regression tests both directions (older-VERIFIED/latest-ISSUES_FOUND refused; latest-VERIFIED corroborates). Suite 2727 passed. Round 6 decides.",
+      "status": "complete"
     }
   ]
 }

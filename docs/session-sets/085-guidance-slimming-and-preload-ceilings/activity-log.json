@@ -1,7 +1,7 @@
 {
   "sessionSetName": "085-guidance-slimming-and-preload-ceilings",
   "createdDate": "2026-07-07T14:15:46.686498+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -12,6 +12,61 @@
       "status": "complete",
       "kind": "path_aware_critique",
       "choice": "required"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/s2.constitution",
+      "dateTime": "2026-07-07T12:43:19.416757-04:00",
+      "description": "Authored docs/session-constitution.md (2,683 tokens, ceiling 4,000): happy path, source-of-truth/conflict rules, blessed-writer state discipline, irreversible-action list, definition of done per tier, recovery/escalation, on-demand pointer table.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/s2.demotions",
+      "dateTime": "2026-07-07T12:43:19.418263-04:00",
+      "description": "Rewrote the required-reading contract on every live surface (workflow doc preamble/diagram/Step 0/Rule 8/instruction-file list, CLAUDE.md, AGENTS.md, GEMINI.md, project-guidance Workflow Expectations, quick-start, repository-reference doc map, lessons-archive header, consumer-bootstrap shared-body + start-here templates) and grepped stale echoes to zero on live surfaces; regenerated cold-start goldens (UPDATE_GOLDEN=1 npm run test:unit, 1270 passing) and dist/templates via npm run compile.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/s2.triage",
+      "dateTime": "2026-07-07T12:43:19.418788-04:00",
+      "description": "Lessons triage: routed guidance_triage proposal (opus, $0.17, kept 17/~8.8k tokens) sharpened against the F3 admission test into s2-lessons-triage-decision.md; operator approved 'Apply as proposed'. Active tier rewritten to 2,385 tokens (8 condensed keeps incl. L-064-3+L-079-1 merge; 4 gate-and-archive with encoded-in; 5 archives); full texts appended to lessons-archive.md; validate_guidance_meta OK (25 ids, D2 uniqueness); L-079-2 pointer added to authoring guide.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/s2.ceilings",
+      "dateTime": "2026-07-07T12:43:19.418788-04:00",
+      "description": "Lowered the preload manifest: constitution 4000, project-guidance 3532, lessons-learned 2385, CLAUDE.md 1949, total 12000; demoted docs (workflow/schema/close-out/authoring-guide/quick-start) left the manifest uncapped; guidance_report --check exit 0 (TOTAL 10,549/12,000; was 92,719).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/s2.suite",
+      "dateTime": "2026-07-07T12:43:19.418788-04:00",
+      "description": "Full pytest suite 2812 passed / 5 skipped (S1 baseline unchanged); TS unit suite 1270 passing with regenerated goldens.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/s2.verification",
+      "dateTime": "2026-07-07T12:59:33.205093-04:00",
+      "description": "Cross-provider verification (gpt-5-4, orchestrator provider anthropic excluded): R1 ISSUES_FOUND (2 Major: manifest-vs-contract engine-file mismatch I-085-S2-1; constitution per-step-table/principle-level shape I-085-S2-2) -> both remediated (largest-engine-file representative entry AGENTS.md; per-step pointer table + trimmed gate mechanics). R2 ISSUES_FOUND (1 Major, new: three surfaces stated a three-file preload omitting the engine bootstrap file, I-085-S2-3) -> fixed on every echo; token-neutral trims kept files at ceilings (project-guidance 3,499 < S1's 3,528). R3 VERIFIED, 0 findings. Gate green TOTAL 10,673/12,000. Cost $0.34+$0.40+$0.42.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 1.16115
+        }
+      ]
     }
   ]
 }

@@ -880,26 +880,32 @@ guidance:
   # default (false) means canonical docs and the engine bootstrap files
   # are never machine-stamped. Ratchet start: nothing opts in.
   #
-  # Ratchet start (Set 085 S1): every ceiling is the file's measured
-  # current size, so the gate is green from this commit and growth is
-  # blocked immediately. Set 085 S2 lowers these as content is demoted
-  # to on-demand references and the total is cut to 12000.
+  # Set 085 S2 (the slimming): the manifest bounds the per-session
+  # preload defined by the required-reading contract —
+  # docs/session-constitution.md (the per-session operating doc, capped
+  # at its declared 4000-token budget), the two guidance-lifecycle
+  # files at their measured sizes, and ONE engine bootstrap file. A
+  # session reads exactly one of CLAUDE.md / AGENTS.md / GEMINI.md, so
+  # the manifest (a sum-based gate) counts the LARGEST of the three as
+  # the representative entry — the total then bounds every engine's
+  # session. The three engine files share one body by policy and are
+  # kept in lockstep; an edit that makes an uncounted sibling the
+  # largest must repoint this entry in the same change (review-time
+  # discipline; see docs/guidance-lifecycle.md).
+  # The demoted on-demand references (ai-led-session-workflow.md,
+  # session-state-schema.md, close-out.md, the authoring guide,
+  # quick-start.md) left the manifest deliberately UNCAPPED, like the
+  # archive: their size is no longer a recurring per-session tax
+  # (docs/guidance-lifecycle.md -> "Membership follows the
+  # required-reading contract").
   preload:
-    total_ceiling_tokens: 92719
+    total_ceiling_tokens: 12000
     files:
-      - path: docs/ai-led-session-workflow.md
-        ceiling_tokens: 38402
-      - path: docs/session-state-schema.md
-        ceiling_tokens: 14051
-      - path: ai_router/docs/close-out.md
-        ceiling_tokens: 13557
-      - path: docs/planning/lessons-learned.md
-        ceiling_tokens: 9797
-      - path: docs/planning/session-set-authoring-guide.md
-        ceiling_tokens: 8465
+      - path: docs/session-constitution.md
+        ceiling_tokens: 4000
       - path: docs/planning/project-guidance.md
-        ceiling_tokens: 3528
-      - path: docs/quick-start.md
-        ceiling_tokens: 3052
-      - path: CLAUDE.md
-        ceiling_tokens: 1867
+        ceiling_tokens: 3499
+      - path: docs/planning/lessons-learned.md
+        ceiling_tokens: 2385
+      - path: AGENTS.md   # largest engine bootstrap file (representative)
+        ceiling_tokens: 2031

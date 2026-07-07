@@ -1,0 +1,18 @@
+### Orchestrator Recommendation
+
+**Engine/Provider/Effort**: `claude/anthropic`, `claude-3-sonnet-20240229`, `medium effort`
+
+### Rationale
+
+This session's tasks require a balance between analytical capability and cost-efficiency. The code audit, documentation authoring, and multi-provider critique synthesis demand a model with reliable reasoning and comprehension, making the cheapest-tier models (e.g., Haiku) a risk for quality and rework. However, a top-tier model (e.g., Opus) is unnecessary and cost-prohibitive for the entire session, especially given the mechanical nature of the release tasks. Claude 3 Sonnet is the cheapest-capable orchestrator: it is adept at the code and documentation tasks while being significantly more economical than Opus. This choice allows for strategic routing of the simplest, purely mechanical release steps to Haiku for maximum cost savings, while reserving a top-tier model exclusively for the mandatory, high-stakes verification rounds.
+
+### Per-Step Routing Decisions
+
+| Step / Task | Recommended Engine/Provider/Model |
+| :--- | :--- |
+| 1. Verifier context audit | **Direct**: `claude/anthropic/claude-3-sonnet-20240229` |
+| 2. Author `guidance-slimming-playbook.md` | **Direct**: `claude/anthropic/claude-3-sonnet-20240229` |
+| 3. Live dogfood run | **Orchestrator Execution** |
+| 4. Path-aware critique | **Direct**: `claude/anthropic/claude-3-sonnet-20240229` |
+| 5. Package releases (pyproject, package.json, etc.) | **Route**: `claude/anthropic/claude-3-haiku-20240307` |
+| *Cross-cutting: Verification* | **Route**: `claude/anthropic/claude-3-opus-20240229` |

@@ -21,10 +21,16 @@
     {
       "number": 2,
       "title": "Session 2",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-07T12:10:38.250811-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "effort": "high",
+        "identityProvenance": "direct"
+      },
       "verificationVerdict": null
     },
     {

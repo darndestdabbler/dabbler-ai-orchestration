@@ -178,7 +178,10 @@ verification is attested.
 
 - **Tier model (SSoT):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>
-- **Full execution mechanics (the 10-step procedure, rules, verification):**
+- **Session constitution (the happy-path operating doc; open the full
+  workflow doc only for rare branches):**
+  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/session-constitution.md>
+- **Full execution mechanics (the 10-step procedure, rules, verification — on demand):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/ai-led-session-workflow.md>
 - **Spec schema (`tier`, `verificationMode`, the config block):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/spec-md-schema.md>

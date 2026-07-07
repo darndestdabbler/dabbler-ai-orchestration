@@ -1,0 +1,27 @@
+===== routed batch 0 =====
+```json
+[
+  {"index": 0, "classification": "drop", "reason_code": "section-header", "merge_target": null, "rationale": "Bare section heading demarcating the portable-lessons tier; carries no durable knowledge.", "confidence": "high"},
+  {"index": 1, "classification": "keep-active", "reason_code": "promoted-pointer-registry", "merge_target": null, "rationale": "Collapsed one-line pointer table for already-promoted lessons; the grep/reactivation navigation is the intended residue of promotion, not a droppable note.", "confidence": "medium"},
+  {"index": 2, "classification": "keep-active", "reason_code": "live-structured-output-guard", "merge_target": null, "rationale": "Truncation-on-end_turn still bites structured consumers; recently used (077). Actionable pre-parse check.", "confidence": "high"},
+  {"index": 3, "classification": "archive", "reason_code": "encoded", "merge_target": null, "rationale": "Cost guard is implemented in router-config.yaml with metrics; the only action is 'trust the guard', a redundant prose echo of an automated mechanism.", "confidence": "medium"},
+  {"index": 4, "classification": "keep-active", "reason_code": "live-data-loss-prevention", "merge_target": null, "rationale": "Losing paid output to a cp1252 print crash is a real disaster class; distinct from subprocess-boundary lesson (16). Used at 084.", "confidence": "high"},
+  {"index": 5, "classification": "keep-active", "reason_code": "live-anti-bias-routing", "merge_target": null, "rationale": "Self-opinion provider bias remains a live authoring hazard; used at 081.", "confidence": "high"},
+  {"index": 6, "classification": "keep-active", "reason_code": "live-escalation-pin", "merge_target": null, "rationale": "Schema-only re-verify escalation causing unbudgeted cross-provider spend is specific and current (083).", "confidence": "high"},
+  {"index": 7, "classification": "keep-active", "reason_code": "live-doc-migration-defect", "merge_target": null, "rationale": "Carried-over claims in successor docs remain a recurring correctness defect; used at 084.", "confidence": "high"},
+  {"index": 8, "classification": "keep-active", "reason_code": "live-evidence-completeness", "merge_target": null, "rationale": "git diff omitting untracked deliverables still undermines verification bundles; used 085.", "confidence": "high"},
+  {"index": 9, "classification": "keep-active", "reason_code": "live-consistency-propagation", "merge_target": null, "rationale": "Global echo propagation avoids multi-round verify churn; recently used (084).", "confidence": "high"},
+  {"index": 10, "classification": "keep-active", "reason_code": "live-methodology-constraint", "merge_target": null, "rationale": "Framing-strength control is a hard constraint referenced by L-071-1; still governing surface decisions.", "confidence": "high"},
+  {"index": 11, "classification": "keep-active", "reason_code": "live-loop-calibration", "merge_target": null, "rationale": "Materiality-bar / loop calibration on strong framing still shapes verify behavior; used 085.", "confidence": "high"},
+  {"index": 12, "classification": "keep-active", "reason_code": "rare-methodology-lesson", "merge_target": null, "rationale": "Equal-arms A/B interaction blind spot is a rare-but-critical experiment-design lesson; keep despite last-used 075.", "confidence": "medium"},
+  {"index": 13, "classification": "keep-active", "reason_code": "rare-replication-discipline", "merge_target": null, "rationale": "Replication-scope naming discipline is distinct from 12 and guards against overclaiming on held decisions.", "confidence": "medium"},
+  {"index": 14, "classification": "keep-active", "reason_code": "live-enablement-checklist", "merge_target": null, "rationale": "Pin-bump vs venv-upgrade gap remains a live rollout failure mode; used 084.", "confidence": "high"},
+  {"index": 15, "classification": "keep-active", "reason_code": "live-rollback-integrity", "merge_target": null, "rationale": "Unpublished pinned version in rollback recipe is a high-cost incident-time failure; used 084.", "confidence": "high"},
+  {"index": 16, "classification": "keep-active", "reason_code": "live-critical-cp1252-class", "merge_target": null, "rationale": "Windows subprocess byte-boundary bug class hit multiple sets, silent failures; distinct from 4. Critical.", "confidence": "high"},
+  {"index": 17, "classification": "keep-active", "reason_code": "live-gate-config-parity", "merge_target": null, "rationale": "Prose-vs-config-block gate mismatch is discovered only at end-of-set; expensive and current.", "confidence": "high"},
+  {"index": 18, "classification": "drop", "reason_code": "section-header", "merge_target": null, "rationale": "Bare section heading for the repo-specific tier; no durable content.", "confidence": "high"},
+  {"index": 19, "classification": "archive", "reason_code": "superseded", "merge_target": null, "rationale": "Explicitly 'Resolved in Set 068' via budget-aware forced verdict; the bug is now guarded in code, prose reminder redundant. Grep-able if regression suspected.", "confidence": "medium"},
+  {"index": 20, "classification": "keep-active", "reason_code": "live-ci-rot-disaster", "merge_target": null, "rationale": "Untested layer rot + red-CI-masks-regressions is a rare, high-impact lesson with active per-session action; used 081.", "confidence": "medium"}
+]
+```
+

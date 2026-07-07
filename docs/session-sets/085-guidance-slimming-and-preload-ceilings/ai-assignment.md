@@ -32,7 +32,7 @@ reduce. The non-negotiable cross-provider verification (routed, gpt-5-4)
 was the real quality gate — and it earned its keep, catching eight rounds
 of genuine fail-closed defects.
 
-## Next-session recommendation (routed analysis)
+## Next-session recommendation (routed analysis, made before S2)
 
 For **Session 2 of 3 (F2+F3 — the constitution, the demotions, the
 lessons triage)** the routed analysis recommends **claude / anthropic /
@@ -43,3 +43,42 @@ the cross-cutting required-reading rewrite. `pathAwareCritique: required`
 for the set-terminal close. The routed model-id suggestions were stale
 training artifacts (Claude 3 era); the current capable equivalent is
 `claude-opus-4-8`.
+
+## Session 2 of 3 — The constitution, the demotions, the lessons triage (F2+F3)
+
+Orchestrator: **claude / anthropic / claude-fable-5 / high** (operator's
+model choice; the routed S1 recommendation was claude/anthropic/high).
+
+| Step | Handled by | Rationale |
+| :--- | :--- | :--- |
+| Author `docs/session-constitution.md` | Orchestrator (direct) | Content fully determined by the spec + the live docs it condenses; cross-file coherence with the simultaneous contract rewrite is the orchestrator's whole-context strength. |
+| Required-reading contract rewrite (11 live surfaces + templates + goldens) | Orchestrator (direct) | Wide stale-echo blast radius (L-065-1): one context editing every echo in one pass beats routing per-file fragments. |
+| Lessons triage classification | **Routed — guidance_triage (opus, $0.17)** | The tool's routed bulk classifier; proposal artifact saved raw. |
+| Triage sharpening vs the F3 admission test + operator decision sheet | Orchestrator (direct) + **operator approval** | The routed pass kept 17 lessons (~8.8k tokens); the admission test is a spec-defined filter the orchestrator applied and the operator reviewed/approved per the spec's gate. |
+| Manifest ceilings + gate run | Orchestrator (direct) | Mechanical measurement transcribed into config. |
+| **Session verification (Step 6)** | **Routed — cross-provider, non-anthropic** | Mandatory no-skip cross-provider check (Set 083). |
+| Next-orchestrator recommendation | **Routed — analysis (gemini-pro, $0.005)** | Rule 17: never self-opine. Saved raw at `s2-next-orchestrator-analysis.txt`. |
+
+### Actuals
+- Orchestrator used: claude / anthropic / claude-fable-5 @ effort=high
+- Routed cost (pre-verification): ~$0.18 (triage $0.172 + analysis $0.005)
+- Deviations from recommendation: none material (operator selected the
+  Fable 5 model on the recommended claude/anthropic/high seat).
+- Notes: the routed triage classifier under-applied the admission test
+  (kept 17/~8.8k tokens vs the ~2k target); the orchestrator-sharpened,
+  operator-approved decision sheet is the artifact that landed. Budget a
+  sharpening pass on top of `guidance_triage` output in consumer repos.
+
+**Next-session orchestrator recommendation (Session 3, routed —
+gemini-pro; raw at `s2-next-orchestrator-analysis.txt`):**
+claude / anthropic @ effort=medium, Sonnet-class model (routed model ids
+were stale Claude-3-era artifacts; current equivalent is
+`claude-sonnet-4-6` — or the operator's preferred Claude seat). Rationale
+(routed): S3 mixes a focused audit, portable doc authoring, a
+mechanically-prescribed critique, and mechanical releases — a
+mid-tier, cost-efficient orchestrator suffices, and S3's live dogfood by
+design just runs the session from the slimmed preload. Correction
+applied: the routed suggestion to verify with an Anthropic model is
+overridden by the mandatory cross-provider machinery (the verifier
+excludes the orchestrator's effective provider — Set 084); verification
+routing is not an orchestrator choice.

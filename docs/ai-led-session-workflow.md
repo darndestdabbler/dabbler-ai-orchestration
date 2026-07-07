@@ -1,14 +1,17 @@
 # AI-Led Session-Set Workflow
 
-> **New here?** Start with [`docs/quick-start.md`](quick-start.md) for a
-> 5-minute orientation. Then return to this document for the full procedure.
+> **This is the on-demand execution reference, not the per-session
+> preload (Set 085).** The per-session operating doc is
+> [`docs/session-constitution.md`](session-constitution.md) — it carries
+> the happy path, the authority rules, and the pointer table into this
+> document. Read the constitution before every session; open this file
+> at its trigger moments — a rare procedural branch (UAT/E2E-gated sets,
+> maxout, parallel worktrees, Lightweight verification modes, typed
+> sessions, adjudication mechanics), router configuration, or the full
+> Rules list.
 >
-> **Simple session shortcut:** if the active spec declares
-> `requiresUAT: false` (the common case), you only need **Steps 0–10,
-> the Rules list, and the Session Set Configuration table.** Jump to
-> [§Step 0](#step-0-verify-api-keys-and-read-guidance).
-> The UAT procedures and AI Router details below that marker are reference
-> material for specific features — read them when they apply.
+> **New here?** Start with [`docs/quick-start.md`](quick-start.md) for a
+> 5-minute orientation.
 
 This document describes the orchestration pattern used to develop features in
 this repository. An AI coding agent (Claude Code, Codex, or a Gemini-based
@@ -32,16 +35,21 @@ The orchestrator can change from session to session at the human's discretion.
 All three orchestrators follow the same workflow — only the instruction file
 they read differs.
 
-Read `docs/planning/project-guidance.md`,
-`docs/planning/lessons-learned.md`, and
-`docs/planning/session-set-authoring-guide.md` before every session and
-before changing architecture, testing strategy, workflow assets, or
-human-UAT conventions. Do **not** read `docs/planning/lessons-archive.md`
+The before-every-session reading is the preload defined in
+[`docs/session-constitution.md`](session-constitution.md): the
+constitution itself, `docs/planning/project-guidance.md`, the active
+`docs/planning/lessons-learned.md`, and the engine bootstrap file.
+This document, `docs/session-state-schema.md`,
+`ai_router/docs/close-out.md`, and
+`docs/planning/session-set-authoring-guide.md` are consulted on demand
+at their trigger moments (the authoring guide when authoring or
+revising a spec). Do **not** read `docs/planning/lessons-archive.md`
 at session start — the archive (Set 064) is the preserved, never-auto-
 loaded tier; search it on demand with `python -m ai_router.guidance_search
 --archive`. The guidance lifecycle these files follow (per-lesson metadata,
-citation-at-close, archival triggers, ceilings) is documented canonically
-in [`docs/guidance-lifecycle.md`](guidance-lifecycle.md).
+citation-at-close, archival triggers, ceilings, the preload manifest and
+admission test) is documented canonically in
+[`docs/guidance-lifecycle.md`](guidance-lifecycle.md).
 
 ## Overview
 
@@ -55,8 +63,8 @@ Human
 Orchestrator (Claude / Codex / Gemini)
   |
   |-- reads instruction file (CLAUDE.md / AGENTS.md / GEMINI.md)
-  |-- reads project-guidance.md, lessons-learned.md,
-  |   and session-set-authoring-guide.md
+  |-- reads session-constitution.md, project-guidance.md,
+  |   and lessons-learned.md (the preload; Set 085)
   |   (NOT lessons-archive.md -- never auto-loaded; Set 064)
   |-- reads spec.md (incl. Session Set Configuration block)
   |   in the active session set
@@ -1118,13 +1126,18 @@ involved.
 
 Before doing anything else:
 
-1. Read `docs/planning/project-guidance.md`
-2. Read `docs/planning/lessons-learned.md` (its **active** tier only —
-   do **not** read `docs/planning/lessons-archive.md`, which is never
+1. Read the preload:
+   [`docs/session-constitution.md`](session-constitution.md),
+   `docs/planning/project-guidance.md`,
+   `docs/planning/lessons-learned.md` (its **active** tier only — do
+   **not** read `docs/planning/lessons-archive.md`, which is never
    auto-loaded; search it on demand with
-   `python -m ai_router.guidance_search --archive`)
-3. Read `docs/planning/session-set-authoring-guide.md`
-4. Then load keys from the environment and confirm all required keys
+   `python -m ai_router.guidance_search --archive`), and your engine
+   bootstrap file (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`). The authoring
+   guide, this document's reference sections, the schema doc, and the
+   close-out doc are opened on demand at their trigger moments — see
+   the constitution's pointer table.
+2. Then load keys from the environment and confirm all required keys
   are present (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, and optionally `PUSHOVER_API_KEY` /
   `PUSHOVER_USER_KEY` if
@@ -2484,13 +2497,16 @@ for the full workflow and rules.
 Each agent-specific file should contain:
 
 1. **Project overview** — what the repo is, package structure
-2. **Pointer to `docs/planning/project-guidance.md`**
-3. **Pointer to `docs/planning/lessons-learned.md`**
-4. **Pointer to this workflow doc** for the full procedure and rules
-5. **AI router import snippet** — how to load the `ai_router` module
-6. **API key export commands** — platform-specific commands to load keys
-7. **Build and test commands**
-8. **Solution structure**
+2. **Pointer to `docs/session-constitution.md`** — the per-session
+   operating doc (Set 085)
+3. **Pointer to `docs/planning/project-guidance.md`**
+4. **Pointer to `docs/planning/lessons-learned.md`**
+5. **Pointer to this workflow doc** as the on-demand execution
+   reference
+6. **AI router import snippet** — how to load the `ai_router` module
+7. **API key export commands** — platform-specific commands to load keys
+8. **Build and test commands**
+9. **Solution structure**
 
 The instruction file **should not** duplicate the per-step procedure, the
 rules list, the UAT checklist rule, or the reorganization-proposal rule —
@@ -3074,13 +3090,16 @@ This is the authoritative rules list. Instruction files (`CLAUDE.md`,
    only for mechanical, single-file edits under ~50 lines.
 6. **Do not commit with unresolved Critical/Major issues.** Inform the human.
 7. **The human controls orchestrator choice.** Any session can use any agent.
-8. **Before every session, read all required-reading files.**
-   `docs/planning/project-guidance.md`,
-   `docs/planning/lessons-learned.md`, and
-   `docs/planning/session-set-authoring-guide.md` are mandatory
-   pre-session context. `docs/planning/lessons-archive.md` is **not** —
-   it is the never-auto-loaded archive tier (Set 064), searched on demand
-   via `python -m ai_router.guidance_search --archive`.
+8. **Before every session, read the preload.**
+   `docs/session-constitution.md`,
+   `docs/planning/project-guidance.md`, and
+   `docs/planning/lessons-learned.md` (plus the engine bootstrap file)
+   are mandatory pre-session context (Set 085).
+   `docs/planning/lessons-archive.md` is **not** — it is the
+   never-auto-loaded archive tier (Set 064), searched on demand via
+   `python -m ai_router.guidance_search --archive` — and the authoring
+   guide is read when authoring or revising a spec, not before every
+   session.
 9. **Treat pending human UAT as blocking** *(applies only when the active
    spec declares `requiresUAT: true`).* Do not start downstream sessions
    on top of a checklist the human has not yet reviewed unless the human

@@ -149,11 +149,15 @@ A developer runs one session by telling their AI agent:
 
 The agent then:
 
-1. **Reads guidance** — `project-guidance.md`, `lessons-learned.md`,
-   `session-set-authoring-guide.md` (Step 0). It does **not** read
+1. **Reads the preload** — [`session-constitution.md`](session-constitution.md)
+   (the per-session operating doc), `project-guidance.md`,
+   `lessons-learned.md`, and its own engine bootstrap file
+   (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`) (Step 0). It does **not** read
    `lessons-archive.md` — that is the never-auto-loaded archive tier
-   (Set 064), searched on demand via `ai_router.guidance_search --archive`.
-   The lifecycle these files follow is documented in
+   (Set 064), searched on demand via `ai_router.guidance_search --archive` —
+   and it opens the workflow doc, schema doc, close-out doc, and
+   authoring guide on demand at their trigger moments (Set 085). The
+   lifecycle these files follow is documented in
    [`docs/guidance-lifecycle.md`](guidance-lifecycle.md).
 2. **Reads the spec** and the activity log to find its current step; registers
    the session start so the VS Code Explorer shows the set as in-progress
@@ -183,7 +187,8 @@ Sessions on different sets can run in parallel using worktrees — see
 
 | File / directory | What it does |
 |---|---|
-| `docs/ai-led-session-workflow.md` | Full session procedure (Steps 0–10), rules, config reference |
+| `docs/session-constitution.md` | The per-session operating doc: happy path, authority rules, on-demand pointer table (Set 085) |
+| `docs/ai-led-session-workflow.md` | On-demand execution reference: full procedure (Steps 0–10), rules, config reference |
 | `docs/planning/session-set-authoring-guide.md` | How to write a spec; flag semantics; anti-patterns |
 | `docs/budget-yaml-schema.md` | Canonical contract for `ai_router/budget.yaml` (the budget step's output) |
 | `docs/disposition-schema.md` | Schema for `disposition.json` (required at session close) |
@@ -232,9 +237,12 @@ and say:
 
 **What the agent does (you watch, approve, or redirect):**
 
-1. Reads `project-guidance.md`, `lessons-learned.md`, and
-   `session-set-authoring-guide.md` (Step 0) — **not** `lessons-archive.md`
-   (the never-auto-loaded archive tier, Set 064).
+1. Reads the preload — `session-constitution.md`, `project-guidance.md`,
+   `lessons-learned.md`, and its own engine bootstrap file (Step 0) —
+   **not** `lessons-archive.md`
+   (the never-auto-loaded archive tier, Set 064) and **not** the
+   on-demand references (workflow doc, schema doc, close-out doc,
+   authoring guide), which it opens at their trigger moments.
 2. Finds the active session set and calls `register_session_start()` — the
    VS Code Explorer will show the set as in-progress (Step 1–3).
 3. Implements the session plan from `spec.md` — writes code, edits files,

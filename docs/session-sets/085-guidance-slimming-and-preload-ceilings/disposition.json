@@ -1,16 +1,27 @@
 {
   "status": "completed",
-  "summary": "Set 085 Session 1 (F1): shipped the declarative preload manifest (guidance.preload in router-config.yaml: per-file token ceilings + total_ceiling_tokens) and the ratcheting CI ceiling gate. Extended guidance_config.py (manifest parsing with int-not-bool guards, preload_declared/malformed-entry tracking, back-compat) and guidance_report.py (per-file + total --check, fail-closed on unbuildable/unconfirmable manifests, repo-root-relative path containment incl. platform-independent absolute + realpath symlink checks, --write-headers stamp:true opt-in, byte-identical legacy --json). Declared this repo's manifest at ratchet-start sizes (total 92,719), added a dedicated ubuntu CI job, a CONTRIBUTING pre-commit line, and documented the ratchet-down-only rule + the preload admission test in guidance-lifecycle.md. New pytest matrix (89 tests). Cross-provider verification (gpt-5-4) ran 12 diff-based rounds plus one independent Set-084 close-backstop round; each caught a real, distinct fail-closed/path-containment/contract defect (config fail-open, --json back-compat, malformed preload/guidance blocks, misplaced top-level preload, non-root-relative + symlink paths, cross-platform absolute detection, silently-dropped malformed entries, --repo-root config source, and the close-backstop's --write-headers stamp:false opt-in violation + its dual-ceiling stamping consequence), all fixed; round 12 VERIFIED. Full suite 2812 passed, 5 skipped. Adjudication of the extended loop (edge-case exhaustion, L-071-1) recorded in s1-conventions.md.",
+  "summary": "Set 085 Session 2 (F2+F3): authored docs/session-constitution.md (2,758 tokens vs the 4,000 budget) — happy path, source-of-truth/conflict rules, blessed-writer state discipline, irreversible-action list, definition of done per tier, recovery/escalation, and a per-step pointer table into the on-demand references. Rewrote the required-reading contract on every live surface (workflow doc preamble/diagram/Step 0/Rule 8/instruction-file list, CLAUDE.md/AGENTS.md/GEMINI.md, project-guidance Workflow Expectations, quick-start, repository-reference doc map, lessons-archive header, consumer-bootstrap shared-body + start-here templates; cold-start goldens and dist/templates regenerated) and grepped stale echoes to zero on live surfaces. Lessons triage: routed guidance_triage proposal (opus) sharpened against the F3 admission test into an operator decision sheet; operator approved 'Apply as proposed' — active tier rewritten to 2,385 tokens (from 9,797): 8 condensed keeps (incl. L-064-3 merged into L-079-1), 4 gate-and-archive with encoded-in pointers, 5 archives; full texts preserved verbatim in lessons-archive.md; validate_guidance_meta OK (25 ids). Manifest lowered to the S2 targets: constitution 4000, project-guidance 3499, lessons 2385, AGENTS.md 2031 (largest engine bootstrap file as the sum-gate representative — a session reads exactly one engine file), total 12000; demoted docs (workflow/schema/close-out/authoring-guide/quick-start) left the manifest uncapped by design. guidance_report --check green: TOTAL 10,673/12,000 (ratchet start was 92,719). Verification (gpt-5-4, 3 rounds): R1 two Major (manifest/contract engine-file mismatch; constitution shape) and R2 one Major (three surfaces stated a three-file preload) — all remediated with token-neutral trims that kept ceiling files at 100%; R3 VERIFIED with zero findings. Full pytest suite 2812 passed / 5 skipped; TS unit 1270 passing.",
   "files_changed": [
-    "ai_router/guidance_config.py",
-    "ai_router/guidance_report.py",
-    "ai_router/router-config.yaml",
-    "ai_router/tests/test_guidance_preload_manifest.py",
+    "docs/session-constitution.md",
+    "docs/ai-led-session-workflow.md",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "GEMINI.md",
+    "docs/planning/project-guidance.md",
+    "docs/planning/lessons-learned.md",
+    "docs/planning/lessons-archive.md",
+    "docs/planning/session-set-authoring-guide.md",
+    "docs/quick-start.md",
     "docs/guidance-lifecycle.md",
-    ".github/workflows/test.yml",
-    "CONTRIBUTING.md",
+    "docs/repository-reference.md",
+    "docs/templates/consumer-bootstrap/engine-file.shared-body.md",
+    "docs/templates/consumer-bootstrap/start-here.md.template",
+    "test-fixtures/cold-start/**",
+    "tools/dabbler-ai-orchestration/dist/**",
+    "ai_router/router-config.yaml",
     "docs/session-sets/085-guidance-slimming-and-preload-ceilings/ai-assignment.md",
-    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/s1-conventions.md"
+    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/s2-conventions.md",
+    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/s2-lessons-triage-decision.md"
   ],
   "verification_method": "api",
   "verification_message_ids": [],
@@ -18,20 +29,17 @@
   "next_orchestrator": {
     "engine": "claude",
     "provider": "anthropic",
-    "model": "claude-opus-4-8",
-    "effort": "high",
+    "model": "claude-sonnet-4-6",
+    "effort": "medium",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Routed analysis recommends a large-context, high-coherence Claude/Anthropic orchestrator at high effort for Session 2 (F2+F3): authoring session-constitution.md and rewriting the required-reading contract across many cross-cutting surfaces is authoring-heavy with a wide stale-echo blast radius; operator supervision on the cross-cutting rewrite and the required path-aware critique apply."
+      "specifics": "Routed analysis (gemini-pro, raw at s2-next-orchestrator-analysis.txt) recommends a mid-tier Claude/Anthropic orchestrator at medium effort for Session 3: a focused verifier-context audit, portable playbook authoring, a mechanically-prescribed multi-provider critique, and operator-authorized releases — no wide cross-file blast radius. S3 is also the live dogfood: it must run from the slimmed preload alone, recording on-demand opens and time-to-first-task-action. The routed suggestion to verify on Anthropic is overridden by the mandatory cross-provider exclusion machinery (Set 084). Routed model ids were stale Claude-3-era artifacts; current equivalent is claude-sonnet-4-6 (operator may substitute their preferred Claude seat)."
     }
   },
   "blockers": [],
   "lessons_cited": [
-    "L-066-1",
-    "L-069-1",
-    "L-070-1",
-    "L-071-1",
+    "L-065-1",
     "L-064-9",
-    "L-064-10"
+    "L-064-8"
   ]
 }

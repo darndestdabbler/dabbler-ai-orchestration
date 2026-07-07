@@ -1,0 +1,19 @@
+## ISSUES FOUND
+
+- **Issue 1:** The required-reading contract rewrite is still inconsistent across named live surfaces: several docs now define the preload as only three files, omitting the engine bootstrap file the task explicitly added.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Details:**
+    - **Violation:** The task required: **“Before-every-session reading becomes: constitution + `project-guidance.md` + active `lessons-learned.md` (+ the engine bootstrap file). Update every surface that states the old contract: ... `docs/planning/project-guidance.md` (Workflow Expectations), `docs/quick-start.md`, `docs/ai-led-session-workflow.md` (its own Step 0/required-reading text) ...”**
+    - **Impact:** This session’s core deliverable is the contract rewrite. As merged, the repo’s own guidance surfaces disagree about what the preload is, so the rewrite is not complete. A future orchestrator or human following these docs gets conflicting instructions about session-start reading, and the repo still carries stale/incomplete echoes on the exact surfaces the task named. That is merge-blocking for a session whose purpose is to standardize this contract.
+    - **Evidence:**
+      - `docs/session-constitution.md` correctly defines four required reads, including item 4: **“Your engine bootstrap file (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`).”**
+      - But `docs/planning/project-guidance.md` now says: **“Before every session, read the preload (Set 085): [`docs/session-constitution.md`] ... plus this file and `docs/planning/lessons-learned.md`.”** No engine bootstrap file is included.
+      - `docs/quick-start.md` says: **“Reads the preload — [`session-constitution.md`], `project-guidance.md`, and `lessons-learned.md` (Step 0).”** Again, only three files.
+      - `docs/ai-led-session-workflow.md` Step 0 says: **“Read the preload: [`docs/session-constitution.md`], `docs/planning/project-guidance.md`, and `docs/planning/lessons-learned.md` ...”** Again, only three files.
+      - The session also claims the rewrite was complete: `activity-log.json` step 2 says it **“Rewrote the required-reading contract on every live surface”** and **“grepped stale echoes to zero on live surfaces”** — but the evidence above shows the new contract is still inconsistent on those live surfaces.
+    - **Correct answer:** Make each named surface state the same four-part contract, or explicitly word it as “in addition to the already-loaded engine bootstrap file, read ...” so the omission is no longer ambiguous or contradictory.
+
+#### NITS
+
+- **Nit:** `docs/session-constitution.md`’s pointer table includes `docs/guidance-slimming-playbook.md`, but that file is not present in this working tree. Either remove the row until Session 3 creates the file or mark it clearly as forthcoming.

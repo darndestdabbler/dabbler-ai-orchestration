@@ -63,10 +63,11 @@ extension build, the publish runbook, and the CI matrix all live in
 
 [`docs/session-state-schema.md`](docs/session-state-schema.md) is the
 authoritative reference for `session-state.json` (the v4 shape, on both
-Full and Lightweight tiers) and is required reading at every session
-boundary — an orchestrator that touches a state file without reading it is
-the usual cause of the N−1/N display drift the Session Set Explorer
-surfaces. The per-session `orchestrator` block (the four `engine` /
+Full and Lightweight tiers), consulted on demand whenever a state-file
+question arises (Set 085) — the blessed writers own the shape at
+runtime, and an orchestrator that hand-touches a state file without
+consulting the schema is the usual cause of the N−1/N display drift the
+Session Set Explorer surfaces. The per-session `orchestrator` block (the four `engine` /
 `provider` / `model` / `effort` fields, written omit-null) and the Set 049
 writer contract live there too; the engine-agnostic narrative of the
 coordination-layer rip-out — the `writer-bypass` (D3) check in
@@ -107,17 +108,16 @@ is the single source of truth.
 Most curator work in this repo is ad-hoc PR-style review and
 normalization. When a structured pass is justified (e.g., merging a
 non-trivial change from a consumer repo, or refactoring `ai_router/`),
-author a session set under `docs/session-sets/<slug>/` and follow the
-full procedure in `docs/ai-led-session-workflow.md`. Required reading
-before any session: `docs/planning/project-guidance.md`,
-`docs/planning/lessons-learned.md`, and
-`docs/planning/session-set-authoring-guide.md`. Do **not** read
-`docs/planning/lessons-archive.md` at session start — the archive (Set
-064) is the preserved, never-auto-loaded tier, searched on demand via
-`python -m ai_router.guidance_search --archive`, not loaded into context.
-The full guidance lifecycle (per-lesson metadata, citation-at-close,
-archival triggers, ceilings) is documented canonically in
-`docs/guidance-lifecycle.md`.
+author a session set under `docs/session-sets/<slug>/` and follow
+`docs/session-constitution.md` — the per-session operating doc (Set
+085). The constitution names the whole session-start preload (this
+bootstrap file is its engine-file item) and carries the per-step
+pointer table into the on-demand references (workflow doc, authoring
+guide, schema and close-out docs). Never auto-load
+`docs/planning/lessons-archive.md` — search it on demand via
+`python -m ai_router.guidance_search --archive`. The guidance lifecycle
+(ceilings, archival, the preload manifest and admission test) is
+documented canonically in `docs/guidance-lifecycle.md`.
 
 ## Running the router
 

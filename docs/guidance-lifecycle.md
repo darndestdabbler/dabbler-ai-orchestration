@@ -166,6 +166,26 @@ engine bootstrap files are never machine-stamped).
 Back-compat: a repo with no `preload:` block keeps exactly the two-file
 Set-064 behavior (universal core, gated extension).
 
+**Membership follows the required-reading contract (Set 085 S2).** The
+manifest bounds the per-session preload — in this repo:
+`docs/session-constitution.md`, `docs/planning/project-guidance.md`,
+`docs/planning/lessons-learned.md`, and **one** engine bootstrap file —
+under a 12,000-token total. Because a session reads exactly one of
+`CLAUDE.md` / `AGENTS.md` / `GEMINI.md` and the gate sums every listed
+entry, the manifest counts the **largest** engine file as the
+representative entry, so the total bounds every engine's session
+without over-counting the alternatives. The three engine files share
+one body by policy and are kept in lockstep; the gate does not watch
+the two uncounted siblings, so an edit that makes a sibling the largest
+must repoint the manifest entry **in the same change** — that is a
+review-time discipline, and the per-file ceiling on the representative
+still blocks growth of the counted path. Demoted
+on-demand references (the workflow doc, the schema doc, the close-out
+doc, the authoring guide, `quick-start.md`) are deliberately **uncapped**,
+like the archive: their size is no longer a recurring per-session tax,
+and capping them would only invite ceiling-editing churn where no
+preload cost exists.
+
 ## The preload admission test (Set 085)
 
 Preload context is the scarcest resource in the workflow: every token

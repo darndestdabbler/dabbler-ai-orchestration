@@ -231,6 +231,13 @@ prerequisites:           # optional; sets that must complete before this one is 
     condition: complete
 ```
 
+> **Prose cannot arm a gate (L-079-2).** The durable gate-policy record
+> is captured once, at set start, **from this block**, and is immutable
+> thereafter. When authoring or revising a spec, grep the prose for gate
+> words ("required critique", "required UAT/E2E") and confirm each has
+> the matching config-block flag — a prose-vs-block mismatch surfaces
+> only at the most expensive moment (end of set).
+
 ### Field semantics
 
 - **`tier: "full"`** — the set runs through the full AI router:

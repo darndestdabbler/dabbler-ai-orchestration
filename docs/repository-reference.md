@@ -781,7 +781,8 @@ covered elsewhere in this doc.
 
 | Path | Purpose |
 |---|---|
-| [docs/ai-led-session-workflow.md](ai-led-session-workflow.md) | The single source of truth for **execution mechanics**: trigger phrases, the 10-step procedure, cross-provider verification rules, the verifier-disagreement adjudication path, delegation discipline, the metrics log, and the authoritative rule list every orchestrator obeys. |
+| [docs/session-constitution.md](session-constitution.md) | The **per-session operating doc** (Set 085): the preload contract, the happy-path step sequence, source-of-truth and state-mutation rules, the irreversible-action list, definition of done, recovery/escalation, and the pointer table into the on-demand references. Read before every session. |
+| [docs/ai-led-session-workflow.md](ai-led-session-workflow.md) | The single source of truth for **execution mechanics**, consulted on demand at its trigger moments (Set 085): trigger phrases, the 10-step procedure, cross-provider verification rules, the verifier-disagreement adjudication path, delegation discipline, the metrics log, and the authoritative rule list every orchestrator obeys. |
 | [docs/adoption-bootstrap.md](adoption-bootstrap.md) | **Retired** (Set 063): a URL-stable deprecation stub redirecting to the extension's Getting Started form (VS Code) and the quick-start manual path (without VS Code). Kept at the same path because extension clients ≤ 0.31.0 fetch the raw URL at click time. |
 | [docs/budget-yaml-schema.md](budget-yaml-schema.md) | Canonical contract for `ai_router/budget.yaml`: the post-migration shape (written by the Getting Started form's Full-tier budget step, Set 063), field semantics, writers/readers, and the legacy-compatibility rules for pre-migration files. |
 | [docs/repository-reference.md](repository-reference.md) | This file. |

@@ -70,10 +70,19 @@ The canonical full-pass before any commit:
 
 ```bash
 python -m pytest
+python -m ai_router.guidance_report --check   # preload ceiling gate (Set 085)
 cd tools/dabbler-ai-orchestration
 npx tsc --noEmit && npm run test:unit
 npm run test:playwright
 ```
+
+`guidance_report --check` is the ratcheting preload-ceiling gate: it
+fails if any required-reading file is over its per-file ceiling or the
+always-loaded corpus is over its `total_ceiling_tokens` (declared in the
+`guidance.preload` block of `ai_router/router-config.yaml`). At ceiling,
+adding prose to a preloaded doc means removing prose elsewhere —
+ceilings ratchet **down only**; raising one is an operator-authorized
+config edit with a stated reason, never an in-session fix.
 
 ## UAT fixture workspace
 
@@ -169,7 +178,9 @@ both Python (`python -m pytest`) and the Layer-3 Playwright suite
 (`npm run test:playwright`; Linux uses `xvfb-run`). Layer 2 is
 skipped in CI — known broken on Windows 11 + VS Code 1.120,
 untested elsewhere. See `docs/implementation-summary-023-027.md`
-for details.
+for details. Two fast dependency-light gate jobs also run: the
+tier-model `drift-guards` and the Set 085 `guidance-ceiling` job
+(`python -m ai_router.guidance_report --check`).
 
 ## License
 

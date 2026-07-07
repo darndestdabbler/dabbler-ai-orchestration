@@ -28,6 +28,38 @@ jobs:
       - name: Run tier-model / consumer-bootstrap drift guards
         run: python ai_router/scripts/drift_guard.py
 
+  guidance-ceiling:
+    name: Preload guidance ceiling gate
+    runs-on: ubuntu-latest
+    # Set 085 F1: the ratcheting preload-ceiling gate. `guidance_report
+    # --check` fails the build if any required-reading file is over its
+    # per-file ceiling or the corpus is over its total_ceiling_tokens, so
+    # the manifest in router-config.yaml is the single anti-rebloat
+    # enforcement point (ceilings ratchet down only). The check reads the
+    # config via config.load_config() when it can, but is fail-CLOSED: if
+    # that load fails (e.g. a malformed config) it recovers the manifest
+    # from a raw YAML parse and, if it still cannot confirm it, exits
+    # non-zero rather than silently passing on the legacy path. The dummy
+    # provider keys below keep load_config() on its happy path (env
+    # validation), matching the python-tests job.
+    env:
+      DABBLER_ANTHROPIC_API_KEY: ci-dummy-anthropic-key
+      DABBLER_GEMINI_API_KEY: ci-dummy-gemini-key
+      DABBLER_OPENAI_API_KEY: ci-dummy-openai-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install ai_router (config loader needs pyyaml)
+        run: pip install -e .
+
+      - name: Check preload guidance ceilings
+        run: python -m ai_router.guidance_report --check
+
   template-snapshot:
     name: Consumer-bootstrap template snapshot
     runs-on: ubuntu-latest

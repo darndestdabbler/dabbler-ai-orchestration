@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Manifest paths are not actually repo-root-relative unless `--repo-root` is passed**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The Session 1 contract says the `preload:` entries are **“repo-root-relative”**.\n    - **Impact:** `python -m ai_router.guidance_report --check` can report false missing-file failures from a subdirectory of a valid repo, because it finds the repo config but measures manifest files relative to the current working directory instead of the repo root. That breaks the core new manifest/gate behavior outside one invocation pattern and makes the declared path semantics untrue.\n    - **Evidence:** In `ai_router/guidance_report.py`, `build_preload_reports()` does:\n      ```python\n      root = repo_root if repo_root is not None else os.getcwd()\n      abspath = os.path.normpath(os.path.join(root, entry.path))\n      ```\n      But `load_raw_preload_manifest()` explicitly supports omitting `--repo-root` by resolving `router-config.yaml` via the config loader’s walk-up logic:\n      ```python\n      resolved, _src = _resolve_config_path_and_source(None)\n      ```\n      So from `/repo/ai_router`, a manifest entry like `docs/ai-led-session-workflow.md` is resolved as `/repo/ai_router/docs/ai-led-session-workflow.md` instead of `/repo/docs/ai-led-session-workflow.md`. The correct answer is to derive the manifest root from the resolved repo/config location when `--repo-root` is omitted, not from `os.getcwd()`.\n\n-",
+      "category": "Correctness",
+      "severity": "Major"
+    },
+    {
+      "description": "The fail-closed fix still misclassifies a malformed `guidance:` block as “legacy/no manifest,” so the gate can still be bypassed**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The stated contract says a manifest-enabled repo whose config cannot be confirmed must **“fail closed (exit 1)”**, while only a **“genuine no-config / no-`preload:` repo keeps fail-open legacy behavior.”**\n    - **Impact:** A parseable but malformed config such as `guidance: 7`, combined with any `load_config()` failure on `--check`, drops back to the legacy two-file branch instead of hard-failing. That means the dedicated ceiling gate can still go green without enforcing the manifest — the same merge-blocking class of defect this session was supposed to eliminate.\n    - **Evidence:** In `ai_router/guidance_report.py`, `load_raw_preload_manifest()` does:\n      ```python\n      block = data.get(\"guidance\")\n      if not isinstance(block, dict):\n          return None, False, False  # parseable config, no guidance block -> legacy\n      ```\n      Then `main()` only fails closed when `declared` or `raw_error` is true:\n      ```python\n      if args.check and manifest is None and (declared or raw_error):\n          ...\n          return 1\n      ```\n      For a config file containing `guidance: 7`, the raw path returns `(None, False, False)`, so `--check` proceeds on the legacy branch and can exit 0. That is not a genuine no-manifest repo; it is malformed, unconfirmable config. The correct answer is to distinguish **absent `guidance`** from **present-but-malformed `guidance`**, and fail `--check` closed for the latter.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

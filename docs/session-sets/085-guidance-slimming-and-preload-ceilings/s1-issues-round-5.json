@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Malformed manifest entries are silently dropped, so `--check` can pass while no longer gating every required-reading file**\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The task requires that the manifest cover the preload corpus and that CI be the enforcement point: **“Every required-reading file enters the manifest with its ceiling set at its measured current size”** and **“CI is the single enforcement point.”** The conventions file also claims the **“manifest declared but not enforced”** class is closed. That is not true for malformed *individual entries*.\n  - **Impact:** A typo in one `files:` item can silently remove that file from the enforced set while leaving the rest of the manifest active. CI can then go green without measuring that required-reading file at all, and the total token check also goes artificially low because the omitted file contributes `0` tokens. That defeats the core anti-rebloat gate and is merge-blocking.\n  - **Evidence:** In `ai_router/guidance_config.py`, `_parse_preload_manifest()` drops bad entries instead of preserving them as failures:\n    ```python\n    for item in files_raw:\n        if not isinstance(item, dict):\n            continue\n        path = item.get(\"path\")\n        if not isinstance(path, str) or not path.strip():\n            continue\n    ```\n    It only returns `None` if **no** valid entries survive:\n    ```python\n    if not entries:\n        return None\n    ```\n    In `ai_router/guidance_report.py`, fail-closed only triggers when the whole manifest is absent/unconfirmable:\n    ```python\n    if args.check and manifest is None and (declared or unconfirmable):\n        ...\n        return 1\n    ```\n    So a partially malformed manifest still produces a non-`None` manifest and proceeds normally. The new test suite explicitly locks in this behavior in `ai_router/tests/test_guidance_preload_manifest.py::test_pathless_and_nonmapping_entries_are_skipped`, which asserts that malformed entries are just omitted from `cfg.preload.files`.\n  - **Correct answer:** Do not silently drop declared `files:` entries that lack a usable `path`. Treat any malformed file entry as a manifest build failure for `--check`, or surface it as an explicit invalid-entry report/failure so the gate cannot silently stop enforcing part of the declared corpus.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

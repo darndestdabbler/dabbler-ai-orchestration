@@ -1,0 +1,30 @@
+{
+  "status": "completed",
+  "summary": "Set 085 Session 1 (F1): shipped the declarative preload manifest (guidance.preload in router-config.yaml: per-file token ceilings + total_ceiling_tokens) and the ratcheting CI ceiling gate. Extended guidance_config.py (manifest parsing with int-not-bool guards, preload_declared/malformed-entry tracking, back-compat) and guidance_report.py (per-file + total --check, fail-closed on unbuildable/unconfirmable manifests, repo-root-relative path containment incl. platform-independent absolute + realpath symlink checks, --write-headers stamp:true opt-in, byte-identical legacy --json). Declared this repo's manifest at ratchet-start sizes (total 92,719), added a dedicated ubuntu CI job, a CONTRIBUTING pre-commit line, and documented the ratchet-down-only rule + the preload admission test in guidance-lifecycle.md. New pytest matrix (86 tests). Cross-provider verification (gpt-5-4) took 9 rounds: rounds 1-8 each caught a real, distinct fail-closed/path-containment defect (config fail-open, --json back-compat, malformed preload/guidance blocks, misplaced keys, non-root-relative + symlink paths, cross-platform absolute detection, silently-dropped malformed entries, --repo-root config source), all fixed; round 9 VERIFIED. Full suite green.",
+  "files_changed": [
+    "ai_router/guidance_config.py",
+    "ai_router/guidance_report.py",
+    "ai_router/router-config.yaml",
+    "ai_router/tests/test_guidance_preload_manifest.py",
+    "docs/guidance-lifecycle.md",
+    ".github/workflows/test.yml",
+    "CONTRIBUTING.md",
+    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/ai-assignment.md",
+    "docs/session-sets/085-guidance-slimming-and-preload-ceilings/s1-conventions.md"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "verification_verdict": "VERIFIED",
+  "next_orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-4-8",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Routed analysis recommends a large-context, high-coherence Claude/Anthropic orchestrator at high effort for Session 2 (F2+F3): authoring session-constitution.md and rewriting the required-reading contract across many cross-cutting surfaces is authoring-heavy with a wide stale-echo blast radius; operator supervision on the cross-cutting rewrite and the required path-aware critique apply."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": ["L-066-1", "L-069-1", "L-070-1", "L-071-1", "L-064-9", "L-064-10"]
+}

@@ -17,9 +17,21 @@ Modes
   capped file (opt-in, the only mode that writes). Re-running replaces
   the existing block in place rather than appending.
 
-Ceilings are enforced **per active file** (the D5 ``lessons-learned`` and
-``project-guidance`` values from the router-config ``guidance:`` block);
-the archive is uncapped and the combined total is informational only.
+Two gate surfaces, chosen by config (Set 085 F1):
+
+- **Legacy (no ``preload:`` manifest)** — enforced **per active file**
+  (the D5 ``lessons-learned`` and ``project-guidance`` values from the
+  router-config ``guidance:`` block); the archive is uncapped and the
+  combined total is informational only. Every existing consumer repo
+  stays on this path byte-for-byte.
+- **Preload manifest (``guidance.preload`` declared)** — the report and
+  ``--check`` cover *every* required-reading file the manifest lists,
+  gating both per-file ceilings and a combined ``total_ceiling_tokens``.
+  This is the anti-rebloat gate: at ceiling, adding prose fails the
+  build, so growth is token-neutral by construction. Ceilings ratchet
+  **down only**. ``--write-headers`` still stamps the two Set-064
+  lifecycle files; manifest entries are auto-edited only when they opt
+  in with ``stamp: true`` (default false).
 
 ASCII-only output (Windows cp1252 consoles).
 """
@@ -39,6 +51,8 @@ try:  # test convention: bare import; production: relative fallback
         LESSONS_ACTIVE,
         PROJECT_GUIDANCE,
         GuidanceConfig,
+        PreloadManifest,
+        _parse_preload_manifest,
         discover_guidance_files,
         estimate_tokens,
         load_guidance_config,
@@ -49,6 +63,8 @@ except ImportError:
         LESSONS_ACTIVE,
         PROJECT_GUIDANCE,
         GuidanceConfig,
+        PreloadManifest,
+        _parse_preload_manifest,
         discover_guidance_files,
         estimate_tokens,
         load_guidance_config,
@@ -70,6 +86,8 @@ class FileReport:
     lines: int
     tokens: int
     ceiling: Optional[int]  # None = uncapped
+    missing: bool = False  # Set 085: manifest listed a path not on disk
+    escapes_root: bool = False  # Set 085: path not repo-root-relative
 
     @property
     def over_ceiling(self) -> bool:
@@ -82,7 +100,8 @@ class FileReport:
         return round(100 * self.tokens / self.ceiling)
 
 
-def measure_file(name: str, path: str, cfg: GuidanceConfig) -> FileReport:
+def measure_path(name: str, path: str, ceiling: Optional[int]) -> FileReport:
+    """Measure a file against an explicit *ceiling* (Set 085 manifest path)."""
     with open(path, "r", encoding="utf-8") as f:
         text = f.read()
     return FileReport(
@@ -91,8 +110,132 @@ def measure_file(name: str, path: str, cfg: GuidanceConfig) -> FileReport:
         bytes=len(text.encode("utf-8")),
         lines=text.count("\n") + (0 if text.endswith("\n") or text == "" else 1),
         tokens=estimate_tokens(text),
-        ceiling=cfg.ceiling_for(name),
+        ceiling=ceiling,
     )
+
+
+def measure_file(name: str, path: str, cfg: GuidanceConfig) -> FileReport:
+    """Measure a legacy Set-064 guidance file (ceiling from :class:`GuidanceConfig`)."""
+    return measure_path(name, path, cfg.ceiling_for(name))
+
+
+def _path_escapes_root(rel: str) -> bool:
+    """True if *rel* is not strictly repo-root-relative (lexical check).
+
+    Platform-INDEPENDENT (I-085-S1-11): a manifest authored on Windows
+    must be rejected identically on the ubuntu CI runner and vice-versa,
+    so this does not rely on the host ``os.path`` semantics. Rejects:
+
+    - POSIX-absolute (``/x``) and Windows drive / UNC absolutes
+      (``C:\\x``, ``\\\\server\\share``) parsed with both flavors;
+    - a leading separator (``/x`` / ``\\x``);
+    - any ``..`` segment that escapes the root (checked against both
+      separators).
+
+    Symlink escapes are caught separately by :func:`_resolved_escapes_root`
+    after the join, because a lexically-safe path can still resolve
+    outside the repo.
+    """
+    from pathlib import PureWindowsPath
+
+    if not rel:
+        return True
+    if os.path.isabs(rel):
+        return True
+    # Windows-flavored absolute (drive letter or UNC) even on a POSIX host.
+    win = PureWindowsPath(rel)
+    if win.is_absolute() or win.drive or win.root:
+        return True
+    if rel[0] in "/\\":
+        return True
+    # `..` escape, checked with both separators normalized to '/'.
+    norm = rel.replace("\\", "/")
+    while "//" in norm:
+        norm = norm.replace("//", "/")
+    segments = norm.split("/")
+    depth = 0
+    for seg in segments:
+        if seg in ("", "."):
+            continue
+        if seg == "..":
+            depth -= 1
+            if depth < 0:
+                return True
+        else:
+            depth += 1
+    return False
+
+
+def _resolved_escapes_root(root: str, abspath: str) -> bool:
+    """True if *abspath* resolves (through symlinks) outside *root*.
+
+    A committed symlink inside the repo can point at a file outside it; a
+    purely lexical check would treat it as in-repo and then measure (or,
+    under ``--write-headers``, rewrite) an outside file. Resolve both
+    sides with ``realpath`` and require the target to stay under the real
+    root (I-085-S1-11). Fail closed (treat as escaping) on any resolution
+    error or a cross-drive comparison.
+    """
+    try:
+        real_root = os.path.realpath(root)
+        real_target = os.path.realpath(abspath)
+        common = os.path.commonpath([real_root, real_target])
+        return common != real_root
+    except (ValueError, OSError):
+        return True
+
+
+def build_preload_reports(
+    repo_root: Optional[str], manifest: PreloadManifest
+) -> List[FileReport]:
+    """Measure every file the preload manifest declares (Set 085 F1).
+
+    Paths are repo-root-relative. A declared file that is absent on disk
+    becomes a ``missing`` report; a path that is not repo-root-relative
+    (absolute, or ``..``-escaping) becomes an ``escapes_root`` report.
+    Both are zero-token reports surfaced as hard ``--check`` failures —
+    a manifest entry pointing at a moved/renamed doc, or outside the repo
+    entirely, is exactly the drift the gate exists to catch.
+    """
+    root = repo_root if repo_root is not None else os.getcwd()
+    reports: List[FileReport] = []
+    for entry in manifest.files:
+        abspath = os.path.normpath(os.path.join(root, entry.path))
+        # Lexical check first (absolute / ``..``), then a resolved check
+        # that follows symlinks -- a lexically-safe path can still resolve
+        # outside the repo (I-085-S1-11).
+        if _path_escapes_root(entry.path) or _resolved_escapes_root(
+            root, abspath
+        ):
+            reports.append(
+                FileReport(
+                    name=entry.path,
+                    path=entry.path,
+                    bytes=0,
+                    lines=0,
+                    tokens=0,
+                    ceiling=entry.ceiling_tokens,
+                    escapes_root=True,
+                )
+            )
+            continue
+        if os.path.isfile(abspath):
+            reports.append(
+                measure_path(entry.path, abspath, entry.ceiling_tokens)
+            )
+        else:
+            reports.append(
+                FileReport(
+                    name=entry.path,
+                    path=abspath,
+                    bytes=0,
+                    lines=0,
+                    tokens=0,
+                    ceiling=entry.ceiling_tokens,
+                    missing=True,
+                )
+            )
+    return reports
 
 
 def build_reports(
@@ -144,6 +287,199 @@ def render_report(reports: List[FileReport]) -> str:
         f"~{_fmt(total_tokens):>7} tokens  [informational only]"
     )
     return "\n".join(lines)
+
+
+def render_preload_report(
+    reports: List[FileReport],
+    total_ceiling: Optional[int],
+    malformed_count: int = 0,
+) -> str:
+    """Render the Set 085 preload-manifest report (per-file + gated total)."""
+    lines: List[str] = []
+    lines.append("Preload manifest (tokens-read-per-session, Set 085):")
+    if malformed_count > 0:
+        lines.append(
+            f"  WARNING: {malformed_count} malformed files: entry/entries "
+            "(missing/invalid 'path' or non-mapping) -- --check will FAIL."
+        )
+    if not reports:
+        lines.append("  (manifest declares no valid files)")
+        return "\n".join(lines)
+    total_bytes = total_lines = total_tokens = 0
+    for r in reports:
+        total_bytes += r.bytes
+        total_lines += r.lines
+        total_tokens += r.tokens
+        if r.escapes_root:
+            lines.append(
+                f"  {r.name:<44} NOT REPO-ROOT-RELATIVE  "
+                f"[absolute or '..'-escaping path]"
+            )
+            continue
+        if r.missing:
+            lines.append(
+                f"  {r.name:<44} MISSING ON DISK  "
+                f"[expected under a {_fmt(r.ceiling or 0)}-token ceiling]"
+            )
+            continue
+        ceil_txt = (
+            "uncapped" if r.ceiling is None else f"ceiling {_fmt(r.ceiling)}"
+        )
+        lines.append(
+            f"  {r.name:<44} {_fmt(r.bytes):>9} bytes  {_fmt(r.lines):>5} lines  "
+            f"~{_fmt(r.tokens):>7} tokens  [{ceil_txt}: {_status_token(r)}]"
+        )
+    if total_ceiling is None:
+        total_status = "uncapped"
+        ceil_txt = "uncapped"
+    else:
+        ceil_txt = f"ceiling {_fmt(total_ceiling)}"
+        if total_tokens > total_ceiling:
+            total_status = f"OVER by {_fmt(total_tokens - total_ceiling)} tokens"
+        else:
+            pct = round(100 * total_tokens / total_ceiling) if total_ceiling else 0
+            total_status = f"OK ({pct}% of ceiling)"
+    lines.append(
+        f"  {'TOTAL':<44} {_fmt(total_bytes):>9} bytes  {_fmt(total_lines):>5} lines  "
+        f"~{_fmt(total_tokens):>7} tokens  [{ceil_txt}: {total_status}]"
+    )
+    return "\n".join(lines)
+
+
+def preload_check_failures(
+    reports: List[FileReport], total_ceiling: Optional[int]
+) -> List[str]:
+    """Return remediation lines for a preload ``--check`` breach (empty = pass).
+
+    A breach is any of: a per-file overage, a manifest file missing on
+    disk, or the combined total over ``total_ceiling``. Each line names
+    the offending file and the exact overage so a CI failure is
+    self-explanatory. Ceilings ratchet down only — at ceiling, the fix is
+    to remove prose, never to raise the number in-session.
+    """
+    failures: List[str] = []
+    for r in reports:
+        if r.escapes_root:
+            failures.append(
+                f"{r.name}: NOT repo-root-relative (absolute or '..'-escaping "
+                "path). Manifest paths must resolve under the repo root."
+            )
+        elif r.missing:
+            failures.append(
+                f"{r.name}: MISSING on disk (manifest lists it; a moved or "
+                "renamed required-reading file must be re-pathed in the "
+                "preload manifest)."
+            )
+        elif r.over_ceiling:
+            failures.append(
+                f"{r.name}: +{_fmt(r.tokens - (r.ceiling or 0))} tok over its "
+                f"{_fmt(r.ceiling or 0)}-token ceiling."
+            )
+    total_tokens = sum(r.tokens for r in reports)
+    if total_ceiling is not None and total_tokens > total_ceiling:
+        failures.append(
+            f"TOTAL: +{_fmt(total_tokens - total_ceiling)} tok over the "
+            f"{_fmt(total_ceiling)}-token preload total ceiling."
+        )
+    return failures
+
+
+def _resolve_config_path(repo_root: Optional[str]) -> Optional[str]:
+    """Resolve ``router-config.yaml`` for *repo_root* (or the loader walk-up).
+
+    When *repo_root* is given the config is ``<repo_root>/ai_router/
+    router-config.yaml``; otherwise defer to the config loader's own
+    cwd walk-up. Returns an absolute path if the file exists, else None.
+    """
+    if repo_root is not None:
+        candidate = os.path.join(repo_root, "ai_router", "router-config.yaml")
+        return os.path.abspath(candidate) if os.path.isfile(candidate) else None
+    try:
+        try:
+            from config import (  # type: ignore[import-not-found]
+                _resolve_config_path_and_source,
+            )
+        except ImportError:
+            from .config import (  # type: ignore[no-redef]
+                _resolve_config_path_and_source,
+            )
+        resolved, _src = _resolve_config_path_and_source(None)
+        return os.path.abspath(resolved) if os.path.isfile(resolved) else None
+    except Exception:
+        return None
+
+
+def effective_repo_root(repo_root: Optional[str]) -> Optional[str]:
+    """Return the repo root manifest paths are resolved against.
+
+    Explicit ``--repo-root`` wins. Otherwise derive it from the resolved
+    ``router-config.yaml`` location (``<root>/ai_router/router-config.yaml``
+    -> ``<root>``) so ``guidance_report`` measures ``repo-root-relative``
+    manifest paths correctly **regardless of the current working
+    directory** -- not just when invoked from the repo root (R2
+    remediation I-085-S1-4). Falls back to ``None`` (``os.getcwd()`` in
+    the report builders) when no config can be located.
+    """
+    if repo_root is not None:
+        return repo_root
+    config_path = _resolve_config_path(None)
+    if config_path is None:
+        return None
+    ai_router_dir = os.path.dirname(config_path)
+    return os.path.dirname(ai_router_dir)
+
+
+def load_raw_preload_manifest(
+    repo_root: Optional[str] = None,
+) -> "tuple[Optional[PreloadManifest], bool, bool]":
+    """Best-effort raw parse of the preload manifest, bypassing ``load_config``.
+
+    Returns ``(manifest, declared, unconfirmable)``. This decouples the
+    ceiling gate from ``config.load_config()``'s **env-key validation**: a
+    repo whose provider keys are absent (or whose config fails validation
+    for an unrelated reason) must still have its declared manifest
+    enforced, not silently skipped (R2 remediation I-085-S1-1/3/5).
+
+    - ``declared`` -- a ``preload:`` key is PRESENT in a well-formed
+      ``guidance:`` mapping (even if the manifest itself is malformed and
+      parses to ``None``).
+    - ``unconfirmable`` -- the config is present but broken in a way that
+      means a manifest could neither be confirmed present nor confirmed
+      absent: unreadable / non-mapping YAML, or a ``guidance:`` key that
+      is present but not a mapping (e.g. ``guidance: 7``).
+
+    The caller fails ``--check`` closed when ``declared or unconfirmable``.
+    A genuine no-config repo, or a parseable config whose ``guidance:``
+    mapping simply has no ``preload:`` key, returns
+    ``(None, False, False)`` -> fail-open legacy (back-compat).
+    """
+    import yaml
+
+    path = _resolve_config_path(repo_root)
+    if path is None:
+        return None, False, False  # no config file -> genuine legacy
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+    except Exception:
+        return None, False, True  # unparseable -> unconfirmable, fail closed
+    if not isinstance(data, dict):
+        return None, False, True
+    # A top-level ``preload:`` key is ALWAYS a misplaced manifest (it
+    # belongs under ``guidance:``) -- whether or not a ``guidance:``
+    # mapping is also present. Treat it as unconfirmable so --check fails
+    # closed, matching the config-success path (I-085-S1-7/9).
+    if "preload" in data:
+        return None, False, True
+    if "guidance" not in data:
+        return None, False, False  # genuine legacy
+    block = data.get("guidance")
+    if not isinstance(block, dict):
+        # `guidance:` present but not a mapping (e.g. `guidance: 7`) --
+        # malformed, not a genuine no-manifest repo (I-085-S1-5).
+        return None, False, True
+    declared = "preload" in block
+    return _parse_preload_manifest(block), declared, False
 
 
 def _build_header_block(
@@ -264,7 +600,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Exit non-zero if any capped file is over its token ceiling.",
+        help=(
+            "Exit non-zero if any capped file is over its token ceiling. "
+            "With a preload manifest, also fails on the combined total "
+            "ceiling and on any manifest file missing from disk."
+        ),
     )
     parser.add_argument(
         "--write-headers",
@@ -284,33 +624,126 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    try:
-        config = load_config()
-    except Exception:
-        config = None
+    # Load config from the SAME repo the gate is measuring: when
+    # --repo-root is given, resolve its router-config.yaml explicitly
+    # instead of the implicit cwd walk-up, so the manifest enforced and
+    # the files measured come from one repo (I-085-S1-12). When that repo
+    # has no config, config is absent (legacy for that repo) -- never the
+    # cwd's config.
+    if args.repo_root:
+        _cfg_path = _resolve_config_path(args.repo_root)
+        try:
+            config = load_config(_cfg_path) if _cfg_path else None
+        except Exception:
+            config = None
+    else:
+        try:
+            config = load_config()
+        except Exception:
+            config = None
     cfg = load_guidance_config(config)
-    reports = build_reports(args.repo_root, cfg)
+
+    # Manifest paths are repo-root-relative. When --repo-root is omitted,
+    # derive the root from the resolved router-config.yaml location so the
+    # gate works from ANY working directory, not only the repo root
+    # (I-085-S1-4). Explicit --repo-root always wins.
+    root = effective_repo_root(args.repo_root)
+
+    # Set 085 F1: when a preload manifest is declared, it is the report +
+    # gate surface (every required-reading file, per-file and total). With
+    # no manifest, the legacy two-file Set-064 behavior is byte-identical.
+    manifest = cfg.preload
+    # A manifest was DECLARED (``preload:`` key present) even if it parsed
+    # to None because it was malformed. ``unconfirmable`` covers a config
+    # that is present but broken (unparseable, or a ``guidance:`` that is
+    # not a mapping). Both are tracked separately from a parsed manifest so
+    # --check fails closed instead of silently reverting to legacy
+    # (R2 remediation I-085-S1-3/5).
+    declared = cfg.preload_declared
+    unconfirmable = False
+    # Structurally-misplaced manifest declarations that load_guidance_config
+    # silently defaults past on the config-SUCCESS path (I-085-S1-5/7):
+    #   - a ``guidance:`` key present but not a mapping (``guidance: 7``);
+    #   - a top-level ``preload:`` key (misindented manifest).
+    # Catch them here so they fail closed like the raw path does.
+    if isinstance(config, dict):
+        gblock = config.get("guidance")
+        if ("guidance" in config and not isinstance(gblock, dict)) or (
+            "preload" in config
+        ):
+            unconfirmable = True
+
+    # Fail-closed recovery (I-085-S1-1): if load_config() failed, the
+    # manifest we would gate on is None -- but the repo may actually
+    # declare one. Recover it from a raw YAML parse (decoupled from env-key
+    # validation) and pick up the declared / unconfirmable signals.
+    if manifest is None and config is None:
+        raw_manifest, raw_declared, raw_unconfirmable = load_raw_preload_manifest(
+            root
+        )
+        declared = declared or raw_declared
+        unconfirmable = unconfirmable or raw_unconfirmable
+        if raw_manifest is not None:
+            manifest = raw_manifest
+
+    # The gate never passes on the legacy fallback when a manifest was
+    # meant to be enforced: a declared-but-unbuildable manifest, or a
+    # config present-but-broken (``unconfirmable`` -- e.g. a misplaced
+    # top-level ``preload:``), fails --check closed. ``unconfirmable``
+    # fails closed EVEN when a valid manifest also parsed (I-085-S1-13): a
+    # stray second manifest declaration must not be silently ignored while
+    # the old one keeps enforcing. A genuine no-manifest repo (declared
+    # False, not unconfirmable) keeps the fail-open legacy behavior.
+    if args.check and (unconfirmable or (manifest is None and declared)):
+        print(
+            "CHECK FAILED: a preload manifest could not be confirmed from "
+            "router-config.yaml -- the guidance.preload block is declared "
+            "but malformed, or the config is present but could not be "
+            "loaded/parsed. Refusing to pass the ceiling gate on the "
+            "legacy two-file fallback. Fix the config so the manifest "
+            "parses, then re-run --check."
+        )
+        return 1
+
+    legacy_reports = build_reports(root, cfg)
+    preload_reports = (
+        build_preload_reports(root, manifest)
+        if manifest is not None
+        else None
+    )
+    reports = preload_reports if preload_reports is not None else legacy_reports
 
     if args.json:
         import json
 
+        def _file_payload(r: FileReport) -> dict:
+            d = {
+                "name": r.name,
+                "bytes": r.bytes,
+                "lines": r.lines,
+                "tokens": r.tokens,
+                "ceiling": r.ceiling,
+                "over_ceiling": r.over_ceiling,
+                "pct_of_ceiling": r.pct_of_ceiling,
+            }
+            # Manifest-only fields stay OUT of the legacy no-manifest shape:
+            # a repo with no preload: block must get byte-identical JSON
+            # (back-compat is a hard requirement; R2 remediation I-085-S1-2).
+            if manifest is not None:
+                d["missing"] = r.missing
+            return d
+
+        payload = {"files": [_file_payload(r) for r in reports]}
+        if manifest is not None:
+            payload["total_tokens"] = sum(r.tokens for r in reports)
+            payload["total_ceiling_tokens"] = manifest.total_ceiling_tokens
+        print(json.dumps(payload, indent=2))
+    elif manifest is not None:
         print(
-            json.dumps(
-                {
-                    "files": [
-                        {
-                            "name": r.name,
-                            "bytes": r.bytes,
-                            "lines": r.lines,
-                            "tokens": r.tokens,
-                            "ceiling": r.ceiling,
-                            "over_ceiling": r.over_ceiling,
-                            "pct_of_ceiling": r.pct_of_ceiling,
-                        }
-                        for r in reports
-                    ],
-                },
-                indent=2,
+            render_preload_report(
+                reports,
+                manifest.total_ceiling_tokens,
+                manifest.malformed_entry_count,
             )
         )
     else:
@@ -318,7 +751,33 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.write_headers:
         today = datetime.date.today().isoformat()
-        for r in reports:
+        # The legacy Set-064 lifecycle header (last-pruned-set, the
+        # lessons/guidance pruning ceiling) is preserved untouched. The
+        # manifest additionally stamps any entry that opts in via
+        # ``stamp: true`` (default false -- canonical docs and the engine
+        # bootstrap are never auto-edited). Dedup by resolved path so a
+        # Set-064 file that is also a manifest entry is stamped once.
+        stamp_targets: List[FileReport] = list(legacy_reports)
+        seen = {os.path.normpath(r.path) for r in stamp_targets}
+        if manifest is not None and preload_reports is not None:
+            stamp_opt_in = {
+                e.path for e in manifest.files if e.stamp
+            }
+            for r in preload_reports:
+                # NEVER write a file that is missing or not repo-root-
+                # relative: --write-headers is the only mutating mode, so
+                # it must not open/rewrite a path outside the repo, even
+                # when an escaping entry opted in with stamp: true
+                # (I-085-S1-10). Such entries still fail --check.
+                if (
+                    not r.missing
+                    and not r.escapes_root
+                    and r.name in stamp_opt_in
+                    and os.path.normpath(r.path) not in seen
+                ):
+                    stamp_targets.append(r)
+                    seen.add(os.path.normpath(r.path))
+        for r in stamp_targets:
             with open(r.path, "r", encoding="utf-8") as f:
                 text = f.read()
             lp = args.last_pruned_set or _existing_last_pruned(text) or "(none)"
@@ -330,14 +789,46 @@ def main(argv: Optional[List[str]] = None) -> int:
                 print(f"  stamped header into {r.name}")
 
     if args.check:
-        over = [r for r in reports if r.over_ceiling]
-        if over:
-            names = ", ".join(f"{r.name} (+{r.tokens - (r.ceiling or 0)} tok)" for r in over)
-            print(
-                f"CHECK FAILED: {len(over)} guidance file(s) over ceiling: {names}. "
-                "Run a pruning sweep (see docs/planning archive triggers) before adding."
+        if manifest is not None:
+            failures = preload_check_failures(
+                reports, manifest.total_ceiling_tokens
             )
-            return 1
+            if manifest.malformed_entry_count > 0:
+                # A declared files: entry that could not be built (missing/
+                # invalid 'path' or non-mapping) must not silently vanish
+                # from the gate (I-085-S1-8).
+                failures.insert(
+                    0,
+                    f"{manifest.malformed_entry_count} manifest files: "
+                    "entry/entries are malformed (a non-mapping item, or a "
+                    "missing/empty 'path'); a declared required-reading file "
+                    "must not be silently dropped from the gate. Fix the "
+                    "guidance.preload.files entry.",
+                )
+            if failures:
+                print(
+                    f"CHECK FAILED: {len(failures)} preload-ceiling breach(es):"
+                )
+                for line in failures:
+                    print(f"  - {line}")
+                print(
+                    "Preload ceilings ratchet DOWN only: at ceiling, remove "
+                    "prose (demote to on-demand reference or a gate) rather "
+                    "than raising the number. Raising a ceiling is an "
+                    "operator-authorized config edit with a stated reason."
+                )
+                return 1
+        else:
+            over = [r for r in reports if r.over_ceiling]
+            if over:
+                names = ", ".join(
+                    f"{r.name} (+{r.tokens - (r.ceiling or 0)} tok)" for r in over
+                )
+                print(
+                    f"CHECK FAILED: {len(over)} guidance file(s) over ceiling: {names}. "
+                    "Run a pruning sweep (see docs/planning archive triggers) before adding."
+                )
+                return 1
 
     return 0
 
@@ -351,8 +842,14 @@ __all__ = [
     "HEADER_END",
     "FileReport",
     "measure_file",
+    "measure_path",
     "build_reports",
+    "build_preload_reports",
+    "load_raw_preload_manifest",
+    "effective_repo_root",
     "render_report",
+    "render_preload_report",
+    "preload_check_failures",
     "stamp_header",
     "summarize_overhead",
     "main",

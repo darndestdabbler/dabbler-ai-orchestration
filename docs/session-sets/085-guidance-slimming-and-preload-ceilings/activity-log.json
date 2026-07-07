@@ -1,0 +1,17 @@
+{
+  "sessionSetName": "085-guidance-slimming-and-preload-ceilings",
+  "createdDate": "2026-07-07T14:15:46.686498+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-07T14:15:46.687490+00:00",
+      "description": "Operator set pathAwareCritique: required.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "required"
+    }
+  ]
+}

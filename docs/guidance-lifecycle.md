@@ -126,6 +126,86 @@ generated date). **Do not edit that header manually** — re-run with
 `--write-headers` instead. `--check` is the CI-friendly gate (non-zero exit when
 over ceiling).
 
+## The preload manifest and the ratcheting ceiling gate (Set 085)
+
+The Set-064 ceilings above cap the two guidance *lifecycle* files. The
+**preload manifest** (Set 085 F1) is a second, complementary gate that
+caps the *entire* always-loaded corpus — every file the workflow
+requires in context at session start, not just the two lifecycle files.
+It lives in the router-config `guidance:` block:
+
+```yaml
+guidance:
+  preload:
+    total_ceiling_tokens: 12000
+    files:
+      - path: docs/session-constitution.md
+        ceiling_tokens: 4000
+      - path: docs/planning/project-guidance.md
+        ceiling_tokens: 3528
+      # ... one entry per required-reading file
+```
+
+`python -m ai_router.guidance_report --check` reports and gates every
+entry (per-file **and** the combined total) and is run in CI, so a
+breach fails the build. This makes the ceiling itself the anti-rebloat
+mechanism: **at ceiling, adding prose requires removing prose** —
+token-neutral by construction. A file the manifest lists but that is
+missing on disk is also a hard failure (it catches a required-reading
+doc that was moved or renamed without updating the manifest).
+
+**Ceilings ratchet DOWN only.** Lowering a ceiling (as content is
+demoted to on-demand reference or encoded into a gate) is routine.
+**Raising** a ceiling — or the total — is an **operator-authorized
+config edit with a stated reason**, never an in-session accommodation.
+An orchestrator that finds itself at ceiling mid-session removes prose;
+it does not edit the number. The `stamp: true` per-entry opt-in controls
+`--write-headers` auto-editing (default false — canonical docs and the
+engine bootstrap files are never machine-stamped).
+
+Back-compat: a repo with no `preload:` block keeps exactly the two-file
+Set-064 behavior (universal core, gated extension).
+
+## The preload admission test (Set 085)
+
+Preload context is the scarcest resource in the workflow: every token
+loaded at session start is paid on *every* session and dilutes the
+salience of the rules that matter. A rule or lesson earns preload
+residency **only if it satisfies all five** of the following
+(GPT-5.4's formulation, adopted by the 2026-07-07 cross-provider
+consult):
+
+1. **Recent recurrence** — it has actually come up recently, not once
+   long ago.
+2. **High miss cost** — getting it wrong is expensive or hard to
+   unwind.
+3. **Weak automated detectability** — no cheap deterministic check
+   reliably catches the mistake.
+4. **No executable-gate equivalent** — it is not already enforced by a
+   test, validator, linter, or CI check.
+5. **Expressible in ≤150 tokens** — the principle fits; the full
+   treatment lives on demand.
+
+The routing that follows from the test — the **prose → gate → archive
+pipeline**:
+
+- **Machine-checkable → make it a gate.** Anything a test / validator /
+  CI check can enforce becomes that check, and the prose archives with a
+  pointer to the automation (`encoded-in`). The gate costs zero
+  attention until it fires; the prose costs attention every session.
+- **Situational → on-demand reference.** Anything that only matters at a
+  specific moment moves out of the preload path to a reference doc,
+  consulted at the moment of need (searchable via
+  `python -m ai_router.guidance_search`). It stays authoritative for its
+  domain; only its *preload residency* ends.
+- **Stale → archive or drop.** Anything superseded, retired, or long
+  unused archives by the evidence rules above.
+
+`guidance_triage` produces an operator-reviewed **proposal** against
+this test — it classifies each entry and projects the post-triage size,
+but **never edits the target file directly**. Archival and demotion stay
+operator-reviewed actions.
+
 ## Already over budget? Use the one-time backlog recipe
 
 If a repository's guidance files are already significantly over budget, the steady-state lifecycle mechanisms are insufficient for the initial cleanup. A separate, one-time, operator-driven remediation process is required.

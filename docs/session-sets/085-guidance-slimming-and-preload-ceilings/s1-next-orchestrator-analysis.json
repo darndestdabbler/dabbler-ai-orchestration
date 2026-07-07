@@ -1,0 +1,37 @@
+```json
+{
+  "next_orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-3-opus-20240229",
+    "effort": "high",
+    "reason": {
+      "code": "other",
+      "specifics": "Session 2 is large-scale, cross-file document authoring and refactoring, which aligns with Claude 3 Opus's superior large-context handling and prose generation capabilities, a better fit than the S1 verification model."
+    }
+  },
+  "ai_assignment_session_2": [
+    {
+      "step": "Author session-constitution.md",
+      "recommended": "claude-3-opus-20240229",
+      "why": "Best for structured, long-form prose generation."
+    },
+    {
+      "step": "Rewrite required-reading contract",
+      "recommended": "claude-3-opus-20240229",
+      "why": "Requires largest context window for cross-file consistency."
+    },
+    {
+      "step": "Apply guidance_triage and lower ceilings",
+      "recommended": "claude-3-haiku-20240307",
+      "why": "Mechanical task; use faster/cheaper model."
+    },
+    {
+      "step": "pathAwareCritique (session-wide)",
+      "recommended": "claude-3-opus-20240229",
+      "why": "Core task requires full context and reasoning capability."
+    }
+  ],
+  "notes": "The shift from S1's code-correctness task to S2's authoring-heavy workload justifies moving to an orchestrator optimized for large-context, high-coherence prose. Operator supervision on the cross-cutting rewrite is critical."
+}
+```

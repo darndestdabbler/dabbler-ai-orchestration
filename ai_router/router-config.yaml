@@ -858,3 +858,48 @@ guidance:
   active_lessons_ceiling_tokens: 10000   # docs/planning/lessons-learned.md (~40 KB)
   project_guidance_ceiling_tokens: 6000  # docs/planning/project-guidance.md (~24 KB)
   disuse_window_sets: 20                  # D5: archive after N sets unused AND unreferenced
+
+  # --- Preload manifest + ratcheting ceiling gate (Set 085 F1) ---
+  # Every file the session-start workflow requires in context, each with
+  # a per-file token ceiling, plus a combined total_ceiling_tokens. The
+  # gate is the anti-rebloat mechanism: `guidance_report --check` (run in
+  # CI) fails the build on any per-file OR total breach, so at ceiling,
+  # adding prose requires removing prose -- token-neutral by construction.
+  #
+  # Ceilings RATCHET DOWN ONLY. Raising any ceiling (or the total) is an
+  # operator-authorized config edit with a stated reason, never an
+  # in-session accommodation (docs/guidance-lifecycle.md).
+  #
+  # These ceilings are the "preload residency" budget and are DISTINCT
+  # from the two Set-064 lifecycle ceilings above (which remain the
+  # lessons/guidance pruning backstop that summarize_overhead and
+  # --write-headers use). A repo with no `preload:` block keeps exactly
+  # the two-file Set-064 behavior (universal core, gated extension).
+  #
+  # `stamp: true` opts a file in to --write-headers auto-editing; the
+  # default (false) means canonical docs and the engine bootstrap files
+  # are never machine-stamped. Ratchet start: nothing opts in.
+  #
+  # Ratchet start (Set 085 S1): every ceiling is the file's measured
+  # current size, so the gate is green from this commit and growth is
+  # blocked immediately. Set 085 S2 lowers these as content is demoted
+  # to on-demand references and the total is cut to 12000.
+  preload:
+    total_ceiling_tokens: 92719
+    files:
+      - path: docs/ai-led-session-workflow.md
+        ceiling_tokens: 38402
+      - path: docs/session-state-schema.md
+        ceiling_tokens: 14051
+      - path: ai_router/docs/close-out.md
+        ceiling_tokens: 13557
+      - path: docs/planning/lessons-learned.md
+        ceiling_tokens: 9797
+      - path: docs/planning/session-set-authoring-guide.md
+        ceiling_tokens: 8465
+      - path: docs/planning/project-guidance.md
+        ceiling_tokens: 3528
+      - path: docs/quick-start.md
+        ceiling_tokens: 3052
+      - path: CLAUDE.md
+        ceiling_tokens: 1867

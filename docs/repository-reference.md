@@ -63,10 +63,40 @@ can learn it.
 
 | Surface | Current version | State | Canonical details |
 |---|---|---|---|
-| `dabbler-ai-router` | `0.28.0` | **Published.** Sequenced per the release-ordering invariant: `v0.27.0` (Set 077 — Mode-B engine-or-provider close gate + start-time same-pair refusal, pending-verification banner, external-verification round/`WAIVED` parser, resolved-runtime-mode gate keying, A12 lazy-synth fix, close/state/verification robustness) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437` — the commit where the 0.27.0 version bump landed, before Set 078 bumped further), then `v0.28.0` (Set 078 — Copilot CLI hybrid tier: `copilot-cli` transport profile, seat-local catalog lockfile, honest seat accounting, three live-dogfood fixes) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`). Both confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
-| `dabbler-ai-orchestration` VS Code extension | `0.38.0` | **Published.** Set 082 (omit `verificationMode` from Full-tier scaffolds; extension-only — `ai_router` untouched, router stays `0.28.0`). A Full-tier scaffold no longer renders a `verificationMode:` config line (whole-line `{{VERIFICATION_MODE_LINE}}` token; Lightweight renders the exact pre-082 line, comment included) and no longer writes the `.dabbler/verification-mode` marker (Lightweight-only; on Full the marker is neither written nor deleted, so a prior Lightweight pick survives a tier round-trip). `buildSessionGenPrompt` hard-requirements rescoped: `full` sets OMIT the field. Lightweight scaffold output byte-identical to 0.37.0 (golden-snapshot tripwire). Per-set UAT walked and attested 2026-07-06: all 5 functional items PASS across 3 walks incl. one REAL cold-start Build per tier from fresh empty folders (L-079-3) and a Full-over-Lightweight re-Build asserting marker preservation. Published 2026-07-06 (tag `vsix-v0.38.0`, tagged commit `e9bbfae`, publish-vscode.yml run [28806840851](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28806840851); Test run [28806467299](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28806467299) green on the tagged commit). Previous: `0.37.0` (Set 081) published 2026-07-05 (tag `vsix-v0.37.0`, tagged commit `bc3b43f`, publish-vscode.yml run [28764677942](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28764677942)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
+| `dabbler-ai-router` | `0.29.0` | **Published.** `v0.29.0` — the combined Sets 083 + 084 release (verify_session CLI + verification-integrity gate + mandatory Full-tier verification; identity-is-the-underlying-model, dynamic verifier exclusion, stamped evidence, the close backstop; plus a Windows drive-letter path-case fix found by the Set 084 out-of-band Copilot UAT) — published 2026-07-07 (release.yml run [28872574166](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28872574166), tagged commit `477e625`, Test green on the tagged commit; confirmed live on PyPI). 0.29.0 is the number Set 083 never shipped in between (superseded by 084). Previous: `v0.28.0` (Set 078 — Copilot CLI hybrid tier) published 2026-07-04 (release.yml run [28718741271](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718741271), tagged commit `a391f61`); `v0.27.0` (Set 077) published 2026-07-04 (release.yml run [28718682653](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28718682653), tagged commit `51fc437`). All confirmed live on PyPI. | `pyproject.toml`, `ai_router/CHANGELOG.md` |
+| `dabbler-ai-orchestration` VS Code extension | `0.39.0` | **Published.** `vsix-v0.39.0` — the combined Sets 083 + 084 release: the scaffolded consumer-bootstrap bundle now teaches mandatory Full-tier verification (no skip), the Copilot-seat `--model` requirement / identity-from-model, dynamic verifier exclusion + `verification_unavailable`, and the close backstop; cold-start goldens + bundled dist templates regenerated. Published 2026-07-07 (publish-vscode.yml run [28872587000](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28872587000), tagged commit `477e625`, Test green on the tagged commit). Previous: `0.38.0` Set 082 (omit `verificationMode` from Full-tier scaffolds; extension-only — `ai_router` untouched, router stays `0.28.0`). A Full-tier scaffold no longer renders a `verificationMode:` config line (whole-line `{{VERIFICATION_MODE_LINE}}` token; Lightweight renders the exact pre-082 line, comment included) and no longer writes the `.dabbler/verification-mode` marker (Lightweight-only; on Full the marker is neither written nor deleted, so a prior Lightweight pick survives a tier round-trip). `buildSessionGenPrompt` hard-requirements rescoped: `full` sets OMIT the field. Lightweight scaffold output byte-identical to 0.37.0 (golden-snapshot tripwire). Per-set UAT walked and attested 2026-07-06: all 5 functional items PASS across 3 walks incl. one REAL cold-start Build per tier from fresh empty folders (L-079-3) and a Full-over-Lightweight re-Build asserting marker preservation. Published 2026-07-06 (tag `vsix-v0.38.0`, tagged commit `e9bbfae`, publish-vscode.yml run [28806840851](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28806840851); Test run [28806467299](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28806467299) green on the tagged commit). Previous: `0.37.0` (Set 081) published 2026-07-05 (tag `vsix-v0.37.0`, tagged commit `bc3b43f`, publish-vscode.yml run [28764677942](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28764677942)). | `tools/dabbler-ai-orchestration/package.json`, `tools/dabbler-ai-orchestration/CHANGELOG.md` |
 
 ### Recent version walk
+
+- **`dabbler-ai-router 0.29.0` + Extension `0.39.0`** — Sets 083 + 084,
+  the verification-identity release. 0.29.0 combines Set 083 (the
+  `verify_session` CLI, the verification-integrity close gate, mandatory
+  Full-tier verification with no engine-facing skip) and Set 084 (identity is
+  the underlying model resolved through the registry, not the seat label;
+  dynamic verifier exclusion of the orchestrator's effective provider with a
+  fail-closed `verification_unavailable`; only `verify_session`- or
+  backstop-stamped evidence corroborates a close; and the **close backstop** —
+  `close_session` runs the verification itself in-process when a Full-tier close
+  arrives unverified). Set 083 never shipped on its own (superseded by 084).
+  Also fixes a **Windows drive-letter case-sensitivity** bug in the
+  close/verify path, found by the Set 084 out-of-band Copilot UAT (a real seat
+  passing `--session-set-dir c:\...` against git's `C:\...` spuriously failed
+  the stamp/gate comparisons); every two-source path compare now
+  `os.path.normcase`s both sides. The extension `0.39.0` ships the matching
+  consumer-bootstrap bundle. **Published 2026-07-07** — router `v0.29.0`
+  (release.yml run
+  [28872574166](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28872574166),
+  live on PyPI) and extension `vsix-v0.39.0` (publish-vscode.yml run
+  [28872587000](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/28872587000)),
+  both tagged commit `477e625`, Test green on the tagged commit. Set 084's
+  per-set UAT was walked partly via the Session Set Explorer cold-start Build
+  (Walk 0/1 attested) and partly via a REAL GitHub Copilot orchestrator running
+  a live session (the incident-3 reproduction), which confirmed the machinery
+  end-to-end and surfaced the path-case fix; the close-out itself used the
+  operator-attested `--manual-verify` because the backstop hall-of-mirrors on
+  the session's own committed verification artifacts (a recorded framework
+  follow-up). Consumer floor-bump (`dabbler-ai-router>=0.29.0` + L-075-1
+  venv-upgrade-and-confirm) happens in each consumer repo's own session.
 
 - **Extension `0.38.0`** — Set 082, omit `verificationMode` from
   Full-tier scaffolds. Extension-only (`ai_router` untouched; router

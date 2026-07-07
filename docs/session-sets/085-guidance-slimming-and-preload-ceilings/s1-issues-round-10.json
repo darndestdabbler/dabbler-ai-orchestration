@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 10,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "`--write-headers` still rewrites opted-out files, so the new `stamp: true` opt-in contract is not actually enforced**\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The task requires: **“`--write-headers` stamps only files that opt in (`stamp: true` per entry, default false — CLAUDE.md and canonical docs are not auto-edited).”** The checked-in config repeats the same contract: **“`stamp: true` opts a file in to `--write-headers` auto-editing … Ratchet start: nothing opts in.”**\n  - **Impact:** A reviewer cannot accept the claimed `stamp: true` safeguard as implemented, because the only mutating mode still edits files that did **not** opt in. In this repo, that means `python -m ai_router.guidance_report --write-headers` will rewrite opted-out guidance docs despite the manifest saying nothing opts in. That is a direct behavioral mismatch in one of Session 1’s explicit deliverables.\n  - **Evidence:** In `ai_router/router-config.yaml`, the manifest entries for `docs/planning/lessons-learned.md` and `docs/planning/project-guidance.md` have no `stamp: true`. But in `ai_router/guidance_report.py::main`, stamping starts with:\n    ```python\n    stamp_targets: List[FileReport] = list(legacy_reports)\n    ```\n    and then writes every target in `stamp_targets`. The manifest opt-in check is applied only when adding **extra** manifest files:\n    ```python\n    if manifest is not None and preload_reports is not None:\n        stamp_opt_in = {e.path for e in manifest.files if e.stamp}\n        ...\n    ```\n    so the legacy guidance files are stamped unconditionally even when they are opted out in the manifest.\n  - **Correct answer:** When a preload manifest is present, do not stamp any file unless its manifest entry has `stamp: true`. If preserving legacy header stamping is intentional, that opt-in must be made explicit in the manifest and the docs/spec updated to match; it cannot stay as an implicit bypass of the new opt-in rule.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

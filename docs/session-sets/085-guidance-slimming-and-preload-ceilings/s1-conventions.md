@@ -83,6 +83,40 @@ diff:
 New suite is now 44 tests (was 34); full suite baseline unchanged
 (2774 passed, 5 skipped) plus these.
 
+### Round 10 finding (Set 084 CLOSE BACKSTOP) — remediated
+
+The close-out ran the Set 084 in-process backstop verification (an
+independent surface from the diff-based verify_session loop) and caught a
+real bug the prior 9 rounds missed: **I-085-S1-14 — `--write-headers`
+stamped the two Set-064 files (lessons-learned / project-guidance) via
+the always-on legacy path even though their manifest entries are the
+default `stamp: false`, violating the opt-in contract** ("canonical docs
+are not auto-edited"). Fixed exactly per the verifier's correct answer:
+when a manifest is present, `stamp:` is the SOLE authority — only
+`stamp: true` entries are stamped, no always-on legacy stamping. At
+ratchet start nothing opts in, so `--write-headers` is a no-op in this
+repo (matching the router-config comment). The no-manifest path keeps the
+legacy two-file stamping (back-compat). Covered by
+`test_write_headers_manifest_does_not_stamp_set064_files_when_stamp_false`
+and `test_write_headers_no_manifest_stamps_set064_files`. This
+demonstrates the backstop's value: an independent verification surface
+caught a stamp-contract violation the diff loop did not exercise.
+
+### Round 11 finding — remediated (stamping uses the right ceiling source)
+
+The round-10 fix (stamp: as sole authority) initially sourced ALL stamped
+files from `preload_reports`, so an opted-in Set-064 file would show the
+preload residency ceiling instead of its legacy pruning ceiling
+(I-085-S1-15) -- contradicting the deliberate two-ceiling separation.
+Fixed with dual-source stamping in manifest mode: an opt-in file that is
+also a Set-064 lifecycle file is stamped from its `legacy_reports` entry
+(legacy ceiling); other opt-in files stamp from `preload_reports`
+(preload ceiling). The full stamping contract is now self-consistent:
+stamp:false -> never stamped; stamp:true Set-064 -> legacy ceiling;
+stamp:true other -> preload ceiling; no manifest -> legacy two-file
+stamping (back-compat). Covered by
+`test_write_headers_opt_in_set064_file_uses_legacy_ceiling`.
+
 ### Round 8 findings — remediated (config-source + stray-manifest guard)
 
 - **I-085-S1-12 (`--repo-root` didn't steer config load).** `main()`

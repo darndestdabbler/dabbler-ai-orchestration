@@ -751,32 +751,39 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.write_headers:
         today = datetime.date.today().isoformat()
-        # The legacy Set-064 lifecycle header (last-pruned-set, the
-        # lessons/guidance pruning ceiling) is preserved untouched. The
-        # manifest additionally stamps any entry that opts in via
-        # ``stamp: true`` (default false -- canonical docs and the engine
-        # bootstrap are never auto-edited). Dedup by resolved path so a
-        # Set-064 file that is also a manifest entry is stamped once.
-        stamp_targets: List[FileReport] = list(legacy_reports)
-        seen = {os.path.normpath(r.path) for r in stamp_targets}
-        if manifest is not None and preload_reports is not None:
-            stamp_opt_in = {
-                e.path for e in manifest.files if e.stamp
-            }
-            for r in preload_reports:
-                # NEVER write a file that is missing or not repo-root-
-                # relative: --write-headers is the only mutating mode, so
-                # it must not open/rewrite a path outside the repo, even
-                # when an escaping entry opted in with stamp: true
-                # (I-085-S1-10). Such entries still fail --check.
-                if (
-                    not r.missing
-                    and not r.escapes_root
-                    and r.name in stamp_opt_in
-                    and os.path.normpath(r.path) not in seen
-                ):
-                    stamp_targets.append(r)
-                    seen.add(os.path.normpath(r.path))
+        # When a manifest is present, ``stamp:`` is the SOLE authority for
+        # what --write-headers writes (opt-in, default false): only
+        # ``stamp: true`` entries are stamped, so canonical docs and the
+        # engine bootstrap are never auto-edited. The Set-064 always-stamp
+        # of lessons-learned / project-guidance is NOT applied on top --
+        # those files carry ``stamp: false`` in the manifest, and writing
+        # them anyway would violate the opt-in contract (close-backstop
+        # round 10, I-085-S1-14). With NO manifest, the legacy two-file
+        # Set-064 stamping applies unchanged (back-compat).
+        if manifest is not None:
+            stamp_targets: List[FileReport] = []
+            if preload_reports is not None:
+                stamp_opt_in = {e.path for e in manifest.files if e.stamp}
+                # An opt-in file that is ALSO a Set-064 lifecycle file is
+                # stamped from its legacy report (its pruning ceiling), not
+                # the preload report (residency ceiling): the header's
+                # last-pruned-set / sweep-due semantics belong to the
+                # lifecycle ceiling, and the two are deliberately distinct
+                # (I-085-S1-15). Non-overlapping opt-in files stamp from the
+                # preload report.
+                legacy_by_abspath = {
+                    os.path.normpath(lr.path): lr for lr in legacy_reports
+                }
+                for r in preload_reports:
+                    # NEVER write a missing or non-repo-root-relative path:
+                    # --write-headers is the only mutating mode and must not
+                    # open/rewrite a file outside the repo (I-085-S1-10).
+                    if r.missing or r.escapes_root or r.name not in stamp_opt_in:
+                        continue
+                    legacy = legacy_by_abspath.get(os.path.normpath(r.path))
+                    stamp_targets.append(legacy if legacy is not None else r)
+        else:
+            stamp_targets = list(legacy_reports)
         for r in stamp_targets:
             with open(r.path, "r", encoding="utf-8") as f:
                 text = f.read()

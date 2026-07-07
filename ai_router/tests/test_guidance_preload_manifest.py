@@ -577,11 +577,85 @@ def test_no_manifest_uses_legacy_report(tmp_path, monkeypatch, capsys):
 
 
 def test_write_headers_skips_non_opt_in_manifest_files(repo, monkeypatch):
-    """A manifest file with stamp:false (default) is never auto-edited."""
+    """A manifest file with stamp:false (default) is never auto-edited --
+    including files that would legacy-stamp (Set-064 lessons/guidance): the
+    manifest stamp: opt-in is the sole authority (I-085-S1-14)."""
     _patch_cfg(monkeypatch, GuidanceConfig(preload=_manifest()))
     guidance_report.main(["--write-headers", "--repo-root", str(repo)])
     assert HEADER_BEGIN not in (repo / "a.md").read_text(encoding="utf-8")
     assert HEADER_BEGIN not in (repo / "sub" / "b.md").read_text(encoding="utf-8")
+
+
+def test_write_headers_manifest_does_not_stamp_set064_files_when_stamp_false(
+    tmp_path, monkeypatch
+):
+    """When a manifest lists lessons-learned/project-guidance with the
+    default stamp:false, --write-headers must NOT stamp them -- the old
+    Set-064 always-stamp does not override an explicit opt-out
+    (close-backstop round 10, I-085-S1-14)."""
+    gdir = tmp_path / "docs" / "planning"
+    gdir.mkdir(parents=True)
+    lessons = gdir / "lessons-learned.md"
+    guide = gdir / "project-guidance.md"
+    lessons.write_text("# L\n\n---\n\nbody\n", encoding="utf-8")
+    guide.write_text("# G\n\n---\n\nbody\n", encoding="utf-8")
+    manifest = PreloadManifest(
+        files=(
+            PreloadEntry(path="docs/planning/lessons-learned.md", ceiling_tokens=100),
+            PreloadEntry(path="docs/planning/project-guidance.md", ceiling_tokens=100),
+        ),
+        total_ceiling_tokens=1000,
+    )
+    _patch_cfg(monkeypatch, GuidanceConfig(preload=manifest))
+    guidance_report.main(["--write-headers", "--repo-root", str(tmp_path)])
+    assert HEADER_BEGIN not in lessons.read_text(encoding="utf-8")
+    assert HEADER_BEGIN not in guide.read_text(encoding="utf-8")
+
+
+def test_write_headers_opt_in_set064_file_uses_legacy_ceiling(tmp_path, monkeypatch):
+    """An opted-in (stamp:true) Set-064 file is stamped with its LEGACY
+    pruning ceiling, not the manifest preload ceiling -- the two are
+    deliberately distinct (I-085-S1-15)."""
+    gdir = tmp_path / "docs" / "planning"
+    gdir.mkdir(parents=True)
+    lessons = gdir / "lessons-learned.md"
+    lessons.write_text("# L\n\n---\n\nbody\n", encoding="utf-8")
+    (gdir / "project-guidance.md").write_text("# G\n\n---\n\nbody\n", encoding="utf-8")
+    manifest = PreloadManifest(
+        files=(
+            PreloadEntry(
+                path="docs/planning/lessons-learned.md",
+                ceiling_tokens=123,  # preload ceiling -- must NOT appear
+                stamp=True,
+            ),
+        ),
+        total_ceiling_tokens=10000,
+    )
+    _patch_cfg(
+        monkeypatch,
+        GuidanceConfig(
+            active_lessons_ceiling_tokens=9999,  # legacy ceiling -- MUST appear
+            preload=manifest,
+        ),
+    )
+    guidance_report.main(["--write-headers", "--repo-root", str(tmp_path)])
+    header = lessons.read_text(encoding="utf-8")
+    assert HEADER_BEGIN in header
+    assert "9,999" in header  # legacy pruning ceiling
+    assert "123" not in header  # NOT the preload residency ceiling
+
+
+def test_write_headers_no_manifest_stamps_set064_files(tmp_path, monkeypatch):
+    """Back-compat: with NO manifest, the legacy Set-064 two-file stamping
+    still applies (consumer repos are unaffected)."""
+    gdir = tmp_path / "docs" / "planning"
+    gdir.mkdir(parents=True)
+    lessons = gdir / "lessons-learned.md"
+    lessons.write_text("# L\n\n---\n\nbody\n", encoding="utf-8")
+    (gdir / "project-guidance.md").write_text("# G\n\n---\n\nbody\n", encoding="utf-8")
+    _patch_cfg(monkeypatch, GuidanceConfig())  # no manifest
+    guidance_report.main(["--write-headers", "--repo-root", str(tmp_path)])
+    assert HEADER_BEGIN in lessons.read_text(encoding="utf-8")
 
 
 # --- back-compat: --json legacy shape (R2 remediation I-085-S1-2) -------------

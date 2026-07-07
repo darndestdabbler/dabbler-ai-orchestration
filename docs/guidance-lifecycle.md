@@ -164,7 +164,13 @@ it does not edit the number. The `stamp: true` per-entry opt-in controls
 engine bootstrap files are never machine-stamped).
 
 Back-compat: a repo with no `preload:` block keeps exactly the two-file
-Set-064 behavior (universal core, gated extension).
+Set-064 behavior (universal core, gated extension). Only a
+**workspace-resolved** `router-config.yaml` (or one explicitly pointed
+at via `--repo-root` / `AI_ROUTER_CONFIG`) can declare a repo's preload
+contract — the package-bundled default config is never treated as a
+manifest source, so a pip-installed consumer with no config of its own
+stays on the legacy behavior instead of inheriting this repo's manifest
+(Set 085 S3).
 
 **Membership follows the required-reading contract (Set 085 S2).** The
 manifest bounds the per-session preload — in this repo:

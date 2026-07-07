@@ -140,7 +140,7 @@ whose trigger moment is situational, moved full-text to
   the resolved installed version at close, not just the declared floor.
 
 ## A Rollback Recipe Must Name A Registry-Live Version
-<!-- lesson: id="L-078-1" added-set="078" last-used-set="084" status="active" scope="portable" -->
+<!-- lesson: id="L-078-1" added-set="078" last-used-set="085" status="active" scope="portable" -->
 
 - "Decided in the repo" and "installable by an operator" are different
   facts: a rollback step naming a not-yet-published version fails at the

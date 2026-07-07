@@ -890,3 +890,80 @@ def test_write_headers_stamps_opt_in_manifest_file(repo, monkeypatch):
     guidance_report.main(["--write-headers", "--repo-root", str(repo)])
     assert HEADER_BEGIN in (repo / "a.md").read_text(encoding="utf-8")
     assert HEADER_BEGIN not in (repo / "sub" / "b.md").read_text(encoding="utf-8")
+
+
+# --- bundled-default guard (Set 085 S3) ---------------------------------------
+#
+# The packaged default router-config.yaml is the orchestration repo's own
+# file shipped as package-data; as of Set 085 it DECLARES that repo's
+# preload manifest. A pip-installed consumer with no workspace config must
+# not inherit it: a bundled-default resolution is "no config" for guidance
+# purposes (the documented no-manifest fail-open back-compat). Workspace /
+# env / explicit sources keep enforcing.
+
+
+def _patch_loader_source(monkeypatch, path: str, source: str) -> None:
+    import config as config_mod
+
+    monkeypatch.setattr(
+        config_mod,
+        "_resolve_config_path_and_source",
+        lambda p=None: (path, source),
+    )
+
+
+def test_bundled_default_resolution_is_no_config(monkeypatch):
+    import config as config_mod
+
+    bundled = str(config_mod._THIS_DIR / "router-config.yaml")
+    assert os.path.isfile(bundled)  # the packaged file really exists
+    _patch_loader_source(
+        monkeypatch, bundled, config_mod.CONFIG_SOURCE_BUNDLED_DEFAULT
+    )
+    assert guidance_report._resolve_config_path(None) is None
+
+
+def test_workspace_resolution_still_resolves(repo, monkeypatch):
+    import config as config_mod
+
+    _write_router_config(repo, "guidance: {}\n")
+    cfg_path = str(repo / "ai_router" / "router-config.yaml")
+    _patch_loader_source(
+        monkeypatch, cfg_path, config_mod.CONFIG_SOURCE_WORKSPACE
+    )
+    resolved = guidance_report._resolve_config_path(None)
+    assert resolved is not None
+    assert os.path.samefile(resolved, cfg_path)
+
+
+def test_env_resolution_still_resolves(repo, monkeypatch):
+    import config as config_mod
+
+    _write_router_config(repo, "guidance: {}\n")
+    cfg_path = str(repo / "ai_router" / "router-config.yaml")
+    _patch_loader_source(monkeypatch, cfg_path, config_mod.CONFIG_SOURCE_ENV)
+    resolved = guidance_report._resolve_config_path(None)
+    assert resolved is not None
+    assert os.path.samefile(resolved, cfg_path)
+
+
+def test_consumer_without_config_check_passes_on_legacy(
+    tmp_path, monkeypatch, capsys
+):
+    """The end-to-end consumer story: pip-installed package, no workspace
+    config anywhere, loader falls back to the bundled default (which
+    carries the orchestration repo's manifest) -> guidance_report --check
+    must pass on the legacy no-manifest path, NOT hard-fail on a foreign
+    manifest whose files exist only in the orchestration repo."""
+    import config as config_mod
+
+    bundled = str(config_mod._THIS_DIR / "router-config.yaml")
+    _patch_loader_source(
+        monkeypatch, bundled, config_mod.CONFIG_SOURCE_BUNDLED_DEFAULT
+    )
+    monkeypatch.chdir(tmp_path)  # a bare consumer cwd: no config, no docs
+    rc = guidance_report.main(["--check"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Preload manifest" not in out  # legacy report, no foreign manifest
+    assert "MISSING" not in out

@@ -1,0 +1,24 @@
+### 1. Scoping Judgment
+
+Unscoped.
+
+The current evidence assembly successfully omits the disallowed process manual, achieving the primary goal of the requirement. However, it also omits "the constitution," which the spec explicitly lists as required evidence.
+
+**Required Edit:** Add `session-constitution.md` to the evidence bundle.
+
+### 2. Constitution Inclusion
+
+The omission is the better state; do not add the constitution.
+
+**Reasoning:**
+The core requirement is to prevent "process-heavy critiques" by focusing the verifier on the concrete work (`diff`) vs. the concrete task (`spec`). The constitution, like the process manual, contains abstract principles separate from the direct task. Including it re-introduces the risk of dilution and encourages critiques based on procedural or philosophical alignment rather than task completion. Adhering to the "prefer removal over addition" principle, the current, leaner state better serves the requirement's intent, even if it deviates from its literal text. The spec's allow-list should be amended to remove the constitution.
+
+### 3. Residual Scoping Risks
+
+1.  **Issue:** The conventions block containing test/gate outcomes is optional.
+    *   **Severity:** Major
+    *   **Impact:** Omitting this file removes objective evidence of quality, forcing the verifier to judge correctness from the diff alone.
+
+2.  **Issue:** The whole-spec fallback loads the entire specification if a session excerpt isn't found.
+    *   **Severity:** Minor
+    *   **Impact:** For large specs, this can dilute the verifier's focus from the specific task of the session under review.

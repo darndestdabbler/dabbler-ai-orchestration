@@ -1,0 +1,24 @@
+### Next Session Set Recommendation
+
+1.  **Set 077: Finalize VS Code Extension UAT**
+    *   **Rationale:** Highest priority. This single session closes the release gates for a previous set (077), which is a critical engineering-hygiene task. Completing in-flight work takes precedence over starting new initiatives.
+    *   **Sizing:** 1 session.
+
+2.  **Set 086: Auth Preflight Resilience**
+    *   **Rationale:** Second priority. This addresses a known system-resilience gap (the Copilot CLI auth failure from Set 078 GAP-1) by creating a durable record. It is a discrete, high-value task that reduces operational risk.
+    *   **Sizing:** 1 session.
+
+### Cheapest-Capable Orchestrator Seat
+
+The recommended next work is the final session of **Set 077 (Finalize VS Code Extension UAT)**.
+
+*   **Engine:** Any
+*   **Effort Level:** Low
+*   **Model Class:** Mid-tier
+
+The task is to rewrite a checklist to a precise, literal, procedural format. This is a structured text-transformation task that does not require the reasoning or cost of a frontier model.
+
+### Sequencing Constraints
+
+There is a strong process-based sequencing constraint:
+*   The final session of **Set 077 must be completed first** to close its open release gates before any new set (e.g., Set 086) is started.

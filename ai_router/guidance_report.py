@@ -397,13 +397,28 @@ def _resolve_config_path(repo_root: Optional[str]) -> Optional[str]:
     try:
         try:
             from config import (  # type: ignore[import-not-found]
+                CONFIG_SOURCE_BUNDLED_DEFAULT,
                 _resolve_config_path_and_source,
             )
         except ImportError:
             from .config import (  # type: ignore[no-redef]
+                CONFIG_SOURCE_BUNDLED_DEFAULT,
                 _resolve_config_path_and_source,
             )
-        resolved, _src = _resolve_config_path_and_source(None)
+        resolved, src = _resolve_config_path_and_source(None)
+        # The PACKAGE-BUNDLED default config can never declare the
+        # consumer repo's preload contract: it is the orchestration
+        # repo's own file shipped as package-data, so its manifest paths
+        # (docs/session-constitution.md, ...) exist only in that repo.
+        # Honoring it here would make a pip-installed consumer with no
+        # workspace config inherit a foreign manifest resolved against
+        # site-packages -- every entry "missing", --check hard-failing.
+        # A bundled-default resolution is therefore "no config" for
+        # guidance purposes (fail-open legacy), exactly the documented
+        # no-manifest back-compat. Workspace / env / explicit sources
+        # keep enforcing.
+        if src == CONFIG_SOURCE_BUNDLED_DEFAULT:
+            return None
         return os.path.abspath(resolved) if os.path.isfile(resolved) else None
     except Exception:
         return None
@@ -630,17 +645,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     # the files measured come from one repo (I-085-S1-12). When that repo
     # has no config, config is absent (legacy for that repo) -- never the
     # cwd's config.
-    if args.repo_root:
-        _cfg_path = _resolve_config_path(args.repo_root)
-        try:
-            config = load_config(_cfg_path) if _cfg_path else None
-        except Exception:
-            config = None
-    else:
-        try:
-            config = load_config()
-        except Exception:
-            config = None
+    # Both branches resolve through _resolve_config_path so the
+    # bundled-default guard applies uniformly: with no workspace config,
+    # the packaged default (which carries the orchestration repo's own
+    # manifest) is never treated as this repo's preload declaration.
+    _cfg_path = _resolve_config_path(args.repo_root or None)
+    try:
+        config = load_config(_cfg_path) if _cfg_path else None
+    except Exception:
+        config = None
     cfg = load_guidance_config(config)
 
     # Manifest paths are repo-root-relative. When --repo-root is omitted,

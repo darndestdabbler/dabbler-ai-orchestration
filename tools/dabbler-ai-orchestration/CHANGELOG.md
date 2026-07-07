@@ -3,6 +3,31 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.40.0] — 2026-07-07 (Set 085 — scaffold bundle points sessions at the session constitution)
+
+> Template-bundle-only release accompanying `dabbler-ai-router 0.30.0`
+> (the preload manifest + ratcheting ceiling gate). No extension code
+> changes.
+
+### Changed
+
+- **(Set 085 S2) The scaffolded consumer-bootstrap bundle teaches the
+  slimmed per-session reading contract.** `engine-file.shared-body.md`
+  and `start-here.md.template` (and their shipped `dist/templates`
+  copies) now link the **session constitution**
+  (`docs/session-constitution.md` in the orchestration repo) as the
+  happy-path operating doc, and mark the full workflow doc as an
+  **on-demand** reference for rare branches instead of required
+  reading.
+
+### Rollback
+
+- Install `0.39.0` (confirmed live on the VS Code Marketplace,
+  published 2026-07-07): `code --install-extension
+  DarndestDabbler.dabbler-ai-orchestration@0.39.0`. Scaffolds produced
+  by 0.39.0 simply lack the constitution link; no state or config
+  migration is involved.
+
 ## [0.39.0] — 2026-07-07 (Sets 083 + 084 — mandatory verification in the scaffold bundle; identity, exclusion, stamped evidence, close backstop taught in the shipped docs)
 
 > The extension ships the consumer-bootstrap template bundle in the VSIX.

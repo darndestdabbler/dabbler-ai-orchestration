@@ -67,6 +67,114 @@
           "costUsd": 1.16115
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 0,
+      "stepKey": "session-003/s3.preload",
+      "dateTime": "2026-07-07T14:48:57.530405-04:00",
+      "description": "Slimmed-preload session start (live dogfood): read exactly constitution + project-guidance + active lessons + CLAUDE.md; keys confirmed; registered via start_session 14:42:31 EDT; prereqs (S1 gate green 10,673/12,000; S2 constitution+lifecycle) confirmed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-003/s3.assignment",
+      "dateTime": "2026-07-07T14:48:57.531405-04:00",
+      "description": "ai-assignment.md S3 block appended; next-set recommendation routed (gemini-pro, analysis, \\.004) saved raw at s3-next-set-analysis.txt: finish Set 077 UAT session first, then auth-preflight set.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "costUsd": 0.004119
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-003/s3.verifier-scope",
+      "dateTime": "2026-07-07T14:48:57.531405-04:00",
+      "description": "Verifier context audit: assemble_evidence/build_prompt feed spec excerpt + git status + full diff + optional conventions block into verification.md; NO process manual in the bundle -> no-change-needed (prefer removal over addition). Routed second opinion (gemini-pro, \\.005, s3-verifier-scope-audit.txt) concurs constitution omission is the better state; residuals adjudicated: optional conventions block = by-design (L-064-10 mandates it in guidance; no second enforcement surface), whole-spec fallback = Minor by-design fail-visible.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "taskType": "analysis",
+          "costUsd": 0.004547
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-003/s3.playbook",
+      "dateTime": "2026-07-07T14:50:52.204814-04:00",
+      "description": "Authored docs/guidance-slimming-playbook.md (repo-portable, engine-agnostic): measure -> admission-test classify -> prose->gate->archive demotion -> constitution -> manifest declaration (yaml mirrors live router-config) -> ratchet; consensus cheap-mistakes limits verbatim + latest-safe-point refinement; verifier-scope section; A/B signals (rounds/session, time-to-first-task-action, gate failures); anti-patterns. Constitution pointer table already references it (no stale pointer).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-003/s3.bundled-default-guard",
+      "dateTime": "2026-07-07T14:57:44.650499-04:00",
+      "description": "Release-prep audit found a Major portability defect in what 0.30.0 would ship: with no workspace config, the loader falls back to the PACKAGE-BUNDLED router-config.yaml (package-data), which since S1/S2 declares THIS repo's preload manifest -> a pip-installed consumer's guidance_report --check would hard-fail on foreign missing files. Fix: bundled-default resolution is now 'no config' for guidance purposes (guidance_report._resolve_config_path source guard + main() unified through it); workspace/env/explicit sources keep enforcing. 4 new tests (guard unit + workspace/env still-resolve + end-to-end consumer-no-config --check passes on legacy); 93 pass in the two gate test files; repo gate green from root and subdir. Documented in guidance-lifecycle.md back-compat paragraph.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-003/s3.release",
+      "dateTime": "2026-07-07T15:00:52.450932-04:00",
+      "description": "Release prep (publish awaits operator authorization): pyproject 0.29.0 -> 0.30.0 with CHANGELOG section (manifest machinery Added + bundled-default guard Fixed + rollback pinning registry-live 0.29.0); extension package.json 0.39.0 -> 0.40.0 with CHANGELOG (template-bundle-only: constitution link + workflow-doc on-demand; rollback names registry-live 0.39.0); repository-reference release-status rows flipped to 'Prepared, publish pending operator authorization' keeping registry-live versions named, and a 0.30.0+0.40.0 version-walk entry added (L-078-1 respected throughout).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-003/s3.suite",
+      "dateTime": "2026-07-07T15:06:34.838735-04:00",
+      "description": "Full pass green: pytest 2816 passed / 5 skipped (S2 baseline 2812 + the 4 new bundled-default-guard tests; skips pre-existing); npx tsc --noEmit clean; npm run test:unit 1270 passing (no extension code changes); guidance_report --check exit 0 (TOTAL 10,673/12,000, green from repo root and subdir); validate_guidance_meta OK (25 ids). Layer 3 Playwright not run by scope rule (L-064-12: no Explorer-rendering, state-writer, or fixture-harness changes).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "session-003/s3.verification-r1",
+      "dateTime": "2026-07-07T15:11:15.935585-04:00",
+      "description": "Verification round 1 (gpt-5-4, $0.18, orchestrator provider anthropic excluded): ISSUES_FOUND, 1 Major (I-085-S3-1): the audit's no-change-needed claim vs the spec sentence's literal five-item evidence list (constitution never fed; test/gate outcomes only via the optional conventions flag), plus a real nit that step-2's log entry overstated the split routed second opinion as 'concurs' (its top-line answer said Unscoped/Required-Edit; its reasoned answer 2 said omission is the better state). CORRECTION (this entry supplements, never edits, step 2): the routed artifact is internally split and is now cited as such. Remediation: s3-conventions.md rewritten to present the outcome as an explicit, operator-adjudicated deviation with provenance (the consensus-adopted scope list 'diff, test output, gate outcomes, spec' does not include the constitution; the spec sentence appended it at authoring time), the playbook attributes its scope list to the consult and flags constitution-feeding as an operator call, and the disposition will carry the adjudication packet. verify_session.py/templates remain deliberately untouched pending operator adjudication; the spec-sentence ambiguity is queued for the Step 9 review.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.18304
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-003/s3.verification-r2-stop",
+      "dateTime": "2026-07-07T15:18:24.148100-04:00",
+      "description": "Verification round 2 (gpt-5-4, $0.29): ISSUES_FOUND, 2 Major. (a) I-085-S3-1 re-asserted (spec sentence's literal five-item evidence list vs the consensus-adopted four-item scope; verifier requires a tool change or a spec change) - now an unfixed Major after two automatic rounds on a genuine spec-interpretation fork: per the constitution's bounded-round rule the loop STOPS TO THE OPERATOR; adjudication packet recorded in disposition.json (verifier_scope_adjudication, status pending-operator); no round 3; close_session not run; notification not fired. (b) I-085-S3-2 (sequencing, remediated): change-log.md spoke in completed tense before the disposition dogfood record and path-aware-critique.json existed - disposition.json now carries the full dogfood datapoint + adjudication (status requires_review), pull_critique launched to produce the artifact, change-log number-reconciliation nit fixed (65k six-doc baseline vs 92,719 full ratchet-start declaration). The activity-log 'concurs' nit was already corrected by the appended step-7 entry (append-only discipline).",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-4",
+          "taskType": "session-verification",
+          "costUsd": 0.2921
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-003/s3.path-aware-critique",
+      "dateTime": "2026-07-07T15:24:07.591758-04:00",
+      "description": "Required set-terminal path-aware critique produced via pull_critique (google gemini-2.5-pro + openai gpt-5.4, diff-base 5ce3b3a): gemini CLEAN (zero findings; explicitly verifies the bundled-default guard, fail-closed --check matrix, path containment, back-compat, tests); openai 2 Major - #1 artifact-missing is resolved-by-construction (the run reviewed the pre-artifact state and then wrote the artifact), #2 duplicates I-085-S3-1 (the operator-pending verifier-scope fork). No finding drives a new code change -> converged per L-070-1; per-finding adjudication recorded in disposition.json (path_aware_critique_adjudication). Lessons cited via cite_lessons --set 85: L-064-8, L-064-9, L-065-1, L-078-1; guidance gate re-run green after citation stamps.",
+      "status": "complete"
     }
   ]
 }

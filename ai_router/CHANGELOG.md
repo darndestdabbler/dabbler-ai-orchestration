@@ -3,6 +3,64 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.30.0] — 2026-07-07 (Set 085 — preload manifest + ratcheting ceiling gate; guidance slimming)
+
+The router half of the Set 085 guidance-slimming release: the preload
+manifest machinery consumer repos need to adopt
+`docs/guidance-slimming-playbook.md`.
+
+### Added
+
+- **Preload manifest in the `guidance:` config block**
+  (`guidance_config.py`): an optional `preload:` mapping — `files:` (a
+  list of `{path, ceiling_tokens, stamp}` entries, repo-root-relative)
+  plus `total_ceiling_tokens` — declaring every file the workflow
+  requires in context at session start, each with a per-file token
+  ceiling. Absent manifest → exactly the two-file Set-064 behavior
+  (legacy keys keep working; back-compat is byte-identical, including
+  the `--json` shape).
+- **`guidance_report` reports and gates the manifest.** Every entry is
+  reported per-file and in total against its ceiling
+  (`ceil(chars / 4)` proxy); `--check` exits non-zero on any per-file
+  or total breach with a remediation line naming the file and overage,
+  and treats a listed-but-missing file as a hard failure. Fail-closed
+  throughout: a declared-but-malformed manifest, an unparseable config,
+  a misplaced top-level `preload:` key, or a config that fails env-key
+  validation for unrelated reasons (raw-parse recovery) all fail
+  `--check` rather than silently reverting to legacy. Manifest paths
+  are containment-checked (no escape above the repo root) and resolve
+  from any working directory. Ceilings **ratchet down only** — raising
+  one is an operator-authorized config edit with a stated reason
+  (`docs/guidance-lifecycle.md`).
+- **`--write-headers` is opt-in per entry** (`stamp: true`, default
+  false): canonical docs and the engine bootstrap files are never
+  machine-stamped.
+- **CI gate:** the repo test workflow and the documented pre-commit
+  pass run `guidance_report --check`, making the ceiling the
+  anti-rebloat mechanism — at ceiling, adding prose requires removing
+  prose.
+
+### Fixed
+
+- **The package-bundled default config is never a manifest source**
+  (S3, found in release prep). The packaged `router-config.yaml` is the
+  orchestration repo's own file and now declares that repo's preload
+  manifest; without a guard, a pip-installed consumer with **no**
+  workspace config would inherit it via the bundled-default fallback
+  and `guidance_report --check` would hard-fail on files that exist
+  only in the orchestration repo. Bundled-default resolution is now
+  treated as "no config" for guidance purposes (fail-open legacy);
+  workspace / `--repo-root` / `AI_ROUTER_CONFIG` sources keep
+  enforcing.
+
+### Rollback
+
+- Pin `dabbler-ai-router==0.29.0` (confirmed live on PyPI, published
+  2026-07-07). No state-file or config migration is involved: a repo
+  that has not declared a `preload:` block is unaffected in both
+  directions; a repo that has declared one simply loses the gate
+  (0.29.0 ignores the unknown key) until re-upgrade.
+
 ## [0.29.0] — 2026-07-07 (Sets 083 + 084 — verify_session CLI, verification-integrity gate, mandatory verification; identity + dynamic exclusion, stamped evidence, the close backstop)
 
 > Combined release. Set 083's changes below never reached PyPI on their own

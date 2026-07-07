@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "085-guidance-slimming-and-preload-ceilings",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-07-07T15:22:45.294147-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Reviewed the Set 085 code and close-prep artifacts: ai_router/guidance_report.py, ai_router/guidance_config.py, ai_router/router-config.yaml, the new pytest suite, guidance-lifecycle/playbook/repository-reference docs, spec.md, change-log.md, disposition.json, and the session-set directory contents. I also checked the on-disk session-set root against the required path-aware-critique contract and the verifier-scope claims against the actual repository state.",
+      "findings": [
+        {
+          "description": "Violation: the set is configured with `pathAwareCritique: required` in `docs/session-sets/085-guidance-slimming-and-preload-ceilings/spec.md`, and the process docs say the set-terminal close requires a saved `path-aware-critique.json` artifact at the session-set root (`docs/path-aware-critique-schema.md`: `docs/session-sets/<slug>/path-aware-critique.json`; `docs/ai-led-session-workflow.md`: a valid `path-aware-critique.json` artifact exists at the session-set root). Impact: this branch cannot satisfy the required close gate as-is, and the review trail is internally misleading because both `change-log.md` and `disposition.json` list `docs/session-sets/085-guidance-slimming-and-preload-ceilings/path-aware-critique.json` as a produced/changed deliverable even though the file is absent on disk. That changes the merge/close decision: the set is not actually ready for required close-out. Evidence: `list_dir` of `docs/session-sets/085-guidance-slimming-and-preload-ceilings/` shows no `path-aware-critique.json`, and attempting to read that path returns ENOENT, while `change-log.md` and `disposition.json` both claim the artifact. Fix: run the required multi-provider critique, save the raw artifact at the session-set root, and update the close-prep docs to match the real on-disk state.",
+          "severity": "Major",
+          "category": "completeness"
+        },
+        {
+          "description": "Violation: Session 3 Step 1 in `docs/session-sets/085-guidance-slimming-and-preload-ceilings/spec.md` says verifier evidence should be `the diff, test output, gate outcomes, the spec, and the constitution`, but the close-prep artifacts explicitly document a no-code-change outcome where `the constitution is deliberately not fed` and the conventions block carrying test/gate outcomes is only provided by an optional file (`s3-conventions.md`). Impact: the repository is shipping with an unresolved contract drift on a load-bearing verification surface; a reviewer cannot tell from the code/docs whether the intended verifier bundle includes the constitution and guaranteed test/gate evidence, so the set's claimed verifier-scope audit is not actually settled. That is merge-blocking because this set's own disposition marks the issue as `pending-operator` and `requires_review`, yet the change-log presents the audit outcome as delivered. Evidence: `disposition.json`'s `verifier_scope_adjudication` states the finding is still pending operator decision; `change-log.md` says `the constitution is deliberately not fed`; and the spec's Session 3 Step 1 still requires `the constitution`. Fix: either amend the governing spec/docs to match the shipped verifier scope, or change the verifier assembly/code path so the constitution and guaranteed conventions evidence are actually included.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the changes for the \"Guidance Slimming And Preload Ceilings Spec\" (set 085). My review focused on the new preload manifest functionality, the associated ratcheting ceiling gate, the portability fix for bundled configurations, and related documentation updates. I inspected the core logic in `ai_router/guidance_report.py` and `ai_router/guidance_config.py`, the new test suite in `ai_router/tests/test_guidance_preload_manifest.py`, the CI workflow update in `.github/workflows/test.yml`, and the configuration change in `ai_router/router-config.yaml`.\n\nThe implementation appears robust and well-tested. Key claims from the specification and change-log hold up to scrutiny:\n1.  **Portability Fix:** The logic in `ai_router.guidance_report._resolve_config_path` correctly identifies when the bundled-default configuration is being used and treats it as \"no config\" for guidance purposes, preventing failures in consumer repositories.\n2.  **Fail-Closed Gate:** The `--check` command is thoroughly fail-closed. It correctly handles missing configuration files, unparseable YAML, malformed manifest entries (e.g., missing paths), misplaced `preload` keys, and failures in the main config loader by using a raw YAML parse as a fallback for enforcing the gate.\n3.  **Path Safety:** Path handling is secure, with both lexical and symlink-aware checks (`_path_escapes_root`, `_resolved_escapes_root`) to ensure manifest paths do not escape the repository root.\n4.  **Backward Compatibility:** The changes maintain backward compatibility for repositories without a `preload` manifest. The code paths correctly fall back to the legacy two-file behavior, and the JSON output remains byte-identical.\n5.  **Comprehensive Tests:** The new test file `test_guidance_preload_manifest.py` is extensive. It covers a wide range of success and failure scenarios, including various configuration errors, path validation edge cases (e.g., different path separators, symlinks), and the nuances of the `--write-headers` and `--check` flags.\n\nThe changes are internally consistent, and the implementation aligns with the documentation and changelog descriptions. I found no significant issues.",
+      "findings": []
+    }
+  ]
+}

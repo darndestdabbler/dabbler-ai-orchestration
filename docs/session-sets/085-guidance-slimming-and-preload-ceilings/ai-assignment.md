@@ -82,3 +82,21 @@ applied: the routed suggestion to verify with an Anthropic model is
 overridden by the mandatory cross-provider machinery (the verifier
 excludes the orchestrator's effective provider — Set 084); verification
 routing is not an orchestrator choice.
+
+## Session 3 of 3 — Verifier evidence scope, playbook, live dogfood, release (F4)
+
+Orchestrator: **claude / anthropic / claude-fable-5 / high** (operator's
+model choice; the routed S2 recommendation was claude/anthropic @
+medium, Sonnet-class — the operator kept the same seat that ran S2,
+which also holds the orchestrator seat constant for the set's dogfood
+datapoint).
+
+| Step | Handled by | Rationale |
+| :--- | :--- | :--- |
+| Verifier context audit (s3.verifier-scope) | Facts: orchestrator (direct reads of `verify_session.py` + `verification.md`); judgment: **routed — analysis** | Delegation discipline: the scoped/unscoped verdict is reasoning and gets an independent second opinion (saved raw at `s3-verifier-scope-audit.txt`); the code reads are mechanics. |
+| Author `docs/guidance-slimming-playbook.md` (s3.playbook) | Orchestrator (direct) | Content fully determined by the spec, the 2026-07-07 consensus synthesis (verbatim limits), and the shipped S1/S2 machinery the doc describes; whole-context coherence (S1/S2 precedent); the mandatory cross-provider verification is the quality gate. |
+| Live dogfood (s3.dogfood) | Orchestrator execution | By design: the session itself, run from the slimmed preload, is the datapoint. |
+| Release prep (s3.release) | Orchestrator (direct) | Mechanical version/changelog/manifest edits; publishing is operator-authorized, never in-session. |
+| **Session verification (Step 6)** | **Routed — cross-provider, non-anthropic** | Mandatory no-skip cross-provider check (Set 083/084). |
+| End-of-set path-aware critique | **Routed — multi-provider (>= 2 providers)** | `pathAwareCritique: required`; template-driven, saved raw. |
+| Next-set recommendation | **Routed — analysis (gemini-pro, $0.004)** | Rule 17: never self-opine. Saved raw at `s3-next-set-analysis.txt`. |

@@ -100,3 +100,24 @@ datapoint).
 | **Session verification (Step 6)** | **Routed — cross-provider, non-anthropic** | Mandatory no-skip cross-provider check (Set 083/084). |
 | End-of-set path-aware critique | **Routed — multi-provider (>= 2 providers)** | `pathAwareCritique: required`; template-driven, saved raw. |
 | Next-set recommendation | **Routed — analysis (gemini-pro, $0.004)** | Rule 17: never self-opine. Saved raw at `s3-next-set-analysis.txt`. |
+
+### Actuals
+- Orchestrator used: claude / anthropic / claude-fable-5 @ effort=high
+  (operator kept the S2 seat; routed S2 recommendation was
+  Sonnet-class @ medium — deviation noted, holds the seat constant for
+  the set's dogfood datapoint).
+- Routed cost: $0.484 metered in router-metrics (analyses $0.009;
+  verification R1 $0.183 + R2 $0.292); the pull_critique tool-loop is
+  not metered in router-metrics.jsonl.
+- Deviations from plan: one unplanned in-scope fix (the bundled-default
+  manifest guard, a Major portability defect found during release
+  prep); verification stopped at the bounded-round rule on the
+  verifier-scope spec-interpretation fork (I-085-S3-1) — adjudication
+  packet in `disposition.json`, session closed pending the operator's
+  call rather than a third round; releases prepared but unpublished
+  (operator authorization required).
+- Next-set recommendation (routed, gemini-pro, raw at
+  `s3-next-set-analysis.txt`): finish Set 077's remaining UAT-checklist
+  session first (1 session; closes 077's open release gates; any
+  engine, low effort, mid-tier model), then an auth-preflight set for
+  the Set 078 GAP-1 durable record (1 session).

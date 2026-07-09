@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 6,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The `start_session` preflight check incorrectly blocks a correctly authenticated Copilot seat if the operator omits the optional `--model` flag.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The task requires wiring the auth preflight into `start_session` to \"block a mis-authed copilot-cli seat\". The current implementation blocks a correctly authed seat under normal usage.\n    - **Impact:** An operator running a standard command like `python -m ai_router.start_session --engine copilot` (without `--model`) will have their session blocked by a preflight failure. The preflight module has a sensible default model for its probe, but the `start_session` wiring prevents that default from ever being used, instead forcing a probe against an invalid empty-string model (`model=\"\"`). This makes the feature unusable in its default configuration and will create user confusion, as the seat is fine but the preflight reports an error. A reasonable reviewer would require this to be fixed before merge.\n    - **Evidence:** The call site in `ai_router/start_session.py` is:\n      ```python\n      result = run_preflight(\n          model=getattr(args, \"model\", None) or \"\",\n          run_live_probe=run_live_probe,\n      )\n      ```\n      If the `--model` flag is not provided to `start_session`, `getattr(args, \"model\", None)` is `None`, and the expression evaluates to `\"\"`. This forces the preflight to run with `model=\"\"`. The preflight module's own default (`DEFAULT_PROBE_MODEL`) is ignored. The CLI transport will then fail when dispatching to `copilot ... --model \"\" ...`, causing the preflight to fail and block a valid session.\n      The fix is to allow the preflight module's default to be used, for instance by not passing the `model` argument at all when it's not specified on the command line.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

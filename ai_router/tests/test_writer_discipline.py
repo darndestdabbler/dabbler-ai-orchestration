@@ -217,3 +217,46 @@ def test_scan_writer_bypass_set_slug_filter(tmp_path):
     reports = scan_writer_bypass(set_slug="dirty", workspace_root=tmp_path)
     assert len(reports) == 1
     assert reports[0].set_slug == "dirty"
+
+
+# ---------------------------------------------------------------------------
+# Set 086 S1 — require_ledger strict mode (fail loud on missing/unreadable)
+# ---------------------------------------------------------------------------
+
+from ai_router.writer_discipline import (  # noqa: E402
+    REASON_LEDGER_ABSENT,
+    REASON_LEDGER_EMPTY,
+    REASON_LEDGER_UNREADABLE,
+)
+
+
+def test_require_ledger_absent_is_high(tmp_path):
+    state_file = _make_state_file(tmp_path)
+    reports = detect_writer_bypass(read_session_state(state_file), require_ledger=True)
+    assert len(reports) == 1
+    assert reports[0].severity == "high"
+    assert reports[0].reason == REASON_LEDGER_ABSENT
+    # Default mode still skips (back-compat with the historical scan).
+    assert detect_writer_bypass(read_session_state(state_file)) == []
+
+
+def test_require_ledger_empty_is_high(tmp_path):
+    state_file = _make_state_file(tmp_path)
+    state_file.with_name("session-events.jsonl").write_text("", encoding="utf-8")
+    reports = detect_writer_bypass(read_session_state(state_file), require_ledger=True)
+    assert len(reports) == 1
+    assert reports[0].reason == REASON_LEDGER_EMPTY
+    assert detect_writer_bypass(read_session_state(state_file)) == []
+
+
+def test_require_ledger_unreadable_is_high(tmp_path):
+    # Round-5 finding: an existing-but-unreadable ledger must fail loud, not
+    # skip. A directory in the ledger's place raises OSError on open().
+    state_file = _make_state_file(tmp_path)
+    (state_file.with_name("session-events.jsonl")).mkdir()
+    reports = detect_writer_bypass(read_session_state(state_file), require_ledger=True)
+    assert len(reports) == 1
+    assert reports[0].severity == "high"
+    assert reports[0].reason == REASON_LEDGER_UNREADABLE
+    # Default mode still skips.
+    assert detect_writer_bypass(read_session_state(state_file)) == []

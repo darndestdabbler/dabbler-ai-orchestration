@@ -1603,6 +1603,35 @@ def run(
     # flip all use the same resolved value.
     verdict: Optional[str] = resolve_close_verdict(disposition)
 
+    # Set 086 S1: reject a non-verdict token BEFORE any event is emitted or
+    # any state is flipped. The blessed writer (_flip_state_to_closed) raises
+    # on the same value as a hard guarantee, but the success event fires
+    # before the flip, so catching it here keeps the failure clean (no
+    # "succeeded" event followed by an aborted flip). Tolerates the shipped
+    # extension tokens readers prefix-match; rejects the incident's
+    # confabulated 'manual-override-development'. Applies on every close path
+    # including --force (force bypasses bookkeeping gates, not evidence).
+    try:
+        from session_state import (  # type: ignore[import-not-found]
+            normalize_verification_verdict,
+            validate_verification_verdict,
+        )
+    except ImportError:
+        from .session_state import (  # type: ignore[no-redef]
+            normalize_verification_verdict,
+            validate_verification_verdict,
+        )
+    _verdict_error = validate_verification_verdict(verdict)
+    if _verdict_error is not None:
+        outcome.result = "invalid_invocation"
+        outcome.messages.append(_verdict_error)
+        return outcome
+    # Canonicalize the accepted verdict so the closeout_succeeded event AND the
+    # snapshot flip both persist the exact blessed token (Round-4 finding):
+    # exact-match readers (the extension's `verdict === "VERIFIED"`) depend on
+    # the canonical spelling, and this value flows to both emitters.
+    verdict = normalize_verification_verdict(verdict)
+
     # Note: ``--force`` is hard-scoped (Set 9 Session 3, D-2) — the
     # env-var gate and ``--reason-file`` requirement are validated by
     # ``_validate_args`` above. By the time we reach here the operator

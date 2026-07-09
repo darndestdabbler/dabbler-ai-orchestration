@@ -1056,6 +1056,122 @@ def _read_budget_yaml(project_root: str) -> Tuple[Optional[dict], str]:
     return data, ""
 
 
+def _check_session_ledger_present(session_set_dir: str) -> GateOutcome:
+    """Ledger axis of the verification-integrity gate (Set 086 S1).
+
+    A Full-tier close must be corroborated by a real router-written events
+    ledger (``session-events.jsonl``, created by ``start_session`` and
+    appended by every blessed writer). Its **absence** is the one signature a
+    fully-simulated session leaves — no canonical writer ever ran — and it is
+    exactly the case ``writer_discipline`` historically *skipped*. Here we opt
+    into its strict ``require_ledger=True`` mode so an absent or empty ledger
+    is a HIGH finding that fails the close loud.
+
+    Orthogonal to the verdict/stamp axis (a hand-forged stamp can look
+    corroborated while the ledger is absent), so this runs FIRST and
+    short-circuits — one message, the root cause, never two. Guards are
+    inherited from the caller: Lightweight is inert (its own early-out) and
+    ``--manual-verify`` swaps this whole gate for the vocabulary check, so the
+    ledger axis never fires on either sanctioned no-ledger path. ``--no-router``
+    is deliberately NOT consulted: this sub-check only *inspects*, so skipping
+    under it would reopen the very bypass being closed (gate-placement
+    decision C: docs/session-sets/086.../s1-gate-placement-architecture.json).
+    """
+    try:
+        try:
+            from .writer_discipline import (  # type: ignore[import-not-found]
+                REASON_LEDGER_ABSENT,
+                REASON_LEDGER_EMPTY,
+                REASON_LEDGER_UNREADABLE,
+                detect_writer_bypass,
+                read_session_state as wd_read_state,
+            )
+        except ImportError:
+            from writer_discipline import (  # type: ignore[no-redef]
+                REASON_LEDGER_ABSENT,
+                REASON_LEDGER_EMPTY,
+                REASON_LEDGER_UNREADABLE,
+                detect_writer_bypass,
+                read_session_state as wd_read_state,
+            )
+        from pathlib import Path as _Path
+
+        state_file = _Path(session_set_dir) / "session-state.json"
+        view = wd_read_state(state_file)
+        if view is None:
+            # wd_read_state collapses "absent" and "present-but-unreadable"
+            # to None. Distinguish them (Round-5 class): a state file that
+            # EXISTS but cannot be read/parsed must fail closed — an unreadable
+            # snapshot cannot corroborate a router-executed session any more
+            # than an unreadable ledger can. A genuinely ABSENT state file is
+            # the api-evidence branch's / disposition-present gate's job (they
+            # fail closed with a clearer message), so pass it through here.
+            if state_file.exists():
+                raise OSError(
+                    "session-state.json is present but could not be read/parsed"
+                )
+            return True, ""
+        reports = detect_writer_bypass(view, require_ledger=True)
+    except Exception as exc:
+        # Fail CLOSED (Round-1 finding): this ledger axis is a security gate
+        # for the very set that adds it. An import OR a runtime failure of the
+        # detector must NOT silently disarm it (that is exactly the fail-open
+        # hole this set exists to remove) — block the close with a diagnostic.
+        # The whole read+detect path is inside this try so no exception path
+        # can convert to a silent pass. The operator can fix the ai_router
+        # install, or use the sanctioned --manual-verify (attested) /
+        # Lightweight escapes.
+        return (
+            False,
+            "verification_integrity ledger check could not run "
+            f"({type(exc).__name__}: {exc}); failing closed rather than "
+            "skipping the router-ledger evidence check. Fix the ai_router "
+            "install, or use --manual-verify for an attested close.",
+        )
+
+    # Scope: this gate owns the LEDGER-ABSENCE axis only (the fully-simulated
+    # signature). A pure mtime-divergence report is the standalone D3
+    # detector's separate concern; wiring divergence-blocking into close would
+    # be a far broader behavior change (any legitimate out-of-tolerance write
+    # pattern would block) and is out of Set 086's scope. Ignore it here.
+    absence = [
+        r for r in reports
+        if r.reason in (
+            REASON_LEDGER_ABSENT, REASON_LEDGER_EMPTY, REASON_LEDGER_UNREADABLE
+        )
+    ]
+    if not absence:
+        return True, ""
+
+    reason = absence[0].reason
+    command = _verify_session_command(session_set_dir)
+    if reason == REASON_LEDGER_ABSENT:
+        detail = (
+            "no session-events.jsonl ledger exists next to session-state.json"
+        )
+    elif reason == REASON_LEDGER_EMPTY:
+        detail = (
+            "session-events.jsonl exists but carries no canonical-writer event"
+        )
+    else:  # REASON_LEDGER_UNREADABLE
+        detail = (
+            "the session-state file or session-events.jsonl ledger could not "
+            "be read/stat'ed (unreadable, permission-denied, or not a file)"
+        )
+    return (
+        False,
+        f"missing verification evidence (severity: HIGH) -- {detail}. A "
+        "Full-tier close requires a router-written events ledger (created by "
+        "start_session) as proof a real writer executed this session; its "
+        "absence means the session was fully simulated or the state file was "
+        "hand-authored. Re-run the session through the real (authenticated) "
+        f"router so start_session/close_session write the ledger, then verify "
+        f"via: {command}. If this set is genuinely Lightweight, declare "
+        "'tier: lightweight' in spec.md; if this is an authorized manual "
+        "close, re-run with --manual-verify (attested, logged).",
+    )
+
+
 def check_verification_method_vocabulary(
     session_set_dir: str,
     disposition: Optional[Disposition],
@@ -1184,6 +1300,18 @@ def check_verification_integrity(
     # (Set 057 Q6 / Set 077); this Full-tier per-session gate is inert.
     if _set_is_lightweight(session_set_dir):
         return True, ""
+
+    # Layer 2a — ledger axis (Set 086 S1). Orthogonal to the verdict/stamp
+    # axis below and checked FIRST with a short-circuit: a fully-simulated
+    # session leaves a corroborated-looking verdict but no router ledger, so
+    # the ledger absence is the loudest, root-cause signal. Runs on the Full,
+    # non-manual path only (Lightweight already returned; --manual-verify
+    # swaps this gate out at the caller).
+    ledger_passed, ledger_remediation = _check_session_ledger_present(
+        session_set_dir
+    )
+    if not ledger_passed:
+        return False, ledger_remediation
 
     # Layer 2 — evidence. Per-session cross-provider verification is
     # MANDATORY on Full tier (Set 083 S3 operator decision; the Set 068

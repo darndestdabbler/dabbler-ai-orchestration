@@ -58,7 +58,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   2026-05-01 to avoid duplicate guidance drifting in two places.
 
 ## State The Suite Baseline And Release Contract Up Front In Verification Round 1
-<!-- lesson: id="L-064-10" added-set="062" last-used-set="085" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-10" added-set="062" last-used-set="086" status="archived" scope="portable" -->
 
 - **Promoted.** This lesson now lives at `project-guidance.md` →
   Conventions → Workflow Expectations: *"Open every session-verification
@@ -119,7 +119,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   per-session routed verification had missed.
 
 ## A Bug Is A Bug CLASS — Fix Every Sibling Site, Not Just The Reported One
-<!-- lesson: id="L-069-1" added-set="069" last-used-set="085" status="archived" scope="portable" -->
+<!-- lesson: id="L-069-1" added-set="069" last-used-set="086" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-19**
   after application across Sets 068 (origin: the `contract_gate` `UnicodeError` fix),

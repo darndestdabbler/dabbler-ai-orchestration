@@ -1,0 +1,73 @@
+{
+  "sessionSetName": "086-verification-verdict-token-legibility",
+  "createdDate": "2026-07-09T10:46:48.661512+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-09T10:46:48.661512+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/preflight-built",
+      "dateTime": "2026-07-09T07:20:21.831807-04:00",
+      "description": "Built ai_router/copilot_preflight.py: staged binary->credential->live-probe auth check classified through the transport error_class taxonomy, injectable seams (which/credential-dir/spawner), CLI + JSON output.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/preflight-wired",
+      "dateTime": "2026-07-09T07:20:21.832232-04:00",
+      "description": "Wired preflight into start_session before register_session_start: blocks a mis-authed copilot-cli seat; the live auth probe runs on EVERY start including idempotent re-entry (repo state is not proof of current seat auth; Round-2 fix removed the earlier re-entry skip); no-op on direct-API and --no-router; a missing model falls back to the module default rather than probing an empty --model.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/gate-placement-routed",
+      "dateTime": "2026-07-09T07:20:21.832232-04:00",
+      "description": "Routed architecture decision (tier 3) on close fail-loud gate placement; ruled: ledger sub-check inside check_verification_integrity delegating to writer_discipline require_ledger, no_router NOT consulted. Saved raw.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/close-fail-loud",
+      "dateTime": "2026-07-09T07:20:21.832232-04:00",
+      "description": "Added require_ledger=True mode to writer_discipline (absent/empty ledger -> HIGH) and a ledger sub-check in check_verification_integrity (Full, non-manual; scoped to ledger-absence, short-circuits before the verdict axis).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/verdict-validation",
+      "dateTime": "2026-07-09T07:20:21.832232-04:00",
+      "description": "Added verdict-token validation + normalization at the blessed writer: EXACT allowlist (canonical + shipped extension token ISSUES_FOUND_RESOLVED_IN_FLIGHT), case-insensitive; a prefix look-alike like VERIFIED_NOT_REALLY is rejected, not tolerated; accepted non-canonical spellings are canonicalized before persist; _flip_state_to_closed, register_typed_session_handoff and mark_session_complete all normalize (L-069-1 siblings); close_session.run blocks/normalizes before the success event. Rejects manual-override-development.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/repair-helper-decision",
+      "dateTime": "2026-07-09T07:20:21.833527-04:00",
+      "description": "Decided one-shot repair-helper OUT (deferred per spec non-goal); manual remediation recipe recorded (re-verify via router, close via --repair, never a hand edit).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/tests",
+      "dateTime": "2026-07-09T07:20:21.833527-04:00",
+      "description": "Added pytest: test_copilot_preflight (8), ledger-axis (5) and verdict-validation (5) in the gate/verdict suites, start_session preflight wiring (4); fixed _make_gate_set to carry a realistic ledger.",
+      "status": "complete"
+    }
+  ]
+}

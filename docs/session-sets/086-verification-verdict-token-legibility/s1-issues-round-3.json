@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Verdict validation still allows arbitrary invented strings that merely start with a blessed prefix\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Location:** `ai_router/session_state.py` (`_TOLERATED_VERDICT_PREFIXES`, `is_tolerated_verdict_token()`, `validate_verification_verdict()`); enforced by `ai_router/close_session.py` and `_flip_state_to_closed()`\n  - **Details:**\n    - **Violation:** The task required: **“reject a non-verdict token on the active-set close path; tolerate shipped extension tokens”** and to end with **“a non-verdict token cannot persist into verificationVerdict.”** The implementation does not enforce that boundary; it accepts any string whose normalized form merely *starts with* `VERIFIED`, `ISSUES_FOUND`, or `WAIVED`.\n    - **Impact:** The new safety net is bypassable. A confabulating writer can still persist invented tokens like `VERIFIED_NOT_REALLY`, `ISSUES_FOUNDATION`, or `WAIVEDoops`, and they will be treated as valid by the new validator. That is a merge-blocking integrity hole because this session’s core purpose was to stop fabricated verdict tokens from reaching `verificationVerdict`.\n    - **Evidence:** `is_tolerated_verdict_token()` is:\n      ```python\n      _TOLERATED_VERDICT_PREFIXES = (\"VERIFIED\", \"ISSUES_FOUND\", \"WAIVED\")\n      ...\n      return any(norm.startswith(prefix) for prefix in _TOLERATED_VERDICT_PREFIXES)\n      ```\n      `validate_verification_verdict()` accepts anything that passes that predicate, and both `close_session.run()` and `_flip_state_to_closed()` rely on that validator before persisting. So the code rejects `manual-override-development`, but still admits many other non-verdict strings solely because they share a prefix.\n  - **Fix:** Whitelist exact canonical verdict tokens plus the exact shipped extension tokens that are intentionally supported, or at minimum require delimiter-bounded forms rather than raw `startswith()` on arbitrary strings.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

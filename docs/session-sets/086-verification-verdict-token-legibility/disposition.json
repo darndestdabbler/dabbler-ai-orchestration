@@ -1,0 +1,54 @@
+{
+  "status": "completed",
+  "summary": "Set 086 Session 1 (router-side enforcement, the safety net): shipped the prevention + fail-loud + validation layer so a Full-tier session on an unauthenticated Copilot-CLI seat cannot report verification that did not happen. FOUR deliverables. (1) Auth-preflight: new ai_router/copilot_preflight.py (binary -> credential -> live-probe, each classified through the transport's existing error_class taxonomy; injectable which/credential_dir/spawner so the real CLI is never touched), wired into start_session BEFORE any state write. The live probe runs on EVERY start including idempotent re-entry (repo state is not proof of current seat auth); no-op on the direct-API path and under --no-router; a missing model falls back to the module default rather than probing an empty --model; identity-helper unavailability fails CLOSED via the known copilot seat-label fallback. (2) Close fail-loud on missing evidence: writer_discipline.detect_writer_bypass gains opt-in require_ledger=True (absent / empty / UNREADABLE ledger each -> one HIGH report; default False preserves the historical standalone scan), and gate_checks.check_verification_integrity gains a ledger sub-check that runs FIRST with short-circuit on the Full, non-manual path. Gate placement was decided by a routed tier-3 architecture delegation (s1-gate-placement-architecture.json): inside the existing gate, delegating detection to writer_discipline, scoped to ledger-absence (mtime-divergence deliberately NOT wired in), and NOT consulting --no-router (that would reopen the bypass). Every error path (import, OSError stat/read, unreadable/unparseable state file) fails CLOSED. (3) Verdict-token validation + normalization at the blessed writer: session_state.validate_verification_verdict / is_tolerated_verdict_token / normalize_verification_verdict use an EXACT allowlist (canonical VERIFIED/ISSUES_FOUND/WAIVED + the exact shipped extension token ISSUES_FOUND_RESOLVED_IN_FLIGHT), case-insensitively -- a prefix look-alike like VERIFIED_NOT_REALLY is REJECTED, not tolerated (readers stay lenient/prefix-match, the writer is strict); accepted non-canonical spellings are canonicalized before persist. Applied to ALL THREE verdict-writer siblings (_flip_state_to_closed, register_typed_session_handoff, mark_session_complete; L-069-1) plus an early clean block in close_session.run before the success event; schema note updated. (4) One-shot repair-helper: DEFERRED per the spec non-goal (rewriting closed-set state files contradicts blessed-writers-only and the verdict validation this set adds); manual remediation recipe = re-verify via the real router then close via --repair, never a hand edit. Tests: new test_copilot_preflight.py (9) + ledger-axis and require_ledger coverage + verdict reject/tolerate/normalize + fail-closed regressions + start_session wiring; test_orchestrator_identity._make_gate_set now carries a realistic ledger (a real Full-tier set always has one). Suite: pytest 2848+ passed / 5 skipped (final clean run). Verification (mandatory cross-provider, no skip): EIGHT rounds. gpt-5-4 R1 (2 Major, fail-open on preflight+ledger import errors), R2 (1 Major, re-entry skipped the auth probe), R3 (1 Major, verdict prefix-match too loose), R4 (1 Major, verdict not normalized), R5 (1 Major, OSError fail-open in the detector) -- each a genuine, distinct, AGREED Major, fixed, and R5 triggered an L-069-1 completeness sweep closing the whole fail-open class + all verdict-writer siblings. Per the operator's in-session rule refinement (continue while findings are agreed Critical/Major and being fixed; stop only on Minor-only convergence or genuine disagreement), rounds continued past the default two-round cap. R6 (openai 429 rate-limit -> per the escalation ladder, fell back to the remaining cross-provider verifier gemini-pro via verify_session's route_fn seam) found 1 Major (an `or \"\"` model coercion; impact was actually guarded upstream by _refuse_unresolvable_identity, fixed defensively). R7 (gemini) found 2 real Majors that were doc-staleness in MY OWN evidence artifacts (the conventions file + activity-log still described the pre-R2/pre-R3 behavior -- L-064-8); corrected both to match the shipped code. R8 (gemini): VERIFIED, zero findings. verify_session's cross-provider guarantee held throughout (anthropic excluded as the orchestrator's effective provider; openai excluded only for the rate-limited fallback rounds).",
+  "files_changed": [
+    "ai_router/copilot_preflight.py",
+    "ai_router/start_session.py",
+    "ai_router/writer_discipline.py",
+    "ai_router/gate_checks.py",
+    "ai_router/session_state.py",
+    "ai_router/close_session.py",
+    "ai_router/schemas/session-state.schema.json",
+    "ai_router/tests/test_copilot_preflight.py",
+    "ai_router/tests/test_start_session.py",
+    "ai_router/tests/test_writer_discipline.py",
+    "ai_router/tests/test_verification_integrity_gate.py",
+    "ai_router/tests/test_close_session_verdict.py",
+    "ai_router/tests/test_orchestrator_identity.py",
+    "docs/copilot-seat-setup-checklist.md",
+    "docs/session-sets/086-verification-verdict-token-legibility/ai-assignment.md",
+    "docs/session-sets/086-verification-verdict-token-legibility/activity-log.json",
+    "docs/session-sets/086-verification-verdict-token-legibility/s1-gate-placement-architecture.json",
+    "docs/session-sets/086-verification-verdict-token-legibility/s1-next-orchestrator-analysis.json"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "verification_verdict": "VERIFIED",
+  "next_orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-6",
+    "effort": "medium",
+    "reason": {
+      "code": "switch-due-to-cost",
+      "specifics": "Routed analysis (s1-next-orchestrator-analysis.json) recommends claude/anthropic Sonnet-class at medium effort for Session 2: the set-terminal session spans Python router diagnostics + TypeScript extension legibility/onboarding + docs + a .vsix build -- a multi-language, cost-sensitive workload where Sonnet is fully capable of the set-terminal duties (advisory path-aware critique, change-log synthesis) without Opus cost. Operator owns the final model on the recommended seat; supervision warranted on the Explorer legibility UI change, the .vsix build/install, and the final disposition."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-069-1",
+    "L-064-8",
+    "L-064-9",
+    "L-064-10"
+  ],
+  "repair_helper_decision": {
+    "decision": "deferred-out-of-scope",
+    "rationale": "The spec names the historical-set repair helper an in-scope item only if it proves low-risk in Session 1; it does not. Rewriting closed-set session-state.json files contradicts the blessed-writers-only discipline and the very verdict-token validation this session adds (a hand edit is exactly what the incident did). Historical drift stays visible in the Session Set Explorer and is not retroactively rewritten.",
+    "manual_remediation_recipe": "For a historically-drifted (confabulated) set: re-run verification through the real, authenticated router (python -m ai_router.verify_session) to produce genuine stamped evidence, then reconcile the snapshot via the sanctioned close-out repair path (close_session --repair) -- never a hand edit of session-state.json."
+  },
+  "verification_round_provenance": {
+    "note": "OpenAI (gpt-5-4) returned a sustained 429 on rounds 6-7 attempts; per the Step-6 escalation ladder ('fall back to the remaining cross-provider verifier'), rounds 6-8 ran on gemini-pro via verify_session.run's injectable route_fn seam, forcing exclude_providers to include openai in addition to the auto-excluded orchestrator provider (anthropic). All artifact-writing / evidence-stamping / disposition-patching logic was reused unchanged; only provider selection was narrowed. The cross-provider guarantee (verifier provider != orchestrator effective provider) held in every round.",
+    "rounds": "R1-R5 gpt-5-4 (all agreed Major, fixed); R6 gemini-pro (1 Major, fixed); R7 gemini-pro (2 Major doc-staleness in evidence artifacts, fixed); R8 gemini-pro VERIFIED 0 findings.",
+    "bounded_round_note": "Rounds ran past the constitution's default two-automatic-round cap under an operator in-session rule refinement (2026-07-09): continue while each round's Critical/Major findings are ones the orchestrator agrees are real and is fixing; stop-to-human only on Minor-only convergence or genuine disagreement. Every round here met that bar (distinct, agreed, fixed). A proposed codification of this refinement (constitution Recovery-and-escalation + the severity-gated-verification-stop lesson) was surfaced to the operator for sign-off and is NOT yet written."
+  }
+}

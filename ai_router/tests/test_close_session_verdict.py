@@ -434,3 +434,132 @@ class TestR4VerdicClobberInvariant:
             "R4 invariant violated: _flip_state_to_closed with None "
             "must not overwrite an existing stored verdict"
         )
+
+
+# ---------------------------------------------------------------------------
+# Set 086 S1 — verdict-token validation at the blessed writer
+# ---------------------------------------------------------------------------
+
+from session_state import (  # noqa: E402
+    InvalidVerificationVerdictError,
+    is_tolerated_verdict_token,
+    normalize_verification_verdict,
+    validate_verification_verdict,
+)
+
+
+def _register_only(tmp_path: Path, slug: str = "vset", total_sessions: int = 2) -> Path:
+    # total_sessions defaults to 2 so flipping session 1 to complete leaves a
+    # valid "between-sessions" state (1 complete, >=1 not-started) rather than
+    # a terminal close that would trip the set-completion invariant in a
+    # direct _flip_state_to_closed unit test.
+    set_dir = tmp_path / "docs" / "session-sets" / slug
+    set_dir.mkdir(parents=True)
+    (set_dir / "spec.md").write_text("# spec\n", encoding="utf-8")
+    register_session_start(
+        session_set=str(set_dir),
+        session_number=1,
+        total_sessions=total_sessions,
+        orchestrator_engine="claude-code",
+        orchestrator_model="claude-opus-4-7",
+        orchestrator_effort="high",
+        orchestrator_provider="anthropic",
+    )
+    return set_dir
+
+
+class TestVerdictTokenValidation:
+    def test_tolerates_canonical_and_extension_tokens(self):
+        for ok in [
+            "VERIFIED", "ISSUES_FOUND", "ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+            "WAIVED", "verified",  # case-insensitive
+        ]:
+            assert is_tolerated_verdict_token(ok), ok
+            assert validate_verification_verdict(ok) is None, ok
+        # None is acceptable (no verdict recorded).
+        assert validate_verification_verdict(None) is None
+
+    def test_rejects_non_verdict_tokens(self):
+        for bad in [
+            "manual-override-development", "", "   ", "development", 123, [],
+            # Round-3 finding: invented look-alikes that merely SHARE a prefix
+            # must be rejected too — an exact allowlist, not a prefix match.
+            "VERIFIED_NOT_REALLY", "ISSUES_FOUNDATION", "WAIVEDoops",
+            "VERIFIEDish", "ISSUES_FOUND_BUT_FAKE",
+        ]:
+            assert not is_tolerated_verdict_token(bad), bad
+            assert validate_verification_verdict(bad) is not None, bad
+
+    def test_flip_writer_raises_and_writes_nothing(self, tmp_path):
+        set_dir = _register_only(tmp_path)
+        state_path = set_dir / "session-state.json"
+        before = state_path.read_text(encoding="utf-8")
+        with pytest.raises(InvalidVerificationVerdictError) as exc:
+            _flip_state_to_closed(
+                str(set_dir),
+                verification_verdict="manual-override-development",
+            )
+        assert "manual-override-development" in str(exc.value)
+        # Validation runs before any file mutation: no partial close.
+        assert state_path.read_text(encoding="utf-8") == before
+
+    def test_flip_writer_persists_tolerated_extension_token(self, tmp_path):
+        set_dir = _register_only(tmp_path)
+        _flip_state_to_closed(
+            str(set_dir),
+            verification_verdict="ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+        )
+        state = json.loads(
+            (set_dir / "session-state.json").read_text(encoding="utf-8")
+        )
+        verdicts = [s.get("verificationVerdict") for s in state["sessions"]]
+        assert "ISSUES_FOUND_RESOLVED_IN_FLIGHT" in verdicts
+
+    def test_normalize_canonicalizes_accepted_tokens(self):
+        # Round-4 finding: a tolerated but non-canonical spelling must be
+        # canonicalized, not persisted verbatim (exact-match readers depend
+        # on the canonical form).
+        assert normalize_verification_verdict("verified") == "VERIFIED"
+        assert normalize_verification_verdict("  VERIFIED  ") == "VERIFIED"
+        assert normalize_verification_verdict("Issues_Found") == "ISSUES_FOUND"
+        assert normalize_verification_verdict(None) is None
+        with pytest.raises(InvalidVerificationVerdictError):
+            normalize_verification_verdict("manual-override-development")
+        with pytest.raises(InvalidVerificationVerdictError):
+            normalize_verification_verdict("VERIFIED_NOT_REALLY")
+
+    def test_flip_writer_canonicalizes_noncanonical_spelling(self, tmp_path):
+        set_dir = _register_only(tmp_path)
+        # A lowercase/whitespace verdict must land on disk canonicalized.
+        _flip_state_to_closed(
+            str(set_dir), verification_verdict="  verified  "
+        )
+        state = json.loads(
+            (set_dir / "session-state.json").read_text(encoding="utf-8")
+        )
+        verdicts = [s.get("verificationVerdict") for s in state["sessions"]]
+        assert "VERIFIED" in verdicts
+        assert "  verified  " not in verdicts
+
+    def test_close_run_blocks_non_verdict_before_success(
+        self, tmp_path, monkeypatch
+    ):
+        root, set_dir = _build_repo_with_set(tmp_path, total_sessions=1)
+        _make_closeable(
+            root, set_dir,
+            Disposition(
+                status="completed", summary="s",
+                verification_method="api",
+                verification_verdict="manual-override-development",
+            ),
+        )
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "invalid_invocation"
+        assert any(
+            "manual-override-development" in m for m in outcome.messages
+        )
+        # The state file must NOT have been flipped to closed.
+        state = json.loads(
+            (set_dir / "session-state.json").read_text(encoding="utf-8")
+        )
+        assert state.get("status") != "closed"

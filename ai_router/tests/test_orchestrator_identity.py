@@ -103,7 +103,14 @@ def _make_gate_set(
 ) -> Path:
     """A ``<root>/docs/session-sets/<slug>`` set with session 1 in flight
     and an arbitrary orchestrator block (hand-written state so the gate
-    sees exactly the shape under test)."""
+    sees exactly the shape under test).
+
+    Set 086 S1: a real Full-tier set always has a router-written
+    ``session-events.jsonl`` ledger (start_session's boundary write), and the
+    verification-integrity gate now fails loud on its absence. These fixtures
+    exercise the identity/evidence axis, not the ledger axis, so they carry a
+    minimal non-empty ledger — the honest shape of a router-executed set.
+    """
     set_dir = tmp_path / "docs" / "session-sets" / "identity-set"
     set_dir.mkdir(parents=True)
     (set_dir / "spec.md").write_text("# spec\n", encoding="utf-8")
@@ -125,6 +132,11 @@ def _make_gate_set(
     }
     (set_dir / "session-state.json").write_text(
         json.dumps(state, indent=2), encoding="utf-8"
+    )
+    (set_dir / "session-events.jsonl").write_text(
+        json.dumps({"ts": "2026-07-07T09:00:00-04:00", "event": "work_started"})
+        + "\n",
+        encoding="utf-8",
     )
     (set_dir / "s1-verification.md").write_text("raw\n", encoding="utf-8")
     return set_dir

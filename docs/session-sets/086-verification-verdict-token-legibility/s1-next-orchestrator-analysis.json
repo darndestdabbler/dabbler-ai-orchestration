@@ -1,0 +1,7 @@
+{
+  "provider": null,
+  "model": null,
+  "tier": 2,
+  "cost": null,
+  "content": "### Orchestrator Recommendation\n\n*   **Engine**: claude\n*   **Provider**: anthropic\n*   **Model Class**: Sonnet\n*   **Effort**: medium\n\n### Rationale\n\nThe recommended orchestrator is `claude/anthropic` with the `Sonnet` model class, set to `medium` effort. This selection provides the most cost-effective balance of capability for the session's cross-surface workload. The tasks span Python diagnostics, TypeScript extension UI, documentation, and packaging, requiring a model proficient in multiple languages and contexts without the expense of a flagship model like Opus. Sonnet is fully capable of handling the nuanced, holistic reasoning required for set-terminal duties like the advisory path-aware critique and changelog generation, where a cheaper model like Haiku would risk failing to synthesize the full scope of changes, potentially requiring a costly re-run.\n\n### Operator Supervision\n\nOperator supervision is warranted for the following steps:\n1.  **Step 2 (Reader legibility):** The operator must validate the proposed UI change or guardrail test to ensure it meets legibility and UX requirements.\n2.  **Step 4 (Produce .vsix):** The operator must confirm the successful build and manually install/test the resulting `.vsix` artifact.\n3.  **Step 6 (Build + full suite):** The operator must actively review the results of the cross-provider verification and the path-aware critique to make a final disposition for the set."
+}

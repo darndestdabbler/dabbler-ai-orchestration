@@ -1,0 +1,29 @@
+ISSUES FOUND
+
+The implementation of the core product code is robust and addresses the specified requirements, including hardening against several critical failure modes identified in prior review rounds. However, the session's own descriptive artifacts — the "What landed" summary and the `activity-log.json` — are factually incorrect. They describe earlier, buggy versions of the implementation, not the final, safer code that was shipped. This misrepresentation of the system's security properties is a material defect.
+
+### Issues
+
+- **Issue 1:** Session summary and artifacts incorrectly claim the auth preflight skips its live probe on re-entry.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Details:**
+    - **Violation:** The "What landed" summary provided for verification explicitly states the preflight logic `skips the billed probe on idempotent re-entry`. The session's own `activity-log.json` makes the identical claim. This is false. The live authentication probe is deliberately and correctly run on *every* session start to prevent a security bypass.
+    - **Impact:** An engineer or security reviewer reading the session's summary will have a dangerously incorrect understanding of the system's auth guarantees. They would believe a conditional path exists that skips live authentication based on repository state, which was the exact nature of a major bug (Round-2) that was fixed. Misrepresenting the security boundary is a material error that could lead to future vulnerabilities if other code is built on this false assumption. A reasonable reviewer would require the description to match the implementation before merging.
+    - **Evidence:**
+      - The claim in "What landed": `(skips the billed probe on idempotent re-entry)`
+      - The claim in `docs/.../activity-log.json`: `"description": "...skips the billed live probe on idempotent re-entry..."`
+      - The code in `ai_router/start_session.py`: The call is hardcoded to `_run_copilot_preflight_or_block(args, run_live_probe=True)`.
+      - A comment in `ai_router/start_session.py` confirms this was an intentional fix: `The live probe runs on EVERY start, including an idempotent re-entry (Round-2 finding)`.
+
+- **Issue 2:** Session summary and artifacts incorrectly claim verdict validation uses a loose prefix-match instead of a strict allowlist.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Details:**
+    - **Violation:** The "What landed" summary claims verdict-token validation `Tolerates prefix-matched extension tokens`. The `activity-log.json` echoes this. This is false. The implementation was correctly hardened to use an exact, case-insensitive match against a strict allowlist of tokens, rejecting any string that is not an exact match (e.g., `VERIFIED_BUT_NOT_REALLY` is rejected).
+    - **Impact:** This misrepresents the verdict-token contract. A developer reading the summary would believe the validation is weak and might expect invented tokens that share a prefix to be accepted, leading to confusion and incorrect integration attempts. The code enforces a much stronger guarantee than claimed; the summary must reflect that reality.
+    - **Evidence:**
+      - The claim in "What landed": `Tolerates prefix-matched extension tokens`
+      - The claim in `docs/.../activity-log.json`: `"description": "...tolerating prefix-matched extension tokens..."`
+      - The code in `ai_router/session_state.py`: `is_tolerated_verdict_token` performs an exact match: `return token.strip().upper() in _ALLOWED_VERDICT_TOKENS`.
+      - A comment in `ai_router/session_state.py` confirms the intent: `a WRITER-side prefix match is too loose... So the writer uses an EXACT allowlist`.

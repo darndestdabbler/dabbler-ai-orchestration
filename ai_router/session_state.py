@@ -101,6 +101,107 @@ except ImportError:
 
 
 SESSION_STATE_FILENAME = "session-state.json"
+
+# Set 086 S1: verdict-token validation at the blessed writer.
+#
+# ``verificationVerdict`` is a typed string (not an enum) on disk because
+# readers PREFIX-MATCH it — that reader-tolerant contract lets a reader
+# classify an extension token like ``ISSUES_FOUND_RESOLVED_IN_FLIGHT`` without
+# a schema bump. But the *writer* must fail closed: the 2026-07-08 incident
+# persisted ``manual-override-development`` — a free-form non-verdict a
+# confabulating orchestrator invented — and every reader then rendered a
+# fabricated status.
+#
+# Round-3 finding: a WRITER-side prefix match is too loose — it would still
+# admit invented look-alikes like ``VERIFIED_NOT_REALLY`` / ``ISSUES_FOUNDATION``
+# / ``WAIVEDoops`` solely because they share a prefix, which is exactly the
+# "a non-verdict token cannot persist" boundary this set must hold. So the
+# writer uses an EXACT allowlist (mirroring the exact-token discipline of
+# ``disposition.RETIRED_VERIFICATION_METHODS`` / ``VERIFICATION_METHODS``): the
+# canonical verdicts plus the exact extension tokens intentionally shipped.
+# Readers stay lenient (prefix-match, forward-compatible); the writer stays
+# strict (exact, fail-closed) — the right asymmetry. Shipping a genuinely new
+# extension token is a deliberate vocabulary change: add it here.
+_CANONICAL_VERDICT_TOKENS = ("VERIFIED", "ISSUES_FOUND", "WAIVED")
+# Exact extension tokens readers prefix-match and the writer intentionally
+# admits. ``ISSUES_FOUND_RESOLVED_IN_FLIGHT`` is the documented shipped token
+# (docs/proposals/2026-06-02-verification-verdict-persistence/).
+_SHIPPED_EXTENSION_VERDICT_TOKENS = ("ISSUES_FOUND_RESOLVED_IN_FLIGHT",)
+_ALLOWED_VERDICT_TOKENS = frozenset(
+    _CANONICAL_VERDICT_TOKENS + _SHIPPED_EXTENSION_VERDICT_TOKENS
+)
+
+
+class InvalidVerificationVerdictError(ValueError):
+    """Raised by the blessed writer when asked to persist a non-verdict token
+    into ``verificationVerdict``. A ``ValueError`` subclass so existing
+    ``except ValueError`` callers still catch it."""
+
+
+def is_tolerated_verdict_token(token: object) -> bool:
+    """True iff ``token``'s normalized (stripped, upper-cased) form is EXACTLY
+    an allowed verdict token — a canonical verdict or an intentionally shipped
+    extension token. A prefix-only match is deliberately NOT enough (Round-3
+    finding): an invented look-alike must not be admitted. Non-strings and
+    empties are never tolerated."""
+    if not isinstance(token, str):
+        return False
+    return token.strip().upper() in _ALLOWED_VERDICT_TOKENS
+
+
+def validate_verification_verdict(token: object) -> Optional[str]:
+    """Return a remediation message if ``token`` is a non-null, non-verdict
+    value; ``None`` when it is acceptable.
+
+    ``None`` is acceptable — it means "no verdict recorded" (manual / skipped /
+    no-router / a mid-set session that carried no routed verifier). Any other
+    value must be EXACTLY one of the allowed verdict tokens.
+    """
+    if token is None:
+        return None
+    allowed = ", ".join(sorted(_ALLOWED_VERDICT_TOKENS))
+    if not isinstance(token, str) or not token.strip():
+        return (
+            f"verificationVerdict {token!r} is not a valid verdict: it must be "
+            f"exactly one of the allowed tokens ({allowed}), or null when no "
+            "verdict was recorded."
+        )
+    if is_tolerated_verdict_token(token):
+        return None
+    return (
+        f"verificationVerdict {token!r} is not a verdict token. A persisted "
+        f"verification verdict must be EXACTLY one of the allowed tokens "
+        f"({allowed}) — an invented look-alike that merely shares a prefix "
+        "(e.g. 'VERIFIED_NOT_REALLY') is rejected too, as is a free-form "
+        "string like 'manual-override-development' (the confabulated non-verdict "
+        "this set exists to reject). Verdicts are written by the router "
+        "(python -m ai_router.verify_session), never hand-authored; a genuinely "
+        "new extension token is a deliberate vocabulary change in session_state."
+    )
+
+
+def normalize_verification_verdict(token: object) -> Optional[str]:
+    """Return the CANONICAL blessed token for an accepted verdict, ``None`` for
+    ``None``, or raise :class:`InvalidVerificationVerdictError` for a
+    non-verdict.
+
+    Round-4 finding: validation alone is not enough — a tolerated but
+    non-canonical spelling (``'verified'``, ``' VERIFIED '``) must be
+    canonicalized to its exact blessed token before it is persisted, because
+    the on-disk value is load-bearing for EXACT-match readers (the extension's
+    ``verdict === "VERIFIED"``). Since every allowed token is stored
+    upper-cased, the canonical form is ``token.strip().upper()``. This is the
+    writer's single normalization+validation entry point; the blessed writer
+    calls it so no non-canonical verdict can ever reach disk.
+    """
+    if token is None:
+        return None
+    error = validate_verification_verdict(token)
+    if error is not None:
+        raise InvalidVerificationVerdictError(error)
+    # ``validate_...`` guaranteed a tolerated string; canonicalize it.
+    return token.strip().upper()
+
 # Set 047 Session 4: writer-flip phase (Python). Writers now emit v4
 # on-disk shape — top-level state (currentSession, totalSessions,
 # completedSessions, orchestrator, startedAt, completedAt,
@@ -1230,6 +1331,12 @@ def register_typed_session_handoff(
             f"got {followon_type!r}."
         )
 
+    # Set 086 S1 (L-069-1 sibling site): this blessed writer also persists a
+    # verificationVerdict, so it validates + canonicalizes on the same
+    # contract as _flip_state_to_closed — no confabulated / non-canonical
+    # token can enter via the typed-handoff path either.
+    verification_verdict = normalize_verification_verdict(verification_verdict)
+
     existing = read_raw_session_state(session_set)
     if (
         not isinstance(existing, dict)
@@ -1530,7 +1637,22 @@ def _flip_state_to_closed(
 
     Returns the file path if it existed and was updated, ``None`` if no
     state file existed.
+
+    Set 086 S1: the blessed writer refuses to persist a non-verdict token.
+    Validation runs FIRST — before any file read or mutation — so an illegal
+    verdict raises :class:`InvalidVerificationVerdictError` with no on-disk
+    side effect (no partial close). The active-set close path
+    (``close_session.run``) validates the same value earlier and blocks
+    cleanly before emitting any success event; this raise is the guarantee
+    that no code path — including a direct caller — can ever write a
+    confabulated verdict into ``verificationVerdict``.
     """
+    # Validate AND canonicalize (Round-4 finding): a tolerated but
+    # non-canonical spelling is normalized to its exact blessed token before
+    # anything is written, so an exact-match reader never sees ' verified '.
+    # Runs first — before any file read/mutation — so an invalid token raises
+    # with no on-disk side effect.
+    verification_verdict = normalize_verification_verdict(verification_verdict)
     path = _state_path(session_set)
     if not os.path.isfile(path):
         return None
@@ -1829,6 +1951,13 @@ def mark_session_complete(
     raises out of ``append_event`` and the flip itself does not happen,
     so the snapshot and the ledger never disagree on success.
     """
+    # Set 086 S1 (L-069-1 sibling site): normalize+validate the verdict up
+    # front so BOTH the closeout_succeeded event field below and the
+    # _flip_state_to_closed snapshot persist the exact canonical token (and a
+    # non-verdict is rejected before any event/flip). _flip re-normalizes
+    # idempotently.
+    verification_verdict = normalize_verification_verdict(verification_verdict)
+
     if not os.path.isfile(_state_path(session_set)):
         return None
 

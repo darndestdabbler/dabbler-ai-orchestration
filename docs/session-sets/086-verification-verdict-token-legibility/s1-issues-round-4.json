@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Verdict normalization is still missing; the writer accepts non-canonical spellings without canonicalizing them.\n  - **Location:** `ai_router/session_state.py` (`is_tolerated_verdict_token`, `validate_verification_verdict`, `_flip_state_to_closed`); `ai_router/tests/test_close_session_verdict.py`\n  - **Fix:** Canonicalize accepted verdicts on the writer path before writing state (for example, strip + uppercase to the exact blessed token), or reject non-exact spellings outright if exact-token persistence is the contract.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The task explicitly called for verdict **“reject/normalize/tolerate”** in Session 1 tests, and the new schema note now claims the blessed writer fails closed against an **“EXACT allowlist”** of tokens.\n    - **Impact:** The on-disk `verificationVerdict` contract is still not canonicalized. Inputs like `\"verified\"` / `\" VERIFIED \"` are treated as valid, but there is no normalization step on the writer path in this change, so the exact-token persistence invariant is not actually enforced. For a persisted wire-format field whose literal token values are load-bearing, that is a real contract hole, not a cosmetic one.\n    - **Evidence:** `is_tolerated_verdict_token()` accepts `token.strip().upper() in _ALLOWED_VERDICT_TOKENS`; the new test explicitly blesses lowercase input (`\"verified\"`); `_flip_state_to_closed()` only validates via `validate_verification_verdict()` and this diff adds no code that rewrites the accepted value to its canonical token before state is written.",
+      "category": "Completeness",
+      "severity": "Major"
+    }
+  ]
+}

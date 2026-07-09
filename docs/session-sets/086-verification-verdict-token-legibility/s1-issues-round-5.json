@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The new ledger gate still has a fail-open bypass on filesystem/read errors inside `writer_discipline`\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The task required **“Make close fail loud on missing evidence”** and the landed summary claims `gate_checks.check_verification_integrity` now has a ledger sub-check that **“runs FIRST (short-circuit)”** and fails closed on detector problems. `_check_session_ledger_present()` itself also claims: **“An import OR a runtime failure of the detector must NOT silently disarm it.”**\n    - **Impact:** A Full-tier close can still bypass the new ledger safety net if `session-events.jsonl` exists but cannot be read/opened/stat'ed. In the exact scenario this change was added to catch — forged stamp/verdict evidence with no trustworthy router ledger — close can still fall through to the old stamp/verdict axis and succeed. That is merge-blocking because the new enforcement can be defeated by a tampered or unreadable ledger path.\n    - **Evidence:** `ai_router/writer_discipline.py` still returns a silent success on `OSError` even when `require_ledger=True`:\n      ```python\n      try:\n          state_mtime_ns = state.state_file.stat().st_mtime_ns\n      except OSError:\n          return []\n      ...\n      try:\n          for event in iter_session_events(events_path):\n              ...\n      except OSError:\n          return []\n      ```\n      `ai_router/gate_checks.py` then treats “no reports” as pass:\n      ```python\n      reports = detect_writer_bypass(view, require_ledger=True)\n      ...\n      if not absence:\n          return True, \"\"\n      ```\n      So a path like `session-events.jsonl` being unreadable, permission-denied, or replaced with a directory does **not** block close; it silently disables the new ledger axis.  \n      **Correct answer:** when `require_ledger=True`, read/open/stat failures for the state file or events ledger must surface as a blocking failure/report, not `[]`.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

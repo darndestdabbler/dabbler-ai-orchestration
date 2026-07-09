@@ -1140,3 +1140,124 @@ class TestCloseSessionEndToEnd:
         assert vi.passed
         assert "--manual-verify" in vi.remediation
         assert "vocabulary still enforced" in vi.remediation
+
+
+# ---------------------------------------------------------------------------
+# Set 086 S1 — the ledger axis (fail loud on a fully-simulated session)
+# ---------------------------------------------------------------------------
+
+class TestLedgerAxis:
+    """A Full-tier close requires a router-written events ledger. Its absence
+    is the fully-simulated signature (no canonical writer ever ran) and now
+    HIGH-blocks the verification-integrity gate, orthogonal to the verdict/
+    stamp axis. ``_make_set`` builds a real ledger via register_session_start;
+    these tests remove/empty it to model the incident."""
+
+    def _delete_ledger(self, set_dir: Path) -> None:
+        (set_dir / "session-events.jsonl").unlink()
+
+    def test_absent_ledger_blocks_even_with_valid_evidence(
+        self, tmp_path, monkeypatch
+    ):
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch, [write_stamped_evidence(set_dir)]
+        )
+        self._delete_ledger(set_dir)
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "session-events.jsonl" in remediation
+        assert "HIGH" in remediation
+
+    def test_empty_ledger_blocks(self, tmp_path, monkeypatch):
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch, [write_stamped_evidence(set_dir)]
+        )
+        (set_dir / "session-events.jsonl").write_text("", encoding="utf-8")
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "no canonical-writer event" in remediation
+
+    def test_ledger_axis_short_circuits_before_verdict_axis(self, tmp_path):
+        # No evidence at all AND no ledger: the LEDGER message must win (it is
+        # the root cause and runs first), not the verdict/artifact message.
+        set_dir = _make_set(tmp_path)
+        self._delete_ledger(set_dir)
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "session-events.jsonl" in remediation
+        # The verdict-axis artifact message must NOT be what surfaced.
+        assert "s1-verification*.md" not in remediation
+
+    def test_present_ledger_passes_ledger_axis(self, tmp_path, monkeypatch):
+        # Sanity: with the real ledger left in place, full valid evidence
+        # closes (the ledger axis is satisfied).
+        set_dir = _make_set(tmp_path)
+        _write_metrics(
+            tmp_path, monkeypatch, [write_stamped_evidence(set_dir)]
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert passed, remediation
+
+    def test_unreadable_ledger_fails_closed(self, tmp_path, monkeypatch):
+        # Round-5 finding: an existing-but-unreadable ledger (a directory in
+        # its place) must BLOCK, not fall through to the verdict axis.
+        set_dir = _make_set(tmp_path)
+        events = set_dir / "session-events.jsonl"
+        events.unlink()
+        events.mkdir()
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "could not be read" in remediation or "unreadable" in remediation
+
+    def test_unreadable_state_file_fails_closed(self, tmp_path):
+        # Round-5 class: a state file present but unparseable must fail closed,
+        # not pass the ledger axis (an unreadable snapshot cannot corroborate).
+        set_dir = _make_set(tmp_path)
+        (set_dir / "session-state.json").write_text(
+            "{ not valid json", encoding="utf-8"
+        )
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "failing closed" in remediation
+
+    def test_lightweight_absent_ledger_is_inert(self, tmp_path):
+        # Lightweight sets verify per-set; the Full-tier ledger axis must not
+        # fire (the lightweight early-out precedes it).
+        set_dir = _make_set(tmp_path, tier_line="tier: lightweight")
+        self._delete_ledger(set_dir)
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert passed, remediation
+
+    def test_ledger_check_fails_closed_on_internal_error(
+        self, tmp_path, monkeypatch
+    ):
+        # Round-1 finding: a failure inside the ledger detector must BLOCK
+        # (fail closed), never silently pass — this axis is the safety net.
+        set_dir = _make_set(tmp_path)  # has a real ledger
+        import writer_discipline as wd
+
+        def _raise(*a, **k):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(wd, "detect_writer_bypass", _raise)
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "failing closed" in remediation

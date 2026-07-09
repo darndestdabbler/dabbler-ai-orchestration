@@ -73,7 +73,7 @@
         },
         "verificationVerdict": {
           "type": ["string", "null"],
-          "description": "Canonical tokens are VERIFIED / ISSUES_FOUND; operators have shipped extension tokens (prefix-matched by readers), so this is typed string, not an enum."
+          "description": "Canonical tokens are VERIFIED / ISSUES_FOUND (plus WAIVED for external verification); operators have shipped extension tokens (e.g. ISSUES_FOUND_RESOLVED_IN_FLIGHT) that readers PREFIX-MATCH, so this is typed string, not an enum. Set 086: the blessed writer (session_state.validate_verification_verdict) fails closed against an EXACT allowlist of canonical + shipped-extension tokens, so a confabulated non-verdict (manual-override-development) or an invented prefix look-alike (VERIFIED_NOT_REALLY) can never persist here. Readers stay lenient; the writer is strict."
         }
       },
       "required": ["number", "title", "status"]

@@ -99,7 +99,7 @@ whose trigger moment is situational, moved full-text to
   pinned below it and silently broke the cross-provider guarantee.
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="085" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="086" status="active" scope="portable" -->
 
 - Prose carried over from a superseded doc was true (or tolerated) in the
   old context and reads authoritative in the new one — a defect class of
@@ -109,7 +109,7 @@ whose trigger moment is situational, moved full-text to
   verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="085" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="086" status="active" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and

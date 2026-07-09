@@ -168,6 +168,80 @@ ORCHESTRATOR_WRITER_LOG = os.path.expanduser(
 )
 
 
+def _run_copilot_preflight_or_block(
+    args, *, run_live_probe: bool
+) -> Optional[int]:
+    """Set 086 S1: gate session start on a mis-authed Copilot-CLI seat.
+
+    Only the copilot-cli seat (a multi-provider engine) runs this — the
+    direct-API path has no CLI to preflight, so single-vendor engines return
+    immediately with no cost or new failure mode. Under ``--no-router``
+    (Lightweight, zero metered calls) it also no-ops: there is no routed
+    verification to protect, so spending a billed live probe would be wrong.
+
+    Returns an exit code to STOP session start (the preflight failed and
+    printed its remediation), or ``None`` to proceed. The preflight is the
+    prevention layer for the root cause of Set 086: an unauthenticated seat
+    that starts a session it can never honestly verify, then confabulates a
+    result. Fail-closed by construction — an unexpected internal error blocks
+    rather than waves the seat through.
+    """
+    engine = getattr(args, "engine", None)
+    try:
+        try:
+            from .orchestrator_identity import (  # type: ignore[import-not-found]
+                is_multi_provider_engine,
+            )
+        except ImportError:
+            from ai_router.orchestrator_identity import (  # type: ignore[no-redef]
+                is_multi_provider_engine,
+            )
+        multi = is_multi_provider_engine(engine)
+    except Exception:
+        # Fail CLOSED where it matters (Round-1 finding): if the identity
+        # helper cannot be resolved, do NOT wave a possibly-copilot seat
+        # through — fall back to the known multi-provider seat labels so a
+        # copilot seat still gets preflighted. A direct-API engine is still
+        # correctly single-vendor, so the common path is unaffected.
+        multi = str(engine or "").strip().lower() in {"github-copilot", "copilot"}
+
+    if not multi:
+        return None
+    if is_no_router_mode():
+        return None
+
+    try:
+        try:
+            from .copilot_preflight import run_preflight  # type: ignore[import-not-found]
+        except ImportError:
+            from ai_router.copilot_preflight import run_preflight  # type: ignore[no-redef]
+        result = run_preflight(
+            # Pass the seat's real model through; run_preflight falls back to
+            # its own default if it is somehow absent (Round-6 finding: never
+            # coerce to "" and probe an empty --model). In the normal flow a
+            # copilot seat always has a validated --model — a multi-provider
+            # engine without one is already refused by
+            # _refuse_unresolvable_identity above, before this runs.
+            model=getattr(args, "model", None),
+            run_live_probe=run_live_probe,
+        )
+    except Exception as exc:  # noqa: BLE001 - fail closed on a preflight bug
+        print(
+            "start_session: refused -- Copilot-seat auth-preflight could not "
+            f"run ({type(exc).__name__}: {exc}). Fail-closed: an "
+            "unauthenticated seat is the Set 086 root cause. Fix the "
+            "preflight or the seat setup (docs/copilot-seat-setup-checklist.md) "
+            "before starting a session.",
+            file=sys.stderr,
+        )
+        return EXIT_BOUNDARY
+
+    if result.ok:
+        return None
+    print(result.message, file=sys.stderr)
+    return EXIT_BOUNDARY
+
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="start_session",
@@ -994,6 +1068,19 @@ def _run_under_lock(args: argparse.Namespace) -> int:
         total_sessions = (
             view.total_sessions if view is not None and view.total_sessions > 0 else None
         )
+
+    # Set 086 S1: auth-preflight for the Copilot-CLI seat, BEFORE any state
+    # is written. A mis-authed seat is blocked here rather than allowed to
+    # start a session it could never honestly verify. The live probe runs on
+    # EVERY start, including an idempotent re-entry (Round-2 finding): repo
+    # state ("a session is in flight") is not proof the seat is STILL
+    # authenticated — a login that lapsed, changed host, or lost its license
+    # between the fresh start and a re-entry must be caught, and one small
+    # premium request is cheap next to a seat that confabulates verification.
+    # No-op for the direct-API path and under --no-router (see the helper).
+    preflight_block = _run_copilot_preflight_or_block(args, run_live_probe=True)
+    if preflight_block is not None:
+        return preflight_block
 
     register_session_start(
         session_set=session_set_dir,

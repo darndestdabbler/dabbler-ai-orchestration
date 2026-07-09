@@ -1,0 +1,10 @@
+**VERIFIED**
+
+I have audited the implementation against the Session 1 specification, focusing on the three primary security controls: Copilot-seat auth-preflight, fail-loud close on missing ledger evidence, and strict verdict-token validation. The work is correct, complete, and demonstrates robust, fail-closed design.
+
+My verification process specifically confirmed that the fixes for all previously identified major issues (documented across seven prior review rounds) have been correctly implemented. This includes:
+1.  **Auth-Preflight**: The live authentication probe now correctly runs on every `start_session` invocation, including idempotent re-entries, closing a critical security gap where a lapsed credential could bypass the check. The logic correctly fails closed if the preflight module or its dependencies cannot run, and correctly handles cases where an operator omits an optional `--model` flag.
+2.  **Ledger-Integrity Gate**: The check for a session events ledger is correctly placed to short-circuit the close process before the verdict/stamp axis. It correctly fails closed on any internal error, including unreadable state files or ledgers, preventing the safety net from being silently disarmed by filesystem-level tampering.
+3.  **Verdict Validation**: The blessed writers now enforce an exact, case-insensitive allowlist for verdict tokens and canonicalize acceptable inputs before persistence. This correctly prevents non-verdict strings or invented look-alikes from being written to `session-state.json`, which was a root cause of the motivating incident.
+
+The accompanying tests for all new code paths are thorough, and the session's own descriptive artifacts (e.g., `activity-log.json`, summary) now accurately reflect the final, hardened state of the implementation. I could not substantiate any remaining correctness or completeness defects.

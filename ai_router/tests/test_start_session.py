@@ -793,3 +793,127 @@ def test_contract_gate_capture_never_blocks_boundary_write(tmp_path: Path, monke
     # The boundary write still landed even though capture failed.
     state = read_session_state(str(set_dir)) or {}
     assert state.get("status") == "in-progress"
+
+
+# ---------------------------------------------------------------------------
+# Set 086 S1 — Copilot-seat auth-preflight wiring
+# ---------------------------------------------------------------------------
+
+import ai_router.copilot_preflight as cp_pkg  # noqa: E402
+from ai_router.copilot_preflight import PreflightResult  # noqa: E402
+
+
+class _RecordingPreflight:
+    """Stand-in for run_preflight that records kwargs and returns a fixed
+    result — so wiring tests never touch the real CLI."""
+
+    def __init__(self, ok: bool):
+        self._ok = ok
+        self.calls: list = []
+
+    def __call__(self, **kwargs):
+        self.calls.append(kwargs)
+        if self._ok:
+            return PreflightResult(
+                ok=True, stage="live-probe", error_class=None, message="ok"
+            )
+        return PreflightResult(
+            ok=False, stage="live-probe", error_class="auth-class",
+            message="blocked: run copilot login --host ...",
+        )
+
+
+def test_preflight_noop_for_direct_api_engine(tmp_path, monkeypatch):
+    def _boom(**kwargs):  # must never be called for a single-vendor engine
+        raise AssertionError("run_preflight called for a direct-API engine")
+
+    monkeypatch.setattr(cp_pkg, "run_preflight", _boom)
+    args = _args(_fresh_set(tmp_path))  # engine defaults to claude
+    assert start_session._run_copilot_preflight_or_block(
+        args, run_live_probe=True
+    ) is None
+
+
+def test_preflight_blocks_start_on_copilot_failure(tmp_path, monkeypatch):
+    rec = _RecordingPreflight(ok=False)
+    monkeypatch.setattr(cp_pkg, "run_preflight", rec)
+    set_dir = _fresh_set(tmp_path)
+    args = _args(set_dir, engine="copilot", model="claude-sonnet-4.6")
+    rc = start_session.run(args)
+    assert rc == start_session.EXIT_BOUNDARY
+    assert rec.calls  # the preflight actually ran for the copilot seat
+    # State must NOT have flipped to in-progress — start was blocked.
+    state = read_session_state(str(set_dir)) or {}
+    assert state.get("status") == "not-started"
+
+
+def test_preflight_passes_lets_copilot_start(tmp_path, monkeypatch):
+    rec = _RecordingPreflight(ok=True)
+    monkeypatch.setattr(cp_pkg, "run_preflight", rec)
+    set_dir = _fresh_set(tmp_path)
+    args = _args(set_dir, engine="copilot", model="claude-sonnet-4.6")
+    rc = start_session.run(args)
+    assert rc == start_session.EXIT_OK
+    state = read_session_state(str(set_dir)) or {}
+    assert state.get("status") == "in-progress"
+    # Fresh start probes live (run_live_probe defaults True at the call site).
+    assert rec.calls[0]["run_live_probe"] is True
+
+
+def test_preflight_probes_live_on_every_start_including_reentry(
+    tmp_path, monkeypatch
+):
+    # Round-2 finding: repo state ("a session is in flight") is not proof the
+    # seat is STILL authenticated, so the live probe must run on EVERY start,
+    # including an idempotent re-entry — never skipped based on session state.
+    rec = _RecordingPreflight(ok=True)
+    monkeypatch.setattr(cp_pkg, "run_preflight", rec)
+    set_dir = _fresh_set(tmp_path)
+    args = _args(set_dir, engine="copilot", model="claude-sonnet-4.6")
+    assert start_session.run(args) == start_session.EXIT_OK
+    # Re-enter the same in-flight session (e.g. after a context reset).
+    assert start_session.run(args) == start_session.EXIT_OK
+    assert rec.calls[0]["run_live_probe"] is True  # fresh start: billed probe
+    assert rec.calls[1]["run_live_probe"] is True  # re-entry: STILL probes
+
+
+def test_preflight_fails_closed_for_copilot_when_identity_raises(
+    tmp_path, monkeypatch
+):
+    # Round-1 finding: if the identity helper is unavailable, a copilot seat
+    # must still be preflighted (fail closed via the seat-label fallback),
+    # never waved through.
+    import ai_router.orchestrator_identity as oi
+
+    def _raise(engine):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(oi, "is_multi_provider_engine", _raise)
+    rec = _RecordingPreflight(ok=False)
+    monkeypatch.setattr(cp_pkg, "run_preflight", rec)
+    args = _args(_fresh_set(tmp_path), engine="copilot", model="claude-sonnet-4.6")
+    rc = start_session._run_copilot_preflight_or_block(args, run_live_probe=True)
+    assert rc == start_session.EXIT_BOUNDARY
+    assert rec.calls  # preflight ran despite the broken identity helper
+
+
+def test_preflight_direct_engine_unaffected_when_identity_raises(
+    tmp_path, monkeypatch
+):
+    # The fail-closed fallback must NOT start blocking the common direct-API
+    # path: a claude seat with a broken identity helper still proceeds.
+    import ai_router.orchestrator_identity as oi
+
+    def _raise(engine):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(oi, "is_multi_provider_engine", _raise)
+
+    def _boom(**kwargs):
+        raise AssertionError("preflight ran for a direct-API engine")
+
+    monkeypatch.setattr(cp_pkg, "run_preflight", _boom)
+    args = _args(_fresh_set(tmp_path))  # engine defaults to claude
+    assert start_session._run_copilot_preflight_or_block(
+        args, run_live_probe=True
+    ) is None

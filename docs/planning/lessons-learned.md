@@ -71,7 +71,7 @@ whose trigger moment is situational, moved full-text to
 | L-079-2 | spec-authoring rule — see the authoring guide (gate flags live in the config block, prose cannot arm a gate) |
 
 ## Windows cp1252 Is A Standing Bug Class — Bytes At Subprocess Boundaries, Persist Before Printing
-<!-- lesson: id="L-079-1" added-set="079" last-used-set="084" status="active" scope="portable" -->
+<!-- lesson: id="L-079-1" added-set="079" last-used-set="087" status="active" scope="portable" -->
 
 - The child Python's stdout text layer defaults to `cp1252` on Windows,
   so any non-ASCII payload crossing a pipe *as text* is a latent crash in
@@ -109,7 +109,7 @@ whose trigger moment is situational, moved full-text to
   verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="086" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="087" status="active" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and
@@ -118,7 +118,7 @@ whose trigger moment is situational, moved full-text to
   alongside the diff so additions are visible.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="085" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="087" status="active" scope="portable" -->
 
 - A consistency finding is rarely local: the same claim echoes in the
   summary table, body prose, per-row cells, and the bottom line, and each
@@ -155,7 +155,7 @@ whose trigger moment is situational, moved full-text to
 ## Repo-Specific Lessons
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="081" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="087" status="active" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families

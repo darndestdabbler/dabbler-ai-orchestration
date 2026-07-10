@@ -441,6 +441,8 @@ suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
   function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     return {
       name: "x",
+      module: null,
+      moduleTitle: null,
       dir: "/x",
       specPath: "/x/spec.md",
       activityPath: "/x/activity-log.json",
@@ -453,7 +455,7 @@ suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
       sessionsCompleted: 0,
       lastTouched: null,
       liveSession: null,
-      config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none" },
+      config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none", module: null },
       uatSummary: null,
       root: "/x",
       needsMigration: false,

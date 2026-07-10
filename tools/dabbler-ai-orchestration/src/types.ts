@@ -112,6 +112,61 @@ export interface SessionSetConfig {
   uatScope: string;
   tier: SessionSetTier;
   verificationMode: VerificationMode;
+  // Set 087 Session 1: the spec's declared `module:` key — the RAW value
+  // as authored, before validation against `docs/modules.yaml`. A
+  // grouping attribute only, never part of set identity (the Set 087
+  // invariant: names stay globally unique; `RowPayload.slug` and
+  // `findSetBySlug` are unchanged on purpose). Null when the spec
+  // declares no module. The validated result lives on
+  // `SessionSet.module` / `SessionSet.moduleTitle`; the raw value is
+  // kept here so later sessions can surface a declared-but-unknown slug
+  // instead of silently reading it as "no module".
+  module: string | null;
+}
+
+// Set 087 Session 1 (routed architecture ruling, saved raw at
+// docs/session-sets/087-.../s1-collision-check-architecture.json): the
+// fail-loud duplicate-set-name error attached to the one merged row the
+// Explorer shows for a collided name. Undefined on every non-collided
+// set, so a workspace with globally-unique names renders byte-identically
+// to pre-087. Session 2 renders the affordance (badge/tooltip); Session 1
+// ships the data only.
+export interface DuplicateNameError {
+  name: string;
+  // The winning copy's dir — always a member of `conflictingDirs`.
+  chosenDir: string;
+  // One dir per DISTINCT logical set sharing the name (legitimate
+  // main-checkout/worktree copies of the same set collapse to one
+  // entry), sorted.
+  conflictingDirs: string[];
+}
+
+// The diagnostics-level record for one collided name, returned by
+// `readAllSessionSetsWithDiagnostics().collisions` so a future surface
+// (throttled notification, status item) can report without re-scanning.
+export interface DuplicateNameCollision extends DuplicateNameError {
+  candidates: Array<{
+    dir: string;
+    familyId: string;
+    state: SessionState;
+    lastTouched: string | null;
+  }>;
+}
+
+// Set 087 Session 1: one entry of `docs/modules.yaml` (the module
+// manifest — recommendation §2.4). `slug` is the machine identity of the
+// module; `title` is what the Explorer displays (defaults to the slug);
+// `codeRoots` are the code paths the module owns (ownership enforcement
+// is later-phase machinery — carried, not enforced, in Phase 1);
+// `planPath` locates the module's project plan; `touches` names the
+// modules an integration module is sanctioned to edit across. Display
+// order in the Explorer = manifest file order.
+export interface ModuleManifestEntry {
+  slug: string;
+  title: string;
+  codeRoots: string[];
+  planPath: string | null;
+  touches: string[];
 }
 
 // Set 047 Session 5: prerequisites field schema landed by spec §3.3.
@@ -184,6 +239,16 @@ export interface LiveSession {
 
 export interface SessionSet {
   name: string;
+  // Set 087 Session 1: the VALIDATED module attribution — the spec's
+  // `module:` key when it names a `docs/modules.yaml` slug, else null
+  // (the implicit module: absent manifest, absent key, or a declared
+  // slug the manifest doesn't know). `moduleTitle` is the manifest
+  // entry's display title (null exactly when `module` is null). Grouping
+  // attributes only — never identity; every name-keyed lookup
+  // (`findSetBySlug`, prerequisite resolution, the cross-root merge)
+  // stays keyed on `name` alone.
+  module: string | null;
+  moduleTitle: string | null;
   dir: string;
   specPath: string;
   activityPath: string;
@@ -295,6 +360,13 @@ export interface SessionSet {
   // Start-Next-Session copy-action auto-route. Optional so
   // fixture-shaped records without the field read as "not derived".
   workflowState?: WorkflowState | null;
+  // Set 087 Session 1: the fail-loud duplicate-set-name flag, set by
+  // `readAllSessionSetsWithDiagnostics` on the ONE merged row shown for
+  // a collided name. Undefined everywhere else (and always on the
+  // per-root `readSessionSets` output — collisions are a cross-root
+  // property). Optional so the no-collision path stays byte-identical
+  // to pre-087 and fixture-shaped records need no update.
+  duplicateNameError?: DuplicateNameError;
 }
 
 // Set 052 S2: reconciled with the on-disk schema the router actually

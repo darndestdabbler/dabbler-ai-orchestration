@@ -26,6 +26,8 @@ function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
   const dir = path.join(root, "docs", "session-sets", slug);
   return {
     name: slug,
+    module: null,
+    moduleTitle: null,
     dir,
     specPath: path.join(dir, "spec.md"),
     activityPath: path.join(dir, "activity-log.json"),
@@ -38,7 +40,7 @@ function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
     sessionsCompleted: 1,
     lastTouched: null,
     liveSession: null,
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none" },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none", module: null },
     uatSummary: null,
     root,
     needsMigration: false,
@@ -196,6 +198,7 @@ suite("copyPromptCommands — verification kickoff prompt (Set 062 S2, spec D2)"
         uatScope: "none",
         tier: "lightweight",
         verificationMode: "dedicated-sessions",
+        module: null,
       },
     });
 
@@ -273,6 +276,7 @@ suite("copyPromptCommands — verification kickoff prompt (Set 062 S2, spec D2)"
           uatScope: "none",
           tier: "lightweight",
           verificationMode: "dedicated-sessions",
+          module: null,
         },
       }),
     );

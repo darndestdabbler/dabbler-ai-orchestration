@@ -102,6 +102,8 @@ function fakeSet(
 ): SessionSet {
   return {
     name,
+    module: null,
+    moduleTitle: null,
     dir: `/tmp/${name}`,
     specPath: `/tmp/${name}/spec.md`,
     activityPath: `/tmp/${name}/activity-log.json`,
@@ -123,7 +125,7 @@ function fakeSet(
       forceClosed: null,
       completedSessions: [],
     },
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none" },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none", module: null },
     uatSummary: null,
     root: "/tmp",
     needsMigration: false,

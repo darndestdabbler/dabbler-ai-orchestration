@@ -1,0 +1,11 @@
+- **Issue** → Session 1 is not actually closed or dispositioned, so the session contract is incomplete.
+  **Location** → `docs/session-sets/087-module-organized-projects-foundations/session-state.json` (`status: "in-progress"`, `completedAt: null`, `verificationVerdict: null`), `docs/session-sets/087-module-organized-projects-foundations/session-events.jsonl` (only `work_started`), and missing `docs/session-sets/087-module-organized-projects-foundations/disposition.json`.
+  **Fix** → Finish the required session-finalization steps: write `disposition.json`, record the verification verdict, set `completedAt`, mark the session/set `complete`, append the close/completion event(s), and run `close_session` so the repo state matches the spec’s required end-state.
+
+- **Issue** → `readModulesManifest()` accepts structurally invalid module entries as valid modules because it only requires `slug`; `codeRoots` and `planPath` are effectively optional in the implementation.
+  **Location** → `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts`, `readModulesManifest()`, specifically the `out.push({ slug, title, codeRoots: ..., planPath, touches: ... })` path after only checking `slug`.
+  **Fix** → Enforce the manifest contract per entry: require non-empty `codeRoots` and a non-empty `planPath` before treating a row as a valid manifest module. Drop/warn invalid rows and add tests covering missing/empty `codeRoots` and `planPath`.
+
+- **Issue** → Present-but-malformed manifest shapes are silently treated as “no manifest”, which makes actual config errors indistinguishable from the intentional implicit-module fallback.
+  **Location** → `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts`, `readModulesManifest()`, early returns for `doc === null || typeof doc !== "object" || Array.isArray(doc)` and `!Array.isArray(doc.modules)`.
+  **Fix** → Emit a warning (or structured diagnostic) for wrong-shape manifests, not just YAML parse failures. Add tests for syntactically valid but structurally invalid `docs/modules.yaml` files so “malformed” is covered beyond parse errors.

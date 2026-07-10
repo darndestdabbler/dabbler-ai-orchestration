@@ -91,7 +91,8 @@ honest machine-verified vs operator-waived release labels.
   no-`copilot` condition (reproduced locally by removing the CLI from PATH). Two
   **pre-existing, unrelated** CI failures that predated this work were fixed to
   unblock the release: a drift-guard docs-lint false positive (commit `e3e6a4d`;
-  `module-organized-projects-recommendation.md:315`, the "no python" bigram) and
+  `module-organized-projects-recommendation.md:315`, which quoted one of the
+  guard's banned stale-tier-framing bigrams) and
   four Set 086 copilot-preflight tests missing their stub (commit `2af75fc`;
   see §8).
 - The independent, different-provider review process caught **nine** real defects

@@ -16,6 +16,8 @@ function makeTmpDir(): string {
 function ssStub(over: Partial<SessionSet> = {}): SessionSet {
   return {
     name: "test-set",
+    module: null,
+    moduleTitle: null,
     dir: "/tmp/test-set",
     specPath: "",
     activityPath: "",
@@ -28,7 +30,7 @@ function ssStub(over: Partial<SessionSet> = {}): SessionSet {
     sessionsCompleted: 0,
     lastTouched: "2026-05-16T00:00:00Z",
     liveSession: null,
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none" },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none", module: null },
     uatSummary: null,
     root: "/tmp",
     needsMigration: false,

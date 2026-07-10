@@ -30,869 +30,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// node_modules/ms/index.js
-var require_ms = __commonJS({
-  "node_modules/ms/index.js"(exports2, module2) {
-    var s = 1e3;
-    var m = s * 60;
-    var h2 = m * 60;
-    var d = h2 * 24;
-    var w = d * 7;
-    var y2 = d * 365.25;
-    module2.exports = function(val, options) {
-      options = options || {};
-      var type = typeof val;
-      if (type === "string" && val.length > 0) {
-        return parse2(val);
-      } else if (type === "number" && isFinite(val)) {
-        return options.long ? fmtLong(val) : fmtShort(val);
-      }
-      throw new Error(
-        "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
-      );
-    };
-    function parse2(str) {
-      str = String(str);
-      if (str.length > 100) {
-        return;
-      }
-      var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
-        str
-      );
-      if (!match) {
-        return;
-      }
-      var n = parseFloat(match[1]);
-      var type = (match[2] || "ms").toLowerCase();
-      switch (type) {
-        case "years":
-        case "year":
-        case "yrs":
-        case "yr":
-        case "y":
-          return n * y2;
-        case "weeks":
-        case "week":
-        case "w":
-          return n * w;
-        case "days":
-        case "day":
-        case "d":
-          return n * d;
-        case "hours":
-        case "hour":
-        case "hrs":
-        case "hr":
-        case "h":
-          return n * h2;
-        case "minutes":
-        case "minute":
-        case "mins":
-        case "min":
-        case "m":
-          return n * m;
-        case "seconds":
-        case "second":
-        case "secs":
-        case "sec":
-        case "s":
-          return n * s;
-        case "milliseconds":
-        case "millisecond":
-        case "msecs":
-        case "msec":
-        case "ms":
-          return n;
-        default:
-          return void 0;
-      }
-    }
-    function fmtShort(ms) {
-      var msAbs = Math.abs(ms);
-      if (msAbs >= d) {
-        return Math.round(ms / d) + "d";
-      }
-      if (msAbs >= h2) {
-        return Math.round(ms / h2) + "h";
-      }
-      if (msAbs >= m) {
-        return Math.round(ms / m) + "m";
-      }
-      if (msAbs >= s) {
-        return Math.round(ms / s) + "s";
-      }
-      return ms + "ms";
-    }
-    function fmtLong(ms) {
-      var msAbs = Math.abs(ms);
-      if (msAbs >= d) {
-        return plural(ms, msAbs, d, "day");
-      }
-      if (msAbs >= h2) {
-        return plural(ms, msAbs, h2, "hour");
-      }
-      if (msAbs >= m) {
-        return plural(ms, msAbs, m, "minute");
-      }
-      if (msAbs >= s) {
-        return plural(ms, msAbs, s, "second");
-      }
-      return ms + " ms";
-    }
-    function plural(ms, msAbs, n, name) {
-      var isPlural = msAbs >= n * 1.5;
-      return Math.round(ms / n) + " " + name + (isPlural ? "s" : "");
-    }
-  }
-});
-
-// node_modules/debug/src/common.js
-var require_common = __commonJS({
-  "node_modules/debug/src/common.js"(exports2, module2) {
-    function setup(env8) {
-      createDebug.debug = createDebug;
-      createDebug.default = createDebug;
-      createDebug.coerce = coerce;
-      createDebug.disable = disable;
-      createDebug.enable = enable;
-      createDebug.enabled = enabled;
-      createDebug.humanize = require_ms();
-      createDebug.destroy = destroy;
-      Object.keys(env8).forEach((key) => {
-        createDebug[key] = env8[key];
-      });
-      createDebug.names = [];
-      createDebug.skips = [];
-      createDebug.formatters = {};
-      function selectColor(namespace) {
-        let hash = 0;
-        for (let i2 = 0; i2 < namespace.length; i2++) {
-          hash = (hash << 5) - hash + namespace.charCodeAt(i2);
-          hash |= 0;
-        }
-        return createDebug.colors[Math.abs(hash) % createDebug.colors.length];
-      }
-      createDebug.selectColor = selectColor;
-      function createDebug(namespace) {
-        let prevTime;
-        let enableOverride = null;
-        let namespacesCache;
-        let enabledCache;
-        function debug2(...args) {
-          if (!debug2.enabled) {
-            return;
-          }
-          const self = debug2;
-          const curr = Number(/* @__PURE__ */ new Date());
-          const ms = curr - (prevTime || curr);
-          self.diff = ms;
-          self.prev = prevTime;
-          self.curr = curr;
-          prevTime = curr;
-          args[0] = createDebug.coerce(args[0]);
-          if (typeof args[0] !== "string") {
-            args.unshift("%O");
-          }
-          let index = 0;
-          args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
-            if (match === "%%") {
-              return "%";
-            }
-            index++;
-            const formatter = createDebug.formatters[format];
-            if (typeof formatter === "function") {
-              const val = args[index];
-              match = formatter.call(self, val);
-              args.splice(index, 1);
-              index--;
-            }
-            return match;
-          });
-          createDebug.formatArgs.call(self, args);
-          const logFn = self.log || createDebug.log;
-          logFn.apply(self, args);
-        }
-        debug2.namespace = namespace;
-        debug2.useColors = createDebug.useColors();
-        debug2.color = createDebug.selectColor(namespace);
-        debug2.extend = extend;
-        debug2.destroy = createDebug.destroy;
-        Object.defineProperty(debug2, "enabled", {
-          enumerable: true,
-          configurable: false,
-          get: () => {
-            if (enableOverride !== null) {
-              return enableOverride;
-            }
-            if (namespacesCache !== createDebug.namespaces) {
-              namespacesCache = createDebug.namespaces;
-              enabledCache = createDebug.enabled(namespace);
-            }
-            return enabledCache;
-          },
-          set: (v) => {
-            enableOverride = v;
-          }
-        });
-        if (typeof createDebug.init === "function") {
-          createDebug.init(debug2);
-        }
-        return debug2;
-      }
-      function extend(namespace, delimiter) {
-        const newDebug = createDebug(this.namespace + (typeof delimiter === "undefined" ? ":" : delimiter) + namespace);
-        newDebug.log = this.log;
-        return newDebug;
-      }
-      function enable(namespaces) {
-        createDebug.save(namespaces);
-        createDebug.namespaces = namespaces;
-        createDebug.names = [];
-        createDebug.skips = [];
-        const split = (typeof namespaces === "string" ? namespaces : "").trim().replace(/\s+/g, ",").split(",").filter(Boolean);
-        for (const ns of split) {
-          if (ns[0] === "-") {
-            createDebug.skips.push(ns.slice(1));
-          } else {
-            createDebug.names.push(ns);
-          }
-        }
-      }
-      function matchesTemplate(search, template) {
-        let searchIndex = 0;
-        let templateIndex = 0;
-        let starIndex = -1;
-        let matchIndex = 0;
-        while (searchIndex < search.length) {
-          if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === "*")) {
-            if (template[templateIndex] === "*") {
-              starIndex = templateIndex;
-              matchIndex = searchIndex;
-              templateIndex++;
-            } else {
-              searchIndex++;
-              templateIndex++;
-            }
-          } else if (starIndex !== -1) {
-            templateIndex = starIndex + 1;
-            matchIndex++;
-            searchIndex = matchIndex;
-          } else {
-            return false;
-          }
-        }
-        while (templateIndex < template.length && template[templateIndex] === "*") {
-          templateIndex++;
-        }
-        return templateIndex === template.length;
-      }
-      function disable() {
-        const namespaces = [
-          ...createDebug.names,
-          ...createDebug.skips.map((namespace) => "-" + namespace)
-        ].join(",");
-        createDebug.enable("");
-        return namespaces;
-      }
-      function enabled(name) {
-        for (const skip of createDebug.skips) {
-          if (matchesTemplate(name, skip)) {
-            return false;
-          }
-        }
-        for (const ns of createDebug.names) {
-          if (matchesTemplate(name, ns)) {
-            return true;
-          }
-        }
-        return false;
-      }
-      function coerce(val) {
-        if (val instanceof Error) {
-          return val.stack || val.message;
-        }
-        return val;
-      }
-      function destroy() {
-        console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
-      }
-      createDebug.enable(createDebug.load());
-      return createDebug;
-    }
-    module2.exports = setup;
-  }
-});
-
-// node_modules/debug/src/browser.js
-var require_browser = __commonJS({
-  "node_modules/debug/src/browser.js"(exports2, module2) {
-    exports2.formatArgs = formatArgs;
-    exports2.save = save;
-    exports2.load = load;
-    exports2.useColors = useColors;
-    exports2.storage = localstorage();
-    exports2.destroy = /* @__PURE__ */ (() => {
-      let warned = false;
-      return () => {
-        if (!warned) {
-          warned = true;
-          console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
-        }
-      };
-    })();
-    exports2.colors = [
-      "#0000CC",
-      "#0000FF",
-      "#0033CC",
-      "#0033FF",
-      "#0066CC",
-      "#0066FF",
-      "#0099CC",
-      "#0099FF",
-      "#00CC00",
-      "#00CC33",
-      "#00CC66",
-      "#00CC99",
-      "#00CCCC",
-      "#00CCFF",
-      "#3300CC",
-      "#3300FF",
-      "#3333CC",
-      "#3333FF",
-      "#3366CC",
-      "#3366FF",
-      "#3399CC",
-      "#3399FF",
-      "#33CC00",
-      "#33CC33",
-      "#33CC66",
-      "#33CC99",
-      "#33CCCC",
-      "#33CCFF",
-      "#6600CC",
-      "#6600FF",
-      "#6633CC",
-      "#6633FF",
-      "#66CC00",
-      "#66CC33",
-      "#9900CC",
-      "#9900FF",
-      "#9933CC",
-      "#9933FF",
-      "#99CC00",
-      "#99CC33",
-      "#CC0000",
-      "#CC0033",
-      "#CC0066",
-      "#CC0099",
-      "#CC00CC",
-      "#CC00FF",
-      "#CC3300",
-      "#CC3333",
-      "#CC3366",
-      "#CC3399",
-      "#CC33CC",
-      "#CC33FF",
-      "#CC6600",
-      "#CC6633",
-      "#CC9900",
-      "#CC9933",
-      "#CCCC00",
-      "#CCCC33",
-      "#FF0000",
-      "#FF0033",
-      "#FF0066",
-      "#FF0099",
-      "#FF00CC",
-      "#FF00FF",
-      "#FF3300",
-      "#FF3333",
-      "#FF3366",
-      "#FF3399",
-      "#FF33CC",
-      "#FF33FF",
-      "#FF6600",
-      "#FF6633",
-      "#FF9900",
-      "#FF9933",
-      "#FFCC00",
-      "#FFCC33"
-    ];
-    function useColors() {
-      if (typeof window !== "undefined" && window.process && (window.process.type === "renderer" || window.process.__nwjs)) {
-        return true;
-      }
-      if (typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
-        return false;
-      }
-      let m;
-      return typeof document !== "undefined" && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // Is firebug? http://stackoverflow.com/a/398120/376773
-      typeof window !== "undefined" && window.console && (window.console.firebug || window.console.exception && window.console.table) || // Is firefox >= v31?
-      // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-      typeof navigator !== "undefined" && navigator.userAgent && (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) && parseInt(m[1], 10) >= 31 || // Double check webkit in userAgent just in case we are in a worker
-      typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
-    }
-    function formatArgs(args) {
-      args[0] = (this.useColors ? "%c" : "") + this.namespace + (this.useColors ? " %c" : " ") + args[0] + (this.useColors ? "%c " : " ") + "+" + module2.exports.humanize(this.diff);
-      if (!this.useColors) {
-        return;
-      }
-      const c3 = "color: " + this.color;
-      args.splice(1, 0, c3, "color: inherit");
-      let index = 0;
-      let lastC = 0;
-      args[0].replace(/%[a-zA-Z%]/g, (match) => {
-        if (match === "%%") {
-          return;
-        }
-        index++;
-        if (match === "%c") {
-          lastC = index;
-        }
-      });
-      args.splice(lastC, 0, c3);
-    }
-    exports2.log = console.debug || console.log || (() => {
-    });
-    function save(namespaces) {
-      try {
-        if (namespaces) {
-          exports2.storage.setItem("debug", namespaces);
-        } else {
-          exports2.storage.removeItem("debug");
-        }
-      } catch (error) {
-      }
-    }
-    function load() {
-      let r2;
-      try {
-        r2 = exports2.storage.getItem("debug") || exports2.storage.getItem("DEBUG");
-      } catch (error) {
-      }
-      if (!r2 && typeof process !== "undefined" && "env" in process) {
-        r2 = process.env.DEBUG;
-      }
-      return r2;
-    }
-    function localstorage() {
-      try {
-        return localStorage;
-      } catch (error) {
-      }
-    }
-    module2.exports = require_common()(exports2);
-    var { formatters } = module2.exports;
-    formatters.j = function(v) {
-      try {
-        return JSON.stringify(v);
-      } catch (error) {
-        return "[UnexpectedJSONParseError]: " + error.message;
-      }
-    };
-  }
-});
-
-// node_modules/has-flag/index.js
-var require_has_flag = __commonJS({
-  "node_modules/has-flag/index.js"(exports2, module2) {
-    "use strict";
-    module2.exports = (flag, argv = process.argv) => {
-      const prefix = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
-      const position = argv.indexOf(prefix + flag);
-      const terminatorPosition = argv.indexOf("--");
-      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
-    };
-  }
-});
-
-// node_modules/supports-color/index.js
-var require_supports_color = __commonJS({
-  "node_modules/supports-color/index.js"(exports2, module2) {
-    "use strict";
-    var os4 = require("os");
-    var tty = require("tty");
-    var hasFlag = require_has_flag();
-    var { env: env8 } = process;
-    var forceColor;
-    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
-      forceColor = 0;
-    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
-      forceColor = 1;
-    }
-    if ("FORCE_COLOR" in env8) {
-      if (env8.FORCE_COLOR === "true") {
-        forceColor = 1;
-      } else if (env8.FORCE_COLOR === "false") {
-        forceColor = 0;
-      } else {
-        forceColor = env8.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env8.FORCE_COLOR, 10), 3);
-      }
-    }
-    function translateLevel(level) {
-      if (level === 0) {
-        return false;
-      }
-      return {
-        level,
-        hasBasic: true,
-        has256: level >= 2,
-        has16m: level >= 3
-      };
-    }
-    function supportsColor(haveStream, streamIsTTY) {
-      if (forceColor === 0) {
-        return 0;
-      }
-      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
-        return 3;
-      }
-      if (hasFlag("color=256")) {
-        return 2;
-      }
-      if (haveStream && !streamIsTTY && forceColor === void 0) {
-        return 0;
-      }
-      const min = forceColor || 0;
-      if (env8.TERM === "dumb") {
-        return min;
-      }
-      if (process.platform === "win32") {
-        const osRelease = os4.release().split(".");
-        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
-          return Number(osRelease[2]) >= 14931 ? 3 : 2;
-        }
-        return 1;
-      }
-      if ("CI" in env8) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env8) || env8.CI_NAME === "codeship") {
-          return 1;
-        }
-        return min;
-      }
-      if ("TEAMCITY_VERSION" in env8) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env8.TEAMCITY_VERSION) ? 1 : 0;
-      }
-      if (env8.COLORTERM === "truecolor") {
-        return 3;
-      }
-      if ("TERM_PROGRAM" in env8) {
-        const version = parseInt((env8.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-        switch (env8.TERM_PROGRAM) {
-          case "iTerm.app":
-            return version >= 3 ? 3 : 2;
-          case "Apple_Terminal":
-            return 2;
-        }
-      }
-      if (/-256(color)?$/i.test(env8.TERM)) {
-        return 2;
-      }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env8.TERM)) {
-        return 1;
-      }
-      if ("COLORTERM" in env8) {
-        return 1;
-      }
-      return min;
-    }
-    function getSupportLevel(stream) {
-      const level = supportsColor(stream, stream && stream.isTTY);
-      return translateLevel(level);
-    }
-    module2.exports = {
-      supportsColor: getSupportLevel,
-      stdout: translateLevel(supportsColor(true, tty.isatty(1))),
-      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
-    };
-  }
-});
-
-// node_modules/debug/src/node.js
-var require_node = __commonJS({
-  "node_modules/debug/src/node.js"(exports2, module2) {
-    var tty = require("tty");
-    var util = require("util");
-    exports2.init = init;
-    exports2.log = log;
-    exports2.formatArgs = formatArgs;
-    exports2.save = save;
-    exports2.load = load;
-    exports2.useColors = useColors;
-    exports2.destroy = util.deprecate(
-      () => {
-      },
-      "Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`."
-    );
-    exports2.colors = [6, 2, 3, 4, 5, 1];
-    try {
-      const supportsColor = require_supports_color();
-      if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
-        exports2.colors = [
-          20,
-          21,
-          26,
-          27,
-          32,
-          33,
-          38,
-          39,
-          40,
-          41,
-          42,
-          43,
-          44,
-          45,
-          56,
-          57,
-          62,
-          63,
-          68,
-          69,
-          74,
-          75,
-          76,
-          77,
-          78,
-          79,
-          80,
-          81,
-          92,
-          93,
-          98,
-          99,
-          112,
-          113,
-          128,
-          129,
-          134,
-          135,
-          148,
-          149,
-          160,
-          161,
-          162,
-          163,
-          164,
-          165,
-          166,
-          167,
-          168,
-          169,
-          170,
-          171,
-          172,
-          173,
-          178,
-          179,
-          184,
-          185,
-          196,
-          197,
-          198,
-          199,
-          200,
-          201,
-          202,
-          203,
-          204,
-          205,
-          206,
-          207,
-          208,
-          209,
-          214,
-          215,
-          220,
-          221
-        ];
-      }
-    } catch (error) {
-    }
-    exports2.inspectOpts = Object.keys(process.env).filter((key) => {
-      return /^debug_/i.test(key);
-    }).reduce((obj, key) => {
-      const prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, (_2, k2) => {
-        return k2.toUpperCase();
-      });
-      let val = process.env[key];
-      if (/^(yes|on|true|enabled)$/i.test(val)) {
-        val = true;
-      } else if (/^(no|off|false|disabled)$/i.test(val)) {
-        val = false;
-      } else if (val === "null") {
-        val = null;
-      } else {
-        val = Number(val);
-      }
-      obj[prop] = val;
-      return obj;
-    }, {});
-    function useColors() {
-      return "colors" in exports2.inspectOpts ? Boolean(exports2.inspectOpts.colors) : tty.isatty(process.stderr.fd);
-    }
-    function formatArgs(args) {
-      const { namespace: name, useColors: useColors2 } = this;
-      if (useColors2) {
-        const c3 = this.color;
-        const colorCode = "\x1B[3" + (c3 < 8 ? c3 : "8;5;" + c3);
-        const prefix = `  ${colorCode};1m${name} \x1B[0m`;
-        args[0] = prefix + args[0].split("\n").join("\n" + prefix);
-        args.push(colorCode + "m+" + module2.exports.humanize(this.diff) + "\x1B[0m");
-      } else {
-        args[0] = getDate() + name + " " + args[0];
-      }
-    }
-    function getDate() {
-      if (exports2.inspectOpts.hideDate) {
-        return "";
-      }
-      return (/* @__PURE__ */ new Date()).toISOString() + " ";
-    }
-    function log(...args) {
-      return process.stderr.write(util.formatWithOptions(exports2.inspectOpts, ...args) + "\n");
-    }
-    function save(namespaces) {
-      if (namespaces) {
-        process.env.DEBUG = namespaces;
-      } else {
-        delete process.env.DEBUG;
-      }
-    }
-    function load() {
-      return process.env.DEBUG;
-    }
-    function init(debug2) {
-      debug2.inspectOpts = {};
-      const keys = Object.keys(exports2.inspectOpts);
-      for (let i2 = 0; i2 < keys.length; i2++) {
-        debug2.inspectOpts[keys[i2]] = exports2.inspectOpts[keys[i2]];
-      }
-    }
-    module2.exports = require_common()(exports2);
-    var { formatters } = module2.exports;
-    formatters.o = function(v) {
-      this.inspectOpts.colors = this.useColors;
-      return util.inspect(v, this.inspectOpts).split("\n").map((str) => str.trim()).join(" ");
-    };
-    formatters.O = function(v) {
-      this.inspectOpts.colors = this.useColors;
-      return util.inspect(v, this.inspectOpts);
-    };
-  }
-});
-
-// node_modules/debug/src/index.js
-var require_src = __commonJS({
-  "node_modules/debug/src/index.js"(exports2, module2) {
-    if (typeof process === "undefined" || process.type === "renderer" || process.browser === true || process.__nwjs) {
-      module2.exports = require_browser();
-    } else {
-      module2.exports = require_node();
-    }
-  }
-});
-
-// node_modules/@kwsites/file-exists/dist/src/index.js
-var require_src2 = __commonJS({
-  "node_modules/@kwsites/file-exists/dist/src/index.js"(exports2) {
-    "use strict";
-    var __importDefault = exports2 && exports2.__importDefault || function(mod) {
-      return mod && mod.__esModule ? mod : { "default": mod };
-    };
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var fs_1 = require("fs");
-    var debug_1 = __importDefault(require_src());
-    var log = debug_1.default("@kwsites/file-exists");
-    function check(path36, isFile, isDirectory) {
-      log(`checking %s`, path36);
-      try {
-        const stat = fs_1.statSync(path36);
-        if (stat.isFile() && isFile) {
-          log(`[OK] path represents a file`);
-          return true;
-        }
-        if (stat.isDirectory() && isDirectory) {
-          log(`[OK] path represents a directory`);
-          return true;
-        }
-        log(`[FAIL] path represents something other than a file or directory`);
-        return false;
-      } catch (e) {
-        if (e.code === "ENOENT") {
-          log(`[FAIL] path is not accessible: %o`, e);
-          return false;
-        }
-        log(`[FATAL] %o`, e);
-        throw e;
-      }
-    }
-    function exists2(path36, type = exports2.READABLE) {
-      return check(path36, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
-    }
-    exports2.exists = exists2;
-    exports2.FILE = 1;
-    exports2.FOLDER = 2;
-    exports2.READABLE = exports2.FILE + exports2.FOLDER;
-  }
-});
-
-// node_modules/@kwsites/file-exists/dist/index.js
-var require_dist = __commonJS({
-  "node_modules/@kwsites/file-exists/dist/index.js"(exports2) {
-    "use strict";
-    function __export3(m) {
-      for (var p2 in m)
-        if (!exports2.hasOwnProperty(p2))
-          exports2[p2] = m[p2];
-    }
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    __export3(require_src2());
-  }
-});
-
-// node_modules/@kwsites/promise-deferred/dist/index.js
-var require_dist2 = __commonJS({
-  "node_modules/@kwsites/promise-deferred/dist/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.createDeferred = exports2.deferred = void 0;
-    function deferred2() {
-      let done;
-      let fail;
-      let status = "pending";
-      const promise = new Promise((_done, _fail) => {
-        done = _done;
-        fail = _fail;
-      });
-      return {
-        promise,
-        done(result) {
-          if (status === "pending") {
-            status = "resolved";
-            done(result);
-          }
-        },
-        fail(error) {
-          if (status === "pending") {
-            status = "rejected";
-            fail(error);
-          }
-        },
-        get fulfilled() {
-          return status !== "pending";
-        },
-        get status() {
-          return status;
-        }
-      };
-    }
-    exports2.deferred = deferred2;
-    exports2.createDeferred = deferred2;
-    exports2.default = deferred2;
-  }
-});
-
 // node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
   "node_modules/yaml/dist/nodes/identity.js"(exports2) {
@@ -4853,10 +3990,10 @@ var require_resolve_block_map = __commonJS({
       let offset = bm.offset;
       let commentEnd = null;
       for (const collItem of bm.items) {
-        const { start, key, sep: sep3, value } = collItem;
+        const { start, key, sep: sep4, value } = collItem;
         const keyProps = resolveProps.resolveProps(start, {
           indicator: "explicit-key-ind",
-          next: key ?? sep3?.[0],
+          next: key ?? sep4?.[0],
           offset,
           onError: onError2,
           parentIndent: bm.indent,
@@ -4870,7 +4007,7 @@ var require_resolve_block_map = __commonJS({
             else if ("indent" in key && key.indent !== bm.indent)
               onError2(offset, "BAD_INDENT", startColMsg);
           }
-          if (!keyProps.anchor && !keyProps.tag && !sep3) {
+          if (!keyProps.anchor && !keyProps.tag && !sep4) {
             commentEnd = keyProps.end;
             if (keyProps.comment) {
               if (map.comment)
@@ -4894,7 +4031,7 @@ var require_resolve_block_map = __commonJS({
         ctx.atKey = false;
         if (utilMapIncludes.mapIncludes(ctx, map.items, keyNode))
           onError2(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
-        const valueProps = resolveProps.resolveProps(sep3 ?? [], {
+        const valueProps = resolveProps.resolveProps(sep4 ?? [], {
           indicator: "map-value-ind",
           next: value,
           offset: keyNode.range[2],
@@ -4910,7 +4047,7 @@ var require_resolve_block_map = __commonJS({
             if (ctx.options.strict && keyProps.start < valueProps.found.offset - 1024)
               onError2(keyNode.range, "KEY_OVER_1024_CHARS", "The : indicator must be at most 1024 chars after the start of an implicit block mapping key");
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : composeEmptyNode(ctx, offset, sep3, null, valueProps, onError2);
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : composeEmptyNode(ctx, offset, sep4, null, valueProps, onError2);
           if (ctx.schema.compat)
             utilFlowIndentCheck.flowIndentCheck(bm.indent, value, onError2);
           offset = valueNode.range[2];
@@ -5001,7 +4138,7 @@ var require_resolve_end = __commonJS({
       let comment = "";
       if (end) {
         let hasSpace = false;
-        let sep3 = "";
+        let sep4 = "";
         for (const token of end) {
           const { source, type } = token;
           switch (type) {
@@ -5015,13 +4152,13 @@ var require_resolve_end = __commonJS({
               if (!comment)
                 comment = cb;
               else
-                comment += sep3 + cb;
-              sep3 = "";
+                comment += sep4 + cb;
+              sep4 = "";
               break;
             }
             case "newline":
               if (comment)
-                sep3 += source;
+                sep4 += source;
               hasSpace = true;
               break;
             default:
@@ -5064,18 +4201,18 @@ var require_resolve_flow_collection = __commonJS({
       let offset = fc.offset + fc.start.source.length;
       for (let i2 = 0; i2 < fc.items.length; ++i2) {
         const collItem = fc.items[i2];
-        const { start, key, sep: sep3, value } = collItem;
+        const { start, key, sep: sep4, value } = collItem;
         const props = resolveProps.resolveProps(start, {
           flow: fcName,
           indicator: "explicit-key-ind",
-          next: key ?? sep3?.[0],
+          next: key ?? sep4?.[0],
           offset,
           onError: onError2,
           parentIndent: fc.indent,
           startOnNewline: false
         });
         if (!props.found) {
-          if (!props.anchor && !props.tag && !sep3 && !value) {
+          if (!props.anchor && !props.tag && !sep4 && !value) {
             if (i2 === 0 && props.comma)
               onError2(props.comma, "UNEXPECTED_TOKEN", `Unexpected , in ${fcName}`);
             else if (i2 < fc.items.length - 1)
@@ -5130,8 +4267,8 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap && !sep3 && !props.found) {
-          const valueNode = value ? composeNode(ctx, value, props, onError2) : composeEmptyNode(ctx, props.end, sep3, null, props, onError2);
+        if (!isMap && !sep4 && !props.found) {
+          const valueNode = value ? composeNode(ctx, value, props, onError2) : composeEmptyNode(ctx, props.end, sep4, null, props, onError2);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
           if (isBlock(value))
@@ -5143,7 +4280,7 @@ var require_resolve_flow_collection = __commonJS({
           if (isBlock(key))
             onError2(keyNode.range, "BLOCK_IN_FLOW", blockMsg);
           ctx.atKey = false;
-          const valueProps = resolveProps.resolveProps(sep3 ?? [], {
+          const valueProps = resolveProps.resolveProps(sep4 ?? [], {
             flow: fcName,
             indicator: "map-value-ind",
             next: value,
@@ -5154,8 +4291,8 @@ var require_resolve_flow_collection = __commonJS({
           });
           if (valueProps.found) {
             if (!isMap && !props.found && ctx.options.strict) {
-              if (sep3)
-                for (const st of sep3) {
+              if (sep4)
+                for (const st of sep4) {
                   if (st === valueProps.found)
                     break;
                   if (st.type === "newline") {
@@ -5172,7 +4309,7 @@ var require_resolve_flow_collection = __commonJS({
             else
               onError2(valueProps.start, "MISSING_CHAR", `Missing , or : between ${fcName} items`);
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep3, null, valueProps, onError2) : null;
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError2) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep4, null, valueProps, onError2) : null;
           if (valueNode) {
             if (isBlock(value))
               onError2(valueNode.range, "BLOCK_IN_FLOW", blockMsg);
@@ -5352,7 +4489,7 @@ var require_resolve_block_scalar = __commonJS({
           chompStart = i2 + 1;
       }
       let value = "";
-      let sep3 = "";
+      let sep4 = "";
       let prevMoreIndented = false;
       for (let i2 = 0; i2 < contentStart; ++i2)
         value += lines[i2][0].slice(trimIndent) + "\n";
@@ -5369,24 +4506,24 @@ var require_resolve_block_scalar = __commonJS({
           indent = "";
         }
         if (type === Scalar.Scalar.BLOCK_LITERAL) {
-          value += sep3 + indent.slice(trimIndent) + content;
-          sep3 = "\n";
+          value += sep4 + indent.slice(trimIndent) + content;
+          sep4 = "\n";
         } else if (indent.length > trimIndent || content[0] === "	") {
-          if (sep3 === " ")
-            sep3 = "\n";
-          else if (!prevMoreIndented && sep3 === "\n")
-            sep3 = "\n\n";
-          value += sep3 + indent.slice(trimIndent) + content;
-          sep3 = "\n";
+          if (sep4 === " ")
+            sep4 = "\n";
+          else if (!prevMoreIndented && sep4 === "\n")
+            sep4 = "\n\n";
+          value += sep4 + indent.slice(trimIndent) + content;
+          sep4 = "\n";
           prevMoreIndented = true;
         } else if (content === "") {
-          if (sep3 === "\n")
+          if (sep4 === "\n")
             value += "\n";
           else
-            sep3 = "\n";
+            sep4 = "\n";
         } else {
-          value += sep3 + content;
-          sep3 = " ";
+          value += sep4 + content;
+          sep4 = " ";
           prevMoreIndented = false;
         }
       }
@@ -5564,25 +4701,25 @@ var require_resolve_flow_scalar = __commonJS({
       if (!match)
         return source;
       let res = match[1];
-      let sep3 = " ";
+      let sep4 = " ";
       let pos = first2.lastIndex;
       line.lastIndex = pos;
       while (match = line.exec(source)) {
         if (match[1] === "") {
-          if (sep3 === "\n")
-            res += sep3;
+          if (sep4 === "\n")
+            res += sep4;
           else
-            sep3 = "\n";
+            sep4 = "\n";
         } else {
-          res += sep3 + match[1];
-          sep3 = " ";
+          res += sep4 + match[1];
+          sep4 = " ";
         }
         pos = line.lastIndex;
       }
       const last2 = /[ \t]*(.*)/sy;
       last2.lastIndex = pos;
       match = last2.exec(source);
-      return res + sep3 + (match?.[1] ?? "");
+      return res + sep4 + (match?.[1] ?? "");
     }
     function doubleQuotedValue(source, onError2) {
       let res = "";
@@ -6392,14 +5529,14 @@ var require_cst_stringify = __commonJS({
         }
       }
     }
-    function stringifyItem({ start, key, sep: sep3, value }) {
+    function stringifyItem({ start, key, sep: sep4, value }) {
       let res = "";
       for (const st of start)
         res += st.source;
       if (key)
         res += stringifyToken(key);
-      if (sep3)
-        for (const st of sep3)
+      if (sep4)
+        for (const st of sep4)
           res += st.source;
       if (value)
         res += stringifyToken(value);
@@ -7562,18 +6699,18 @@ var require_parser = __commonJS({
         if (this.type === "map-value-ind") {
           const prev = getPrevProps(this.peek(2));
           const start = getFirstKeyStartProps(prev);
-          let sep3;
+          let sep4;
           if (scalar.end) {
-            sep3 = scalar.end;
-            sep3.push(this.sourceToken);
+            sep4 = scalar.end;
+            sep4.push(this.sourceToken);
             delete scalar.end;
           } else
-            sep3 = [this.sourceToken];
+            sep4 = [this.sourceToken];
           const map = {
             type: "block-map",
             offset: scalar.offset,
             indent: scalar.indent,
-            items: [{ start, key: scalar, sep: sep3 }]
+            items: [{ start, key: scalar, sep: sep4 }]
           };
           this.onKeyLine = true;
           this.stack[this.stack.length - 1] = map;
@@ -7725,15 +6862,15 @@ var require_parser = __commonJS({
                 } else if (isFlowToken(it.key) && !includesToken(it.sep, "newline")) {
                   const start2 = getFirstKeyStartProps(it.start);
                   const key = it.key;
-                  const sep3 = it.sep;
-                  sep3.push(this.sourceToken);
+                  const sep4 = it.sep;
+                  sep4.push(this.sourceToken);
                   delete it.key;
                   delete it.sep;
                   this.stack.push({
                     type: "block-map",
                     offset: this.offset,
                     indent: this.indent,
-                    items: [{ start: start2, key, sep: sep3 }]
+                    items: [{ start: start2, key, sep: sep4 }]
                   });
                 } else if (start.length > 0) {
                   it.sep = it.sep.concat(start, this.sourceToken);
@@ -7927,13 +7064,13 @@ var require_parser = __commonJS({
             const prev = getPrevProps(parent);
             const start = getFirstKeyStartProps(prev);
             fixFlowSeqItems(fc);
-            const sep3 = fc.end.splice(1, fc.end.length);
-            sep3.push(this.sourceToken);
+            const sep4 = fc.end.splice(1, fc.end.length);
+            sep4.push(this.sourceToken);
             const map = {
               type: "block-map",
               offset: fc.offset,
               indent: fc.indent,
-              items: [{ start, key: fc, sep: sep3 }]
+              items: [{ start, key: fc, sep: sep4 }]
             };
             this.onKeyLine = true;
             this.stack[this.stack.length - 1] = map;
@@ -8110,7 +7247,7 @@ var require_public_api = __commonJS({
       }
       return doc;
     }
-    function parse2(src, reviver, options) {
+    function parse3(src, reviver, options) {
       let _reviver = void 0;
       if (typeof reviver === "function") {
         _reviver = reviver;
@@ -8151,7 +7288,7 @@ var require_public_api = __commonJS({
         return value.toString(options);
       return new Document4.Document(value, _replacer, options).toString(options);
     }
-    exports2.parse = parse2;
+    exports2.parse = parse3;
     exports2.parseAllDocuments = parseAllDocuments;
     exports2.parseDocument = parseDocument2;
     exports2.stringify = stringify;
@@ -8159,7 +7296,7 @@ var require_public_api = __commonJS({
 });
 
 // node_modules/yaml/dist/index.js
-var require_dist3 = __commonJS({
+var require_dist = __commonJS({
   "node_modules/yaml/dist/index.js"(exports2) {
     "use strict";
     var composer = require_composer();
@@ -8207,6 +7344,869 @@ var require_dist3 = __commonJS({
     exports2.stringify = publicApi.stringify;
     exports2.visit = visit.visit;
     exports2.visitAsync = visit.visitAsync;
+  }
+});
+
+// node_modules/ms/index.js
+var require_ms = __commonJS({
+  "node_modules/ms/index.js"(exports2, module2) {
+    var s = 1e3;
+    var m = s * 60;
+    var h2 = m * 60;
+    var d = h2 * 24;
+    var w = d * 7;
+    var y2 = d * 365.25;
+    module2.exports = function(val, options) {
+      options = options || {};
+      var type = typeof val;
+      if (type === "string" && val.length > 0) {
+        return parse3(val);
+      } else if (type === "number" && isFinite(val)) {
+        return options.long ? fmtLong(val) : fmtShort(val);
+      }
+      throw new Error(
+        "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
+      );
+    };
+    function parse3(str) {
+      str = String(str);
+      if (str.length > 100) {
+        return;
+      }
+      var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
+        str
+      );
+      if (!match) {
+        return;
+      }
+      var n = parseFloat(match[1]);
+      var type = (match[2] || "ms").toLowerCase();
+      switch (type) {
+        case "years":
+        case "year":
+        case "yrs":
+        case "yr":
+        case "y":
+          return n * y2;
+        case "weeks":
+        case "week":
+        case "w":
+          return n * w;
+        case "days":
+        case "day":
+        case "d":
+          return n * d;
+        case "hours":
+        case "hour":
+        case "hrs":
+        case "hr":
+        case "h":
+          return n * h2;
+        case "minutes":
+        case "minute":
+        case "mins":
+        case "min":
+        case "m":
+          return n * m;
+        case "seconds":
+        case "second":
+        case "secs":
+        case "sec":
+        case "s":
+          return n * s;
+        case "milliseconds":
+        case "millisecond":
+        case "msecs":
+        case "msec":
+        case "ms":
+          return n;
+        default:
+          return void 0;
+      }
+    }
+    function fmtShort(ms) {
+      var msAbs = Math.abs(ms);
+      if (msAbs >= d) {
+        return Math.round(ms / d) + "d";
+      }
+      if (msAbs >= h2) {
+        return Math.round(ms / h2) + "h";
+      }
+      if (msAbs >= m) {
+        return Math.round(ms / m) + "m";
+      }
+      if (msAbs >= s) {
+        return Math.round(ms / s) + "s";
+      }
+      return ms + "ms";
+    }
+    function fmtLong(ms) {
+      var msAbs = Math.abs(ms);
+      if (msAbs >= d) {
+        return plural(ms, msAbs, d, "day");
+      }
+      if (msAbs >= h2) {
+        return plural(ms, msAbs, h2, "hour");
+      }
+      if (msAbs >= m) {
+        return plural(ms, msAbs, m, "minute");
+      }
+      if (msAbs >= s) {
+        return plural(ms, msAbs, s, "second");
+      }
+      return ms + " ms";
+    }
+    function plural(ms, msAbs, n, name) {
+      var isPlural = msAbs >= n * 1.5;
+      return Math.round(ms / n) + " " + name + (isPlural ? "s" : "");
+    }
+  }
+});
+
+// node_modules/debug/src/common.js
+var require_common = __commonJS({
+  "node_modules/debug/src/common.js"(exports2, module2) {
+    function setup(env8) {
+      createDebug.debug = createDebug;
+      createDebug.default = createDebug;
+      createDebug.coerce = coerce;
+      createDebug.disable = disable;
+      createDebug.enable = enable;
+      createDebug.enabled = enabled;
+      createDebug.humanize = require_ms();
+      createDebug.destroy = destroy;
+      Object.keys(env8).forEach((key) => {
+        createDebug[key] = env8[key];
+      });
+      createDebug.names = [];
+      createDebug.skips = [];
+      createDebug.formatters = {};
+      function selectColor(namespace) {
+        let hash = 0;
+        for (let i2 = 0; i2 < namespace.length; i2++) {
+          hash = (hash << 5) - hash + namespace.charCodeAt(i2);
+          hash |= 0;
+        }
+        return createDebug.colors[Math.abs(hash) % createDebug.colors.length];
+      }
+      createDebug.selectColor = selectColor;
+      function createDebug(namespace) {
+        let prevTime;
+        let enableOverride = null;
+        let namespacesCache;
+        let enabledCache;
+        function debug2(...args) {
+          if (!debug2.enabled) {
+            return;
+          }
+          const self = debug2;
+          const curr = Number(/* @__PURE__ */ new Date());
+          const ms = curr - (prevTime || curr);
+          self.diff = ms;
+          self.prev = prevTime;
+          self.curr = curr;
+          prevTime = curr;
+          args[0] = createDebug.coerce(args[0]);
+          if (typeof args[0] !== "string") {
+            args.unshift("%O");
+          }
+          let index = 0;
+          args[0] = args[0].replace(/%([a-zA-Z%])/g, (match, format) => {
+            if (match === "%%") {
+              return "%";
+            }
+            index++;
+            const formatter = createDebug.formatters[format];
+            if (typeof formatter === "function") {
+              const val = args[index];
+              match = formatter.call(self, val);
+              args.splice(index, 1);
+              index--;
+            }
+            return match;
+          });
+          createDebug.formatArgs.call(self, args);
+          const logFn = self.log || createDebug.log;
+          logFn.apply(self, args);
+        }
+        debug2.namespace = namespace;
+        debug2.useColors = createDebug.useColors();
+        debug2.color = createDebug.selectColor(namespace);
+        debug2.extend = extend;
+        debug2.destroy = createDebug.destroy;
+        Object.defineProperty(debug2, "enabled", {
+          enumerable: true,
+          configurable: false,
+          get: () => {
+            if (enableOverride !== null) {
+              return enableOverride;
+            }
+            if (namespacesCache !== createDebug.namespaces) {
+              namespacesCache = createDebug.namespaces;
+              enabledCache = createDebug.enabled(namespace);
+            }
+            return enabledCache;
+          },
+          set: (v) => {
+            enableOverride = v;
+          }
+        });
+        if (typeof createDebug.init === "function") {
+          createDebug.init(debug2);
+        }
+        return debug2;
+      }
+      function extend(namespace, delimiter) {
+        const newDebug = createDebug(this.namespace + (typeof delimiter === "undefined" ? ":" : delimiter) + namespace);
+        newDebug.log = this.log;
+        return newDebug;
+      }
+      function enable(namespaces) {
+        createDebug.save(namespaces);
+        createDebug.namespaces = namespaces;
+        createDebug.names = [];
+        createDebug.skips = [];
+        const split = (typeof namespaces === "string" ? namespaces : "").trim().replace(/\s+/g, ",").split(",").filter(Boolean);
+        for (const ns of split) {
+          if (ns[0] === "-") {
+            createDebug.skips.push(ns.slice(1));
+          } else {
+            createDebug.names.push(ns);
+          }
+        }
+      }
+      function matchesTemplate(search, template) {
+        let searchIndex = 0;
+        let templateIndex = 0;
+        let starIndex = -1;
+        let matchIndex = 0;
+        while (searchIndex < search.length) {
+          if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === "*")) {
+            if (template[templateIndex] === "*") {
+              starIndex = templateIndex;
+              matchIndex = searchIndex;
+              templateIndex++;
+            } else {
+              searchIndex++;
+              templateIndex++;
+            }
+          } else if (starIndex !== -1) {
+            templateIndex = starIndex + 1;
+            matchIndex++;
+            searchIndex = matchIndex;
+          } else {
+            return false;
+          }
+        }
+        while (templateIndex < template.length && template[templateIndex] === "*") {
+          templateIndex++;
+        }
+        return templateIndex === template.length;
+      }
+      function disable() {
+        const namespaces = [
+          ...createDebug.names,
+          ...createDebug.skips.map((namespace) => "-" + namespace)
+        ].join(",");
+        createDebug.enable("");
+        return namespaces;
+      }
+      function enabled(name) {
+        for (const skip of createDebug.skips) {
+          if (matchesTemplate(name, skip)) {
+            return false;
+          }
+        }
+        for (const ns of createDebug.names) {
+          if (matchesTemplate(name, ns)) {
+            return true;
+          }
+        }
+        return false;
+      }
+      function coerce(val) {
+        if (val instanceof Error) {
+          return val.stack || val.message;
+        }
+        return val;
+      }
+      function destroy() {
+        console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+      }
+      createDebug.enable(createDebug.load());
+      return createDebug;
+    }
+    module2.exports = setup;
+  }
+});
+
+// node_modules/debug/src/browser.js
+var require_browser = __commonJS({
+  "node_modules/debug/src/browser.js"(exports2, module2) {
+    exports2.formatArgs = formatArgs;
+    exports2.save = save;
+    exports2.load = load;
+    exports2.useColors = useColors;
+    exports2.storage = localstorage();
+    exports2.destroy = /* @__PURE__ */ (() => {
+      let warned = false;
+      return () => {
+        if (!warned) {
+          warned = true;
+          console.warn("Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`.");
+        }
+      };
+    })();
+    exports2.colors = [
+      "#0000CC",
+      "#0000FF",
+      "#0033CC",
+      "#0033FF",
+      "#0066CC",
+      "#0066FF",
+      "#0099CC",
+      "#0099FF",
+      "#00CC00",
+      "#00CC33",
+      "#00CC66",
+      "#00CC99",
+      "#00CCCC",
+      "#00CCFF",
+      "#3300CC",
+      "#3300FF",
+      "#3333CC",
+      "#3333FF",
+      "#3366CC",
+      "#3366FF",
+      "#3399CC",
+      "#3399FF",
+      "#33CC00",
+      "#33CC33",
+      "#33CC66",
+      "#33CC99",
+      "#33CCCC",
+      "#33CCFF",
+      "#6600CC",
+      "#6600FF",
+      "#6633CC",
+      "#6633FF",
+      "#66CC00",
+      "#66CC33",
+      "#9900CC",
+      "#9900FF",
+      "#9933CC",
+      "#9933FF",
+      "#99CC00",
+      "#99CC33",
+      "#CC0000",
+      "#CC0033",
+      "#CC0066",
+      "#CC0099",
+      "#CC00CC",
+      "#CC00FF",
+      "#CC3300",
+      "#CC3333",
+      "#CC3366",
+      "#CC3399",
+      "#CC33CC",
+      "#CC33FF",
+      "#CC6600",
+      "#CC6633",
+      "#CC9900",
+      "#CC9933",
+      "#CCCC00",
+      "#CCCC33",
+      "#FF0000",
+      "#FF0033",
+      "#FF0066",
+      "#FF0099",
+      "#FF00CC",
+      "#FF00FF",
+      "#FF3300",
+      "#FF3333",
+      "#FF3366",
+      "#FF3399",
+      "#FF33CC",
+      "#FF33FF",
+      "#FF6600",
+      "#FF6633",
+      "#FF9900",
+      "#FF9933",
+      "#FFCC00",
+      "#FFCC33"
+    ];
+    function useColors() {
+      if (typeof window !== "undefined" && window.process && (window.process.type === "renderer" || window.process.__nwjs)) {
+        return true;
+      }
+      if (typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/(edge|trident)\/(\d+)/)) {
+        return false;
+      }
+      let m;
+      return typeof document !== "undefined" && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance || // Is firebug? http://stackoverflow.com/a/398120/376773
+      typeof window !== "undefined" && window.console && (window.console.firebug || window.console.exception && window.console.table) || // Is firefox >= v31?
+      // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+      typeof navigator !== "undefined" && navigator.userAgent && (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) && parseInt(m[1], 10) >= 31 || // Double check webkit in userAgent just in case we are in a worker
+      typeof navigator !== "undefined" && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
+    }
+    function formatArgs(args) {
+      args[0] = (this.useColors ? "%c" : "") + this.namespace + (this.useColors ? " %c" : " ") + args[0] + (this.useColors ? "%c " : " ") + "+" + module2.exports.humanize(this.diff);
+      if (!this.useColors) {
+        return;
+      }
+      const c3 = "color: " + this.color;
+      args.splice(1, 0, c3, "color: inherit");
+      let index = 0;
+      let lastC = 0;
+      args[0].replace(/%[a-zA-Z%]/g, (match) => {
+        if (match === "%%") {
+          return;
+        }
+        index++;
+        if (match === "%c") {
+          lastC = index;
+        }
+      });
+      args.splice(lastC, 0, c3);
+    }
+    exports2.log = console.debug || console.log || (() => {
+    });
+    function save(namespaces) {
+      try {
+        if (namespaces) {
+          exports2.storage.setItem("debug", namespaces);
+        } else {
+          exports2.storage.removeItem("debug");
+        }
+      } catch (error) {
+      }
+    }
+    function load() {
+      let r2;
+      try {
+        r2 = exports2.storage.getItem("debug") || exports2.storage.getItem("DEBUG");
+      } catch (error) {
+      }
+      if (!r2 && typeof process !== "undefined" && "env" in process) {
+        r2 = process.env.DEBUG;
+      }
+      return r2;
+    }
+    function localstorage() {
+      try {
+        return localStorage;
+      } catch (error) {
+      }
+    }
+    module2.exports = require_common()(exports2);
+    var { formatters } = module2.exports;
+    formatters.j = function(v) {
+      try {
+        return JSON.stringify(v);
+      } catch (error) {
+        return "[UnexpectedJSONParseError]: " + error.message;
+      }
+    };
+  }
+});
+
+// node_modules/has-flag/index.js
+var require_has_flag = __commonJS({
+  "node_modules/has-flag/index.js"(exports2, module2) {
+    "use strict";
+    module2.exports = (flag, argv = process.argv) => {
+      const prefix = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
+      const position = argv.indexOf(prefix + flag);
+      const terminatorPosition = argv.indexOf("--");
+      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+    };
+  }
+});
+
+// node_modules/supports-color/index.js
+var require_supports_color = __commonJS({
+  "node_modules/supports-color/index.js"(exports2, module2) {
+    "use strict";
+    var os4 = require("os");
+    var tty = require("tty");
+    var hasFlag = require_has_flag();
+    var { env: env8 } = process;
+    var forceColor;
+    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
+      forceColor = 0;
+    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
+      forceColor = 1;
+    }
+    if ("FORCE_COLOR" in env8) {
+      if (env8.FORCE_COLOR === "true") {
+        forceColor = 1;
+      } else if (env8.FORCE_COLOR === "false") {
+        forceColor = 0;
+      } else {
+        forceColor = env8.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env8.FORCE_COLOR, 10), 3);
+      }
+    }
+    function translateLevel(level) {
+      if (level === 0) {
+        return false;
+      }
+      return {
+        level,
+        hasBasic: true,
+        has256: level >= 2,
+        has16m: level >= 3
+      };
+    }
+    function supportsColor(haveStream, streamIsTTY) {
+      if (forceColor === 0) {
+        return 0;
+      }
+      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
+        return 3;
+      }
+      if (hasFlag("color=256")) {
+        return 2;
+      }
+      if (haveStream && !streamIsTTY && forceColor === void 0) {
+        return 0;
+      }
+      const min = forceColor || 0;
+      if (env8.TERM === "dumb") {
+        return min;
+      }
+      if (process.platform === "win32") {
+        const osRelease = os4.release().split(".");
+        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
+          return Number(osRelease[2]) >= 14931 ? 3 : 2;
+        }
+        return 1;
+      }
+      if ("CI" in env8) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env8) || env8.CI_NAME === "codeship") {
+          return 1;
+        }
+        return min;
+      }
+      if ("TEAMCITY_VERSION" in env8) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env8.TEAMCITY_VERSION) ? 1 : 0;
+      }
+      if (env8.COLORTERM === "truecolor") {
+        return 3;
+      }
+      if ("TERM_PROGRAM" in env8) {
+        const version = parseInt((env8.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env8.TERM_PROGRAM) {
+          case "iTerm.app":
+            return version >= 3 ? 3 : 2;
+          case "Apple_Terminal":
+            return 2;
+        }
+      }
+      if (/-256(color)?$/i.test(env8.TERM)) {
+        return 2;
+      }
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env8.TERM)) {
+        return 1;
+      }
+      if ("COLORTERM" in env8) {
+        return 1;
+      }
+      return min;
+    }
+    function getSupportLevel(stream) {
+      const level = supportsColor(stream, stream && stream.isTTY);
+      return translateLevel(level);
+    }
+    module2.exports = {
+      supportsColor: getSupportLevel,
+      stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+    };
+  }
+});
+
+// node_modules/debug/src/node.js
+var require_node = __commonJS({
+  "node_modules/debug/src/node.js"(exports2, module2) {
+    var tty = require("tty");
+    var util = require("util");
+    exports2.init = init;
+    exports2.log = log;
+    exports2.formatArgs = formatArgs;
+    exports2.save = save;
+    exports2.load = load;
+    exports2.useColors = useColors;
+    exports2.destroy = util.deprecate(
+      () => {
+      },
+      "Instance method `debug.destroy()` is deprecated and no longer does anything. It will be removed in the next major version of `debug`."
+    );
+    exports2.colors = [6, 2, 3, 4, 5, 1];
+    try {
+      const supportsColor = require_supports_color();
+      if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
+        exports2.colors = [
+          20,
+          21,
+          26,
+          27,
+          32,
+          33,
+          38,
+          39,
+          40,
+          41,
+          42,
+          43,
+          44,
+          45,
+          56,
+          57,
+          62,
+          63,
+          68,
+          69,
+          74,
+          75,
+          76,
+          77,
+          78,
+          79,
+          80,
+          81,
+          92,
+          93,
+          98,
+          99,
+          112,
+          113,
+          128,
+          129,
+          134,
+          135,
+          148,
+          149,
+          160,
+          161,
+          162,
+          163,
+          164,
+          165,
+          166,
+          167,
+          168,
+          169,
+          170,
+          171,
+          172,
+          173,
+          178,
+          179,
+          184,
+          185,
+          196,
+          197,
+          198,
+          199,
+          200,
+          201,
+          202,
+          203,
+          204,
+          205,
+          206,
+          207,
+          208,
+          209,
+          214,
+          215,
+          220,
+          221
+        ];
+      }
+    } catch (error) {
+    }
+    exports2.inspectOpts = Object.keys(process.env).filter((key) => {
+      return /^debug_/i.test(key);
+    }).reduce((obj, key) => {
+      const prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, (_2, k2) => {
+        return k2.toUpperCase();
+      });
+      let val = process.env[key];
+      if (/^(yes|on|true|enabled)$/i.test(val)) {
+        val = true;
+      } else if (/^(no|off|false|disabled)$/i.test(val)) {
+        val = false;
+      } else if (val === "null") {
+        val = null;
+      } else {
+        val = Number(val);
+      }
+      obj[prop] = val;
+      return obj;
+    }, {});
+    function useColors() {
+      return "colors" in exports2.inspectOpts ? Boolean(exports2.inspectOpts.colors) : tty.isatty(process.stderr.fd);
+    }
+    function formatArgs(args) {
+      const { namespace: name, useColors: useColors2 } = this;
+      if (useColors2) {
+        const c3 = this.color;
+        const colorCode = "\x1B[3" + (c3 < 8 ? c3 : "8;5;" + c3);
+        const prefix = `  ${colorCode};1m${name} \x1B[0m`;
+        args[0] = prefix + args[0].split("\n").join("\n" + prefix);
+        args.push(colorCode + "m+" + module2.exports.humanize(this.diff) + "\x1B[0m");
+      } else {
+        args[0] = getDate() + name + " " + args[0];
+      }
+    }
+    function getDate() {
+      if (exports2.inspectOpts.hideDate) {
+        return "";
+      }
+      return (/* @__PURE__ */ new Date()).toISOString() + " ";
+    }
+    function log(...args) {
+      return process.stderr.write(util.formatWithOptions(exports2.inspectOpts, ...args) + "\n");
+    }
+    function save(namespaces) {
+      if (namespaces) {
+        process.env.DEBUG = namespaces;
+      } else {
+        delete process.env.DEBUG;
+      }
+    }
+    function load() {
+      return process.env.DEBUG;
+    }
+    function init(debug2) {
+      debug2.inspectOpts = {};
+      const keys = Object.keys(exports2.inspectOpts);
+      for (let i2 = 0; i2 < keys.length; i2++) {
+        debug2.inspectOpts[keys[i2]] = exports2.inspectOpts[keys[i2]];
+      }
+    }
+    module2.exports = require_common()(exports2);
+    var { formatters } = module2.exports;
+    formatters.o = function(v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts).split("\n").map((str) => str.trim()).join(" ");
+    };
+    formatters.O = function(v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts);
+    };
+  }
+});
+
+// node_modules/debug/src/index.js
+var require_src = __commonJS({
+  "node_modules/debug/src/index.js"(exports2, module2) {
+    if (typeof process === "undefined" || process.type === "renderer" || process.browser === true || process.__nwjs) {
+      module2.exports = require_browser();
+    } else {
+      module2.exports = require_node();
+    }
+  }
+});
+
+// node_modules/@kwsites/file-exists/dist/src/index.js
+var require_src2 = __commonJS({
+  "node_modules/@kwsites/file-exists/dist/src/index.js"(exports2) {
+    "use strict";
+    var __importDefault = exports2 && exports2.__importDefault || function(mod) {
+      return mod && mod.__esModule ? mod : { "default": mod };
+    };
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    var fs_1 = require("fs");
+    var debug_1 = __importDefault(require_src());
+    var log = debug_1.default("@kwsites/file-exists");
+    function check(path36, isFile, isDirectory) {
+      log(`checking %s`, path36);
+      try {
+        const stat = fs_1.statSync(path36);
+        if (stat.isFile() && isFile) {
+          log(`[OK] path represents a file`);
+          return true;
+        }
+        if (stat.isDirectory() && isDirectory) {
+          log(`[OK] path represents a directory`);
+          return true;
+        }
+        log(`[FAIL] path represents something other than a file or directory`);
+        return false;
+      } catch (e) {
+        if (e.code === "ENOENT") {
+          log(`[FAIL] path is not accessible: %o`, e);
+          return false;
+        }
+        log(`[FATAL] %o`, e);
+        throw e;
+      }
+    }
+    function exists2(path36, type = exports2.READABLE) {
+      return check(path36, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+    }
+    exports2.exists = exists2;
+    exports2.FILE = 1;
+    exports2.FOLDER = 2;
+    exports2.READABLE = exports2.FILE + exports2.FOLDER;
+  }
+});
+
+// node_modules/@kwsites/file-exists/dist/index.js
+var require_dist2 = __commonJS({
+  "node_modules/@kwsites/file-exists/dist/index.js"(exports2) {
+    "use strict";
+    function __export3(m) {
+      for (var p2 in m)
+        if (!exports2.hasOwnProperty(p2))
+          exports2[p2] = m[p2];
+    }
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    __export3(require_src2());
+  }
+});
+
+// node_modules/@kwsites/promise-deferred/dist/index.js
+var require_dist3 = __commonJS({
+  "node_modules/@kwsites/promise-deferred/dist/index.js"(exports2) {
+    "use strict";
+    Object.defineProperty(exports2, "__esModule", { value: true });
+    exports2.createDeferred = exports2.deferred = void 0;
+    function deferred2() {
+      let done;
+      let fail;
+      let status = "pending";
+      const promise = new Promise((_done, _fail) => {
+        done = _done;
+        fail = _fail;
+      });
+      return {
+        promise,
+        done(result) {
+          if (status === "pending") {
+            status = "resolved";
+            done(result);
+          }
+        },
+        fail(error) {
+          if (status === "pending") {
+            status = "rejected";
+            fail(error);
+          }
+        },
+        get fulfilled() {
+          return status !== "pending";
+        },
+        get status() {
+          return status;
+        }
+      };
+    }
+    exports2.deferred = deferred2;
+    exports2.createDeferred = deferred2;
+    exports2.default = deferred2;
   }
 });
 
@@ -11767,62 +11767,62 @@ var require_fast_uri = __commonJS({
     function normalize2(uri, options) {
       if (typeof uri === "string") {
         uri = /** @type {T} */
-        serialize(parse2(uri, options), options);
+        serialize(parse3(uri, options), options);
       } else if (typeof uri === "object") {
         uri = /** @type {T} */
-        parse2(serialize(uri, options), options);
+        parse3(serialize(uri, options), options);
       }
       return uri;
     }
     function resolve5(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
-      const resolved = resolveComponent(parse2(baseURI, schemelessOptions), parse2(relativeURI, schemelessOptions), schemelessOptions, true);
+      const resolved = resolveComponent(parse3(baseURI, schemelessOptions), parse3(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative5, options, skipNormalization) {
+    function resolveComponent(base, relative6, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
-        base = parse2(serialize(base, options), options);
-        relative5 = parse2(serialize(relative5, options), options);
+        base = parse3(serialize(base, options), options);
+        relative6 = parse3(serialize(relative6, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative5.scheme) {
-        target.scheme = relative5.scheme;
-        target.userinfo = relative5.userinfo;
-        target.host = relative5.host;
-        target.port = relative5.port;
-        target.path = removeDotSegments(relative5.path || "");
-        target.query = relative5.query;
+      if (!options.tolerant && relative6.scheme) {
+        target.scheme = relative6.scheme;
+        target.userinfo = relative6.userinfo;
+        target.host = relative6.host;
+        target.port = relative6.port;
+        target.path = removeDotSegments(relative6.path || "");
+        target.query = relative6.query;
       } else {
-        if (relative5.userinfo !== void 0 || relative5.host !== void 0 || relative5.port !== void 0) {
-          target.userinfo = relative5.userinfo;
-          target.host = relative5.host;
-          target.port = relative5.port;
-          target.path = removeDotSegments(relative5.path || "");
-          target.query = relative5.query;
+        if (relative6.userinfo !== void 0 || relative6.host !== void 0 || relative6.port !== void 0) {
+          target.userinfo = relative6.userinfo;
+          target.host = relative6.host;
+          target.port = relative6.port;
+          target.path = removeDotSegments(relative6.path || "");
+          target.query = relative6.query;
         } else {
-          if (!relative5.path) {
+          if (!relative6.path) {
             target.path = base.path;
-            if (relative5.query !== void 0) {
-              target.query = relative5.query;
+            if (relative6.query !== void 0) {
+              target.query = relative6.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative5.path[0] === "/") {
-              target.path = removeDotSegments(relative5.path);
+            if (relative6.path[0] === "/") {
+              target.path = removeDotSegments(relative6.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative5.path;
+                target.path = "/" + relative6.path;
               } else if (!base.path) {
-                target.path = relative5.path;
+                target.path = relative6.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative5.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative6.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative5.query;
+            target.query = relative6.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -11830,19 +11830,19 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative5.fragment;
+      target.fragment = relative6.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
       if (typeof uriA === "string") {
         uriA = unescape(uriA);
-        uriA = serialize(normalizeComponentEncoding(parse2(uriA, options), true), { ...options, skipEscape: true });
+        uriA = serialize(normalizeComponentEncoding(parse3(uriA, options), true), { ...options, skipEscape: true });
       } else if (typeof uriA === "object") {
         uriA = serialize(normalizeComponentEncoding(uriA, true), { ...options, skipEscape: true });
       }
       if (typeof uriB === "string") {
         uriB = unescape(uriB);
-        uriB = serialize(normalizeComponentEncoding(parse2(uriB, options), true), { ...options, skipEscape: true });
+        uriB = serialize(normalizeComponentEncoding(parse3(uriB, options), true), { ...options, skipEscape: true });
       } else if (typeof uriB === "object") {
         uriB = serialize(normalizeComponentEncoding(uriB, true), { ...options, skipEscape: true });
       }
@@ -11912,7 +11912,7 @@ var require_fast_uri = __commonJS({
       return uriTokens.join("");
     }
     var URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
-    function parse2(uri, opts) {
+    function parse3(uri, opts) {
       const options = Object.assign({}, opts);
       const parsed = {
         scheme: void 0,
@@ -12006,7 +12006,7 @@ var require_fast_uri = __commonJS({
       resolveComponent,
       equal,
       serialize,
-      parse: parse2
+      parse: parse3
     };
     module2.exports = fastUri;
     module2.exports.default = fastUri;
@@ -14693,6 +14693,7 @@ var vscode11 = __toESM(require("vscode"));
 var vscode = __toESM(require("vscode"));
 var fs5 = __toESM(require("fs"));
 var path6 = __toESM(require("path"));
+var YAML = __toESM(require_dist());
 
 // src/utils/git.ts
 var cp = __toESM(require("child_process"));
@@ -16223,6 +16224,7 @@ function repoRootForSpecPath(specPath) {
 
 // src/utils/fileSystem.ts
 var SESSION_SETS_REL = path6.join("docs", "session-sets");
+var MODULES_MANIFEST_REL = path6.join("docs", "modules.yaml");
 var PLAYWRIGHT_REL_DEFAULT = "tests";
 var STATE_RANK = {
   complete: 3,
@@ -16230,33 +16232,46 @@ var STATE_RANK = {
   "not-started": 1,
   cancelled: 0
 };
-function discoverRoots() {
+function discoverRootsWithFamilies() {
   const seen = /* @__PURE__ */ new Map();
   const order = [];
-  const add = (p2) => {
+  const canonicalKey = (p2) => {
+    try {
+      return fs5.realpathSync.native(p2);
+    } catch {
+      return p2;
+    }
+  };
+  const add = (p2, familyId) => {
     if (!p2)
       return;
     const canonical = path6.resolve(p2);
-    let key;
-    try {
-      key = fs5.realpathSync.native(canonical);
-    } catch {
-      key = canonical;
-    }
+    const key = canonicalKey(canonical);
     if (seen.has(key) || !fs5.existsSync(canonical))
       return;
     seen.set(key, canonical);
-    order.push(canonical);
+    order.push({ dir: canonical, familyId });
   };
-  for (const folder of vscode.workspace.workspaceFolders ?? []) {
-    add(folder.uri.fsPath);
+  const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => {
+    const folderPath = path6.resolve(f.uri.fsPath);
+    const worktrees = listGitWorktrees(folderPath);
+    const familyId = canonicalKey(
+      worktrees.length > 0 ? worktrees[0] : folderPath
+    );
+    return { folderPath, worktrees, familyId };
+  });
+  for (const f of folders) {
+    add(f.folderPath, f.familyId);
   }
-  for (const folder of vscode.workspace.workspaceFolders ?? []) {
-    for (const wt of listGitWorktrees(folder.uri.fsPath)) {
-      add(wt);
+  for (const f of folders) {
+    for (const wt of f.worktrees) {
+      add(wt, f.familyId);
     }
   }
   return order;
+}
+function discoverRoots() {
+  return discoverRootsWithFamilies().map((r2) => r2.dir);
 }
 function isMidSetComplete(statePath) {
   if (!fs5.existsSync(statePath))
@@ -16342,7 +16357,8 @@ function parseSessionSetConfig(specPath) {
     requiresE2E: false,
     uatScope: "none",
     tier: "full",
-    verificationMode: "out-of-band-or-none"
+    verificationMode: "out-of-band-or-none",
+    module: null
   };
   if (!fs5.existsSync(specPath))
     return config;
@@ -16399,6 +16415,9 @@ function parseSessionSetConfig(specPath) {
       config.verificationMode = v;
     }
   }
+  const mod = stringValue(block.match(stringRe("module")));
+  if (mod)
+    config.module = mod;
   return config;
 }
 function parsePrerequisites(specPath) {
@@ -16460,6 +16479,67 @@ function parsePrerequisites(specPath) {
       condition = "complete";
     }
     out.push({ slug, condition });
+  }
+  return out;
+}
+function readModulesManifest(root) {
+  const manifestPath = path6.join(root, MODULES_MANIFEST_REL);
+  if (!fs5.existsSync(manifestPath))
+    return null;
+  let text;
+  try {
+    text = fs5.readFileSync(manifestPath, "utf8");
+  } catch {
+    return null;
+  }
+  let doc;
+  try {
+    doc = YAML.parse(text);
+  } catch {
+    console.warn(
+      `[dabblerSessionSets] ${manifestPath} is not valid YAML \u2014 falling back to the single implicit module.`
+    );
+    return null;
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    console.warn(
+      `[dabblerSessionSets] ${manifestPath} is not a YAML mapping \u2014 falling back to the single implicit module.`
+    );
+    return null;
+  }
+  const rawModules = doc.modules;
+  if (!Array.isArray(rawModules)) {
+    console.warn(
+      `[dabblerSessionSets] ${manifestPath} has no "modules:" list \u2014 falling back to the single implicit module.`
+    );
+    return null;
+  }
+  const stringList = (v) => Array.isArray(v) ? v.filter((x2) => typeof x2 === "string" && x2.trim() !== "").map((s) => s.trim()) : [];
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const raw of rawModules) {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw))
+      continue;
+    const obj = raw;
+    const slug = typeof obj.slug === "string" ? obj.slug.trim() : "";
+    if (!slug)
+      continue;
+    if (seen.has(slug)) {
+      console.warn(
+        `[dabblerSessionSets] duplicate module slug "${slug}" in ${manifestPath} \u2014 keeping the first entry.`
+      );
+      continue;
+    }
+    seen.add(slug);
+    const title = typeof obj.title === "string" && obj.title.trim() !== "" ? obj.title.trim() : slug;
+    const planPath = typeof obj.planPath === "string" && obj.planPath.trim() !== "" ? obj.planPath.trim() : null;
+    out.push({
+      slug,
+      title,
+      codeRoots: stringList(obj.codeRoots),
+      planPath,
+      touches: stringList(obj.touches)
+    });
   }
   return out;
 }
@@ -16539,6 +16619,7 @@ function readSessionSets(root) {
   const entries = fs5.readdirSync(sessionSetsDir, { withFileTypes: true });
   const sets = [];
   const workspaceTierMarker = readTierMarker(root);
+  const modulesManifest = readModulesManifest(root);
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith("_"))
       continue;
@@ -16671,6 +16752,21 @@ function readSessionSets(root) {
     const durableMode = durableVerificationModeFrom(activityLogParsed);
     if (durableMode !== null)
       config.verificationMode = durableMode;
+    let module2 = null;
+    let moduleTitle = null;
+    if (config.module !== null && modulesManifest !== null) {
+      const manifestEntry = modulesManifest.find(
+        (m) => m.slug === config.module
+      );
+      if (manifestEntry) {
+        module2 = manifestEntry.slug;
+        moduleTitle = manifestEntry.title;
+      } else {
+        console.warn(
+          `[dabblerSessionSets] ${entry.name}: spec declares module: ${config.module}, which is not a slug in docs/modules.yaml \u2014 treating as the implicit module.`
+        );
+      }
+    }
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
     const plusFraction = shouldRenderPlusFraction(
@@ -16703,6 +16799,8 @@ function readSessionSets(root) {
     }
     sets.push({
       name: entry.name,
+      module: module2,
+      moduleTitle,
       dir,
       specPath,
       activityPath,
@@ -16784,28 +16882,87 @@ function deriveBlockedByPrereqs(sets) {
     s.unsatisfiedPrereqs = unsatisfied;
   }
 }
-function readAllSessionSets() {
-  const merged = /* @__PURE__ */ new Map();
-  for (const root of discoverRoots()) {
-    for (const set of readSessionSets(root)) {
-      const prior = merged.get(set.name);
-      if (!prior) {
-        merged.set(set.name, set);
-        continue;
-      }
-      const newRank = STATE_RANK[set.state] ?? -1;
-      const priorRank = STATE_RANK[prior.state] ?? -1;
-      if (newRank > priorRank) {
-        merged.set(set.name, set);
-      } else if (newRank === priorRank) {
-        if ((set.lastTouched || "") > (prior.lastTouched || ""))
-          merged.set(set.name, set);
-      }
+function outranks(candidate, incumbent) {
+  const candRank = STATE_RANK[candidate.state] ?? -1;
+  const incRank = STATE_RANK[incumbent.state] ?? -1;
+  if (candRank !== incRank)
+    return candRank > incRank;
+  return (candidate.lastTouched || "") > (incumbent.lastTouched || "");
+}
+var loggedCollisionSignatures = /* @__PURE__ */ new Set();
+function readAllSessionSetsWithDiagnostics() {
+  const byName = /* @__PURE__ */ new Map();
+  for (const root of discoverRootsWithFamilies()) {
+    for (const set of readSessionSets(root.dir)) {
+      const relPath = path6.relative(root.dir, set.dir).split(path6.sep).join("/");
+      const candidate = {
+        set,
+        familyId: root.familyId,
+        identityKey: `${root.familyId}\0${relPath}`
+      };
+      const bucket = byName.get(set.name);
+      if (bucket)
+        bucket.push(candidate);
+      else
+        byName.set(set.name, [candidate]);
     }
   }
-  const mergedList = Array.from(merged.values());
+  const mergedList = [];
+  const collisions = [];
+  const currentSignatures = /* @__PURE__ */ new Set();
+  for (const [name, candidates] of byName) {
+    let winner = candidates[0];
+    for (const c3 of candidates.slice(1)) {
+      if (outranks(c3.set, winner.set))
+        winner = c3;
+    }
+    const distinctIdentities = /* @__PURE__ */ new Map();
+    for (const c3 of candidates) {
+      const rep = distinctIdentities.get(c3.identityKey);
+      if (!rep || outranks(c3.set, rep.set)) {
+        distinctIdentities.set(c3.identityKey, c3);
+      }
+    }
+    if (distinctIdentities.size > 1) {
+      const representatives = Array.from(distinctIdentities.values());
+      const conflictingDirs = representatives.map((c3) => c3.set.dir).sort();
+      winner.set.duplicateNameError = {
+        name,
+        chosenDir: winner.set.dir,
+        conflictingDirs
+      };
+      const collision = {
+        name,
+        chosenDir: winner.set.dir,
+        conflictingDirs,
+        candidates: representatives.map((c3) => ({
+          dir: c3.set.dir,
+          familyId: c3.familyId,
+          state: c3.set.state,
+          lastTouched: c3.set.lastTouched
+        }))
+      };
+      collisions.push(collision);
+      const signature = `${name}\0${conflictingDirs.join("|")}`;
+      currentSignatures.add(signature);
+      if (!loggedCollisionSignatures.has(signature)) {
+        loggedCollisionSignatures.add(signature);
+        console.error(
+          `[dabblerSessionSets] DUPLICATE SESSION-SET NAME "${name}": ${conflictingDirs.length} different sets share this name (${conflictingDirs.join(", ")}). Session-set names must be globally unique across the workspace \u2014 rename one of them. Showing only ${winner.set.dir}; name-keyed actions resolve to that copy.`
+        );
+      }
+    }
+    mergedList.push(winner.set);
+  }
+  for (const sig of loggedCollisionSignatures) {
+    if (!currentSignatures.has(sig))
+      loggedCollisionSignatures.delete(sig);
+  }
   deriveBlockedByPrereqs(mergedList);
-  return mergedList;
+  return { sets: mergedList, collisions };
+}
+function readAllSessionSets() {
+  return readAllSessionSetsWithDiagnostics().sets;
 }
 
 // src/providers/SessionSetsModel.ts
@@ -17872,7 +18029,7 @@ var os2 = __toESM(require("os"));
 var path14 = __toESM(require("path"));
 
 // node_modules/simple-git/dist/esm/index.js
-var import_file_exists = __toESM(require_dist(), 1);
+var import_file_exists = __toESM(require_dist2(), 1);
 
 // node_modules/@simple-git/args-pathspec/dist/index.mjs
 var t = /* @__PURE__ */ new WeakMap();
@@ -17890,7 +18047,7 @@ function o(n) {
 // node_modules/simple-git/dist/esm/index.js
 var import_debug = __toESM(require_src(), 1);
 var import_child_process = require("child_process");
-var import_promise_deferred = __toESM(require_dist2(), 1);
+var import_promise_deferred = __toESM(require_dist3(), 1);
 var import_node_path = require("node:path");
 
 // node_modules/@simple-git/argv-parser/dist/index.mjs
@@ -18359,7 +18516,7 @@ function ne(e, t2) {
 }
 
 // node_modules/simple-git/dist/esm/index.js
-var import_promise_deferred2 = __toESM(require_dist2(), 1);
+var import_promise_deferred2 = __toESM(require_dist3(), 1);
 var import_node_events = require("node:events");
 var __defProp2 = Object.defineProperty;
 var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -18766,7 +18923,7 @@ function parseStringResponse(result, parsers12, texts, trim = true) {
         }
         return lines[i2 + offset];
       };
-      parsers12.some(({ parse: parse2 }) => parse2(line, result));
+      parsers12.some(({ parse: parse3 }) => parse3(line, result));
     }
   });
   return result;
@@ -26354,7 +26511,7 @@ var fs21 = __toESM(require("fs"));
 // src/utils/routerConfig.ts
 var fs20 = __toESM(require("fs"));
 var path23 = __toESM(require("path"));
-var YAML = __toESM(require_dist3());
+var YAML2 = __toESM(require_dist());
 var DEFAULT_METRICS_FILENAME = "router-metrics.jsonl";
 var DEFAULT_REVIEW_FREQUENCY_DAYS = 30;
 function findAiRouterDir(workspaceRoot2) {
@@ -26377,7 +26534,7 @@ function readRouterConfig(workspaceRoot2) {
   const configPath = path23.join(aiRouterDir, "router-config.yaml");
   let doc = {};
   try {
-    doc = YAML.parse(fs20.readFileSync(configPath, "utf8")) ?? {};
+    doc = YAML2.parse(fs20.readFileSync(configPath, "utf8")) ?? {};
   } catch {
     doc = {};
   }
@@ -26755,7 +26912,7 @@ var fs24 = __toESM(require("fs"));
 var path25 = __toESM(require("path"));
 
 // src/configEditor/yamlReadWrite.ts
-var import_yaml = __toESM(require_dist3());
+var import_yaml = __toESM(require_dist());
 var fs23 = __toESM(require("fs"));
 function readYamlFile(filePath) {
   if (!fs23.existsSync(filePath))
@@ -27557,7 +27714,7 @@ function walk(obj, prefix, emit) {
 }
 
 // src/configEditor/patch.ts
-var import_yaml2 = __toESM(require_dist3());
+var import_yaml2 = __toESM(require_dist());
 function applyPatch(routerConfigDoc, budgetDoc, localOverridesDoc, payload) {
   const result = {
     routerConfigChanged: false,

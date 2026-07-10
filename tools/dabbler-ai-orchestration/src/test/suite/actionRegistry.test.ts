@@ -28,6 +28,8 @@ function fakeSet(
 ): SessionSet {
   return {
     name: over.name ?? "fixture",
+    module: null,
+    moduleTitle: null,
     dir: "/x",
     specPath: "/x/spec.md",
     activityPath: "/x/activity-log.json",
@@ -46,6 +48,7 @@ function fakeSet(
       uatScope: "none",
       tier: "full",
       verificationMode: "out-of-band-or-none",
+      module: null,
     },
     uatSummary: null,
     root: "/x",
@@ -351,6 +354,7 @@ suite("ActionRegistry", () => {
           uatScope: "",
           tier: "full",
           verificationMode: "out-of-band-or-none",
+          module: null,
         },
         sessionsCompleted: 2,
         needsMigration: true,
@@ -423,6 +427,7 @@ suite("ActionRegistry", () => {
         uatScope: "none",
         tier: "lightweight",
         verificationMode: "dedicated-sessions",
+        module: null,
       },
       blockedByPrereqs: true,
       unsatisfiedPrereqs: [
@@ -458,6 +463,7 @@ suite("ActionRegistry", () => {
     uatScope: "none",
     tier: "lightweight" as const,
     verificationMode,
+    module: null,
   });
 
   test("copyVerificationKickoffPrompt — Lightweight Mode-B rows with no completed verification, cancelled excluded (spec D2)", () => {

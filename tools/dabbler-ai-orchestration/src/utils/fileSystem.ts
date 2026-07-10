@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import * as YAML from "yaml";
 import { listGitWorktrees } from "./git";
 import { readStatus } from "./sessionState";
 import { isCancelled, readCancellationState } from "./cancelLifecycle";
@@ -15,6 +16,8 @@ import {
 } from "./tierLegibility";
 import { readTierMarker } from "./tierMarkerStore";
 import {
+  DuplicateNameCollision,
+  ModuleManifestEntry,
   SessionSet,
   SessionState,
   SessionSetConfig,
@@ -27,6 +30,7 @@ import {
 } from "../types";
 
 export const SESSION_SETS_REL = path.join("docs", "session-sets");
+export const MODULES_MANIFEST_REL = path.join("docs", "modules.yaml");
 export const PLAYWRIGHT_REL_DEFAULT = "tests";
 
 // Cancelled sets sort below all other groups in the merge logic — Set 8
@@ -41,38 +45,72 @@ const STATE_RANK: Record<SessionState, number> = {
   cancelled: 0,
 };
 
-export function discoverRoots(): string[] {
+// Set 087 Session 1: one discovered root plus the identity of the git
+// repository ("family") it belongs to. A workspace folder and every
+// worktree it enumerates share one `familyId` (the realpath of the
+// repo's MAIN worktree — the first `git worktree list` entry, which git
+// guarantees lists first); a non-git folder is its own family. The
+// familyId is what lets the duplicate-set-name check tell the
+// legitimate cross-root merge (same repo, main checkout + worktrees)
+// apart from a true collision (two different repos sharing a set name).
+// Derived entirely from the worktree enumeration discovery already
+// runs — no additional git calls.
+export interface DiscoveredRoot {
+  dir: string;
+  familyId: string;
+}
+
+export function discoverRootsWithFamilies(): DiscoveredRoot[] {
   const seen = new Map<string, string>();
-  const order: string[] = [];
-  const add = (p: string | undefined) => {
+  const order: DiscoveredRoot[] = [];
+  // Set 077 S1 (verifier round 2): dedup on the filesystem's own
+  // canonical form, not an OS-name proxy — realpath collapses case
+  // variants only where the volume itself is case-insensitive (so
+  // case-sensitive APFS/Linux keep distinct roots distinct), and
+  // resolves symlinked duplicates as a bonus. Fall back to the
+  // resolved path when realpath fails (nonexistent target — filtered
+  // by the existsSync check below).
+  const canonicalKey = (p: string): string => {
+    try {
+      return fs.realpathSync.native(p);
+    } catch {
+      return p;
+    }
+  };
+  const add = (p: string | undefined, familyId: string) => {
     if (!p) return;
     const canonical = path.resolve(p);
-    // Set 077 S1 (verifier round 2): dedup on the filesystem's own
-    // canonical form, not an OS-name proxy — realpath collapses case
-    // variants only where the volume itself is case-insensitive (so
-    // case-sensitive APFS/Linux keep distinct roots distinct), and
-    // resolves symlinked duplicates as a bonus. Fall back to the
-    // resolved path when realpath fails (nonexistent target — filtered
-    // by the existsSync check below).
-    let key: string;
-    try {
-      key = fs.realpathSync.native(canonical);
-    } catch {
-      key = canonical;
-    }
+    const key = canonicalKey(canonical);
     if (seen.has(key) || !fs.existsSync(canonical)) return;
     seen.set(key, canonical);
-    order.push(canonical);
+    order.push({ dir: canonical, familyId });
   };
-  for (const folder of vscode.workspace.workspaceFolders ?? []) {
-    add(folder.uri.fsPath);
+  // One worktree enumeration per workspace folder (same git-call count
+  // as before Set 087 — the list is reused for both the familyId and
+  // the worktree-root additions below).
+  const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => {
+    const folderPath = path.resolve(f.uri.fsPath);
+    const worktrees = listGitWorktrees(folderPath);
+    // Main worktree first per `git worktree list` contract; a non-git
+    // folder (empty list) is its own single-member family.
+    const familyId = canonicalKey(
+      worktrees.length > 0 ? worktrees[0] : folderPath,
+    );
+    return { folderPath, worktrees, familyId };
+  });
+  for (const f of folders) {
+    add(f.folderPath, f.familyId);
   }
-  for (const folder of vscode.workspace.workspaceFolders ?? []) {
-    for (const wt of listGitWorktrees(folder.uri.fsPath)) {
-      add(wt);
+  for (const f of folders) {
+    for (const wt of f.worktrees) {
+      add(wt, f.familyId);
     }
   }
   return order;
+}
+
+export function discoverRoots(): string[] {
+  return discoverRootsWithFamilies().map((r) => r.dir);
 }
 
 // Detect a stale `status: "complete"` snapshot that doesn't actually
@@ -218,12 +256,17 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   // the Set 057 per-set verification choice's spec-config seed.
   // Absent defaults to `"out-of-band-or-none"` (the strictly-opt-in
   // Set 057 contract).
+  // Set 087 Session 1: `module` joins the parsed fields — the raw
+  // declared grouping slug, validated against docs/modules.yaml by the
+  // caller (readSessionSets), never here (the parser has no root
+  // context). Absent defaults to null (the implicit module).
   const config: SessionSetConfig = {
     requiresUAT: false,
     requiresE2E: false,
     uatScope: "none",
     tier: "full",
     verificationMode: "out-of-band-or-none",
+    module: null,
   };
   if (!fs.existsSync(specPath)) return config;
   let text: string;
@@ -285,6 +328,8 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
     }
     // Unknown values fall back to the default, same posture as `tier`.
   }
+  const mod = stringValue(block.match(stringRe("module")));
+  if (mod) config.module = mod;
   return config;
 }
 
@@ -407,6 +452,105 @@ export function parsePrerequisites(
   return out;
 }
 
+/**
+ * Set 087 Session 1 (recommendation §2.4): read the module manifest at
+ * ``docs/modules.yaml`` for one root.
+ *
+ * Returns ``null`` when the manifest is absent, unreadable, or not a
+ * mapping with a ``modules:`` list — the single-implicit-module case:
+ * every set groups into one unlabeled module and the Explorer renders
+ * exactly today's flat view. Returns the entries in FILE ORDER (which is
+ * the Explorer's module display order) otherwise; an empty array means
+ * "manifest present but no usable entries" and behaves like the implicit
+ * module downstream.
+ *
+ * Tolerant read, mirroring `parseSessionSetConfig` / `parsePrerequisites`
+ * posture: entries missing a ``slug`` are dropped; a duplicate ``slug``
+ * keeps the first entry (later duplicates dropped with a console.warn);
+ * ``title`` defaults to the slug; ``codeRoots`` / ``touches`` keep only
+ * their string members; ``planPath`` is null when absent. Unlike the two
+ * markdown-embedded parsers this uses the real YAML parser — the
+ * manifest is a standalone .yaml file (same posture as
+ * `utils/routerConfig.ts`), not a fenced block inside a spec.
+ */
+export function readModulesManifest(root: string): ModuleManifestEntry[] | null {
+  const manifestPath = path.join(root, MODULES_MANIFEST_REL);
+  if (!fs.existsSync(manifestPath)) return null;
+  let text: string;
+  try {
+    text = fs.readFileSync(manifestPath, "utf8");
+  } catch {
+    return null;
+  }
+  let doc: unknown;
+  try {
+    doc = YAML.parse(text);
+  } catch {
+    console.warn(
+      `[dabblerSessionSets] ${manifestPath} is not valid YAML — ` +
+        `falling back to the single implicit module.`,
+    );
+    return null;
+  }
+  // S1 verifier round 1: a PRESENT manifest with the wrong shape is a
+  // config error, not the intentional no-manifest case — warn so the
+  // operator can tell the two apart, then degrade the same way (the
+  // implicit module must never block the Explorer).
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    console.warn(
+      `[dabblerSessionSets] ${manifestPath} is not a YAML mapping — ` +
+        `falling back to the single implicit module.`,
+    );
+    return null;
+  }
+  const rawModules = (doc as Record<string, unknown>).modules;
+  if (!Array.isArray(rawModules)) {
+    console.warn(
+      `[dabblerSessionSets] ${manifestPath} has no "modules:" list — ` +
+        `falling back to the single implicit module.`,
+    );
+    return null;
+  }
+  const stringList = (v: unknown): string[] =>
+    Array.isArray(v)
+      ? v
+          .filter((x): x is string => typeof x === "string" && x.trim() !== "")
+          .map((s) => s.trim())
+      : [];
+  const out: ModuleManifestEntry[] = [];
+  const seen = new Set<string>();
+  for (const raw of rawModules) {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const obj = raw as Record<string, unknown>;
+    const slug = typeof obj.slug === "string" ? obj.slug.trim() : "";
+    if (!slug) continue;
+    if (seen.has(slug)) {
+      console.warn(
+        `[dabblerSessionSets] duplicate module slug "${slug}" in ` +
+          `${manifestPath} — keeping the first entry.`,
+      );
+      continue;
+    }
+    seen.add(slug);
+    const title =
+      typeof obj.title === "string" && obj.title.trim() !== ""
+        ? obj.title.trim()
+        : slug;
+    const planPath =
+      typeof obj.planPath === "string" && obj.planPath.trim() !== ""
+        ? obj.planPath.trim()
+        : null;
+    out.push({
+      slug,
+      title,
+      codeRoots: stringList(obj.codeRoots),
+      planPath,
+      touches: stringList(obj.touches),
+    });
+  }
+  return out;
+}
+
 export function parseUatChecklist(checklistPath: string): UatSummary | null {
   if (!fs.existsSync(checklistPath)) return null;
   let data: unknown;
@@ -491,6 +635,9 @@ export function readSessionSets(root: string): SessionSet[] {
   // can surface the tier-mismatch advisory. Tolerant reader — missing /
   // unreadable / unknown values read as null (no advisory).
   const workspaceTierMarker = readTierMarker(root);
+  // Set 087 Session 1: the module manifest, read ONCE per root. Null =
+  // no manifest → every set lands in the single implicit module.
+  const modulesManifest = readModulesManifest(root);
 
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith("_")) continue;
@@ -821,6 +968,36 @@ export function readSessionSets(root: string): SessionSet[] {
     // below) reads the same effective mode the gate does (critique M5).
     const durableMode = durableVerificationModeFrom(activityLogParsed);
     if (durableMode !== null) config.verificationMode = durableMode;
+    // Set 087 Session 1: validate the spec's declared `module:` against
+    // the manifest. Only a manifest-known slug attributes the set; an
+    // unknown slug (typo, module removed, manifest absent) reads as the
+    // implicit module — grouping must degrade gracefully, never block a
+    // row — with a console.warn as the diagnostic trail. The raw declared
+    // value stays on `config.module` so later sessions can surface the
+    // mismatch in the UI if warranted.
+    let module: string | null = null;
+    let moduleTitle: string | null = null;
+    if (config.module !== null && modulesManifest !== null) {
+      // S1 verifier round 2: the unknown-slug warning only fires when a
+      // manifest actually LOADED and lacks the slug. With no usable
+      // manifest (absent, or malformed — which already warned once at
+      // manifest level), a declared module: reads silently as implicit;
+      // repeating a per-set "not a slug" warning there would misreport
+      // the real condition.
+      const manifestEntry = modulesManifest.find(
+        (m) => m.slug === config.module,
+      );
+      if (manifestEntry) {
+        module = manifestEntry.slug;
+        moduleTitle = manifestEntry.title;
+      } else {
+        console.warn(
+          `[dabblerSessionSets] ${entry.name}: spec declares ` +
+            `module: ${config.module}, which is not a slug in ` +
+            `docs/modules.yaml — treating as the implicit module.`,
+        );
+      }
+    }
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
     // Set 061 Session 1 (spec D1): derived, never persisted.
@@ -876,6 +1053,8 @@ export function readSessionSets(root: string): SessionSet[] {
 
     sets.push({
       name: entry.name,
+      module,
+      moduleTitle,
       dir,
       specPath,
       activityPath,
@@ -995,26 +1174,138 @@ function deriveBlockedByPrereqs(sets: SessionSet[]): void {
   }
 }
 
-export function readAllSessionSets(): SessionSet[] {
-  const merged = new Map<string, SessionSet>();
-  for (const root of discoverRoots()) {
-    for (const set of readSessionSets(root)) {
-      const prior = merged.get(set.name);
-      if (!prior) { merged.set(set.name, set); continue; }
-      const newRank = STATE_RANK[set.state] ?? -1;
-      const priorRank = STATE_RANK[prior.state] ?? -1;
-      if (newRank > priorRank) {
-        merged.set(set.name, set);
-      } else if (newRank === priorRank) {
-        if ((set.lastTouched || "") > (prior.lastTouched || "")) merged.set(set.name, set);
-      }
+// Set 087 Session 1: the diagnostics envelope for the fail-loud
+// duplicate-set-name check (routed architecture ruling, saved raw at
+// docs/session-sets/087-.../s1-collision-check-architecture.json).
+export interface ReadAllSessionSetsResult {
+  sets: SessionSet[];
+  collisions: DuplicateNameCollision[];
+}
+
+// One record per discovered copy of a set, carried through the merge so
+// the collision pass can group by logical identity afterwards.
+interface MergeCandidate {
+  set: SessionSet;
+  familyId: string;
+  // familyId + NUL + posix relPath(root → set dir). Two records with
+  // the SAME key are copies of one set (main checkout + its worktrees)
+  // — the legitimate merge. Two records for one name with DIFFERENT
+  // keys are two different sets sharing a name — the collision. The
+  // relPath component makes a future nested layout
+  // (docs/session-sets/<module>/<name>) register as a collision with
+  // no predicate change.
+  identityKey: string;
+}
+
+// True when `candidate` outranks `incumbent` under the merge-precedence
+// rule (state rank, tie-broken by lastTouched) — the SAME rule the
+// pre-087 merge applied, factored out so the per-identity representative
+// pick below cannot drift from the winner pick.
+function outranks(candidate: SessionSet, incumbent: SessionSet): boolean {
+  const candRank = STATE_RANK[candidate.state] ?? -1;
+  const incRank = STATE_RANK[incumbent.state] ?? -1;
+  if (candRank !== incRank) return candRank > incRank;
+  return (candidate.lastTouched || "") > (incumbent.lastTouched || "");
+}
+
+// Deduped fail-loud log state: one console.error per distinct collision
+// signature. Reconciled on every scan — a signature that disappears
+// re-arms, so a collision that clears and later reappears logs again
+// instead of staying silent forever.
+const loggedCollisionSignatures = new Set<string>();
+
+export function readAllSessionSetsWithDiagnostics(): ReadAllSessionSetsResult {
+  const byName = new Map<string, MergeCandidate[]>();
+  for (const root of discoverRootsWithFamilies()) {
+    for (const set of readSessionSets(root.dir)) {
+      const relPath = path
+        .relative(root.dir, set.dir)
+        .split(path.sep)
+        .join("/");
+      const candidate: MergeCandidate = {
+        set,
+        familyId: root.familyId,
+        identityKey: `${root.familyId}\u0000${relPath}`,
+      };
+      const bucket = byName.get(set.name);
+      if (bucket) bucket.push(candidate);
+      else byName.set(set.name, [candidate]);
     }
   }
-  const mergedList = Array.from(merged.values());
+
+  const mergedList: SessionSet[] = [];
+  const collisions: DuplicateNameCollision[] = [];
+  const currentSignatures = new Set<string>();
+  for (const [name, candidates] of byName) {
+    // The merge winner — identical precedence to the pre-087 merge
+    // (first-seen wins ties, since `outranks` is strict).
+    let winner = candidates[0];
+    for (const c of candidates.slice(1)) {
+      if (outranks(c.set, winner.set)) winner = c;
+    }
+
+    const distinctIdentities = new Map<string, MergeCandidate>();
+    for (const c of candidates) {
+      const rep = distinctIdentities.get(c.identityKey);
+      if (!rep || outranks(c.set, rep.set)) {
+        distinctIdentities.set(c.identityKey, c);
+      }
+    }
+    if (distinctIdentities.size > 1) {
+      // True collision: the name spans more than one logical set.
+      // Fail loud — but NEVER blank the Explorer or drop the name:
+      // one deterministic winner row ships, flagged, so name-keyed
+      // actions stay unambiguous while the error is visible.
+      const representatives = Array.from(distinctIdentities.values());
+      const conflictingDirs = representatives
+        .map((c) => c.set.dir)
+        .sort();
+      winner.set.duplicateNameError = {
+        name,
+        chosenDir: winner.set.dir,
+        conflictingDirs,
+      };
+      const collision: DuplicateNameCollision = {
+        name,
+        chosenDir: winner.set.dir,
+        conflictingDirs,
+        candidates: representatives.map((c) => ({
+          dir: c.set.dir,
+          familyId: c.familyId,
+          state: c.set.state,
+          lastTouched: c.set.lastTouched,
+        })),
+      };
+      collisions.push(collision);
+      const signature = `${name}\u0000${conflictingDirs.join("|")}`;
+      currentSignatures.add(signature);
+      if (!loggedCollisionSignatures.has(signature)) {
+        loggedCollisionSignatures.add(signature);
+        console.error(
+          `[dabblerSessionSets] DUPLICATE SESSION-SET NAME "${name}": ` +
+            `${conflictingDirs.length} different sets share this name ` +
+            `(${conflictingDirs.join(", ")}). Session-set names must be ` +
+            `globally unique across the workspace — rename one of them. ` +
+            `Showing only ${winner.set.dir}; name-keyed actions resolve ` +
+            `to that copy.`,
+        );
+      }
+    }
+    mergedList.push(winner.set);
+  }
+  // Re-arm cleared collisions so a reintroduction logs again.
+  for (const sig of loggedCollisionSignatures) {
+    if (!currentSignatures.has(sig)) loggedCollisionSignatures.delete(sig);
+  }
+
   // S5 verifier Important-2 fix: re-derive blockedByPrereqs against
   // the merged map so a prereq target discovered in a different root
   // / worktree still resolves. The per-root pass inside
   // readSessionSets() handles the single-root case.
   deriveBlockedByPrereqs(mergedList);
-  return mergedList;
+  return { sets: mergedList, collisions };
+}
+
+export function readAllSessionSets(): SessionSet[] {
+  return readAllSessionSetsWithDiagnostics().sets;
 }

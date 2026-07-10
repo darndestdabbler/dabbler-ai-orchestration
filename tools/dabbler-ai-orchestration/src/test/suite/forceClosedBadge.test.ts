@@ -26,6 +26,8 @@ function fakeLive(over: Partial<LiveSession> = {}): LiveSession {
 function fakeSet(liveSession: LiveSession | null): SessionSet {
   return {
     name: "x",
+    module: null,
+    moduleTitle: null,
     dir: "/x",
     specPath: "/x/spec.md",
     activityPath: "/x/activity-log.json",
@@ -44,6 +46,7 @@ function fakeSet(liveSession: LiveSession | null): SessionSet {
       uatScope: "none",
       tier: "full",
       verificationMode: "out-of-band-or-none",
+      module: null,
     },
     uatSummary: null,
     root: "/x",

@@ -201,6 +201,8 @@ suite("setupVerification — blessed-writer invocation (S3, spec D3/D4)", () => 
 function fakeCompletedSet(): SessionSet {
   return {
     name: "062-fixture",
+    module: null,
+    moduleTitle: null,
     dir: "/repo/docs/session-sets/062-fixture",
     specPath: "/repo/docs/session-sets/062-fixture/spec.md",
     activityPath: "/repo/docs/session-sets/062-fixture/activity-log.json",
@@ -219,6 +221,7 @@ function fakeCompletedSet(): SessionSet {
       uatScope: "none",
       tier: "lightweight",
       verificationMode: "out-of-band-or-none",
+      module: null,
     },
     uatSummary: null,
     root: "/repo",

@@ -267,6 +267,7 @@ suite("tier marker + tooltips — D2 helpers (Set 061 S1)", () => {
         uatScope: "none",
         tier: "lightweight",
         verificationMode: "dedicated-sessions",
+        module: null,
       },
     });
     const full = set({
@@ -276,6 +277,7 @@ suite("tier marker + tooltips — D2 helpers (Set 061 S1)", () => {
         uatScope: "none",
         tier: "full",
         verificationMode: "out-of-band-or-none",
+        module: null,
       },
     });
     assert.strictEqual(tierMarker(lw), "lw");

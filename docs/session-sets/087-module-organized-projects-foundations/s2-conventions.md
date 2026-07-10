@@ -13,9 +13,12 @@ the code, tests, and docs in the diff. (Same settled point as the S1
 R1/R4 workflow-order dismissals.)
 
 ## Suite baseline — FINAL totals (the ONLY authoritative counts)
-- Extension unit suite (`npm run test:unit`): **1306 passing, 0 failing**,
-  including **13** new Set-087-S2 tests in
-  `src/test/suite/moduleTier.test.ts`.
+- Extension unit suite (`npm run test:unit`): **1313 passing, 0 failing**,
+  including **20** new Set-087-S2 tests in
+  `src/test/suite/moduleTier.test.ts` (13 in the initial commit + 7
+  behavior-level payload tests added by the round-1 remediation; the
+  1306 count in older log entries is the pre-remediation chronology,
+  not a contradiction).
 - `npx tsc --noEmit`: clean. `npm run compile` (esbuild): clean, exit 0.
 - `eslint src --ext ts`: **7 pre-existing errors** (6×`no-var-requires`,
   1×`no-regex-spaces`) in `consumerBootstrap.test.ts`,
@@ -34,11 +37,15 @@ R1/R4 workflow-order dismissals.)
   windows-latest, macos-latest, and ubuntu-latest** (including the new
   module-tier smoke), Python tests on all three OSes, the tier-model
   drift guards, the preload ceiling gate, and the template snapshot.
-  The armed E2E gate is satisfied. The round-1 remediation commit that
-  followed (payload-builder extraction, below) re-runs the same CI on
-  push; its green run supersedes as the final citation in
-  disposition.json. The webview rendering path (`client.js`,
-  `tree.css`) is untouched by that remediation.
+  The armed E2E gate is satisfied. The round-1 remediation commit
+  `121493e` (payload-builder extraction, below) then re-ran the same
+  matrix and is ALSO fully green — run
+  https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/29125361374
+  — making it the Layer-3 evidence of record for the session's FINAL
+  code commit. The webview rendering path (`client.js`, `tree.css`) is
+  untouched by that remediation. Every code commit in this session has
+  its own fully green CI run except the first (`d089272`, whose single
+  red job was the Windows EOL test-helper bug fixed in `4e5516f`).
 - The operator answered the `requiresUAT`/`requiresE2E: suggested`
   tri-state prompt at session start with **"e2e"** (recorded as the
   `suggestion_disposition` activity-log entry, session 2). The armed gate
@@ -122,6 +129,23 @@ gemini-pro; the exclusion is logged in the activity log):
   omitted-Cancelled/empty-default contract, the all-implicit
   single-payload sentinel case, per-module `sortBucket` reuse, and a
   disk-fixture scan → payload end-to-end run. Unit suite 1306 → 1313.
+
+- R2 (Major) "the rendered DOM is not a conformant WAI-ARIA tree
+  (aria-level on generic divs; aria-expanded on role=group; module/
+  bucket headers click-only)": **adjudicated DEFER via the
+  operator-selected third-provider path** — the orchestrator disputed
+  in-session fixability (the identical pattern is the LOCKED byte-
+  identical pre-087 dialect; the spec text was implemented verbatim per
+  the routed Q4 ruling; header keyboard nav is unspecified new surface),
+  the operator chose "third-provider opinion", and gemini-pro ruled:
+  verifier technically correct on the ARIA merits, but a partial fix
+  confined to the multi-module dialect would give assistive-tech users
+  two inconsistent models for the same element — worse than deferring —
+  so convert to a HIGH-PRIORITY scoped follow-on refactoring BOTH
+  dialects (nested treeitem/group + keyboard operability) concurrently.
+  Saved raw: `s2-third-opinion-aria.json`; recorded in
+  `disposition.json.deferred`; close verdict token: WAIVED (the
+  operator-adjudication token, per the Set 089/090 precedent).
 
 ## Known out-of-scope (surfaced, not forgotten)
 - The S1 collision ruling *anticipated* ("Session 2 is expected to

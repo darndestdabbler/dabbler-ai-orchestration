@@ -1,0 +1,10 @@
+ISSUES FOUND
+
+- **Issue 1: The rendered DOM does not implement a valid three-level ARIA tree**
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Details:**
+    - **Violation:** The task requires “`aria-level` 1 (module) / 2 (bucket) / 3 (row)” and ends with “`aria-level` correct.” Merely placing those attributes on generic `<div>` elements does not establish module and bucket levels in the accessibility tree. In the ARIA tree pattern, hierarchical nodes must be `treeitem`s, with child nodes contained by `group`s; `aria-expanded` belongs on the expandable `treeitem`.
+    - **Impact:** Assistive technology sees only the rows as tree items, all declared at level 3, with no semantic level-1 module or level-2 bucket ancestors. Module and bucket expansion state is also attached to `role="group"` wrappers rather than the interactive nodes, and the headers are click-only with no keyboard focus or activation. Thus the promised accessibility hierarchy and collapsible-tree behavior are not delivered, despite the tests passing.
+    - **Evidence:** In `media/session-sets-tree/client.js`, `renderModule` emits an outer `role="group"` carrying `aria-expanded`, while `.module-header` has `aria-level="1"` and `aria-controls` but no role or `tabindex`. `renderBucket` repeats the pattern: the wrapper is `role="group"` and `.bucket-header` is a generic `<div aria-level="2">`. Only `renderRow` emits `role="treeitem"`. `wireInteraction` registers only `click` handlers. The Playwright test checks literal attributes with `toHaveAttribute` and therefore cannot detect the invalid accessibility semantics.
+    - **Correct answer:** Restructure the multi-module dialect into valid nested `treeitem`/`group` relationships, place `aria-level`, `aria-expanded`, and `aria-controls` on the expandable tree items, and add keyboard focus plus Enter/Space and appropriate arrow-key handling. Preserve the sanctioned implicit-only DOM unchanged, and extend Layer 3 coverage to inspect roles and keyboard collapse behavior.

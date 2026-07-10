@@ -82,4 +82,22 @@ split and found no mis-delegated step. The operator owns the final seat
 choice.
 
 ### Actuals (S2)
-- Filled at close (see disposition.json).
+- Orchestrator used: claude / anthropic / claude-fable-5 (recommendation
+  was Opus-class/high; operator's seat choice).
+- Total routed cost: $0.42 — architecture ruling (gemini-pro after two
+  anthropic provider failures, + auto-verify passes), analysis
+  (gemini-pro), two session-verification rounds (gpt-5-6, $0.35), and
+  the third-provider adjudication opinion (gemini-pro).
+- Deviations from recommendation: seat (fable-5 vs opus/high) —
+  operator's call; no scope effect.
+- Verification: R1 ISSUES_FOUND (1 Major — payload-shape test
+  substituted with source scans) fixed in-flight (builder extraction +
+  7 behavioral tests); R2 ISSUES_FOUND (1 Major — ARIA tree
+  conformance) adjudicated DEFER via the operator-selected
+  third-provider path; close verdict WAIVED via operator adjudication.
+- Notes for next-session calibration: the verifier pair (gpt-5-6) held
+  the module tier to full WAI-ARIA authoring practice, beyond the
+  spec's literal aria-level text — S3's webview-action work should
+  state interaction/a11y intent explicitly in its conventions block up
+  front. Anthropic-as-provider failed twice on one routed call
+  (timeout, then 400); exclude-and-reroute worked cleanly.

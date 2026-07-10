@@ -227,6 +227,58 @@ suite("buildSessionGenPrompt — tier truth (Set 077 S2)", () => {
 });
 
 // ---------------------------------------------------------------------
+// Set 087 Session 3 (ruling Q2) — module-targeted decomposition: the
+// worked exemplar STAMPS `module: <slug>` (writer-rendered, so the
+// prompt cannot drift from the shared writer), a hard-requirements line
+// demands it on every generated set, the guidance recommends (never
+// enforces) the slug in set names, and the plan reference points at the
+// module's own plan. A module-less render is the pre-087 prompt.
+// ---------------------------------------------------------------------
+
+suite("buildSessionGenPrompt — module targeting (Set 087 S3)", () => {
+  const mod = {
+    slug: "greeter",
+    planPath: "docs/modules/greeter/project-plan.md",
+  };
+
+  test("module option: exemplar stamps module:, requirement + guidance present, module plan referenced", () => {
+    const p = buildSessionGenPrompt(bundle, { module: mod });
+    assert.ok(/^module: greeter/m.test(p), "exemplar must render the module: line");
+    assert.ok(p.includes("declare `module: greeter` in EVERY generated set's"));
+    assert.ok(p.includes("This decomposition targets the **greeter** module"));
+    assert.ok(p.includes("Recommended (not enforced)"));
+    assert.ok(p.includes("docs/modules/greeter/project-plan.md"));
+    assert.ok(
+      !p.includes("docs/planning/project-plan.md"),
+      "a module-targeted prompt must not point at the repo-level plan",
+    );
+    assert.ok(
+      p.includes("globally unique"),
+      "the grouping-not-identity invariant rides the prompt",
+    );
+  });
+
+  test("no module option: no module line, no module guidance, repo-level plan (pre-087 shape)", () => {
+    const p = buildSessionGenPrompt(bundle, {});
+    assert.ok(!/^module:/m.test(p));
+    assert.ok(!p.includes("This decomposition targets"));
+    assert.ok(p.includes("docs/planning/project-plan.md"));
+  });
+
+  test("module option composes with tier + verification-mode options", () => {
+    const p = buildSessionGenPrompt(bundle, {
+      module: mod,
+      tier: "lightweight",
+      tierSource: "form",
+      verificationMode: "dedicated-sessions",
+    });
+    assert.ok(/^module: greeter/m.test(p));
+    assert.ok(p.includes("verificationMode: dedicated-sessions"));
+    assert.ok(p.includes("The operator selected the **lightweight** tier"));
+  });
+});
+
+// ---------------------------------------------------------------------
 // Set 077 Session 3 (Feature 2) — the decomposition prompt's
 // verification-mode truth: the exemplar declares the operator's pick on
 // Lightweight, the guidance steers only when a non-default pick exists,

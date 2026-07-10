@@ -177,6 +177,7 @@ suite("gettingStartedHtml — form structure (Set 060 S1/S2 parity)", () => {
       "build-structure",
       "import-plan",
       "copy-plan-prompt",
+      "new-module",
       "build-session-sets",
     ]) {
       assert.ok(
@@ -186,6 +187,18 @@ suite("gettingStartedHtml — form structure (Set 060 S1/S2 parity)", () => {
     }
     assert.ok(html.includes('name="gs-tier"'));
     assert.ok(html.includes('name="gs-parallel"'));
+  });
+
+  test("the New module button carries its explainer hover copy (Set 087 S3)", () => {
+    const html = gsHtml.renderGettingStarted(gs(), FULL);
+    const btnIdx = html.indexOf('data-gs-action="new-module"');
+    assert.notStrictEqual(btnIdx, -1);
+    // The title attribute rides the same tag (host-side input boxes
+    // collect slug/title, so the button itself is riderless).
+    const tagEnd = html.indexOf(">", btnIdx);
+    const tag = html.slice(btnIdx, tagEnd);
+    assert.ok(tag.includes("title="), "new-module button must carry a title attr");
+    assert.ok(html.includes("docs/modules.yaml"));
   });
 
   test("completion flags grey/check the steps (D2/D3)", () => {

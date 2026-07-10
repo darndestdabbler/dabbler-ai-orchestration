@@ -14,6 +14,7 @@ import {
   readVerificationModeMarker,
   resolveDurableTier,
 } from "../utils/tierMarkerStore";
+import { modulePlanRelPath, pickModuleForAuthoring } from "../utils/moduleAuthoring";
 import { VerificationMode } from "../types";
 
 const PLAN_PATH = path.join("docs", "planning", "project-plan.md");
@@ -34,6 +35,7 @@ const PLAN_REL_POSIX = "docs/planning/project-plan.md";
 function sampleContext(
   tier: Tier,
   verificationMode: VerificationMode = "out-of-band-or-none",
+  moduleSlug?: string,
 ): BootstrapContext {
   return {
     repoName: "example-app",
@@ -44,6 +46,10 @@ function sampleContext(
     tier,
     verificationMode,
     totalSessions: 3,
+    // Set 087 S3 (ruling Q2): a module-targeted decomposition renders the
+    // module: line IN the exemplar (writer-rendered, so the prompt cannot
+    // drift from what the shared writer emits); absent → no line at all.
+    module: moduleSlug,
   };
 }
 
@@ -112,6 +118,16 @@ export interface SessionGenPromptOptions {
    * durable ``.dabbler/verification-mode`` marker.
    */
   verificationMode?: VerificationMode;
+  /**
+   * Set 087 S3 (ruling Q2): the module this decomposition targets, when
+   * the workspace's ``docs/modules.yaml`` names one (auto-selected for a
+   * single-module manifest; QuickPicked for two or more; absent for a
+   * no-manifest repo — that prompt is byte-identical to pre-087).
+   * ``slug`` is stamped as ``module: <slug>`` in the worked exemplar and
+   * demanded by a hard-requirements line; ``planPath`` (repo-relative,
+   * forward-slashed) replaces the repo-level plan reference.
+   */
+  module?: { slug: string; planPath: string };
 }
 
 const PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator asked for parallel session sets
@@ -140,10 +156,29 @@ export function buildSessionGenPrompt(
     exemplarTier === "lightweight" && options.verificationMode
       ? options.verificationMode
       : "out-of-band-or-none";
-  const ctx = sampleContext(exemplarTier, exemplarMode);
+  const ctx = sampleContext(exemplarTier, exemplarMode, options.module?.slug);
   const exampleSpec = renderSpec(bundle, ctx);
   const exampleState = renderSessionState(bundle, ctx);
   const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
+  // Set 087 S3 (ruling Q2): a module-targeted decomposition adds a hard
+  // requirement + a guidance line and reads the module's own plan; a
+  // module-less render emits neither (byte-identical pre-087 prompt).
+  const moduleRequirement = options.module
+    ? `- **Module:** declare \`module: ${options.module.slug}\` in EVERY generated set's
+  Session Set Configuration block, exactly as the worked example shows (the value is
+  validated against \`docs/modules.yaml\`). \`module\` is a grouping attribute only —
+  session-set names stay globally unique across ALL modules.
+`
+    : "";
+  const moduleGuidance = options.module
+    ? `- **Module.** This decomposition targets the **${options.module.slug}** module
+  (declared in \`docs/modules.yaml\`). Stamp \`module: ${options.module.slug}\` in each
+  generated set's configuration block. Recommended (not enforced): include the module
+  slug in each set's name (e.g. \`00N-${options.module.slug}-<feature>\`) so names stay
+  self-describing and collision-free across modules.
+`
+    : "";
+  const planRefPosix = options.module?.planPath ?? PLAN_REL_POSIX;
   // Set 077 S3 (Feature 2): when the operator chose dedicated
   // verification sessions, say so — otherwise the planner has no reason
   // to deviate from the schema default the hard-requirements block
@@ -208,6 +243,7 @@ For EACH session set, scaffold a folder \`docs/session-sets/<NNN-slug>/\` contai
   not-started defaults).
 - **\`session-state.json\`** MUST use \`"schemaVersion": 4\` and \`"status": "not-started"\`.
   Never emit the retired schemaVersion-2 state shape.
+${moduleRequirement}
 
 ## Worked example — \`spec.md\` for a 3-session ${exemplarTier === "lightweight" ? "Lightweight" : "Full"} set (\`001-example-feature\`)
 
@@ -235,13 +271,13 @@ ${exampleState}
 - Both tiers run the same Python lifecycle (\`start_session\` / \`close_session\`), state
   handling, and close-out. Lightweight is router-off, not Python-off — pick \`tier:
   lightweight\` when the project opts out of metered API calls.
-${tierGuidance}${modeGuidance}${parallelGuidance}
+${tierGuidance}${modeGuidance}${moduleGuidance}${parallelGuidance}
 ---
 
 ## The project plan (read it from the workspace)
 
 The authoritative input for this decomposition is the project plan at
-\`${PLAN_REL_POSIX}\` in this workspace. Read that file directly — it is
+\`${planRefPosix}\` in this workspace. Read that file directly — it is
 intentionally NOT inlined here. Decompose the plan it describes into session
 sets per the rules above.`;
 }
@@ -270,10 +306,32 @@ export async function copySessionSetGenPrompt(
     return false;
   }
 
-  const planPath = path.join(root, PLAN_PATH);
+  // Set 087 S3 (ruling Q2): resolve the module target BEFORE the plan
+  // check — a module-targeted decomposition reads the module's own plan
+  // (manifest `planPath`, defaulting to docs/modules/<slug>/project-plan.md).
+  // No-manifest repos resolve to "none" and keep today's flow unchanged;
+  // an Esc on the picker cancels the whole copy (never a silent fallback
+  // to the repo-level plan).
+  const modulePick = await pickModuleForAuthoring(root, {
+    showQuickPick: (items, opts) => vscode.window.showQuickPick(items, opts),
+    showInformationMessage: (m) => vscode.window.showInformationMessage(m),
+  });
+  if (modulePick.kind === "cancelled") return false;
+  const moduleOpt = modulePick.entry
+    ? {
+        slug: modulePick.entry.slug,
+        planPath: modulePlanRelPath(modulePick.entry),
+      }
+    : undefined;
+
+  const planRelPosix = moduleOpt?.planPath ?? PLAN_REL_POSIX;
+  const planPath = path.join(root, ...planRelPosix.split("/"));
   if (!fs.existsSync(planPath)) {
     const action = await vscode.window.showWarningMessage(
-      `No project plan found at ${PLAN_PATH}. Import one first?`,
+      moduleOpt
+        ? `No project plan found at ${planRelPosix} for module "${moduleOpt.slug}". ` +
+            `Create it (the New Module command writes a stub) or import one first?`
+        : `No project plan found at ${PLAN_PATH}. Import one first?`,
       "Import Plan"
     );
     if (action === "Import Plan") void vscode.commands.executeCommand("dabbler.importPlan");
@@ -318,6 +376,7 @@ export async function copySessionSetGenPrompt(
     tier: resolvedTier,
     tierSource: options.tier ? "form" : durable?.source,
     verificationMode: options.verificationMode ?? durableMode ?? undefined,
+    module: moduleOpt,
   };
 
   const prompt = buildSessionGenPrompt(bundle, resolved);

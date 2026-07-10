@@ -307,6 +307,7 @@ export type GettingStartedActionId =
   | "build-structure"      // step 1: no-prompt structure-only scaffold (D5)
   | "import-plan"          // step 2: file picker -> docs/planning/project-plan.md
   | "copy-plan-prompt"     // step 2 alt: copy the plan-authoring prompt
+  | "new-module"           // step 2 opt (Set 087 S3): docs/modules.yaml entry + plan stub
   | "build-session-sets";  // step 3: copy the decomposition prompt (D4)
 
 export interface GettingStartedActionMsg {

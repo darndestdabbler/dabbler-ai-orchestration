@@ -104,6 +104,17 @@
     "Then reload the VS Code window (changes made after launch are not " +
     "visible until you reload).";
 
+  // Set 087 S3 (routed ruling Q1): the optional "New module" affordance in
+  // step 2 — hover copy for the button that posts the `new-module` action
+  // (slug/title are collected host-side via input boxes; the button carries
+  // no riders). Modules are the multi-developer grouping layer; a solo
+  // project skips this entirely.
+  var NEW_MODULE_BUTTON_TITLE =
+    "Optional, for teams: declare a module in docs/modules.yaml and " +
+    "create its plan stub at docs/modules/<slug>/project-plan.md. Session " +
+    "sets authored for a module are grouped under it in the Session Set " +
+    "Explorer. Solo projects can skip this.";
+
   // Set 079 S1 (Feature 1): the Full-tier seat-profile sub-choice — how
   // Full's routed calls dispatch. "api" keeps the current direct
   // provider-key path (the unchanged default); "copilot-cli" is Set
@@ -620,6 +631,12 @@
       '</button>' +
       '<button class="gs-button gs-button-secondary" type="button" data-gs-action="copy-plan-prompt">' +
         'Copy prompt for planning' +
+      '</button>' +
+      // Set 087 S3 (ruling Q1): the optional module scaffold. Same typed
+      // gettingStartedAction channel; no riders (host-side input boxes).
+      '<button class="gs-button gs-button-secondary" type="button" data-gs-action="new-module"' +
+        ' title="' + escAttr(NEW_MODULE_BUTTON_TITLE) + '">' +
+        'New module…' +
       '</button>',
     );
     var step3 = gsStep(
@@ -669,6 +686,7 @@
     VERIFICATION_MODE_OUT_OF_BAND_TEXT: VERIFICATION_MODE_OUT_OF_BAND_TEXT,
     VERIFICATION_MODE_DEDICATED_TEXT: VERIFICATION_MODE_DEDICATED_TEXT,
     PYTHON_WARNING_TEXT: PYTHON_WARNING_TEXT,
+    NEW_MODULE_BUTTON_TITLE: NEW_MODULE_BUTTON_TITLE,
     TRANSPORT_PROFILE_LABEL_TEXT: TRANSPORT_PROFILE_LABEL_TEXT,
     TRANSPORT_PROFILE_API_TEXT: TRANSPORT_PROFILE_API_TEXT,
     TRANSPORT_PROFILE_COPILOT_TEXT: TRANSPORT_PROFILE_COPILOT_TEXT,

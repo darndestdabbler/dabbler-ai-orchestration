@@ -50,7 +50,7 @@ const WATCHER_ALLOWLIST: WatcherEntry[] = [
     file: "extension.ts",
     // Set 077 S2: +9 — the retainContextWhenHidden evaluation comment
     // at the view registration shifted both callsites down.
-    line: 200,
+    line: 201,
     target: "docs/session-sets/** (spec.md, session-state.json, session-events.jsonl, activity-log.json, change-log.md, CANCELLED.md, *-uat-checklist.json)",
     purpose:
       "Tree-view refresh on canonical session-set state files. Watched files are themselves the writers' source of truth (no inference from indirect signals) — D1 permits.",
@@ -58,7 +58,7 @@ const WATCHER_ALLOWLIST: WatcherEntry[] = [
   {
     file: "extension.ts",
     // Set 077 S2: +9 (same comment-block shift as above).
-    line: 236,
+    line: 237,
     target: "Getting Started D3 inputs: {CLAUDE.md, AGENTS.md, GEMINI.md, docs/planning/project-plan.md, .venv/**/site-packages/ai_router/**, docs/session-sets/*}",
     purpose:
       "Set 060 Getting Started form live-progress refresh: the form's D3 step-1/2/3 completion keys on these scaffold artifacts (engine files + venv router package + project plan + numbered set dirs), which the spec.md-scoped session-sets watcher does not fully cover. The watched paths ARE the source of truth for the form steps (no indirect orchestrator-state inference) — D1 permits.",

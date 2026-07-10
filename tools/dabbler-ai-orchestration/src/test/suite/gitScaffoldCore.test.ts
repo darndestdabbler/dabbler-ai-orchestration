@@ -114,7 +114,7 @@ const PROJECT = "/repo";
 const cfgPath = path.join(PROJECT, "ai_router", "router-config.yaml").replace(/\\/g, "/");
 
 suite("scaffoldConsumerRepo — file writes", () => {
-  test("writes the ten artifacts under the project dir", async () => {
+  test("writes the full-render artifacts under the project dir", async () => {
     const { ops, store } = memFileOps();
     const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
@@ -123,13 +123,14 @@ suite("scaffoldConsumerRepo — file writes", () => {
       fileOps: ops,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Twelve writes: eleven artifacts (the seven Set-060 artifacts, the
-    // three Set 064 D7 docs/planning/ guidance-lifecycle starters, and
-    // the Set 077 S4 cross-provider verification doc) plus the Set 077
-    // S2 durable tier marker. (The verification-mode marker is
+    // Fourteen writes: thirteen artifacts (the seven Set-060 artifacts,
+    // the three Set 064 D7 docs/planning/ guidance-lifecycle starters,
+    // the Set 077 S4 cross-provider verification doc, and the two Set
+    // 087 S3 ownership/CI teaching templates) plus the Set 077 S2
+    // durable tier marker. (The verification-mode marker is
     // Lightweight-only as of Set 082; this is a Full scaffold, so it is
     // not written.)
-    assert.strictEqual(result.written.length, 12);
+    assert.strictEqual(result.written.length, 14);
     assert.strictEqual(result.skipped.length, 0);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
@@ -142,6 +143,9 @@ suite("scaffoldConsumerRepo — file writes", () => {
     assert.ok(store.has("/repo/docs/planning/lessons-archive.md"));
     assert.ok(store.has("/repo/docs/session-sets/001-first-feature/spec.md"));
     assert.ok(store.has("/repo/docs/session-sets/001-first-feature/session-state.json"));
+    // Set 087 S3 (ruling Q3): ownership + monorepo-CI teaching templates.
+    assert.ok(store.has("/repo/.github/CODEOWNERS"));
+    assert.ok(store.has("/repo/.github/workflows/monorepo-ci.yml"));
   });
 
   test("never clobbers an existing file (records it as skipped)", async () => {
@@ -155,7 +159,7 @@ suite("scaffoldConsumerRepo — file writes", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 11); // 10 artifacts + tier marker (Full: no verification-mode marker, Set 082)
+    assert.strictEqual(result.written.length, 13); // 12 artifacts + tier marker (Full: no verification-mode marker, Set 082)
   });
 });
 
@@ -207,7 +211,7 @@ suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
     });
     assert.strictEqual(result.installOk, false);
     assert.strictEqual(result.installMessage, "pip failed");
-    assert.strictEqual(result.written.length, 12); // artifacts + tier marker still written (Full)
+    assert.strictEqual(result.written.length, 14); // artifacts + tier marker still written (Full)
   });
 });
 

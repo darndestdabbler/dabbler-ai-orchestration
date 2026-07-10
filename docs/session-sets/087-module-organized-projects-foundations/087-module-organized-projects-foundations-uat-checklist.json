@@ -1,0 +1,89 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "dabbler-ai-orchestration 0.41.0 local VSIX (Set 087 'Module-Organized Projects - Foundations', Session 3 of 4; the version bump happens at release, after Session 4)",
+  "DocumentDate": "7/10/2026",
+  "Notes": "Ad-hoc per-session UAT for Session 3: the 'New module' scaffold (a docs/modules.yaml entry + a plan stub), module-targeted plan authoring / decomposition (the flows ask WHICH module and stamp 'module: <slug>' into generated specs), and the CODEOWNERS + monorepo-CI teaching templates new projects now scaffold with. Sessions 1-2 (the manifest reader and the Explorer's module grouping) were verified earlier under the operator-armed E2E gate and are NOT re-walked here. Every step below was ALREADY exercised for real before this checklist was offered to you: the full extension unit suite (1,346 passing / 0 failing, incl. 33 new Set-087-S3 tests) plus a live end-to-end dogfood run on 2026-07-10 that drove the real new-module flow, the real module picker, and the real prompt builders against a scratch repo (12/12 PASS; the exact strings quoted in each Expectation are from that run and from current source). What automation genuinely cannot check - and what this walk is FOR - is the real VS Code UI surface: input boxes appearing with the right copy, the QuickPick, toasts, and the button in the Getting Started form. UAT runs against a LOCALLY BUILT VSIX ONLY: the orchestrator built one for you during authoring at tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.41.0.vsix (it contains the Set 087 S1+S2+S3 changes). Install it via Extensions > '...' menu > 'Install from VSIX...', then reload when prompted. Walks 1-5 all happen in ONE fresh empty folder (call it uat-modules); walk 6 uses a second fresh folder (uat-single); walks 7-8 use a third fresh folder (uat-scaffold). Walk 7 chooses a $0 budget with 'Skip verification' ON PURPOSE so the walk spends nothing.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Module authoring",
+      "Subarea": "Walk 1 - New module from the Getting Started form",
+      "ItemLabel": "The step-2 'New module...' button scaffolds a manifest entry + plan stub and opens the stub",
+      "HumanAction": "1. Create a new EMPTY folder anywhere (e.g. C:\\temp\\uat-modules) and open it in VS Code (File > Open Folder...).\n2. Click the Dabbler AI Orchestration icon in the Activity Bar. The Getting Started form appears.\n3. In step '2. Create or import a project plan', find the button labeled exactly 'New module...' (after 'Copy prompt for planning'). Hover it for ~2 seconds and read the tooltip.\n4. Click 'New module...'. An input box titled 'New module (1/2): slug' appears with placeholder 'greeter'. Type exactly: greeter and press Enter.\n5. A second input box titled 'New module (2/2): display title' appears. Type exactly: Greeter and press Enter.",
+      "Expectation": "The hover tooltip in step 3 begins 'Optional, for teams: declare a module in docs/modules.yaml'. After step 5: (a) an editor tab opens on docs/modules/greeter/project-plan.md whose first line is exactly '# Greeter — module project plan'; (b) a toast reads exactly: Module \"greeter\" declared in a new docs/modules.yaml. Plan stub created at docs/modules/greeter/project-plan.md — fill it in, then decompose it into session sets. (c) the file docs/modules.yaml exists and starts with a comment block headed '# docs/modules.yaml — the module manifest' followed by 'modules:' and one entry with 'slug: greeter', 'title: \"Greeter\"', 'codeRoots: []' and 'planPath: docs/modules/greeter/project-plan.md'.",
+      "ProgrammaticVerification": "moduleAuthoring.test.ts > 'runNewModuleFlow' happy-path + 'scaffoldNewModule' fresh-manifest tests (real fs); AI exploratory check 2026-07-10: drove the real flow against a scratch repo (Walk A of the dogfood run, PASS). gettingStartedHtml.test.ts pins the button + hover copy.",
+      "Result": ""
+    },
+    {
+      "FunctionalArea": "Module authoring",
+      "Subarea": "Walk 2 - slug validation is live and fail-loud",
+      "ItemLabel": "Bad slugs are rejected inline with specific messages; Esc writes nothing",
+      "HumanAction": "Still in uat-modules: click 'New module...' again.\n1. In the slug box type exactly: Greeter (capital G) and read the inline validation message under the box.\n2. Clear it and type exactly: greeter (the module you just made) and read the message.\n3. Press Esc to cancel.\n4. Open docs/modules.yaml and count the entries.",
+      "Expectation": "Step 1 shows exactly: Module slugs are kebab-case: lowercase letters and digits, joined by single hyphens (e.g. \"greeter\", \"payment-api\"). Step 2 shows exactly: Module \"greeter\" already exists in docs/modules.yaml. While either message shows, Enter does not accept the value. After Esc (step 3), docs/modules.yaml still has exactly ONE entry (greeter) - nothing was written.",
+      "ProgrammaticVerification": "moduleAuthoring.test.ts > 'slug validation' matrix (exact messages) + 'Esc on either input box cancels without writing'.",
+      "Result": ""
+    },
+    {
+      "FunctionalArea": "Module authoring",
+      "Subarea": "Walk 3 - second module via the Command Palette",
+      "ItemLabel": "'Dabbler: New Module' appends to the existing manifest without touching its text",
+      "HumanAction": "Still in uat-modules:\n1. Open docs/modules.yaml and add a comment line anywhere above the 'modules:' line, e.g.: # my note. Save.\n2. Ctrl+Shift+P > type 'Dabbler: New Module' > Enter.\n3. Slug: clock (Enter). Title: press Enter WITHOUT typing anything (empty = default).\n4. Re-open docs/modules.yaml.",
+      "Expectation": "The toast reads exactly: Module \"clock\" appended to docs/modules.yaml. Plan stub created at docs/modules/clock/project-plan.md — fill it in, then decompose it into session sets. In docs/modules.yaml: your '# my note' comment line is STILL THERE untouched, the greeter entry is byte-identical to before, and a new second entry 'slug: clock' with 'title: \"clock\"' (the empty title defaulted to the slug) sits at the end. docs/modules/clock/project-plan.md exists and opened in the editor.",
+      "ProgrammaticVerification": "moduleAuthoring.test.ts > 'append preserves the existing file's text — comments and formatting included' + 'empty title defaults to the slug'; dogfood Walk A scaffolded exactly this greeter-then-clock sequence (PASS).",
+      "Result": ""
+    },
+    {
+      "FunctionalArea": "Module-targeted decomposition",
+      "Subarea": "Walk 4 - the decomposition prompt asks which module and stamps it",
+      "ItemLabel": "With two modules, 'Copy prompt to build session sets' shows a module QuickPick and the copied prompt is module-stamped",
+      "HumanAction": "Still in uat-modules (two modules exist):\n1. In the Getting Started form's step '3. Build session sets', click 'Copy prompt to build session sets'.\n2. A QuickPick appears with placeholder 'Which module is this for?'. It lists 'Greeter' (with 'greeter' beside it) then 'clock', each showing a 'plan: ...' detail line. Click 'clock'.\n3. After the 'Session-set generation prompt copied to clipboard...' toast, open a new untitled editor (Ctrl+N) and paste (Ctrl+V).\n4. In the pasted text, use Ctrl+F to find: module: clock — then find: docs/modules/clock/project-plan.md — then find: docs/planning/project-plan.md",
+      "Expectation": "The QuickPick rows appear in manifest order (Greeter first). In the pasted prompt: (a) the worked example's 'Session Set Configuration' yaml block contains the line 'module: clock' directly under the 'tier:' line; (b) a hard-requirements bullet begins '- **Module:** declare `module: clock` in EVERY generated set's'; (c) a guidance bullet begins '- **Module.** This decomposition targets the **clock** module' and contains 'Recommended (not enforced)'; (d) the closing section 'The project plan (read it from the workspace)' names docs/modules/clock/project-plan.md; (e) the search for docs/planning/project-plan.md finds NOTHING - the module's own plan replaced it.",
+      "ProgrammaticVerification": "sessionGenPrompt.test.ts > 'buildSessionGenPrompt — module targeting (Set 087 S3)' (all three tests); consumerBootstrap.test.ts > 'module context renders the module: line'; dogfood Walk C rendered this exact prompt from the canonical bundle (PASS).",
+      "Result": ""
+    },
+    {
+      "FunctionalArea": "Module-targeted plan authoring",
+      "Subarea": "Walk 5 - the planning prompt targets the picked module's plan",
+      "ItemLabel": "'Copy prompt for planning' asks which module and names the module plan path",
+      "HumanAction": "Still in uat-modules:\n1. In step 2 of the form, click 'Copy prompt for planning'.\n2. In the 'Which module is this for?' QuickPick, click 'Greeter'.\n3. Read the toast, then paste the clipboard into an untitled editor.",
+      "Expectation": "The toast reads exactly: Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, then save the result as docs/modules/greeter/project-plan.md — or import it with 'Import project-plan.md'. The pasted prompt asks for a plan 'for the \"Greeter\" module (`greeter`) of my software project', says the plan 'covers ONLY the greeter module', and ends 'Format as a clean Markdown document I can save as docs/modules/greeter/project-plan.md.'",
+      "ProgrammaticVerification": "gettingStartedActions.test.ts > 'planImport — module-aware targeting (Set 087 S3)' (copyPlanningPrompt tests); dogfood Walk D built this exact prompt (PASS).",
+      "Result": ""
+    },
+    {
+      "FunctionalArea": "Module-targeted plan authoring",
+      "Subarea": "Walk 6 - a single-module repo auto-selects with a visible notice, no picker",
+      "ItemLabel": "One module in the manifest: the flows never show a QuickPick but always SAY which module they targeted",
+      "HumanAction": "1. Create a second EMPTY folder (e.g. C:\\temp\\uat-single) and open it in VS Code.\n2. Ctrl+Shift+P > 'Dabbler: New Module' > slug: greeter > title: Greeter.\n3. In the Getting Started form's step 2, click 'Copy prompt for planning'.",
+      "Expectation": "Step 3 shows NO QuickPick. Two toasts appear: first exactly 'Using module \"Greeter\" (greeter) — the only module in docs/modules.yaml.' and then the 'Plan-authoring prompt copied to clipboard...' toast naming docs/modules/greeter/project-plan.md as the save path.",
+      "ProgrammaticVerification": "moduleAuthoring.test.ts > 'pickModuleForAuthoring: one module auto-selects WITH the operator notice (ruling Q2)'; gettingStartedActions.test.ts > 'copyPlanningPrompt: single module auto-targets its plan with the notice'.",
+      "Result": ""
+    },
+    {
+      "FunctionalArea": "Backward compatibility",
+      "Subarea": "Walk 7 - a repo with NO modules.yaml behaves exactly as before",
+      "ItemLabel": "No manifest: no module picker anywhere, repo-level plan path unchanged",
+      "HumanAction": "1. Create a third EMPTY folder (e.g. C:\\temp\\uat-scaffold) and open it in VS Code (do NOT create any module).\n2. In the Getting Started form's step 2, click 'Copy prompt for planning'.",
+      "Expectation": "NO QuickPick and NO 'Using module...' toast appear - just the single toast: Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, then save the result as docs/planning/project-plan.md — or import it with 'Import project-plan.md'. (The pre-087 behavior, byte-identical prompt.)",
+      "ProgrammaticVerification": "gettingStartedActions.test.ts > 'copyPlanningPrompt copies the authoring prompt and toasts' (the Set 060 suite runs with no manifest); planImport.buildPlanningPrompt renders the repo-level prompt byte-identical (pinned by the same suite); dogfood confirmed pickModuleForAuthoring returns 'none' with zero UI on a manifest-less root.",
+      "Result": ""
+    },
+    {
+      "FunctionalArea": "Ownership + CI templates",
+      "Subarea": "Walk 8 - 'Build project structure' scaffolds CODEOWNERS + monorepo CI",
+      "ItemLabel": "A new project starts with .github/CODEOWNERS and .github/workflows/monorepo-ci.yml teaching templates",
+      "HumanAction": "Still in uat-scaffold (from walk 7):\n1. In step 1 of the form, leave the 'Full' radio and 'Direct provider API keys' selected. In 'Verification budget (USD, not-to-exceed)' type exactly: 0\n2. In the choice that appears below, select 'Skip verification' (this walk must spend nothing).\n3. Click 'Build project structure' and wait for the build to finish (the venv install can take a minute or two).\n4. When the summary toast appears, open the Explorer file tree and inspect the .github folder.",
+      "Expectation": "The toast begins 'Project structure built (full tier):' and counts the files written. The folder now contains .github/CODEOWNERS and .github/workflows/monorepo-ci.yml. CODEOWNERS is ENTIRELY comment lines (every non-blank line starts with '#') and includes the worked Priya/Sam/Alex example plus a comment block explaining the integration `touches` review rule. monorepo-ci.yml declares 'name: Monorepo CI', triggers on push to main + pull_request, and its only ACTIVE job is 'all-modules' whose step is an echo placeholder that says to replace it - committing these files as-is cannot break a build or assign a reviewer.",
+      "ProgrammaticVerification": "gettingStartedActions.test.ts > 'writes exactly the structure artifacts and NO starter session set' (asserts both .github paths); gitScaffoldCore.test.ts full-render tests; coldStartSnapshot.test.ts golden includes both files for both tiers; the monorepo-ci template is valid YAML (loaded + parsed by the bundle tests).",
+      "Result": ""
+    }
+  ]
+}

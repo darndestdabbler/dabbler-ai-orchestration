@@ -16,6 +16,8 @@
 //   - build-structure    → buildProjectStructureNoPrompt (Set 058 writer)
 //   - import-plan        → importPlanFromFile (wizard/planImport)
 //   - copy-plan-prompt   → copyPlanningPrompt (wizard/planImport)
+//   - new-module         → runNewModuleFlow (Set 087 S3 — modules.yaml
+//                          entry + plan stub; shared with dabbler.newModule)
 //   - build-session-sets → copySessionSetGenPrompt (D4 — copies the
 //                          decomposition prompt; never an inline router call)
 
@@ -32,6 +34,7 @@ import {
 } from "../utils/budgetYaml";
 import { copyPlanningPrompt, importPlanFromFile } from "../wizard/planImport";
 import { copySessionSetGenPrompt } from "../wizard/sessionGenPrompt";
+import { runNewModuleFlow } from "./newModule";
 
 export interface GettingStartedHandlers {
   openFolder(): Promise<void>;
@@ -43,6 +46,8 @@ export interface GettingStartedHandlers {
   ): Promise<void>;
   importPlan(): Promise<void>;
   copyPlanPrompt(): Promise<void>;
+  /** Set 087 S3: the "New module" scaffold (docs/modules.yaml entry + plan stub). */
+  newModule(): Promise<void>;
   buildSessionSets(
     parallel: boolean,
     tier: Tier,
@@ -225,6 +230,11 @@ export async function routeGettingStartedAction(
     case "copy-plan-prompt":
       await handlers.copyPlanPrompt();
       return true;
+    case "new-module":
+      // Set 087 S3: no riders — slug/title are collected host-side via
+      // input boxes (validated fail-loud in the flow itself).
+      await handlers.newModule();
+      return true;
     case "build-session-sets": {
       // Set 060 S4: the tier radio rides this action too (same untrusted
       // narrowing as build-structure) so the copied decomposition prompt
@@ -255,7 +265,7 @@ export async function routeGettingStartedAction(
   }
 }
 
-/** Bind the real VS Code implementations for the five actions. */
+/** Bind the real VS Code implementations for the six actions. */
 export function makeGettingStartedHandlers(
   context: vscode.ExtensionContext,
 ): GettingStartedHandlers {
@@ -334,6 +344,12 @@ export function makeGettingStartedHandlers(
     // Step 2 alternative: copy the plan-authoring prompt.
     async copyPlanPrompt(): Promise<void> {
       await copyPlanningPrompt();
+    },
+
+    // Set 087 S3 (ruling Q1): the "New module" scaffold — same flow the
+    // dabbler.newModule palette command drives.
+    async newModule(): Promise<void> {
+      await runNewModuleFlow();
     },
 
     // Step 3 (D4): copy the decomposition prompt, honoring the parallel

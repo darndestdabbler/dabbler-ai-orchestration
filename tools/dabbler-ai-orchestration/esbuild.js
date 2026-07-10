@@ -29,6 +29,11 @@ function copyTemplateBundle() {
     "lessons-learned.md.template",
     "project-guidance.md.template",
     "lessons-archive.md.template",
+    // Set 077 S4 (Feature 3): engine-facing verification instructions.
+    "cross-provider-verification.md.template",
+    // Set 087 S3 (ruling Q3): module ownership + monorepo CI templates.
+    "CODEOWNERS.template",
+    "monorepo-ci.yml.template",
   ];
   for (const f of required) {
     if (!fs.existsSync(path.join(src, f))) {

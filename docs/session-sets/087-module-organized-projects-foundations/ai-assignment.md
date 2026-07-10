@@ -106,3 +106,42 @@ choice.
   state interaction/a11y intent explicitly in its conventions block up
   front. Anthropic-as-provider failed twice on one routed call
   (timeout, then 400); exclude-and-reroute worked cleanly.
+
+## Session 3 of 4 — Module authoring, scaffolding & ownership templates
+
+Orchestrator: **claude / anthropic / claude-fable-5** (recommendation was
+Opus-class/medium; the operator owns the seat choice and started the session
+on the Fable seat — a capability superset, so no scope adjustment).
+
+| Step | Handled by | Rationale |
+| :--- | :--- | :--- |
+| Read S1–S2 outcomes + map the touched surfaces (Getting Started action set, sessionGenPrompt, planImport, consumerBootstrap templates) | Orchestrator (direct) | Read-only reconnaissance over files the spec names explicitly. |
+| **Authoring/scaffold architecture decision** (new-module action surface + input UX; how generated specs acquire `module:` — prompt-only vs writer-rendered exemplar; CODEOWNERS/CI template posture — reference-only vs scaffold-written, target paths, touches-rule encoding; plan-authoring module-awareness) | **Routed — architecture** | The one oracle-free, solution-divergent decision cluster of the session (`delegation.always_route_task_types` includes architecture). Anthropic-as-provider failed (400 ×3 attempts, S2 precedent) → excluded, rerouted to gemini-pro. Saved raw: `s3-authoring-scaffold-architecture.json`. |
+| Scaffold module / command / protocol / prompt-flow / template implementation | Orchestrator (direct) | Flows deterministically from the spec + the routed ruling; mirrors existing house patterns (fail-loud rider narrowing, whole-line template tokens, skip-existing scaffold guard). |
+| Unit + Layer 2 tests | Orchestrator (direct) | Written against the live modules; exercised by the full suite. |
+| Ad-hoc UAT checklist (operator-armed gate) | Orchestrator (direct), automation-first | Authored to the Set-078 bar; every automation-checkable step pre-verified by the suite before the human walk. |
+| **Session verification (Step 6)** | **Routed — cross-provider, non-anthropic** | Mandatory no-skip cross-provider check (no-skip-verification-mandate). |
+| Next-orchestrator AI assignment (S4) | **Routed — analysis (gemini-pro, tier 2)** | L-064-6: never self-opine on model choice. Saved raw: `s3-next-orchestrator-analysis.json`. |
+
+**Delegation note.** The routed analysis suggested splitting the direct
+implementation further (template boilerplate to a cheaper model). Recorded as
+a deviation, not adopted: S1/S2 precedent is that implementation flowing
+deterministically from an operator-approved ruling is orchestrator-direct —
+at this scale the decomposition/hand-off overhead exceeds the seat delta,
+and the templates are teaching artifacts whose wording is review-sensitive.
+
+## Next-session recommendation (routed analysis, made in S3)
+
+For **Session 4 of 4 (Hello World team walkthrough + AI feedback prompt +
+set-terminal ceremony)** the routed analysis
+(`s3-next-orchestrator-analysis.json`, gemini-pro, tier 2) recommends
+**claude / anthropic / Opus-class / high effort**. Rationale (routed): the
+deliverables are long-form, coherence-critical prose (tutorial + review
+meta-prompt) with strict stylistic constraints; high-end Claude models have
+the verified track record here. Supervision points (routed): (1) the operator
+executes the walkthrough verbatim in a clean environment (AI tutorials can be
+theoretically sound but practically flawed), (2) dogfooded review-prompt
+output is checked for coaching tone and cited-evidence quality, not just for
+flagging the planted violation, (3) the path-aware critique is rejected if
+generic — it must ground in Set 087's actual events. The operator owns the
+final seat choice.

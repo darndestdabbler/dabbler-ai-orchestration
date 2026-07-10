@@ -23,6 +23,9 @@
 | [`lessons-learned.md.template`](lessons-learned.md.template) | `docs/planning/lessons-learned.md` — the always-loaded **active** guidance tier with the per-lesson metadata-trailer convention (Set 064 D7) | yes |
 | [`project-guidance.md.template`](project-guidance.md.template) | `docs/planning/project-guidance.md` — Principles/Conventions skeleton, ceiling-aware (Set 064 D7) | yes |
 | [`lessons-archive.md.template`](lessons-archive.md.template) | `docs/planning/lessons-archive.md` — the never-auto-loaded **archive** tier, seeded empty (Set 064 D7) | yes |
+| [`cross-provider-verification.md.template`](cross-provider-verification.md.template) | `docs/dabbler/cross-provider-verification.md` — the engine-facing out-of-band verification instructions (Set 077 S4); also ensure-written idempotently before any Evaluate pointer prompt | yes |
+| [`CODEOWNERS.template`](CODEOWNERS.template) | `.github/CODEOWNERS` — the module-ownership teaching template: worked three-person example + the integration `touches` review rule (Set 087 S3). **Token-free and comment-only** — inert until adapted to `docs/modules.yaml` | yes |
+| [`monorepo-ci.yml.template`](monorepo-ci.yml.template) | `.github/workflows/monorepo-ci.yml` — monorepo CI teaching template: commented path-scoped per-module jobs + the ACTIVE all-module guardrail job on every merge to `main` (its placeholder step succeeds, so the unadapted file never breaks a build) (Set 087 S3). **Token-free** | yes |
 
 The three `docs/planning/` guidance starters are repo-level structure (not
 per-set), so they are written by **both** the full session-set scaffold and the
@@ -65,6 +68,7 @@ snapshot-test failure). Canonical token set:
 | `{{SLUG}}` | full `NNN-`-prefixed set slug | `001-user-authentication` |
 | `{{CREATED}}` | ISO date the set was created | `2026-06-09` |
 | `{{TIER}}` | `full` or `lightweight` | `lightweight` |
+| `{{MODULE_LINE}}` | the whole `module:` config line (module-targeted sets only, Set 087 S3) | `module: greeter  # grouping only — …` + newline |
 | `{{VERIFICATION_MODE_LINE}}` | the whole `verificationMode:` config line (Lightweight only) | `verificationMode: out-of-band-or-none  # Lightweight only: …` + newline |
 | `{{TOTAL_SESSIONS}}` | planned session count | `3` |
 
@@ -76,6 +80,13 @@ the field entirely** — the field is Lightweight-only and omission means the
 documented default. The token sits flush against the next template line, so
 the Full render leaves no blank-line residue. See
 [`docs/spec-md-schema.md`](../../spec-md-schema.md).
+
+`{{MODULE_LINE}}` follows the same whole-line pattern (Set 087 S3): when the
+context carries a module slug (a module-targeted decomposition) the writer
+fills the full `module: <slug>` line + newline; otherwise the empty string,
+so a repo with no module manifest renders byte-identical pre-087 output.
+`module` is a grouping attribute only — session-set names stay globally
+unique across all modules.
 
 ## Repeated session blocks (how `{{TOTAL_SESSIONS}}` is honored)
 

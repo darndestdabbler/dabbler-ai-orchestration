@@ -20,6 +20,7 @@ import { registerInstallAiRouterCommands } from "./commands/installAiRouterComma
 // commands the wizard module used to register survive as standalone
 // registrations.
 import { registerGetStartedCommand } from "./commands/gettingStartedDoc";
+import { registerNewModuleCommand } from "./commands/newModule";
 import { registerPlanImportCommand } from "./wizard/planImport";
 import { registerSessionGenPromptCommand } from "./wizard/sessionGenPrompt";
 import { registerCostDashboardCommand } from "./dashboard/CostDashboard";
@@ -303,6 +304,7 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerTroubleshootCommand", () => registerTroubleshootCommand(context));
   safeRegister("registerGetStartedCommand", () => registerGetStartedCommand(context));
   safeRegister("registerPlanImportCommand", () => registerPlanImportCommand(context));
+  safeRegister("registerNewModuleCommand", () => registerNewModuleCommand(context));
   safeRegister("registerSessionGenPromptCommand", () =>
     registerSessionGenPromptCommand(context),
   );

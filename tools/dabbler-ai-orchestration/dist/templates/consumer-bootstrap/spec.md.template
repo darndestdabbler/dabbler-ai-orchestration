@@ -12,7 +12,7 @@
 
 ```yaml
 tier: {{TIER}}                         # full | lightweight — see the tier model SSoT (link below)
-requiresUAT: false                     # true | false | "suggested"
+{{MODULE_LINE}}requiresUAT: false                     # true | false | "suggested"
 requiresE2E: false                     # true | false | "suggested"
 uatScope: none                         # none | per-session | per-set (only when requiresUAT)
 uatStyle: ad-hoc                       # ad-hoc | dsl (only when requiresUAT)

@@ -102,6 +102,22 @@ suite("consumerBootstrap — spec.md render", () => {
   // Set 082: the verificationMode field is Lightweight-only — a Full
   // render omits the whole line (omission means the documented default),
   // with no blank-line residue where the line used to be.
+  test("module context renders the module: line; absent omits it (Set 087 S3)", () => {
+    const withModule = renderSpec(bundle, ctx({ module: "greeter" }));
+    assert.ok(/^module: greeter/m.test(withModule), "module line must render");
+    assert.ok(
+      withModule.includes("globally unique"),
+      "the grouping-only comment rides the line",
+    );
+    const without = renderSpec(bundle, ctx());
+    assert.ok(!/^module:/m.test(without), "no module context — no module line");
+    // Whole-line token: no blank-line residue where the token sat.
+    assert.ok(
+      /^tier: full[^\n]*\nrequiresUAT/m.test(without),
+      "tier line must be directly followed by requiresUAT",
+    );
+  });
+
   test("Full render omits the verificationMode line entirely (Set 082)", () => {
     const spec = renderSpec(bundle, ctx({ tier: "full" }));
     assert.ok(
@@ -177,6 +193,8 @@ suite("consumerBootstrap — spec.md render", () => {
       crossProviderVerificationTemplate: crlf(
         bundle.crossProviderVerificationTemplate,
       ),
+      codeownersTemplate: crlf(bundle.codeownersTemplate),
+      monorepoCiTemplate: crlf(bundle.monorepoCiTemplate),
     };
     const spec = renderSpec(crlfBundle, ctx({ totalSessions: 3 }));
     const headers = (spec.match(/### Session \d+ of 3:/g) || []).map((h) =>
@@ -238,10 +256,13 @@ suite("consumerBootstrap — engine files", () => {
 });
 
 suite("consumerBootstrap — full render", () => {
-  test("produces the eleven artifacts at canonical relative paths", () => {
+  test("produces the thirteen artifacts at canonical relative paths", () => {
     const { files } = renderConsumerBootstrap(bundle, ctx());
     const keys = Object.keys(files).sort();
     assert.deepStrictEqual(keys, [
+      // Set 087 S3 (ruling Q3): ownership + monorepo-CI teaching templates.
+      ".github/CODEOWNERS",
+      ".github/workflows/monorepo-ci.yml",
       "AGENTS.md",
       "CLAUDE.md",
       "GEMINI.md",
@@ -302,7 +323,7 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
     );
   });
 
-  test("the REAL packaged dist bundle exists with all twelve files", () => {
+  test("the REAL packaged dist bundle exists with all fourteen files", () => {
     // Pins the actual build artifact the .vsix ships (esbuild copyTemplateBundle
     // writes it; it is committed alongside dist/extension.js). A broken copy
     // step or a missing packaged bundle fails here, not on a user's machine.
@@ -322,6 +343,9 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
       "lessons-archive.md.template",
       // Set 077 S4 (Feature 3): engine-facing verification instructions.
       "cross-provider-verification.md.template",
+      // Set 087 S3 (ruling Q3): ownership + monorepo-CI templates.
+      "CODEOWNERS.template",
+      "monorepo-ci.yml.template",
     ];
     for (const f of required) {
       assert.ok(
@@ -331,7 +355,7 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
     }
     // And it must actually render.
     const { files } = renderConsumerBootstrap(loadTemplateBundle(distDir), ctx());
-    assert.strictEqual(Object.keys(files).length, 11);
+    assert.strictEqual(Object.keys(files).length, 13);
   });
 
   test("loadTemplateBundle reads a bundle laid out at the packaged path", () => {

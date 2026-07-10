@@ -1,0 +1,83 @@
+# .github/workflows/monorepo-ci.yml — monorepo CI for module-organized
+# projects (Dabbler). Scaffolded by the Dabbler AI Orchestration extension.
+#
+# The two-layer contract (keep it in sync with docs/modules.yaml):
+#
+#   1. PATH-SCOPED MODULE JOBS — fast feedback: each module's job runs only
+#      when its `codeRoots` change (the `changes` detection job below).
+#   2. THE ALL-MODULE GUARDRAIL — every merge to `main` builds and tests
+#      EVERY module, unconditionally. This is the anti-integration-bomb
+#      rule: cross-module breakage surfaces on the merge that caused it,
+#      not weeks later when the victim module next changes.
+#
+# HOW TO ADAPT: replace the `echo` placeholder in `all-modules` with your
+# real build/test commands, then uncomment the `changes` + per-module jobs
+# and point each filter at that module's `codeRoots` from docs/modules.yaml.
+# The scaffolded file is deliberately harmless as-is (the placeholder step
+# succeeds), so committing it before adapting cannot break your builds.
+
+name: Monorepo CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # ---- 1. Path-scoped module jobs (uncomment and adapt) ----------------
+  # Detect which modules a PR touches. Filters mirror each module's
+  # `codeRoots` in docs/modules.yaml (worked example: Priya's `greeter`,
+  # Sam's `clock`, Alex's `integration` composing both).
+  #
+  # changes:
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     pull-requests: read
+  #   outputs:
+  #     greeter: ${{ steps.filter.outputs.greeter }}
+  #     clock: ${{ steps.filter.outputs.clock }}
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: dorny/paths-filter@v3
+  #       id: filter
+  #       with:
+  #         filters: |
+  #           greeter:
+  #             - 'services/greeter/**'
+  #           clock:
+  #             - 'services/clock/**'
+  #
+  # greeter:
+  #   needs: changes
+  #   if: needs.changes.outputs.greeter == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Build and test the greeter module
+  #       run: |
+  #         echo "TODO: this module's build/test commands, e.g.:"
+  #         echo "  npm ci && npm test --workspace services/greeter"
+  #
+  # clock:
+  #   needs: changes
+  #   if: needs.changes.outputs.clock == 'true'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Build and test the clock module
+  #       run: |
+  #         echo "TODO: this module's build/test commands"
+
+  # ---- 2. The all-module guardrail (active; replace the placeholder) ---
+  all-modules:
+    # Runs on every merge to main, NEVER path-filtered: integration
+    # breakage must surface on the merge that caused it.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test ALL modules (replace this placeholder)
+        run: |
+          echo "TODO: replace with the commands that build and test every"
+          echo "module in this repo (the anti-integration-bomb guardrail)."
+          echo "Until then this placeholder succeeds so CI stays green."

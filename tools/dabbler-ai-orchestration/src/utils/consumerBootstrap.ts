@@ -54,6 +54,14 @@ export interface BootstrapContext {
   verificationMode: string;
   /** Planned session count (>= 1). */
   totalSessions: number;
+  /**
+   * Set 087 S3 (ruling Q2): the module slug the rendered set belongs to
+   * (its ``docs/modules.yaml`` identity). Optional — absent renders no
+   * ``module:`` line at all (the single-module / no-manifest case), so
+   * pre-087 output is byte-identical. ``module`` is a grouping attribute
+   * only: set names stay globally unique across all modules.
+   */
+  module?: string;
 }
 
 /** The raw template strings, as loaded from the bundle directory. */
@@ -93,6 +101,21 @@ export interface TemplateBundle {
    * re-bootstrap).
    */
   crossProviderVerificationTemplate: string;
+  /**
+   * Set 087 S3 (ruling Q3): the module-ownership CODEOWNERS teaching
+   * template — a worked three-person example plus the integration
+   * `touches` review rule, written to {@link CODEOWNERS_REL_PATH}.
+   * Token-free and comment-only, so committing it unadapted is inert.
+   */
+  codeownersTemplate: string;
+  /**
+   * Set 087 S3 (ruling Q3): the monorepo CI teaching template —
+   * commented path-scoped per-module jobs plus the ACTIVE all-module
+   * guardrail job on every merge to main (its placeholder step succeeds,
+   * so the unadapted file never breaks a build). Written to
+   * {@link MONOREPO_CI_REL_PATH}. Token-free.
+   */
+  monorepoCiTemplate: string;
 }
 
 /** Filenames inside ``docs/templates/consumer-bootstrap/``. */
@@ -109,6 +132,8 @@ const BUNDLE_FILES = {
   projectGuidanceTemplate: "project-guidance.md.template",
   lessonsArchiveTemplate: "lessons-archive.md.template",
   crossProviderVerificationTemplate: "cross-provider-verification.md.template",
+  codeownersTemplate: "CODEOWNERS.template",
+  monorepoCiTemplate: "monorepo-ci.yml.template",
 } as const;
 
 /**
@@ -155,6 +180,8 @@ export function loadTemplateBundle(bundleDir: string): TemplateBundle {
     crossProviderVerificationTemplate: read(
       BUNDLE_FILES.crossProviderVerificationTemplate,
     ),
+    codeownersTemplate: read(BUNDLE_FILES.codeownersTemplate),
+    monorepoCiTemplate: read(BUNDLE_FILES.monorepoCiTemplate),
   };
 }
 
@@ -194,6 +221,18 @@ function verificationModeLine(ctx: BootstrapContext): string {
   return `verificationMode: ${mode}  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full\n`;
 }
 
+/**
+ * The whole ``module:`` config line (text + trailing newline) for the spec
+ * template's ``{{MODULE_LINE}}`` token (Set 087 S3, ruling Q2 — the same
+ * whole-line-token pattern as {@link verificationModeLine}): the line
+ * renders only when the context carries a module slug, so a repo with no
+ * module manifest emits byte-identical pre-087 output.
+ */
+function moduleLine(ctx: BootstrapContext): string {
+  if (!ctx.module) return "";
+  return `module: ${ctx.module}                      # grouping only — set names stay globally unique\n`;
+}
+
 /** Map a {@link BootstrapContext} to its ``{{TOKEN}}`` -> value table. */
 function tokenTable(ctx: BootstrapContext): Record<string, string> {
   return {
@@ -203,6 +242,7 @@ function tokenTable(ctx: BootstrapContext): Record<string, string> {
     SLUG: ctx.slug,
     CREATED: ctx.created,
     TIER: ctx.tier,
+    MODULE_LINE: moduleLine(ctx),
     VERIFICATION_MODE_LINE: verificationModeLine(ctx),
     TOTAL_SESSIONS: String(ctx.totalSessions),
   };
@@ -423,6 +463,22 @@ export const LESSONS_LEARNED_REL_PATH = path.posix.join("docs", "planning", "les
 export const PROJECT_GUIDANCE_REL_PATH = path.posix.join("docs", "planning", "project-guidance.md");
 export const LESSONS_ARCHIVE_REL_PATH = path.posix.join("docs", "planning", "lessons-archive.md");
 
+/**
+ * Set 087 S3 (ruling Q3): output paths of the module-ownership CODEOWNERS
+ * and the monorepo-CI teaching templates. Repo structure — both scaffold
+ * paths emit them (skip-existing guarded, like every scaffold artifact),
+ * so a new project starts with the ownership map and the
+ * anti-integration-bomb CI shape in place. Both files are inert until
+ * adapted: CODEOWNERS is comment-only, and the CI workflow's single
+ * active job runs a succeeding placeholder step.
+ */
+export const CODEOWNERS_REL_PATH = path.posix.join(".github", "CODEOWNERS");
+export const MONOREPO_CI_REL_PATH = path.posix.join(
+  ".github",
+  "workflows",
+  "monorepo-ci.yml",
+);
+
 /** Render the three guidance-lifecycle starters (token-substituted). */
 function guidanceFiles(
   bundle: TemplateBundle,
@@ -461,6 +517,10 @@ export function renderConsumerBootstrap(
     [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
     // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
     ...guidanceFiles(bundle, ctx),
+    // Set 087 S3 (ruling Q3): the module-ownership + monorepo-CI teaching
+    // templates (token-free; inert until adapted).
+    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
+    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate,
   };
 
   const leftovers = new Set<string>();
@@ -513,6 +573,10 @@ export function renderStructureBootstrap(
     // so a fresh repo built via "Build project structure" starts the
     // lifecycle with docs/planning/ in place.
     ...guidanceFiles(bundle, ctx),
+    // Set 087 S3 (ruling Q3): the ownership + CI teaching templates are
+    // repo structure too — a new project starts with them in place.
+    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
+    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate,
   };
 
   const leftovers = new Set<string>();

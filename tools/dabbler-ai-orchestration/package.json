@@ -185,6 +185,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.newModule",
+        "title": "New Module",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.generateSessionSetPrompt",
         "title": "Generate Session-Set Prompt",
         "category": "Dabbler"

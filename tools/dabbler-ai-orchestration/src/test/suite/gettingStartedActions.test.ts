@@ -64,6 +64,8 @@ interface CallLog {
   buildStructureProfiles: Array<string | undefined>;
   importPlan: number;
   copyPlanPrompt: number;
+  // Set 087 S3: the New-module scaffold action.
+  newModule: number;
   // Set 060 S4: build-session-sets carries (parallel, tier).
   buildSessionSets: Array<{ parallel: boolean; tier: "full" | "lightweight" }>;
 }
@@ -76,6 +78,7 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
     buildStructureProfiles: [],
     importPlan: 0,
     copyPlanPrompt: 0,
+    newModule: 0,
     buildSessionSets: [],
   };
   const handlers: GettingStartedHandlers = {
@@ -87,6 +90,7 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
     },
     importPlan: async () => void calls.importPlan++,
     copyPlanPrompt: async () => void calls.copyPlanPrompt++,
+    newModule: async () => void calls.newModule++,
     buildSessionSets: async (parallel, tier) =>
       void calls.buildSessionSets.push({ parallel, tier }),
   };
@@ -101,6 +105,7 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
       "build-structure",
       "import-plan",
       "copy-plan-prompt",
+      "new-module",
       "build-session-sets",
     ] as const) {
       const handled = await routeGettingStartedAction(
@@ -117,6 +122,7 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     assert.strictEqual(calls.buildStructure.length, 1);
     assert.strictEqual(calls.importPlan, 1);
     assert.strictEqual(calls.copyPlanPrompt, 1);
+    assert.strictEqual(calls.newModule, 1);
     assert.strictEqual(calls.buildSessionSets.length, 1);
   });
 
@@ -431,7 +437,7 @@ const PROJECT = "/repo";
 const cfgPath = path.join(PROJECT, "ai_router", "router-config.yaml").replace(/\\/g, "/");
 
 suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
-  test("writes exactly the eight structure artifacts and NO starter session set", async () => {
+  test("writes exactly the structure artifacts and NO starter session set", async () => {
     const { ops, store } = memFileOps();
     const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
@@ -441,13 +447,14 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
       structureOnly: true,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Ten writes: nine structure artifacts (the five Set-060 structure
-    // artifacts, the three Set 064 D7 docs/planning/ guidance-lifecycle
-    // starters, and the Set 077 S4 cross-provider verification doc)
-    // plus the Set 077 S2 durable tier marker. (The verification-mode
-    // marker is Lightweight-only as of Set 082; this is a Full
-    // scaffold.)
-    assert.strictEqual(result.written.length, 10);
+    // Twelve writes: eleven structure artifacts (the five Set-060
+    // structure artifacts, the three Set 064 D7 docs/planning/
+    // guidance-lifecycle starters, the Set 077 S4 cross-provider
+    // verification doc, and the two Set 087 S3 ownership/CI teaching
+    // templates) plus the Set 077 S2 durable tier marker. (The
+    // verification-mode marker is Lightweight-only as of Set 082; this
+    // is a Full scaffold.)
+    assert.strictEqual(result.written.length, 12);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
@@ -457,6 +464,9 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     assert.ok(store.has("/repo/docs/planning/lessons-learned.md"));
     assert.ok(store.has("/repo/docs/planning/project-guidance.md"));
     assert.ok(store.has("/repo/docs/planning/lessons-archive.md"));
+    // Set 087 S3 (ruling Q3): ownership + monorepo-CI teaching templates.
+    assert.ok(store.has("/repo/.github/CODEOWNERS"));
+    assert.ok(store.has("/repo/.github/workflows/monorepo-ci.yml"));
     // The whole point of structureOnly: no docs/session-sets path is
     // materialized, so the dual-mode Explorer stays on the form
     // (hasAnySets keys on a renderable set) and no unnamed starter set
@@ -498,12 +508,12 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 9); // 8 artifacts + tier marker (Full: no verification-mode marker, Set 082)
+    assert.strictEqual(result.written.length, 11); // 10 artifacts + tier marker (Full: no verification-mode marker, Set 082)
   });
 });
 
 suite("renderStructureBootstrap (Set 060 S2)", () => {
-  test("renders the nine structure files, fully token-substituted", () => {
+  test("renders the eleven structure files, fully token-substituted", () => {
     const { files } = renderStructureBootstrap(
       bundle,
       structureOnlyContext("my-app", "full", "2026-06-10"),
@@ -511,6 +521,9 @@ suite("renderStructureBootstrap (Set 060 S2)", () => {
     assert.deepStrictEqual(
       Object.keys(files).sort(),
       [
+        // Set 087 S3 (ruling Q3): ownership + monorepo-CI templates.
+        ".github/CODEOWNERS",
+        ".github/workflows/monorepo-ci.yml",
         "AGENTS.md",
         "CLAUDE.md",
         "GEMINI.md",
@@ -597,6 +610,9 @@ interface UiLog {
 function makeUi(over: Partial<PlanImportUi>, log: UiLog): PlanImportUi {
   return {
     showOpenDialog: async () => undefined,
+    // Set 087 S3: the module picker's QuickPick — no-manifest tests never
+    // reach it (pickModuleForAuthoring resolves "none" first).
+    showQuickPick: async () => undefined,
     showWarningMessage: (async () => undefined) as PlanImportUi["showWarningMessage"],
     showInformationMessage: (async (m: string) => {
       log.infos.push(m);
@@ -713,6 +729,123 @@ suite("planImport handlers (Set 060 S2)", () => {
 });
 
 // ---------------------------------------------------------------------
+// Set 087 Session 3 (ruling Q4) — the plan-authoring flows are
+// module-aware: with a module manifest the prompt/import target the
+// picked module's plan (one module auto-selects with a notice; Esc on
+// the multi-module picker cancels); with no manifest both flows are the
+// unchanged repo-level pre-087 behavior (pinned by the Set 060 suite
+// above, whose fixtures have no docs/modules.yaml).
+// ---------------------------------------------------------------------
+
+suite("planImport — module-aware targeting (Set 087 S3)", () => {
+  function moduleRoot(prefix: string, manifest: string): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+    fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+    fs.writeFileSync(path.join(root, "docs", "modules.yaml"), manifest, "utf8");
+    return root;
+  }
+  const ONE_MODULE = "modules:\n  - slug: greeter\n    title: Greeter\n";
+  const TWO_MODULES =
+    "modules:\n" +
+    "  - slug: greeter\n    title: Greeter\n" +
+    "  - slug: clock\n    title: Clock\n    planPath: docs/plans/clock.md\n";
+
+  test("copyPlanningPrompt: single module auto-targets its plan with the notice", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-prompt-", ONE_MODULE);
+    try {
+      await copyPlanningPrompt(makeUi({ workspaceRoot: () => root }, log));
+      assert.strictEqual(log.clipboard.length, 1);
+      assert.ok(log.clipboard[0].includes("docs/modules/greeter/project-plan.md"));
+      assert.ok(log.clipboard[0].includes('the "Greeter" module'));
+      assert.ok(!log.clipboard[0].includes("docs/planning/project-plan.md"));
+      // Two toasts: the auto-select notice + the copied confirmation.
+      assert.strictEqual(log.infos.length, 2);
+      assert.ok(log.infos[0].includes("greeter"));
+      assert.ok(log.infos[1].includes("docs/modules/greeter/project-plan.md"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("copyPlanningPrompt: Esc on the multi-module picker copies nothing", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-cancel-", TWO_MODULES);
+    try {
+      await copyPlanningPrompt(
+        makeUi(
+          { workspaceRoot: () => root, showQuickPick: async () => undefined },
+          log,
+        ),
+      );
+      assert.strictEqual(log.clipboard.length, 0);
+      assert.strictEqual(log.infos.length, 0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("importPlanFromFile: the picked module's planPath is the destination", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-import-", TWO_MODULES);
+    const src = path.join(os.tmpdir(), `gs-mod-src-${process.pid}.md`);
+    fs.writeFileSync(src, "# clock plan\nCLOCK_PLAN_MARKER\n");
+    try {
+      const ok = await importPlanFromFile(
+        makeUi(
+          {
+            workspaceRoot: () => root,
+            // Pick the second row (clock, with an explicit planPath).
+            showQuickPick: async (items) => items[1],
+            showOpenDialog: (async () => [
+              { fsPath: src },
+            ]) as unknown as PlanImportUi["showOpenDialog"],
+          },
+          log,
+        ),
+      );
+      assert.strictEqual(ok, true);
+      const dest = path.join(root, "docs", "plans", "clock.md");
+      assert.ok(fs.existsSync(dest), "plan must land at the module's planPath");
+      assert.ok(fs.readFileSync(dest, "utf8").includes("CLOCK_PLAN_MARKER"));
+      assert.ok(
+        !fs.existsSync(path.join(root, "docs", "planning", "project-plan.md")),
+        "repo-level plan path must stay untouched",
+      );
+      assert.ok(log.infos.some((m) => m.includes("docs/plans/clock.md")));
+    } finally {
+      fs.rmSync(src, { force: true });
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("importPlanFromFile: Esc on the module picker never opens the file dialog", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-import-esc-", TWO_MODULES);
+    let dialogShown = false;
+    try {
+      const ok = await importPlanFromFile(
+        makeUi(
+          {
+            workspaceRoot: () => root,
+            showQuickPick: async () => undefined,
+            showOpenDialog: (async () => {
+              dialogShown = true;
+              return undefined;
+            }) as unknown as PlanImportUi["showOpenDialog"],
+          },
+          log,
+        ),
+      );
+      assert.strictEqual(ok, false);
+      assert.strictEqual(dialogShown, false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------
 // Set 077 Session 3 (Feature 2) — the three-way choice's verification-
 // mode rider: narrowing, tier gating, and dispatch threading. Cases
 // generated via routed test-generation (gemini-pro) and adapted to the
@@ -806,6 +939,7 @@ suite("verification-mode rider — dispatch threading (Set 077 S3)", () => {
       },
       importPlan: async () => undefined,
       copyPlanPrompt: async () => undefined,
+      newModule: async () => undefined,
       buildSessionSets: async (parallel, tier, verificationMode) => {
         calls.buildSessionSets.push({ parallel, tier, verificationMode });
       },

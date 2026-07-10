@@ -1,12 +1,37 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
+import {
+  ModulePickUi,
+  modulePlanRelPath,
+  pickModuleForAuthoring,
+} from "../utils/moduleAuthoring";
+import { ModuleManifestEntry } from "../types";
 
-const PLAN_DEST = path.join("docs", "planning", "project-plan.md");
-const PLAN_AUTHORING_PROMPT = `You are a project planning assistant for an AI-led development workflow.
+/** Repo-level plan destination (forward-slashed, repo-relative). */
+const PLAN_DEST_POSIX = "docs/planning/project-plan.md";
 
-Help me create a project plan in Markdown format for my software project.
+/**
+ * Build the plan-authoring prompt (Set 087 S3, ruling Q4: module-aware).
+ * A repo-level render (``module: null``) is byte-identical to the
+ * pre-087 prompt; a module-targeted render names the module and its
+ * plan path. Pure, so the suite pins both shapes.
+ */
+export function buildPlanningPrompt(
+  module: ModuleManifestEntry | null,
+  destPosix: string,
+): string {
+  const subject = module
+    ? `the "${module.title}" module (\`${module.slug}\`) of my software project`
+    : "my software project";
+  const moduleNote = module
+    ? `\nThis plan covers ONLY the ${module.slug} module (its scope is declared in
+docs/modules.yaml); the project's other modules have their own plans.\n`
+    : "";
+  return `You are a project planning assistant for an AI-led development workflow.
 
+Help me create a project plan in Markdown format for ${subject}.
+${moduleNote}
 The plan should include:
 1. Project overview (2-3 sentences)
 2. Goals and success criteria
@@ -17,7 +42,8 @@ Keep it concise and focused — this plan will be used to generate AI session se
 distinct feature area or phase should be something that can be implemented in 2-6 focused AI
 sessions.
 
-Format as a clean Markdown document I can save as docs/planning/project-plan.md.`;
+Format as a clean Markdown document I can save as ${destPosix}.`;
+}
 
 // Set 060 S2: the two halves of the old QuickPick command are exported
 // individually so the Getting Started form's two step-2 buttons
@@ -34,6 +60,8 @@ export interface PlanImportUi {
   showWarningMessage: typeof vscode.window.showWarningMessage;
   showInformationMessage: typeof vscode.window.showInformationMessage;
   showErrorMessage: typeof vscode.window.showErrorMessage;
+  /** Set 087 S3 (ruling Q4): the module picker's QuickPick surface. */
+  showQuickPick: ModulePickUi["showQuickPick"];
   writeClipboard: (text: string) => Thenable<void>;
   executeCommand: (command: string, ...args: unknown[]) => Thenable<unknown>;
   workspaceRoot: () => string | undefined;
@@ -45,28 +73,61 @@ function defaultUi(): PlanImportUi {
     showWarningMessage: vscode.window.showWarningMessage,
     showInformationMessage: vscode.window.showInformationMessage,
     showErrorMessage: vscode.window.showErrorMessage,
+    showQuickPick: (items, opts) => vscode.window.showQuickPick(items, opts),
     writeClipboard: (text) => vscode.env.clipboard.writeText(text),
     executeCommand: (command, ...args) => vscode.commands.executeCommand(command, ...args),
     workspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
   };
 }
 
+/**
+ * Resolve which plan this flow targets (Set 087 S3, ruling Q4): the
+ * picked module's plan when ``docs/modules.yaml`` names modules (one
+ * module auto-selects with a notice; Esc on the picker cancels the whole
+ * flow), the repo-level plan otherwise. ``null`` = cancelled.
+ */
+async function resolvePlanTarget(
+  root: string | undefined,
+  ui: PlanImportUi,
+): Promise<{ entry: ModuleManifestEntry | null; destPosix: string } | null> {
+  if (!root) return { entry: null, destPosix: PLAN_DEST_POSIX };
+  const pick = await pickModuleForAuthoring(root, {
+    showQuickPick: ui.showQuickPick,
+    showInformationMessage: ui.showInformationMessage,
+  });
+  if (pick.kind === "cancelled") return null;
+  return {
+    entry: pick.entry,
+    destPosix: pick.entry ? modulePlanRelPath(pick.entry) : PLAN_DEST_POSIX,
+  };
+}
+
 /** Copy the plan-authoring prompt to the clipboard (step-2 "OR" path). */
 export async function copyPlanningPrompt(ui: PlanImportUi = defaultUi()): Promise<void> {
-  await ui.writeClipboard(PLAN_AUTHORING_PROMPT);
+  const target = await resolvePlanTarget(ui.workspaceRoot(), ui);
+  if (!target) return; // module picker cancelled
+  await ui.writeClipboard(buildPlanningPrompt(target.entry, target.destPosix));
   void ui.showInformationMessage(
-    "Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, " +
-    "then save the result as docs/planning/project-plan.md — or import it with " +
-    "'Import project-plan.md'."
+    `Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, ` +
+    `then save the result as ${target.destPosix} — or import it with ` +
+    `'Import project-plan.md'.`
   );
 }
 
 /**
- * File-picker import into ``docs/planning/project-plan.md``. Returns true
- * when a plan was written (so callers can refresh live state), false on
- * cancel / error.
+ * File-picker import into the targeted plan path (the repo-level
+ * ``docs/planning/project-plan.md``, or the picked module's plan — Set
+ * 087 S3, ruling Q4). Returns true when a plan was written (so callers
+ * can refresh live state), false on cancel / error.
  */
 export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promise<boolean> {
+  // The module pick needs a root; the no-root ERROR stays after the file
+  // dialog (pre-087 order) so a cancelled dialog is a quiet false, never
+  // an error toast.
+  const root = ui.workspaceRoot();
+  const target = await resolvePlanTarget(root, ui);
+  if (!target) return false; // module picker cancelled
+
   const picked = await ui.showOpenDialog({
     canSelectFiles: true,
     canSelectFolders: false,
@@ -76,13 +137,12 @@ export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promis
   });
   if (!picked?.[0]) return false;
 
-  const root = ui.workspaceRoot();
   if (!root) {
     void ui.showErrorMessage("No workspace folder is open.");
     return false;
   }
 
-  const destPath = path.join(root, PLAN_DEST);
+  const destPath = path.join(root, ...target.destPosix.split("/"));
   const destDir = path.dirname(destPath);
   try {
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
@@ -95,7 +155,7 @@ export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promis
 
   if (fs.existsSync(destPath)) {
     const overwrite = await ui.showWarningMessage(
-      `${PLAN_DEST} already exists. Overwrite it?`,
+      `${target.destPosix} already exists. Overwrite it?`,
       { modal: true },
       "Overwrite"
     );
@@ -106,13 +166,13 @@ export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promis
     fs.copyFileSync(picked[0].fsPath, destPath);
   } catch (err) {
     void ui.showErrorMessage(
-      `Failed to write ${PLAN_DEST}: ${err instanceof Error ? err.message : String(err)}`
+      `Failed to write ${target.destPosix}: ${err instanceof Error ? err.message : String(err)}`
     );
     return false;
   }
   void ui.executeCommand("vscode.open", vscode.Uri.file(destPath));
   void ui.showInformationMessage(
-    `Plan imported to ${PLAN_DEST}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
+    `Plan imported to ${target.destPosix}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
   );
   return true;
 }

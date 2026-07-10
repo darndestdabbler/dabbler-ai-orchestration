@@ -140,6 +140,14 @@
       "dateTime": "2026-07-10T13:55:41.656405-04:00",
       "description": "R6 (gpt-5-4): two parts re-raise the settled workflow-order point under fresh wording (disposition.json authored pre-close is REQUIRED by the close gate per disposition-schema.md; verdict field is machine-patched per round) - documented, not resurrected. Third part exposed a REAL evidence defect: the default generated-bundle exclusion pathspec (dist) does not match the nested tools/dabbler-ai-orchestration/dist, so all prior rounds reviewed a bundle-noise-swamped, source-truncated diff. Round 7 re-runs with --exclude tools/dabbler-ai-orchestration/dist so the verifier finally sees the complete source/test diffs cleanly.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 18,
+      "stepKey": "session-001/verified",
+      "dateTime": "2026-07-10T13:59:48.848165-04:00",
+      "description": "Round 7 (gpt-5-4, clean evidence with --exclude tools/dabbler-ai-orchestration/dist): VERIFIED, zero findings, non-blocking. The nested-dist evidence defect was the root cause of the rounds 1-6 grind - once the verifier saw the complete source/test diffs without bundle noise it passed the session outright. Disposition machine-patched to verification_verdict=VERIFIED. Proceeding to close.",
+      "status": "complete"
     }
   ]
 }

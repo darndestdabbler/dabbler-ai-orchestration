@@ -57,6 +57,32 @@ tests. The append-only activity log is never rewritten. The final state is:
   — all jobs green including Playwright Layer 3 on all three OSes.
   Commits after `1fb5286` touch session-set artifacts (json/md) only.
 
+## disposition.json authoring pattern (not a contradiction)
+`disposition.json` MUST exist before `close_session` runs — the close gate
+validates its presence (`docs/disposition-schema.md`: "the orchestrator
+writes disposition.json AFTER the verifier returns a verdict and BEFORE
+invoking close_session"; the gate refuses to close without it). Therefore a
+`"status": "completed"` disposition coexisting with an in-progress
+`session-state.json` is the DOCUMENTED happy-path authoring sequence, not a
+contradiction: "completed" describes the session's work, and the state file
+flips only when the blessed close writer succeeds. The `verification_verdict`
+field is machine-patched by every verify_session round with that round's
+verdict token — it always reflects the LATEST round; older activity-log
+entries describing earlier intents are append-only history, never rewritten.
+This is the same settled point as the R1/R4 workflow-order dismissals.
+
+## Evidence-bundle note (round 7)
+Rounds 1–6 evidence bundles were degraded: the default generated-bundle
+exclusion pathspec (`dist`) does not match this repo's NESTED bundle path
+(`tools/dabbler-ai-orchestration/dist`), so ~4,400 lines of esbuild output
+swamped the diff and the real source/test diffs were partially truncated —
+exactly what round 6's evidence-completeness finding observed. Round 7 runs
+with an explicit `--exclude tools/dabbler-ai-orchestration/dist` so the
+bundle noise is gone and the full source/test diffs are visible. The
+`dist/*` files ARE part of the committed change set (the repo commits its
+compiled bundle; see files_changed) — their absence from the diff is the
+stated exclusion policy, not an omission.
+
 ## files_changed inventory policy
 `disposition.json.files_changed` inventories the full
 `<pre-session>..HEAD` diff plus all verification artifacts that exist when

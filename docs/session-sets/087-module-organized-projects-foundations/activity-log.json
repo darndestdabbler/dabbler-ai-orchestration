@@ -132,6 +132,14 @@
       "dateTime": "2026-07-10T13:53:10.080950-04:00",
       "description": "CI fully green for every code commit in the session: dd5c923 (run 29110488046), fe74dbf/R4 fix (run 29111369426), 1fb5286/R5 fix - the final code commit (run 29111967215) - all jobs green incl. Playwright Layer 3 on windows/macos/ubuntu. Conventions CI-evidence section updated with per-commit citations.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 17,
+      "stepKey": "session-001/round-6-evidence-defect-found",
+      "dateTime": "2026-07-10T13:55:41.656405-04:00",
+      "description": "R6 (gpt-5-4): two parts re-raise the settled workflow-order point under fresh wording (disposition.json authored pre-close is REQUIRED by the close gate per disposition-schema.md; verdict field is machine-patched per round) - documented, not resurrected. Third part exposed a REAL evidence defect: the default generated-bundle exclusion pathspec (dist) does not match the nested tools/dabbler-ai-orchestration/dist, so all prior rounds reviewed a bundle-noise-swamped, source-truncated diff. Round 7 re-runs with --exclude tools/dabbler-ai-orchestration/dist so the verifier finally sees the complete source/test diffs cleanly.",
+      "status": "complete"
     }
   ]
 }

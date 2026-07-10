@@ -84,17 +84,22 @@ choice.
 ### Actuals (S2)
 - Orchestrator used: claude / anthropic / claude-fable-5 (recommendation
   was Opus-class/high; operator's seat choice).
-- Total routed cost: $0.42 — architecture ruling (gemini-pro after two
+- Total routed cost: ~$0.76 — architecture ruling (gemini-pro after two
   anthropic provider failures, + auto-verify passes), analysis
-  (gemini-pro), two session-verification rounds (gpt-5-6, $0.35), and
-  the third-provider adjudication opinion (gemini-pro).
+  (gemini-pro), four session-verification rounds (gpt-5-6: R1 $0.17,
+  R2 $0.18, backstop R3 $0.12, R4 $0.22), and the third-provider
+  adjudication opinion (gemini-pro).
 - Deviations from recommendation: seat (fable-5 vs opus/high) —
   operator's call; no scope effect.
 - Verification: R1 ISSUES_FOUND (1 Major — payload-shape test
   substituted with source scans) fixed in-flight (builder extraction +
-  7 behavioral tests); R2 ISSUES_FOUND (1 Major — ARIA tree
-  conformance) adjudicated DEFER via the operator-selected
-  third-provider path; close verdict WAIVED via operator adjudication.
+  7 behavioral tests). R2 ISSUES_FOUND (1 Major — ARIA tree
+  conformance), re-raised by the close backstop as R3; adjudication
+  chain: orchestrator dispute → operator-selected third-provider
+  opinion (gemini-pro: technically correct, recommended DEFER) →
+  operator override: FIX NOW. Fixed (conformant nested treeitem/group
+  + keyboard operability in the multi-module dialect; implicit dialect
+  re-proven byte-identical). R4: **VERIFIED, zero findings**.
 - Notes for next-session calibration: the verifier pair (gpt-5-6) held
   the module tier to full WAI-ARIA authoring practice, beyond the
   spec's literal aria-level text — S3's webview-action work should

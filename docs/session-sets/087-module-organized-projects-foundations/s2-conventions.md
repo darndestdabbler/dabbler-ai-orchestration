@@ -38,14 +38,18 @@ R1/R4 workflow-order dismissals.)
   module-tier smoke), Python tests on all three OSes, the tier-model
   drift guards, the preload ceiling gate, and the template snapshot.
   The armed E2E gate is satisfied. The round-1 remediation commit
-  `121493e` (payload-builder extraction, below) then re-ran the same
-  matrix and is ALSO fully green — run
-  https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/29125361374
-  — making it the Layer-3 evidence of record for the session's FINAL
-  code commit. The webview rendering path (`client.js`, `tree.css`) is
-  untouched by that remediation. Every code commit in this session has
-  its own fully green CI run except the first (`d089272`, whose single
-  red job was the Windows EOL test-helper bug fixed in `4e5516f`).
+  `121493e` (payload-builder extraction) re-ran the same matrix fully
+  green (run 29125361374). The R2/R3 ARIA-conformance fix commit
+  `46bbab8` — this session's FINAL code commit — is ALSO fully green:
+  run
+  https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/29126914970
+  with Playwright Layer 3 on all three OSes including the EXTENDED
+  module-tier smoke (treeitem roles, nested groups, and the
+  Enter/Space/ArrowRight/ArrowLeft keyboard collapse assertions). That
+  run is the Layer-3 / E2E-gate evidence of record. Every code commit
+  in this session has its own fully green CI run except the first
+  (`d089272`, whose single red job was the Windows EOL test-helper bug
+  fixed in `4e5516f`).
 - The operator answered the `requiresUAT`/`requiresE2E: suggested`
   tri-state prompt at session start with **"e2e"** (recorded as the
   `suggestion_disposition` activity-log entry, session 2). The armed gate

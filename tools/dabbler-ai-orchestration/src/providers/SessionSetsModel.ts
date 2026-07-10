@@ -1,6 +1,12 @@
 import * as vscode from "vscode";
 import { SessionSet, SessionState } from "../types";
 import {
+  BucketPayload,
+  ModulePayload,
+  RowPayload,
+} from "../types/sessionSetsWebviewProtocol";
+import { listInProgressSets } from "./inProgressSetsService";
+import {
   PLUS_FRACTION_TOOLTIP,
   TIER_MISMATCH_MARKER,
   isRecognizedVerdictToken,
@@ -354,4 +360,68 @@ export function sortBucket(subset: SessionSet[], groupKey: SessionState): Sessio
     out.sort((a, b) => (b.lastTouched || "").localeCompare(a.lastTouched || ""));
   }
   return out;
+}
+
+// Set 087 Session 2 (verifier round 1, Major): the snapshot payload
+// assembly, extracted from CustomSessionSetsView so the payload SHAPE
+// is behavior-testable at Layer 2 (the host class is not importable
+// from the unit harness). Pure given `rowFor` — the host passes its
+// private `buildRow` (unchanged, per the spec); tests pass a stub.
+// Semantics are the pre-087 host logic verbatim: the three default
+// buckets always render (empty ones included), Cancelled only when
+// non-empty, in-progress ordered by `listInProgressSets`, the other
+// buckets by `sortBucket`.
+export function buildBucketPayloads(
+  subset: SessionSet[],
+  rowFor: (set: SessionSet) => RowPayload,
+): BucketPayload[] {
+  const buckets = bucketSets(subset);
+  const build = (
+    key: BucketPayload["key"],
+    label: string,
+    sets: SessionSet[],
+    sorted: SessionSet[],
+  ): BucketPayload => ({
+    key,
+    label,
+    count: sets.length,
+    rows: sorted.map(rowFor),
+  });
+  const groups: BucketPayload[] = [
+    build(
+      "in-progress",
+      "In Progress",
+      buckets.inProgress,
+      listInProgressSets(buckets.inProgress),
+    ),
+    build(
+      "not-started",
+      "Not Started",
+      buckets.notStarted,
+      sortBucket(buckets.notStarted, "not-started"),
+    ),
+    build("complete", "Complete", buckets.complete, sortBucket(buckets.complete, "complete")),
+  ];
+  if (buckets.cancelled.length > 0) {
+    groups.push(
+      build("cancelled", "Cancelled", buckets.cancelled, sortBucket(buckets.cancelled, "cancelled")),
+    );
+  }
+  return groups;
+}
+
+// Set 087 Session 2: the module tier's full payload — groupByModule
+// (manifest order, implicit last) with the bucket pass run per module.
+// The implicit module maps its null slug/title onto the protocol's ""
+// sentinels. A no-manifest / all-implicit workspace produces exactly
+// one implicit ModulePayload (the webview's pixel-compatible case).
+export function buildModulePayloads(
+  all: SessionSet[],
+  rowFor: (set: SessionSet) => RowPayload,
+): ModulePayload[] {
+  return groupByModule(all).map((group) => ({
+    slug: group.slug ?? "",
+    title: group.title ?? "",
+    buckets: buildBucketPayloads(group.sets, rowFor),
+  }));
 }

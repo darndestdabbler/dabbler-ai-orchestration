@@ -232,6 +232,22 @@
       "dateTime": "2026-07-10T17:21:33.423581-04:00",
       "description": "CI run 29123889271 on d089272: all jobs green except the NEW module-tier Playwright spec on windows-latest - the stampModule helper matched requiresE2E with a bare \\n while the Python harness writes CRLF on Windows (macOS/ubuntu green incl. the new spec). Fixed newline-agnostic (regex reuses the anchor EOL); verified against a real harness fixture (CRLF confirmed, stamp lands). Test-helper portability fix only; no product-code change.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/e2e-gate-green",
+      "dateTime": "2026-07-10T17:31:50.786416-04:00",
+      "description": "CI run 29124453680 on 4e5516f fully green: Playwright Layer 3 on windows/macos/ubuntu incl. the new module-tier smoke, Python tests on all three OSes, drift guards, preload ceiling, template snapshot. The operator-armed E2E gate (suggestion_disposition=e2e) is satisfied; citation recorded in s2-conventions.md and disposition.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-002/r1-major-remediated",
+      "dateTime": "2026-07-10T17:39:01.446194-04:00",
+      "description": "Verification round 1 (gpt-5-6, \\.17): ISSUES_FOUND, one Major (Completeness): the spec-required buildModules payload-shape Layer-2 test had been substituted with source scans. Fixed: extracted the payload assembly verbatim into pure SessionSetsModel.buildModulePayloads/buildBucketPayloads (host buildModules one-line delegates with its unchanged buildRow); added 7 behavior-level tests (2-modules+integration fixture, four buckets per labeled module, row containment + leak sweep, omitted-Cancelled/empty-default contract, all-implicit sentinel case, per-module sortBucket, disk-fixture end-to-end). Unit suite 1313 passing; tsc clean; lint clean on touched files; bundle rebuilt. client.js/tree.css untouched.",
+      "status": "complete"
     }
   ]
 }

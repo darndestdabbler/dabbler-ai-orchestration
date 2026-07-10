@@ -1,12 +1,19 @@
 {
   "status": "completed",
-  "summary": "Session 1: docs/modules.yaml manifest reader (readModulesManifest, tolerant read, real YAML parse; present-but-unreadable/wrong-shape manifests warn, incl. directories and dangling symlinks at the path; only a truly absent manifest is silent), module/moduleTitle threaded onto SessionSet + raw module key on SessionSetConfig (manifest-validated; unknown/absent/no-manifest degrade to the implicit module; the per-set unknown-slug warning fires only when a manifest actually loaded), and the fail-loud global set-name uniqueness check per the routed architecture ruling (repo-family + relPath identity from the existing worktree enumeration, one flagged winner row via duplicateNameError, readAllSessionSetsWithDiagnostics envelope, deduped re-arming console.error; the legitimate main+worktree merge is unchanged). FINAL evidence: unit suite 1293 passing locally incl. 20 new Set-087 tests; Layer 1 pytest 2905 passed/6 skipped with the one pre-existing drift-guard failure fixed in this diff (Set-088 doc quoted a banned bigram; reworded); Playwright Layer 3 green on CI (run 29110488046 on dd5c923, all three OSes; post-dd5c923 code deltas are confined to the manifest-reader warning branches + tests, CI re-runs on every push; local Electron launch unavailable in the agent shell, reproduced at clean HEAD). Verification history: rounds 1-5 on gpt-5-4 (R3 was the close-backstop round; a third-provider google round was attempted per the disputed-finding path and failed artifact-less on provider 429s for both gemini models). No structured envelope ever rated a finding Critical/Major; every actionable part was fixed in flight (wrong-shape/unreadable/dangling-symlink manifest warnings, warning-precision gating, activity-log totalSessions, files_changed completeness, evidence-count consistency); two findings dismissed with citations (codeRoots: [] is sanctioned by recommendation 2.4; saved verification artifacts are immutable). Full per-finding adjudication in s1-conventions.md.",
+  "summary": "Session 2: the Explorer module tier (module -> status-bucket -> row). Protocol: ModulePayload { slug; title; buckets } + SnapshotPayload.modules replacing the top-level buckets field per the routed rendering ruling (Q2 - host and webview ship together; a duplicated field only invites divergence); RowPayload.slug and every action message unchanged (module is grouping, never identity). View-model: pure groupByModule(all) ordered by the new SessionSet.moduleOrder (the manifest entry index, stamped at scan time next to module/moduleTitle - ruling Q3; the small types.ts/fileSystem.ts touches beyond the spec's declared list are named in s2-conventions.md). Host: buildModules wraps the unchanged buildBuckets/buildRow. Webview: the single-implicit case renders BYTE-IDENTICAL pre-087 markup (proven by an old-vs-new innerHTML diff harness, 3136 bytes equal, incl. empty + cancelled buckets); multi-module workspaces render collapsible module groups in manifest file order with the implicit '(ungrouped)' group last (ruling Q1), aria-level 1 (module header) / 2 (bucket header) / 3 (row), per-module collapse state, and composite '<module>/<bucket>' collapse keys (ruling Q4). Ruling saved raw at s2-explorer-render-architecture.json (anthropic excluded after a read-timeout + a 400 on the architecture call; exclusion logged). Operator answered the requiresUAT/requiresE2E 'suggested' prompt with 'e2e' (suggestion_disposition entry): the Playwright gate is armed, no UAT checklist owed. Evidence: unit suite 1306 passing (13 new Layer-2 tests in moduleTier.test.ts), tsc + esbuild clean, eslint 7 pre-existing errors only (zero new), Layer 1 pytest 2922 passed / 6 skipped / 0 failed. Layer 3: first push d089272 (run 29123889271) was green on every job except the NEW smoke on windows-latest - a test-helper EOL bug (\\n-only match vs the harness's CRLF specs), fixed newline-agnostic in 4e5516f; the fix commit's fully green run 29124453680 (Playwright Layer 3 green on all three OSes incl. the new smoke) is the Layer-3 / E2E-gate evidence of record. Local Electron launch remains unavailable in the agent shell (S1-documented limitation; six untouched CI-green specs fail at app.firstWindow locally - the environment control).",
   "verification_method": "api",
-  "verification_verdict": "VERIFIED",
+  "verification_verdict": "ISSUES_FOUND",
   "files_changed": [
-    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
     "tools/dabbler-ai-orchestration/src/types.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/modulesManifest.test.ts",
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/providers/SessionSetsModel.ts",
+    "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleTier.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/module-tier.spec.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/session-sets-tree.spec.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/copyPromptCommands.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/flagDecisionForReview.test.ts",
@@ -15,28 +22,14 @@
     "tools/dabbler-ai-orchestration/src/test/suite/prerequisites.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/sessionSetsProvider.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/setupVerification.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/tierLegibility.test.ts",
     "tools/dabbler-ai-orchestration/dist/extension.js",
     "tools/dabbler-ai-orchestration/dist/extension.js.map",
-    "docs/verification-loop-remediation-2026-07.md",
-    "docs/planning/lessons-learned.md",
-    "docs/planning/lessons-archive.md",
     "docs/session-sets/087-module-organized-projects-foundations/activity-log.json",
     "docs/session-sets/087-module-organized-projects-foundations/ai-assignment.md",
     "docs/session-sets/087-module-organized-projects-foundations/disposition.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-conventions.md",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-collision-check-architecture.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-next-orchestrator-analysis.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-verification.md",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-issues.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-verification-round-2.md",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-issues-round-2.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-verification-round-3.md",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-issues-round-3.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-verification-round-4.md",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-issues-round-4.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-verification-round-5.md",
-    "docs/session-sets/087-module-organized-projects-foundations/s1-issues-round-5.json",
+    "docs/session-sets/087-module-organized-projects-foundations/s2-conventions.md",
+    "docs/session-sets/087-module-organized-projects-foundations/s2-explorer-render-architecture.json",
+    "docs/session-sets/087-module-organized-projects-foundations/s2-next-orchestrator-analysis.json",
     "docs/session-sets/087-module-organized-projects-foundations/session-events.jsonl",
     "docs/session-sets/087-module-organized-projects-foundations/session-state.json"
   ],
@@ -45,18 +38,22 @@
     "engine": "claude",
     "provider": "anthropic",
     "model": "claude-opus-4-8",
-    "effort": "high",
+    "effort": "medium",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Routed analysis (s1-next-orchestrator-analysis.json, gemini-pro) recommends an Opus-class/high seat for Session 2's cross-surface Explorer module tier (host TS + webview client + ARIA/pixel-compat constraints + Playwright layer), where a visual regression's remediation cost exceeds the seat premium. Supervision points: the ModulePayload protocol contract, the ARIA attributes, and the Layer 3 assertions."
+      "specifics": "Routed analysis (s2-next-orchestrator-analysis.json, gemini-pro) recommends an Opus-class Claude seat at medium effort for Session 3's mix (precise YAML/MD/TS file work + CODEOWNERS/monorepo-CI template authoring; no new rendering layer). Supervision points: the templates' path-scoping and ownership mappings, the scaffold action's typing across the webview action union + host handler, and error handling on the modules.yaml / project-plan.md writes."
     }
   },
   "blockers": [],
+  "deferred": [
+    {
+      "item": "Explorer UI affordance for duplicateNameError (row badge/tooltip + at most one throttled notification)",
+      "reason": "Anticipated by the S1 collision ruling ('Session 2 is expected to render...') but absent from the operator-approved spec's Session 2 plan, which scopes S2 to the module tier only. Surfaced here per the scope-doubt rule instead of unilaterally expanding scope; the fail-loud data-layer behavior (flagged winner row + deduped console.error) shipped in S1 and is live. Candidate for Session 3/4 spare capacity or the 088 follow-on set."
+    }
+  ],
   "lessons_cited": [
     "L-064-9",
-    "L-064-10",
-    "L-065-1",
-    "L-079-1",
-    "L-064-12"
+    "L-064-12",
+    "L-079-1"
   ]
 }

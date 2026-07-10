@@ -28,6 +28,17 @@ R1/R4 workflow-order dismissals.)
 - Playwright Layer 3: see the evidence-of-record section below.
 
 ## Layer-3 / E2E gate status
+- **Evidence of record:** CI run
+  https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/29124453680
+  on `4e5516f` completed fully green: **Playwright Layer 3 on
+  windows-latest, macos-latest, and ubuntu-latest** (including the new
+  module-tier smoke), Python tests on all three OSes, the tier-model
+  drift guards, the preload ceiling gate, and the template snapshot.
+  The armed E2E gate is satisfied. The round-1 remediation commit that
+  followed (payload-builder extraction, below) re-runs the same CI on
+  push; its green run supersedes as the final citation in
+  disposition.json. The webview rendering path (`client.js`,
+  `tree.css`) is untouched by that remediation.
 - The operator answered the `requiresUAT`/`requiresE2E: suggested`
   tri-state prompt at session start with **"e2e"** (recorded as the
   `suggestion_disposition` activity-log entry, session 2). The armed gate
@@ -97,6 +108,20 @@ gemini-pro; the exclusion is logged in the activity log):
 - **`module` is grouping, never identity** (operator-approved §2.5):
   `RowPayload.slug`, every action message, `findSetBySlug`, and the
   merge-by-name key are unchanged on purpose.
+
+## Cross-round issue ledger (a settled point must not reopen)
+- R1 (Major) "the required Layer-2 `buildModules` payload test was
+  replaced with source-text scans": **fixed** — the payload assembly was
+  extracted from the host into the pure, unit-importable
+  `SessionSetsModel.buildModulePayloads` /`buildBucketPayloads`
+  (semantics verbatim; the host's `buildModules` now one-line delegates,
+  passing its unchanged private `buildRow`), and 7 behavior-level tests
+  drive it: the spec's 2-modules-plus-integration fixture with all four
+  lifecycle buckets asserted per labeled module in canonical order,
+  per-module row containment (incl. a leak sweep), the
+  omitted-Cancelled/empty-default contract, the all-implicit
+  single-payload sentinel case, per-module `sortBucket` reuse, and a
+  disk-fixture scan → payload end-to-end run. Unit suite 1306 → 1313.
 
 ## Known out-of-scope (surfaced, not forgotten)
 - The S1 collision ruling *anticipated* ("Session 2 is expected to

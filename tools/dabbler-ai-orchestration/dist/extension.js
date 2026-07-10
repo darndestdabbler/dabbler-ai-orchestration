@@ -16982,6 +16982,18 @@ function readAllSessionSets() {
 
 // src/providers/SessionSetsModel.ts
 var vscode2 = __toESM(require("vscode"));
+
+// src/providers/inProgressSetsService.ts
+function listInProgressSets(all) {
+  const sets = all ?? readAllSessionSets();
+  return sets.filter((s) => s.state === "in-progress").sort((a, b2) => {
+    const aStart = a.liveSession?.startedAt ?? "";
+    const bStart = b2.liveSession?.startedAt ?? "";
+    return aStart.localeCompare(bStart);
+  });
+}
+
+// src/providers/SessionSetsModel.ts
 function migrationMarker(set) {
   return set.needsMigration ? "*" : "";
 }
@@ -17130,15 +17142,42 @@ function sortBucket(subset, groupKey) {
   }
   return out;
 }
-
-// src/providers/inProgressSetsService.ts
-function listInProgressSets(all) {
-  const sets = all ?? readAllSessionSets();
-  return sets.filter((s) => s.state === "in-progress").sort((a, b2) => {
-    const aStart = a.liveSession?.startedAt ?? "";
-    const bStart = b2.liveSession?.startedAt ?? "";
-    return aStart.localeCompare(bStart);
+function buildBucketPayloads(subset, rowFor) {
+  const buckets = bucketSets(subset);
+  const build = (key, label, sets, sorted2) => ({
+    key,
+    label,
+    count: sets.length,
+    rows: sorted2.map(rowFor)
   });
+  const groups = [
+    build(
+      "in-progress",
+      "In Progress",
+      buckets.inProgress,
+      listInProgressSets(buckets.inProgress)
+    ),
+    build(
+      "not-started",
+      "Not Started",
+      buckets.notStarted,
+      sortBucket(buckets.notStarted, "not-started")
+    ),
+    build("complete", "Complete", buckets.complete, sortBucket(buckets.complete, "complete"))
+  ];
+  if (buckets.cancelled.length > 0) {
+    groups.push(
+      build("cancelled", "Cancelled", buckets.cancelled, sortBucket(buckets.cancelled, "cancelled"))
+    );
+  }
+  return groups;
+}
+function buildModulePayloads(all, rowFor) {
+  return groupByModule(all).map((group) => ({
+    slug: group.slug ?? "",
+    title: group.title ?? "",
+    buckets: buildBucketPayloads(group.sets, rowFor)
+  }));
 }
 
 // src/providers/ActionRegistry.ts
@@ -24853,36 +24892,14 @@ var CustomSessionSetsView = class {
   }
   // Set 087 Session 2: the module tier — group by validated module
   // attribution (pure `groupByModule`, manifest order, implicit last),
-  // then run the EXISTING bucket pass per module. The implicit module
-  // maps its null slug/title onto the protocol's `""` sentinels. A
-  // no-manifest / all-implicit workspace produces exactly one implicit
-  // ModulePayload, which the webview renders as today's two-level view
-  // (pixel-compatible). `buildRow` and `findSetBySlug` are unchanged —
-  // module is grouping, never identity.
+  // then run the EXISTING bucket pass per module. The whole payload
+  // assembly lives in SessionSetsModel.buildModulePayloads (verifier
+  // round 1: the payload SHAPE must be behavior-testable at Layer 2,
+  // and this class is not importable from the unit harness); the host
+  // contributes only its private `buildRow` — unchanged, per the spec —
+  // as the row builder. Module is grouping, never identity.
   buildModules(all) {
-    return groupByModule(all).map((group) => ({
-      slug: group.slug ?? "",
-      title: group.title ?? "",
-      buckets: this.buildBuckets(group.sets)
-    }));
-  }
-  buildBuckets(all) {
-    const buckets = bucketSets(all);
-    const inProgressOrdered = listInProgressSets(buckets.inProgress);
-    const groups = [
-      this.buildBucket("in-progress", "In Progress", inProgressOrdered),
-      this.buildBucket("not-started", "Not Started", buckets.notStarted),
-      this.buildBucket("complete", "Complete", buckets.complete)
-    ];
-    if (buckets.cancelled.length > 0) {
-      groups.push(this.buildBucket("cancelled", "Cancelled", buckets.cancelled));
-    }
-    return groups;
-  }
-  buildBucket(key, label, subset) {
-    const sorted2 = key === "in-progress" ? subset : sortBucket(subset, key);
-    const rows = sorted2.map((set) => this.buildRow(set));
-    return { key, label, count: subset.length, rows };
+    return buildModulePayloads(all, (set) => this.buildRow(set));
   }
   buildRow(set) {
     const fraction = fractionFor(set);

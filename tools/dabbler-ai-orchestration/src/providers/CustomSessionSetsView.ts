@@ -32,17 +32,15 @@ import { readAllSessionSets } from "../utils/fileSystem";
 import { SessionSet } from "../types";
 import { ScanState } from "./scanState";
 import {
-  bucketSets,
   blockedMarker,
   blockedTooltip,
+  buildModulePayloads,
   forceClosedBadge,
   fractionTooltip,
-  groupByModule,
   ICON_FILES,
   isCurrentSessionInFlight,
   migrationMarker,
   migrationTooltip,
-  sortBucket,
   tierMarker,
   tierTooltip,
   touchedDate,
@@ -52,11 +50,6 @@ import {
   verificationOwedText,
   verificationTooltip,
 } from "./SessionSetsModel";
-// Set 034: the per-row orchestrator-tracking accordion (gauges + model
-// description) is retired from the UI. Set 036 Session 6 deleted the
-// OrchestratorAccordion + detectOrchestrators source modules. The
-// in-progress ordering helper survives in inProgressSetsService.
-import { listInProgressSets } from "./inProgressSetsService";
 import {
   ActionSupports,
   RowAction,
@@ -74,7 +67,6 @@ import {
   suppress,
 } from "./suppressionState";
 import {
-  BucketPayload,
   GettingStartedPayload,
   HostToWebview,
   ModulePayload,
@@ -605,42 +597,14 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
 
   // Set 087 Session 2: the module tier — group by validated module
   // attribution (pure `groupByModule`, manifest order, implicit last),
-  // then run the EXISTING bucket pass per module. The implicit module
-  // maps its null slug/title onto the protocol's `""` sentinels. A
-  // no-manifest / all-implicit workspace produces exactly one implicit
-  // ModulePayload, which the webview renders as today's two-level view
-  // (pixel-compatible). `buildRow` and `findSetBySlug` are unchanged —
-  // module is grouping, never identity.
+  // then run the EXISTING bucket pass per module. The whole payload
+  // assembly lives in SessionSetsModel.buildModulePayloads (verifier
+  // round 1: the payload SHAPE must be behavior-testable at Layer 2,
+  // and this class is not importable from the unit harness); the host
+  // contributes only its private `buildRow` — unchanged, per the spec —
+  // as the row builder. Module is grouping, never identity.
   private buildModules(all: SessionSet[]): ModulePayload[] {
-    return groupByModule(all).map((group) => ({
-      slug: group.slug ?? "",
-      title: group.title ?? "",
-      buckets: this.buildBuckets(group.sets),
-    }));
-  }
-
-  private buildBuckets(all: SessionSet[]): BucketPayload[] {
-    const buckets = bucketSets(all);
-    const inProgressOrdered = listInProgressSets(buckets.inProgress);
-    const groups: BucketPayload[] = [
-      this.buildBucket("in-progress", "In Progress", inProgressOrdered),
-      this.buildBucket("not-started", "Not Started", buckets.notStarted),
-      this.buildBucket("complete", "Complete", buckets.complete),
-    ];
-    if (buckets.cancelled.length > 0) {
-      groups.push(this.buildBucket("cancelled", "Cancelled", buckets.cancelled));
-    }
-    return groups;
-  }
-
-  private buildBucket(
-    key: BucketPayload["key"],
-    label: string,
-    subset: SessionSet[],
-  ): BucketPayload {
-    const sorted = key === "in-progress" ? subset : sortBucket(subset, key);
-    const rows = sorted.map((set) => this.buildRow(set));
-    return { key, label, count: subset.length, rows };
+    return buildModulePayloads(all, (set) => this.buildRow(set));
   }
 
   private buildRow(set: SessionSet): RowPayload {

@@ -74,6 +74,47 @@ html, body {
   padding: 2px 0;
 }
 
+/* Set 087 Session 2: the module tier (module → status-bucket → row).
+ * Only present in the multi-module view — a no-manifest / all-implicit
+ * workspace renders the bare bucket tree exactly as before (no .module
+ * elements at all). The module header reads one visual notch above the
+ * uppercase bucket headers: normal case, slightly larger, full
+ * foreground; the same chevron + click-to-collapse affordance. */
+.module {
+  margin-bottom: 6px;
+}
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 8px 7px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  user-select: none;
+  cursor: pointer;
+}
+.module-header:hover {
+  background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.10));
+}
+.module-chevron {
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.module[aria-expanded="false"] .module-body {
+  display: none;
+}
+/* Nested buckets indent under their module header so the three levels
+ * read at a glance. */
+.module-body .bucket-header {
+  padding-left: 24px;
+}
+.module-body .row-header {
+  padding-left: 24px;
+}
+
 .bucket {
   margin-bottom: 4px;
 }

@@ -273,6 +273,58 @@ export function modeBadge(_set: SessionSet): string {
   return "";
 }
 
+// Set 087 Session 2: one module group of the Explorer's module →
+// status-bucket → row tier. `slug` / `title` are null for the implicit
+// module (sets with no validated `module` attribution); the host maps
+// null onto the protocol's `""` sentinel. Pure grouping only — module
+// is never identity (the Set 087 invariant).
+export interface ModuleGroup {
+  slug: string | null;
+  title: string | null;
+  sets: SessionSet[];
+}
+
+// Set 087 Session 2: group the scanned sets by their validated module
+// attribution, BEFORE the existing bucketSets pass (which then runs per
+// module). Pure function of the SessionSet records: the display order
+// rides in on `set.moduleOrder` (the manifest file index, stamped at
+// scan time — routed ruling Q3, saved raw at
+// docs/session-sets/087-.../s2-explorer-render-architecture.json), so
+// labeled modules sort by manifest order and the implicit module —
+// when any of its sets exist — always comes last. Only modules with at
+// least one set produce a group (an empty manifest module renders
+// nothing). Sets keep their input order within each group; per-bucket
+// sorting stays downstream in sortBucket.
+export function groupByModule(all: SessionSet[]): ModuleGroup[] {
+  const labeled = new Map<string, { group: ModuleGroup; order: number }>();
+  const implicit: ModuleGroup = { slug: null, title: null, sets: [] };
+  for (const s of all) {
+    if (s.module === null) {
+      implicit.sets.push(s);
+      continue;
+    }
+    const existing = labeled.get(s.module);
+    if (existing) {
+      existing.group.sets.push(s);
+      // A cross-root merge can theoretically carry differing manifest
+      // indexes for one slug; the smallest wins so ordering stays
+      // deterministic.
+      const order = s.moduleOrder ?? Number.POSITIVE_INFINITY;
+      if (order < existing.order) existing.order = order;
+    } else {
+      labeled.set(s.module, {
+        group: { slug: s.module, title: s.moduleTitle, sets: [s] },
+        order: s.moduleOrder ?? Number.POSITIVE_INFINITY,
+      });
+    }
+  }
+  const groups = Array.from(labeled.values())
+    .sort((a, b) => a.order - b.order)
+    .map((e) => e.group);
+  if (implicit.sets.length > 0) groups.push(implicit);
+  return groups;
+}
+
 // Bucket the scanned sets into the four lifecycle groups. The custom
 // tree (S4) and the native tree (S3 ship) both consume this.
 export interface BucketedSets {

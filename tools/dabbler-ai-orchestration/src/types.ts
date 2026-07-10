@@ -249,6 +249,14 @@ export interface SessionSet {
   // stays keyed on `name` alone.
   module: string | null;
   moduleTitle: string | null;
+  // Set 087 Session 2 (routed ruling Q3, saved raw at
+  // s2-explorer-render-architecture.json): the validated module's index
+  // in its root's docs/modules.yaml `modules:` list — the Explorer's
+  // module DISPLAY order (manifest file order). Stamped at scan time so
+  // the view-model's `groupByModule(all)` stays pure and multi-root
+  // merges carry their ordering with the data. Null exactly when
+  // `module` is null (the implicit module, which always sorts last).
+  moduleOrder: number | null;
   dir: string;
   specPath: string;
   activityPath: string;

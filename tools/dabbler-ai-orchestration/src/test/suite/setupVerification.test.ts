@@ -203,6 +203,7 @@ function fakeCompletedSet(): SessionSet {
     name: "062-fixture",
     module: null,
     moduleTitle: null,
+    moduleOrder: null,
     dir: "/repo/docs/session-sets/062-fixture",
     specPath: "/repo/docs/session-sets/062-fixture/spec.md",
     activityPath: "/repo/docs/session-sets/062-fixture/activity-log.json",

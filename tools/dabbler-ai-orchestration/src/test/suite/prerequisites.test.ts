@@ -443,6 +443,7 @@ suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
       name: "x",
       module: null,
       moduleTitle: null,
+      moduleOrder: null,
       dir: "/x",
       specPath: "/x/spec.md",
       activityPath: "/x/activity-log.json",

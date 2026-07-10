@@ -104,6 +104,7 @@ function fakeSet(
     name,
     module: null,
     moduleTitle: null,
+    moduleOrder: null,
     dir: `/tmp/${name}`,
     specPath: `/tmp/${name}/spec.md`,
     activityPath: `/tmp/${name}/activity-log.json`,

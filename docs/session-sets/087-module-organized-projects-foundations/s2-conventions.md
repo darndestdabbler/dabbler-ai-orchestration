@@ -1,0 +1,119 @@
+# S2 verification conventions (read before reviewing)
+
+## Workflow order (do not report the pre-close state as a finding)
+This verification runs at **Step 6 of a 10-step session**, BEFORE close-out
+(Step 8) — the framework's design, not an omission. At verification time it
+is CORRECT and EXPECTED that `session-state.json` says
+`status: "in-progress"` for session 2 with `completedAt: null` and
+`verificationVerdict: null` (only the blessed `close_session` writer flips
+these, after this verification), and that `disposition.json` is authored /
+patched incrementally until the loop closes. "The session is not closed
+yet" is the definition of Step 6, not a defect. Review the session's WORK —
+the code, tests, and docs in the diff. (Same settled point as the S1
+R1/R4 workflow-order dismissals.)
+
+## Suite baseline — FINAL totals (the ONLY authoritative counts)
+- Extension unit suite (`npm run test:unit`): **1306 passing, 0 failing**,
+  including **13** new Set-087-S2 tests in
+  `src/test/suite/moduleTier.test.ts`.
+- `npx tsc --noEmit`: clean. `npm run compile` (esbuild): clean, exit 0.
+- `eslint src --ext ts`: **7 pre-existing errors** (6×`no-var-requires`,
+  1×`no-regex-spaces`) in `consumerBootstrap.test.ts`,
+  `prerequisites.test.ts:400`, `pythonInterpreter.test.ts` (×2),
+  `readSessionSetsPerfBenchmark.test.ts`, `scanAnnotationsForActiveSet.test.ts`
+  (×2) — the identical pre-existing set S1's baseline recorded; this
+  session adds **zero** new lint problems.
+- Layer 1 pytest: **2922 passed, 6 skipped, 0 failed** (the count grew
+  from S1's 2905 because Sets 088–090 landed tests since; all green).
+- Playwright Layer 3: see the evidence-of-record section below.
+
+## Layer-3 / E2E gate status
+- The operator answered the `requiresUAT`/`requiresE2E: suggested`
+  tri-state prompt at session start with **"e2e"** (recorded as the
+  `suggestion_disposition` activity-log entry, session 2). The armed gate
+  is E2E (Playwright Layer 3 green before notification); **no UAT
+  checklist is owed this session** — that is the operator's recorded
+  choice, not a skipped obligation.
+- New Layer-3 coverage: `src/test/playwright/module-tier.spec.ts`
+  (manifest-order module groups, "(ungrouped)" last, aria-level 1/2/3,
+  composite `module/bucket` collapse keys, per-module row containment,
+  module-collapse round-trip) plus the zero-`.module` no-manifest
+  assertion added to `session-sets-tree.spec.ts`.
+- Local-run caveat (S1 precedent, reproduced in S2): the local attempt
+  ran and ALL 7 selected specs — the new module-tier smoke AND the six
+  pre-existing session-sets-tree specs that are green on CI at HEAD —
+  failed identically at `app.firstWindow` before any assertion (the
+  Electron window never opens in this agent shell). The six untouched
+  specs failing the same way IS the clean-HEAD control: an environment
+  launch limitation, not a regression. The Layer-3 evidence of record is
+  therefore the fully green CI run on this session's final code commit
+  (exact run cited in disposition.json), same as S1.
+
+## Backward-compat evidence (the strongest artifact — read this first)
+The "no-manifest repo renders exactly today's two-level view" claim is
+proven **byte-for-byte**, not just by assertion: a scratch harness
+evaluated the pre-087 `client.js` (from git HEAD) and this session's
+`client.js` side by side on an identical implicit-only snapshot (4 buckets
+incl. an empty bucket and a cancelled bucket) and diffed the full
+`root.innerHTML` strings — **3,136 bytes, exactly equal**. The Playwright
+no-manifest assertions (rows `aria-level="2"`, zero `.module` elements)
+pin the same contract in a live Electron webview.
+
+## By-design decisions (routed ruling — do not report as findings)
+All four were ruled by the routed architecture decision saved raw at
+`s2-explorer-render-architecture.json` (task_type=architecture; anthropic
+was excluded after two provider-side failures — a read timeout after 3
+router attempts, then a 400 — so the ruling came from the next seat,
+gemini-pro; the exclusion is logged in the activity log):
+- **`SnapshotPayload.buckets` is REMOVED**, not kept for compatibility
+  (ruling Q2): host and webview ship together in one VSIX; a duplicated
+  field would invite divergence. `modules: ModulePayload[]` is the single
+  source; the implicit-only case ships exactly one `ModulePayload`.
+- **The implicit module ships `slug: ""` / `title: ""`** and the webview
+  applies the quiet "(ungrouped)" fallback label ONLY when labeled
+  modules coexist (ruling Q1) — the data model stays unlabeled;
+  presentation adds the affordance a collapsible group needs.
+- **`SessionSet.moduleOrder` + the small `fileSystem.ts`/`types.ts`
+  touches are sanctioned** (ruling Q3): the manifest display order is
+  stamped at scan time so `groupByModule(all)` stays pure and multi-root
+  merges carry ordering with the data. These two files are beyond the
+  spec's declared S2 Touches list — a deliberate, ruled addition, named
+  here rather than silent.
+- **Two DOM dialects on purpose** (ruling Q4): implicit-only is
+  byte-identical pre-087 markup (bare `data-bucket-key`, rows
+  `aria-level="2"`, no module wrapper); multi-module adds `aria-level="1"`
+  on module headers / `"2"` on bucket headers / `"3"` on rows and the
+  composite `<module>/<bucket>` collapse keys. `aria-level` sits on the
+  header elements per the operator-approved recommendation §3.4
+  accessibility contract.
+- **`module` is grouping, never identity** (operator-approved §2.5):
+  `RowPayload.slug`, every action message, `findSetBySlug`, and the
+  merge-by-name key are unchanged on purpose.
+
+## Known out-of-scope (surfaced, not forgotten)
+- The S1 collision ruling *anticipated* ("Session 2 is expected to
+  render") a visible row affordance for `duplicateNameError` and a
+  throttled notification. The operator-approved spec's Session 2 plan
+  does NOT include that affordance — S2's spec scope is the module tier
+  only. Per the scope-doubt rule this is surfaced in `disposition.json`
+  as a recommended follow-on rather than unilaterally added. The
+  fail-loud behavior itself (flagged winner row + deduped console.error)
+  shipped in S1 and is live.
+- Empty manifest modules (declared in `docs/modules.yaml`, zero sets)
+  render nothing by design — `groupByModule` emits only non-empty groups;
+  Phase 1 has no "empty module" affordance in the operator-approved
+  design.
+
+## Release contract
+- Mid-set session: **no version bump, no CHANGELOG entry, no publish** —
+  release prep happens at the set-terminal session (S4) per the set spec.
+- `dist/extension.js` / `.map` are the committed esbuild bundle (repo
+  policy); their diff is generated output, not hand-edited code.
+
+## files_changed inventory policy
+`disposition.json.files_changed` inventories the full `<pre-session>..HEAD`
+diff plus all verification artifacts existing when the inventory is
+written. The round currently being run necessarily creates its own
+`s2-verification*.md` / `s2-issues*.json` after that; they are appended in
+the close-out commit. Do not report the running round's own artifacts as
+missing.

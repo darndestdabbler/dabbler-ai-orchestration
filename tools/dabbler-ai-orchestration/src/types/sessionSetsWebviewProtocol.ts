@@ -99,6 +99,23 @@ export interface BucketPayload {
   rows: RowPayload[];
 }
 
+// Set 087 Session 2: one module group of the Explorer's module →
+// status-bucket → row tier (recommendation §3.4/§5). `slug` is the
+// docs/modules.yaml machine identity — `""` for the implicit module
+// (sets with no validated `module:` attribution). `title` is the
+// manifest display title — `""` for the implicit module, which is
+// definitionally unlabeled; the webview applies a quiet fallback label
+// only when labeled modules coexist (routed ruling Q1, saved raw at
+// docs/session-sets/087-.../s2-explorer-render-architecture.json).
+// `module` is a GROUPING attribute, never identity: `RowPayload.slug`,
+// every action message, and `findSetBySlug` stay keyed on the
+// globally-unique set name, unchanged on purpose.
+export interface ModulePayload {
+  slug: string;
+  title: string;
+  buckets: BucketPayload[];
+}
+
 // Set 060 Session 1: the three dual-mode surfaces the Session Set
 // Explorer can render (spec D1/D5). "no-folder" → an "open or create a
 // folder" CTA; "getting-started" → the interactive setup form; "list"
@@ -175,7 +192,16 @@ export interface GettingStartedPayload {
 }
 
 export interface SnapshotPayload {
-  buckets: BucketPayload[];
+  // Set 087 Session 2: the module tier replaces the top-level bucket
+  // list as the snapshot's single rendering source (routed ruling Q2 —
+  // host and webview always ship together in one VSIX, so the
+  // pre-087 `buckets: BucketPayload[]` field is REMOVED rather than
+  // duplicated; a redundant copy would only invite divergence).
+  // Ordering contract: manifest file order, implicit module last. A
+  // no-manifest / all-implicit workspace ships exactly one implicit
+  // ModulePayload (slug "", title "") whose buckets the webview renders
+  // as today's two-level view, byte-identical (routed ruling Q4).
+  modules: ModulePayload[];
   hasAnySets: boolean;
   // Set 060 Session 1: the dual-mode Getting Started state. Set 063 S2
   // (spec D2): REQUIRED — the field's pre-Set-060 optionality (and the

@@ -30,6 +30,7 @@ function fakeSet(
     name: over.name ?? "fixture",
     module: null,
     moduleTitle: null,
+    moduleOrder: null,
     dir: "/x",
     specPath: "/x/spec.md",
     activityPath: "/x/activity-log.json",

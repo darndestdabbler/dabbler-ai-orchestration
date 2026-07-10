@@ -80,6 +80,12 @@ test("renders ARIA tree structure with bucket grouping for an in-progress set", 
     );
     await expect(row).toBeVisible();
     await expect(row).toHaveAttribute("aria-level", "2");
+    // Set 087 Session 2 (routed ruling Q4): a no-manifest workspace is
+    // the single-implicit-module case and must render exactly the
+    // pre-087 two-level view — no module wrapper, no module header,
+    // rows staying at aria-level 2 (asserted above).
+    await expect(inner.locator(".module")).toHaveCount(0);
+    await expect(inner.locator(".module-header")).toHaveCount(0);
     // Set 036 Session 6: dropped the aria-expanded assertion. Set 034
     // retired the per-row accordion (rows are no longer expandable);
     // the renderRow helper in client.js stopped emitting aria-expanded

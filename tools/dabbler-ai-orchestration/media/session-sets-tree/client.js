@@ -30,12 +30,21 @@
   // user click). Persists across re-renders so a fresh snapshot
   // doesn't snap-back an operator's manual collapse / expand.
   const manualToggles = {};
-  // Set 034: bucket-level collapse state. Keyed by bucket.key
-  // ("in-progress" / "not-started" / "complete" / "cancelled");
-  // value true = expanded, false = collapsed. Persists across
-  // re-renders for the session so a watcher tick doesn't snap a
-  // user-collapsed bucket back open.
+  // Set 034: bucket-level collapse state. Keyed by the bucket element's
+  // data-bucket-key attribute; value true = expanded, false = collapsed.
+  // Persists across re-renders for the session so a watcher tick doesn't
+  // snap a user-collapsed bucket back open.
+  //
+  // Set 087 Session 2: in the multi-module view the attribute is the
+  // composite "<module-slug>/<bucket-key>" so collapse state is scoped
+  // per (module, bucket); the implicit-only view keeps today's bare
+  // bucket.key (routed ruling Q4 — that DOM stays byte-identical).
   const bucketCollapsed = {};
+  // Set 087 Session 2: module-level collapse state, keyed by module
+  // slug ("" = the implicit module). Same persistence semantics as
+  // bucketCollapsed. Only consulted in the multi-module view — the
+  // implicit-only view renders no module group.
+  const moduleCollapsed = {};
   // Set 060 Session 3: the Getting Started surface HTML builders moved
   // to gettingStartedHtml.js (a UMD-lite module loaded as a second
   // <script> before this file) so the rendering — including the D6
@@ -221,9 +230,24 @@
     // Set 033 Session 2: ambiguity banner retired. Multi-in-progress
     // is the supported case — every in-progress row carries its own
     // accordion below.
+    //
+    // Set 087 Session 2: the snapshot ships `modules` (module →
+    // status-bucket → row). A single implicit module (slug "") renders
+    // exactly the pre-087 two-level bucket view — no module header, no
+    // wrapper, bare bucket keys, rows at aria-level 2 — byte-identical
+    // per the routed ruling Q4. Anything else renders one collapsible
+    // module group per entry (manifest order, implicit last).
+    const modules = lastSnapshot.modules || [];
+    const implicitOnly = modules.length === 1 && modules[0].slug === "";
     parts.push('<div role="tree" aria-label="Session Sets" class="tree">');
-    for (const bucket of lastSnapshot.buckets) {
-      parts.push(renderBucket(bucket));
+    if (implicitOnly) {
+      for (const bucket of modules[0].buckets) {
+        parts.push(renderBucket(bucket, null));
+      }
+    } else {
+      for (const mod of modules) {
+        parts.push(renderModule(mod));
+      }
     }
     parts.push('</div>');
     root.innerHTML = parts.join("");
@@ -417,14 +441,56 @@
     el.hidden = !message;
   }
 
-  function renderBucket(bucket) {
+  // Set 087 Session 2: one collapsible module group of the 3-level tree
+  // (module → status-bucket → row). Only rendered in the multi-module
+  // view — the single-implicit view goes straight to renderBucket with
+  // moduleSlug null (byte-identical pre-087 DOM, routed ruling Q4).
+  // The implicit module ships slug "" / title "" and renders LAST with
+  // the quiet "(ungrouped)" fallback label (routed ruling Q1 — the data
+  // model stays unlabeled; the fallback is presentation only).
+  function renderModule(mod) {
+    const slug = mod.slug;
+    const label = mod.title || mod.slug || "(ungrouped)";
+    const expanded = moduleCollapsed[slug] !== false;
+    const chevronGlyph = expanded ? "▾" : "▸";
+    const groupId = "module-" + slug;
+    const bodyId = "module-body-" + slug;
+    const buckets = mod.buckets
+      .map(function (bucket) { return renderBucket(bucket, slug); })
+      .join("");
+    return (
+      '<div role="group" aria-labelledby="' + escAttr(groupId) + '" class="module"' +
+        ' aria-expanded="' + (expanded ? "true" : "false") + '"' +
+        ' data-module-key="' + escAttr(slug) + '">' +
+        '<div id="' + escAttr(groupId) + '" class="module-header" data-collapsible="true"' +
+        ' aria-controls="' + escAttr(bodyId) + '" aria-level="1">' +
+          '<span class="module-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
+          '<span class="module-title">' + escHtml(label) + '</span>' +
+        '</div>' +
+        '<div class="module-body" id="' + escAttr(bodyId) + '">' + buckets + '</div>' +
+      '</div>'
+    );
+  }
+
+  // Set 087 Session 2: `moduleSlug` distinguishes the two DOM dialects.
+  // null → the pre-087 single-implicit markup, byte-identical (bare
+  // data-bucket-key, ids "group-<key>"/"body-<key>", no aria-level,
+  // rows at aria-level 2). A string (may be "" for the implicit module
+  // inside a mixed view) → module-scoped ids, the composite
+  // "<module>/<key>" collapse key, aria-level 2 on the bucket header,
+  // rows at aria-level 3.
+  function renderBucket(bucket, moduleSlug) {
+    const inModule = moduleSlug !== null;
     const labelText = bucket.label + "  (" + bucket.count + ")";
-    const groupId = "group-" + bucket.key;
-    const bodyId = "body-" + bucket.key;
+    const idSuffix = inModule ? moduleSlug + "-" + bucket.key : bucket.key;
+    const groupId = "group-" + idSuffix;
+    const bodyId = "body-" + idSuffix;
+    const collapseKey = inModule ? moduleSlug + "/" + bucket.key : bucket.key;
+    const headerLevel = inModule ? ' aria-level="2"' : "";
     if (bucket.count === 0) {
       return (
-        '<div role="group" aria-labelledby="' + groupId + '" class="bucket bucket-empty">' +
-          '<div id="' + groupId + '" class="bucket-header">' +
+        '<div role="group" aria-labelledby="' + escAttr(groupId) + '" class="bucket bucket-empty">' +
+          '<div id="' + escAttr(groupId) + '" class="bucket-header"' + headerLevel + '>' +
             '<span class="bucket-chevron" aria-hidden="true"></span>' +
             '<span>' + escHtml(labelText) + '</span>' +
           '</div>' +
@@ -432,25 +498,30 @@
       );
     }
     // Set 034: bucket-level collapse. Default expanded; respect
-    // manual operator toggles via `bucketCollapsed[key] === false`.
-    const expanded = bucketCollapsed[bucket.key] !== false;
+    // manual operator toggles via `bucketCollapsed[collapseKey] === false`.
+    const expanded = bucketCollapsed[collapseKey] !== false;
     const chevronGlyph = expanded ? "▾" : "▸";
-    const rows = bucket.rows.map(function (row) { return renderRow(row); }).join("");
+    const rows = bucket.rows
+      .map(function (row) { return renderRow(row, inModule ? 3 : 2); })
+      .join("");
     return (
-      '<div role="group" aria-labelledby="' + groupId + '" class="bucket"' +
+      '<div role="group" aria-labelledby="' + escAttr(groupId) + '" class="bucket"' +
         ' aria-expanded="' + (expanded ? "true" : "false") + '"' +
-        ' data-bucket-key="' + escAttr(bucket.key) + '">' +
-        '<div id="' + groupId + '" class="bucket-header" data-collapsible="true"' +
-        ' aria-controls="' + bodyId + '">' +
+        ' data-bucket-key="' + escAttr(collapseKey) + '">' +
+        '<div id="' + escAttr(groupId) + '" class="bucket-header" data-collapsible="true"' +
+        ' aria-controls="' + escAttr(bodyId) + '"' + headerLevel + '>' +
           '<span class="bucket-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
           '<span>' + escHtml(labelText) + '</span>' +
         '</div>' +
-        '<div class="bucket-body" id="' + bodyId + '">' + rows + '</div>' +
+        '<div class="bucket-body" id="' + escAttr(bodyId) + '">' + rows + '</div>' +
       '</div>'
     );
   }
 
-  function renderRow(row) {
+  // Set 087 Session 2: `ariaLevel` is 2 in the single-implicit view
+  // (today's value, unchanged) and 3 under a module group (module 1 /
+  // bucket 2 / row 3 per the spec's accessibility contract).
+  function renderRow(row, ariaLevel) {
     // Set 034: row layout simplified. Per-row chevron + state-badge
     // icon retired; the bold color-coded `row.fraction` is the
     // right-aligned list-icon on the LEFT (fixed-width column). The
@@ -517,7 +588,7 @@
       ? ' title="' + escAttr(row.fractionTooltip) + '"'
       : "";
     return (
-      '<div role="treeitem" tabindex="-1" aria-level="2"' +
+      '<div role="treeitem" tabindex="-1" aria-level="' + (ariaLevel || 2) + '"' +
       ' aria-selected="false" data-slug="' + escAttr(row.slug) + '"' +
       ' data-state="' + escAttr(row.state) + '"' +
       ' data-context-value="' + escAttr(row.contextValue) + '"' +
@@ -612,6 +683,25 @@
 
   // ----- Interaction wiring (after each render) -----
   function wireInteraction() {
+    // Set 087 Session 2: module-level collapse — same pattern as the
+    // Set 034 bucket collapse below. The implicit module's key is ""
+    // (a valid object key), so the guard is `key !== null`, not
+    // truthiness.
+    Array.from(root.querySelectorAll('.module-header[data-collapsible="true"]')).forEach(function (header) {
+      header.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        const moduleEl = header.parentElement;
+        if (!moduleEl) return;
+        const key = moduleEl.getAttribute("data-module-key");
+        const wasExpanded = moduleEl.getAttribute("aria-expanded") === "true";
+        const next = !wasExpanded;
+        moduleEl.setAttribute("aria-expanded", next ? "true" : "false");
+        const chev = header.querySelector(".module-chevron");
+        if (chev) chev.textContent = next ? "▾" : "▸";
+        if (key !== null) moduleCollapsed[key] = next;
+      });
+    });
+
     // Set 034: bucket-level collapse. Click on a collapsible
     // bucket-header toggles aria-expanded on the bucket; CSS hides
     // the .bucket-body when aria-expanded="false".

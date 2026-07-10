@@ -16765,13 +16765,16 @@ function readSessionSets(root) {
       config.verificationMode = durableMode;
     let module2 = null;
     let moduleTitle = null;
+    let moduleOrder = null;
     if (config.module !== null && modulesManifest !== null) {
-      const manifestEntry = modulesManifest.find(
+      const manifestIndex = modulesManifest.findIndex(
         (m) => m.slug === config.module
       );
+      const manifestEntry = manifestIndex >= 0 ? modulesManifest[manifestIndex] : void 0;
       if (manifestEntry) {
         module2 = manifestEntry.slug;
         moduleTitle = manifestEntry.title;
+        moduleOrder = manifestIndex;
       } else {
         console.warn(
           `[dabblerSessionSets] ${entry.name}: spec declares module: ${config.module}, which is not a slug in docs/modules.yaml \u2014 treating as the implicit module.`
@@ -16812,6 +16815,7 @@ function readSessionSets(root) {
       name: entry.name,
       module: module2,
       moduleTitle,
+      moduleOrder,
       dir,
       specPath,
       activityPath,
@@ -17082,6 +17086,32 @@ function blockedTooltip(set) {
     (p2) => `${p2.slug} (${targetStateLabel(p2.targetState)})`
   );
   return `Blocked by prerequisites: ${parts.join(", ")} \u2014 all must complete first.`;
+}
+function groupByModule(all) {
+  const labeled = /* @__PURE__ */ new Map();
+  const implicit = { slug: null, title: null, sets: [] };
+  for (const s of all) {
+    if (s.module === null) {
+      implicit.sets.push(s);
+      continue;
+    }
+    const existing = labeled.get(s.module);
+    if (existing) {
+      existing.group.sets.push(s);
+      const order = s.moduleOrder ?? Number.POSITIVE_INFINITY;
+      if (order < existing.order)
+        existing.order = order;
+    } else {
+      labeled.set(s.module, {
+        group: { slug: s.module, title: s.moduleTitle, sets: [s] },
+        order: s.moduleOrder ?? Number.POSITIVE_INFINITY
+      });
+    }
+  }
+  const groups = Array.from(labeled.values()).sort((a, b2) => a.order - b2.order).map((e) => e.group);
+  if (implicit.sets.length > 0)
+    groups.push(implicit);
+  return groups;
 }
 function bucketSets(all) {
   return {
@@ -24717,7 +24747,7 @@ var CustomSessionSetsView = class {
       void this.setSuppression(pruned);
     }
     const payload = {
-      buckets: this.buildBuckets(all),
+      modules: this.buildModules(all),
       hasAnySets: all.length > 0,
       gettingStarted: this.buildGettingStarted(all)
     };
@@ -24820,6 +24850,21 @@ var CustomSessionSetsView = class {
       // default applies. Same getting-started-only gating.
       (root) => readTransportProfile(root)
     );
+  }
+  // Set 087 Session 2: the module tier — group by validated module
+  // attribution (pure `groupByModule`, manifest order, implicit last),
+  // then run the EXISTING bucket pass per module. The implicit module
+  // maps its null slug/title onto the protocol's `""` sentinels. A
+  // no-manifest / all-implicit workspace produces exactly one implicit
+  // ModulePayload, which the webview renders as today's two-level view
+  // (pixel-compatible). `buildRow` and `findSetBySlug` are unchanged —
+  // module is grouping, never identity.
+  buildModules(all) {
+    return groupByModule(all).map((group) => ({
+      slug: group.slug ?? "",
+      title: group.title ?? "",
+      buckets: this.buildBuckets(group.sets)
+    }));
   }
   buildBuckets(all) {
     const buckets = bucketSets(all);

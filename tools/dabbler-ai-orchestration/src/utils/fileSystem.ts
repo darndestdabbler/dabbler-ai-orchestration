@@ -999,6 +999,10 @@ export function readSessionSets(root: string): SessionSet[] {
     // mismatch in the UI if warranted.
     let module: string | null = null;
     let moduleTitle: string | null = null;
+    // Set 087 Session 2 (routed ruling Q3): the manifest entry's index —
+    // the Explorer's module display order — stamped alongside the
+    // validated attribution so `groupByModule` stays pure downstream.
+    let moduleOrder: number | null = null;
     if (config.module !== null && modulesManifest !== null) {
       // S1 verifier round 2: the unknown-slug warning only fires when a
       // manifest actually LOADED and lacks the slug. With no usable
@@ -1006,12 +1010,15 @@ export function readSessionSets(root: string): SessionSet[] {
       // manifest level), a declared module: reads silently as implicit;
       // repeating a per-set "not a slug" warning there would misreport
       // the real condition.
-      const manifestEntry = modulesManifest.find(
+      const manifestIndex = modulesManifest.findIndex(
         (m) => m.slug === config.module,
       );
+      const manifestEntry =
+        manifestIndex >= 0 ? modulesManifest[manifestIndex] : undefined;
       if (manifestEntry) {
         module = manifestEntry.slug;
         moduleTitle = manifestEntry.title;
+        moduleOrder = manifestIndex;
       } else {
         console.warn(
           `[dabblerSessionSets] ${entry.name}: spec declares ` +
@@ -1077,6 +1084,7 @@ export function readSessionSets(root: string): SessionSet[] {
       name: entry.name,
       module,
       moduleTitle,
+      moduleOrder,
       dir,
       specPath,
       activityPath,

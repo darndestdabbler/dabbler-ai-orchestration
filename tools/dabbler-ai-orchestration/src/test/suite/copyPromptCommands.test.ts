@@ -28,6 +28,7 @@ function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
     name: slug,
     module: null,
     moduleTitle: null,
+    moduleOrder: null,
     dir,
     specPath: path.join(dir, "spec.md"),
     activityPath: path.join(dir, "activity-log.json"),

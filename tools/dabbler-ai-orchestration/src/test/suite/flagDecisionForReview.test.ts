@@ -18,6 +18,7 @@ function ssStub(over: Partial<SessionSet> = {}): SessionSet {
     name: "test-set",
     module: null,
     moduleTitle: null,
+    moduleOrder: null,
     dir: "/tmp/test-set",
     specPath: "",
     activityPath: "",

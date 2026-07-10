@@ -37,6 +37,7 @@ import {
   blockedTooltip,
   forceClosedBadge,
   fractionTooltip,
+  groupByModule,
   ICON_FILES,
   isCurrentSessionInFlight,
   migrationMarker,
@@ -76,6 +77,7 @@ import {
   BucketPayload,
   GettingStartedPayload,
   HostToWebview,
+  ModulePayload,
   RowPayload,
   ScanState as ProtocolScanState,
   SnapshotPayload,
@@ -488,7 +490,7 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     // orchestrator block yet (e.g., a pre-Set-033 in-flight set, or
     // a freshly-started set that hasn't run start_session yet).
     const payload: SnapshotPayload = {
-      buckets: this.buildBuckets(all),
+      modules: this.buildModules(all),
       hasAnySets: all.length > 0,
       gettingStarted: this.buildGettingStarted(all),
     };
@@ -599,6 +601,22 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // default applies. Same getting-started-only gating.
       (root) => readTransportProfile(root),
     );
+  }
+
+  // Set 087 Session 2: the module tier — group by validated module
+  // attribution (pure `groupByModule`, manifest order, implicit last),
+  // then run the EXISTING bucket pass per module. The implicit module
+  // maps its null slug/title onto the protocol's `""` sentinels. A
+  // no-manifest / all-implicit workspace produces exactly one implicit
+  // ModulePayload, which the webview renders as today's two-level view
+  // (pixel-compatible). `buildRow` and `findSetBySlug` are unchanged —
+  // module is grouping, never identity.
+  private buildModules(all: SessionSet[]): ModulePayload[] {
+    return groupByModule(all).map((group) => ({
+      slug: group.slug ?? "",
+      title: group.title ?? "",
+      buckets: this.buildBuckets(group.sets),
+    }));
   }
 
   private buildBuckets(all: SessionSet[]): BucketPayload[] {

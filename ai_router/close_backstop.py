@@ -318,6 +318,31 @@ def _issues_envelope_for_artifact(
     return data if isinstance(data, dict) else None
 
 
+def _read_stamped_artifact_text(
+    session_set_dir: Path, artifact_path: Optional[str]
+) -> Optional[str]:
+    """The UTF-8 text of the stamped raw verification artifact, or ``None``.
+
+    Resolves ``artifact_path`` the way the stamp validator does (absolute as-is,
+    else by basename at the session-set root). This artifact is the HASH-BOUND
+    source of truth for the verifier's findings: its bytes are re-validated
+    against ``artifact_sha256`` by :func:`validate_stamped_row` (so a row only
+    reaches ``valid`` when the artifact is intact). Reparsing it is therefore
+    tamper-evident, unlike reading the editable ``sN-issues.json`` envelope.
+    """
+    if not artifact_path:
+        return None
+    resolved = (
+        Path(artifact_path)
+        if os.path.isabs(str(artifact_path))
+        else Path(session_set_dir) / os.path.basename(str(artifact_path))
+    )
+    try:
+        return resolved.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
 def _existing_evidence_settles_the_close(
     session_set_dir: Path,
     session_number: int,
@@ -354,14 +379,21 @@ def _existing_evidence_settles_the_close(
     if claimed == "VERIFIED":
         return authoritative
     if claimed == "ISSUES_FOUND":
-        envelope = _issues_envelope_for_artifact(
+        # SS2 anti-laundering: derive the findings from the HASH-BOUND raw
+        # artifact, NOT the editable sN-issues.json envelope. The artifact's
+        # bytes were re-validated against artifact_sha256 when this row was
+        # admitted to ``valid`` (validate_stamped_row), so a Major in the
+        # artifact can never be laundered into a non-blocking close by
+        # hand-editing the envelope's severity; editing the artifact itself
+        # breaks its hash and drops the row from ``valid``. (In production the
+        # envelope is DERIVED from this same artifact; here the artifact is the
+        # single bound source of truth for severity.)
+        artifact_text = _read_stamped_artifact_text(
             session_set_dir, authoritative.get("artifact_path")
         )
-        if envelope is None:
-            return None  # anti-laundering: no findings list -> blocking
-        issues = envelope.get("issues")
-        if not isinstance(issues, list):
-            return None
+        if artifact_text is None:
+            return None  # no readable bound artifact -> do not settle (blocking)
+        _verdict, issues = parse_verification_response(artifact_text)
         if is_blocking_verdict("ISSUES_FOUND", issues):
             return None
         return authoritative

@@ -150,8 +150,20 @@ def _corroborate_api_close(
     Minor-only findings envelope so the claim reads as non-blocking
     (effectively VERIFIED for the loop, L-071-1) and the backstop
     stands down."""
+    # SS2: findings live in the HASH-BOUND artifact (the close reads severity
+    # from here, as in production where the envelope is derived from it). For an
+    # ISSUES_FOUND claim the artifact must carry the Minor so the reparse-at-close
+    # reads it as non-blocking; a bare "ISSUES_FOUND" token parses to no findings,
+    # which is (correctly) blocking.
+    if verdict == "ISSUES_FOUND":
+        content = (
+            "ISSUES FOUND\n\nIssue 1: nit recorded for the ledger\n"
+            "Severity: Minor\n"
+        )
+    else:
+        content = f"{verdict}\n"
     row = write_stamped_evidence(
-        set_dir, session_number=session_number, content=f"{verdict}\n",
+        set_dir, session_number=session_number, content=content,
     )
     metrics = tmp_path / "router-metrics.jsonl"
     metrics.write_text(json.dumps(row) + "\n", encoding="utf-8")

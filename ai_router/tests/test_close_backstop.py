@@ -453,7 +453,11 @@ class TestBackstopSkips:
         self, closeable, fake_route,
     ):
         root, set_dir = closeable
-        row = write_stamped_evidence(set_dir, content="ISSUES_FOUND\n")
+        # SS2: findings live in the HASH-BOUND artifact (as in production, where
+        # the envelope is derived from it), so the close reads severity from here.
+        row = write_stamped_evidence(
+            set_dir, content="ISSUES FOUND\n\nIssue 1: nit\nSeverity: Minor\n",
+        )
         Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
             json.dumps(row) + "\n", encoding="utf-8",
         )
@@ -479,7 +483,11 @@ class TestBackstopSkips:
         """A blocking ISSUES_FOUND claim is NOT settled — the backstop
         runs a fresh round and ITS verdict governs."""
         root, set_dir = closeable
-        row = write_stamped_evidence(set_dir, content="ISSUES_FOUND\n")
+        # SS2: the Major lives in the HASH-BOUND artifact; the close reads it
+        # from there, so a blocking finding reruns regardless of the envelope.
+        row = write_stamped_evidence(
+            set_dir, content="ISSUES FOUND\n\nIssue 1: broken\nSeverity: Major\n",
+        )
         Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
             json.dumps(row) + "\n", encoding="utf-8",
         )
@@ -497,6 +505,37 @@ class TestBackstopSkips:
 
         outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
         assert outcome.result == "succeeded", outcome.messages
+        assert len(fake_route.calls) == 1
+
+    def test_laundered_minor_envelope_cannot_settle_a_major_artifact(
+        self, closeable, fake_route,
+    ):
+        root, set_dir = closeable
+        # The HASH-BOUND raw artifact carries a real Major finding.
+        content = "ISSUES FOUND\n\nIssue 1: auth bypass\nSeverity: Major\n"
+        row = write_stamped_evidence(set_dir, content=content)
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        # The UNBOUND envelope is tampered to hide that Major as a Minor -- the
+        # laundering surface (editing this file breaks no hash today).
+        (set_dir / "s1-issues.json").write_text(
+            json.dumps({
+                "schemaVersion": 1,
+                "sessionNumber": 1,
+                "verificationRound": 1,
+                "verificationVerdict": "ISSUES_FOUND",
+                "issues": [{"severity": "Minor", "description": "auth bypass"}],
+            }) + "\n",
+            encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="ISSUES_FOUND"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "succeeded", outcome.messages
+        # DESIRED (SS2): the bound artifact's Major governs -> the backstop runs
+        # a fresh round; the laundered Minor envelope must NOT stand it down.
+        # CURRENT: the envelope's Minor settles the close (calls == 0) -> laundered.
         assert len(fake_route.calls) == 1
 
     def test_zero_budget_tier_passthrough(

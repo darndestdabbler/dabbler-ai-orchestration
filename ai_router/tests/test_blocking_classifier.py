@@ -129,25 +129,41 @@ def test_major_blocks_even_under_a_verified_token():
 
 
 def test_push_parser_trusts_the_verified_token_no_false_positive():
-    """On the PUSH surface the parser TRUSTS the VERIFIED token (the template
-    binds VERIFIED <=> no Critical/Major) and returns no findings — it must NOT
-    scan a VERIFIED body for "Severity: Major" substrings, or a clean review that
-    merely *discusses* severity in prose would be misread as blocking (the exact
-    false positive Set 071 kills; S2 R5). The severity-derived anti-laundering
-    safety net is tested at the predicate level
-    (test_major_blocks_even_under_a_verified_token) and on the pull surface
-    (test_classifier_is_surface_agnostic_over_pull_findings)."""
+    """On the PUSH surface the parser trusts the VERIFIED token for PROSE and
+    NITS (the template binds VERIFIED <=> no Critical/Major): it must NOT scan a
+    VERIFIED body for "Severity: Major" substrings, or a clean review that merely
+    *discusses* severity in prose would be misread as blocking (the exact false
+    positive Set 071 kills; S2 R5).
+
+    SS1 refinement (out-of-band remediation, ratified at GPT review): a genuinely
+    STRUCTURED ``Issue N:`` block carrying an explicit ``Severity: Major`` label
+    under a VERIFIED token is the one exception — it is contradictory evidence
+    and is SURFACED, not laundered into a clean pass. That case (formerly asserted
+    to be ``[]`` here) is now asserted below and has a dedicated guard in
+    test_critical_eval_ss1_phase0. The three prose/nits cases remain the
+    false-positive guard. The severity-derived anti-laundering net is also tested
+    at the predicate level (test_major_blocks_even_under_a_verified_token) and on
+    the pull surface (test_classifier_is_surface_agnostic_over_pull_findings)."""
     for response in (
         "VERIFIED - tried to break it and could not.",
         "VERIFIED - clean.\n\n#### NITS (optional, non-blocking)\n"
         "- **Nit:** the log line could read clearer.\n",
         # prose discussing severity -- must NOT manufacture a blocking finding
         'VERIFIED - I checked that "**Severity:** Major" now parses correctly.',
-        "VERIFIED\n\n- **Issue 1:** off-by-one.\n  - **Severity:** Major\n",
     ):
         verdict, issues = parse_verification_response(response)
         assert verdict == "VERIFIED" and issues == [], response
         assert is_blocking_verdict(verdict, issues) is False, response
+
+    # SS1: a STRUCTURED Issue block with an explicit Severity: Major label under a
+    # VERIFIED token is contradictory evidence -> surfaced (not dropped), so the
+    # downstream state machine can route it to a human instead of laundering it.
+    verdict, issues = parse_verification_response(
+        "VERIFIED\n\n- **Issue 1:** off-by-one.\n  - **Severity:** Major\n"
+    )
+    assert verdict == "VERIFIED"
+    assert [i.get("severity") for i in issues] == ["Major"]
+    assert is_blocking_verdict(verdict, issues) is True
 
 
 def test_trailing_nits_does_not_bleed_into_issue_description():

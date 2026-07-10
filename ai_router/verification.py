@@ -198,6 +198,55 @@ def build_verification_prompt(
     )
 
 
+def _strip_nits_section(text: str) -> str:
+    """Drop a trailing NITS section so non-blocking nits never bleed into issue
+    parsing (they are read separately, for logging only, via :func:`parse_nits`).
+    """
+    nits_head = re.search(r'(?im)^\s*#{0,6}\s*\*{0,2}NITS\b.*$', text)
+    return text[: nits_head.start()].rstrip() if nits_head else text
+
+
+def _parse_issue_blocks(body: str) -> list:
+    """Parse explicit ``Issue N:`` blocks from a header/NITS-stripped body.
+
+    Structural grammar ONLY — an ``Issue`` marker plus optional ``Category:`` /
+    ``Severity:`` labels. It never scans free prose for severity words: a block
+    with no ``Severity:`` label carries no ``severity`` key (the Set-071
+    false-positive guard). Shared by the ISSUES_FOUND path and the VERIFIED
+    contradiction-surfacing branch so both read the identical grammar.
+    """
+    issues: list = []
+    # Match an explicit structured issue-block HEADER only: at the start of a
+    # line (after optional bullet / emphasis / heading markers) the whole word
+    # "Issue", an optional number, then a REQUIRED ':' or '.'. Line-anchoring
+    # (MULTILINE ^ + horizontal-only [ \t] inside the marker) plus the required
+    # punctuation keep mid-prose mentions ("...the issue template...") and bare
+    # inline "issue" OUT — the Set-071 false-positive guard. The captured body
+    # runs (DOTALL) to the next such header or end.
+    marker = r'^[ \t]*[-*>#]*[ \t]*\*{0,2}Issue\b[ \t]*\d*\*{0,2}[ \t]*[:.][ \t]*'
+    issue_pattern = re.compile(
+        marker + r'(.*?)(?=' + marker + r'|\Z)',
+        re.IGNORECASE | re.MULTILINE | re.DOTALL,
+    )
+    for match in issue_pattern.findall(body):
+        issue = {"description": match.strip()}
+        # Category: permissive separators; value stops at line end (or ``*``) so
+        # it does not swallow the following Severity line.
+        cat_match = re.search(r'Category[\s*:.\-_]*([^\n*]+)', match, re.IGNORECASE)
+        if cat_match:
+            issue["category"] = cat_match.group(1).strip()
+        # Severity: tolerant of markdown emphasis / punctuation order so
+        # "**Severity:** Minor", "Severity: Minor", "Severity - Major" all parse.
+        sev_match = re.search(
+            r'Severity[\s*:.\-_]*(Critical|Major|Minor)', match, re.IGNORECASE
+        )
+        if sev_match:
+            issue["severity"] = sev_match.group(1).strip()
+        if issue["description"]:
+            issues.append(issue)
+    return issues
+
+
 def parse_verification_response(response: str) -> tuple[str, list]:
     """
     Parse the verifier's response into a verdict and issue list.
@@ -219,19 +268,29 @@ def parse_verification_response(response: str) -> tuple[str, list]:
     head = re.sub(r'^[\s*_#>-]*VERDICT\s*[:.\-]?\s*', '', upper)
     head = re.sub(r'^[\s*_#>-]+', '', head)
     if head.startswith("VERIFIED"):
-        # A VERIFIED verdict carries no issues. On the push surface the verdict
-        # token IS the verifier's severity judgment — the template binds
-        # VERIFIED <=> "no Critical/Major" — so the parser TRUSTS the token and
-        # returns no findings. This is the safe, churn-free behaviour: it never
-        # manufactures a blocking finding from a clean pass (incl. a VERIFIED +
-        # NITS review). The severity-derived anti-laundering safety net lives in
-        # is_blocking_verdict, which still blocks a Critical/Major handed to it
-        # from a surface that returns structured findings (the pull surface's
-        # Finding objects, or any direct caller). We deliberately do NOT scan a
-        # VERIFIED body for "Severity: Major" substrings: a clean review that
-        # merely *discusses* severity in prose would be misread as blocking —
-        # the exact false positive Set 071 exists to eliminate.
-        return "VERIFIED", []
+        # A VERIFIED verdict normally carries no issues: on the push surface the
+        # token IS the verifier's severity judgment (the template binds
+        # VERIFIED <=> "no Critical/Major"), so we TRUST it for the clean and the
+        # VERIFIED+NITS cases. BUT we still SURFACE a genuinely *structured*
+        # blocking finding — an explicit ``Issue N:`` block carrying an explicit
+        # ``Severity: Critical/Major`` label — so a VERIFIED-token/Major mismatch
+        # is visible as CONTRADICTORY evidence the caller can adjudicate (SS1,
+        # anti-laundering: a Major hidden under a mislabeled VERIFIED is never
+        # dropped). We match ONLY the structured grammar and NEVER scan prose for
+        # severity words: a clean review that merely *discusses* severity has no
+        # ``Severity:`` label and stays clean — the Set-071 false positive is
+        # preserved. A labelled Minor under VERIFIED is coherent (a nit) and is
+        # left out of the issue list.
+        structured = _parse_issue_blocks(_strip_nits_section(response))
+        # Use the SHARED predicate (one source of truth — not a local
+        # Critical/Major string check): a structured block whose severity is
+        # Critical/Major OR unknown/missing/unrecognized ("Severity: High", or no
+        # label at all) is blocking contradictory evidence and must be surfaced;
+        # only an explicit Minor is a coherent nit and stays out. This keeps the
+        # anti-laundering rule "unknown severity blocks" true on the VERIFIED
+        # surface too — a structured Major can never be dropped by relabeling.
+        blocking = [i for i in structured if is_blocking_issue(i)]
+        return "VERIFIED", blocking
 
     # Default to ISSUES_FOUND for anything that isn't a clear VERIFIED
     verdict = "ISSUES_FOUND"
@@ -251,50 +310,12 @@ def parse_verification_response(response: str) -> tuple[str, list]:
     ).strip()
 
     # Drop a trailing NITS section *before* issue parsing so non-blocking nits
-    # never bleed into an issue's description (they are read separately, for
-    # logging only, via :func:`parse_nits`). This keeps "nits stay out of the
+    # never bleed into an issue's description. This keeps "nits stay out of the
     # issues list" literally true.
-    nits_head = re.search(r'(?im)^\s*#{0,6}\s*\*{0,2}NITS\b.*$', body)
-    if nits_head:
-        body = body[: nits_head.start()].rstrip()
+    body = _strip_nits_section(body)
 
-    # Parse individual issues
-    issues = []
-    # Look for patterns like "Issue 1:", "**Issue 1:**", "- Issue:"
-    issue_pattern = re.compile(
-        r'\*?\*?Issue\s*\d*\*?\*?\s*[:.]?\s*(.*?)(?=\*?\*?Issue\s*\d|\Z)',
-        re.IGNORECASE | re.DOTALL
-    )
-
-    matches = issue_pattern.findall(body)
-    for match in matches:
-        issue = {"description": match.strip()}
-
-        # Try to extract category. The separator class is permissive about
-        # markdown emphasis / punctuation order, and the value stops at the line
-        # end (or a ``*``) so it does not swallow the following Severity line.
-        cat_match = re.search(
-            r'Category[\s*:.\-_]*([^\n*]+)',
-            match, re.IGNORECASE
-        )
-        if cat_match:
-            issue["category"] = cat_match.group(1).strip()
-
-        # Try to extract severity. The separator class tolerates any order of
-        # markdown emphasis and punctuation, so "**Severity:** Minor",
-        # "Severity: Minor", and "Severity - Major" all parse. The old regex
-        # required asterisks *before* the colon and so silently dropped the
-        # label on "**Severity:** Minor", making a Minor finding read as
-        # unknown-severity -> blocking — reintroducing the churn Set 071 kills.
-        sev_match = re.search(
-            r'Severity[\s*:.\-_]*(Critical|Major|Minor)',
-            match, re.IGNORECASE
-        )
-        if sev_match:
-            issue["severity"] = sev_match.group(1).strip()
-
-        if issue["description"]:
-            issues.append(issue)
+    # Parse individual issues (shared structural grammar — see _parse_issue_blocks).
+    issues = _parse_issue_blocks(body)
 
     # If no structured issue parsed but verdict is ISSUES_FOUND, treat the whole
     # (header-stripped) body as one issue so it is never silently dropped.
@@ -397,6 +418,20 @@ def _severity_of(issue: dict) -> str:
     return str((issue or {}).get("severity") or "").strip().lower()
 
 
+def is_blocking_issue(issue: dict) -> bool:
+    """Whether a single finding, on its own, opens/continues a re-verify round.
+
+    The ONE per-issue severity predicate — shared by :func:`is_blocking_verdict`,
+    :func:`classify_blocking`, and the dedicated state machine's
+    ``derive_state`` (SS1: one source of truth, so the loop layer and the
+    workflow layer can never disagree about what "blocking" means). Critical or
+    Major — or any unknown/missing severity (a real defect must never be
+    laundered into a nit by an absent label) — is blocking; only an explicit
+    Minor is non-blocking.
+    """
+    return _severity_of(issue) not in NONBLOCKING_SEVERITIES
+
+
 def is_blocking_verdict(verdict: str, issues: list) -> bool:
     """Whether a verification result should open / continue a re-verify round.
 
@@ -435,7 +470,7 @@ def is_blocking_verdict(verdict: str, issues: list) -> bool:
     # (mislabeled) VERIFIED must never be laundered through. Only when there are
     # NO blocking findings does the verdict token decide the no-findings case.
     for issue in issues:
-        if _severity_of(issue) not in NONBLOCKING_SEVERITIES:
+        if is_blocking_issue(issue):
             return True
     if issues:
         return False  # every finding present is Minor -> non-blocking
@@ -473,10 +508,10 @@ def classify_blocking(verdict: str, issues: list) -> BlockingClassification:
     # Partition by severity FIRST (severity-derived, same as is_blocking_verdict).
     blocking_issues, nit_issues = [], []
     for issue in issues:
-        if _severity_of(issue) in NONBLOCKING_SEVERITIES:
-            nit_issues.append(issue)
-        else:
+        if is_blocking_issue(issue):
             blocking_issues.append(issue)
+        else:
+            nit_issues.append(issue)
     if blocking_issues:
         return BlockingClassification(
             blocking=True,

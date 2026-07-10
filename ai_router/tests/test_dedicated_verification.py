@@ -446,7 +446,12 @@ class TestDeriveStateLadder:
             == dv.STATE_CLOSED_VERIFIED
         )
 
-    def test_verification_all_dispositioned_is_verified(self):
+    def test_verification_accepted_dispositions_await_human(self):
+        # SS1 item 6 (disposition-authority interim): accepting risk / declaring
+        # not-reproducible is a RELEASE decision needing operator authority. With
+        # no gated authority record yet, these fail closed to a human instead of
+        # self-closing. (Was CLOSED_VERIFIED before the interim — changed
+        # deliberately per GPT SS1 review finding #1.)
         assert (
             dv.derive_state(
                 [_s(1, "complete"), _s(2, "complete", "verification", "ISSUES_FOUND")],
@@ -454,7 +459,7 @@ class TestDeriveStateLadder:
                 set_status="complete",
                 latest_issues=_issues("accepted-risk", "not-reproducible"),
             )
-            == dv.STATE_CLOSED_VERIFIED
+            == dv.STATE_AWAITING_HUMAN
         )
 
     def test_verification_open_issues_awaits_remediation(self):
@@ -510,7 +515,12 @@ class TestDeriveStateLadder:
             == dv.STATE_AWAITING_VERIFICATION
         )
 
-    def test_remediation_all_accepted_is_dispositioned(self):
+    def test_remediation_accepted_dispositions_await_human(self):
+        # SS1 item 6: after remediation, all-accepted findings no longer
+        # self-close (was CLOSED_DISPOSITIONED). Accepting risk/consequence is a
+        # release decision needing operator authority, so it fails closed to a
+        # human until a gated authority writer exists (SS-later). Changed
+        # deliberately per GPT SS1 review finding #1.
         assert (
             dv.derive_state(
                 [
@@ -522,7 +532,7 @@ class TestDeriveStateLadder:
                 set_status="complete",
                 latest_issues=_issues("accepted-risk", "accepted-consequence"),
             )
-            == dv.STATE_CLOSED_DISPOSITIONED
+            == dv.STATE_AWAITING_HUMAN
         )
 
     def test_remediation_advisory_disagreement_awaits_human(self):

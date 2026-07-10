@@ -44,6 +44,11 @@ from pathlib import Path
 from typing import List, Optional
 
 try:
+    from verification import is_blocking_issue  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - package-context import shim
+    from .verification import is_blocking_issue  # type: ignore[no-redef]
+
+try:
     from progress import (  # type: ignore[import-not-found]
         SESSION_STATUS_COMPLETE,
         SESSION_STATUS_IN_PROGRESS,
@@ -126,16 +131,30 @@ WORKFLOW_STATES = (
 # set — a disagreement always surfaces to a human, consistent with the
 # design's "hard stop to a human whenever it cannot be followed
 # mechanically" constraint.
+# SS1 disposition-authority interim (item 6): accepting risk/consequence or
+# declaring a finding not-reproducible is a RELEASE decision that requires
+# operator authority. Until a gated authority record exists (SS-later) the
+# framework cannot tell whether the ORCHESTRATOR (the policed actor) or a human
+# set these, so it fails closed — they are human-stops, NOT self-service
+# terminal closes (the anti-self-release rule: the builder cannot release
+# itself). Only "fixed" stays terminal: it is a "remediation worked, RE-VERIFY"
+# signal that routes to awaiting-verification, never a silent close. When SS-later
+# adds an authorized resolution writer, operator-set accepts move back to a
+# terminal close (closed-dispositioned) via that gated path.
 _TERMINAL_DISPOSITIONS = frozenset(
     {
         "fixed",
-        "not-reproducible",
-        "accepted-risk",
-        "accepted-consequence",
     }
 )
 _HUMAN_STOP_DISPOSITIONS = frozenset(
-    {"escalate-human", "needs-more-context", "advisory-disagreement"}
+    {
+        "escalate-human",
+        "needs-more-context",
+        "advisory-disagreement",
+        "accepted-risk",
+        "accepted-consequence",
+        "not-reproducible",
+    }
 )
 # A verification session at/after this round count escalates to a human
 # rather than authoring another automatic remediation round (the bounded-
@@ -1105,6 +1124,17 @@ def _disposition(issue: dict) -> Optional[str]:
     return status if isinstance(status, str) and status else None
 
 
+def _disposition_is_known(status: Optional[str]) -> bool:
+    """Whether a non-empty ``resolution_status`` is one the workflow recognizes.
+
+    A value that is neither a known terminal nor a known human-stop disposition
+    is an unknown/misspelled/unauthorized status — INVALID evidence that must
+    fail closed to a human, never silently satisfy a close (SS1: closes the
+    fail-open where an unknown status was neither "open" nor "human-stop").
+    """
+    return status in _TERMINAL_DISPOSITIONS or status in _HUMAN_STOP_DISPOSITIONS
+
+
 def derive_state(
     sessions: List[dict],
     *,
@@ -1180,36 +1210,67 @@ def derive_state(
 
     human_stop = any(_disposition(i) in _HUMAN_STOP_DISPOSITIONS for i in issues)
     open_issues = [i for i in issues if _disposition(i) is None]
+    # Disposition authority (SS1): a resolution_status that is neither a known
+    # terminal nor a known human-stop value is INVALID evidence — fail closed to
+    # a human rather than let an unknown status satisfy a close.
+    unknown_disposition = any(
+        _disposition(i) is not None and not _disposition_is_known(_disposition(i))
+        for i in issues
+    )
+    # Severity-anchored open blockers (SS1, L-071-1): a round is loop-opening
+    # ONLY for an undispositioned finding that is blocking by severity
+    # (Critical/Major, or unknown/missing severity — never laundered into a nit
+    # by an absent label). An undispositioned Minor is a recorded observation,
+    # not an open blocker, so a Minor-only round closes ("verified with
+    # observations") instead of churning. ``is_blocking_issue`` is the SAME
+    # predicate the push/pull loop layers use, so the workflow layer and the
+    # loop layer can never disagree about what "blocking" means.
+    open_blocking = [i for i in open_issues if is_blocking_issue(i)]
+
+    # Disposition authority applies to BOTH the verification and remediation
+    # boundaries (SS1): an unknown/unauthorized resolution_status anywhere in the
+    # envelope is invalid evidence -> fail closed to a human BEFORE any branch can
+    # route it onward. Hoisted above the branches so a `fixed` issue alongside an
+    # unknown one cannot win via the remediation ``any_fixed`` path and recycle
+    # invalid evidence back into re-verification (GPT SS1 rerun finding).
+    if unknown_disposition:
+        return STATE_AWAITING_HUMAN
 
     if latest_type == SESSION_TYPE_VERIFICATION:
         verdict = str(latest.get("verificationVerdict") or "").strip().upper()
-        if verdict == "VERIFIED":
-            return STATE_CLOSED_VERIFIED
+        verified_token = verdict.startswith("VERIFIED")
+        if open_blocking:
+            # A VERIFIED token that nonetheless carries an open blocking finding
+            # is CONTRADICTORY evidence (token says clean, findings say
+            # otherwise): trust neither — a human adjudicates. This also replaces
+            # the old short-circuit that returned closed-verified on the bare
+            # VERIFIED token *before* inspecting the issues (so a structured
+            # Major could ride a mislabeled VERIFIED). A normal ISSUES_FOUND
+            # blocking round routes to remediation, or to a human at the limit.
+            if verified_token:
+                return STATE_AWAITING_HUMAN
+            verification_rounds = sum(
+                1 for s in sessions if _session_type(s) == SESSION_TYPE_VERIFICATION
+            )
+            if human_stop or verification_rounds >= _AUTOMATIC_ROUND_LIMIT:
+                return STATE_AWAITING_HUMAN
+            return STATE_AWAITING_REMEDIATION
+        if human_stop:
+            # No open blocker, but a finding escalates to a human
+            # (advisory-disagreement / escalate-human / needs-more-context).
+            return STATE_AWAITING_HUMAN
         if not issues:
-            # Set 077 S5 (S1 bundle E adjudication): a completed
-            # verification round with NO findings envelope and NO
-            # VERIFIED verdict is unconfirmable — a blank verdict could
-            # be "clean but never recorded" or "never actually reviewed";
-            # a non-VERIFIED verdict with no envelope is incoherent
-            # (issues claimed, none seeded). Pre-terminal, surface it to
-            # a human rather than guessing clean. On a set that already
-            # closed terminally, keep the legacy closed-verified reading:
-            # the Q6 close gate vouched at close time, and re-deriving a
-            # nag onto a closed set would make the S5 banner chase sets
-            # the operator already finished.
-            if set_terminal:
+            # Set 077 S5: a completed verification round with NO findings
+            # envelope is unconfirmable pre-terminal unless the verdict token
+            # vouches (VERIFIED). On a set that already closed terminally, keep
+            # the legacy closed-verified reading (the close gate vouched then).
+            if verified_token or set_terminal:
                 return STATE_CLOSED_VERIFIED
             return STATE_AWAITING_HUMAN
-        if not open_issues and not human_stop:
-            # Every finding already terminally dispositioned at the
-            # verification boundary (e.g. all accepted/not-reproducible).
-            return STATE_CLOSED_VERIFIED
-        verification_rounds = sum(
-            1 for s in sessions if _session_type(s) == SESSION_TYPE_VERIFICATION
-        )
-        if human_stop or verification_rounds >= _AUTOMATIC_ROUND_LIMIT:
-            return STATE_AWAITING_HUMAN
-        return STATE_AWAITING_REMEDIATION
+        # Findings present, none open-blocking: Minor-only (verified with
+        # observations) or every finding already terminally dispositioned
+        # (e.g. all accepted/not-reproducible). Effectively verified (L-071-1).
+        return STATE_CLOSED_VERIFIED
 
     if latest_type == SESSION_TYPE_REMEDIATION:
         if human_stop or open_issues:

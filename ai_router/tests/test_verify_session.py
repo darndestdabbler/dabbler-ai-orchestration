@@ -245,10 +245,13 @@ class TestEvidenceAssembly:
         )
         assert "def backdoor" in evidence.as_response_under_review()
 
-    def test_nested_dist_source_is_not_excluded(self, repo: Path):
-        # GPT SS3 #3: :(exclude)dist excludes only a TOP-LEVEL dist, so a real
-        # source file at src/dist/ must still be inlined (the old segment
-        # matcher wrongly dropped it).
+    def test_nested_dist_is_excluded_but_reported_uncovered(self, repo: Path):
+        # Set 089 (supersedes the SS3-era keep-src/dist behavior): excludes are
+        # now depth-agnostic, so a `dist/` at ANY depth is treated as a
+        # generated bundle. It is NOT inlined -- but, exactly like a top-level
+        # excluded dir, it is reported as explicitly UNCOVERED (never silently
+        # dropped), and its path also stays visible in the unfiltered git
+        # status. Completeness is preserved at the path level; the flood is not.
         (repo / "src" / "dist").mkdir(parents=True)
         (repo / "src" / "dist" / "algorithm.py").write_text(
             "answer = 42\n", encoding="utf-8"
@@ -256,11 +259,77 @@ class TestEvidenceAssembly:
         evidence = vs.assemble_evidence(
             _set_dir(repo), 1, "HEAD", vs.DEFAULT_DIFF_EXCLUDES
         )
-        assert any(
+        assert not any(
             p.endswith("src/dist/algorithm.py")
             for p, _ in evidence.untracked_included
         )
-        assert "answer = 42" in evidence.as_response_under_review()
+        assert any(
+            p.endswith("src/dist/algorithm.py") and "excluded" in reason
+            for p, reason in evidence.untracked_omitted
+        )
+
+    def test_nested_dist_bundle_excluded_from_diff(self, repo: Path):
+        # Set 089 acceptance test: a NESTED generated bundle (tools/**/dist) is
+        # excluded from the diff by DEFAULT -- no manual --exclude -- while a
+        # real source file is still reviewed. This is the ~4,400-line flood that
+        # churned a real session for 6 rounds; the fix retires the per-repo
+        # `--exclude tools/dabbler-ai-orchestration/dist` workaround.
+        nested = repo / "tools" / "dabbler-ai-orchestration" / "dist"
+        nested.mkdir(parents=True)
+        (nested / "bundle.js").write_text("GENERATED\n" * 500, encoding="utf-8")
+        (repo / "real_src.py").write_text("real = True\n", encoding="utf-8")
+        _git(repo, "add", "-A")
+        evidence = vs.assemble_evidence(
+            _set_dir(repo), 1, "HEAD", vs.DEFAULT_DIFF_EXCLUDES
+        )
+        assert "real = True" in evidence.diff
+        assert "GENERATED" not in evidence.diff
+        assert "bundle.js" not in evidence.diff
+        # Set 089: the excluded TRACKED bundle path is reported explicitly
+        # (never silently dropped) so the reviewer knows it changed.
+        assert any(
+            p.endswith("tools/dabbler-ai-orchestration/dist/bundle.js")
+            for p in evidence.tracked_excluded
+        )
+        assert "Excluded tracked paths" in evidence.as_response_under_review()
+
+    def test_tracked_source_under_dist_reported_not_silent(self, repo: Path):
+        # Finding-1 completeness guarantee: a real (tracked) source file under a
+        # dist/ dir is dropped from the diff BUT reported as an explicit "review
+        # directly" path -- honest exclusion, never a silent removal.
+        (repo / "src" / "dist").mkdir(parents=True)
+        (repo / "src" / "dist" / "algorithm.py").write_text(
+            "answer = 42\n", encoding="utf-8"
+        )
+        _git(repo, "add", "-A")
+        evidence = vs.assemble_evidence(
+            _set_dir(repo), 1, "HEAD", vs.DEFAULT_DIFF_EXCLUDES
+        )
+        assert "answer = 42" not in evidence.diff
+        assert any(
+            p.endswith("src/dist/algorithm.py")
+            for p in evidence.tracked_excluded
+        )
+        assert "src/dist/algorithm.py" in evidence.as_response_under_review()
+
+    def test_nested_generated_dirs_and_vsix_all_excluded(self, repo: Path):
+        # The depth-agnostic treatment applies to every default-excluded dir
+        # (out / node_modules / __pycache__) and to *.vsix, at any depth.
+        for sub in ("out", "node_modules", "__pycache__"):
+            d = repo / "pkg" / sub
+            d.mkdir(parents=True)
+            (d / "gen.txt").write_text("GENERATED\n", encoding="utf-8")
+        deep = repo / "a" / "b" / "c"
+        deep.mkdir(parents=True)
+        (deep / "app.vsix").write_text("VSIXBYTES\n", encoding="utf-8")
+        (repo / "keep.py").write_text("keep = 1\n", encoding="utf-8")
+        _git(repo, "add", "-A")
+        evidence = vs.assemble_evidence(
+            _set_dir(repo), 1, "HEAD", vs.DEFAULT_DIFF_EXCLUDES
+        )
+        assert "keep = 1" in evidence.diff
+        assert "GENERATED" not in evidence.diff
+        assert "VSIXBYTES" not in evidence.diff
 
     def test_toplevel_excluded_dir_reported_uncovered_not_dropped(self, repo: Path):
         # GPT SS3 round-2 #1: a top-level generated file is excluded from
@@ -321,8 +390,16 @@ class TestEvidenceAssembly:
         )
 
     def test_build_diff_pathspecs_shape(self):
+        # Set 089: depth-agnostic glob pathspecs. A directory pattern gets both
+        # the entry (**/dist) and its contents (**/dist/**) at any depth; a glob
+        # pattern (*.vsix) gets only **/*.vsix (a /** suffix would be inert).
         specs = vs.build_diff_pathspecs(["dist", "*.vsix"])
-        assert specs == [".", ":(exclude)dist", ":(exclude)*.vsix"]
+        assert specs == [
+            ".",
+            ":(exclude,glob)**/dist",
+            ":(exclude,glob)**/dist/**",
+            ":(exclude,glob)**/*.vsix",
+        ]
         assert vs.build_diff_pathspecs([]) == []
 
 
@@ -758,3 +835,69 @@ class TestRun:
         # No artifact was written -> the recorded stamp row fails the close
         # gate's artifact-hash check and cannot settle a close.
         assert not (set_dir / "s1-verification.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# Set 089: oversized-INPUT guard (mirror of the SS3 output-truncation guard)
+# ---------------------------------------------------------------------------
+
+class TestOversizedEvidenceGuard:
+    def test_evidence_char_cap_env_override(self, monkeypatch):
+        monkeypatch.delenv(vs._EVIDENCE_CHAR_CAP_ENV, raising=False)
+        assert vs.evidence_char_cap() == vs._EVIDENCE_CHAR_CAP_DEFAULT
+        monkeypatch.setenv(vs._EVIDENCE_CHAR_CAP_ENV, "12345")
+        assert vs.evidence_char_cap() == 12345
+        # Invalid / non-positive values fall back to the default (never 0/neg).
+        for bad in ("0", "-5", "notanint", "  "):
+            monkeypatch.setenv(vs._EVIDENCE_CHAR_CAP_ENV, bad)
+            assert vs.evidence_char_cap() == vs._EVIDENCE_CHAR_CAP_DEFAULT
+
+    def test_oversized_evidence_fails_closed_before_routing(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # Evidence over the cap would be truncated at the verifier's context
+        # boundary -> the verifier reviews PARTIAL evidence with no signal it is
+        # partial. Fail closed BEFORE any metered call: no route, no artifact,
+        # no disposition; the close stays BLOCKED.
+        set_dir = _set_dir(repo)
+        monkeypatch.setenv(vs._EVIDENCE_CHAR_CAP_ENV, "50000")
+        (repo / "huge.py").write_text("x = 1  # pad\n" * 9000, encoding="utf-8")  # ~117 KB
+        _git(repo, "add", "-A")
+        fake = FakeRoute(response="VERIFIED")
+        rc = vs.run(_args(set_dir), route_fn=fake)
+        assert rc == vs.EXIT_VERIFICATION_UNAVAILABLE
+        assert fake.calls == []  # nothing routed
+        assert not (set_dir / "s1-verification.md").exists()
+        err = capsys.readouterr().err
+        assert "VERIFICATION UNAVAILABLE" in err
+        assert "exceeds the cap" in err
+
+    def test_under_cap_evidence_routes_normally(self, repo: Path, monkeypatch):
+        # A modest change well under the cap routes as usual (the guard is
+        # size-gated, not a blanket block).
+        set_dir = _set_dir(repo)
+        monkeypatch.setenv(vs._EVIDENCE_CHAR_CAP_ENV, "50000")
+        (repo / "small.py").write_text("y = 2\n", encoding="utf-8")
+        _git(repo, "add", "-A")
+        fake = FakeRoute(response="VERIFIED -- fine.")
+        rc = vs.run(_args(set_dir), route_fn=fake)
+        assert rc == vs.EXIT_OK
+        assert len(fake.calls) == 1  # guard did NOT trip
+
+    def test_assemble_evidence_raises_when_oversized(self, repo: Path):
+        # Finding 2: the guard is enforced at ASSEMBLY (not only the CLI), so a
+        # direct, non-CLI caller of assemble_evidence also fails closed.
+        (repo / "huge.py").write_text("x = 1  # pad\n" * 9000, encoding="utf-8")
+        _git(repo, "add", "-A")
+        with pytest.raises(vs.EvidenceTooLargeError):
+            vs.assemble_evidence(
+                _set_dir(repo), 1, "HEAD", (), max_evidence_chars=50_000
+            )
+
+    def test_assemble_evidence_under_cap_returns_bundle(self, repo: Path):
+        (repo / "small.py").write_text("y = 2\n", encoding="utf-8")
+        _git(repo, "add", "-A")
+        bundle = vs.assemble_evidence(
+            _set_dir(repo), 1, "HEAD", (), max_evidence_chars=1_000_000
+        )
+        assert "y = 2" in bundle.diff

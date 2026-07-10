@@ -3,6 +3,45 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] — verification evidence completeness (Set 089)
+
+> Stacks on the 0.32.0 remediation. An **upstream** evidence-*completeness* gap
+> the SS1–SS3 work (decision logic + evidence *integrity*) did not cover: it let
+> broken evidence keep producing unrated findings that the anti-laundering rule
+> (correctly) treats as blocking → real 6-round churn. Publish stays
+> operator-gated; renumber/fold at publish time.
+
+### Fixed
+
+- **(Set 089) Generated-bundle excludes are now depth-agnostic.**
+  `build_diff_pathspecs` emitted the root-anchored `:(exclude)<name>`, which
+  excluded a top-level `dist/` but NOT a **nested** bundle
+  (`tools/dabbler-ai-orchestration/dist`) — that then flooded the evidence diff
+  (~4,400 lines) and truncated the real source. Each default exclude
+  (`dist` / `out` / `node_modules` / `.venv` / `__pycache__` / `*.vsix`) now
+  becomes a `glob`-magic pathspec matching at ANY depth (`**/<p>` plus
+  `**/<p>/**` for directories), fixing both the main diff and the untracked
+  collector (they share the function) and **retiring the per-repo
+  `--exclude tools/dabbler-ai-orchestration/dist` workaround**. The exact
+  pathspec is proven against a real `git` in the test suite. Exclusion is never
+  **silent**: excluded **tracked** files are now reported as an explicit
+  "Excluded tracked paths -- review directly" section (the same honesty SS3 gave
+  excluded *untracked* files), and every changed path also stays visible in the
+  unfiltered `git status --short`. So a source dir that happens to match a
+  generated pattern (e.g. `src/dist`) is surfaced for direct review, not
+  dropped without a trace -- this preserves the SS3 completeness guarantee while
+  extending the exclusion to nested bundles.
+
+### Added
+
+- **(Set 089) Oversized-INPUT evidence guard.** The mirror of SS3's
+  output-truncation guard, applied to the INPUT: when the assembled prompt
+  exceeds a cap (`AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS`, default 600 KiB), the
+  verifier would truncate it and review PARTIAL evidence with no signal it is
+  partial. `verify_session` now **fails closed** before any metered call
+  (`EXIT_VERIFICATION_UNAVAILABLE`, writing nothing) with actionable guidance
+  (exclude generated files / split the change / raise the cap).
+
 ## [0.32.0] — Unreleased (out-of-band verification-loop remediation)
 
 > Prepared **out of band** — NOT through the framework's own verification loop,

@@ -147,6 +147,23 @@ class VerifySessionError(Exception):
     """Raised for deterministic pre-route failures (usage / state)."""
 
 
+class EvidenceTooLargeError(Exception):
+    """Raised by ``assemble_evidence`` when the assembled evidence exceeds the
+    oversized-input cap (Set 089). Distinct from :class:`VerifySessionError` so
+    the CLI maps it to ``EXIT_VERIFICATION_UNAVAILABLE`` (fail-closed evidence),
+    not ``EXIT_USAGE``. Raising it at assembly time -- not only in the CLI --
+    means EVERY caller of ``assemble_evidence`` fails closed rather than routing
+    a diff the verifier would silently truncate."""
+
+    def __init__(self, assembled_chars: int, cap: int) -> None:
+        self.assembled_chars = assembled_chars
+        self.cap = cap
+        super().__init__(
+            f"assembled evidence is {assembled_chars} chars, over the "
+            f"{cap}-char cap"
+        )
+
+
 # ---------------------------------------------------------------------------
 # Session / round resolution
 # ---------------------------------------------------------------------------
@@ -390,10 +407,35 @@ def repo_root_for(session_set_dir: Path) -> Path:
 
 
 def build_diff_pathspecs(excludes: Sequence[str]) -> List[str]:
-    """Return the pathspec arguments implementing the exclusions."""
+    """Return the pathspec arguments implementing the exclusions.
+
+    Set 089 (evidence completeness): exclusions are **depth-agnostic**. The
+    pre-089 form ``:(exclude)dist`` is anchored at the repo root, so it excluded
+    a top-level ``dist/`` but NOT a NESTED generated bundle like
+    ``tools/dabbler-ai-orchestration/dist`` -- which then flooded the diff
+    (~4,400 lines) and truncated the real source, churning the loop. Each
+    pattern now becomes a ``glob``-magic pathspec that matches at ANY depth:
+    ``**/<p>`` (the entry itself, anywhere) plus, for directory-style patterns,
+    ``**/<p>/**`` (its contents, anywhere). This form subsumes the top-level
+    case (``**/dist/**`` also matches ``dist/...`` at the root), so both the main
+    diff and the untracked collector -- which share this function -- exclude a
+    nested bundle without any per-repo ``--exclude`` workaround. Proven against a
+    real ``git`` in ``test_verify_session`` (pathspec nesting is version-
+    sensitive; do not assume it). A directory named ``dist`` is treated as a
+    generated bundle at every depth; its path still appears in the unfiltered
+    ``git status --short`` section of the evidence, so exclusion is never silent.
+    """
     if not excludes:
         return []
-    return [".", *(f":(exclude){pattern}" for pattern in excludes)]
+    specs: List[str] = ["."]
+    for pattern in excludes:
+        specs.append(f":(exclude,glob)**/{pattern}")
+        if "*" not in pattern:
+            # A directory-style pattern: also exclude its contents at any depth.
+            # (Skipped for globs like ``*.vsix``, where ``**/*.vsix`` already
+            # matches the files and a ``/**`` suffix would be inert.)
+            specs.append(f":(exclude,glob)**/{pattern}/**")
+    return specs
 
 
 @dataclass
@@ -410,6 +452,24 @@ class EvidenceBundle:
     # be safely inlined (reported as explicitly uncovered).
     untracked_included: List[tuple] = field(default_factory=list)
     untracked_omitted: List[tuple] = field(default_factory=list)
+    # Set 089: TRACKED changed files dropped from the diff by a generated-bundle
+    # exclude. Reported EXPLICITLY (never silently absent) so a reviewer knows a
+    # tracked path was excluded on purpose -- the same honesty SS3 gave untracked
+    # excluded files. A real source dir that matches a generated pattern (e.g.
+    # src/dist) surfaces here as "review directly", not as a silent omission.
+    tracked_excluded: List[str] = field(default_factory=list)
+
+    def assembled_char_count(self) -> int:
+        """Total characters of assembled evidence (Set 089 oversized-input
+        guard). Sums the spec excerpt, git status, diff, and inlined untracked
+        content -- the material that would be truncated at the verifier's
+        context boundary."""
+        return (
+            len(self.spec_excerpt)
+            + len(self.git_status)
+            + len(self.diff)
+            + sum(len(text) for _, text in self.untracked_included)
+        )
 
     def as_response_under_review(self) -> str:
         """The evidence rendered for the template's Response Under
@@ -446,12 +506,43 @@ class EvidenceBundle:
                 "\n\n#### Uncovered untracked paths (NOT inlined -- review these "
                 "directly; do not assume they are clean)\n\n" + lines
             )
+        if self.tracked_excluded:
+            lines = "\n".join(f"- `{path}`" for path in self.tracked_excluded)
+            parts.append(
+                "\n\n#### Excluded tracked paths (generated-bundle pattern; "
+                "changed but DROPPED from the diff -- review directly if any is "
+                "real source, e.g. a source dir named `dist`)\n\n" + lines
+            )
         return "".join(parts)
 
 
 # Per-file cap on inlined untracked content. Oversized files are reported as
 # uncovered rather than silently dropped or blowing up the prompt.
 _UNTRACKED_BYTE_CAP = 64 * 1024
+
+# Set 089 (evidence completeness): cap on the TOTAL assembled prompt sent to the
+# verifier. Above this, the input itself is likely to be truncated at the
+# model's context boundary -- the verifier would review PARTIAL evidence with no
+# signal it is partial (the mirror of the SS3 output-truncation guard, applied
+# to the INPUT). The default is comfortably above any legitimate review yet well
+# below the smallest verifier's input budget, so it catches a genuine flood
+# without false-positiving a normal diff. Overridable (e.g. for a large but
+# real change on a high-context verifier) via the env var below.
+_EVIDENCE_CHAR_CAP_DEFAULT = 600 * 1024
+_EVIDENCE_CHAR_CAP_ENV = "AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS"
+
+
+def evidence_char_cap() -> int:
+    """The active assembled-evidence character cap (env override or default)."""
+    raw = os.environ.get(_EVIDENCE_CHAR_CAP_ENV, "").strip()
+    if raw:
+        try:
+            val = int(raw)
+        except ValueError:
+            val = 0
+        if val > 0:
+            return val
+    return _EVIDENCE_CHAR_CAP_DEFAULT
 
 
 def _ls_untracked(
@@ -527,12 +618,46 @@ def _collect_untracked_contents(
     return included, omitted
 
 
+def _diff_names(
+    root: Path,
+    diff_base: str,
+    pathspecs: Sequence[str],
+    run_git: Callable[[Path, Sequence[str]], str],
+) -> List[str]:
+    """TRACKED changed file paths vs *diff_base* under *pathspecs* (NUL-safe)."""
+    raw = run_git(
+        root, ["diff", "--name-only", "-z", diff_base, "--", *pathspecs]
+    )
+    return [rel for rel in raw.split("\0") if rel]
+
+
+def _tracked_excluded_paths(
+    root: Path,
+    diff_base: str,
+    excludes: Sequence[str],
+    run_git: Callable[[Path, Sequence[str]], str],
+) -> List[str]:
+    """TRACKED changed files DROPPED from the diff by a generated-bundle exclude.
+
+    The full changed set (no pathspec filter) minus the kept set (the same
+    exclude pathspecs the diff itself uses). Reported explicitly so a
+    depth-agnostic exclude never SILENTLY removes a tracked path from review
+    (Set 089): the flood is suppressed, the fact of the change is not.
+    """
+    if not excludes:
+        return []
+    all_changed = _diff_names(root, diff_base, ["."], run_git)
+    kept = set(_diff_names(root, diff_base, build_diff_pathspecs(excludes), run_git))
+    return [p for p in all_changed if p not in kept]
+
+
 def assemble_evidence(
     session_set_dir: Path,
     session_number: int,
     diff_base: str,
     excludes: Sequence[str],
     run_git: Callable[[Path, Sequence[str]], str] = _run_git,
+    max_evidence_chars: Optional[int] = None,
 ) -> EvidenceBundle:
     """Assemble the evidence bundle for the round.
 
@@ -540,7 +665,14 @@ def assemble_evidence(
     - ``git status --short`` so untracked deliverables are visible
       (L-064-9: a diff-only bundle silently omits new files);
     - the complete unfiltered diff, working tree vs *diff_base*, less
-      the generated-bundle *excludes*.
+      the generated-bundle *excludes*;
+    - tracked files those excludes DROPPED from the diff, reported explicitly.
+
+    Set 089: enforces the oversized-INPUT guard HERE (not only in the CLI) so
+    every caller fails closed. When the assembled evidence exceeds the cap
+    (``max_evidence_chars`` or :func:`evidence_char_cap`), raises
+    :class:`EvidenceTooLargeError` rather than returning a bundle the verifier
+    would silently truncate.
     """
     spec_path = session_set_dir / "spec.md"
     try:
@@ -559,8 +691,9 @@ def assemble_evidence(
     untracked_included, untracked_omitted = _collect_untracked_contents(
         root, excludes, run_git
     )
+    tracked_excluded = _tracked_excluded_paths(root, diff_base, excludes, run_git)
 
-    return EvidenceBundle(
+    bundle = EvidenceBundle(
         spec_excerpt=excerpt,
         git_status=status,
         diff=diff,
@@ -568,7 +701,14 @@ def assemble_evidence(
         excludes=list(excludes),
         untracked_included=untracked_included,
         untracked_omitted=untracked_omitted,
+        tracked_excluded=tracked_excluded,
     )
+
+    cap = max_evidence_chars if max_evidence_chars is not None else evidence_char_cap()
+    assembled = bundle.assembled_char_count()
+    if assembled > cap:
+        raise EvidenceTooLargeError(assembled, cap)
+    return bundle
 
 
 def load_verification_template() -> str:
@@ -974,6 +1114,28 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
     except VerifySessionError as exc:
         print(f"verify_session: {exc}", file=sys.stderr)
         return EXIT_USAGE
+    except EvidenceTooLargeError as exc:
+        # -- Set 089: oversized-INPUT guard (enforced in assemble_evidence so
+        #    every caller fails closed). A larger input would be truncated at
+        #    the verifier's context boundary -> it would review PARTIAL evidence
+        #    with no signal it is partial (the mirror of the SS3 output-
+        #    truncation guard). Fail closed: nothing routed, nothing written,
+        #    the close stays BLOCKED.
+        print(
+            "verify_session: VERIFICATION UNAVAILABLE -- the assembled evidence "
+            f"({exc.assembled_chars:,} chars) exceeds the cap ({exc.cap:,} "
+            "chars); a larger input would be truncated at the verifier's "
+            "context boundary, so it would review PARTIAL evidence with no "
+            "signal it is partial. No verdict, artifact, or disposition was "
+            "written; the close stays BLOCKED. Shrink the evidence: exclude "
+            "generated files (--exclude <path>; the default depth-agnostic "
+            "bundle excludes already drop dist/out/node_modules/__pycache__/"
+            "*.vsix at any depth), split the change into smaller sessions, or "
+            f"-- only if the chosen verifier can truly hold it -- raise "
+            f"{_EVIDENCE_CHAR_CAP_ENV}.",
+            file=sys.stderr,
+        )
+        return EXIT_VERIFICATION_UNAVAILABLE
 
     conventions = ""
     if args.conventions_file:

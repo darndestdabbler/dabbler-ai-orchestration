@@ -1,0 +1,17 @@
+{
+  "status": "completed",
+  "summary": "Closed an upstream evidence-completeness gap in ai_router.verify_session (the 6-round-churn cause the SS1-SS3 integrity work did not cover). Fix A: generated-bundle excludes are now depth-agnostic (**/<p> glob pathspecs), so a NESTED bundle (tools/dabbler-ai-orchestration/dist) is excluded like a top-level dist/ -- retiring the per-repo --exclude workaround -- with excluded TRACKED paths reported explicitly so nothing is silently dropped. Fix B: an oversized/truncated-INPUT guard raised from assemble_evidence itself (EvidenceTooLargeError, cap AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS default 600KiB) so every caller fails closed, mirroring SS3's output-truncation guard. Both git-pathspec behavior and the guard are proven by tests (56 in test_verify_session.py; full suite 2913 passed). Verification ran two rounds (gpt-5-4, cross-provider): round 1 found TWO real bugs (a src/dist completeness regression and Fix B not threaded through assemble_evidence), both fixed; round 2 CONFIRMS the fixes and raised only two verifier category errors (immutable-round-1-artifact + circular set-not-closed-at-verify-time). Per the bounded-round discipline the loop stopped at round 2; the operator adjudicated both residual findings as non-defects and authorized this operator-attested close. Verdict WAIVED (honest override, not VERIFIED).",
+  "verification_method": "api",
+  "verification_verdict": "WAIVED",
+  "files_changed": [
+    "ai_router/verify_session.py",
+    "ai_router/tests/test_verify_session.py",
+    "ai_router/CHANGELOG.md",
+    "docs/session-sets/089-verify-evidence-completeness/spec.md",
+    "docs/session-sets/089-verify-evidence-completeness/change-log.md",
+    "docs/session-sets/089-verify-evidence-completeness/s1-adjudication.md",
+    "docs/ss4-evidence-completeness-problem.md"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": null
+}

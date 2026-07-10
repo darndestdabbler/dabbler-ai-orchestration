@@ -1,0 +1,21 @@
+**ISSUES FOUND**
+
+- **Issue 1: The recorded verification verdict is built on demonstrably false blockers**
+  - **Category:** False Positive
+  - **Severity:** Major
+  - **Details:**
+    - **Violation** — The produced review artifacts assert Major issues that the spec and code directly contradict.
+      - `docs/session-sets/089-verify-evidence-completeness/s1-verification.md` Issue 1 says the spec required avoiding matches like `src/dist/...`. The actual spec says the opposite: **“A depth-agnostic rule necessarily also matches a source dir named `dist` (e.g. `src/dist`), so make exclusion honest rather than narrow: report excluded tracked files as an explicit ‘review directly’ section”** (`docs/session-sets/089-verify-evidence-completeness/spec.md`, “Approach (pre-decided by the source doc)”).
+      - `s1-verification.md` Issue 2 says the oversized guard exists only in `run()` and was not threaded through `assemble_evidence()`. The diff shows `assemble_evidence(..., max_evidence_chars: Optional[int] = None)` now computes `assembled = bundle.assembled_char_count()` and `raise EvidenceTooLargeError(assembled, cap)` in `ai_router/verify_session.py`; tests `test_assemble_evidence_raises_when_oversized` and `test_assemble_evidence_under_cap_returns_bundle` cover that path in `ai_router/tests/test_verify_session.py`.
+    - **Impact** — These are blocking false positives. They turn the mandatory verification result into `ISSUES_FOUND`, which prevents the session from reaching the required **VERIFIED (or Minor-only)** end state and changes the merge/close decision.
+    - **Evidence** — The spec text explicitly permits excluding `src/dist` so long as it is reported honestly; the code adds `tracked_excluded` reporting and tests `test_tracked_source_under_dist_reported_not_silent` / `test_nested_dist_is_excluded_but_reported_uncovered` to enforce exactly that. The code also clearly adds the non-CLI guard inside `assemble_evidence()`, contrary to the review artifact’s claim.
+    - **Correct answer** — Discard or correct the false blockers and re-run/record verification against the actual implementation.
+
+- **Issue 2: The session is not actually complete; required closeout artifacts/state are still missing**
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Details:**
+    - **Violation** — The task required: **“Author `disposition.json`; commit and push; `close_session`; notify; … end-of-set `change-log.md`.”** It also says the session **“Ends with: … cross-provider VERIFIED (or Minor-only); pushed; `close_session` succeeded.”**
+    - **Impact** — This is not a finished session-verification run. Even if the code changes are acceptable, the required session workflow is incomplete, so the task should not be accepted as done.
+    - **Evidence** — `docs/session-sets/089-verify-evidence-completeness/session-state.json` still shows overall `"status": "in-progress"` and session 1 `"status": "in-progress"` with `"completedAt": null` and `"verificationVerdict": null`. `session-events.jsonl` contains only `work_started`. No `change-log.md` appears in `git status --short` or the untracked-file listing. `disposition.json` exists, but that does not satisfy the missing close/session-complete artifacts.
+    - **Correct answer** — Finish the required verification resolution, write `change-log.md`, run `close_session`, and update session state/artifacts so the set is actually closed.

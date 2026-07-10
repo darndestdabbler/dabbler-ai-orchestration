@@ -1,14 +1,14 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "090-verifier-preclose-review-scope",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-10T15:08:18.454523-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-10T15:47:43.194057-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "WAIVED"
     }
   ]
 }

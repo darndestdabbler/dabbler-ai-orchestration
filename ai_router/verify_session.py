@@ -742,7 +742,11 @@ def build_prompt(
         )
     task_parts.append(
         f"Session {session_number} of the active session set "
-        f"(verification round {round_number}). The session's plan, "
+        f"(verification round {round_number}). This is a **pre-close** review "
+        "at Step 6: close-out (close_session, change-log.md, the final "
+        "disposition verdict, committed/pushed/complete state) happens AFTER "
+        "this verification, so those artifacts do not exist yet and their "
+        "absence is not a defect (see 'Review scope'). The session's plan, "
         "verbatim from spec.md:\n\n" + evidence.spec_excerpt
     )
     original_task = "\n\n".join(task_parts)

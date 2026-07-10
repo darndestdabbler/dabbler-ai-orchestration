@@ -71,7 +71,7 @@ STAMP_SOURCES = (STAMP_SOURCE_VERIFY_SESSION, STAMP_SOURCE_CLOSE_BACKSTOP)
 # template bumps this constant in the same change — the PINNED hash
 # registry below makes an unbumped edit fail closed rather than pass
 # accidentally.
-TEMPLATE_ID = "session-verification-v1"
+TEMPLATE_ID = "session-verification-v2"
 
 # The immutable id -> normalized-hash registry (I-084-S2-2): each
 # version id pins exactly one normalized content hash, recorded here at
@@ -85,6 +85,12 @@ TEMPLATE_ID = "session-verification-v1"
 TEMPLATE_HASHES = {
     "session-verification-v1": (
         "9d7c1f0cb474498187a2210076b8631dd3a0642a53375cea17e404088dfc45de"
+    ),
+    # Set 090: minted when the "Review scope" pre-close carve-out was added to
+    # verification.md (retiring the recurring circular category error). v1 is
+    # retained for historical rows; v2 is the active id.
+    "session-verification-v2": (
+        "cd20129c39723a29c9903c9d92e6c36cf046824d4607a3b75f8cb4e0203ee3e1"
     ),
 }
 

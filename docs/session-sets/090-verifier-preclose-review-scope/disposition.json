@@ -1,0 +1,19 @@
+{
+  "status": "completed",
+  "summary": "Retired the recurring verifier category error that blocked Sets 088 and 089 at close. verification.md gains a 'Review scope' section (+ a build_prompt context note) telling the verifier it reviews mid-flight, pre-close work: not-yet-created close-out state (close_session success, change-log.md, final verdict, committed/pushed/complete tree) is never a completeness defect, and the review's own immutable append-only sN-verification*.md / sN-issues*.json are not deliverables under review. The carve-out is narrow (a genuinely missing spec-promised code/test/doc deliverable stays in scope), so adversarial rigor is untouched. The template hash pin was version-bumped session-verification-v1 -> v2 (Set 084 F3 discipline). Section-anchored regression tests + a runtime load_verification_template() assertion pin the guidance. DOGFOOD: this set's own verify_session round 1 did NOT raise the circular 'set-not-closed-at-verify-time' finding (present in both 088 and 089) -- the fix works. Round 1's only real finding (a coverage gap vs this set's spec) was fixed. Round 2 raised a single verifiably-false finding (it misattributed verification.md's template sections to spec.md, which is clean); the operator adjudicated it as a false positive and authorized this operator-attested close. Full suite green (2920 passed). Verdict WAIVED (honest override, not VERIFIED).",
+  "verification_method": "api",
+  "verification_verdict": "WAIVED",
+  "files_changed": [
+    "ai_router/prompt-templates/verification.md",
+    "ai_router/verify_session.py",
+    "ai_router/verification_stamp.py",
+    "ai_router/tests/test_verification_framing.py",
+    "ai_router/tests/test_verify_session.py",
+    "ai_router/CHANGELOG.md",
+    "docs/session-sets/090-verifier-preclose-review-scope/spec.md",
+    "docs/session-sets/090-verifier-preclose-review-scope/change-log.md",
+    "docs/session-sets/090-verifier-preclose-review-scope/s1-adjudication.md"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": null
+}

@@ -235,6 +235,48 @@ def test_pull_template_carries_materiality_layer(phrase: str):
     )
 
 
+# Set 090: the "Review scope" section scopes the verifier to pre-close work so it
+# stops raising the circular "set-not-closed-at-verify-time" category error (and
+# the immutable-artifact "stale" complaint) that blocked Sets 088 and 089. Pins
+# are section-anchored (so unrelated prose can't satisfy them) and each survives
+# _norm (no underscores/backticks in the pinned substrings).
+REVIEW_SCOPE_PHRASES = [
+    'before close-out',
+    'their absence is never a finding',
+    'the set is still open',                 # the exact non-defect it must not flag
+    'immutable, append-only raw records',    # the prior-round-artifact carve-out
+    'not deliverables under review',
+]
+
+
+@pytest.mark.parametrize("phrase", REVIEW_SCOPE_PHRASES)
+def test_push_template_carries_preclose_review_scope(phrase: str):
+    """verification.md must scope the verifier to pre-close work (Set 090).
+
+    Anchored to the 'Review scope' section, so the same words elsewhere cannot
+    satisfy the pin. Without this carve-out the verifier reads the spec's
+    close-out 'Ends with' lines as due deliverables and reliably category-errors
+    on small sets (blocked Sets 088 and 089, each needing an operator override).
+    """
+    section = _norm(_section(_push_text(), "review scope"))
+    assert section, "verification.md lost the 'Review scope' section (Set 090)."
+    assert phrase.lower() in section, (
+        f"'Review scope' section lost the pin {phrase!r}; the pre-close carve-out "
+        "must survive or the circular 'set-not-closed-at-verify-time' finding returns."
+    )
+
+
+def test_review_scope_preserves_substantive_rigor():
+    """The carve-out must NOT weaken substantive review: the clause keeping a
+    genuinely-missing spec deliverable in scope must remain (Set 090)."""
+    section = _norm(_section(_push_text(), "review scope"))
+    assert "does not lower your bar on the actual work" in section
+    assert (
+        "genuinely missing spec-promised code, test, or documentation deliverable"
+        in section
+    )
+
+
 @pytest.mark.parametrize("phrase", STRONG_FRAMING_PHRASES)
 def test_pull_template_carries_strong_adversarial_framing(phrase: str):
     """The pull prompt body must independently pin the strong-framing phrases too.

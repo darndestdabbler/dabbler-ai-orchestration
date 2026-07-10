@@ -3,6 +3,26 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] — verifier pre-close review scope (Set 090)
+
+> Stacks on Sets 089/0.32.0. Retires a recurring verifier **category error**
+> that blocked two consecutive closes (088, 089), each needing an operator
+> override. Publish stays operator-gated.
+
+### Changed
+
+- **(Set 090) The verification prompt now scopes the verifier to pre-close
+  work.** `ai_router/prompt-templates/verification.md` gains a **"Review scope"**
+  section, and `build_prompt` a matching context note: `verify_session` runs at
+  Step 6, *before* close-out, so not-yet-created close-out state (a
+  `close_session` success, `change-log.md`, the final disposition verdict, a
+  committed/pushed/`complete` tree) is **never** a completeness defect, and the
+  review's own immutable append-only `sN-verification*.md` / `sN-issues*.json`
+  are not "stale/false" when a later round supersedes them. The carve-out is
+  narrow — a genuinely missing spec-promised code/test/doc deliverable stays in
+  scope — so adversarial rigor, materiality, and anti-laundering are untouched.
+  Section-anchored regression tests pin the guidance.
+
 ## [Unreleased] — verification evidence completeness (Set 089)
 
 > Stacks on the 0.32.0 remediation. An **upstream** evidence-*completeness* gap

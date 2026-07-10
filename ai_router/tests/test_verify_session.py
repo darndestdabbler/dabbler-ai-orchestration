@@ -377,6 +377,30 @@ class TestEvidenceAssembly:
         assert "Build the widget" in prompt
         assert "git status --short" in prompt
 
+    def test_build_prompt_carries_preclose_context(self, repo: Path):
+        # Set 090: the assembled prompt states the pre-close (Step 6) context
+        # independent of the template file, so the verifier is not misled into
+        # flagging not-yet-created close-out artifacts as missing deliverables.
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        prompt = vs.build_prompt(evidence, 1, 1).lower()
+        assert "pre-close" in prompt
+        assert "happens after this verification" in prompt
+
+    def test_load_verification_template_carries_review_scope(self):
+        # Set 090: guard the RUNTIME loader (not only the file read directly in
+        # the framing tests), so the actual verification prompt can never lose
+        # the pre-close Review-scope carve-out that retires the recurring
+        # circular category error.
+        # Drop markdown emphasis and collapse whitespace so bold/line-wrap
+        # formatting doesn't break the substring check.
+        raw = vs.load_verification_template().lower()
+        for ch in "*`_":
+            raw = raw.replace(ch, "")
+        template = " ".join(raw.split())
+        assert "review scope" in template
+        assert "before close-out" in template
+        assert "their absence is never a finding" in template
+
     def test_conventions_block_prepended(self, repo: Path):
         evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
         prompt = vs.build_prompt(

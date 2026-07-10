@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The Set 090 regression coverage does not actually test the `load_verification_template()` / pull path the spec explicitly required.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Details:** **Violation** — Step 5 requires: `\"Tests: assert load_verification_template() / the built prompt carry the scope guidance (regression guard)\"`, and Acceptance #1 requires: ``\"`verification.md` and the assembled `build_prompt` output carry the scope guidance\"``. **Impact** — This leaves the runtime template-loading path unguarded for the new scope language. A stale/incorrect pull-side template can slip through while the new tests still pass: the source file can contain the right text, and `build_prompt` can still include the hardcoded pre-close note, but the actual loaded template body used by verification can still be missing the new \"Review scope\" guidance. That is merge-blocking here because this set's purpose is to prevent that exact verifier misframing from recurring. **Evidence** — The new tests in `ai_router/tests/test_verification_framing.py` are push-side only: `test_push_template_carries_preclose_review_scope` and `test_review_scope_preserves_substantive_rigor`, both anchored on `_push_text()`. The only new runtime test in `ai_router/tests/test_verify_session.py` is `test_build_prompt_carries_preclose_context`, which checks for `\"pre-close\"` and `\"happens after this verification\"`—the injected `build_prompt` note, not the pull-side template content. No new `test_pull_template_*` / direct `load_verification_template()` assertion was added for the Set 090 guidance, despite the file already using `test_pull_template_*` coverage for other framing guarantees. **Correct answer** — Add pull-side regression coverage that asserts the loaded template content (or `_pull_text()` equivalent) includes the new Review scope guidance, analogous to the existing pull-template framing tests.",
+      "category": "Completeness",
+      "severity": "Major"
+    }
+  ]
+}

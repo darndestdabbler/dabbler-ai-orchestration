@@ -1,0 +1,17 @@
+{
+  "sessionSetName": "090-verifier-preclose-review-scope",
+  "createdDate": "2026-07-10T19:08:18.469063+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-10T19:08:18.469063+00:00",
+      "description": "Operator set pathAwareCritique: none.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "none"
+    }
+  ]
+}

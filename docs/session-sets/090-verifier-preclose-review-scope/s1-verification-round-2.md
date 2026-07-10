@@ -1,0 +1,8 @@
+**ISSUES FOUND**
+
+- **Issue 1:** The session-set spec artifact is corrupted with unrelated verifier-prompt content.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Details:** **Violation** — The work for this set is scoped to the verifier prompt/template, `build_prompt`, tests, and changelog; the set spec itself should remain the canonical record of the session plan and deliverables. **Impact** — This leaves `docs/session-sets/090-verifier-preclose-review-scope/spec.md` as an inaccurate source-of-truth artifact, which can mislead later reviewers/auditors and any tooling or humans reading the set spec. That is merge-blocking for a session-set record that is supposed to be accurate. **Evidence** — In `docs/session-sets/090-verifier-preclose-review-scope/spec.md`, after the end-of-set deliverables bullet `Dogfood evidence: 090's own verification free of the circular finding.`, the file continues with unrelated prompt-template sections: `### Review scope — verify the WORK, not the close-out`, `### Your Instructions`, `### Materiality`, `### Severity anchoring`, and `### Response Format`. Those sections belong in `ai_router/prompt-templates/verification.md`, not in the set spec.
+  - **Location:** `docs/session-sets/090-verifier-preclose-review-scope/spec.md` immediately after the end-of-set deliverables list.
+  - **Fix:** Remove the appended verifier-prompt block so `spec.md` ends at the set deliverables section.

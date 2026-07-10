@@ -38,6 +38,17 @@ Review the session's WORK — the code, tests, and docs in the diff.
   1290)": **fixed** — the counts differed because each remediation round
   added tests; the Suite baseline section above now carries the single
   final total (1291 / 18) and labels the earlier numbers as chronological.
+- R3 finding (Major) "suite-green claim not substantiated for Layer 3":
+  **fixed with exact-revision evidence** — CI run 29110488046 on commit
+  `dd5c923` is fully green including Playwright Layer 3 on all three OSes
+  (see Suite baseline above); the disposition summary now scopes each
+  layer's evidence precisely.
+- R3 finding (Minor) "activity-log totalSessions: 0": **fixed** — set to 4
+  via the SessionLog writer class (the file's blessed writer).
+- R3 finding (Minor) "files_changed incomplete": **fixed** — the inventory
+  is now exhaustive over `git diff --name-only <pre-session>..HEAD` plus the
+  round-3 artifacts, including verification artifacts and lesson-citation
+  metadata.
 
 ## Suite baseline (FINAL post-remediation totals — single source for counts)
 - Extension unit suite (`npm run test:unit`): **1291 passing, 0 failing**
@@ -61,14 +72,21 @@ Review the session's WORK — the code, tests, and docs in the diff.
   stale-tier-framing bigram while describing the earlier e3e6a4d fix) and is
   **fixed in this session's diff** by rewording the quote (drift-guard file now
   25/25 green). No Python *source* was changed — the fix is a one-line doc edit.
-- Playwright Layer 3: **all 19 specs fail in THIS local environment with one
-  identical signature** — `launchVSCode` times out waiting for
-  `app.firstWindow()` / the workbench activity bar; no assertion is ever
-  reached. Reproduced **identically at clean HEAD with the session's changes
-  stashed**, so it is an environment launch issue (agent shell cannot open the
-  VS Code Electron window), not a regression from this diff. The CI matrix is
-  the effective Layer 3 gate for this session; do not attribute these launch
-  timeouts to the session's changes.
+- Playwright Layer 3: **GREEN on CI for this exact code revision** — run
+  https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/29110488046
+  (commit `dd5c923`, the session's code commit) completed `success` with ALL
+  jobs green, including **Playwright Layer 3 on windows-latest, macos-latest,
+  and ubuntu-latest**, plus Python tests on all three OSes, the tier-model
+  drift guards, the preload ceiling gate, and the template snapshot. (The two
+  prior commits' Test runs were red from the pre-existing drift-guard failure
+  this session fixed.) Locally the 19 Playwright specs cannot run in this
+  agent shell — `launchVSCode` times out waiting for `app.firstWindow()`
+  before any assertion, reproduced identically at clean HEAD with the
+  session's changes stashed — which is an environment launch limitation, not
+  a regression; the green CI run above is the Layer-3 evidence of record.
+  Any post-`dd5c923` commit in this session touches session-set artifacts
+  (json/md) only, not extension code, so the CI evidence remains valid for
+  the shipped code.
 
 ## Release contract
 - Mid-set session: **no version bump, no CHANGELOG entry, no publish** —

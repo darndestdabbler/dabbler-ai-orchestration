@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "086-verification-verdict-token-legibility",
-  "status": "in-progress",
+  "status": "cancelled",
   "sessions": [
     {
       "number": 1,
@@ -33,5 +33,6 @@
       },
       "verificationVerdict": null
     }
-  ]
+  ],
+  "preCancelStatus": "in-progress"
 }

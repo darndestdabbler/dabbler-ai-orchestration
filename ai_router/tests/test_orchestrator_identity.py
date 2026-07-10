@@ -47,6 +47,28 @@ from orchestrator_identity import (
 )
 from session_state import build_orchestrator_block, register_session_start
 from ai_router.utils import get_escalation_model
+import ai_router.copilot_preflight as _cp_pkg
+from ai_router.copilot_preflight import PreflightResult as _PreflightResult
+
+
+@pytest.fixture(autouse=True)
+def _stub_copilot_preflight(monkeypatch):
+    """Stub the Set 086 copilot-seat preflight to PASS.
+
+    The copilot-engine identity fixtures here run ``start_session``, which now
+    runs the real preflight (``which copilot``). Stubbing keeps them off the real
+    CLI so they do not require ``copilot`` to be installed (absent in CI); the
+    tests still reach their intended identity/exclusion assertions. The
+    preflight's own behavior is covered by test_copilot_preflight.py /
+    test_start_session.py.
+    """
+    monkeypatch.setattr(
+        _cp_pkg,
+        "run_preflight",
+        lambda *a, **k: _PreflightResult(
+            ok=True, stage="live-probe", error_class=None, message="stubbed"
+        ),
+    )
 # The PACKAGE class object — the one production route()/verify_session
 # raise and catch (I-084-S1-2: a bare `from verification import ...` binds
 # a DISTINCT class under the conftest sys.path shim and would miss the

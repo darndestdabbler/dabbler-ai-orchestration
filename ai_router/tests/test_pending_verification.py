@@ -15,6 +15,30 @@ import pytest
 import dedicated_verification as dv
 import pending_verification as pv
 
+import ai_router.copilot_preflight as _cp_pkg
+from ai_router.copilot_preflight import PreflightResult as _PreflightResult
+
+
+@pytest.fixture(autouse=True)
+def _stub_copilot_preflight(monkeypatch):
+    """Stub the Set 086 copilot-seat preflight to PASS.
+
+    These tests exercise pending-verification banners, not the preflight, but
+    some use a copilot-engine fixture whose ``start_session`` now runs the real
+    preflight (``which copilot``). Stubbing keeps them off the real CLI so they
+    do not require ``copilot`` to be installed (it is absent in CI). The
+    preflight's own behavior is covered by test_copilot_preflight.py /
+    test_start_session.py.
+    """
+    monkeypatch.setattr(
+        _cp_pkg,
+        "run_preflight",
+        lambda *a, **k: _PreflightResult(
+            ok=True, stage="live-probe", error_class=None, message="stubbed"
+        ),
+    )
+
+
 D = dv.VERIFICATION_MODE_DEDICATED
 OOB = dv.VERIFICATION_MODE_OUT_OF_BAND
 

@@ -100,6 +100,14 @@
       "dateTime": "2026-07-10T13:27:41.832951-04:00",
       "description": "R3 (close-backstop round, gpt-5-4): Major - suite-green claim not substantiated for Layer 3: FIXED with exact-revision evidence, CI run 29110488046 on the code commit dd5c923 fully green incl. Playwright Layer 3 on windows/macos/ubuntu (also proves the local launch failure was environmental, and turns CI green after two red runs from the pre-existing drift-guard failure this session fixed). Minor - activity-log totalSessions 0: FIXED to 4 via the SessionLog writer. Minor - files_changed incomplete: FIXED, now exhaustive (31 paths) over the pre-session..HEAD diff plus round-3 artifacts. Conventions ledger updated; disposition summary rescoped per-layer evidence.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 13,
+      "stepKey": "session-001/round-4-remediation-and-third-provider-escalation",
+      "dateTime": "2026-07-10T13:32:59.320618-04:00",
+      "description": "R4 (gpt-5-4): (a) regenerate-round-3-artifacts finding DISMISSED as contrary to the constitution (saved verification artifacts are immutable; resolution lives in the ledger + later rounds; the verificationVerdict: null observation repeats the R1 workflow-order dismissal). (b) present-but-unreadable modules.yaml silently null - FIXED: read-failure branch warns with path+error; new EISDIR-based test; unit suite 1292/19 final. Escalation: rounds 1-4 produced zero structured Critical/Major (all envelope severities unknown) and each round surfaced fresh unrated nits after fixes - edge-case exhaustion per the bounded-round rule. Round 5 is a THIRD-PROVIDER opinion (openai excluded alongside anthropic via the verify_session route_fn seam, Set 086 precedent) rather than another same-verifier round.",
+      "status": "complete"
     }
   ]
 }

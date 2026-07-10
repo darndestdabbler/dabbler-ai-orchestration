@@ -219,6 +219,30 @@ suite("Set 087 — readModulesManifest", () => {
     }
   });
 
+  // S1 verifier round 4: a PRESENT manifest that cannot be read is an
+  // I/O failure and must warn (only a truly absent manifest is silent).
+  // A directory at the manifest path forces the read failure portably
+  // (EISDIR) — existsSync is true, readFileSync throws.
+  test("present-but-unreadable manifest warns and degrades to implicit", () => {
+    const root = makeTmpDir();
+    const origWarn = console.warn;
+    const warnings: string[] = [];
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    };
+    try {
+      fs.mkdirSync(path.join(root, "docs", "modules.yaml"), {
+        recursive: true,
+      });
+      assert.strictEqual(readModulesManifest(root), null);
+      assert.strictEqual(warnings.length, 1);
+      assert.ok(warnings[0].includes("could not be read"));
+    } finally {
+      console.warn = origWarn;
+      fs.rmSync(root, { recursive: true });
+    }
+  });
+
   test("manifest present but entries empty returns []", () => {
     const root = makeTmpDir();
     try {

@@ -16489,7 +16489,10 @@ function readModulesManifest(root) {
   let text;
   try {
     text = fs5.readFileSync(manifestPath, "utf8");
-  } catch {
+  } catch (e) {
+    console.warn(
+      `[dabblerSessionSets] ${manifestPath} exists but could not be read (${e instanceof Error ? e.message : String(e)}) \u2014 falling back to the single implicit module.`
+    );
     return null;
   }
   let doc;

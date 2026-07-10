@@ -49,6 +49,38 @@ Review the session's WORK — the code, tests, and docs in the diff.
   is now exhaustive over `git diff --name-only <pre-session>..HEAD` plus the
   round-3 artifacts, including verification artifacts and lesson-citation
   metadata.
+- R4 finding "round-3 blocker not cleared from the round-3 artifacts;
+  regenerate them": **dismissed as contrary to the framework's own rules** —
+  saved verification artifacts are IMMUTABLE ("never edited after they are
+  written; retries append sibling round files", session constitution →
+  Source of truth). A prior round's artifact recording ISSUES_FOUND is the
+  correct, permanent historical record; resolution is recorded in THIS
+  ledger, the activity log, and the subsequent round — never by rewriting
+  history. The `verificationVerdict: null` / not-closed observations repeat
+  the R1 workflow-order dismissal (verification runs BEFORE close; the
+  close that failed did so precisely because the loop is still open, which
+  is the gate working as designed). Do not resurrect.
+- R4 finding "present-but-unreadable modules.yaml silently treated as no
+  manifest": **fixed** — the read-failure branch now warns with the path
+  and error before degrading (only a truly absent manifest is silent); new
+  test forces the failure portably via a directory at the manifest path.
+  Final totals hereafter: **1292 unit tests passing / 19 Set-087 tests**.
+- Suite-count note: the Suite baseline above says 1291/18; after the R4
+  test addition the final totals are 1292/19 (same chronological-counts
+  rule as the R2 disposition).
+
+## Round-5 escalation note (third-provider opinion)
+Rounds 1–4 (all gpt-5-4) produced zero findings the verifier itself rated
+Critical/Major in its structured output (every envelope entry is
+severity "unknown"; R3's prose rated one Major — the Layer-3 evidence
+claim — which was fixed with the exact-revision green CI citation). Each
+round's actionable parts were fixed in flight and each subsequent round
+surfaced only fresh unrated nits — the edge-case-exhaustion pattern the
+session constitution's bounded-round rule names. Per the constitution's
+disputed-finding path, round 5 is a **third-provider opinion** (openai
+excluded alongside the auto-excluded anthropic), not another same-verifier
+round. Reviewer: judge the CODE and the evidence; the cross-round ledger
+above records every prior finding's disposition.
 
 ## Suite baseline (FINAL post-remediation totals — single source for counts)
 - Extension unit suite (`npm run test:unit`): **1291 passing, 0 failing**

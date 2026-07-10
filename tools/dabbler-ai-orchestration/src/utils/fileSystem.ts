@@ -479,7 +479,16 @@ export function readModulesManifest(root: string): ModuleManifestEntry[] | null 
   let text: string;
   try {
     text = fs.readFileSync(manifestPath, "utf8");
-  } catch {
+  } catch (e) {
+    // S1 verifier round 4: a PRESENT manifest that cannot be read is an
+    // I/O / config failure, not the intentional no-manifest case — warn
+    // (same posture as the wrong-shape branches below), then degrade to
+    // the implicit module. Only a truly absent manifest is silent.
+    console.warn(
+      `[dabblerSessionSets] ${manifestPath} exists but could not be ` +
+        `read (${e instanceof Error ? e.message : String(e)}) — ` +
+        `falling back to the single implicit module.`,
+    );
     return null;
   }
   let doc: unknown;

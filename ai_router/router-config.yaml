@@ -262,7 +262,7 @@ models:
     model_id: gpt-5.5
     tier: 3
     is_enabled: true
-    is_enabled_as_verifier: false   # new model: generator + explicit-call only until calibrated (registry convention, lines 120-130); promote later
+    is_enabled_as_verifier: true    # Set 090 follow-up: PROMOTED to verifier (repinned session-verification below) to cut gpt-5-4's false positives on small meta-work sets. Deliberately overrides the calibrate-as-generator-first convention, on the operator's call. (Newer sibling frontier model: gpt-5-6 "Sol".)
     input_cost_per_1m: 2.50
     output_cost_per_1m: 15.00
     max_context_tokens: 272000
@@ -271,6 +271,23 @@ models:
     notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier +
       consensus engine. PLACEHOLDER pricing/limits mirror gpt-5.4 — confirm
       against OpenAI's published GPT-5.5 rates before trusting cost reports."
+    generation_params:
+      reasoning_effort: high
+
+  gpt-5-6:
+    provider: openai
+    model_id: gpt-5.6
+    tier: 3
+    is_enabled: true
+    is_enabled_as_verifier: false   # brand new (GPT 5.6 "Sol"); calibrate before pinning as verifier. model_id PROBED live before trusting.
+    input_cost_per_1m: 2.50
+    output_cost_per_1m: 15.00
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Frontier OpenAI model GPT-5.6, codename 'Sol' (operator, 2026-07-10).
+      PLACEHOLDER pricing/limits mirror gpt-5.4/5.5 — confirm against OpenAI's
+      published GPT-5.6 rates and the exact model_id before trusting."
     generation_params:
       reasoning_effort: high
 
@@ -360,9 +377,13 @@ routing:
     # hand-tuned static pin ("swap this value if a different
     # orchestrator runs sessions") was the incident-3 hole: it
     # dispatched a Copilot-seat verification to the orchestrator's own
-    # underlying model. gpt-5-4 stays as the preferred verifier when it
-    # survives the exclusion (the common Claude-orchestrator case).
-    session-verification: gpt-5-4
+    # underlying model. Set 090 follow-up: the preferred verifier is now
+    # gpt-5-5 (was gpt-5-4) — gpt-5-4 produced repeated false-positive Major
+    # findings on small meta-work sets (Sets 088/089/090); a stronger verifier
+    # should reduce them. Still a PREFERENCE ONLY; the dynamic orchestrator
+    # exclusion is unchanged, so on a Claude-orchestrator session gpt-5-5
+    # (openai) survives the anthropic exclusion and is used.
+    session-verification: gpt-5-5
     # Fresh close-out turn. The orchestrator routes a new turn with
     # task_type=session-close-out after disposition.json reports
     # status=completed AND verification has terminated. The work is

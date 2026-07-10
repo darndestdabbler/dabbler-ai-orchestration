@@ -538,6 +538,32 @@ class TestBackstopSkips:
         # CURRENT: the envelope's Minor settles the close (calls == 0) -> laundered.
         assert len(fake_route.calls) == 1
 
+    def test_newer_invalid_row_does_not_fall_back_to_older_valid_row(
+        self, closeable, fake_route,
+    ):
+        # SS3 anti-rollback (GPT SS3 review #1): an older valid VERIFIED row must
+        # NOT settle the close when a NEWER attempt failed validation -- here a
+        # truncated round whose artifact never landed (write_artifact=False).
+        # The latest attempt governs; the older pass cannot be resurrected.
+        root, set_dir = closeable
+        old_verified = write_stamped_evidence(set_dir, content="VERIFIED\n")
+        newer_invalid = write_stamped_evidence(
+            set_dir,
+            round_number=2,
+            content="ISSUES FOUND\n\nIssue 1: auth bypass\nSeverity: Major\n",
+            write_artifact=False,
+        )
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(old_verified) + "\n" + json.dumps(newer_invalid) + "\n",
+            encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "succeeded", outcome.messages
+        # The older row did NOT stand the backstop down: a fresh round ran.
+        assert len(fake_route.calls) == 1
+
     def test_zero_budget_tier_passthrough(
         self, closeable, fake_route, tmp_path,
     ):

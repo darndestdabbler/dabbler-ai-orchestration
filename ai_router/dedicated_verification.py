@@ -897,6 +897,20 @@ def cross_provider_satisfied(
     check the no-baseline case themselves (no work session with any
     recorded identity) — this predicate returns ``False`` there, but
     the corrective message differs.
+
+    ACCEPTED BOUNDARY (out-of-band remediation SS3, operator-ratified
+    2026-07-10; not a bug). The engine arm lets two DIFFERENT engines on the
+    SAME underlying provider pass as "independent" — weaker than true
+    effective-provider independence. This is deliberately RETAINED: this is the
+    LIGHTWEIGHT / dedicated tier (router-off, no stamped artifact), whose
+    integrity model is intentionally weaker and opt-in. The enforced release
+    gate is the FULL tier, which already excludes the orchestrator's EFFECTIVE
+    PROVIDER (not merely engine) via
+    ``verify_session.resolve_orchestrator_exclusion`` and binds stamped
+    cross-provider evidence. Tightening this arm to require provider-difference
+    would break backward-compatible multi-engine/same-provider configs for
+    marginal value, so it is documented as a known limitation rather than
+    closed. See ``../dabbler-orchestration-remediation/ss3-summary.md``.
     """
     work_engines = {e for e, _p in work_pairs if e is not None}
     # Engine arm — legacy set-based comparison, unchanged semantics.

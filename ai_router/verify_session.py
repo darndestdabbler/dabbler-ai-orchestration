@@ -405,23 +405,126 @@ class EvidenceBundle:
     diff: str
     diff_base: str
     excludes: List[str] = field(default_factory=list)
+    # SS3: untracked files' CONTENT (git diff shows only their names). Each is
+    # (path, text) for inlined files, or (path, reason) for ones that could not
+    # be safely inlined (reported as explicitly uncovered).
+    untracked_included: List[tuple] = field(default_factory=list)
+    untracked_omitted: List[tuple] = field(default_factory=list)
 
     def as_response_under_review(self) -> str:
         """The evidence rendered for the template's Response Under
         Review slot: status first (untracked deliverables visible --
-        L-064-9), then the complete diff."""
+        L-064-9), then the complete diff, then untracked file CONTENTS
+        (SS3 -- git diff omits new-file content) and any uncovered paths."""
         status = self.git_status.strip() or "(clean -- no changes reported)"
         diff = self.diff.strip() or "(empty diff)"
         exclude_note = (
             ", ".join(self.excludes) if self.excludes else "(none)"
         )
-        return (
+        parts = [
             "The session's work, as the working tree presents it.\n\n"
             f"#### git status --short\n\n```\n{status}\n```\n\n"
             f"#### Complete diff (working tree vs `{self.diff_base}`; "
             f"generated-bundle exclusions: {exclude_note})\n\n"
             f"```diff\n{diff}\n```"
-        )
+        ]
+        if self.untracked_included:
+            blocks = []
+            for path, text in self.untracked_included:
+                body = text if text.strip() else "(empty file)"
+                blocks.append(f"##### `{path}`\n\n```\n{body}\n```")
+            parts.append(
+                "\n\n#### Untracked file contents (new files, absent from the "
+                "diff)\n\n" + "\n\n".join(blocks)
+            )
+        if self.untracked_omitted:
+            lines = "\n".join(
+                f"- `{path}` -- {reason}"
+                for path, reason in self.untracked_omitted
+            )
+            parts.append(
+                "\n\n#### Uncovered untracked paths (NOT inlined -- review these "
+                "directly; do not assume they are clean)\n\n" + lines
+            )
+        return "".join(parts)
+
+
+# Per-file cap on inlined untracked content. Oversized files are reported as
+# uncovered rather than silently dropped or blowing up the prompt.
+_UNTRACKED_BYTE_CAP = 64 * 1024
+
+
+def _ls_untracked(
+    root: Path,
+    run_git: Callable[[Path, Sequence[str]], str],
+    pathspecs: Sequence[str],
+) -> List[str]:
+    """Untracked (non-gitignored) file paths under *pathspecs*, in order.
+
+    ``git ls-files --others --exclude-standard -z`` is file-level (a new
+    directory expands to its files -- ``git status --short`` lists only
+    ``newdir/``) and NUL-delimited (filenames with spaces/quotes/newlines parse
+    safely). ``--exclude-standard`` honors .gitignore, so ignored local junk is
+    intentionally not enumerated.
+    """
+    raw = run_git(
+        root, ["ls-files", "--others", "--exclude-standard", "-z", "--", *pathspecs]
+    )
+    return [rel.strip() for rel in raw.split("\0") if rel.strip()]
+
+
+def _collect_untracked_contents(
+    root: Path,
+    excludes: Sequence[str],
+    run_git: Callable[[Path, Sequence[str]], str] = _run_git,
+) -> tuple:
+    """Read the text of untracked FILES (not directories) under *root*.
+
+    Enumerates ALL non-ignored untracked files, then partitions them with the
+    SAME generated-bundle pathspecs the diff uses (so exclusion matches the diff
+    exactly -- git's ``:(exclude)dist`` excludes a top-level ``dist`` but NOT a
+    real source path like ``src/dist/x.py``, which a segment-matcher would wrongly
+    drop).
+
+    Returns ``(included, omitted)``: ``included`` is ``[(path, text), ...]`` for
+    UTF-8 text files under the size cap; ``omitted`` is ``[(path, reason), ...]``
+    for files that cannot be safely inlined -- **generated-bundle-excluded**,
+    symlink, oversized, binary/non-UTF-8, or unreadable. Every non-inlined file is
+    reported EXPLICITLY (including excluded ones) so a reviewer never mistakes
+    silence for coverage. (.gitignore-ignored files are intentionally NOT
+    disclosed -- git itself treats them as non-source; the generated-bundle
+    excludes may hold real files, so those ARE disclosed as uncovered.)
+    """
+    all_untracked = _ls_untracked(root, run_git, ["."])
+    kept = set(
+        _ls_untracked(root, run_git, build_diff_pathspecs(excludes) or ["."])
+    )
+    included: List[tuple] = []
+    omitted: List[tuple] = []
+    for rel in all_untracked:
+        if rel not in kept:
+            omitted.append((rel, "excluded (generated-bundle pattern)"))
+            continue
+        p = root / rel
+        try:
+            if p.is_symlink():
+                omitted.append((rel, "symlink (not followed)"))
+                continue
+            size = p.stat().st_size
+            if size > _UNTRACKED_BYTE_CAP:
+                omitted.append((rel, f"oversized ({size} bytes)"))
+                continue
+            data = p.read_bytes()
+        except OSError:
+            omitted.append((rel, "unreadable"))
+            continue
+        try:
+            text = data.decode("utf-8")
+        except UnicodeDecodeError:
+            omitted.append((rel, "binary / non-UTF-8"))
+            continue
+        included.append((rel, text))
+    return included, omitted
 
 
 def assemble_evidence(
@@ -453,6 +556,9 @@ def assemble_evidence(
     diff_args = ["diff", "--no-color", diff_base, "--"]
     diff_args.extend(build_diff_pathspecs(excludes) or ["."])
     diff = run_git(root, diff_args)
+    untracked_included, untracked_omitted = _collect_untracked_contents(
+        root, excludes, run_git
+    )
 
     return EvidenceBundle(
         spec_excerpt=excerpt,
@@ -460,6 +566,8 @@ def assemble_evidence(
         diff=diff,
         diff_base=diff_base,
         excludes=list(excludes),
+        untracked_included=untracked_included,
+        untracked_omitted=untracked_omitted,
     )
 
 
@@ -1043,6 +1151,26 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         )
         return EXIT_ROUTE_FAILED
 
+    # -- Truncation is INVALID EVIDENCE, not a warning (SS3). A truncated
+    #    verifier response is an incomplete review; treat the round as
+    #    verification-unavailable and write NOTHING -- no artifact, no verdict,
+    #    no disposition patch. The stamped metrics row route() already recorded
+    #    then binds an artifact that never lands on disk, so it fails the close
+    #    gate's artifact-hash check (validate_stamped_row check #6) and cannot
+    #    corroborate a close: the backstop runs a fresh round rather than
+    #    settling on a partial review.
+    if bool(getattr(result, "truncated", False)):
+        print(
+            "verify_session: VERIFICATION UNAVAILABLE -- the verifier response "
+            "was TRUNCATED (L-064-1). An incomplete review is invalid evidence: "
+            "no verdict, artifact, or disposition was written, and the close "
+            "stays BLOCKED. Re-run with a smaller evidence bundle or a "
+            "higher-capacity verifier, or resolve via the operator-attested "
+            "manual path (see --manual-verify).",
+            file=sys.stderr,
+        )
+        return EXIT_VERIFICATION_UNAVAILABLE
+
     # -- Persist RAW output BEFORE any display or parsing (L-064-3).
     #    newline="" disables newline translation so the on-disk bytes
     #    equal content.encode("utf-8") — the exact bytes the Set 084 F3
@@ -1060,8 +1188,8 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
 
     disposition_path = patch_disposition(session_set_dir, verdict)
 
-    # -- Report (ASCII-only).
-    truncated = bool(getattr(result, "truncated", False))
+    # -- Report (ASCII-only). (Truncation was already handled above as a hard
+    #    verification-unavailable outcome, so any result reaching here is whole.)
     print(f"verify_session: session {session_number}, round {round_number}")
     print(f"  excluded providers: {', '.join(exclude_providers)} "
           f"(orchestrator effective provider via {identity.source})")
@@ -1077,12 +1205,6 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
     print(f"  disposition patch:  {disposition_path} "
           f"(verification_method=api, verification_verdict={verdict})")
     print(f"  cost:               ${getattr(result, 'total_cost_usd', 0.0):.4f}")
-    if truncated:
-        print(
-            "  WARNING: the verifier response appears TRUNCATED "
-            "(L-064-1). Treat this round as unreliable; re-run with a "
-            "smaller evidence bundle or a higher-capacity verifier.",
-        )
 
     if classification.blocking:
         next_round = round_number + 1

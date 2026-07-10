@@ -195,6 +195,91 @@ class TestEvidenceAssembly:
         evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
         assert "x = 999" in evidence.diff
 
+    def test_untracked_text_content_is_inlined(self, repo: Path):
+        # SS3: the verifier must see the CONTENT of a new (untracked) file, not
+        # just its name -- git diff omits new-file content, so a reviewer would
+        # otherwise grade incomplete evidence.
+        (repo / "new_module.py").write_text(
+            "def sneaky():\n    return 'backdoor'\n", encoding="utf-8"
+        )
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        rendered = evidence.as_response_under_review()
+        assert "new_module.py" in rendered
+        assert "def sneaky" in rendered  # the CONTENT is inlined, not just named
+        assert ("new_module.py", ) == tuple(
+            p for p, _ in evidence.untracked_included
+        )
+
+    def test_untracked_binary_reported_uncovered_not_inlined(self, repo: Path):
+        (repo / "blob.bin").write_bytes(b"\x00\x01\x02\xff\xfe\x00")
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        rendered = evidence.as_response_under_review()
+        # A binary untracked file is NOT inlined but is flagged uncovered so it
+        # is not mistaken for reviewed-clean.
+        assert not any(p == "blob.bin" for p, _ in evidence.untracked_included)
+        assert any(p == "blob.bin" for p, _ in evidence.untracked_omitted)
+        assert "Uncovered untracked paths" in rendered
+        assert "blob.bin" in rendered
+
+    def test_untracked_oversized_reported_uncovered(self, repo: Path):
+        big = "x = 1\n" * (vs._UNTRACKED_BYTE_CAP // 5)  # exceeds the cap
+        (repo / "huge.py").write_text(big, encoding="utf-8")
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        assert any(
+            p == "huge.py" and "oversized" in reason
+            for p, reason in evidence.untracked_omitted
+        )
+        assert not any(p == "huge.py" for p, _ in evidence.untracked_included)
+
+    def test_untracked_file_inside_new_directory_is_inlined(self, repo: Path):
+        # GPT SS3 #2: git status --short lists only "newpkg/" for a new dir;
+        # ls-files enumerates the files inside so their CONTENT is reviewed.
+        (repo / "newpkg").mkdir()
+        (repo / "newpkg" / "backdoor.py").write_text(
+            "def backdoor():\n    return 1\n", encoding="utf-8"
+        )
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        assert any(
+            p.endswith("newpkg/backdoor.py")
+            for p, _ in evidence.untracked_included
+        )
+        assert "def backdoor" in evidence.as_response_under_review()
+
+    def test_nested_dist_source_is_not_excluded(self, repo: Path):
+        # GPT SS3 #3: :(exclude)dist excludes only a TOP-LEVEL dist, so a real
+        # source file at src/dist/ must still be inlined (the old segment
+        # matcher wrongly dropped it).
+        (repo / "src" / "dist").mkdir(parents=True)
+        (repo / "src" / "dist" / "algorithm.py").write_text(
+            "answer = 42\n", encoding="utf-8"
+        )
+        evidence = vs.assemble_evidence(
+            _set_dir(repo), 1, "HEAD", vs.DEFAULT_DIFF_EXCLUDES
+        )
+        assert any(
+            p.endswith("src/dist/algorithm.py")
+            for p, _ in evidence.untracked_included
+        )
+        assert "answer = 42" in evidence.as_response_under_review()
+
+    def test_toplevel_excluded_dir_reported_uncovered_not_dropped(self, repo: Path):
+        # GPT SS3 round-2 #1: a top-level generated file is excluded from
+        # INLINING but must still be reported as explicitly UNCOVERED -- never
+        # silently absent from both lists (a reviewer must know it exists).
+        (repo / "dist").mkdir()
+        (repo / "dist" / "bundle.js").write_text("generated\n", encoding="utf-8")
+        evidence = vs.assemble_evidence(
+            _set_dir(repo), 1, "HEAD", vs.DEFAULT_DIFF_EXCLUDES
+        )
+        assert not any("bundle.js" in p for p, _ in evidence.untracked_included)
+        assert any(
+            p.endswith("dist/bundle.js") and "excluded" in reason
+            for p, reason in evidence.untracked_omitted
+        )
+        rendered = evidence.as_response_under_review()
+        assert "Uncovered untracked paths" in rendered
+        assert "dist/bundle.js" in rendered
+
     def test_default_excludes_suppress_generated_bundles(self, repo: Path):
         dist = repo / "dist"
         dist.mkdir()
@@ -655,7 +740,11 @@ class TestRun:
         assert "Build the widget" in call["prompt"]  # spec excerpt
         assert "adversarial" in call["prompt"].lower()  # real template
 
-    def test_truncated_result_warns(self, repo: Path, capsys):
+    def test_truncated_result_is_verification_unavailable(self, repo: Path, capsys):
+        # SS3: a truncated verifier response is INVALID evidence -> a hard
+        # verification-unavailable outcome, NOT a warn-then-pass (was EXIT_OK).
+        # Nothing is written, so the stamp row route() recorded binds an artifact
+        # that never lands and cannot corroborate a close.
         set_dir = _set_dir(repo)
 
         def truncated_route(*a, **k):
@@ -664,5 +753,8 @@ class TestRun:
             )
 
         rc = vs.run(_args(set_dir), route_fn=truncated_route)
-        assert rc == vs.EXIT_OK
-        assert "TRUNCATED" in capsys.readouterr().out
+        assert rc == vs.EXIT_VERIFICATION_UNAVAILABLE
+        assert "TRUNCATED" in capsys.readouterr().err
+        # No artifact was written -> the recorded stamp row fails the close
+        # gate's artifact-hash check and cannot settle a close.
+        assert not (set_dir / "s1-verification.md").exists()

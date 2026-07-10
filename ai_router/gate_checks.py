@@ -1461,6 +1461,24 @@ def check_verification_integrity(
                 "corroborate a close; run the sanctioned Step 6 command: "
                 f"{command}",
             )
+        # SS3 (anti-rollback): the LATEST ATTEMPT governs, not the latest VALID
+        # row. If the newest session-verification row FAILED validation (e.g. a
+        # truncated round whose artifact never landed, or a tampered row), an
+        # earlier favorable valid row must NOT corroborate the close -- fail
+        # closed so a newer failed attempt cannot be discarded in favor of an
+        # older pass. ``find_valid_stamped_rows`` appends the same dicts in
+        # order, so identity against ``all_rows[-1]`` is exact.
+        if valid_rows[-1] is not all_rows[-1]:
+            first_reason = rejections[0] if rejections else "invalid latest row"
+            return (
+                False,
+                f"claimed verdict {claimed!r} (method api): the LATEST "
+                f"session-verification row for session {current} is INVALID "
+                f"({first_reason}). A newer attempt failed validation, so an "
+                "earlier favorable row cannot corroborate the close (SS3 "
+                "anti-rollback, fails closed). Re-verify via the sanctioned "
+                f"Step 6 command: {command}",
+            )
         # I-084-S2-7/-8: the CLAIM must match what the verifier
         # actually said — and when multiple valid rows exist, the
         # AUTHORITATIVE result is the LATEST one (rows append

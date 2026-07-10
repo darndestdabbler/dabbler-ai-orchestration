@@ -367,6 +367,14 @@ def _existing_evidence_settles_the_close(
     )
     if not valid:
         return None
+    # SS3 (anti-rollback): the LATEST ATTEMPT governs. If the newest
+    # session-verification row is invalid (e.g. a truncated round whose artifact
+    # never landed, or a tampered row), do NOT fall back to an older favorable
+    # valid row -- return None so the backstop runs a fresh round rather than
+    # settling on a superseded pass. (find_valid_stamped_rows appends the same
+    # dicts in order, so identity against _all[-1] is exact.)
+    if valid[-1] is not _all[-1]:
+        return None
     claimed = _claimed_close_verdict(disposition)
     # I-084-S2-7/-8: the LATEST valid stamped row is the one
     # authoritative result (rows append chronologically) — the claim

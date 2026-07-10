@@ -124,20 +124,25 @@ test("multi-module workspace renders the 3-level module tier with manifest order
       "(ungrouped)",
     ]);
 
-    // 3-level ARIA contract (ruling Q4): module header 1, bucket
-    // header 2, row 3.
+    // 3-level ARIA tree contract (ruling Q4 + the R2 conformance fix):
+    // module and bucket are treeitems carrying aria-level/aria-expanded
+    // themselves, with children nested in role="group" containers.
     const greeterModule = inner.locator('.module[data-module-key="greeter"]');
-    await expect(greeterModule.locator(".module-header")).toHaveAttribute(
-      "aria-level",
-      "1",
+    await expect(greeterModule).toHaveAttribute("role", "treeitem");
+    await expect(greeterModule).toHaveAttribute("aria-level", "1");
+    await expect(greeterModule.locator("> .module-body")).toHaveAttribute(
+      "role",
+      "group",
     );
     const greeterNotStarted = greeterModule.locator(
       '[data-bucket-key="greeter/not-started"]',
     );
     await expect(greeterNotStarted).toHaveCount(1);
-    await expect(greeterNotStarted.locator(".bucket-header")).toHaveAttribute(
-      "aria-level",
-      "2",
+    await expect(greeterNotStarted).toHaveAttribute("role", "treeitem");
+    await expect(greeterNotStarted).toHaveAttribute("aria-level", "2");
+    await expect(greeterNotStarted.locator("> .bucket-body")).toHaveAttribute(
+      "role",
+      "group",
     );
     const greeterRow = inner.locator(
       '[role="treeitem"][data-slug="087-greeter-core"]',
@@ -158,13 +163,33 @@ test("multi-module workspace renders the 3-level module tier with manifest order
     ).toHaveCount(1);
 
     // Module collapse: clicking the header hides the whole group body
-    // (buckets + rows) and flips aria-expanded.
+    // (buckets + rows) and flips aria-expanded on the treeitem.
     await expect(greeterModule).toHaveAttribute("aria-expanded", "true");
     await greeterModule.locator(".module-header").click();
     await expect(greeterModule).toHaveAttribute("aria-expanded", "false");
     await expect(greeterRow).toBeHidden();
     // Re-expand restores it.
     await greeterModule.locator(".module-header").click();
+    await expect(greeterRow).toBeVisible();
+
+    // Keyboard operability (R2 fix): the module node is focusable and
+    // Enter toggles it; ArrowLeft collapses; ArrowRight re-expands —
+    // the WAI-ARIA tree pattern.
+    await greeterModule.press("Enter");
+    await expect(greeterModule).toHaveAttribute("aria-expanded", "false");
+    await expect(greeterRow).toBeHidden();
+    await greeterModule.press("ArrowRight");
+    await expect(greeterModule).toHaveAttribute("aria-expanded", "true");
+    await expect(greeterRow).toBeVisible();
+    await greeterModule.press("ArrowLeft");
+    await expect(greeterModule).toHaveAttribute("aria-expanded", "false");
+    await greeterModule.press(" ");
+    await expect(greeterModule).toHaveAttribute("aria-expanded", "true");
+    // Bucket nodes are keyboard-operable too.
+    await greeterNotStarted.press("Enter");
+    await expect(greeterNotStarted).toHaveAttribute("aria-expanded", "false");
+    await expect(greeterRow).toBeHidden();
+    await greeterNotStarted.press("Enter");
     await expect(greeterRow).toBeVisible();
   } finally {
     await teardown(per);

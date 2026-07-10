@@ -106,6 +106,24 @@ html, body {
 .module[aria-expanded="false"] .module-body {
   display: none;
 }
+/* R2 fix: module/bucket nodes are focusable treeitems in the
+ * multi-module dialect. Focus/selection paints the HEADER line only
+ * (the treeitem element contains all descendants; outlining it would
+ * ring the whole subtree). The single-implicit dialect's buckets are
+ * not treeitems and never match these selectors. */
+.module:focus,
+.module-body .bucket:focus {
+  outline: none;
+}
+.module[aria-selected="true"] > .module-header,
+.module-body .bucket[aria-selected="true"] > .bucket-header {
+  background: var(--vscode-list-focusBackground, rgba(127, 127, 127, 0.10));
+}
+.module:focus-visible > .module-header,
+.module-body .bucket:focus-visible > .bucket-header {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+}
 /* Nested buckets indent under their module header so the three levels
  * read at a glance. */
 .module-body .bucket-header {

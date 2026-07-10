@@ -132,20 +132,30 @@ gemini-pro; the exclusion is logged in the activity log):
 
 - R2 (Major) "the rendered DOM is not a conformant WAI-ARIA tree
   (aria-level on generic divs; aria-expanded on role=group; module/
-  bucket headers click-only)": **adjudicated DEFER via the
-  operator-selected third-provider path** — the orchestrator disputed
-  in-session fixability (the identical pattern is the LOCKED byte-
-  identical pre-087 dialect; the spec text was implemented verbatim per
-  the routed Q4 ruling; header keyboard nav is unspecified new surface),
-  the operator chose "third-provider opinion", and gemini-pro ruled:
-  verifier technically correct on the ARIA merits, but a partial fix
-  confined to the multi-module dialect would give assistive-tech users
-  two inconsistent models for the same element — worse than deferring —
-  so convert to a HIGH-PRIORITY scoped follow-on refactoring BOTH
-  dialects (nested treeitem/group + keyboard operability) concurrently.
-  Saved raw: `s2-third-opinion-aria.json`; recorded in
-  `disposition.json.deferred`; close verdict token: WAIVED (the
-  operator-adjudication token, per the Set 089/090 precedent).
+  bucket headers click-only)" — re-raised verbatim by the close
+  backstop's round 3: **FIXED, by operator decision**. Full
+  adjudication history, all steps logged with saved-raw artifacts: the
+  orchestrator disputed in-session fixability; the operator selected the
+  third-provider path; gemini-pro (`s2-third-opinion-aria.json`) ruled
+  the verifier technically correct but recommended DEFER on
+  dialect-consistency grounds; the close backstop then re-raised the
+  finding; the operator — the final authority — overrode the DEFER and
+  ordered the in-session fix. The multi-module dialect now follows the
+  WAI-ARIA tree pattern: module = `role="treeitem"` aria-level=1 with
+  aria-expanded ON the treeitem and children in a nested
+  `role="group"`; non-empty buckets likewise treeitems at level 2
+  (empty buckets are leaf nodes, no aria-expanded, per the APG); rows
+  level 3; module/bucket nodes join the roving tabindex with
+  Enter/Space toggle, ArrowRight expand-or-first-child, ArrowLeft
+  collapse-or-parent; arrow navigation walks visible nodes only;
+  nested-treeitem event bubbling guarded. The single-implicit dialect
+  stays LOCKED byte-identical per the operator-approved spec (re-proven
+  by the diff harness after the restructure — 3,136 bytes equal); the
+  third opinion's dialect-inconsistency concern therefore survives as a
+  possible future harmonization, noted in disposition.deferred only as
+  the follow-on to align the legacy dialect (NOT as an open defect in
+  the new tier). Playwright smoke extended to roles + keyboard
+  collapse; unit scans assert the treeitem/group structure.
 
 ## Known out-of-scope (surfaced, not forgotten)
 - The S1 collision ruling *anticipated* ("Session 2 is expected to

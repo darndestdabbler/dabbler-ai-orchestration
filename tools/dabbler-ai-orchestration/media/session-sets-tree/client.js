@@ -441,44 +441,56 @@
     el.hidden = !message;
   }
 
-  // Set 087 Session 2: one collapsible module group of the 3-level tree
+  // Set 087 Session 2: one collapsible module node of the 3-level tree
   // (module → status-bucket → row). Only rendered in the multi-module
   // view — the single-implicit view goes straight to renderBucket with
   // moduleSlug null (byte-identical pre-087 DOM, routed ruling Q4).
   // The implicit module ships slug "" / title "" and renders LAST with
   // the quiet "(ungrouped)" fallback label (routed ruling Q1 — the data
   // model stays unlabeled; the fallback is presentation only).
+  //
+  // R2 verifier Major, operator-adjudicated FIX-NOW: the multi-module
+  // dialect follows the WAI-ARIA tree pattern properly — the module is
+  // a `role="treeitem"` carrying aria-level="1" + aria-expanded, its
+  // children live in a nested `role="group"`, and the node is
+  // keyboard-focusable/operable (roving tabindex; Enter/Space toggle;
+  // ArrowLeft/Right collapse/expand — see the root keydown handler).
+  // aria-labelledby points at the header (the chevron is aria-hidden)
+  // so the accessible name is the module title, not the concatenated
+  // descendant text.
   function renderModule(mod) {
     const slug = mod.slug;
     const label = mod.title || mod.slug || "(ungrouped)";
     const expanded = moduleCollapsed[slug] !== false;
     const chevronGlyph = expanded ? "▾" : "▸";
-    const groupId = "module-" + slug;
-    const bodyId = "module-body-" + slug;
+    const headerId = "module-" + slug;
     const buckets = mod.buckets
       .map(function (bucket) { return renderBucket(bucket, slug); })
       .join("");
     return (
-      '<div role="group" aria-labelledby="' + escAttr(groupId) + '" class="module"' +
-        ' aria-expanded="' + (expanded ? "true" : "false") + '"' +
+      '<div role="treeitem" tabindex="-1" aria-level="1"' +
+        ' aria-selected="false" aria-expanded="' + (expanded ? "true" : "false") + '"' +
+        ' aria-labelledby="' + escAttr(headerId) + '" class="module"' +
         ' data-module-key="' + escAttr(slug) + '">' +
-        '<div id="' + escAttr(groupId) + '" class="module-header" data-collapsible="true"' +
-        ' aria-controls="' + escAttr(bodyId) + '" aria-level="1">' +
+        '<div id="' + escAttr(headerId) + '" class="module-header" data-collapsible="true">' +
           '<span class="module-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
           '<span class="module-title">' + escHtml(label) + '</span>' +
         '</div>' +
-        '<div class="module-body" id="' + escAttr(bodyId) + '">' + buckets + '</div>' +
+        '<div class="module-body" role="group">' + buckets + '</div>' +
       '</div>'
     );
   }
 
   // Set 087 Session 2: `moduleSlug` distinguishes the two DOM dialects.
   // null → the pre-087 single-implicit markup, byte-identical (bare
-  // data-bucket-key, ids "group-<key>"/"body-<key>", no aria-level,
-  // rows at aria-level 2). A string (may be "" for the implicit module
-  // inside a mixed view) → module-scoped ids, the composite
-  // "<module>/<key>" collapse key, aria-level 2 on the bucket header,
-  // rows at aria-level 3.
+  // data-bucket-key, ids "group-<key>"/"body-<key>", role="group"
+  // wrapper, rows at aria-level 2). A string (may be "" for the
+  // implicit module inside a mixed view) → the ARIA tree pattern: the
+  // bucket is a `role="treeitem"` at aria-level="2" (aria-expanded on
+  // the treeitem when it has rows; an empty bucket is a leaf node with
+  // no aria-expanded, per the APG), children in a nested
+  // `role="group"`, composite "<module>/<key>" collapse key, rows at
+  // aria-level 3.
   function renderBucket(bucket, moduleSlug) {
     const inModule = moduleSlug !== null;
     const labelText = bucket.label + "  (" + bucket.count + ")";
@@ -486,11 +498,23 @@
     const groupId = "group-" + idSuffix;
     const bodyId = "body-" + idSuffix;
     const collapseKey = inModule ? moduleSlug + "/" + bucket.key : bucket.key;
-    const headerLevel = inModule ? ' aria-level="2"' : "";
     if (bucket.count === 0) {
+      if (inModule) {
+        // Leaf tree node: no children, no aria-expanded (APG end node).
+        return (
+          '<div role="treeitem" tabindex="-1" aria-level="2"' +
+            ' aria-selected="false" aria-labelledby="' + escAttr(groupId) + '"' +
+            ' class="bucket bucket-empty">' +
+            '<div id="' + escAttr(groupId) + '" class="bucket-header">' +
+              '<span class="bucket-chevron" aria-hidden="true"></span>' +
+              '<span>' + escHtml(labelText) + '</span>' +
+            '</div>' +
+          '</div>'
+        );
+      }
       return (
         '<div role="group" aria-labelledby="' + escAttr(groupId) + '" class="bucket bucket-empty">' +
-          '<div id="' + escAttr(groupId) + '" class="bucket-header"' + headerLevel + '>' +
+          '<div id="' + escAttr(groupId) + '" class="bucket-header">' +
             '<span class="bucket-chevron" aria-hidden="true"></span>' +
             '<span>' + escHtml(labelText) + '</span>' +
           '</div>' +
@@ -504,12 +528,26 @@
     const rows = bucket.rows
       .map(function (row) { return renderRow(row, inModule ? 3 : 2); })
       .join("");
+    if (inModule) {
+      return (
+        '<div role="treeitem" tabindex="-1" aria-level="2"' +
+          ' aria-selected="false" aria-expanded="' + (expanded ? "true" : "false") + '"' +
+          ' aria-labelledby="' + escAttr(groupId) + '" class="bucket"' +
+          ' data-bucket-key="' + escAttr(collapseKey) + '">' +
+          '<div id="' + escAttr(groupId) + '" class="bucket-header" data-collapsible="true">' +
+            '<span class="bucket-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
+            '<span>' + escHtml(labelText) + '</span>' +
+          '</div>' +
+          '<div class="bucket-body" role="group">' + rows + '</div>' +
+        '</div>'
+      );
+    }
     return (
       '<div role="group" aria-labelledby="' + escAttr(groupId) + '" class="bucket"' +
         ' aria-expanded="' + (expanded ? "true" : "false") + '"' +
         ' data-bucket-key="' + escAttr(collapseKey) + '">' +
         '<div id="' + escAttr(groupId) + '" class="bucket-header" data-collapsible="true"' +
-        ' aria-controls="' + escAttr(bodyId) + '"' + headerLevel + '>' +
+        ' aria-controls="' + escAttr(bodyId) + '">' +
           '<span class="bucket-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
           '<span>' + escHtml(labelText) + '</span>' +
         '</div>' +
@@ -621,10 +659,29 @@
   }
 
   // ----- Roving tabindex + kbd nav -----
+  //
+  // Set 087 Session 2 (R2 fix): module and bucket nodes in the
+  // multi-module dialect are treeitems now, so the roving tabindex and
+  // arrow navigation include them. Navigation walks VISIBLE nodes only
+  // — a treeitem inside a collapsed ancestor (aria-expanded="false")
+  // is skipped, per the WAI-ARIA tree pattern. In the single-implicit
+  // dialect rows remain the only treeitems, so behavior there is
+  // unchanged.
+  function visibleTreeItems() {
+    return Array.from(root.querySelectorAll('[role="treeitem"]')).filter(function (el) {
+      let p = el.parentElement;
+      while (p && p !== root) {
+        if (p.getAttribute("aria-expanded") === "false") return false;
+        p = p.parentElement;
+      }
+      return true;
+    });
+  }
+
   function initRovingFocus() {
     const items = Array.from(root.querySelectorAll('[role="treeitem"]'));
     if (items.length === 0) return;
-    // The first row owns the single tabstop into the tree.
+    // The first node owns the single tabstop into the tree.
     items.forEach(function (el, idx) {
       el.setAttribute("tabindex", idx === 0 ? "0" : "-1");
     });
@@ -643,7 +700,7 @@
   }
 
   function moveFocus(current, delta) {
-    const all = Array.from(root.querySelectorAll('[role="treeitem"]'));
+    const all = visibleTreeItems();
     const i = all.indexOf(current);
     if (i === -1) return;
     const next = all[Math.min(all.length - 1, Math.max(0, i + delta))];
@@ -651,12 +708,32 @@
   }
 
   function focusFirst() {
-    const all = Array.from(root.querySelectorAll('[role="treeitem"]'));
+    const all = visibleTreeItems();
     if (all.length) focusItem(all[0]);
   }
   function focusLast() {
-    const all = Array.from(root.querySelectorAll('[role="treeitem"]'));
+    const all = visibleTreeItems();
     if (all.length) focusItem(all[all.length - 1]);
+  }
+
+  // Set 087 Session 2 (R2 fix): one collapse/expand toggler for module
+  // and bucket nodes, shared by header clicks (both dialects) and the
+  // keyboard handlers (multi-module dialect, where the node itself is
+  // the treeitem). `nodeEl` is the element carrying aria-expanded — a
+  // treeitem in the multi-module dialect, the role="group" wrapper in
+  // the byte-identical single-implicit dialect.
+  function toggleCollapsible(nodeEl, forceExpanded) {
+    if (!nodeEl || !nodeEl.hasAttribute("aria-expanded")) return;
+    const wasExpanded = nodeEl.getAttribute("aria-expanded") === "true";
+    const next = typeof forceExpanded === "boolean" ? forceExpanded : !wasExpanded;
+    if (next === wasExpanded) return;
+    nodeEl.setAttribute("aria-expanded", next ? "true" : "false");
+    const chev = nodeEl.querySelector(".module-chevron, .bucket-chevron");
+    if (chev) chev.textContent = next ? "▾" : "▸";
+    const moduleKey = nodeEl.getAttribute("data-module-key");
+    const bucketKey = nodeEl.getAttribute("data-bucket-key");
+    if (moduleKey !== null) moduleCollapsed[moduleKey] = next;
+    else if (bucketKey) bucketCollapsed[bucketKey] = next;
   }
 
   function toggleRow(item, expand) {
@@ -683,40 +760,23 @@
 
   // ----- Interaction wiring (after each render) -----
   function wireInteraction() {
-    // Set 087 Session 2: module-level collapse — same pattern as the
-    // Set 034 bucket collapse below. The implicit module's key is ""
-    // (a valid object key), so the guard is `key !== null`, not
-    // truthiness.
-    Array.from(root.querySelectorAll('.module-header[data-collapsible="true"]')).forEach(function (header) {
+    // Set 087 Session 2 (R2 fix): module + bucket collapse share one
+    // toggler. In the multi-module dialect the header's parent is the
+    // treeitem (which also takes focus on click, per the tree
+    // pattern); in the single-implicit dialect it is the pre-087
+    // role="group" wrapper — toggleCollapsible handles both, keyed by
+    // whichever of data-module-key / data-bucket-key the node carries.
+    Array.from(
+      root.querySelectorAll(
+        '.module-header[data-collapsible="true"], .bucket-header[data-collapsible="true"]',
+      ),
+    ).forEach(function (header) {
       header.addEventListener("click", function (ev) {
         ev.stopPropagation();
-        const moduleEl = header.parentElement;
-        if (!moduleEl) return;
-        const key = moduleEl.getAttribute("data-module-key");
-        const wasExpanded = moduleEl.getAttribute("aria-expanded") === "true";
-        const next = !wasExpanded;
-        moduleEl.setAttribute("aria-expanded", next ? "true" : "false");
-        const chev = header.querySelector(".module-chevron");
-        if (chev) chev.textContent = next ? "▾" : "▸";
-        if (key !== null) moduleCollapsed[key] = next;
-      });
-    });
-
-    // Set 034: bucket-level collapse. Click on a collapsible
-    // bucket-header toggles aria-expanded on the bucket; CSS hides
-    // the .bucket-body when aria-expanded="false".
-    Array.from(root.querySelectorAll('.bucket-header[data-collapsible="true"]')).forEach(function (header) {
-      header.addEventListener("click", function (ev) {
-        ev.stopPropagation();
-        const bucket = header.parentElement;
-        if (!bucket) return;
-        const key = bucket.getAttribute("data-bucket-key");
-        const wasExpanded = bucket.getAttribute("aria-expanded") === "true";
-        const next = !wasExpanded;
-        bucket.setAttribute("aria-expanded", next ? "true" : "false");
-        const chev = header.querySelector(".bucket-chevron");
-        if (chev) chev.textContent = next ? "▾" : "▸";
-        if (key) bucketCollapsed[key] = next;
+        const nodeEl = header.parentElement;
+        if (!nodeEl) return;
+        if (nodeEl.getAttribute("role") === "treeitem") focusItem(nodeEl);
+        toggleCollapsible(nodeEl);
       });
     });
 
@@ -765,6 +825,11 @@
     // on the VS Code window — no cursor position to capture.
     Array.from(root.querySelectorAll('[role="treeitem"]')).forEach(function (item) {
       item.addEventListener("contextmenu", function (ev) {
+        // Set 087 S2 (R2 fix): treeitems nest now (module ⊃ bucket ⊃
+        // row), so a bubbled event must only be handled by the
+        // INNERMOST treeitem — otherwise the ancestors' handlers would
+        // re-focus the module after the row already took focus.
+        if (ev.target.closest('[role="treeitem"]') !== item) return;
         ev.preventDefault();
         focusItem(item);
         const slug = item.getAttribute("data-slug");
@@ -802,11 +867,18 @@
     });
   }
 
-  // Root-level keydown — captures keys regardless of which row has
-  // focus. Implements WAI-ARIA single-select tree pattern.
+  // Root-level keydown — captures keys regardless of which node has
+  // focus. Implements the WAI-ARIA single-select tree pattern. Set 087
+  // S2 (R2 fix): module/bucket nodes are expandable treeitems in the
+  // multi-module dialect — Enter/Space toggles them, ArrowRight expands
+  // (or steps into the first child), ArrowLeft collapses (or steps to
+  // the parent treeitem). Rows keep their pre-087 behavior: Enter/Space
+  // activates, ArrowRight/Left stay consumed no-ops in the
+  // single-implicit dialect (no parent treeitem exists there).
   document.addEventListener("keydown", function (ev) {
     const item = ev.target.closest && ev.target.closest('[role="treeitem"]');
     if (!item) return;
+    const expandable = item.hasAttribute("aria-expanded");
     switch (ev.key) {
       case "ArrowDown":
         ev.preventDefault();
@@ -825,18 +897,41 @@
         focusLast();
         return;
       case "ArrowRight":
-      case "ArrowLeft":
-        // Set 034: per-row accordion is retired; ArrowRight/Left no
-        // longer expand/collapse anything. Keep the keys consumed so
-        // they don't bubble to the editor unexpectedly.
         ev.preventDefault();
+        if (expandable) {
+          if (item.getAttribute("aria-expanded") === "false") {
+            toggleCollapsible(item, true);
+          } else {
+            // Already open → focus the first child treeitem.
+            const firstChild = item.querySelector('[role="treeitem"]');
+            if (firstChild) focusItem(firstChild);
+          }
+        }
+        return;
+      case "ArrowLeft":
+        ev.preventDefault();
+        if (expandable && item.getAttribute("aria-expanded") === "true") {
+          toggleCollapsible(item, false);
+          return;
+        }
+        {
+          // Closed node or leaf → focus the parent treeitem (rows in
+          // the single-implicit dialect have none; key stays consumed).
+          const parent = item.parentElement &&
+            item.parentElement.closest('[role="treeitem"]');
+          if (parent) focusItem(parent);
+        }
         return;
       case "Enter":
       case " ":
         ev.preventDefault();
-        const slug = item.getAttribute("data-slug");
-        if (slug) {
-          vscode.postMessage({ type: "activateRow", slug: slug });
+        {
+          const slug = item.getAttribute("data-slug");
+          if (slug) {
+            vscode.postMessage({ type: "activateRow", slug: slug });
+          } else if (expandable) {
+            toggleCollapsible(item);
+          }
         }
         return;
       case "F10":

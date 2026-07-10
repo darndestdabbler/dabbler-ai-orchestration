@@ -522,7 +522,7 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     );
   });
 
-  test("webview renders both dialects: byte-identical implicit-only and 3-level module view", () => {
+  test("webview renders both dialects: byte-identical implicit-only and a conformant 3-level ARIA tree", () => {
     const client = fs.readFileSync(
       path.join(extRoot, "media", "session-sets-tree", "client.js"),
       "utf8",
@@ -530,16 +530,32 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     // Implicit-only branch renders through the pre-087 bucket dialect.
     assert.ok(client.includes('modules.length === 1 && modules[0].slug === ""'));
     assert.ok(client.includes("renderBucket(bucket, null)"));
-    // Module groups: collapsible header at aria-level 1, quiet
-    // fallback label for the unlabeled implicit module, per-module
-    // collapse state, composite per-(module, bucket) collapse keys,
-    // rows at aria-level 3.
+    // Module nodes: role="treeitem" carrying aria-level 1 +
+    // aria-expanded (R2 conformance fix), children nested in
+    // role="group", quiet fallback label for the unlabeled implicit
+    // module, per-module collapse state, composite per-(module, bucket)
+    // collapse keys, rows at aria-level 3.
     assert.ok(client.includes('class="module-header"'));
     assert.ok(client.includes('"(ungrouped)"'));
     assert.ok(client.includes("moduleCollapsed[slug]"));
     assert.ok(client.includes('moduleSlug + "/" + bucket.key'));
-    assert.ok(client.includes('aria-level="1"'));
+    assert.ok(
+      client.includes('\'<div role="treeitem" tabindex="-1" aria-level="1"\''),
+      "the module node itself is a treeitem at level 1",
+    );
+    assert.ok(
+      client.includes('\'<div role="treeitem" tabindex="-1" aria-level="2"\''),
+      "the bucket node itself is a treeitem at level 2 in the module dialect",
+    );
+    assert.ok(client.includes('class="module-body" role="group"'));
+    assert.ok(client.includes('class="bucket-body" role="group"'));
     assert.ok(client.includes("renderRow(row, inModule ? 3 : 2)"));
+    // Keyboard operability: shared toggler wired to Enter/Space and
+    // ArrowRight/ArrowLeft; arrow navigation walks visible nodes only.
+    assert.ok(client.includes("function toggleCollapsible(nodeEl"));
+    assert.ok(client.includes("toggleCollapsible(item, true)"));
+    assert.ok(client.includes("toggleCollapsible(item, false)"));
+    assert.ok(client.includes("function visibleTreeItems()"));
   });
 
   test("the module header style ships (collapse affordance + hidden body)", () => {

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The three-level module view still does not implement a valid or keyboard-operable ARIA tree**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The session requires “`aria-level` 1 (module) / 2 (bucket) / 3 (row)” and ends with “`aria-level` correct.” In an ARIA tree, those levels must describe actual `treeitem` nodes. The current module and bucket headers are generic `<div>` elements, while `aria-expanded` is placed on `role=\"group\"` wrappers. The collapsible headers are also mouse-only.\n    - **Impact:** Assistive technology receives only level-3 row `treeitem`s, without semantic level-1 module or level-2 bucket ancestors. Module and bucket expansion cannot be operated from the keyboard. This means the promised accessible three-level hierarchy is not delivered and should be fixed before merge.\n    - **Evidence:** In `media/session-sets-tree/client.js`, `renderModule` emits `<div role=\"group\" ... aria-expanded>` with a generic `.module-header aria-level=\"1\"`. `renderBucket` does the same with `.bucket-header aria-level=\"2\"`. Only `renderRow` has `role=\"treeitem\"`, and `wireInteraction` registers only `click` handlers. The Layer-3 test merely checks literal `aria-level` attributes and mouse clicks. Moreover, `s2-third-opinion-aria.json` explicitly confirms that the implementation is non-conformant and presents “a significant accessibility barrier.”\n    - **Correct answer:** Represent modules and buckets as expandable, focusable `treeitem`s owning nested `role=\"group\"` containers; put `aria-level`, `aria-expanded`, and `aria-controls` on those treeitems; implement keyboard activation/navigation; and test roles plus keyboard behavior. This can be applied to the new multi-module dialect while preserving the explicitly locked no-manifest markup. Deferring or labeling the defect `WAIVED` does not remediate it; under the stated cross-round rule, the still-present Major must be re-reported and remains blocking.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

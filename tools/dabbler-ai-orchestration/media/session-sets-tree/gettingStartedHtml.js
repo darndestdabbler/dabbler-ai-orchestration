@@ -132,7 +132,10 @@
     "Copilot CLI guide at docs.github.com/copilot), or set the " +
     "dabblerSessionSets.copilotCliPath setting to the installed copilot " +
     "executable. Then reload the VS Code window (changes made after " +
-    "launch are not visible until you reload).";
+    "launch are not visible until you reload). Installing is only the " +
+    "first step — the full per-machine setup (install, tenant login, " +
+    "auth-preflight) is in docs/copilot-seat-setup-checklist.md; an " +
+    "unauthenticated seat is blocked at session start.";
 
   /**
    * Parse the raw budget input. Required dollar amount: numeric and

@@ -95,7 +95,11 @@ spec, so the *same command* is correct on both tiers:
 > The effective provider used to pick a *different-provider* verifier is
 > derived from that model, never from `--provider`. Single-vendor engines
 > (`claude-code`, `codex`, `gemini`) may omit `--model`; the writer records
-> `identityProvenance: direct`.
+> `identityProvenance: direct`. A Copilot seat must also be **installed +
+> logged in** first — see the per-machine setup checklist:
+> <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/copilot-seat-setup-checklist.md>.
+> `start_session` runs an auth-preflight on a copilot-cli seat and blocks a
+> mis-authed one before it can start a session it could never verify.
 
 > **"No module named ai_router" is not a missing-keys problem** — it almost
 > always means you ran a bare `python` instead of the **venv** interpreter.

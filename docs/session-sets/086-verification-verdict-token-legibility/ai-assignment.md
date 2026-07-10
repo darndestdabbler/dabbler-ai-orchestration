@@ -60,3 +60,45 @@ recommended seat.
 - Process note: rounds ran past the default 2-round cap under the operator's
   in-session rule refinement (continue on agreed Critical/Major); a proposed
   codification was surfaced for operator sign-off (not yet written).
+
+## Session 2 of 2 — Diagnostics, onboarding, and legibility (set-terminal)
+
+Orchestrator: **claude / anthropic / claude-opus-4-8 / high** (the operator
+started this session on the Opus seat; the S1 routed recommendation was
+Sonnet/medium — a supervised-but-not-binding suggestion, and the operator owns
+the final seat).
+
+| Step | Handled by | Rationale |
+| :--- | :--- | :--- |
+| Map the extension Explorer/onboarding surfaces + the Python transport/consumer-doc surfaces | Orchestrator (2 Explore subagents) | Read-only reconnaissance fan-out over a large TS + docs surface; no reasoning to route. |
+| Togglable transport diagnostics (`transport_diagnostics.py` + config toggle + choke-point wiring + enriched raise) | Orchestrator (direct) | Implementation determined by the spec (systemic hole #3) + the transport's existing classified `TransportResult`; new self-contained module + a small wire-in at the single dispatch choke point. |
+| Reader-legibility guardrail (`isRecognizedVerdictToken` + `verdictFractionTooltip`) | Orchestrator (direct) | Small, tightly-coupled TS change mirroring the S1 writer allowlist; the workflow-state ladder already treated only `VERIFIED` as verified, so the tooltip was the one laundering channel. |
+| Wire the setup checklist into onboarding surfaces + refine the checklist against S1 | Orchestrator (direct) | Mechanical doc/copy edits across quick-start, tier-model, README, both consumer-bootstrap templates, the form warning; the preflight already referenced it (S1). |
+| Verdict-contract + Copilot-seat-verification-path docs | Orchestrator (direct) | Corrected the stale `session-state-schema.md` / `disposition-schema.md` prose to the S1-shipped exact-allowlist reality (L-064-8: a replacement/successor claim re-verified against code); the JSON schema note was already current from S1. |
+| Version bumps + CHANGELOG (Unreleased) + candidate `.vsix` | Orchestrator (direct) | Release-prep mechanics; the actual Marketplace/PyPI **publish is operator-gated and pending** (irreversible-actions rule). |
+| pytest + extension unit suites; cold-start golden + dist bundle regenerated | Orchestrator (direct) | Ran against the live modules; a template edit correctly tripped the golden-snapshot + `dist-in-sync` drift guard, both regenerated. |
+| **Session verification (Step 6)** | **Routed — cross-provider, non-anthropic** | Mandatory no-skip cross-provider check (no-skip-verification-mandate). |
+| **End-of-set path-aware critique (Step 9)** | **Routed — multi-provider, path-aware (advisory)** | Set spec `pathAwareCritique: advisory`; runs before the set-terminal close. |
+| Next-**set** recommendation (Step 3.5) | **Routed — analysis** | L-064-6: never self-opine. Saved raw at `s2-next-set-analysis.json`. |
+
+**Delegation note.** As in S1, the implementation that flows from the spec was
+handled directly and the two non-negotiable reasoning gates (cross-provider
+verification + the advisory path-aware critique) plus the next-set analysis
+were routed. The set-terminal release-prep (version bumps, CHANGELOG, candidate
+`.vsix`) is prepared but the registry publish stays an operator action.
+
+## Next-session-set recommendation (routed analysis, made in S2)
+
+Set 086 is the terminal session of its set, so Step 3.5 produces a next-**set**
+recommendation. The routed analysis (`s2-next-set-analysis.json`, gemini-pro,
+tier 2) recommends **Set 087: Historical Verification-State Reconciliation** —
+semi-automated, dry-run-first, auditable tooling to run the existing manual
+recipe (re-verify via the router → `close_session --repair`) across the
+historically-drifted (confabulated) closed sets, so the canonical record is
+corrected now that Set 086 has stopped *new* drift. Posture: Full tier, UAT
+**required** (validate the repair tool against a staging copy of known-bad
+fixtures before touching live state), ~2 sessions. Lower-priority backlog per
+the analysis: the CI/headless `COPILOT_GITHUB_TOKEN` path and the REST-wrapper
+transport (both Set-086 non-goals with unresolved host-targeting questions),
+and the round-cap codification (cheap, can ride along in another set). Operator
+owns the final call.

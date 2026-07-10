@@ -90,6 +90,17 @@ transports:
     require_pinned_version: true       # asserts --no-auto-update on every call
     billed_usage_unavailable: true      # honest non-accounting; see guard-exclusion list below
     max_invocations_per_session: 200    # hard circuit breaker, not a budget (design lock Section 5)
+    # Set 086 S2: togglable transport diagnostics. When enabled, every FAILED
+    # copilot-cli dispatch on the route()/verify() path appends one structured
+    # record (error_class, exit_code, argv with the -p prompt redacted,
+    # auth-reprobe result, stderr tail) to log_path, so a dispatch failure is
+    # never swallowed. Default off (no file writes). The env var
+    # DABBLER_COPILOT_DIAGNOSTICS (truthy/falsy) overrides this both ways;
+    # DABBLER_COPILOT_DIAGNOSTICS_LOG overrides log_path. A compact one-line
+    # summary is embedded in the raised error regardless of this toggle.
+    diagnostics:
+      enabled: false
+      log_path: ai_router/copilot-transport-diagnostics.jsonl
     roles:
       generator:
         prefer: [claude-sonnet-4.6, gpt-5.5, gemini-3.1-pro-preview]
@@ -152,6 +163,26 @@ models:
     notes: "Good for medium-complexity analysis, documentation, code review"
     generation_params:
       thinking_budget: -1         # dynamic; Gemini picks how deep to think
+
+  gemini-3-1-pro:
+    provider: google
+    model_id: gemini-3.1-pro-preview
+    tier: 2
+    is_enabled: true
+    is_enabled_as_verifier: false   # new model: generator + explicit-call only until calibrated (registry convention, lines 120-130); promote later
+    input_cost_per_1m: 1.25
+    output_cost_per_1m: 10.00
+    max_context_tokens: 1048576
+    max_output_tokens: 65536
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Frontier Google Pro (preview id gemini-3.1-pro-preview).
+      Cross-provider verifier + consensus engine. PLACEHOLDER pricing/limits
+      mirror gemini-2.5-pro — confirm against Google's published 3.1 Pro rates
+      before trusting cost reports; the preview model_id may change at GA."
+    # Gemini 3.x uses thinking_level (MINIMAL|LOW|MEDIUM|HIGH), not the
+    # 2.5-era integer thinking_budget.
+    generation_params:
+      thinking_level: HIGH
 
   sonnet:
     provider: anthropic
@@ -225,6 +256,23 @@ models:
     # NOTE: Prompts over 272K input tokens trigger 2x input + 1.5x output
     # pricing for the full session. The router caps input at 80% of
     # max_context_tokens, which keeps you under that ceiling by default.
+
+  gpt-5-5:
+    provider: openai
+    model_id: gpt-5.5
+    tier: 3
+    is_enabled: true
+    is_enabled_as_verifier: false   # new model: generator + explicit-call only until calibrated (registry convention, lines 120-130); promote later
+    input_cost_per_1m: 2.50
+    output_cost_per_1m: 15.00
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier +
+      consensus engine. PLACEHOLDER pricing/limits mirror gpt-5.4 — confirm
+      against OpenAI's published GPT-5.5 rates before trusting cost reports."
+    generation_params:
+      reasoning_effort: high
 
   gpt-5-4-mini:
     provider: openai

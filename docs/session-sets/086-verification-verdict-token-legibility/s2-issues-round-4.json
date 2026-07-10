@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "→ Major: prompt scrubbing still leaks on normalized/escaped stderr variants**  \n  **Location →** `ai_router/transport_diagnostics.py`, `_scrub_prompt()` and its callers via `_stderr_tail()` in both `build_record()` and `diagnostics_summary()`  \n  **Fix →** `_scrub_prompt()` only does `text.replace(prompt, ...)`, so it removes the prompt **only** when stderr contains the exact raw `-p` payload. It does **not** scrub common transformed echoes such as:\n  - CRLF-normalized prompt text (`\\r\\n` instead of `\\n`)\n  - escaped newline renderings (`\\\\n`, `\\\\r\\\\n`) from JSON/Python-style stderr\n  - bytes-repr stderr after `_coerce_str(bytes)` (`b'...\\\\n...'`)\n  \n  That means the “prompt payload never reaches the log / raised summary” guarantee is still false for realistic stderr renderings. Normalize and scrub multiple prompt representations before tail-capping, at minimum:\n  1. exact raw prompt\n  2. CRLF-normalized prompt\n  3. escaped `\\n` / `\\r\\n` prompt forms\n  \n  Add tests for stderr containing:\n  - `prompt.replace(\"\\n\", \"\\r\\n\")`\n  - escaped newline text\n  - bytes stderr whose stringified form contains the prompt in escaped form"
+    }
+  ]
+}

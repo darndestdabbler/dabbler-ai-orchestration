@@ -30,6 +30,7 @@ import {
   allWorkSessionsComplete,
   completedVerificationInfo,
   hasCompletedVerificationSession,
+  isRecognizedVerdictToken,
   verificationMarkerFor,
   verificationMarkerTooltipFor,
 } from "../../utils/tierLegibility";
@@ -350,6 +351,73 @@ suite("SessionSetsModel verification helpers (Set 062 S1)", () => {
       "",
     );
     assert.strictEqual(verdictFractionTooltip(set({})), "");
+  });
+
+  // Set 086 S2 guardrail: a confabulated / free-form non-verdict token must
+  // never render as if it were a clean verdict.
+  test("verdictFractionTooltip flags an unrecognized (confabulated) verdict token", () => {
+    assert.strictEqual(
+      verdictFractionTooltip(
+        set({
+          completedVerification: {
+            sessionNumber: 2,
+            verdict: "manual-override-development",
+          },
+        }),
+      ),
+      'Verification: "manual-override-development" is not a recognized verdict (session 2)',
+    );
+    // Also without a session number.
+    assert.strictEqual(
+      verdictFractionTooltip(
+        set({ completedVerification: { sessionNumber: null, verdict: "done!" } }),
+      ),
+      'Verification: "done!" is not a recognized verdict',
+    );
+  });
+
+  // Readers are prefix-lenient: the intentionally-shipped extension token and
+  // the third canonical verdict render as clean verdicts (not flagged).
+  test("verdictFractionTooltip accepts shipped extension + WAIVED tokens verbatim", () => {
+    assert.strictEqual(
+      verdictFractionTooltip(
+        set({
+          completedVerification: {
+            sessionNumber: 3,
+            verdict: "ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+          },
+        }),
+      ),
+      "Verification: ISSUES_FOUND_RESOLVED_IN_FLIGHT (session 3)",
+    );
+    assert.strictEqual(
+      verdictFractionTooltip(
+        set({ completedVerification: { sessionNumber: 1, verdict: "WAIVED" } }),
+      ),
+      "Verification: WAIVED (session 1)",
+    );
+  });
+
+  test("isRecognizedVerdictToken: canonical + extension prefixes vs non-verdicts", () => {
+    for (const good of [
+      "VERIFIED",
+      "verified",
+      " ISSUES_FOUND ",
+      "ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+      "WAIVED",
+    ]) {
+      assert.strictEqual(isRecognizedVerdictToken(good), true, good);
+    }
+    for (const bad of [
+      "manual-override-development",
+      "done!",
+      "",
+      "   ",
+      null,
+      undefined,
+    ]) {
+      assert.strictEqual(isRecognizedVerdictToken(bad as string), false, String(bad));
+    }
   });
 });
 

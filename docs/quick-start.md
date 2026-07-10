@@ -218,6 +218,12 @@ Sessions on different sets can run in parallel using worktrees — see
   provider-issued keys from Anthropic, Google, and OpenAI; only the environment
   variable names are Dabbler-prefixed.
   Optional: `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` for completion notifications.
+- [ ] **Copilot-seat path (no direct provider keys)?** — if your shop runs
+  Full tier through a **GitHub Copilot CLI seat** instead of `DABBLER_*` keys,
+  follow [`docs/copilot-seat-setup-checklist.md`](copilot-seat-setup-checklist.md)
+  once per machine first (install + `copilot login` + the auth-preflight). An
+  unauthenticated seat is blocked at session start rather than silently faking
+  verification.
 - [ ] **Instruction file present** — your repo needs a provider-specific
   instruction file (`CLAUDE.md` for Claude Code, `AGENTS.md` for Codex,
   `GEMINI.md` for Gemini Code Assist) at the repo root. This repo's own

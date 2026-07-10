@@ -3,6 +3,54 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.31.0] — Unreleased (Set 086 — Copilot-seat verification integrity)
+
+> Prepared in Set 086; **not yet published**. The PyPI publish is an
+> operator-gated action (tag `v0.31.0`). Until then the registry-live
+> router remains `0.30.0`. Ships the router half of Set 086 — the
+> prevention + fail-loud + legibility layer so a Full-tier session on an
+> **unauthenticated Copilot-CLI seat** either verifies for real or stops
+> loudly, never silently accepts a confabulated result.
+
+### Added
+
+- **(Set 086 S1) Auth-preflight** (`ai_router/copilot_preflight.py`, CLI
+  `python -m ai_router.copilot_preflight`): staged binary → credential →
+  live-probe check classified through the transport's existing
+  `error_class` taxonomy, wired into `start_session` so a mis-authed
+  copilot-cli seat is **blocked from starting** a session it could never
+  honestly verify (the live probe runs on every start, including
+  idempotent re-entry — repo state is not proof of current seat auth).
+  No-op on the direct-API path and under `--no-router`. Injectable
+  `which` / credential-dir / spawner so the real CLI is never touched in
+  tests.
+- **(Set 086 S1) Close fail-loud on missing evidence.**
+  `writer_discipline.detect_writer_bypass` gains an opt-in
+  `require_ledger=True`, and `gate_checks.check_verification_integrity`
+  runs a ledger sub-check first on the Full, non-manual path: an
+  **absent** (or empty / unreadable) `session-events.jsonl` is now a
+  high-severity finding that hard-blocks the close, not a silent skip.
+- **(Set 086 S1) Verdict-token validation at the blessed writer**
+  (`session_state.validate_verification_verdict` /
+  `is_tolerated_verdict_token` / `normalize_verification_verdict`): an
+  exact, case-insensitively-normalized allowlist (canonical `VERIFIED` /
+  `ISSUES_FOUND` / `WAIVED` + the shipped extension token
+  `ISSUES_FOUND_RESOLVED_IN_FLIGHT`) applied on the active-set close
+  path across all verdict-writer siblings. A free-form non-verdict
+  (`manual-override-development`) or a prefix look-alike
+  (`VERIFIED_NOT_REALLY`) is **rejected**; readers stay prefix-lenient.
+- **(Set 086 S2) Togglable transport diagnostics**
+  (`ai_router/transport_diagnostics.py`): every failed copilot-cli
+  dispatch on the `route()` / `verify()` path emits a structured JSONL
+  record (`error_class`, `exit_code`, argv with the `-p` prompt redacted,
+  auth-reprobe result, stderr tail) to a config/env-gated log
+  (`transports.copilot-cli.diagnostics.enabled`, env
+  `DABBLER_COPILOT_DIAGNOSTICS` / `DABBLER_COPILOT_DIAGNOSTICS_LOG`);
+  a compact prompt-free summary is embedded in the raised
+  `CopilotCliRoutingError` regardless of the toggle, so a dispatch
+  failure is never swallowed. The write is best-effort and never masks
+  the transport failure itself; the transport stays pure.
+
 ## [0.30.0] — 2026-07-07 (Set 085 — preload manifest + ratcheting ceiling gate; guidance slimming)
 
 The router half of the Set 085 guidance-slimming release: the preload

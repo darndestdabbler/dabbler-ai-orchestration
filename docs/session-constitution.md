@@ -154,13 +154,23 @@ Human-only, every time; never consensus-eligible, never self-authorized:
   failures, drift repair, the local-only path for deliberately
   remote-less repos). Missing `disposition.json` fields are the usual
   first-attempt cause.
-- **Blocking findings** → fix and re-verify narrowly: at most two
-  automatic rounds; a third round, an unfixed Critical/Major, or a
-  human-stop disposition stops to the operator. A settled point never
-  reopens under fresh wording — track findings in the cross-round issue
-  ledger. When later rounds surface only new permutations of an
-  already-closed defect class (edge-case exhaustion), stop and escalate
-  with the adjudication instead of grinding further rounds.
+- **Blocking findings** → fix and re-verify narrowly. **Automatic rounds
+  are hard-capped at two.** Past the cap the loop **suspends** — it does
+  not keep opening rounds:
+  - **No Critical/Major after the cap** (only Minor, or *unrated*/
+    unknown-severity nits remain) → treat as **Minor-only / effectively
+    VERIFIED**, record the residual as adjudicated-minor, and stop.
+    Unknown-severity is *not* a licence to grind: a verifier that keeps
+    surfacing fresh unrated nits each round is edge-case exhaustion, and
+    chasing it burns money and time for no correctness gain (operator
+    rule, Set 086). Persisting past the cap requires a **material
+    Critical/Major**, nothing less.
+  - **An unfixed Critical/Major, or a Critical/Major the orchestrator
+    disputes** → stop to the human: either get a **third-provider
+    opinion** or have the **operator adjudicate**. Never re-round a
+    disputed finding.
+  A settled point never reopens under fresh wording — track findings in
+  the cross-round issue ledger.
 - **Disagreement with a finding** → verifiers flag, humans adjudicate.
   Present the exact finding, the dismissal reason, the context the
   verifier saw, and a self-assessment; the human picks accept / dismiss

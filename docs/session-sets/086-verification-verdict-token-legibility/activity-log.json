@@ -1,7 +1,7 @@
 {
   "sessionSetName": "086-verification-verdict-token-legibility",
   "createdDate": "2026-07-09T10:46:48.661512+00:00",
-  "totalSessions": 0,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -67,6 +67,94 @@
       "stepKey": "session-001/tests",
       "dateTime": "2026-07-09T07:20:21.833527-04:00",
       "description": "Added pytest: test_copilot_preflight (8), ledger-axis (5) and verdict-validation (5) in the gate/verdict suites, start_session preflight wiring (4); fixed _make_gate_set to carry a realistic ledger.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/register",
+      "dateTime": "2026-07-09T09:11:59.928461-04:00",
+      "description": "Registered S2 (claude/anthropic/claude-opus-4-8/high); read spec + S1 disposition; preload complete; keys confirmed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/next-set-analysis",
+      "dateTime": "2026-07-09T09:11:59.928461-04:00",
+      "description": "Routed next-SET analysis (Step 3.5, terminal session) via route(analysis) -> gemini-pro; saved raw at s2-next-set-analysis.json (recommends Set 087 historical verification-state reconciliation).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/transport-diagnostics",
+      "dateTime": "2026-07-09T09:11:59.929461-04:00",
+      "description": "Step 2: new ai_router/transport_diagnostics.py (togglable, orchestrator-visible Copilot-CLI transport diagnostics). Config toggle transports.copilot-cli.diagnostics.{enabled,log_path} + env DABBLER_COPILOT_DIAGNOSTICS(_LOG); emit at the single route()-path choke point _copilot_cli_dispatch on failure; compact prompt-free summary embedded in the raised CopilotCliRoutingError. argv -p prompt redacted; write best-effort fail-open. 23 new pytest.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/reader-legibility",
+      "dateTime": "2026-07-09T09:11:59.929461-04:00",
+      "description": "Step 3: reader-legibility guardrail. tierLegibility.isRecognizedVerdictToken (prefix-lenient reader vocab mirroring the strict writer allowlist); verdictFractionTooltip flags an unrecognized/confabulated token (e.g. manual-override-development) instead of laundering it as a clean verdict. Extension unit suite 1273 passing incl. new tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/release-prep",
+      "dateTime": "2026-07-09T09:54:29.728876-04:00",
+      "description": "Version bumps (ext 0.41.0, router 0.31.0) + Unreleased CHANGELOG entries + candidate 0.41.0.vsix built. Marketplace/PyPI publish is operator-gated and pending. repository-reference release-status table intentionally NOT edited (updated at actual-publish time per precedent).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/suites-green",
+      "dateTime": "2026-07-09T09:54:29.728876-04:00",
+      "description": "Full suites green: pytest 2872 passed / 5 skipped (incl. 23 new test_transport_diagnostics); extension unit 1273 passing (incl. new verdict-legibility guardrail tests); drift_guard 25 green after cold-start golden + dist/templates regeneration.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/verification-BLOCKED",
+      "dateTime": "2026-07-09T09:54:29.729876-04:00",
+      "description": "Mandatory cross-provider verification (Step 6) BLOCKED: both non-anthropic verifiers returned sustained HTTP 429 across the full escalation ladder \u2014 gpt-5-4 (openai) 3x and gemini-pro (google) 2x, retried after 150s and 280s waits (~7+ min total). Anthropic is the orchestrator provider (auto-excluded). No verdict was fabricated or skipped (no-skip-verification-mandate; and confabulation-under-an-unrunnable-required-step is the very failure this set exists to prevent). Nothing written by verify_session. Work is complete and all suites green; verification + advisory path-aware critique + close are PENDING a rate-limit/quota clear. Resume: re-run python -m ai_router.verify_session --session-set-dir docs/session-sets/086-verification-verdict-token-legibility (default HEAD base; work is uncommitted in the working tree) once provider quota clears, then Step 8 close + Step 9.",
+      "status": "blocked"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/verify-r1",
+      "dateTime": "2026-07-09T20:32:07.501551-04:00",
+      "description": "Verification Round 1 (gpt-5-4, openai; anthropic excluded as orchestrator provider): ISSUES_FOUND, verdict-blocking. 5 sub-findings. Two REAL code defects in S2 work, both FIXED: (4) diagnostics wiring lacked integration tests at the __init__ call sites -> added TestTransportDiagnosticsWiring (emit-on-failure + role labels + redacted-summary-in-raise + no-emit-on-success); (5) emit_diagnostics only caught OSError -> broadened to swallow any build/serialize/write failure so a diagnostics problem never masks the transport failure, + 2 tests. Adjudications: (1) session-incomplete/no-change-log is a workflow-ordering artifact (verification runs before close+change-log; the stale verification-BLOCKED entry is what it saw) -> resolved by completing close; (2) unrelated untracked files (087-module-organized-projects, module-organized-projects-*.md) are the operator/parallel work, not S2 -> excluded from evidence + commit; (3) router-config model additions (gemini-3-1-pro, gpt-5-5) are the operator intentional edit made mid-session to restore a rate-limited-out verifier -> kept per operator directive, attributed, not S2 code scope.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-002/verify-r2-r4-stop",
+      "dateTime": "2026-07-09T20:58:48.122329-04:00",
+      "description": "Verification rounds 2-4 (gpt-5-4). R2 (3 findings: stderr prompt-leak, verifier-path summary parity, reprobe under-report) all FIXED+tested. R3 (2: malformed-metadata guard FIXED; reader prefix-match ADJUDICATED minor -- writer already rejects look-alikes). R4 (1, verifier-labeled Major, orchestrator-disputed + operator-adjudicated MINOR: prompt-scrub of escaped/CRLF/bytes-repr stderr variants -- a permutation of the settled R2 prompt-scrub class = edge-case exhaustion). SUSPENDED after R4 per operator directive + the severity-gated-stop rule now added to the constitution. gpt-5-4 returned a fresh UNRATED nit every round (4x); the gate treats unrated as blocking = the exact grind the rule prevents.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-002/rule-codified",
+      "dateTime": "2026-07-09T20:58:48.123376-04:00",
+      "description": "Operator-directed: added the severity-gated verification-stop rule to docs/session-constitution.md Recovery-and-escalation (automatic rounds hard-capped at two; no material Critical/Major past the cap -> suspend as effectively-VERIFIED; a disputed Critical/Major -> third-provider opinion or operator adjudication). lessons-learned.md is at its preload ceiling so the rule lives in the constitution (the governing doc). Per operator, deferred any further/machine-enforcement of the rule to focus on Set 087.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-002/wrap-up",
+      "dateTime": "2026-07-09T20:58:48.123376-04:00",
+      "description": "Work complete + verified (4 real cross-provider rounds, no confabulation) + committed. Formal close_session DEFERRED: limited-budget repo has no legal manual bypass and no clean routed round is achievable with this verifier; documented in disposition.close_status with operator resolution options. Set 087 unblocked.",
       "status": "complete"
     }
   ]

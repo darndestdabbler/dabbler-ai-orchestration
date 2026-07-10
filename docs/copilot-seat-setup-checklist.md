@@ -116,21 +116,26 @@ In the consumer repo's environment:
 
 ---
 
-## Step 5 — Run the auth-preflight *(available after Set 086 ships)*
+## Step 5 — Run the auth-preflight
 
-Once the Set-086 preflight lands, run it to confirm the whole chain in
-one command before a session:
+Run the preflight to confirm the whole chain in one command before a
+session:
 
 ```powershell
 .venv\Scripts\python -m ai_router.copilot_preflight
 ```
 
 - [ ] Preflight reports **OK** (CLI present, credential present, a live
-      auth probe succeeds). A failure prints the exact remediation and
-      **blocks the session from starting** — that is the intended
-      behavior, not a bug.
+      auth probe succeeds). A failure prints the exact remediation
+      (pointing back at this checklist) and exits non-zero — that is the
+      intended behavior, not a bug.
 
-> Until Set 086 ships, Step 3's manual probe is the authoritative check.
+> This same preflight runs **automatically at session start** on a
+> copilot-cli seat (Set 086): `start_session` blocks a mis-authed seat
+> from starting a session it could never honestly verify. Running it
+> yourself here is the pre-flight sanity check; the auto-run at start is
+> the enforcement. (`--no-live-probe` runs only the free binary +
+> credential checks without spending a premium request.)
 
 ---
 
@@ -140,8 +145,14 @@ Run one real session end-to-end, then confirm the router — not the
 engine's imagination — produced the artifacts:
 
 - [ ] `session-state.json` was written by `start_session`/`close_session`
-      (canonical v4 shape), and `verificationVerdict` is a real verdict
-      (`VERIFIED` / `ISSUES_FOUND`), **never** a free-form string.
+      (canonical v4 shape), and `verificationVerdict` is a real verdict.
+      The blessed writer now enforces an **exact allowlist** (Set 086):
+      the canonical `VERIFIED` / `ISSUES_FOUND` / `WAIVED` (plus the
+      intentionally-shipped extension token
+      `ISSUES_FOUND_RESOLVED_IN_FLIGHT`) — a free-form non-verdict like
+      `manual-override-development` is **rejected at write time**, and the
+      Session Set Explorer flags any unrecognized token it reads rather
+      than rendering it as a clean verdict.
 - [ ] A **`session-events.jsonl`** ledger exists next to it (its absence
       is the tell that the router was bypassed).
 - [ ] A `router-metrics` row exists for the verification call with
@@ -163,7 +174,7 @@ router — go back to Step 3/5.
 | Login succeeds but `-p` still fails auth | Logged into the wrong host (github.com instead of the tenant), or no Copilot license on the tenant | Re-run login with the correct `.ghe.com` subdomain; confirm the license is on the tenant |
 | Confusing token errors even after login | A stray `GH_TOKEN` / `GITHUB_TOKEN` in the environment is shadowing the persisted login | Unset it, or (CI only) use `COPILOT_GITHUB_TOKEN`, which takes priority |
 | `--model` value rejected | Model name not available on the seat's plan | Run `copilot` interactively and check `/models` for the exact available ids |
-| Verdict shows a weird string like `manual-override-development` | The seat ran sessions before this checklist — the engine confabulated | Re-run setup; the Set-086 fixes prevent a non-verdict from ever persisting again |
+| Verdict shows a weird string like `manual-override-development` | The seat ran sessions before this checklist — the engine confabulated | Re-run setup; Set-086 both blocks the write (the blessed writer rejects a non-verdict) and flags any such token already on disk in the Explorer. Historical drifted sets are reconciled via the router (re-verify, then `close_session --repair`), never a hand edit |
 
 ---
 

@@ -3,6 +3,38 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.41.0] — Unreleased (Set 086 — Copilot-seat verdict legibility + setup-checklist onboarding)
+
+> Prepared in Set 086 (S2); **not yet published**. The Marketplace
+> publish is an operator-gated action (tag `vsix-v0.41.0`). Until then
+> the registry-live extension remains `0.40.0`. Accompanies
+> `dabbler-ai-router 0.31.0`.
+
+### Added
+
+- **(Set 086 S2) Verdict-legibility guardrail in the Session Set
+  Explorer.** A persisted `verificationVerdict` the reader does not
+  recognize — e.g. the confabulated `manual-override-development` the
+  Set-086 root-cause incident wrote — is now **flagged as unrecognized**
+  in the verdict hover tooltip instead of being rendered verbatim as if
+  it were a clean verdict. New pure predicate
+  `tierLegibility.isRecognizedVerdictToken` (prefix-lenient reader
+  vocabulary — `VERIFIED` / `ISSUES_FOUND` / `WAIVED` — mirroring the
+  strict router-side writer allowlist); `verdictFractionTooltip` uses it.
+
+### Changed
+
+- **(Set 086 S2) Onboarding copy links the Copilot-seat setup
+  checklist.** The Getting Started teaching doc
+  (`getting-started.md.template`, both the step-1 Copilot-seat paragraph
+  and the missing-CLI troubleshooting), the cold-start operative doc
+  (`start-here.md.template`), the form's missing-CLI warning
+  (`gettingStartedHtml.js`), and the root `README.md` now point at
+  `docs/copilot-seat-setup-checklist.md` (install → tenant login →
+  auth-preflight), making explicit that an unauthenticated seat is
+  blocked at session start rather than silently faking verification.
+  Cold-start goldens + bundled `dist/templates` regenerated.
+
 ## [0.40.0] — 2026-07-07 (Set 085 — scaffold bundle points sessions at the session constitution)
 
 > Template-bundle-only release accompanying `dabbler-ai-router 0.30.0`

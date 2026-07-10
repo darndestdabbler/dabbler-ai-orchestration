@@ -232,6 +232,16 @@ guarantees** — never as byte-equivalent to the direct-API Full tier:
   breaker (`transport.max_invocations_per_session`, default 200) caps seat
   burn instead.
 
+**Per-machine setup (do this first):** a Copilot-locked seat must have the
+`copilot` CLI installed and **interactively logged in** to its `.ghe.com`
+tenant before any activation path will work — an unauthenticated seat is the
+exact failure that made an orchestrator confabulate a verification result
+(Set 086). Follow the one-time runbook,
+[`docs/copilot-seat-setup-checklist.md`](../copilot-seat-setup-checklist.md),
+then run `python -m ai_router.copilot_preflight` to confirm the chain; the
+same preflight runs automatically at session start and blocks a mis-authed
+seat.
+
 **Activation (guided, the primary path — Set 079):** use the VS Code
 extension's Getting Started form. In step 1, choosing the **Full** tier
 surfaces a "Provider access (how routed calls run)" choice: **Direct
@@ -278,6 +288,26 @@ POSIX process-tree kill on cancel is unit-tested but has not yet been
 exercised against a live POSIX process tree (the dogfood host was
 Windows), and the config write is atomic against process crash only —
 it makes no power-loss durability claim.
+
+**Verification integrity on a Copilot seat (Set 086):** the seat path adds
+three fail-loud guards on top of the degraded guarantees above, because a
+Copilot-CLI seat whose CLI was never authenticated used to fail *silently* at
+verification time and let the orchestrator confabulate a passing result. (1)
+An **auth-preflight** runs at `start_session` on a copilot-cli seat (binary →
+credential → a live auth probe) and **blocks a mis-authed seat from starting**
+a session it could never honestly verify, pointing at
+[`docs/copilot-seat-setup-checklist.md`](../copilot-seat-setup-checklist.md).
+(2) A Full-tier **close fails loud on missing evidence**: it will not record a
+session as verified without a real events ledger and the verification stamp —
+an *absent* ledger is a high-severity finding, not a skip. (3) **Verdict-token
+validation** at the blessed writer rejects a non-verdict
+(`manual-override-development`) or a prefix look-alike (`VERIFIED_NOT_REALLY`)
+from ever persisting into `verificationVerdict`. Together these mean the seat
+either verifies for real or stops loudly. Optional togglable **transport
+diagnostics** (`transports.copilot-cli.diagnostics.enabled`, or the
+`DABBLER_COPILOT_DIAGNOSTICS` env var) log every failed dispatch's
+`error_class` / argv (prompt-redacted) / auth-reprobe result so a dispatch
+failure is never invisible during a run.
 
 **Choose this profile when:** staff are corporate-policy-locked to Copilot
 seats only, no `DABBLER_*` key is possible, and Full's cross-provider

@@ -238,6 +238,34 @@ export function allWorkSessionsComplete(
   return workCount > 0;
 }
 
+// Set 086 S2: the reader-recognized verdict vocabulary. Readers are
+// deliberately PREFIX-lenient (docs/session-state-schema.md → the
+// `verificationVerdict` contract): an intentionally-shipped extension token
+// like `ISSUES_FOUND_RESOLVED_IN_FLIGHT` classifies via its canonical prefix
+// without a schema bump. This mirrors the STRICT (exact-allowlist) writer side
+// of the same asymmetry (ai_router/session_state.py `_CANONICAL_VERDICT_TOKENS`):
+// the blessed writer refuses to persist a non-verdict, and this reader refuses
+// to render an unrecognized one as if it were a clean verdict.
+export const RECOGNIZED_VERDICT_PREFIXES = [
+  "VERIFIED",
+  "ISSUES_FOUND",
+  "WAIVED",
+] as const;
+
+// True iff `verdict`, normalized (trimmed, upper-cased), begins with a
+// recognized canonical prefix. A free-form non-verdict — e.g. the confabulated
+// `manual-override-development` the Set-086 root-cause incident persisted —
+// returns false, which is what lets the display flag it instead of laundering
+// it into a legitimate-looking status.
+export function isRecognizedVerdictToken(
+  verdict: string | null | undefined,
+): boolean {
+  if (typeof verdict !== "string") return false;
+  const normalized = verdict.trim().toUpperCase();
+  if (!normalized) return false;
+  return RECOGNIZED_VERDICT_PREFIXES.some((p) => normalized.startsWith(p));
+}
+
 // The D1 predicate: which verification-posture marker (if any) does
 // this row render? Pure function of the five derived inputs so the
 // renderer and the tests share one source.

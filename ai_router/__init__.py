@@ -619,10 +619,16 @@ def _copilot_provider_of(model_id: str) -> Optional[str]:
     return None
 
 
-def _copilot_cli_dispatch(model_id: str, system_prompt: str, user_message: str):
+def _copilot_cli_dispatch(
+    model_id: str, system_prompt: str, user_message: str, *, role: str = "generator",
+):
     """The single call site every copilot-cli generator/verifier dispatch
     goes through — enforces the hard invocation breaker BEFORE spawning
     (never counts a breaker-blocked call as an invocation).
+
+    ``role`` ("generator" / "verifier") is context only — it labels the
+    Set 086 S2 diagnostics record on a failed dispatch and has no effect on
+    the invocation itself.
 
     The check-and-reserve happens under ``_copilot_invocation_lock`` so two
     concurrent callers can't both pass the check and jointly exceed the
@@ -651,9 +657,24 @@ def _copilot_cli_dispatch(model_id: str, system_prompt: str, user_message: str):
             )
         _copilot_invocation_count += 1
 
-    return _copilot_transport.dispatch(
+    result = _copilot_transport.dispatch(
         model_id=model_id, system_prompt=system_prompt, user_message=user_message,
     )
+    # Set 086 S2 (systemic hole #3): a failed dispatch's classified diagnostics
+    # (error_class, argv, auth-reprobe, stderr) must never be swallowed. Emit
+    # one structured record to the toggle-gated diagnostics log; the write is
+    # best-effort and never masks the transport failure itself. The caller
+    # (_route_via_copilot_cli) additionally surfaces a compact summary in the
+    # error it raises, regardless of whether the log is enabled.
+    if not result.ok:
+        from .transport_diagnostics import emit_diagnostics
+
+        emit_diagnostics(
+            result,
+            config=_config,
+            context={"role": role, "model_id": model_id},
+        )
+    return result
 
 
 def _route_via_copilot_cli(
@@ -716,11 +737,16 @@ def _route_via_copilot_cli(
     elapsed = time.time() - start
 
     if not result.ok:
+        # Set 086 S2: surface the FULL classified diagnostics (argv redacted,
+        # auth-reprobe result) to the orchestrator, not just error_class +
+        # a stderr slice — a dispatch failure must never read as a bare,
+        # context-free error. The structured record is separately appended to
+        # the toggle-gated diagnostics log by _copilot_cli_dispatch.
+        from .transport_diagnostics import diagnostics_summary
+
         raise CopilotCliRoutingError(
-            f"Copilot CLI dispatch failed: error_class="
-            f"{result.transport_metadata.get('error_class')!r}, "
-            f"exit_code={result.transport_metadata.get('exit_code')!r}. "
-            f"stderr: {result.raw_stderr[:500]}"
+            "Copilot CLI dispatch failed: "
+            + diagnostics_summary(result, context={"role": "generator", "model_id": model_id})
         )
 
     route_result = RouteResult(
@@ -853,6 +879,7 @@ def _run_verification_via_copilot_cli(
     try:
         result = _copilot_cli_dispatch(
             model_id=selection.model_id, system_prompt="", user_message=user_message,
+            role="verifier",
         )
     except InvocationBreakerTripped as exc:
         # The breaker is a hard ceiling on total spawns, generator AND
@@ -870,12 +897,21 @@ def _run_verification_via_copilot_cli(
     elapsed = time.time() - start
 
     if not result.ok:
+        # Set 086 S2 (Round-2 finding: sibling-site parity with the generator
+        # raise, L-069-1): surface the FULL classified diagnostics on the
+        # verifier failure surface too, not just error_class. The structured
+        # record was already emitted to the gated log by _copilot_cli_dispatch.
+        from .transport_diagnostics import diagnostics_summary
+
         return _build_verification_unavailable_stub(
             generator_model_id=route_result.model_id,
             generator_provider=generator_provider,
             reason=(
-                f"verifier dispatch failed: error_class="
-                f"{result.transport_metadata.get('error_class')!r}"
+                "verifier dispatch failed: "
+                + diagnostics_summary(
+                    result,
+                    context={"role": "verifier", "model_id": selection.model_id},
+                )
             ),
         )
 

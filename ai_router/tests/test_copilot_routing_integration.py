@@ -630,3 +630,107 @@ class TestCostGuardExclusions:
             match="did not skip under the copilot-cli profile",
         ):
             ai_router.route(content="x", task_type="general")
+
+
+# ---------------------------------------------------------------------------
+# Set 086 S2: transport-diagnostics wiring at the __init__ call sites.
+# The helper module itself is unit-tested in test_transport_diagnostics.py;
+# these assert the INTEGRATION points (Round-1 verification finding): the
+# choke point emits on failure with the right role, and the raised error
+# carries the redacted summary.
+# ---------------------------------------------------------------------------
+
+class TestTransportDiagnosticsWiring:
+    def _auth_error_with_argv(self):
+        return ai_router.cli_transport.TransportResult(
+            content="", input_tokens=0, output_tokens=0,
+            stop_reason="error:auth-class", usage_authoritative=False,
+            finish_reason_known=False, content_complete=False,
+            partial_output_discarded=False, raw_stdout="",
+            raw_stderr="No authentication information found",
+            transport_metadata={
+                "error_class": "auth-class", "exit_code": 1,
+                "argv": ["copilot", "-p", "SECRET PROMPT TEXT",
+                         "--model", "claude-sonnet-4.6"],
+                "reprobed": True, "reprobe_cli_alive": True,
+            },
+        )
+
+    def test_failed_generator_dispatch_emits_and_raises_redacted_summary(
+        self, copilot_env, monkeypatch
+    ):
+        import ai_router.transport_diagnostics as td_mod
+        transport, _config = copilot_env
+        transport.results = [self._auth_error_with_argv()]
+        spy = []
+        real_emit = td_mod.emit_diagnostics
+
+        def _spy(result, *, config, context=None, **kw):
+            spy.append(context)
+            return real_emit(result, config=config, context=context, **kw)
+
+        monkeypatch.setattr(td_mod, "emit_diagnostics", _spy)
+
+        with pytest.raises(ai_router.CopilotCliRoutingError) as exc:
+            ai_router.route(content="x", task_type="general")
+
+        # emit fired once from the choke point, tagged with the generator role.
+        assert spy == [{"role": "generator", "model_id": "claude-sonnet-4.6"}]
+        # The raised error carries the full classified summary, prompt REDACTED.
+        msg = str(exc.value)
+        assert "error_class='auth-class'" in msg
+        assert "<prompt:" in msg
+        assert "SECRET PROMPT TEXT" not in msg
+
+    def test_verifier_role_dispatch_labels_diagnostics_verifier(
+        self, copilot_env, monkeypatch
+    ):
+        import ai_router.transport_diagnostics as td_mod
+        transport, _config = copilot_env
+        transport.results = [_error_result(error_class="auth-class")]
+        spy = []
+        monkeypatch.setattr(
+            td_mod, "emit_diagnostics",
+            lambda result, *, config, context=None, **kw: spy.append(context),
+        )
+        # Called directly at the choke point with the verifier role — this is
+        # the label the verifier-dispatch site (_run_verification_via_copilot_cli)
+        # passes.
+        ai_router._copilot_cli_dispatch(
+            model_id="gpt-5.4", system_prompt="", user_message="verify this",
+            role="verifier",
+        )
+        assert spy == [{"role": "verifier", "model_id": "gpt-5.4"}]
+
+    def test_verifier_dispatch_failure_surfaces_summary_in_reason(self, copilot_env):
+        # Round-2 finding: drive the REAL verifier path (route -> auto-verify ->
+        # _run_verification_via_copilot_cli) and assert the verification_unavailable
+        # reason carries the full classified summary (sibling-site parity with the
+        # generator raise), prompt redacted.
+        transport, _config = copilot_env
+        transport.results = [
+            _ok_result(content="generated"),
+            self._auth_error_with_argv(),
+        ]
+        result = ai_router.route(content="x", task_type="general")
+        assert result.verification is not None
+        assert result.verification.verdict == "verification_unavailable"
+        raw = result.verification.raw_response
+        assert "verifier dispatch failed:" in raw
+        assert "error_class='auth-class'" in raw
+        assert "<prompt:" in raw
+        assert "SECRET PROMPT TEXT" not in raw
+
+    def test_successful_dispatch_does_not_emit(self, copilot_env, monkeypatch):
+        import ai_router.transport_diagnostics as td_mod
+        transport, _config = copilot_env
+        transport.results = [_ok_result(content="ok")]
+        spy = []
+        monkeypatch.setattr(
+            td_mod, "emit_diagnostics",
+            lambda *a, **k: spy.append(1),
+        )
+        ai_router._copilot_cli_dispatch(
+            model_id="claude-sonnet-4.6", system_prompt="", user_message="x",
+        )
+        assert spy == []

@@ -3,6 +3,7 @@ import { SessionSet, SessionState } from "../types";
 import {
   PLUS_FRACTION_TOOLTIP,
   TIER_MISMATCH_MARKER,
+  isRecognizedVerdictToken,
   tierMarkerFor,
   tierMismatch,
   tierMismatchTooltipFor,
@@ -109,9 +110,18 @@ export function verificationTooltip(set: SessionSet): string {
 export function verdictFractionTooltip(set: SessionSet): string {
   const cv = set.completedVerification;
   if (!cv || !cv.verdict) return "";
-  return cv.sessionNumber != null
-    ? `Verification: ${cv.verdict} (session ${cv.sessionNumber})`
-    : `Verification: ${cv.verdict}`;
+  const suffix = cv.sessionNumber != null ? ` (session ${cv.sessionNumber})` : "";
+  // Set 086 S2 guardrail: a persisted verdict the reader does not recognize —
+  // e.g. the confabulated `manual-override-development` the Set-086 root-cause
+  // incident wrote — must NEVER render as if it were a clean verdict. Flag it
+  // as unrecognized so the reader surfaces the anomaly instead of laundering a
+  // non-verdict into a legitimate-looking status. (The blessed writer now
+  // rejects such tokens outright; this reader guards data that predates the
+  // writer enforcement or was hand-authored around it.)
+  if (!isRecognizedVerdictToken(cv.verdict)) {
+    return `Verification: "${cv.verdict}" is not a recognized verdict${suffix}`;
+  }
+  return `Verification: ${cv.verdict}${suffix}`;
 }
 
 export const ICON_FILES: Record<SessionState, string> = {

@@ -15597,6 +15597,19 @@ function allWorkSessionsComplete(sessions) {
   }
   return workCount > 0;
 }
+var RECOGNIZED_VERDICT_PREFIXES = [
+  "VERIFIED",
+  "ISSUES_FOUND",
+  "WAIVED"
+];
+function isRecognizedVerdictToken(verdict) {
+  if (typeof verdict !== "string")
+    return false;
+  const normalized = verdict.trim().toUpperCase();
+  if (!normalized)
+    return false;
+  return RECOGNIZED_VERDICT_PREFIXES.some((p2) => normalized.startsWith(p2));
+}
 function verificationMarkerFor(tier, verificationMode, sessions, externalVerificationNoteExists, rowState) {
   if (tier !== "lightweight")
     return "";
@@ -16836,7 +16849,11 @@ function verdictFractionTooltip(set) {
   const cv = set.completedVerification;
   if (!cv || !cv.verdict)
     return "";
-  return cv.sessionNumber != null ? `Verification: ${cv.verdict} (session ${cv.sessionNumber})` : `Verification: ${cv.verdict}`;
+  const suffix = cv.sessionNumber != null ? ` (session ${cv.sessionNumber})` : "";
+  if (!isRecognizedVerdictToken(cv.verdict)) {
+    return `Verification: "${cv.verdict}" is not a recognized verdict${suffix}`;
+  }
+  return `Verification: ${cv.verdict}${suffix}`;
 }
 var ICON_FILES = {
   complete: "done.svg",

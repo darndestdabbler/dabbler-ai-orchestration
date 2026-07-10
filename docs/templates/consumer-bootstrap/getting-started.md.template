@@ -42,7 +42,12 @@ know when running sessions on a Copilot seat: because a seat can relay
 any provider's model, each session must name its model
 (`start_session --model …`) so verification can pick a genuinely
 different provider — the orchestrator docs cover this and the tool
-refuses a Copilot start without it. For more
+refuses a Copilot start without it. Before you run sessions on a
+Copilot seat, work through the one-time per-machine setup checklist
+(install the CLI, log in to your tenant, run the auth-preflight):
+<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/copilot-seat-setup-checklist.md>
+— an unauthenticated seat is blocked at session start rather than
+silently faking verification. For more
 information on either option, see the tier model documentation:
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
 
@@ -175,7 +180,9 @@ your seat confirms models from only one AI provider family), the
 message you see explains the specific cause and gives the exact
 command to re-run just the seat check — the project scaffold itself is
 already complete, and you never need to re-run **Build project
-structure** for this.
+structure** for this. The per-machine setup checklist walks the whole
+chain (install, tenant login, auth-preflight) if you need it:
+<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/copilot-seat-setup-checklist.md>.
 
 ### `.venv\Scripts\` has the `.exe` files but no `activate` scripts
 

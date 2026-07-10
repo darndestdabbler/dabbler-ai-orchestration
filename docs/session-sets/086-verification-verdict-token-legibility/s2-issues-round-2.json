@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "**Prompt redaction is incomplete; stderr can still leak the full `-p` prompt payload** → `ai_router/transport_diagnostics.py` (`build_record()` stores `raw_stderr` verbatim via `_stderr_tail()`, and `diagnostics_summary()` embeds `stderr_tail` verbatim) → **Scrub stderr with the exact prompt value before logging/summarizing, or omit stderr from persisted/raised diagnostics when the prompt-bearing argv is present. Add tests where `raw_stderr` contains the prompt text and assert it is redacted in both the JSONL record and the raised summary.**\n\n- **The enriched operator-visible summary is only wired on the generator route path, not the verifier path** → `ai_router/__init__.py`: `_route_via_copilot_cli()` now raises `CopilotCliRoutingError(... diagnostics_summary(...))`, but `_run_verification_via_copilot_cli()` only adds `role=\"verifier\"` to `_copilot_cli_dispatch()` and does not show a matching verifier-side summary wiring in this diff → **Use `diagnostics_summary(result, context={\"role\": \"verifier\", \"model_id\": ...})` in the verifier failure surface too (whatever error/result text `verify()` exposes), and add an integration test that drives the real verifier path rather than only calling `_copilot_cli_dispatch(..., role=\"verifier\")` directly.**\n\n- **The “auth-reprobe result” promised in the surfaced summary is under-reported when reprobe did not run** → `ai_router/transport_diagnostics.py::diagnostics_summary()` only appends `reprobe_cli_alive=...` when `md.get(\"reprobed\")` is truthy; otherwise the summary says nothing about reprobe status at all → **Always include `reprobed=<bool>` in the compact summary, and include `reprobe_cli_alive=<bool>` only when applicable. Update tests to assert both the `reprobed=True` and `reprobed=False` summary forms.**",
+      "category": "unknown",
+      "severity": "unknown"
+    }
+  ]
+}

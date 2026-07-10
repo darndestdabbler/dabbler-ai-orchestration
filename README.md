@@ -170,7 +170,12 @@ came from); multi-seat and enterprise-seat model availability are not
 yet validated, and an enterprise-managed seat may expose only one
 provider family and fail the two-provider check even when the guided
 flow itself succeeds — the form reports that honestly instead of
-leaving a silently broken router. From there the form hands you copyable
+leaving a silently broken router. (Running the Copilot seat also needs a
+one-time per-machine setup — install the `copilot` CLI, log in to your
+tenant, run the auth-preflight — walked through in
+[docs/copilot-seat-setup-checklist.md](docs/copilot-seat-setup-checklist.md);
+an unauthenticated seat is blocked at session start rather than silently
+faking verification.) From there the form hands you copyable
 prompts for drafting `docs/planning/project-plan.md` and decomposing
 it into session sets with your AI agent. The four-tier budget mapping
 is documented in

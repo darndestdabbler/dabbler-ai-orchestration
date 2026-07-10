@@ -1,14 +1,14 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "089-verify-evidence-completeness",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-10T14:21:47.732440-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-10T15:02:56.372631-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "WAIVED"
     }
   ]
 }

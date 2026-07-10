@@ -312,7 +312,7 @@ first, block later.
 
 | Phase | Contents | Risk |
 | --- | --- | --- |
-| **1. Metadata + Explorer tier** | `docs/modules.yaml` reader, `module:` spec attribute, global-uniqueness validation, 3-level Explorer, "New module" scaffold, module-targeted plan/decomposition flows, CODEOWNERS + CI templates in `docs/templates/consumer-bootstrap/`. **No file moves, no identity changes, no Python changes.** | Low |
+| **1. Metadata + Explorer tier** | `docs/modules.yaml` reader, `module:` spec attribute, global-uniqueness validation, 3-level Explorer, "New module" scaffold, module-targeted plan/decomposition flows, CODEOWNERS + CI templates in `docs/templates/consumer-bootstrap/`. **No file moves, no identity changes, no changes to Python files.** | Low |
 | **2. Locators + scope check** | Shared locator API (TS + Python), route all resolvers through it, codeRoots scope check (warn mode), bare-number ambiguity errors. | Medium |
 | **3. Physical layout (optional)** | `docs/session-sets/<module>/…` migration, module-qualified branches, flattened worktree folder names, migration script + drift check, writer-discipline and cost-report canonicalization fixes verified. | Highest — only if flat storage becomes a real problem |
 

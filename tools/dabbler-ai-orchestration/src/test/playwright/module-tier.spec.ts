@@ -67,12 +67,17 @@ const MODULES_YAML = [
 
 // Stamp `module: <slug>` into the harness fixture's Session Set
 // Configuration YAML block (the extension parses the key from there).
+// Newline-agnostic: the Python harness writes the spec in text mode, so
+// the file carries \r\n on Windows and \n elsewhere — the inserted line
+// reuses whatever EOL the anchor line has (the CI windows-latest run
+// 29123889271 caught the \n-only version never matching on Windows).
 function stampModule(h: FixtureHandle, moduleSlug: string): void {
   const specPath = path.join(h.set_dir, "spec.md");
   const spec = fs.readFileSync(specPath, "utf8");
   const patched = spec.replace(
-    "requiresE2E: false\n",
-    `requiresE2E: false\nmodule: ${moduleSlug}\n`,
+    /requiresE2E: false(\r?\n)/,
+    (_m, eol: string) =>
+      `requiresE2E: false${eol}module: ${moduleSlug}${eol}`,
   );
   if (patched === spec) {
     throw new Error(`could not stamp module: into ${specPath}`);

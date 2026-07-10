@@ -224,6 +224,14 @@
       "dateTime": "2026-07-10T17:10:38.460414-04:00",
       "description": "Step 5 build+test: unit 1306 passing (13 new), tsc --noEmit clean, esbuild clean, eslint 7 pre-existing errors only (zero new), Layer 1 pytest 2922 passed/6 skipped/0 failed. Playwright local attempt: all 7 selected specs (new module-tier smoke + 6 pre-existing CI-green specs) failed identically at app.firstWindow before any assertion - the S1-documented agent-shell Electron launch limitation, reproduced; CI on the pushed commit is the Layer-3 evidence of record (E2E gate armed by operator suggestion_disposition=e2e).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/ci-windows-eol-fix",
+      "dateTime": "2026-07-10T17:21:33.423581-04:00",
+      "description": "CI run 29123889271 on d089272: all jobs green except the NEW module-tier Playwright spec on windows-latest - the stampModule helper matched requiresE2E with a bare \\n while the Python harness writes CRLF on Windows (macOS/ubuntu green incl. the new spec). Fixed newline-agnostic (regex reuses the anchor EOL); verified against a real harness fixture (CRLF confirmed, stamp lands). Test-helper portability fix only; no product-code change.",
+      "status": "complete"
     }
   ]
 }

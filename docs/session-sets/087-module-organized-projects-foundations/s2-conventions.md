@@ -39,15 +39,23 @@ R1/R4 workflow-order dismissals.)
   composite `module/bucket` collapse keys, per-module row containment,
   module-collapse round-trip) plus the zero-`.module` no-manifest
   assertion added to `session-sets-tree.spec.ts`.
-- Local-run caveat (S1 precedent, reproduced in S2): the local attempt
-  ran and ALL 7 selected specs — the new module-tier smoke AND the six
-  pre-existing session-sets-tree specs that are green on CI at HEAD —
-  failed identically at `app.firstWindow` before any assertion (the
-  Electron window never opens in this agent shell). The six untouched
-  specs failing the same way IS the clean-HEAD control: an environment
-  launch limitation, not a regression. The Layer-3 evidence of record is
-  therefore the fully green CI run on this session's final code commit
-  (exact run cited in disposition.json), same as S1.
+- Local-run caveat (S1 precedent, reproduced in S2): in the local
+  attempt the six pre-existing session-sets-tree specs — green on CI at
+  HEAD — failed at `app.firstWindow` before any assertion (the Electron
+  window never opens in this agent shell). Untouched specs failing at
+  launch IS the clean-HEAD control: an environment launch limitation,
+  not a regression. The Layer-3 evidence of record is therefore the
+  fully green CI run on this session's final code commit (exact run
+  cited in disposition.json), same as S1.
+- CI round trip on the new smoke: the first push (`d089272`, run
+  29123889271) came back green everywhere EXCEPT the new module-tier
+  spec on windows-latest — the test helper's `\n`-only string match
+  never matched the CRLF the Python harness writes on Windows (macOS /
+  ubuntu green, including the new spec). Fixed by making the stamp
+  newline-agnostic (regex `\r?\n`, reusing the anchor's EOL), verified
+  against a real harness fixture locally (CRLF confirmed present, stamp
+  matches, module line lands). A test-helper portability bug, not a
+  product-code defect — no rendering-path change in the fix commit.
 
 ## Backward-compat evidence (the strongest artifact — read this first)
 The "no-manifest repo renders exactly today's two-level view" claim is

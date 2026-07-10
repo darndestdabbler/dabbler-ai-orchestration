@@ -3,6 +3,72 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.32.0] — Unreleased (out-of-band verification-loop remediation)
+
+> Prepared **out of band** — NOT through the framework's own verification loop,
+> which this work repairs — on branches `fix/critical-eval-ss1..ss3`, reviewed
+> across multiple rounds by an independent, different-provider reviewer (which
+> caught nine real defects the builder missed). The PyPI publish stays
+> operator-gated (tag `v0.32.0`); the version number is provisional — fold into
+> `0.31.0` or renumber at publish time as preferred. Fixes the runaway
+> verification loop: it now exits deterministically on minor-only findings,
+> cannot be talked into a self-release, binds its severity decision to hash-bound
+> evidence, and reviews complete, non-truncated, non-rolled-back evidence.
+> Per-session-set detail lives in the remediation workspace `ssN-summary.md`
+> files (the raw material for a forthcoming documentation session set).
+
+### Changed
+
+- **(SS1) Severity-anchored loop exit.** A single `is_blocking_issue()` predicate
+  now backs `is_blocking_verdict`, `classify_blocking`, AND the dedicated
+  `derive_state`, so the loop layer and the workflow layer can no longer disagree
+  about what "blocking" means. A Minor-only round closes as "verified with
+  observations" instead of churning; Critical/Major/unknown-severity still opens
+  a round.
+
+### Fixed
+
+- **(SS1) Self-release paths closed.** `derive_state` no longer short-circuits to
+  `closed-verified` on a bare `VERIFIED` token before inspecting issues (a
+  structured Major under a mislabeled VERIFIED → `awaiting-human`); an
+  unknown/unauthorized `resolution_status` is invalid evidence → `awaiting-human`
+  (checked above both the verification and remediation branches);
+  `accepted-risk` / `accepted-consequence` / `not-reproducible` are human-stops,
+  not self-service terminal closes (only `fixed` stays terminal). The push parser
+  surfaces a genuinely structured Critical/Major/unknown-severity block under a
+  `VERIFIED` token (line-anchored marker; never scans prose — the Set-071
+  false-positive guard is preserved).
+- **(SS2) Severity laundering closed.** The close settle-logic (`close_backstop`)
+  derives severities by reparsing the HASH-BOUND raw verification artifact, not
+  the editable `sN-issues.json` envelope, so a hand-edited severity can no longer
+  launder a Major into a non-blocking close. No stamp-schema migration — the
+  validator already reparsed the artifact for the verdict; SS2 stops discarding
+  its issues.
+- **(SS3) Incomplete / rolled-back evidence closed.** The evidence bundle now
+  inlines untracked-file CONTENT (file-level `git ls-files --others`; binary /
+  oversized / symlink / generated-bundle-excluded files reported as explicitly
+  uncovered, never silently dropped); a truncated verifier response is invalid
+  evidence → `EXIT_VERIFICATION_UNAVAILABLE` writing nothing; and the LATEST
+  verification attempt governs — `check_verification_integrity` and the close
+  backstop fail closed when the newest stamped row is invalid, so a newer
+  failed/truncated attempt can no longer be discarded in favor of an older
+  favorable valid row.
+
+### Documented
+
+- The Lightweight/dedicated tier's engine-arm cross-provider check remains an
+  **accepted weaker-model boundary** (the Full tier already enforces
+  effective-provider difference via `resolve_orchestrator_exclusion`); documented
+  in the `cross_provider_satisfied` docstring rather than tightened, to avoid
+  breaking backward-compatible multi-engine/same-provider configs for marginal
+  value.
+
+### Deferred (documented, revive on telemetry)
+
+- A `derive_evaluation_decision()` refactor (redundant — SS1/SS2 already made the
+  decisions correct), an attempt-history round budget (needs a durable attempt
+  ledger), and honest machine-verified vs operator-waived release labels.
+
 ## [0.31.0] — Unreleased (Set 086 — Copilot-seat verification integrity)
 
 > Prepared in Set 086; **not yet published**. The PyPI publish is an

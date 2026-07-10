@@ -124,6 +124,14 @@
       "dateTime": "2026-07-10T13:43:43.677045-04:00",
       "description": "R5 (gpt-5-4 ladder-fallback): (a) stale FINAL-count/round-history echoes - FIXED: s1-conventions.md rewritten with one authoritative baseline (1293 unit tests / 20 Set-087 tests) and the disposition summary carries the same finals + full round history. (b) files_changed missing round-4 artifacts - FIXED: regenerated exhaustively (35 paths) + explicit policy for the running round's own artifacts. (c) dangling symlink at docs/modules.yaml bypassed the unreadable-manifest warning via the existsSync precheck - FIXED: attempt-read-first; ENOENT silent only when lstat confirms no directory entry; symlink test with environment skip guard. Suite 1293 green, tsc/compile clean.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 16,
+      "stepKey": "session-001/ci-green-final-code-commit",
+      "dateTime": "2026-07-10T13:53:10.080950-04:00",
+      "description": "CI fully green for every code commit in the session: dd5c923 (run 29110488046), fe74dbf/R4 fix (run 29111369426), 1fb5286/R5 fix - the final code commit (run 29111967215) - all jobs green incl. Playwright Layer 3 on windows/macos/ubuntu. Conventions CI-evidence section updated with per-commit citations.",
+      "status": "complete"
     }
   ]
 }

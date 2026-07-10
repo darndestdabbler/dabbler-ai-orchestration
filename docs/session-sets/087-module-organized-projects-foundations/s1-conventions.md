@@ -50,8 +50,12 @@ tests. The append-only activity log is never rewritten. The final state is:
 - Post-`dd5c923` code deltas are confined to `readModulesManifest`'s
   unreadable/wrong-shape warning branches and their tests (verifier rounds
   4–5 remediations) — no rendering-path or discovery-merge behavior change.
-  CI runs on every push to master; the run for the final code commit is
-  cited in the activity log / disposition when it completes.
+- **Every code commit in this session has its own fully green CI run**:
+  `dd5c923` → run 29110488046, `fe74dbf` (R4 fix) → run 29111369426,
+  `1fb5286` (R5 fix, the FINAL code commit) → run
+  https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/29111967215
+  — all jobs green including Playwright Layer 3 on all three OSes.
+  Commits after `1fb5286` touch session-set artifacts (json/md) only.
 
 ## files_changed inventory policy
 `disposition.json.files_changed` inventories the full

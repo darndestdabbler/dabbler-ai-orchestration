@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "088-external-remediation-documentation",
+  "status": "in-progress",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Session 1",
+      "status": "in-progress",
+      "startedAt": "2026-07-10T12:00:04.277593-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-4-8",
+        "effort": "high",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null
+    }
+  ]
+}

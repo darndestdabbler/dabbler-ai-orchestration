@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Required verification/closure artifacts are missing, and the session set is still open.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The spec requires:  \n      - Step 4: \"**Verify (mandatory Full-tier `verify_session`)**\"  \n      - Step 5: \"**Author `disposition.json`; commit and push; `close_session`**\"  \n      - Step 6: \"**Produce `change-log.md`**\"  \n      - \"**Creates:** `change-log.md`; the standard per-session artifacts (`disposition.json`, `sN-verification*.md`, etc.)\"  \n      - \"**Ends with:** ... **closed session set** ... cross-provider VERIFIED (or Minor-only) ... **pushed**; `close_session` succeeded.\"\n    - **Impact:** This is not a completed, mergeable session record. The required audit trail showing verification, disposition, closure, and final recordkeeping is absent, so a reviewer cannot accept the set as formally captured/closed.\n    - **Evidence:**  \n      - `git status --short` still shows unstaged/uncommitted work:  \n        - `M docs/repository-reference.md`  \n        - `?? docs/session-sets/088-external-remediation-documentation/`  \n        - `?? docs/verification-loop-remediation-2026-07.md`\n      - `docs/session-sets/088-external-remediation-documentation/session-state.json` says:\n        - `\"status\": \"in-progress\"`\n        - session `\"status\": \"in-progress\"`\n        - `\"completedAt\": null`\n        - `\"verificationVerdict\": null`\n      - `session-events.jsonl` contains only `work_started`.\n      - No `change-log.md`, no `disposition.json`, and no `s1-verification*.md` artifact appear in the provided files.\n    - **Correct answer:** Run and record the mandatory full-tier verification, generate the standard session artifacts (`disposition.json`, verification files, `change-log.md`), and close the session/set so the state shows completed/verified.",
+      "category": "Completeness",
+      "severity": "Major"
+    },
+    {
+      "description": "** The required independent-provider documentation feedback pass is not evidenced.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The spec requires:  \n      - Step 2: \"**Route the remediation doc for an independent-provider feedback pass (`route(task_type=\"documentation\")`); log the routed feedback; apply only material corrections to the doc.**\"  \n      - End deliverable: \"**An independent-provider feedback pass applied (material-only) to `docs/verification-loop-remediation-2026-07.md`.**\"\n    - **Impact:** This is one of the set's core deliverables. Without a routed/logged cross-provider feedback pass, the session has not demonstrated the very independent review it was created to capture, which should change a reviewer's merge decision.\n    - **Evidence:**  \n      - `activity-log.json` records only a `pathAwareCritique` choice; it does **not** record any route/feedback event.\n      - `session-events.jsonl` records only `work_started`.\n      - No feedback log, route output, review transcript, or verification artifact is present anywhere in the provided tree.\n      - The presence of a new `docs/verification-loop-remediation-2026-07.md` file does not by itself satisfy the explicit requirement to **route**, **log**, and **apply** independent-provider feedback.\n    - **Correct answer:** Add the route result/log for the documentation pass and show any material-only corrections made to `docs/verification-loop-remediation-2026-07.md` from that feedback.",
+      "category": "Completeness",
+      "severity": "Major"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "sessionSetName": "088-external-remediation-documentation",
+  "createdDate": "2026-07-10T16:00:04.308371+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-10T16:00:04.308371+00:00",
+      "description": "Operator set pathAwareCritique: none.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "none"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "doc-routed-for-feedback",
+      "dateTime": "2026-07-10T12:06:52.116591-04:00",
+      "description": "Routed docs/verification-loop-remediation-2026-07.md via route(task_type=documentation); reviewer gemini-pro (cross-provider), auto-verifier gpt-5-4-mini VERIFIED; applied 4 material traceability corrections, deferred immaterial polish. Raw record: s1-doc-feedback.md",
+      "status": "completed",
+      "routedApiCalls": [
+        {
+          "model": "gemini-pro",
+          "task_type": "documentation",
+          "cost_usd": 0.0243,
+          "purpose": "independent-provider doc feedback"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "discoverability-linked",
+      "dateTime": "2026-07-10T12:06:52.117590-04:00",
+      "description": "Added a Recent-version-walk pointer in docs/repository-reference.md to the remediation doc + the 088 capture; grounded commit refs; captured the Set 086 cancellation/salvage linkage. Skipped lessons-learned.md edit to respect the Set 085 preload slimming.",
+      "status": "completed"
+    }
+  ]
+}

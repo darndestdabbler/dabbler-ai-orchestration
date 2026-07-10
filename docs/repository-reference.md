@@ -68,6 +68,23 @@ can learn it.
 
 ### Recent version walk
 
+- **`dabbler-ai-router 0.32.0`** — **out-of-band verification-loop
+  remediation** (landed on `master`, **publish operator-gated** — not yet on
+  PyPI). The framework's own verification loop had become a "runaway train"
+  (refused to exit on Minor-only findings; anti-fabrication gates bypassable)
+  and was repaired **outside** that loop, because the loop was the thing under
+  repair. Governing principle: **the builder cannot release itself** — release
+  needs different-provider evidence and is computed by the framework, never
+  asserted by the agent. Commits `a7a471f` (severity-aware loop exit +
+  anti-self-release), `60c887d` (close severity rebound to the hash-bound
+  artifact), `a48c6e6` (untracked-content coverage, truncation-as-invalid,
+  latest-attempt anti-rollback). **Set 086 was salvaged inside this release**:
+  cancelled by the same runaway loop, its code had landed on `master` (orphaned
+  `0.31.0`, red CI); its CI was fixed here so its auth-preflight, close
+  fail-loud, verdict-token validation, and transport diagnostics ship in
+  `0.32.0`. Full record + rationale:
+  [`docs/verification-loop-remediation-2026-07.md`](verification-loop-remediation-2026-07.md);
+  formally captured as session set `088-external-remediation-documentation`.
 - **`dabbler-ai-router 0.30.0` + Extension `0.40.0`** — Set 085, the
   guidance-slimming release (**published 2026-07-07** on operator
   authorization: tags `v0.30.0` run

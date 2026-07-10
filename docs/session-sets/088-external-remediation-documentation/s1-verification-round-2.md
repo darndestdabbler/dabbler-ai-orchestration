@@ -1,0 +1,43 @@
+**ISSUES FOUND**
+
+- **Issue 1:** The session set is not actually completed or closed; required end-of-set deliverables are still missing.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Details:**
+    - **Violation:** The spec requires:
+      - Step 5: "**Author `disposition.json`; commit **and** push; `close_session`**"
+      - Step 6: "**Produce `change-log.md`**"
+      - "**Ends with:** ... **closed session set** ... cross-provider VERIFIED (or Minor-only); **pushed**; `close_session` succeeded."
+    - **Impact:** This is not a formally captured, mergeable session record. A reviewer cannot accept the set as complete while it is still open, lacks the required `change-log.md`, and has no evidence that the close/push steps happened.
+    - **Evidence:**
+      - `docs/session-sets/088-external-remediation-documentation/session-state.json` still says:
+        - `"status": "in-progress"`
+        - session `"status": "in-progress"`
+        - `"completedAt": null`
+        - `"verificationVerdict": null`
+      - `docs/session-sets/088-external-remediation-documentation/session-events.jsonl` contains only `work_started`; there is no close/completion event.
+      - No `change-log.md` appears in the provided files.
+      - `git status --short` still shows uncommitted work:
+        - `M docs/repository-reference.md`
+        - `?? docs/session-sets/088-external-remediation-documentation/`
+        - `?? docs/verification-loop-remediation-2026-07.md`
+    - **Correct answer:** Finish the set: produce `change-log.md` (including the Step 6 reorganization-review outcome, even if "no changes recommended"), commit the session artifacts and doc changes, push them, run `close_session`, and update the session state/events to a completed/closed state.
+
+- **Issue 2:** The delivered verification artifacts are stale or false and contradict the actual tree.
+  - **Category:** False Positive
+  - **Severity:** Major
+  - **Details:**
+    - **Violation:** Step 4 requires a mandatory full-tier verification record. That record must accurately describe the delivered work; it cannot block the session on omissions that are demonstrably present in the same tree.
+    - **Impact:** The audit trail is not trustworthy. The current verification result (`ISSUES_FOUND`) is based in part on false claims, so a reviewer cannot rely on it to decide whether the session passed or what still needs fixing.
+    - **Evidence:**
+      - `docs/session-sets/088-external-remediation-documentation/s1-verification.md` and `s1-issues.json` claim:
+        - "`activity-log.json` records only a `pathAwareCritique` choice; it does **not** record any route/feedback event."
+        - "No feedback log ... is present anywhere in the provided tree."
+        - "No ... `disposition.json` ... appear[s] in the provided files."
+      - Those claims are contradicted by the provided files:
+        - `activity-log.json` includes step `doc-routed-for-feedback` with `routedApiCalls` and a description of the cross-provider documentation pass.
+        - `s1-doc-feedback.md` exists and logs the routed feedback pass.
+        - `disposition.json` exists.
+      - `disposition.json` then records the bad outcome:
+        - `"verification_verdict": "ISSUES_FOUND"`
+    - **Correct answer:** Regenerate the verification artifacts against the actual final worktree after the remaining real blockers are fixed, and replace the stale/incorrect `s1-verification.md`, `s1-issues.json`, and resulting disposition with an accurate record.

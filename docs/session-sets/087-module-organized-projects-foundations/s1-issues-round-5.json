@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "- **Issue** → Final verification/suite evidence is stale and internally contradictory after the round-4 remediation, so the claimed end-state is not reliably substantiated.  \n  **Location** →  \n  - `docs/session-sets/087-module-organized-projects-foundations/s1-conventions.md` still labels the suite baseline as “FINAL” with **1291 / 18**, then later says the actual final totals are **1292 / 19**.  \n  - `docs/session-sets/087-module-organized-projects-foundations/disposition.json` summary still says **18 new unit tests**, **1291** passing, and **“Verification: 3 rounds”**, while `activity-log.json` records the round-4 test addition and the round-5 fallback attempt.  \n  **Fix** → Update every final-summary artifact to one consistent post-remediation state: final unit count, final new-test count, and final verification-round history. Remove the stale 1291/18/3-round claims rather than appending contradictory corrections elsewhere.\n\n- **Issue** → `files_changed` is no longer exhaustive after the later remediation rounds.  \n  **Location** → `docs/session-sets/087-module-organized-projects-foundations/disposition.json` → `files_changed` omits at least:  \n  - `docs/session-sets/087-module-organized-projects-foundations/s1-verification-round-4.md`  \n  - `docs/session-sets/087-module-organized-projects-foundations/s1-issues-round-4.json`  \n  Both files are present in the diff.  \n  **Fix** → Regenerate or manually update `files_changed` from the actual `<pre-session>..HEAD` diff plus the appended round artifacts so the inventory is complete.\n\n- **Issue** → `readModulesManifest()` still has a silent “present but unreadable” path: a dangling `docs/modules.yaml` symlink is treated as absent, bypassing the warning path.  \n  **Location** → `tools/dabbler-ai-orchestration/dist/extension.js`, `readModulesManifest()`:\n  ```js\n  if (!fs5.existsSync(manifestPath))\n    return null;\n  ```\n  followed by the `readFileSync()` warning branch. `fs.existsSync()` returns `false` for a broken symlink, so a real directory entry at `docs/modules.yaml` can still degrade silently to “no manifest.”  \n  **Fix** → Do not pre-classify absence with `existsSync()`. Attempt the read first, or `lstatSync()` the path so broken symlinks are treated as present/read-failing and emit the same warning as other unreadable manifest cases.",
+      "category": "unknown",
+      "severity": "unknown"
+    }
+  ]
+}

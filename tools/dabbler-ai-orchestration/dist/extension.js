@@ -16484,12 +16484,20 @@ function parsePrerequisites(specPath) {
 }
 function readModulesManifest(root) {
   const manifestPath = path6.join(root, MODULES_MANIFEST_REL);
-  if (!fs5.existsSync(manifestPath))
-    return null;
   let text;
   try {
     text = fs5.readFileSync(manifestPath, "utf8");
   } catch (e) {
+    if (e.code === "ENOENT") {
+      let entryExists = false;
+      try {
+        fs5.lstatSync(manifestPath);
+        entryExists = true;
+      } catch {
+      }
+      if (!entryExists)
+        return null;
+    }
     console.warn(
       `[dabblerSessionSets] ${manifestPath} exists but could not be read (${e instanceof Error ? e.message : String(e)}) \u2014 falling back to the single implicit module.`
     );

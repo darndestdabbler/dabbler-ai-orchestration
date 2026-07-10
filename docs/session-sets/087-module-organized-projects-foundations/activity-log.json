@@ -108,6 +108,14 @@
       "dateTime": "2026-07-10T13:32:59.320618-04:00",
       "description": "R4 (gpt-5-4): (a) regenerate-round-3-artifacts finding DISMISSED as contrary to the constitution (saved verification artifacts are immutable; resolution lives in the ledger + later rounds; the verificationVerdict: null observation repeats the R1 workflow-order dismissal). (b) present-but-unreadable modules.yaml silently null - FIXED: read-failure branch warns with path+error; new EISDIR-based test; unit suite 1292/19 final. Escalation: rounds 1-4 produced zero structured Critical/Major (all envelope severities unknown) and each round surfaced fresh unrated nits after fixes - edge-case exhaustion per the bounded-round rule. Round 5 is a THIRD-PROVIDER opinion (openai excluded alongside anthropic via the verify_session route_fn seam, Set 086 precedent) rather than another same-verifier round.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 14,
+      "stepKey": "session-001/third-provider-429-fallback",
+      "dateTime": "2026-07-10T13:37:54.685877-04:00",
+      "description": "Third-provider round-5 attempts (google): gemini-3-1-pro 429 across two runs (3 API attempts each) + 120s backoff; registry note: it carries is_enabled_as_verifier: false yet was selected for session-verification - flagged as a possible router selection gap for operator review (out of Phase-1 scope, no ai_router changes). Temporary uncommitted is_enabled toggle to steer selection to gemini-pro (2.5, verifier-enabled; Set 086 fallback precedent) - also 429: the google provider is quota-dead right now. Nothing was written by any failed attempt (artifact-less). Per the Step-6 escalation ladder, round 5 falls back to the remaining cross-provider verifier (gpt-5-4) with the full cross-round adjudication ledger in the conventions block; if it still blocks on fresh unrated nits, the loop SUSPENDS to the operator.",
+      "status": "complete"
     }
   ]
 }

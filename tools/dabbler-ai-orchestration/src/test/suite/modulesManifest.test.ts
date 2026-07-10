@@ -243,6 +243,38 @@ suite("Set 087 — readModulesManifest", () => {
     }
   });
 
+  // S1 verifier round 5: a DANGLING SYMLINK at the manifest path is a
+  // directory entry (config error), not the absent-manifest case — it
+  // must warn like every other unreadable-manifest shape. Skipped where
+  // the environment cannot create symlinks (unprivileged Windows).
+  test("dangling symlink at the manifest path warns (not silent-absent)", function () {
+    const root = makeTmpDir();
+    const origWarn = console.warn;
+    const warnings: string[] = [];
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    };
+    try {
+      fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+      try {
+        fs.symlinkSync(
+          path.join(root, "docs", "nonexistent-target.yaml"),
+          path.join(root, "docs", "modules.yaml"),
+          "file",
+        );
+      } catch {
+        this.skip(); // symlink creation unavailable in this environment
+        return;
+      }
+      assert.strictEqual(readModulesManifest(root), null);
+      assert.strictEqual(warnings.length, 1);
+      assert.ok(warnings[0].includes("could not be read"));
+    } finally {
+      console.warn = origWarn;
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("manifest present but entries empty returns []", () => {
     const root = makeTmpDir();
     try {

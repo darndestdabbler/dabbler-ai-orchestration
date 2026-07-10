@@ -475,15 +475,28 @@ export function parsePrerequisites(
  */
 export function readModulesManifest(root: string): ModuleManifestEntry[] | null {
   const manifestPath = path.join(root, MODULES_MANIFEST_REL);
-  if (!fs.existsSync(manifestPath)) return null;
+  // S1 verifier rounds 4–5: attempt the read FIRST rather than
+  // pre-classifying absence with existsSync (which reads a dangling
+  // symlink as "absent" and would skip the warning). A PRESENT manifest
+  // that cannot be read — wrong permissions, a directory, a broken
+  // symlink — is an I/O / config failure and warns before degrading to
+  // the implicit module; only a truly absent path (ENOENT with no
+  // directory entry under lstat) is silent, because that is the
+  // designed no-manifest fallback.
   let text: string;
   try {
     text = fs.readFileSync(manifestPath, "utf8");
   } catch (e) {
-    // S1 verifier round 4: a PRESENT manifest that cannot be read is an
-    // I/O / config failure, not the intentional no-manifest case — warn
-    // (same posture as the wrong-shape branches below), then degrade to
-    // the implicit module. Only a truly absent manifest is silent.
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      let entryExists = false;
+      try {
+        fs.lstatSync(manifestPath); // succeeds for a dangling symlink
+        entryExists = true;
+      } catch {
+        // no directory entry at all — truly absent
+      }
+      if (!entryExists) return null;
+    }
     console.warn(
       `[dabblerSessionSets] ${manifestPath} exists but could not be ` +
         `read (${e instanceof Error ? e.message : String(e)}) — ` +

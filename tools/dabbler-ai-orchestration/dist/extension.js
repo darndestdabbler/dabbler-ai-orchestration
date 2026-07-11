@@ -24022,6 +24022,21 @@ function validateNewModuleSlug(raw, existingSlugs) {
 function defaultModulePlanPath(slug) {
   return `docs/modules/${slug}/project-plan.md`;
 }
+function classifyModulesManifest(root) {
+  const entries = readModulesManifest(root);
+  if (entries !== null)
+    return { kind: "present", entries };
+  return manifestEntryExists(path15.join(root, MODULES_MANIFEST_REL)) ? { kind: "invalid" } : { kind: "absent" };
+}
+function manifestEntryExists(abs) {
+  try {
+    fs12.lstatSync(abs);
+    return true;
+  } catch {
+    return false;
+  }
+}
+var INVALID_MANIFEST_MESSAGE = `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest (expected a YAML mapping with a "modules:" list). Fix the file by hand before using the module-aware flows.`;
 var MODULES_YAML_HEADER = `# docs/modules.yaml \u2014 the module manifest (Dabbler module-organized projects).
 #
 # Each entry declares one module of this repo:
@@ -24063,25 +24078,23 @@ recommend including \`${slug}\` in each set's name.
 }
 function scaffoldNewModule(root, rawSlug, rawTitle) {
   const slug = (rawSlug ?? "").trim();
-  const existing = readModulesManifest(root);
+  const classified = classifyModulesManifest(root);
+  const existing = classified.kind === "present" ? classified.entries : [];
   const slugError = validateNewModuleSlug(
     slug,
-    (existing ?? []).map((e) => e.slug)
+    existing.map((e) => e.slug)
   );
   if (slugError)
     throw new Error(slugError);
   const manifestAbs = path15.join(root, MODULES_MANIFEST_REL);
-  const manifestExists = fs12.existsSync(manifestAbs);
-  if (manifestExists && existing === null) {
-    throw new Error(
-      `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest (expected a YAML mapping with a "modules:" list). Fix the file by hand before adding modules.`
-    );
+  if (classified.kind === "invalid") {
+    throw new Error(INVALID_MANIFEST_MESSAGE);
   }
   const title = (rawTitle ?? "").trim() || slug;
   const planRel = defaultModulePlanPath(slug);
   const entryBlock = renderModuleManifestEntry(slug, title, planRel);
   let candidate;
-  const manifestCreated = !manifestExists;
+  const manifestCreated = classified.kind === "absent";
   if (manifestCreated) {
     candidate = MODULES_YAML_HEADER + entryBlock;
   } else {
@@ -24091,7 +24104,7 @@ function scaffoldNewModule(root, rawSlug, rawTitle) {
   assertAppendedManifestParses(
     candidate,
     slug,
-    (existing ?? []).length + 1,
+    existing.length + 1,
     entryBlock
   );
   const planAbs = path15.join(root, ...planRel.split("/"));
@@ -24153,7 +24166,14 @@ function modulePlanRelPath(entry) {
   return p2.replace(/\\/g, "/");
 }
 async function pickModuleForAuthoring(root, ui) {
-  const target = resolveModuleTarget(readModulesManifest(root));
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return { kind: "invalid-manifest", entry: null };
+  }
+  const target = resolveModuleTarget(
+    classified.kind === "present" ? classified.entries : null
+  );
   if (target.kind === "none")
     return { kind: "none", entry: null };
   if (target.kind === "auto") {
@@ -24217,9 +24237,10 @@ async function resolvePlanTarget(root, ui) {
     return { entry: null, destPosix: PLAN_DEST_POSIX };
   const pick2 = await pickModuleForAuthoring(root, {
     showQuickPick: ui.showQuickPick,
-    showInformationMessage: ui.showInformationMessage
+    showInformationMessage: ui.showInformationMessage,
+    showErrorMessage: ui.showErrorMessage
   });
-  if (pick2.kind === "cancelled")
+  if (pick2.kind === "cancelled" || pick2.kind === "invalid-manifest")
     return null;
   return {
     entry: pick2.entry,
@@ -24453,10 +24474,12 @@ async function copySessionSetGenPrompt(context, options = {}) {
   }
   const modulePick = await pickModuleForAuthoring(root, {
     showQuickPick: (items, opts) => vscode8.window.showQuickPick(items, opts),
-    showInformationMessage: (m) => vscode8.window.showInformationMessage(m)
+    showInformationMessage: (m) => vscode8.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode8.window.showErrorMessage(m)
   });
-  if (modulePick.kind === "cancelled")
+  if (modulePick.kind === "cancelled" || modulePick.kind === "invalid-manifest") {
     return false;
+  }
   const moduleOpt = modulePick.entry ? {
     slug: modulePick.entry.slug,
     planPath: modulePlanRelPath(modulePick.entry)

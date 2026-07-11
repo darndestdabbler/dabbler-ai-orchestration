@@ -819,6 +819,46 @@ suite("planImport — module-aware targeting (Set 087 S3)", () => {
     }
   });
 
+  test("copyPlanningPrompt: a PRESENT-but-invalid manifest errors and copies NOTHING (S3 verification R1)", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-invalid-prompt-", "just a string, not a manifest\n");
+    try {
+      await copyPlanningPrompt(makeUi({ workspaceRoot: () => root }, log));
+      assert.strictEqual(log.clipboard.length, 0, "must not fall back to the repo-level prompt");
+      assert.strictEqual(log.infos.length, 0);
+      assert.strictEqual(log.errors.length, 1);
+      assert.ok(log.errors[0].includes("not a valid module manifest"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("importPlanFromFile: a PRESENT-but-invalid manifest errors and never opens the file dialog (S3 verification R1)", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-invalid-import-", "modules: 42\n");
+    let dialogShown = false;
+    try {
+      const ok = await importPlanFromFile(
+        makeUi(
+          {
+            workspaceRoot: () => root,
+            showOpenDialog: (async () => {
+              dialogShown = true;
+              return undefined;
+            }) as unknown as PlanImportUi["showOpenDialog"],
+          },
+          log,
+        ),
+      );
+      assert.strictEqual(ok, false);
+      assert.strictEqual(dialogShown, false, "must abort before the file dialog");
+      assert.strictEqual(log.errors.length, 1);
+      assert.ok(log.errors[0].includes("not a valid module manifest"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("importPlanFromFile: Esc on the module picker never opens the file dialog", async () => {
     const log = freshLog();
     const root = moduleRoot("gs-mod-import-esc-", TWO_MODULES);

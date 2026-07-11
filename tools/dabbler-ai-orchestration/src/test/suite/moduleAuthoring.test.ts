@@ -8,9 +8,11 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import {
+  INVALID_MANIFEST_MESSAGE,
   MODULES_YAML_HEADER,
   ModulePickItem,
   ModulePickUi,
+  classifyModulesManifest,
   defaultModulePlanPath,
   modulePlanRelPath,
   pickModuleForAuthoring,
@@ -254,6 +256,7 @@ suite("moduleAuthoring — module-target resolution (Set 087 S3)", () => {
   function pickUi(log: {
     infos: string[];
     picks: ModulePickItem[][];
+    errors?: string[];
   }, answer?: (items: ModulePickItem[]) => ModulePickItem | undefined): ModulePickUi {
     return {
       showQuickPick: async (items, _opts) => {
@@ -261,8 +264,38 @@ suite("moduleAuthoring — module-target resolution (Set 087 S3)", () => {
         return answer ? answer(items) : undefined;
       },
       showInformationMessage: (m) => void log.infos.push(m),
+      showErrorMessage: (m) => void (log.errors ?? (log.errors = [])).push(m),
     };
   }
+
+  test("classifyModulesManifest: absent vs invalid vs present (S3 verification R1)", () => {
+    const root = tmpRoot("mod-classify-");
+    try {
+      assert.deepStrictEqual(classifyModulesManifest(root), { kind: "absent" });
+      writeManifest(root, "just a string\n");
+      assert.deepStrictEqual(classifyModulesManifest(root), { kind: "invalid" });
+      writeManifest(root, "modules:\n  - slug: greeter\n");
+      const out = classifyModulesManifest(root);
+      assert.strictEqual(out.kind, "present");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("pickModuleForAuthoring: a PRESENT-but-invalid manifest errors and aborts — never the repo-level fallback (S3 verification R1)", async () => {
+    const root = tmpRoot("mod-pick-invalid-");
+    const log = { infos: [] as string[], picks: [] as ModulePickItem[][], errors: [] as string[] };
+    try {
+      writeManifest(root, "not: [a, module, manifest\n"); // broken YAML
+      const out = await pickModuleForAuthoring(root, pickUi(log));
+      assert.deepStrictEqual(out, { kind: "invalid-manifest", entry: null });
+      assert.deepStrictEqual(log.errors, [INVALID_MANIFEST_MESSAGE]);
+      assert.strictEqual(log.picks.length, 0, "no QuickPick on an invalid manifest");
+      assert.strictEqual(log.infos.length, 0, "no auto-select notice either");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 
   test("pickModuleForAuthoring: no manifest → none, no UI at all", async () => {
     const root = tmpRoot("mod-pick-none-");

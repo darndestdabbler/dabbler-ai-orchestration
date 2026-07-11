@@ -1,35 +1,48 @@
 {
   "status": "completed",
-  "summary": "Session 2: the Explorer module tier (module -> status-bucket -> row). Protocol: ModulePayload { slug; title; buckets } + SnapshotPayload.modules replacing the top-level buckets field per the routed rendering ruling (Q2 - host and webview ship together; a duplicated field only invites divergence); RowPayload.slug and every action message unchanged (module is grouping, never identity). View-model: pure groupByModule(all) ordered by the new SessionSet.moduleOrder (the manifest entry index, stamped at scan time next to module/moduleTitle - ruling Q3; the small types.ts/fileSystem.ts touches beyond the spec's declared list are named in s2-conventions.md). Host: buildModules wraps the unchanged buildBuckets/buildRow. Webview: the single-implicit case renders BYTE-IDENTICAL pre-087 markup (proven by an old-vs-new innerHTML diff harness, 3136 bytes equal, incl. empty + cancelled buckets); multi-module workspaces render collapsible module groups in manifest file order with the implicit '(ungrouped)' group last (ruling Q1), aria-level 1 (module header) / 2 (bucket header) / 3 (row), per-module collapse state, and composite '<module>/<bucket>' collapse keys (ruling Q4). Ruling saved raw at s2-explorer-render-architecture.json (anthropic excluded after a read-timeout + a 400 on the architecture call; exclusion logged). Operator answered the requiresUAT/requiresE2E 'suggested' prompt with 'e2e' (suggestion_disposition entry): the Playwright gate is armed, no UAT checklist owed. Evidence: unit suite 1313 passing (20 new Layer-2 tests in moduleTier.test.ts incl. the round-1 behavioral payload suite), tsc + esbuild clean, eslint 7 pre-existing errors only (zero new), Layer 1 pytest 2922 passed / 6 skipped / 0 failed. Layer 3: first push d089272 (run 29123889271) was green on every job except the NEW smoke on windows-latest - a test-helper EOL bug (\\n-only match vs the harness's CRLF specs), fixed newline-agnostic in 4e5516f (fully green run 29124453680, Playwright Layer 3 on all three OSes incl. the new smoke). Verification round 1 (gpt-5-6) found one Major (Completeness): the spec-required buildModules payload-shape Layer-2 test had been substituted with source scans; fixed in 121493e by extracting the payload assembly verbatim into pure SessionSetsModel.buildModulePayloads/buildBucketPayloads (host buildModules one-line delegates, buildRow unchanged) + 7 behavior-level tests (unit suite 1306 -> 1313); 121493e's fully green run 29125361374 is the Layer-3 / E2E-gate evidence of record for the final code commit. Verification round 2 (gpt-5-6) raised a fresh Major: the module/bucket headers were not conformant WAI-ARIA treeitems (attributes on generic divs, aria-expanded on role=group, click-only headers); the close backstop's round 3 re-raised it. Adjudication chain (all saved raw): orchestrator disputed in-session fixability; operator selected the third-provider path; gemini-pro (s2-third-opinion-aria.json) ruled the finding technically correct but recommended DEFER on dialect-consistency grounds; the operator - final authority - overrode the DEFER and ordered the FIX NOW. Fixed: the multi-module dialect now follows the WAI-ARIA tree pattern (module treeitem level 1 + aria-expanded on the node, children in nested role=group; non-empty buckets treeitems level 2, empty buckets leaf nodes; rows level 3; roving tabindex includes module/bucket nodes; Enter/Space toggle, ArrowRight expand-or-first-child, ArrowLeft collapse-or-parent; visible-nodes-only arrow navigation; nested-treeitem bubbling guards). The single-implicit dialect stays byte-identical per the locked spec constraint - re-proven by the diff harness after the restructure (3,136 bytes equal); its future harmonization is the recorded follow-on. Playwright smoke extended to roles + keyboard collapse; unit suite 1313 passing; the fix commit 46bbab8's fully green CI run 29126914970 (Playwright Layer 3 on all three OSes incl. the extended keyboard/roles assertions) supersedes as the Layer-3 / E2E-gate evidence of record. Local Electron launch remains unavailable in the agent shell (S1-documented limitation; six untouched CI-green specs fail at app.firstWindow locally - the environment control).",
+  "summary": "Session 3: module authoring, scaffolding & ownership templates. New-module scaffold (routed ruling Q1, saved raw at s3-authoring-scaffold-architecture.json; anthropic excluded after a provider-side 400 x3 - S2 precedent - so gemini-pro ruled, auto-verified VERIFIED): shared unit-testable logic in src/utils/moduleAuthoring.ts (kebab slug validation against the manifest, format-preserving append guarded by a parse-after-append refusal that writes NOTHING and prints the copyable entry block when the appended text cannot land in the modules: list, header-seeded docs/modules.yaml creation, explicit planPath, skip-existing plan stub written stub-first), flow in src/commands/newModule.ts (two InputBoxes with live validateInput; stub opened after creation), exposed BOTH as the dabbler.newModule palette command and as the riderless new-module Getting Started action (protocol union + dispatch case + step-2 secondary button with explainer hover copy). Module-targeted authoring (rulings Q2/Q4): BootstrapContext.module + the whole-line {{MODULE_LINE}} token in spec.md.template (VERIFICATION_MODE_LINE pattern) so the decomposition prompt's worked exemplar STAMPS module: <slug> writer-rendered; copySessionSetGenPrompt resolves the target through the shared pickModuleForAuthoring (no manifest = unchanged pre-087 flow; one module = auto-select WITH an operator-visible notice; >=2 = QuickPick; Esc cancels the whole copy) and references the module's planPath (existence-checked, module-aware missing-plan warning); a hard-requirements line demands the stamp and guidance RECOMMENDS (never enforces) the module slug in set names; copyPlanningPrompt + importPlanFromFile share the same picker and target the module plan, with repo-level renders byte-identical pre-087 and the no-root error deliberately kept AFTER the file dialog to preserve the Set 060 cancelled-dialog semantics. Ownership + CI templates (ruling Q3): CODEOWNERS.template (comment-only, worked Priya/Sam/Alex example, integration `touches` review rule taught as process - CODEOWNERS semantics are path-based) and monorepo-ci.yml.template (commented dorny/paths-filter per-module jobs + the single ACTIVE all-module guardrail job on push to main whose placeholder step succeeds, so the unadapted file can never break a build) loaded via TemplateBundle and written by BOTH scaffold paths to .github/CODEOWNERS + .github/workflows/monorepo-ci.yml (skip-existing); the esbuild required-file gate gains both PLUS the previously-missing cross-provider-verification.md.template (a Set 077 sibling-site gap, L-069-1); the bundle README inventory updated (including the missing Set 077 row). Verification round 1 (gpt-5-6) found one Major (Correctness): pickModuleForAuthoring treated a PRESENT-but-invalid docs/modules.yaml like an absent one, silently falling back to unstamped repo-level authoring; fixed in-flight - classifyModulesManifest distinguishes absent/invalid/present (lstat entry check), an invalid manifest now errors with the shared INVALID_MANIFEST_MESSAGE and ABORTS every authoring flow (new invalid-manifest outcome handled by copyPlanningPrompt, importPlanFromFile before its dialog, and copySessionSetGenPrompt; scaffoldNewModule reuses the classifier), pinned by 4 new tests. Evidence (final): unit suite 1350 passing / 0 failing (37 net-new tests incl. the moduleAuthoring matrix with every refusal case), tsc + esbuild clean, eslint at the 7-error pre-existing baseline (new files fully clean), Layer 1 pytest 2922 passed / 6 skipped / 0 failed (the cold-start acceptance test consumed the regenerated goldens, which now carry the two .github teaching templates per tier), and a live 12/12-PASS dogfood that drove the real flow/picker/prompt-builders end-to-end against a scratch repo. Operator answered the requiresUAT/requiresE2E 'suggested' prompt with 'uat' (suggestion_disposition, session 3): the armed gate is the ad-hoc human checklist - authored to the Set-078 bar as 087-module-organized-projects-foundations-uat-checklist.json (8 walks; every functional item pre-verified by a named suite and/or the live dogfood; runs against the locally built, untracked 0.41.0 VSIX; awaiting the operator's walk - pending UAT blocks downstream sessions, not this close). Code commit 66ed06d pushed; CI run 29131125452 (Playwright Layer 3 on all three OSes, required by L-064-12 for the webview form change even though the armed operator gate is UAT) is the Layer-3 evidence of record - final status recorded in the activity log.",
   "verification_method": "api",
-  "verification_verdict": "VERIFIED",
+  "verification_verdict": "ISSUES_FOUND",
   "files_changed": [
+    "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts",
+    "tools/dabbler-ai-orchestration/src/commands/newModule.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gettingStartedActions.ts",
     "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
-    "tools/dabbler-ai-orchestration/src/types.ts",
-    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
-    "tools/dabbler-ai-orchestration/src/providers/SessionSetsModel.ts",
-    "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
-    "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
-    "tools/dabbler-ai-orchestration/src/test/suite/moduleTier.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/module-tier.spec.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/session-sets-tree.spec.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/copyPromptCommands.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/flagDecisionForReview.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/forceClosedBadge.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/inProgressSetsService.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/prerequisites.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/sessionSetsProvider.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/setupVerification.test.ts",
+    "tools/dabbler-ai-orchestration/src/utils/consumerBootstrap.ts",
+    "tools/dabbler-ai-orchestration/src/wizard/sessionGenPrompt.ts",
+    "tools/dabbler-ai-orchestration/src/wizard/planImport.ts",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/esbuild.js",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleAuthoring.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionGenPrompt.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/consumerBootstrap.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldCore.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
     "tools/dabbler-ai-orchestration/dist/extension.js",
     "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/CODEOWNERS.template",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/monorepo-ci.yml.template",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/README.md",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/spec.md.template",
+    "docs/templates/consumer-bootstrap/CODEOWNERS.template",
+    "docs/templates/consumer-bootstrap/monorepo-ci.yml.template",
+    "docs/templates/consumer-bootstrap/README.md",
+    "docs/templates/consumer-bootstrap/spec.md.template",
+    "test-fixtures/cold-start/full/.github/CODEOWNERS",
+    "test-fixtures/cold-start/full/.github/workflows/monorepo-ci.yml",
+    "test-fixtures/cold-start/lightweight/.github/CODEOWNERS",
+    "test-fixtures/cold-start/lightweight/.github/workflows/monorepo-ci.yml",
+    "docs/session-sets/087-module-organized-projects-foundations/087-module-organized-projects-foundations-uat-checklist.json",
+    "docs/session-sets/087-module-organized-projects-foundations/s3-authoring-scaffold-architecture.json",
+    "docs/session-sets/087-module-organized-projects-foundations/s3-next-orchestrator-analysis.json",
+    "docs/session-sets/087-module-organized-projects-foundations/s3-conventions.md",
     "docs/session-sets/087-module-organized-projects-foundations/activity-log.json",
     "docs/session-sets/087-module-organized-projects-foundations/ai-assignment.md",
     "docs/session-sets/087-module-organized-projects-foundations/disposition.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s2-conventions.md",
-    "docs/session-sets/087-module-organized-projects-foundations/s2-explorer-render-architecture.json",
-    "docs/session-sets/087-module-organized-projects-foundations/s2-next-orchestrator-analysis.json",
     "docs/session-sets/087-module-organized-projects-foundations/session-events.jsonl",
     "docs/session-sets/087-module-organized-projects-foundations/session-state.json"
   ],
@@ -38,27 +51,35 @@
     "engine": "claude",
     "provider": "anthropic",
     "model": "claude-opus-4-8",
-    "effort": "medium",
+    "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Routed analysis (s2-next-orchestrator-analysis.json, gemini-pro) recommends an Opus-class Claude seat at medium effort for Session 3's mix (precise YAML/MD/TS file work + CODEOWNERS/monorepo-CI template authoring; no new rendering layer). Supervision points: the templates' path-scoping and ownership mappings, the scaffold action's typing across the webview action union + host handler, and error handling on the modules.yaml / project-plan.md writes."
+      "specifics": "Routed analysis (s3-next-orchestrator-analysis.json, gemini-pro) recommends an Opus-class Claude seat at HIGH effort for Session 4: the deliverables are long-form, coherence-critical prose (the three-person Hello World walkthrough + the AI feedback review prompt) with strict stylistic constraints, plus the set-terminal ceremony (change-log, Step 9 review, advisory path-aware critique, release prep). Supervision points (routed): the operator executes the walkthrough verbatim in a clean environment; dogfooded review-prompt output is judged on coaching tone and cited-evidence quality, not just on flagging the planted violation; a generic path-aware critique is rejected - it must ground in Set 087's actual events."
     }
   },
   "blockers": [],
   "deferred": [
     {
-      "item": "Harmonize the LEGACY single-implicit Explorer dialect onto the same conformant ARIA tree pattern the multi-module dialect now uses (treeitem buckets + keyboard operability), retiring the byte-identical legacy markup deliberately",
-      "reason": "The R2 ARIA Major was FIXED in-session for the multi-module dialect by operator decision (overriding the third-provider DEFER recommendation; full chain in s2-conventions.md + s2-third-opinion-aria.json). The single-implicit dialect keeps the pre-087 markup because the operator-approved spec locks it byte-identical this set. The third opinion's dialect-consistency concern remains valid for THAT dialect only; harmonizing it requires relaxing the byte-identical constraint, which needs its own operator sign-off. Candidate for 088 or a dedicated a11y pass."
+      "item": "Explorer UI affordance for duplicateNameError (row badge/tooltip + at most one throttled notification)",
+      "reason": "Carried from the S2 disposition unchanged: anticipated by the S1 collision ruling but absent from the operator-approved spec's S2-S4 plans; S3's spec scope (authoring/scaffolding/templates) did not include it and the scope-doubt rule forbids unilateral expansion. The fail-loud data-layer behavior (flagged winner row + deduped console.error) shipped in S1 and is live. Candidate for the 088 follow-on set."
     },
     {
-      "item": "Explorer UI affordance for duplicateNameError (row badge/tooltip + at most one throttled notification)",
-      "reason": "Anticipated by the S1 collision ruling ('Session 2 is expected to render...') but absent from the operator-approved spec's Session 2 plan, which scopes S2 to the module tier only. Surfaced here per the scope-doubt rule instead of unilaterally expanding scope; the fail-loud data-layer behavior (flagged winner row + deduped console.error) shipped in S1 and is live. Candidate for Session 3/4 spare capacity or the 088 follow-on set."
+      "item": "Harmonize the LEGACY single-implicit Explorer dialect onto the conformant ARIA tree pattern (S2 deferral)",
+      "reason": "Carried from the S2 disposition unchanged: the single-implicit dialect keeps pre-087 byte-identical markup by operator-approved spec constraint; relaxing it needs its own operator sign-off. Candidate for 088 or a dedicated a11y pass."
+    },
+    {
+      "item": "The Getting Started form's step-2 'planPresent' completion flag keys only on the repo-level docs/planning/project-plan.md; a module plan import/creation does not flip the step complete",
+      "reason": "The flag is Set 060 D3 scope and the form is a fresh-repo surface; redefining its semantics (which plan counts as 'the plan' in a module-organized repo) was not in the S3 plan and touches the D3 watcher contract. Surfaced per the scope-doubt rule; candidate for 088 or a small follow-on."
+    },
+    {
+      "item": "Human UAT walk of the S3 checklist (8 walks, local 0.41.0 VSIX)",
+      "reason": "The operator-armed ad-hoc gate: the checklist is authored, mechanically pre-verified (every functional item carries ProgrammaticVerification), and pending the operator's walk. Per Rule 9 pending UAT blocks downstream sessions on this surface until reviewed; the operator owns pacing. S4 (tutorials + set close) should confirm the walk's outcome before the set-terminal release prep."
     }
   ],
   "lessons_cited": [
     "L-064-9",
     "L-064-12",
-    "L-065-1",
-    "L-079-1"
+    "L-069-1",
+    "L-065-1"
   ]
 }

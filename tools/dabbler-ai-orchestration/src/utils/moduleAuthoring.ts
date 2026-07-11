@@ -58,6 +58,47 @@ export function defaultModulePlanPath(slug: string): string {
 }
 
 /**
+ * S3 verification round 1 (Major): the authoring flows must distinguish a
+ * truly ABSENT manifest (the designed repo-level fallback) from a PRESENT
+ * but unusable one (a config error that must fail loud — silently
+ * producing unstamped, repo-level output in a module-organized repo is
+ * exactly the wrong-destination hazard). `readModulesManifest` returns
+ * null for both, so this classifier re-checks the directory entry the
+ * same way the reader does (lstat, so a dangling symlink still counts as
+ * present).
+ */
+export type ModulesManifestClassification =
+  | { kind: "absent" }
+  | { kind: "invalid" }
+  | { kind: "present"; entries: ModuleManifestEntry[] };
+
+export function classifyModulesManifest(
+  root: string,
+): ModulesManifestClassification {
+  const entries = readModulesManifest(root);
+  if (entries !== null) return { kind: "present", entries };
+  return manifestEntryExists(path.join(root, MODULES_MANIFEST_REL))
+    ? { kind: "invalid" }
+    : { kind: "absent" };
+}
+
+/** Directory-entry presence via lstat (a dangling symlink IS present). */
+function manifestEntryExists(abs: string): boolean {
+  try {
+    fs.lstatSync(abs);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The operator-facing invalid-manifest refusal, shared by every flow. */
+export const INVALID_MANIFEST_MESSAGE =
+  `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest ` +
+  `(expected a YAML mapping with a "modules:" list). Fix the file by hand ` +
+  `before using the module-aware flows.`;
+
+/**
  * Header comment written when the scaffold CREATES docs/modules.yaml
  * (ruling Q1: an absent manifest is created with a purpose + syntax
  * explainer before the first entry).
@@ -148,21 +189,17 @@ export function scaffoldNewModule(
   rawTitle: string,
 ): NewModuleScaffoldResult {
   const slug = (rawSlug ?? "").trim();
-  const existing = readModulesManifest(root);
+  const classified = classifyModulesManifest(root);
+  const existing = classified.kind === "present" ? classified.entries : [];
   const slugError = validateNewModuleSlug(
     slug,
-    (existing ?? []).map((e) => e.slug),
+    existing.map((e) => e.slug),
   );
   if (slugError) throw new Error(slugError);
 
   const manifestAbs = path.join(root, MODULES_MANIFEST_REL);
-  const manifestExists = fs.existsSync(manifestAbs);
-  if (manifestExists && existing === null) {
-    throw new Error(
-      `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest ` +
-        `(expected a YAML mapping with a "modules:" list). Fix the file by ` +
-        `hand before adding modules.`,
-    );
+  if (classified.kind === "invalid") {
+    throw new Error(INVALID_MANIFEST_MESSAGE);
   }
 
   const title = (rawTitle ?? "").trim() || slug;
@@ -172,7 +209,7 @@ export function scaffoldNewModule(
   // Build + validate the manifest candidate BEFORE any write, so a
   // refusal leaves the workspace untouched.
   let candidate: string;
-  const manifestCreated = !manifestExists;
+  const manifestCreated = classified.kind === "absent";
   if (manifestCreated) {
     candidate = MODULES_YAML_HEADER + entryBlock;
   } else {
@@ -182,7 +219,7 @@ export function scaffoldNewModule(
   assertAppendedManifestParses(
     candidate,
     slug,
-    (existing ?? []).length + 1,
+    existing.length + 1,
     entryBlock,
   );
 
@@ -304,25 +341,42 @@ export interface ModulePickUi {
     options: { placeHolder: string; ignoreFocusOut: boolean },
   ): Thenable<ModulePickItem | undefined>;
   showInformationMessage(message: string): unknown;
+  /** S3 verification R1: the invalid-manifest refusal surface. */
+  showErrorMessage(message: string): unknown;
 }
 
 export type ModulePickOutcome =
   | { kind: "none"; entry: null }
   | { kind: "picked"; entry: ModuleManifestEntry }
-  | { kind: "cancelled"; entry: null };
+  | { kind: "cancelled"; entry: null }
+  /** S3 verification R1 (Major): a PRESENT-but-unusable manifest aborts
+   * the flow with an error — callers treat it like a cancel, never like
+   * the repo-level fallback (which is reserved for a truly absent
+   * manifest). */
+  | { kind: "invalid-manifest"; entry: null };
 
 /**
  * Resolve the module an authoring flow should target. Reads the manifest
- * itself so every caller shares one precedence: none → repo-level flow;
- * one → auto-selected with a notice (ruling Q2 — the operator must see
- * which module the flow silently targeted); many → QuickPick (Esc
- * cancels the whole flow, never falls back silently).
+ * itself so every caller shares one precedence: truly ABSENT manifest →
+ * repo-level flow; PRESENT-but-invalid manifest → error + abort (S3
+ * verification R1 — a config error must never silently produce
+ * unstamped repo-level output in a module-organized repo); one module →
+ * auto-selected with a notice (ruling Q2 — the operator must see which
+ * module the flow silently targeted); many → QuickPick (Esc cancels the
+ * whole flow, never falls back silently).
  */
 export async function pickModuleForAuthoring(
   root: string,
   ui: ModulePickUi,
 ): Promise<ModulePickOutcome> {
-  const target = resolveModuleTarget(readModulesManifest(root));
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return { kind: "invalid-manifest", entry: null };
+  }
+  const target = resolveModuleTarget(
+    classified.kind === "present" ? classified.entries : null,
+  );
   if (target.kind === "none") return { kind: "none", entry: null };
   if (target.kind === "auto") {
     ui.showInformationMessage(

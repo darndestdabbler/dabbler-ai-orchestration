@@ -315,8 +315,13 @@ export async function copySessionSetGenPrompt(
   const modulePick = await pickModuleForAuthoring(root, {
     showQuickPick: (items, opts) => vscode.window.showQuickPick(items, opts),
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode.window.showErrorMessage(m),
   });
-  if (modulePick.kind === "cancelled") return false;
+  // S3 verification R1: a PRESENT-but-invalid manifest aborts (the picker
+  // already showed the error) — never the silent repo-level fallback.
+  if (modulePick.kind === "cancelled" || modulePick.kind === "invalid-manifest") {
+    return false;
+  }
   const moduleOpt = modulePick.entry
     ? {
         slug: modulePick.entry.slug,

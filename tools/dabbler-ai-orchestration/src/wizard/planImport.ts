@@ -94,8 +94,11 @@ async function resolvePlanTarget(
   const pick = await pickModuleForAuthoring(root, {
     showQuickPick: ui.showQuickPick,
     showInformationMessage: ui.showInformationMessage,
+    showErrorMessage: ui.showErrorMessage,
   });
-  if (pick.kind === "cancelled") return null;
+  // S3 verification R1: invalid-manifest aborts like a cancel (the picker
+  // already showed the error) — never the silent repo-level fallback.
+  if (pick.kind === "cancelled" || pick.kind === "invalid-manifest") return null;
   return {
     entry: pick.entry,
     destPosix: pick.entry ? modulePlanRelPath(pick.entry) : PLAN_DEST_POSIX,

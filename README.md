@@ -146,19 +146,20 @@ choice (Full vs. Lightweight — see
 [docs/concepts/tier-model.md](docs/concepts/tier-model.md)); picking
 Full surfaces a second choice for provider access — direct `DABBLER_*`
 API keys (the default) or a GitHub Copilot CLI seat that routes calls
-through your Copilot subscription with no provider keys, with an
-inline warning when the `copilot` CLI can't be found; picking
+through your Copilot subscription with no provider keys; picking
 Lightweight surfaces a second choice between separate verification
 sessions (a dedicated session on a different AI engine or provider
 reviews the work before the set can close) and manual review (paste a
 review prompt into a second AI assistant yourself and record what it
 says — the default). All picks persist through a window
-reload. The form also runs the Full-tier verification **budget / NTE
-step** (saved to `ai_router/budget.yaml` —
-[schema](docs/budget-yaml-schema.md)), warns inline when a Python
-interpreter can't be found — and, for the direct-API option, when no
-provider API key is visible (the Copilot seat option instead warns
-when the `copilot` CLI is missing; prerequisites are checked before
+reload. Environment faults surface in a persistent **System Status
+strip** above the form (and above the Work Explorer tree), visible
+only when a fault exists: a missing Python interpreter, a missing
+provider API key on the direct-API option, or a missing `copilot`
+CLI with the Copilot seat option selected. The form also runs the
+Full-tier verification **budget / NTE step** (saved to
+`ai_router/budget.yaml` —
+[schema](docs/budget-yaml-schema.md); prerequisites are checked before
 any write, so a missing one fails with a friendly explainer and
 leaves nothing behind) — and performs a one-click project scaffold: the
 `.venv` with the router package, the AI-agent instruction files, and

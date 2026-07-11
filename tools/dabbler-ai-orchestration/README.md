@@ -99,11 +99,13 @@ step-by-step instructions in the editor:
    the Full tier the form also asks for your verification **budget /
    NTE cap** (saved to `ai_router/budget.yaml`; a `$0` budget asks
    you to pick manual-via-other-engine or skipped verification
-   explicitly) and warns inline when no provider API key is visible
-   (the direct-API option needs one). A step-1 warning also appears
-   if a Python interpreter — or, with the Copilot seat option
-   selected, the `copilot` CLI — can't be found (with install
-   guidance); the Build action checks prerequisites before writing
+   explicitly). Environment faults render in a persistent **System
+   Status strip** above the form (the same strip that sits above the
+   Work Explorer tree), visible only when a fault exists: a missing
+   provider API key (the direct-API option needs one), a missing
+   Python interpreter, or — with the Copilot seat option selected —
+   a missing `copilot` CLI, each with install guidance; the Build
+   action checks prerequisites before writing
    anything, so a missing tool fails with a friendly explainer
    instead of a raw error, leaving no partial setup behind. With the
    Copilot seat option, Build finishes by checking the seat's model

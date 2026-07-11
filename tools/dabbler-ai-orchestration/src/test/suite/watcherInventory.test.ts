@@ -57,11 +57,10 @@ const WATCHER_ALLOWLIST: WatcherEntry[] = [
   },
   {
     file: "extension.ts",
-    // Set 077 S2: +9 (same comment-block shift as above).
-    line: 237,
-    target: "Getting Started D3 inputs: {CLAUDE.md, AGENTS.md, GEMINI.md, docs/planning/project-plan.md, .venv/**/site-packages/ai_router/**, docs/session-sets/*}",
+    line: 240,
+    target: "Getting Started D3 inputs + module manifest: {CLAUDE.md, AGENTS.md, GEMINI.md, docs/modules.yaml, docs/planning/project-plan.md, .venv/**/site-packages/ai_router/**, docs/session-sets/*}",
     purpose:
-      "Set 060 Getting Started form live-progress refresh: the form's D3 step-1/2/3 completion keys on these scaffold artifacts (engine files + venv router package + project plan + numbered set dirs), which the spec.md-scoped session-sets watcher does not fully cover. The watched paths ARE the source of truth for the form steps (no indirect orchestrator-state inference) — D1 permits.",
+      "Set 060 Getting Started live-progress plus Set 092 manifest diagnostics: these scaffold artifacts and docs/modules.yaml are the direct sources of truth for form completion, module grouping, and invalid-manifest status (no indirect orchestrator-state inference) — D1 permits.",
   },
 ];
 

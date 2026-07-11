@@ -37,6 +37,7 @@ import {
   blockedMarker,
   blockedTooltip,
   buildVisibleModulePayloads,
+  chooseRenderableModuleSnapshot,
   computeVisibleModules,
   forceClosedBadge,
   fractionTooltip,
@@ -53,6 +54,7 @@ import {
   verificationMarker,
   verificationOwedText,
   verificationTooltip,
+  VisibleModule,
 } from "./SessionSetsModel";
 import {
   LEGACY_ROOT_PLAN_REL,
@@ -81,12 +83,15 @@ import {
   RowPayload,
   ScanState as ProtocolScanState,
   SnapshotPayload,
+  SystemStatusPayload,
   WebviewToHost,
 } from "../types/sessionSetsWebviewProtocol";
 // Set 060 Session 1: dual-mode Getting Started detection (spec D1/D3/D5).
 import {
   computeGettingStarted,
+  detectCompletion,
   nodeDetectionFs,
+  providerKeyPresent,
 } from "../utils/gettingStartedDetection";
 // Set 077 Session 2 (Feature 1): the durable tier-marker store.
 import {
@@ -213,6 +218,7 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   private version = 0;
   private renderTimer: NodeJS.Timeout | undefined;
   private cache: SessionSet[] | null = null;
+  private readonly lastKnownGoodModules = new Map<string, readonly VisibleModule[]>();
   private collisionNotificationShown = false;
   // Set 060 Session 2: bound once at construction; injectable for tests.
   private readonly gettingStartedHandlers: GettingStartedHandlers;
@@ -500,10 +506,12 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     // state CTA is shared across in-progress rows that have no
     // orchestrator block yet (e.g., a pre-Set-033 in-flight set, or
     // a freshly-started set that hasn't run start_session yet).
+    const moduleSnapshot = this.buildModules(all);
     const payload: SnapshotPayload = {
-      modules: this.buildModules(all),
+      modules: moduleSnapshot.modules,
       hasAnySets: all.length > 0,
       gettingStarted: this.buildGettingStarted(all),
+      systemStatus: this.buildSystemStatus(moduleSnapshot.manifestFaults),
     };
 
     // D8 (Set 060 S3): the first time the Explorer shows a Getting
@@ -614,28 +622,81 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     );
   }
 
+  private buildSystemStatus(
+    manifestFaults: SystemStatusPayload["manifestFaults"],
+  ): SystemStatusPayload {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      return {
+        workspaceOpen: false,
+        workspaceInitialized: true,
+        providerKeyPresent: true,
+        pythonPresent: true,
+        copilotCliPresent: true,
+        tier: "full",
+        transportProfile: "api",
+        manifestFaults,
+      };
+    }
+    return {
+      workspaceOpen: true,
+      workspaceInitialized: detectCompletion(root, nodeDetectionFs).structureBuilt,
+      providerKeyPresent: providerKeyPresent(process.env),
+      pythonPresent: probePythonPresence(root),
+      copilotCliPresent: probeCopilotCliPresence(root),
+      tier: resolveDurableTier(root)?.tier ?? "full",
+      transportProfile: readTransportProfile(root) ?? "api",
+      manifestFaults,
+    };
+  }
+
   // Set 092 Session 1: compute the settled Q8 visible-module model for
   // each discovered root, then merge those root-scoped results into the
   // global Explorer list. The pure merge/payload helpers stay Layer-2
   // testable; the host owns filesystem classification and plan presence.
-  private buildModules(all: SessionSet[]): ModulePayload[] {
+  private buildModules(all: SessionSet[]): {
+    modules: ModulePayload[];
+    manifestFaults: SystemStatusPayload["manifestFaults"];
+  } {
     const roots = new Set(
       (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
     );
     for (const set of all) roots.add(set.root);
-    const byRoot = Array.from(roots).map((root) =>
-      computeVisibleModules(
-        classifyModulesManifest(root),
+    const manifestFaults: SystemStatusPayload["manifestFaults"] = [];
+    const byRoot = Array.from(roots).map((root) => {
+      const classification = classifyModulesManifest(root);
+      const current = computeVisibleModules(
+        classification,
         all.filter((set) => set.root === root),
         {
           legacyRootPlanExists: fs.existsSync(path.join(root, LEGACY_ROOT_PLAN_REL)),
         },
+      );
+      const selected = chooseRenderableModuleSnapshot(
+        classification,
+        current,
+        this.lastKnownGoodModules.get(root),
+      );
+      if (classification.kind === "invalid") {
+        manifestFaults.push({
+          rootLabel: path.basename(root),
+          message:
+            "docs/modules.yaml is invalid (expected a YAML mapping with a modules list). " +
+            "Fix the file by hand; Work Explorer never overwrites it.",
+          retainedLastKnownGood: selected.retainedLastKnownGood,
+        });
+      } else {
+        this.lastKnownGoodModules.set(root, current);
+      }
+      return selected.modules;
+    });
+    return {
+      modules: buildVisibleModulePayloads(
+        mergeVisibleModules(byRoot),
+        (set) => this.buildRow(set),
       ),
-    );
-    return buildVisibleModulePayloads(
-      mergeVisibleModules(byRoot),
-      (set) => this.buildRow(set),
-    );
+      manifestFaults,
+    };
   }
 
   private buildRow(set: SessionSet): RowPayload {
@@ -728,6 +789,9 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     const gsHtmlUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "gettingStartedHtml.js"),
     );
+    const statusHtmlUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "systemStatusHtml.js"),
+    );
     // Set 077 S1: CSP nonces must come from a CSPRNG — Math.random() is
     // predictable, which voids the script-src nonce guarantee.
     const nonce = crypto.randomBytes(16).toString("hex");
@@ -751,6 +815,7 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
 <body>
   <main id="root" role="presentation"></main>
   <script nonce="${nonce}" src="${gsHtmlUri}"></script>
+  <script nonce="${nonce}" src="${statusHtmlUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;

@@ -51,7 +51,6 @@ const gsHtml = requireFromPackageRoot(
     },
     controls: GsControls,
   ): string;
-  envWarningHtml(visible: boolean): string;
   worktreeNoteHtml(visible: boolean): string;
   budgetBlockHtml(controls: GsControls): string;
   parseBudgetInput(raw: unknown):
@@ -60,25 +59,18 @@ const gsHtml = requireFromPackageRoot(
   validateBudgetControls(controls: GsControls):
     | { ok: true; budgetUsd: number; zeroMethod: string | null }
     | { ok: false; error: string };
-  ENV_WARNING_TEXT: string;
   WORKTREE_NOTE_TEXT: string;
   BUDGET_LABEL_TEXT: string;
   BUDGET_HELP_TEXT: string;
   BUDGET_ZERO_CHOICE_TEXT: string;
-  // Set 077 S3: the Lightweight-only verification-mode block + the A10
-  // missing-Python warning.
+  // Set 077 S3: the Lightweight-only verification-mode block.
   verificationModeBlockHtml(controls: GsControls): string;
-  pythonWarningHtml(visible: boolean): string;
-  PYTHON_WARNING_TEXT: string;
   VERIFICATION_MODE_LABEL_TEXT: string;
   VERIFICATION_MODE_OUT_OF_BAND_TEXT: string;
   VERIFICATION_MODE_DEDICATED_TEXT: string;
-  // Set 079 S1: the Full-only seat-profile block + the missing-CLI
-  // warning.
-  transportProfileBlockHtml(
-    controls: GsControls,
-    copilotCliPresent?: boolean,
-  ): string;
+  // Set 079 S1: the Full-only seat-profile block (Set 092 S2: the
+  // missing-CLI warning moved to the System Status strip).
+  transportProfileBlockHtml(controls: GsControls): string;
   // Set 080 S1: the shared sub-choice option row (radio | name | desc).
   optionRowHtml(
     groupName: string,
@@ -86,11 +78,9 @@ const gsHtml = requireFromPackageRoot(
     checked: boolean,
     text: string,
   ): string;
-  copilotWarningHtml(visible: boolean): string;
   TRANSPORT_PROFILE_LABEL_TEXT: string;
   TRANSPORT_PROFILE_API_TEXT: string;
   TRANSPORT_PROFILE_COPILOT_TEXT: string;
-  COPILOT_WARNING_TEXT: string;
   // Set 077 S2 (A1/A11): pure teardown-restore narrowing for gsState.
   // S3 adds the 4th param (the verification-mode marker seed) and the
   // mode fields, mirroring the tier contract.
@@ -225,50 +215,15 @@ suite("gettingStartedHtml — form structure (Set 060 S1/S2 parity)", () => {
   });
 });
 
-suite("gettingStartedHtml — D6 provider-key warning (Set 060 S3)", () => {
-  test("Full tier + no key → warning VISIBLE under the Build button", () => {
-    const html = gsHtml.renderGettingStarted(
-      gs({ providerKeyPresent: false }),
-      FULL,
-    );
-    assert.strictEqual(isVisible(html, 'data-gs-warning="env"'), true);
-    // Placement: inside step 1's body, after the Build button.
-    const buildIdx = html.indexOf('data-gs-action="build-structure"');
-    const warnIdx = html.indexOf('data-gs-warning="env"');
-    const step2Idx = html.indexOf("2. Create or import a project plan");
-    assert.ok(buildIdx < warnIdx && warnIdx < step2Idx, "warning not under the Build button");
-    // The copy carries the two load-bearing instructions.
-    assert.ok(html.includes("DABBLER_ANTHROPIC_API_KEY"));
-    assert.ok(html.includes("reload the VS Code window"));
-  });
-
-  test("Full tier + key present → warning hidden", () => {
-    const html = gsHtml.renderGettingStarted(
-      gs({ providerKeyPresent: true }),
-      FULL,
-    );
-    assert.strictEqual(isVisible(html, 'data-gs-warning="env"'), false);
-  });
-
-  test("Lightweight tier shows NO warning regardless of keys (D6)", () => {
-    const noKey = gsHtml.renderGettingStarted(
-      gs({ providerKeyPresent: false }),
-      LIGHT,
-    );
-    assert.strictEqual(isVisible(noKey, 'data-gs-warning="env"'), false);
-    const withKey = gsHtml.renderGettingStarted(
-      gs({ providerKeyPresent: true }),
-      LIGHT,
-    );
-    assert.strictEqual(isVisible(withKey, 'data-gs-warning="env"'), false);
-  });
-
-  test("envWarningHtml escapes its copy and carries role=alert", () => {
-    const visible = gsHtml.envWarningHtml(true);
-    assert.ok(visible.includes('role="alert"'));
-    assert.ok(!/\shidden[\s>]/.test(visible));
-    const hidden = gsHtml.envWarningHtml(false);
-    assert.ok(/\shidden>/.test(hidden));
+suite("gettingStartedHtml — diagnostics relocated to System Status (Set 092 S2)", () => {
+  test("provider-key state never renders a form-local warning", () => {
+    for (const controls of [FULL, LIGHT]) {
+      const html = gsHtml.renderGettingStarted(
+        gs({ providerKeyPresent: false }),
+        controls,
+      );
+      assert.ok(!html.includes('data-gs-warning="env"'));
+    }
   });
 });
 
@@ -679,46 +634,15 @@ suite("gettingStartedHtml — verification-mode block (Set 077 S3)", () => {
   });
 });
 
-suite("gettingStartedHtml — A10 missing-Python warning (Set 077 S3)", () => {
-  test("pythonWarningHtml renders role=alert and flips hidden on visible", () => {
-    const visible = gsHtml.pythonWarningHtml(true);
-    assert.ok(visible.includes('data-gs-warning="python"'));
-    assert.ok(visible.includes('role="alert"'));
-    assert.ok(!/\shidden[\s>]/.test(visible));
-    const hidden = gsHtml.pythonWarningHtml(false);
-    assert.ok(/\shidden>/.test(hidden));
-    assert.ok(hidden.includes("python.org"));
-  });
-
-  test("warning VISIBLE when pythonPresent is false — on BOTH tiers", () => {
+suite("gettingStartedHtml — Python diagnostic relocation (Set 092 S2)", () => {
+  test("missing Python never renders a form-local warning on either tier", () => {
     for (const controls of [FULL, LIGHT]) {
       const html = gsHtml.renderGettingStarted(
         gs({ pythonPresent: false }),
         controls,
       );
-      assert.strictEqual(
-        isVisible(html, 'data-gs-warning="python"'),
-        true,
-        `warning not visible on ${controls.tier}`,
-      );
+      assert.ok(!html.includes('data-gs-warning="python"'));
     }
-  });
-
-  test("warning hidden when pythonPresent is true", () => {
-    const html = gsHtml.renderGettingStarted(gs({ pythonPresent: true }), FULL);
-    assert.strictEqual(isVisible(html, 'data-gs-warning="python"'), false);
-  });
-
-  test("warning hidden when pythonPresent is ABSENT (older host fails quiet)", () => {
-    const html = gsHtml.renderGettingStarted(gs(), FULL);
-    assert.strictEqual(isVisible(html, 'data-gs-warning="python"'), false);
-  });
-
-  test("warning leads step 1 (renders before the tier radios)", () => {
-    const html = gsHtml.renderGettingStarted(gs({ pythonPresent: false }), FULL);
-    const warnIdx = html.indexOf('data-gs-warning="python"');
-    const radioIdx = html.indexOf('name="gs-tier"');
-    assert.ok(warnIdx !== -1 && warnIdx < radioIdx, "warning does not lead step 1");
   });
 });
 
@@ -836,14 +760,14 @@ suite("gettingStartedHtml — restoreGsState verification-mode seed (Set 077 S3)
 
 suite("gettingStartedHtml — transport-profile block (Set 079 S1)", () => {
   test("returns empty string for the Lightweight tier (block omitted, not hidden)", () => {
-    assert.strictEqual(gsHtml.transportProfileBlockHtml(LIGHT, true), "");
+    assert.strictEqual(gsHtml.transportProfileBlockHtml(LIGHT), "");
     const html = gsHtml.renderGettingStarted(gs(), LIGHT);
     assert.ok(!html.includes("data-gs-transport-profile"));
     assert.ok(!html.includes('name="gs-transport-profile"'));
   });
 
   test("renders on Full with 'api' checked by default and both copy texts", () => {
-    const html = gsHtml.transportProfileBlockHtml(FULL, true);
+    const html = gsHtml.transportProfileBlockHtml(FULL);
     assert.ok(html.includes("data-gs-transport-profile"));
     assert.ok(html.includes(gsHtml.TRANSPORT_PROFILE_LABEL_TEXT));
     // Set 080 S1: the copy renders split across the name/description
@@ -855,10 +779,10 @@ suite("gettingStartedHtml — transport-profile block (Set 079 S1)", () => {
   });
 
   test("checks 'copilot-cli' when the controls say so", () => {
-    const html = gsHtml.transportProfileBlockHtml(
-      { ...FULL, transportProfile: "copilot-cli" },
-      true,
-    );
+    const html = gsHtml.transportProfileBlockHtml({
+      ...FULL,
+      transportProfile: "copilot-cli",
+    });
     assert.ok(/value="copilot-cli" checked/.test(html));
     assert.ok(!/value="api" checked/.test(html));
   });
@@ -875,82 +799,13 @@ suite("gettingStartedHtml — transport-profile block (Set 079 S1)", () => {
   });
 });
 
-suite("gettingStartedHtml — missing-Copilot-CLI warning (Set 079 S1)", () => {
-  test("copilotWarningHtml renders role=alert and flips hidden on visible", () => {
-    const visible = gsHtml.copilotWarningHtml(true);
-    assert.ok(visible.includes('data-gs-warning="copilot"'));
-    assert.ok(visible.includes('role="alert"'));
-    assert.ok(!/\shidden[\s>]/.test(visible));
-    const hidden = gsHtml.copilotWarningHtml(false);
-    assert.ok(/\shidden>/.test(hidden));
-    assert.ok(hidden.includes("copilot command"));
-    assert.ok(hidden.includes("dabblerSessionSets.copilotCliPath"));
-    assert.ok(hidden.includes("reload the VS Code window"));
-  });
-
-  test("warning VISIBLE when Copilot is selected AND the CLI is missing", () => {
+suite("gettingStartedHtml — Copilot diagnostic relocation (Set 092 S2)", () => {
+  test("missing Copilot CLI never renders a form-local warning", () => {
     const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: false }), {
       ...FULL,
-      transportProfile: "copilot-cli",
-    });
-    assert.strictEqual(isVisible(html, 'data-gs-warning="copilot"'), true);
-  });
-
-  test("warning hidden when Copilot is selected but the CLI is present", () => {
-    const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: true }), {
-      ...FULL,
-      transportProfile: "copilot-cli",
-    });
-    assert.strictEqual(isVisible(html, 'data-gs-warning="copilot"'), false);
-  });
-
-  test("warning hidden while the API option is selected, even with the CLI missing", () => {
-    const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: false }), {
-      ...FULL,
-      transportProfile: "api",
-    });
-    assert.strictEqual(isVisible(html, 'data-gs-warning="copilot"'), false);
-  });
-
-  test("warning hidden when copilotCliPresent is ABSENT (older host fails quiet)", () => {
-    const html = gsHtml.renderGettingStarted(gs(), {
-      ...FULL,
-      transportProfile: "copilot-cli",
-    });
-    assert.strictEqual(isVisible(html, 'data-gs-warning="copilot"'), false);
-  });
-
-  test("warning absent entirely on Lightweight (the block is omitted)", () => {
-    const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: false }), {
-      ...LIGHT,
       transportProfile: "copilot-cli",
     });
     assert.ok(!html.includes('data-gs-warning="copilot"'));
-  });
-});
-
-suite("gettingStartedHtml — D6 key warning vs the Copilot seat pick (Set 079 S1)", () => {
-  test("env warning HIDDEN while Copilot is selected, even with no keys", () => {
-    // The D6 copy tells the operator to set DABBLER_* keys — exactly
-    // what the keyless Copilot-seat audience must NOT be told to do.
-    const html = gsHtml.renderGettingStarted(gs({ providerKeyPresent: false }), {
-      ...FULL,
-      transportProfile: "copilot-cli",
-    });
-    assert.strictEqual(isVisible(html, 'data-gs-warning="env"'), false);
-  });
-
-  test("env warning still VISIBLE on Full/API with no keys (explicit and default)", () => {
-    for (const controls of [
-      { ...FULL, transportProfile: "api" },
-      FULL, // transportProfile absent — the default is the API path
-    ]) {
-      const html = gsHtml.renderGettingStarted(
-        gs({ providerKeyPresent: false }),
-        controls,
-      );
-      assert.strictEqual(isVisible(html, 'data-gs-warning="env"'), true);
-    }
   });
 });
 
@@ -1123,7 +978,7 @@ suite("gettingStartedHtml — sub-choice option rows (Set 080 S1)", () => {
     const countRows = (html: string) =>
       (html.match(/class="gs-option-row"/g) || []).length;
     assert.strictEqual(
-      countRows(gsHtml.transportProfileBlockHtml(FULL, true)),
+      countRows(gsHtml.transportProfileBlockHtml(FULL)),
       2,
     );
     assert.strictEqual(countRows(gsHtml.verificationModeBlockHtml(LIGHT)), 2);
@@ -1131,7 +986,7 @@ suite("gettingStartedHtml — sub-choice option rows (Set 080 S1)", () => {
 
   test("the radio sits inside its row label so the whole row stays clickable", () => {
     for (const [html, name] of [
-      [gsHtml.transportProfileBlockHtml(FULL, true), "gs-transport-profile"],
+      [gsHtml.transportProfileBlockHtml(FULL), "gs-transport-profile"],
       [gsHtml.verificationModeBlockHtml(LIGHT), "gs-verification-mode"],
     ] as const) {
       const rowIdx = html.indexOf('class="gs-option-row"');

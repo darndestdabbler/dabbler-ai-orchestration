@@ -1,8 +1,8 @@
 {
   "ProjectName": "Dabbler AI Orchestration",
-  "ReleaseLabel": "dabbler-ai-orchestration 0.41.0 local VSIX (Set 092, Session 1 of 2; no Marketplace publish)",
-  "DocumentDate": "7/11/2026, 1:13:20 PM",
-  "Notes": "Ad-hoc per-session UAT for the Work Explorer renderer switch. Automation has already exercised the complete functional surface before this checklist was offered: 2,922 Python tests passed (6 skipped), 1,413 extension unit tests passed, and all 21 Playwright Electron tests passed. The human walk is deliberately limited to native VS Code details that need visual/operator confirmation: the contributed view label, the muted Default wrapper treatment, and notification behavior. Install only the local VSIX produced from this working tree; do not publish it.",
+  "ReleaseLabel": "dabbler-ai-orchestration 0.41.0 local VSIX (Set 092, Sessions 1-2; no Marketplace publish)",
+  "DocumentDate": "7/11/2026, 2:30:00 PM",
+  "Notes": "One checklist for the whole set, walked per session. Walks 1-3 are Session 1 (the renderer switch); the operator completed and saved them on 7/11/2026 - do not re-run them. Walks 4-6 are Session 2 (the System Status strip and the modules.yaml guardrails) and are the only open items. IMPORTANT: the 0.41.0 VSIX was REBUILT for Session 2 - reinstall it before starting Walk 4 even if you installed a 0.41.0 VSIX during Session 1. Walk order: Walk 4 stays in this repository (healthy - no strip), Walk 5 stays in this repository (modules.yaml break-and-repair), Walk 6 opens a brand-new empty folder in a separate window (cold-start strip above the Getting Started form). Automation ran first: 2,922 Python tests passed (6 skipped), 1,406 extension unit tests passed, and all 22 Playwright Electron tests passed - including an automated valid-to-invalid-to-repaired modules.yaml recovery walk. The human walks below cover only what automation cannot attest: real-machine visuals, theme colors, and the feel of the fault strip. Install only the local VSIX produced from this working tree; do not publish it.",
   "Configuration": {
     "reviewWidths": [
       "6%",
@@ -46,6 +46,40 @@
       "Passes": true
     },
     {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 4 - healthy repository shows no strip",
+      "ItemLabel": "No System Status strip renders while every diagnostic is healthy",
+      "HumanAction": "Where you are: this repository, fully set up (venv, keys, Python), so every diagnostic is healthy.\n1. Reinstall the rebuilt local dabbler-ai-orchestration-0.41.0.vsix (Extensions view > '...' menu > Install from VSIX..., pick tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.41.0.vsix), then run Developer: Reload Window. This step is required even if you installed a 0.41.0 VSIX during Session 1 - the file was rebuilt with the Session 2 code.\n2. Click the Dabbler AI Orchestration icon in the Activity Bar to open Work Explorer.\n3. Look at the area between the view header and the 'Default' module row.",
+      "Expectation": "There is no box or banner titled 'System Status' anywhere in the view. The tree starts directly with the 'Default' module row. Nothing about API keys, Python, Copilot, or workspace initialization is shown.",
+      "ProgrammaticVerification": "systemStatusHtml.test.ts 'healthy state renders no strip'; module-tier.spec.ts asserts getByTestId('system-status') has count 0 on a healthy workspace before the manifest is broken.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "modules.yaml guardrails",
+      "Subarea": "Walk 5 - invalid manifest is loud but never blanks the tree nor touches the file",
+      "ItemLabel": "Break-and-repair walk: strip appears, last-known-good tree stays, file is never rewritten",
+      "HumanAction": "Where you are: still in this repository, straight after Walk 4. This walk creates a temporary file docs/modules.yaml and deletes it at the end; the repository has no such file today.\n1. Create a new file at docs/modules.yaml (right-click the docs folder in the File Explorer > New File...) and paste exactly these three lines, then save:\nmodules:\n  - slug: demo\n    title: Demo Module\n2. Return to Work Explorer and wait up to 10 seconds. Confirm the tree regrouped: a module header titled 'Demo Module' whose status buckets all show a count of (0), and a module titled 'Unassigned' holding the repository's session sets. No System Status strip is shown - a valid manifest is healthy.\n3. Now select the entire content of docs/modules.yaml, replace it with exactly this single line, and save:\nmodules: [\n4. Return to Work Explorer and wait up to 10 seconds.\n5. Read the System Status box that appears above the tree, then confirm the tree below it still shows 'Demo Module' and 'Unassigned' exactly as in step 2.\n6. Open docs/modules.yaml again and confirm its entire content is still the single line 'modules: [' - the extension must not have rewritten or repaired it.\n7. Delete the docs/modules.yaml file (right-click > Delete, it is untracked).\n8. Return to Work Explorer and wait up to 10 seconds.",
+      "Expectation": "Step 5: a box titled 'System Status' appears above the tree with one item reading exactly: 'dabbler-ai-orchestration: docs/modules.yaml is invalid (expected a YAML mapping with a modules list). Fix the file by hand; Work Explorer never overwrites it. Showing the last-known-good module tree.' The tree below it is NOT blank and still shows the step-2 grouping. Step 6: the file content is untouched. Step 8: the strip disappears and the tree returns to the single muted 'Default' module from Walk 4.",
+      "ProgrammaticVerification": "module-tier.spec.ts 'invalid manifest pins System Status and retains the last-known-good tree until repair' drives the same edit-invalidate-repair cycle in a real Electron webview and asserts the file bytes stay untouched; visibleModules.test.ts pins chooseRenderableModuleSnapshot retention semantics.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 6 - cold-start fault renders in the strip, not in the form",
+      "ItemLabel": "An uninitialized folder shows the workspace-initialization fault above a warning-free Getting Started form",
+      "HumanAction": "Where you are: a brand-new empty folder in a separate VS Code window; this repository stays untouched.\n1. Create a new empty folder anywhere outside this repository (for example C:\\temp\\uat-092-coldstart).\n2. In VS Code run File > New Window, then File > Open Folder... and open that empty folder. If asked, trust the folder.\n3. Click the Dabbler AI Orchestration icon in the Activity Bar.\n4. Read the area above the 'Getting Started' heading.\n5. Scroll through the whole Getting Started form below it, especially step 1 around the tier radios and the 'Build project structure' button.\n6. When done, close the window and delete the folder.",
+      "Expectation": "Step 4: a box titled 'System Status' sits above the Getting Started form with one item reading exactly: 'Workspace initialization is incomplete: the virtual environment, ai_router package, and engine instruction files are required.' (Your machine has Python and provider keys, so no other item appears.) Step 5: the form itself contains NO inline warning boxes - the old Python / provider-key warning paragraphs that used to render inside step 1 are gone; the strip is the only fault surface. The strip is readable in your current theme and clearly separated from the form.",
+      "ProgrammaticVerification": "systemStatusHtml.test.ts 'renders workspace, Python, and direct-provider faults' pins the literal fault strings; gettingStartedHtml relocation suites assert no data-gs-warning elements render; session-sets-tree.spec.ts asserts the form carries no python warning and no python fault on a healthy runner.",
+      "IsJudgmentItem": true,
+      "Result": "",
+      "Feedback": "",
+      "Passes": false
+    },
+    {
       "FunctionalArea": "Work Explorer identity",
       "Subarea": "Walk 1 - contributed view label and stable layout",
       "ItemLabel": "Other",
@@ -68,6 +102,36 @@
     {
       "FunctionalArea": "Warning affordances",
       "Subarea": "Walk 3 - duplicate-name notification remains bounded",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 4 - healthy repository shows no strip",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "modules.yaml guardrails",
+      "Subarea": "Walk 5 - invalid manifest is loud but never blanks the tree nor touches the file",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 6 - cold-start fault renders in the strip, not in the form",
       "ItemLabel": "Other",
       "IsOtherItem": true,
       "HumanAction": "",

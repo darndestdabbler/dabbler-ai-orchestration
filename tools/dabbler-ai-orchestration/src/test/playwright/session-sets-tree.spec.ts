@@ -202,8 +202,8 @@ test("Getting Started form renders the Lightweight three-way choice from durable
   // with no interaction, (1) the Lightweight radio checked from the
   // tier seed, (2) the Lightweight-only verification-mode block with
   // the dedicated radio checked from the mode seed, (3) NO Full-only
-  // budget block (omitted, not hidden), and (4) the A10 python-warning
-  // element present in the DOM (hidden here — CI runners have Python).
+  // budget block (omitted, not hidden), and (4) no Python fault in the
+  // persistent System Status strip (the test runner has Python).
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-threeway");
@@ -238,11 +238,10 @@ test("Getting Started form renders the Lightweight three-way choice from durable
     ).toBeChecked();
     // (3) Lightweight renders no budget block.
     expect(await inner.locator("[data-gs-budget]").count()).toBe(0);
-    // (4) the python warning element exists; visibility follows the
-    // host probe (the runner has Python, so it must be hidden).
-    const pythonWarning = inner.locator('[data-gs-warning="python"]');
-    expect(await pythonWarning.count()).toBe(1);
-    await expect(pythonWarning).toBeHidden();
+    // (4) environment diagnostics no longer live in the form, and the
+    // healthy Python probe contributes no System Status fault.
+    expect(await inner.locator('[data-gs-warning="python"]').count()).toBe(0);
+    expect(await inner.locator('[data-status-code="python"]').count()).toBe(0);
   } finally {
     await teardown(per);
   }

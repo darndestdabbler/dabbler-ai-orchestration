@@ -21,6 +21,7 @@ import {
   PSEUDO_MODULE_SOLE_NAME,
   VisibleModule,
   buildVisibleModulePayloads,
+  chooseRenderableModuleSnapshot,
   computeVisibleModules,
   groupByModule,
   mergeVisibleModules,
@@ -755,6 +756,40 @@ suite("Set 092 S1 — visible-module renderer assembly", () => {
     } as never));
     assert.strictEqual(payload[0].kind, "fallback");
     assert.deepStrictEqual(payload[0].warning, { code: "undeclared-slug", rawSlug: "typo" });
+  });
+
+  test("invalid manifest retains the last known good module snapshot only", () => {
+    const prior = computeVisibleModules(
+      present([entry("billing")]),
+      [stamped("a", "billing")],
+      NO_PLAN,
+    );
+    const invalidCurrent = computeVisibleModules(
+      INVALID,
+      [stamped("a", "billing")],
+      NO_PLAN,
+    );
+    assert.deepStrictEqual(
+      chooseRenderableModuleSnapshot(INVALID, invalidCurrent, prior),
+      { modules: prior, retainedLastKnownGood: true },
+    );
+
+    const absentCurrent = computeVisibleModules(
+      ABSENT,
+      [stamped("a", "billing")],
+      NO_PLAN,
+    );
+    assert.deepStrictEqual(
+      chooseRenderableModuleSnapshot(ABSENT, absentCurrent, prior),
+      { modules: absentCurrent, retainedLastKnownGood: false },
+    );
+
+    const empty = present([]);
+    const emptyCurrent = computeVisibleModules(empty, [], NO_PLAN);
+    assert.deepStrictEqual(
+      chooseRenderableModuleSnapshot(empty, emptyCurrent, prior),
+      { modules: emptyCurrent, retainedLastKnownGood: false },
+    );
   });
 
   test("the webview client renders semantic module inputs without recomputing the model", () => {

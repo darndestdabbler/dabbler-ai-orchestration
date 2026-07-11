@@ -620,6 +620,27 @@ export interface VisibleModulesOptions {
   legacyRootPlanExists: boolean;
 }
 
+export interface RenderableModuleSnapshot {
+  modules: readonly VisibleModule[];
+  retainedLastKnownGood: boolean;
+}
+
+/**
+ * Keep the last usable module tree while a present manifest is invalid.
+ * Absent and valid-empty manifests are healthy compatibility states and
+ * therefore always replace the prior snapshot.
+ */
+export function chooseRenderableModuleSnapshot(
+  classification: ModulesManifestClassification,
+  current: readonly VisibleModule[],
+  lastKnownGood: readonly VisibleModule[] | undefined,
+): RenderableModuleSnapshot {
+  if (classification.kind === "invalid" && lastKnownGood) {
+    return { modules: lastKnownGood, retainedLastKnownGood: true };
+  }
+  return { modules: current, retainedLastKnownGood: false };
+}
+
 /**
  * Compute the ordered visible-module list from the manifest
  * classification plus the scanned sets.

@@ -47,10 +47,12 @@
   const moduleCollapsed = {};
   // Set 060 Session 3: the Getting Started surface HTML builders moved
   // to gettingStartedHtml.js (a UMD-lite module loaded as a second
-  // <script> before this file) so the rendering — including the D6
-  // provider-key warning and the D7 worktree note — is unit-testable
-  // without a webview. This file keeps the wiring only.
+  // <script> before this file) so the rendering — including the D7
+  // worktree note — is unit-testable without a webview. This file keeps
+  // the wiring only. (Set 092 S2: the form-local environment warnings
+  // moved to the System Status strip, systemStatusHtml.js.)
   const gsHtml = window.DabblerGettingStartedHtml;
+  const systemStatusHtml = window.DabblerSystemStatusHtml;
   // Set 060 Session 2: the Getting Started form's control state. Kept
   // here (like bucketCollapsed) so a snapshot re-render — which happens
   // after every action and on every watcher tick — doesn't snap the
@@ -187,6 +189,7 @@
     // now — the pre-Set-060 welcome-HTML fallback branch is retired with
     // the rest of the adoption-bootstrap path.
     var gs = lastSnapshot.gettingStarted;
+    var status = lastSnapshot.systemStatus;
     if (gs && gs.mode !== "list") {
       // Set 077 S2 (A1): the host's durable tier seed rides the
       // snapshot. Applied once per (script load, root) — before the
@@ -218,15 +221,36 @@
         );
         persistGsState();
       }
+      // Set 092 S2 (verification R1): the strip is computed only AFTER
+      // the durable seed lands in gsState, so the first paint's strip
+      // and form read the same finalized tier/profile controls — a
+      // pre-seed strip could show a provider-key fault the seeded tier
+      // suppresses (or hide a Copilot fault it implies).
+      var statusHtml = systemStatusHtml.renderSystemStatus(
+        status,
+        gs.mode === "getting-started"
+          ? gsState
+          : {
+              tier: status && status.tier,
+              transportProfile: status && status.transportProfile,
+            },
+      );
       root.innerHTML =
-        gs.mode === "no-folder"
+        statusHtml + (gs.mode === "no-folder"
           ? gsHtml.renderNoFolder()
-          : gsHtml.renderGettingStarted(gs, gsState);
+          : gsHtml.renderGettingStarted(gs, gsState));
       wireGettingStarted();
       return;
     }
 
-    const parts = [];
+    // List mode has no form controls; the strip follows the host's
+    // durable tier/profile snapshot fields.
+    const parts = [
+      systemStatusHtml.renderSystemStatus(status, {
+        tier: status && status.tier,
+        transportProfile: status && status.transportProfile,
+      }),
+    ];
     // Set 033 Session 2: ambiguity banner retired. Multi-in-progress
     // is the supported case — every in-progress row carries its own
     // accordion below.
@@ -256,8 +280,8 @@
   // state (tier for build-structure, parallel for build-session-sets);
   // the clicked button disables until the host's post-action snapshot
   // re-renders the surface (double-click guard). Radio / checkbox
-  // changes update gsState and toggle the D6 warning / D7 note in
-  // place — no host round-trip.
+  // changes update gsState and toggle the D7 note / System Status
+  // faults in place — no host round-trip.
   function wireGettingStarted() {
     Array.from(root.querySelectorAll('input[name="gs-tier"]')).forEach(function (input) {
       input.addEventListener("change", function () {
@@ -303,10 +327,11 @@
     // Set 079 S1 (Feature 1): the Full-only seat-profile radios. A flip
     // is explicit operator intent (profileDirty), so later seeds never
     // silently revert it — the tierDirty contract. Unlike the
-    // verification-mode radios this DOES re-render: the missing-CLI
-    // warning and the D6 key warning both key on the selection, and the
-    // re-render recomputes their visibility in one pass (radios carry no
-    // typing focus to lose — the budget-input concern doesn't apply).
+    // verification-mode radios this DOES re-render: the System Status
+    // strip's provider-key / Copilot-CLI faults key on the selection,
+    // and the re-render recomputes their visibility in one pass (radios
+    // carry no typing focus to lose — the budget-input concern doesn't
+    // apply).
     // Set 081 S1: the re-render also swaps the budget block in/out under
     // the Direct-API row (omitted while Copilot is selected). gsState
     // keeps the typed budget + zero-rule pick across the swap, so an
@@ -397,10 +422,12 @@
     });
   }
 
-  // D6 note (Set 060 S3 → Set 063 S2): the provider-key warning's
-  // visibility is computed in renderGettingStarted from the tier
-  // control; tier-radio changes re-render the surface (see the tier
-  // listener above), so no standalone visibility-flip helper remains.
+  // D6 note (Set 060 S3 → Set 063 S2 → Set 092 S2): the provider-key
+  // fault now renders in the System Status strip; its visibility is
+  // computed in renderSystemStatus from the tier / seat-profile
+  // controls. Tier and profile radio changes re-render the surface
+  // (see the listeners above), so no standalone visibility-flip helper
+  // remains.
 
   // D7 (Set 060 S3): show the worktree note only while the parallel
   // checkbox is checked.

@@ -204,3 +204,60 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
     await teardown(per);
   }
 });
+
+test("invalid manifest pins System Status and retains the last-known-good tree until repair", async () => {
+  const per: PerTest = {};
+  try {
+    per.tmpPath = makeTmpDir("dabbler-pw-manifest-guard");
+    const fixture = makeSet(per.tmpPath, "092-manifest-guard", 2);
+    stampModule(fixture, "greeter");
+    const manifestPath = path.join(fixture.repo_root, "docs", "modules.yaml");
+    fs.writeFileSync(manifestPath, MODULES_YAML, "utf8");
+
+    for (const name of ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]) {
+      fs.writeFileSync(path.join(fixture.repo_root, name), `# ${name}\n`, "utf8");
+    }
+    fs.mkdirSync(
+      path.join(fixture.repo_root, ".venv", "Lib", "site-packages", "ai_router"),
+      { recursive: true },
+    );
+    fs.mkdirSync(path.join(fixture.repo_root, ".venv", "Scripts"), { recursive: true });
+    fs.writeFileSync(
+      path.join(fixture.repo_root, ".venv", "Scripts", "python.exe"),
+      "",
+      "utf8",
+    );
+    fs.mkdirSync(path.join(fixture.repo_root, ".dabbler"), { recursive: true });
+    fs.writeFileSync(
+      path.join(fixture.repo_root, ".dabbler", "tier"),
+      "lightweight\n",
+      "utf8",
+    );
+
+    per.launch = await launchVSCode(fixture.repo_root);
+    const inner = await openSessionSetsView(per.launch.page);
+    await triggerRefresh(per.launch.page);
+
+    await expect(inner.getByTestId("module-declared-greeter")).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(inner.getByTestId("system-status")).toHaveCount(0);
+
+    fs.writeFileSync(manifestPath, "modules: [\n", "utf8");
+    const status = inner.getByTestId("system-status");
+    await expect(status).toBeVisible({ timeout: 30_000 });
+    await expect(status.locator('[data-status-code="manifest-invalid"]')).toContainText(
+      "last-known-good module tree",
+    );
+    await expect(inner.getByTestId("module-declared-greeter")).toBeVisible();
+    expect(fs.readFileSync(manifestPath, "utf8")).toBe("modules: [\n");
+
+    const repaired = MODULES_YAML.replace("title: Greeter", "title: Greeter Repaired");
+    fs.writeFileSync(manifestPath, repaired, "utf8");
+    await expect(status).toHaveCount(0, { timeout: 30_000 });
+    await expect(inner.getByTestId("module-declared-greeter").locator(".module-title"))
+      .toHaveText("Greeter Repaired");
+  } finally {
+    await teardown(per);
+  }
+});

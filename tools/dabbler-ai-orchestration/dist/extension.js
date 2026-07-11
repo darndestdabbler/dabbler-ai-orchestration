@@ -17501,6 +17501,12 @@ function buildVisibleModulePayloads(modules, rowFor) {
 }
 var PSEUDO_MODULE_SOLE_NAME = "Default";
 var PSEUDO_MODULE_COEXIST_NAME = "Unassigned";
+function chooseRenderableModuleSnapshot(classification, current, lastKnownGood) {
+  if (classification.kind === "invalid" && lastKnownGood) {
+    return { modules: lastKnownGood, retainedLastKnownGood: true };
+  }
+  return { modules: current, retainedLastKnownGood: false };
+}
 function computeVisibleModules(classification, allSets, opts) {
   const declared = classification.kind === "present" ? classification.entries : [];
   const declaredSlugs = new Set(declared.map((e) => e.slug));
@@ -25121,6 +25127,7 @@ var CustomSessionSetsView = class {
     this.scanState = scanState;
     this.version = 0;
     this.cache = null;
+    this.lastKnownGoodModules = /* @__PURE__ */ new Map();
     this.collisionNotificationShown = false;
     // Set 060 Session 3 (D8): the static instructions doc auto-opens
     // ONCE per extension session, the first time a snapshot ships a
@@ -25339,10 +25346,12 @@ var CustomSessionSetsView = class {
     if (pruned !== current) {
       void this.setSuppression(pruned);
     }
+    const moduleSnapshot = this.buildModules(all);
     const payload = {
-      modules: this.buildModules(all),
+      modules: moduleSnapshot.modules,
       hasAnySets: all.length > 0,
-      gettingStarted: this.buildGettingStarted(all)
+      gettingStarted: this.buildGettingStarted(all),
+      systemStatus: this.buildSystemStatus(moduleSnapshot.manifestFaults)
     };
     if (payload.gettingStarted?.mode !== "list" && !this.instructionsOpened) {
       this.instructionsOpened = true;
@@ -25444,6 +25453,31 @@ var CustomSessionSetsView = class {
       (root) => readTransportProfile(root)
     );
   }
+  buildSystemStatus(manifestFaults) {
+    const root = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      return {
+        workspaceOpen: false,
+        workspaceInitialized: true,
+        providerKeyPresent: true,
+        pythonPresent: true,
+        copilotCliPresent: true,
+        tier: "full",
+        transportProfile: "api",
+        manifestFaults
+      };
+    }
+    return {
+      workspaceOpen: true,
+      workspaceInitialized: detectCompletion(root, nodeDetectionFs).structureBuilt,
+      providerKeyPresent: providerKeyPresent(process.env),
+      pythonPresent: probePythonPresence(root),
+      copilotCliPresent: probeCopilotCliPresence(root),
+      tier: resolveDurableTier(root)?.tier ?? "full",
+      transportProfile: readTransportProfile(root) ?? "api",
+      manifestFaults
+    };
+  }
   // Set 092 Session 1: compute the settled Q8 visible-module model for
   // each discovered root, then merge those root-scoped results into the
   // global Explorer list. The pure merge/payload helpers stay Layer-2
@@ -25454,19 +25488,39 @@ var CustomSessionSetsView = class {
     );
     for (const set of all)
       roots.add(set.root);
-    const byRoot = Array.from(roots).map(
-      (root) => computeVisibleModules(
-        classifyModulesManifest(root),
+    const manifestFaults = [];
+    const byRoot = Array.from(roots).map((root) => {
+      const classification = classifyModulesManifest(root);
+      const current = computeVisibleModules(
+        classification,
         all.filter((set) => set.root === root),
         {
           legacyRootPlanExists: fs16.existsSync(path20.join(root, LEGACY_ROOT_PLAN_REL))
         }
-      )
-    );
-    return buildVisibleModulePayloads(
-      mergeVisibleModules(byRoot),
-      (set) => this.buildRow(set)
-    );
+      );
+      const selected = chooseRenderableModuleSnapshot(
+        classification,
+        current,
+        this.lastKnownGoodModules.get(root)
+      );
+      if (classification.kind === "invalid") {
+        manifestFaults.push({
+          rootLabel: path20.basename(root),
+          message: "docs/modules.yaml is invalid (expected a YAML mapping with a modules list). Fix the file by hand; Work Explorer never overwrites it.",
+          retainedLastKnownGood: selected.retainedLastKnownGood
+        });
+      } else {
+        this.lastKnownGoodModules.set(root, current);
+      }
+      return selected.modules;
+    });
+    return {
+      modules: buildVisibleModulePayloads(
+        mergeVisibleModules(byRoot),
+        (set) => this.buildRow(set)
+      ),
+      manifestFaults
+    };
   }
   buildRow(set) {
     const fraction = fractionFor(set);
@@ -25519,6 +25573,9 @@ var CustomSessionSetsView = class {
     const gsHtmlUri = webview.asWebviewUri(
       vscode12.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "gettingStartedHtml.js")
     );
+    const statusHtmlUri = webview.asWebviewUri(
+      vscode12.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "systemStatusHtml.js")
+    );
     const nonce = crypto2.randomBytes(16).toString("hex");
     const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';`;
     return `<!DOCTYPE html>
@@ -25532,6 +25589,7 @@ var CustomSessionSetsView = class {
 <body>
   <main id="root" role="presentation"></main>
   <script nonce="${nonce}" src="${gsHtmlUri}"></script>
+  <script nonce="${nonce}" src="${statusHtmlUri}"></script>
   <script nonce="${nonce}" src="${jsUri}"></script>
 </body>
 </html>`;
@@ -30963,7 +31021,7 @@ function activate(context) {
       context.subscriptions.push(watcher);
       const gsPattern = new vscode32.RelativePattern(
         root,
-        "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**,docs/session-sets/*}"
+        "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/modules.yaml,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**,docs/session-sets/*}"
       );
       const gsWatcher = vscode32.workspace.createFileSystemWatcher(gsPattern);
       gsWatcher.onDidCreate(onEvent);

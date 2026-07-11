@@ -224,6 +224,9 @@ export function activate(context: vscode.ExtensionContext): void {
       //   - step 3 sessionSetsPresent: docs/session-sets/* (a numbered
       //     directory appearing — catches the bare-dir case the
       //     spec.md-scoped session-sets watcher above misses).
+      // Set 092 S2 adds docs/modules.yaml to the same workspace-scoped
+      // watcher so invalid edits and repairs update the diagnostics strip
+      // and last-known-good tree without waiting for the poll interval.
       // Watching these specific paths (the actual source of truth for the
       // steps, not indirect orchestrator-state inference) is D1-permitted.
       // In-workspace globs ride VS Code's existing recursive workspace
@@ -232,7 +235,7 @@ export function activate(context: vscode.ExtensionContext): void {
       // .venv via files.watcherExclude, where the 30s poll backstops).
       const gsPattern = new vscode.RelativePattern(
         root,
-        "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**,docs/session-sets/*}",
+        "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/modules.yaml,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**,docs/session-sets/*}",
       );
       const gsWatcher = vscode.workspace.createFileSystemWatcher(gsPattern);
       gsWatcher.onDidCreate(onEvent);

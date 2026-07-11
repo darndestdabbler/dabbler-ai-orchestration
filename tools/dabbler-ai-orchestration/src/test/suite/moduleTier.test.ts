@@ -495,7 +495,9 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
       path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
       "utf8",
     );
-    assert.ok(view.includes("modules: this.buildModules(all)"));
+    assert.ok(view.includes("const moduleSnapshot = this.buildModules(all)"));
+    assert.ok(view.includes("modules: moduleSnapshot.modules"));
+    assert.ok(view.includes("systemStatus: this.buildSystemStatus(moduleSnapshot.manifestFaults)"));
     assert.ok(
       view.includes("buildVisibleModulePayloads("),
       "buildModules must delegate to the extracted, behavior-tested builder",

@@ -130,6 +130,23 @@ export interface ModulePayload {
   buckets: BucketPayload[];
 }
 
+export interface ManifestFaultPayload {
+  rootLabel: string;
+  message: string;
+  retainedLastKnownGood: boolean;
+}
+
+export interface SystemStatusPayload {
+  workspaceOpen: boolean;
+  workspaceInitialized: boolean;
+  providerKeyPresent: boolean;
+  pythonPresent: boolean;
+  copilotCliPresent: boolean;
+  tier: "full" | "lightweight";
+  transportProfile: "api" | "copilot-cli";
+  manifestFaults: ManifestFaultPayload[];
+}
+
 // Set 060 Session 1: the three dual-mode surfaces the Session Set
 // Explorer can render (spec D1/D5). "no-folder" → an "open or create a
 // folder" CTA; "getting-started" → the interactive setup form; "list"
@@ -182,18 +199,18 @@ export interface GettingStartedPayload {
   verificationModeSeed: "dedicated-sessions" | "out-of-band-or-none" | null;
   // Set 077 S3 (A10): the host's Python-presence probe — false when no
   // interpreter resolves (no explicit pythonPath setting, no workspace
-  // venv, nothing usable on PATH). Drives the prominent step-1 warning;
-  // tier-independent (Lightweight is router-off, not Python-off).
-  // Probed only in "getting-started" mode (true elsewhere — the value
-  // renders nowhere else, and true keeps the warning quiet).
+  // venv, nothing usable on PATH). Set 092 S2: the operator-facing
+  // fault moved to the System Status strip, which reads the
+  // SystemStatusPayload's own copy of this probe; this field is
+  // retained for payload-shape stability until Set 094's form rework
+  // and is no longer consumed by the webview.
   pythonPresent: boolean;
   // Set 079 S1 (Feature 1): the host's Copilot-CLI presence probe —
   // false when no `copilot` executable resolves (no explicit
-  // copilotCliPath setting, nothing usable on PATH). Drives the step-1
-  // Copilot-missing warning, which shows only while the Full-tier
-  // Copilot seat sub-choice is selected. Probed only in
-  // "getting-started" mode (true elsewhere — same quiet default as
-  // pythonPresent).
+  // copilotCliPath setting, nothing usable on PATH). Set 092 S2: same
+  // relocation as pythonPresent — the strip renders the fault from
+  // SystemStatusPayload; this copy is retained for payload-shape
+  // stability until Set 094 and is no longer consumed by the webview.
   copilotCliPresent: boolean;
   // Set 079 S1 (Feature 1): the durable seat-profile seed for the
   // Full-tier sub-choice radios ("api" = direct provider keys, the
@@ -217,6 +234,7 @@ export interface SnapshotPayload {
   // as today's two-level view, byte-identical (routed ruling Q4).
   modules: ModulePayload[];
   hasAnySets: boolean;
+  systemStatus: SystemStatusPayload;
   // Set 060 Session 1: the dual-mode Getting Started state. Set 063 S2
   // (spec D2): REQUIRED — the field's pre-Set-060 optionality (and the
   // `welcomeHtml` fallback it gated) modeled hosts that no longer exist,

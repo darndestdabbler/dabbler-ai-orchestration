@@ -29,24 +29,6 @@
       .replace(/>/g, "&gt;");
   }
 
-  // D6 (Set 060 S3): the Full-tier provider-key warning, rendered
-  // under the Build button. Shown only when the tier radio is on
-  // "full" AND the host reported no provider key in its environment;
-  // tier-radio changes re-render the form surface locally (Set 063
-  // S2), so visibility is computed here on every render — no host
-  // round-trip. The copy carries the two load-bearing instructions:
-  // set at least one key, then RELOAD THE WINDOW (the extension host
-  // captures the merged Windows System + User environment at launch,
-  // so a key set afterwards is invisible until reload).
-  var ENV_WARNING_TEXT =
-    "The Full tier routes work through provider APIs, but no provider " +
-    "API key was found. Use your normal Anthropic, Google, or OpenAI " +
-    "key value under at least one Dabbler environment variable: " +
-    "DABBLER_ANTHROPIC_API_KEY, DABBLER_OPENAI_API_KEY, or " +
-    "DABBLER_GEMINI_API_KEY. Then reload the VS Code window (keys set " +
-    "after launch are not " +
-    "visible until you reload). The Lightweight tier needs no keys.";
-
   // D7 (Set 060 S3, carries verifier issue S060-S2-V1-001): the
   // parallel-worktree info note under the checkbox. Shown only while
   // the box is checked; client.js toggles `hidden` on checkbox
@@ -87,23 +69,6 @@
     "Separate verification sessions — a dedicated session on a different " +
     "AI engine or provider reviews the work before the set can close.";
 
-  // Set 077 S3 (A10): the missing-Python warning at the top of step 1.
-  // BOTH tiers need a base interpreter (Lightweight is router-off, not
-  // Python-off), so unlike the D6 key warning this one does not key on
-  // the tier radio — only on the host's `pythonPresent` probe. The copy
-  // carries the same three remedies as the Getting Started doc's
-  // Troubleshooting appendix and ends with the reload instruction (the
-  // host environment is captured at launch, so a PATH change after an
-  // install is invisible until reload).
-  var PYTHON_WARNING_TEXT =
-    "Python was not found on this machine. Build project structure " +
-    "creates a virtual environment, which still needs a base Python " +
-    "install. Install Python from python.org (tick \"Add python.exe to " +
-    "PATH\"; avoid the Microsoft Store build), or set the " +
-    "dabblerSessionSets.pythonPath setting to an installed interpreter. " +
-    "Then reload the VS Code window (changes made after launch are not " +
-    "visible until you reload).";
-
   // Set 087 S3 (routed ruling Q1): the optional "New module" affordance in
   // step 2 — hover copy for the button that posts the `new-module` action
   // (slug/title are collected host-side via input boxes; the button carries
@@ -129,24 +94,6 @@
   var TRANSPORT_PROFILE_COPILOT_TEXT =
     "GitHub Copilot CLI seat — calls run through your Copilot " +
     "subscription's command-line tool; no provider API keys needed.";
-
-  // Set 079 S1: the missing-Copilot-CLI warning inside the seat-profile
-  // block. Unlike the tier-independent Python warning it keys on the
-  // sub-choice: visible only while the Copilot option is selected AND
-  // the host's probe found no copilot executable. Same remedy shape as
-  // the Python warning (install, or point the setting at an executable,
-  // then reload — the host environment is captured at launch).
-  var COPILOT_WARNING_TEXT =
-    "The GitHub Copilot CLI was not found on this machine. The Copilot " +
-    "seat option runs AI calls through the copilot command, which must " +
-    "be installed and on PATH. Install the GitHub Copilot CLI (see the " +
-    "Copilot CLI guide at docs.github.com/copilot), or set the " +
-    "dabblerSessionSets.copilotCliPath setting to the installed copilot " +
-    "executable. Then reload the VS Code window (changes made after " +
-    "launch are not visible until you reload). Installing is only the " +
-    "first step — the full per-machine setup (install, tenant login, " +
-    "auth-preflight) is in docs/copilot-seat-setup-checklist.md; an " +
-    "unauthenticated seat is blocked at session start.";
 
   /**
    * Parse the raw budget input. Required dollar amount: numeric and
@@ -308,22 +255,6 @@
     return state;
   }
 
-  /**
-   * The D6 warning element. `visible` = (tier === "full" &&
-   * !gs.providerKeyPresent); rendered hidden (not omitted) so the
-   * structure is stable across renders (visibility recomputes on the
-   * tier-change re-render).
-   */
-  function envWarningHtml(visible) {
-    return (
-      '<div class="gs-warning" data-gs-warning="env" role="alert"' +
-      (visible ? "" : " hidden") +
-      ">" +
-      escHtml(ENV_WARNING_TEXT) +
-      "</div>"
-    );
-  }
-
   /** The D7 worktree note element. `visible` = the checkbox is checked. */
   function worktreeNoteHtml(visible) {
     return (
@@ -458,34 +389,15 @@
   }
 
   /**
-   * Set 079 S1 (Feature 1): the missing-Copilot-CLI warning element.
-   * Rendered hidden (not omitted) inside the seat-profile block so the
-   * Full-tier DOM structure is stable across renders. `visible` =
-   * (the Copilot sub-choice is selected AND gs.copilotCliPresent ===
-   * false); an absent payload flag (older host) reads as present, so
-   * the warning fails quiet, never falsely loud.
-   */
-  function copilotWarningHtml(visible) {
-    return (
-      '<div class="gs-warning" data-gs-warning="copilot" role="alert"' +
-      (visible ? "" : " hidden") +
-      ">" +
-      escHtml(COPILOT_WARNING_TEXT) +
-      "</div>"
-    );
-  }
-
-  /**
    * Set 079 S1 (Feature 1): the Full-tier seat-profile block — the
    * second radio group under the Full tier radio, mirroring
    * {@link verificationModeBlockHtml}'s conditional-render shape: on
    * LIGHTWEIGHT the block is OMITTED from the DOM entirely (tier flips
    * re-render the form surface, so there is no visibility flip to
    * manage). The default radio is "api" (direct provider keys),
-   * matching Set 078's unchanged transport.profile default. The
-   * missing-CLI warning renders inside the block, hidden unless the
-   * Copilot option is selected and the probe failed
-   * (`copilotCliPresent === false`).
+   * matching Set 078's unchanged transport.profile default. Set 092
+   * S2: the missing-CLI warning moved to the System Status strip
+   * (systemStatusHtml.js) — no form-local warning renders here.
    * Set 080 S1: options render as {@link optionRowHtml} rows.
    * Set 081 S1: the budget block ({@link budgetBlockHtml}) nests as an
    * indented child of the Direct-API option row — present only while
@@ -494,10 +406,9 @@
    * two option rows adjacent so tree.css's `.gs-option-row +
    * .gs-option-row` separator applies directly).
    */
-  function transportProfileBlockHtml(controls, copilotCliPresent) {
+  function transportProfileBlockHtml(controls) {
     if (controls.tier === "lightweight") return "";
     var copilot = controls.transportProfile === "copilot-cli";
-    var warningVisible = copilot && copilotCliPresent === false;
     var budget = budgetBlockHtml(controls);
     return (
       '<div class="gs-transport-profile" data-gs-transport-profile>' +
@@ -521,23 +432,6 @@
           copilot,
           TRANSPORT_PROFILE_COPILOT_TEXT,
         ) +
-        copilotWarningHtml(warningVisible) +
-      "</div>"
-    );
-  }
-
-  /**
-   * The A10 missing-Python warning element (Set 077 S3). Like the D6
-   * warning it is rendered hidden (not omitted) so the DOM structure is
-   * stable across renders; unlike D6 it is tier-independent — both tiers
-   * need a base interpreter. `visible` = (gs.pythonPresent === false).
-   */
-  function pythonWarningHtml(visible) {
-    return (
-      '<div class="gs-warning" data-gs-warning="python" role="alert"' +
-      (visible ? "" : " hidden") +
-      ">" +
-      escHtml(PYTHON_WARNING_TEXT) +
       "</div>"
     );
   }
@@ -581,9 +475,10 @@
 
   /**
    * The full Getting Started form. `gs` is the host's
-   * GettingStartedPayload (three D3 completion flags +
-   * providerKeyPresent); `controls` is the webview-local control
-   * state `{ tier: "full"|"lightweight", parallel: boolean,
+   * GettingStartedPayload (the three D3 completion flags; its probe
+   * fields are unconsumed here since Set 092 S2 moved the environment
+   * faults to the System Status strip); `controls` is the webview-local
+   * control state `{ tier: "full"|"lightweight", parallel: boolean,
    * budget: string, zeroMethod: string|null }` so re-renders keep the
    * operator's picks (Set 060 S2; budget controls Set 063 S2). Set 081
    * S1: the budget block renders inside the transport-profile block
@@ -593,34 +488,19 @@
     var fullChecked = controls.tier === "lightweight" ? "" : " checked";
     var lightChecked = controls.tier === "lightweight" ? " checked" : "";
     var parallelChecked = controls.parallel ? " checked" : "";
-    // Set 079 S1: the D6 key warning is Full-via-API guidance — while
-    // the Copilot seat sub-choice is selected it would tell the exact
-    // keyless audience the option exists for to go set DABBLER_* keys,
-    // so it stays hidden there (the Copilot path needs no keys).
-    var envWarningVisible =
-      controls.tier !== "lightweight" &&
-      controls.transportProfile !== "copilot-cli" &&
-      gs.providerKeyPresent === false;
-    // Set 077 S3 (A10): the missing-Python warning leads step 1 — it is
-    // the prerequisite everything below it depends on. `pythonPresent`
-    // absent from the payload (an older host) reads as "present" so the
-    // warning fails quiet, never falsely loud.
-    var pythonWarningVisible = gs.pythonPresent === false;
     var step1 = gsStep(
       1,
       "Build project structure",
       gs.structureBuilt,
-      pythonWarningHtml(pythonWarningVisible) +
       '<div class="gs-radio-group" role="radiogroup" aria-label="Project tier">' +
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="full"' + fullChecked + '> Full</label>' +
         '<label class="gs-radio"><input type="radio" name="gs-tier" value="lightweight"' + lightChecked + '> Lightweight</label>' +
       '</div>' +
-      transportProfileBlockHtml(controls, gs.copilotCliPresent) +
+      transportProfileBlockHtml(controls) +
       verificationModeBlockHtml(controls) +
       '<button class="gs-button" type="button" data-gs-action="build-structure">' +
         'Build project structure' +
-      '</button>' +
-      envWarningHtml(envWarningVisible),
+      '</button>',
     );
     var step2 = gsStep(
       2,
@@ -667,17 +547,13 @@
     renderGettingStarted: renderGettingStarted,
     restoreGsState: restoreGsState,
     gsStep: gsStep,
-    envWarningHtml: envWarningHtml,
     worktreeNoteHtml: worktreeNoteHtml,
     budgetBlockHtml: budgetBlockHtml,
     optionRowHtml: optionRowHtml,
     verificationModeBlockHtml: verificationModeBlockHtml,
     transportProfileBlockHtml: transportProfileBlockHtml,
-    pythonWarningHtml: pythonWarningHtml,
-    copilotWarningHtml: copilotWarningHtml,
     parseBudgetInput: parseBudgetInput,
     validateBudgetControls: validateBudgetControls,
-    ENV_WARNING_TEXT: ENV_WARNING_TEXT,
     WORKTREE_NOTE_TEXT: WORKTREE_NOTE_TEXT,
     BUDGET_LABEL_TEXT: BUDGET_LABEL_TEXT,
     BUDGET_HELP_TEXT: BUDGET_HELP_TEXT,
@@ -685,11 +561,9 @@
     VERIFICATION_MODE_LABEL_TEXT: VERIFICATION_MODE_LABEL_TEXT,
     VERIFICATION_MODE_OUT_OF_BAND_TEXT: VERIFICATION_MODE_OUT_OF_BAND_TEXT,
     VERIFICATION_MODE_DEDICATED_TEXT: VERIFICATION_MODE_DEDICATED_TEXT,
-    PYTHON_WARNING_TEXT: PYTHON_WARNING_TEXT,
     NEW_MODULE_BUTTON_TITLE: NEW_MODULE_BUTTON_TITLE,
     TRANSPORT_PROFILE_LABEL_TEXT: TRANSPORT_PROFILE_LABEL_TEXT,
     TRANSPORT_PROFILE_API_TEXT: TRANSPORT_PROFILE_API_TEXT,
     TRANSPORT_PROFILE_COPILOT_TEXT: TRANSPORT_PROFILE_COPILOT_TEXT,
-    COPILOT_WARNING_TEXT: COPILOT_WARNING_TEXT,
   };
 });

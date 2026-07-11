@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "092-work-explorer-single-dialect-renderer",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-07-11T14:47:37.631279-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Reviewed the Session 2 implementation for Set 092 in the actual repo: the new System Status/webview wiring (`src/providers/CustomSessionSetsView.ts`, `media/session-sets-tree/client.js`, `media/session-sets-tree/systemStatusHtml.js`), watcher plumbing (`src/extension.ts`), the model contract (`src/providers/SessionSetsModel.ts`, `src/types/sessionSetsWebviewProtocol.ts`), and the updated unit/Playwright coverage plus the set artifacts and READMEs. I found one blocking completeness issue in the set artifacts and one material doc/code drift issue.",
+      "findings": [
+        {
+          "description": "Violation: the set spec says Session 2 \"Ends with: ... `close_session` succeeded\" and lists \"`change-log.md` + standard per-session artifacts\" as an end-of-set deliverable, but the set directory still has no `change-log.md` at all. Impact: this is not just a cosmetic omission; it means the delivered artifact set is incomplete at the point the set claims it is ready for close, so a reviewer should not approve merge/close on the current tree. Evidence: `docs/session-sets/092-work-explorer-single-dialect-renderer/spec.md` requires `change-log.md`, `grep` in that set directory finds only references to it, and `read_file` on `docs/session-sets/092-work-explorer-single-dialect-renderer/change-log.md` fails because the file does not exist. Fix: add the required `change-log.md` before close-out, or update the set state/docs so the repository no longer claims this deliverable is complete yet.",
+          "severity": "Major",
+          "category": "completeness"
+        },
+        {
+          "description": "Violation: the current docs still claim the Getting Started form itself shows inline prerequisite warnings, but the shipped code removed those form-local warnings and moved them to the shared System Status strip. Impact: operators following the README/extension README will look for warnings in the wrong place during setup and validation, and the set's own relocation claim is undermined by stale public documentation; this is material because the docs are explicitly describing current behavior of the just-changed surface. Evidence: `media/session-sets-tree/gettingStartedHtml.js` no longer renders any `data-gs-warning` blocks, `media/session-sets-tree/systemStatusHtml.js` is now the only renderer for provider/Python/Copilot/workspace faults, and the tests explicitly pin that relocation (`src/test/suite/gettingStartedHtml.test.ts`, suites \"diagnostics relocated to System Status\", \"Python diagnostic relocation\", and \"Copilot diagnostic relocation\"). But `README.md` still says Full \"surfaces ... an inline warning when the `copilot` CLI can't be found\" and that the form \"warns inline when a Python interpreter can't be found\"; `tools/dabbler-ai-orchestration/README.md` likewise says the form \"warns inline when no provider API key is visible\" and that a step-1 warning appears for missing Python/Copilot. Fix: update both READMEs to describe the System Status strip as the fault surface instead of inline form warnings.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the changes for the Work Explorer's single-dialect renderer, the new System Status strip, and the last-known-good `modules.yaml` rendering logic. The review included inspecting the primary implementation files (`CustomSessionSetsView.ts`, `SessionSetsModel.ts`, and `media/session-sets-tree/client.js`), the new and modified unit tests (`systemStatusHtml.test.ts`, `visibleModules.test.ts`), and the end-to-end Playwright tests (`module-tier.spec.ts`).\n\nThe core claims from the summary are substantiated by the code:\n1.  The diagnostics logic has been centralized in `CustomSessionSetsView.ts` and is rendered into a new, persistent \"System Status\" strip. This is confirmed by the new `buildSystemStatus` method and the `systemStatus` property on the webview payload.\n2.  The `modules.yaml` parsing is now fault-tolerant. The `buildModules` method in `CustomSessionSetsView.ts` now uses a `lastKnownGoodModules` map to cache valid module structures. If `classifyModulesManifest` returns an invalid state, the view is rendered using the cached version, and a fault is added to the system status payload. This prevents the tree from blanking out on a transient syntax error and correctly implements the \"last-known-good\" guardrail without overwriting user files.\n3.  A \"Major\" correctness bug found during development (documented in `docs/session-sets/092-work-explorer-single-dialect-renderer/s2-issues.json`) has been fixed. I have verified in `media/session-sets-tree/client.js` that the logic to apply the durable configuration seed from the host now runs *before* the System Status strip is rendered, ensuring the strip and the Getting Started form are built from the same consistent state on the initial paint. The new unit test in `systemStatusHtml.test.ts` correctly pins this source-ordering behavior to prevent regression.\n\nThe end-to-end and unit tests appear robust and correctly exercise the new functionality, including the invalid-to-valid `modules.yaml` recovery path. The implementation is complete and correct according to the specification.",
+      "findings": []
+    }
+  ]
+}

@@ -24,6 +24,29 @@ html, body {
   background: transparent;
 }
 
+.system-status {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--vscode-editorWarning-foreground);
+  background: var(--vscode-editorWarning-background, var(--vscode-sideBarSectionHeader-background));
+  color: var(--vscode-foreground);
+  font-size: 12px;
+}
+
+.system-status-title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.system-status-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.system-status-item + .system-status-item {
+  margin-top: 4px;
+}
+
 /* ---- Theme-derived custom properties ---- */
 /* Set 036 Session 6: the --indicator-stripe-color / --indicator-band-bg
  * / --indicator-band-fg custom properties consumed by the retired
@@ -459,20 +482,6 @@ body.vscode-light, body.vscode-high-contrast-light {
   cursor: default;
   pointer-events: none;
 }
-
-/* Set 060 S3 (D6): the Full-tier provider-key warning under the Build
-   button. Theme warning colors; `hidden` toggled client-side on radio
-   changes. */
-.gs-warning {
-  font-size: 11px;
-  line-height: 1.45;
-  padding: 6px 8px;
-  border-left: 3px solid
-    var(--vscode-inputValidation-warningBorder, #d29922);
-  background: var(--vscode-inputValidation-warningBackground, rgba(210, 153, 34, 0.12));
-  color: var(--vscode-foreground);
-}
-.gs-warning[hidden] { display: none; }
 
 /* Set 060 S3 (D7): the parallel-worktree info note under the checkbox. */
 .gs-note {

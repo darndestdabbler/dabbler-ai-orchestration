@@ -107,17 +107,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path38) {
-      const ctrl = callVisitor(key, node, visitor, path38);
+    function visit_(key, node, visitor, path39) {
+      const ctrl = callVisitor(key, node, visitor, path39);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path38, ctrl);
-        return visit_(key, ctrl, visitor, path38);
+        replaceNode(key, path39, ctrl);
+        return visit_(key, ctrl, visitor, path39);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path38 = Object.freeze(path38.concat(node));
+          path39 = Object.freeze(path39.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = visit_(i2, node.items[i2], visitor, path38);
+            const ci = visit_(i2, node.items[i2], visitor, path39);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -128,13 +128,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path38 = Object.freeze(path38.concat(node));
-          const ck = visit_("key", node.key, visitor, path38);
+          path39 = Object.freeze(path39.concat(node));
+          const ck = visit_("key", node.key, visitor, path39);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path38);
+          const cv = visit_("value", node.value, visitor, path39);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -155,17 +155,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path38) {
-      const ctrl = await callVisitor(key, node, visitor, path38);
+    async function visitAsync_(key, node, visitor, path39) {
+      const ctrl = await callVisitor(key, node, visitor, path39);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path38, ctrl);
-        return visitAsync_(key, ctrl, visitor, path38);
+        replaceNode(key, path39, ctrl);
+        return visitAsync_(key, ctrl, visitor, path39);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path38 = Object.freeze(path38.concat(node));
+          path39 = Object.freeze(path39.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = await visitAsync_(i2, node.items[i2], visitor, path38);
+            const ci = await visitAsync_(i2, node.items[i2], visitor, path39);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -176,13 +176,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path38 = Object.freeze(path38.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path38);
+          path39 = Object.freeze(path39.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path39);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path38);
+          const cv = await visitAsync_("value", node.value, visitor, path39);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -209,23 +209,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path38) {
+    function callVisitor(key, node, visitor, path39) {
       if (typeof visitor === "function")
-        return visitor(key, node, path38);
+        return visitor(key, node, path39);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path38);
+        return visitor.Map?.(key, node, path39);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path38);
+        return visitor.Seq?.(key, node, path39);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path38);
+        return visitor.Pair?.(key, node, path39);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path38);
+        return visitor.Scalar?.(key, node, path39);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path38);
+        return visitor.Alias?.(key, node, path39);
       return void 0;
     }
-    function replaceNode(key, path38, node) {
-      const parent = path38[path38.length - 1];
+    function replaceNode(key, path39, node) {
+      const parent = path39[path39.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -835,10 +835,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path38, value) {
+    function collectionFromPath(schema, path39, value) {
       let v = value;
-      for (let i2 = path38.length - 1; i2 >= 0; --i2) {
-        const k2 = path38[i2];
+      for (let i2 = path39.length - 1; i2 >= 0; --i2) {
+        const k2 = path39[i2];
         if (typeof k2 === "number" && Number.isInteger(k2) && k2 >= 0) {
           const a = [];
           a[k2] = v;
@@ -857,7 +857,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path38) => path38 == null || typeof path38 === "object" && !!path38[Symbol.iterator]().next().done;
+    var isEmptyPath = (path39) => path39 == null || typeof path39 === "object" && !!path39[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -887,11 +887,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path38, value) {
-        if (isEmptyPath(path38))
+      addIn(path39, value) {
+        if (isEmptyPath(path39))
           this.add(value);
         else {
-          const [key, ...rest] = path38;
+          const [key, ...rest] = path39;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -905,8 +905,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path38) {
-        const [key, ...rest] = path38;
+      deleteIn(path39) {
+        const [key, ...rest] = path39;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -920,8 +920,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path38, keepScalar) {
-        const [key, ...rest] = path38;
+      getIn(path39, keepScalar) {
+        const [key, ...rest] = path39;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -939,8 +939,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path38) {
-        const [key, ...rest] = path38;
+      hasIn(path39) {
+        const [key, ...rest] = path39;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -950,8 +950,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path38, value) {
-        const [key, ...rest] = path38;
+      setIn(path39, value) {
+        const [key, ...rest] = path39;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3466,9 +3466,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path38, value) {
+      addIn(path39, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path38, value);
+          this.contents.addIn(path39, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3543,14 +3543,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path38) {
-        if (Collection.isEmptyPath(path38)) {
+      deleteIn(path39) {
+        if (Collection.isEmptyPath(path39)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path38) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path39) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3565,10 +3565,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path38, keepScalar) {
-        if (Collection.isEmptyPath(path38))
+      getIn(path39, keepScalar) {
+        if (Collection.isEmptyPath(path39))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path38, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path39, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3579,10 +3579,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path38) {
-        if (Collection.isEmptyPath(path38))
+      hasIn(path39) {
+        if (Collection.isEmptyPath(path39))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path38) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path39) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3599,13 +3599,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path38, value) {
-        if (Collection.isEmptyPath(path38)) {
+      setIn(path39, value) {
+        if (Collection.isEmptyPath(path39)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path38), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path39), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path38, value);
+          this.contents.setIn(path39, value);
         }
       }
       /**
@@ -5561,9 +5561,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path38) => {
+    visit.itemAtPath = (cst, path39) => {
       let item = cst;
-      for (const [field, index] of path38) {
+      for (const [field, index] of path39) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5572,23 +5572,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path38) => {
-      const parent = visit.itemAtPath(cst, path38.slice(0, -1));
-      const field = path38[path38.length - 1][0];
+    visit.parentCollection = (cst, path39) => {
+      const parent = visit.itemAtPath(cst, path39.slice(0, -1));
+      const field = path39[path39.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path38, item, visitor) {
-      let ctrl = visitor(item, path38);
+    function _visit(path39, item, visitor) {
+      let ctrl = visitor(item, path39);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i2 = 0; i2 < token.items.length; ++i2) {
-            const ci = _visit(Object.freeze(path38.concat([[field, i2]])), token.items[i2], visitor);
+            const ci = _visit(Object.freeze(path39.concat([[field, i2]])), token.items[i2], visitor);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -5599,10 +5599,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path38);
+            ctrl = ctrl(item, path39);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path38) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path39) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -6899,14 +6899,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs36 = this.flowScalar(this.type);
+              const fs37 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs36, sep: [] });
+                map.items.push({ start, key: fs37, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs36);
+                this.stack.push(fs37);
               } else {
-                Object.assign(it, { key: fs36, sep: [] });
+                Object.assign(it, { key: fs37, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7034,13 +7034,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs36 = this.flowScalar(this.type);
+              const fs37 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs36, sep: [] });
+                fc.items.push({ start: [], key: fs37, sep: [] });
               else if (it.sep)
-                this.stack.push(fs36);
+                this.stack.push(fs37);
               else
-                Object.assign(it, { key: fs36, sep: [] });
+                Object.assign(it, { key: fs37, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -8121,10 +8121,10 @@ var require_src2 = __commonJS({
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src());
     var log = debug_1.default("@kwsites/file-exists");
-    function check(path38, isFile, isDirectory) {
-      log(`checking %s`, path38);
+    function check(path39, isFile, isDirectory) {
+      log(`checking %s`, path39);
       try {
-        const stat = fs_1.statSync(path38);
+        const stat = fs_1.statSync(path39);
         if (stat.isFile() && isFile) {
           log(`[OK] path represents a file`);
           return true;
@@ -8144,8 +8144,8 @@ var require_src2 = __commonJS({
         throw e;
       }
     }
-    function exists2(path38, type = exports2.READABLE) {
-      return check(path38, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+    function exists2(path39, type = exports2.READABLE) {
+      return check(path39, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
     }
     exports2.exists = exists2;
     exports2.FILE = 1;
@@ -11414,8 +11414,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path38) {
-      let input = path38;
+    function removeDotSegments(path39) {
+      let input = path39;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -11614,8 +11614,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path38, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path38 && path38 !== "/" ? path38 : void 0;
+        const [path39, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path39 && path39 !== "/" ? path39 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -14682,11 +14682,13 @@ __export(extension_exports, {
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode32 = __toESM(require("vscode"));
-var fs35 = __toESM(require("fs"));
-var path37 = __toESM(require("path"));
+var fs36 = __toESM(require("fs"));
+var path38 = __toESM(require("path"));
 
 // src/providers/CustomSessionSetsView.ts
 var crypto2 = __toESM(require("crypto"));
+var fs16 = __toESM(require("fs"));
+var path20 = __toESM(require("path"));
 var vscode12 = __toESM(require("vscode"));
 
 // src/utils/fileSystem.ts
@@ -17007,6 +17009,7 @@ function validateNewModuleSlug(raw, existingSlugs) {
 function defaultModulePlanPath(slug) {
   return `docs/modules/${slug}/project-plan.md`;
 }
+var LEGACY_ROOT_PLAN_REL = "docs/planning/project-plan.md";
 function classifyModulesManifest(root) {
   const entries = readModulesManifest(root);
   if (entries !== null)
@@ -17372,32 +17375,6 @@ function blockedTooltip(set) {
   );
   return `Blocked by prerequisites: ${parts.join(", ")} \u2014 all must complete first.`;
 }
-function groupByModule(all) {
-  const labeled = /* @__PURE__ */ new Map();
-  const implicit = { slug: null, title: null, sets: [] };
-  for (const s of all) {
-    if (s.module === null) {
-      implicit.sets.push(s);
-      continue;
-    }
-    const existing = labeled.get(s.module);
-    if (existing) {
-      existing.group.sets.push(s);
-      const order = s.moduleOrder ?? Number.POSITIVE_INFINITY;
-      if (order < existing.order)
-        existing.order = order;
-    } else {
-      labeled.set(s.module, {
-        group: { slug: s.module, title: s.moduleTitle, sets: [s] },
-        order: s.moduleOrder ?? Number.POSITIVE_INFINITY
-      });
-    }
-  }
-  const groups = Array.from(labeled.values()).sort((a, b2) => a.order - b2.order).map((e) => e.group);
-  if (implicit.sets.length > 0)
-    groups.push(implicit);
-  return groups;
-}
 function bucketSets(all) {
   return {
     inProgress: all.filter((s) => s.state === "in-progress"),
@@ -17445,12 +17422,148 @@ function buildBucketPayloads(subset, rowFor) {
   }
   return groups;
 }
-function buildModulePayloads(all, rowFor) {
-  return groupByModule(all).map((group) => ({
-    slug: group.slug ?? "",
-    title: group.title ?? "",
-    buckets: buildBucketPayloads(group.sets, rowFor)
+function mergeVisibleModules(roots) {
+  const declared = /* @__PURE__ */ new Map();
+  const fallback = /* @__PURE__ */ new Map();
+  let pseudo = null;
+  let firstSeen = 0;
+  const warningRank = (warning) => {
+    if (!warning)
+      return 0;
+    if (warning.code === "manifest-invalid")
+      return 3;
+    if (warning.code === "manifest-missing")
+      return 2;
+    return 1;
+  };
+  for (const modules of roots) {
+    let declaredOrder = 0;
+    for (const module2 of modules) {
+      if (module2.kind === "declared") {
+        const slug = module2.slug;
+        const existing = declared.get(slug);
+        if (existing) {
+          existing.module = {
+            ...existing.module,
+            sets: [...existing.module.sets, ...module2.sets]
+          };
+          existing.order = Math.min(existing.order, declaredOrder);
+        } else {
+          declared.set(slug, {
+            module: { ...module2, sets: [...module2.sets] },
+            order: declaredOrder,
+            firstSeen: firstSeen++
+          });
+        }
+        declaredOrder++;
+        continue;
+      }
+      if (module2.kind === "fallback") {
+        const slug = module2.slug;
+        const existing = fallback.get(slug);
+        fallback.set(
+          slug,
+          existing ? { ...existing, sets: [...existing.sets, ...module2.sets] } : { ...module2, sets: [...module2.sets] }
+        );
+        continue;
+      }
+      if (!pseudo) {
+        pseudo = { ...module2, sets: [...module2.sets] };
+      } else {
+        const existingPseudo = pseudo;
+        pseudo = {
+          ...existingPseudo,
+          warning: warningRank(module2.warning) > warningRank(existingPseudo.warning) ? module2.warning : existingPseudo.warning,
+          sets: [...existingPseudo.sets, ...module2.sets]
+        };
+      }
+    }
+  }
+  const out = Array.from(declared.values()).sort((a, b2) => a.order - b2.order || a.firstSeen - b2.firstSeen).map((entry) => entry.module);
+  out.push(...Array.from(fallback.values()).sort((a, b2) => a.slug.localeCompare(b2.slug)));
+  const mergedPseudo = pseudo;
+  if (mergedPseudo) {
+    out.push({
+      ...mergedPseudo,
+      displayName: out.length === 0 ? PSEUDO_MODULE_SOLE_NAME : PSEUDO_MODULE_COEXIST_NAME
+    });
+  }
+  return out;
+}
+function buildVisibleModulePayloads(modules, rowFor) {
+  return modules.map((module2) => ({
+    slug: module2.slug ?? "",
+    title: module2.displayName,
+    kind: module2.kind,
+    warning: module2.warning,
+    buckets: buildBucketPayloads([...module2.sets], rowFor)
   }));
+}
+var PSEUDO_MODULE_SOLE_NAME = "Default";
+var PSEUDO_MODULE_COEXIST_NAME = "Unassigned";
+function computeVisibleModules(classification, allSets, opts) {
+  const declared = classification.kind === "present" ? classification.entries : [];
+  const declaredSlugs = new Set(declared.map((e) => e.slug));
+  const declaredSets = /* @__PURE__ */ new Map();
+  const fallbackSets = /* @__PURE__ */ new Map();
+  const unstamped = [];
+  for (const s of allSets) {
+    const raw = s.config?.module ?? null;
+    if (raw === null) {
+      unstamped.push(s);
+    } else if (declaredSlugs.has(raw)) {
+      const list = declaredSets.get(raw);
+      if (list)
+        list.push(s);
+      else
+        declaredSets.set(raw, [s]);
+    } else {
+      const list = fallbackSets.get(raw);
+      if (list)
+        list.push(s);
+      else
+        fallbackSets.set(raw, [s]);
+    }
+  }
+  const out = declared.map((entry) => ({
+    kind: "declared",
+    slug: entry.slug,
+    displayName: entry.title,
+    warning: null,
+    planPath: resolveModulePlanRelPath(entry).path,
+    sets: declaredSets.get(entry.slug) ?? []
+  }));
+  for (const rawSlug of Array.from(fallbackSets.keys()).sort()) {
+    out.push({
+      kind: "fallback",
+      slug: rawSlug,
+      displayName: rawSlug,
+      warning: { code: "undeclared-slug", rawSlug },
+      planPath: null,
+      sets: fallbackSets.get(rawSlug)
+    });
+  }
+  const otherGroupsVisible = out.length > 0;
+  const pseudoVisible = unstamped.length > 0 || opts.legacyRootPlanExists || !otherGroupsVisible;
+  if (pseudoVisible) {
+    let warning = null;
+    if (classification.kind === "invalid") {
+      warning = { code: "manifest-invalid" };
+    } else if (classification.kind === "absent" && allSets.length > 0) {
+      warning = { code: "manifest-missing" };
+    } else if (unstamped.length > 0 && otherGroupsVisible) {
+      warning = { code: "unstamped-sets" };
+    }
+    out.push({
+      kind: "pseudo",
+      slug: null,
+      displayName: otherGroupsVisible ? PSEUDO_MODULE_COEXIST_NAME : PSEUDO_MODULE_SOLE_NAME,
+      warning,
+      planPath: LEGACY_ROOT_PLAN_REL,
+      sets: unstamped
+    });
+  }
+  return out;
 }
 
 // src/providers/ActionRegistry.ts
@@ -18971,8 +19084,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = "\n") {
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path38) {
-  return (0, import_file_exists.exists)(path38, import_file_exists.FOLDER);
+function folderExists(path39) {
+  return (0, import_file_exists.exists)(path39, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -19374,8 +19487,8 @@ function checkIsRepoRootTask() {
     commands: commands28,
     format: "utf-8",
     onError,
-    parser(path38) {
-      return /^\.(git)?$/.test(path38.trim());
+    parser(path39) {
+      return /^\.(git)?$/.test(path39.trim());
     }
   };
 }
@@ -19809,11 +19922,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path38, line, preview] = input.split(NULL);
-    paths.add(path38);
-    (results[path38] = results[path38] || []).push({
+    const [path39, line, preview] = input.split(NULL);
+    paths.add(path39);
+    (results[path39] = results[path39] || []).push({
       line: asNumber(line),
-      path: path38,
+      path: path39,
       preview
     });
   });
@@ -20577,14 +20690,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path38, text) {
+function parseInit(bare, path39, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path38, false, result[1]);
+    return new InitSummary(bare, path39, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path38, true, result[1]);
+    return new InitSummary(bare, path39, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -20595,7 +20708,7 @@ function parseInit(bare, path38, text) {
       break;
     }
   }
-  return new InitSummary(bare, path38, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path39, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -20604,9 +20717,9 @@ var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     "use strict";
     InitSummary = class {
-      constructor(bare, path38, existing, gitDir) {
+      constructor(bare, path39, existing, gitDir) {
         this.bare = bare;
-        this.path = path38;
+        this.path = path39;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -20618,7 +20731,7 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path38, customArgs) {
+function initTask(bare = false, path39, customArgs) {
   const commands28 = ["init", ...customArgs];
   if (bare && !hasBareCommand(commands28)) {
     commands28.splice(1, 0, bareCommand);
@@ -20627,7 +20740,7 @@ function initTask(bare = false, path38, customArgs) {
     commands: commands28,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands28.includes("--bare"), path38, text);
+      return parseInit(commands28.includes("--bare"), path39, text);
     }
   };
 }
@@ -21442,12 +21555,12 @@ var init_FileStatusSummary = __esm({
     "use strict";
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path38, index, working_dir) {
-        this.path = path38;
+      constructor(path39, index, working_dir) {
+        this.path = path39;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path38) || [null, path38, path38];
+          const detail = fromPathRegex.exec(path39) || [null, path39, path39];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -21478,14 +21591,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path38) {
+  function data(index, workingDir, path39) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path38);
+      handler(result, path39);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path38, index, workingDir));
+      result.files.push(new FileStatusSummary(path39, index, workingDir));
     }
   }
 }
@@ -21836,9 +21949,9 @@ var init_simple_git_api = __esm({
           next
         );
       }
-      hashObject(path38, write) {
+      hashObject(path39, write) {
         return this._runTask(
-          hashObjectTask(path38, write === true),
+          hashObjectTask(path39, write === true),
           trailingFunctionArgument(arguments)
         );
       }
@@ -22192,8 +22305,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path38 = input.trim().replace(/^["']|["']$/g, "");
-  return path38 && (0, import_node_path.normalize)(path38);
+  const path39 = input.trim().replace(/^["']|["']$/g, "");
+  return path39 && (0, import_node_path.normalize)(path39);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -22478,8 +22591,8 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path38) {
-  return subModuleTask(["add", repo, path38]);
+function addSubModuleTask(repo, path39) {
+  return subModuleTask(["add", repo, path39]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
@@ -22793,8 +22906,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path38, then) {
-      return this._runTask(addSubModuleTask2(repo, path38), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path39, then) {
+      return this._runTask(addSubModuleTask2(repo, path39), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(
@@ -24892,7 +25005,7 @@ function materializeBundledDoc(context) {
 function tierCalloutMarkdown(tier) {
   const label = tier === "lightweight" ? "Lightweight" : "Full";
   const other = tier === "lightweight" ? "Full" : "Lightweight";
-  return `> **Your project is set up for the ${label} tier** (recorded in \`.dabbler/tier\`). Step 1's tier descriptions below cover both options for reference \u2014 the **${other}-tier** setup notes do not apply to this project. To change tiers, right-click a session set in the Session Set Explorer and use **Switch Tier\u2026**.
+  return `> **Your project is set up for the ${label} tier** (recorded in \`.dabbler/tier\`). Step 1's tier descriptions below cover both options for reference \u2014 the **${other}-tier** setup notes do not apply to this project. To change tiers, right-click a session set in the Work Explorer and use **Switch Tier\u2026**.
 `;
 }
 function renderTierAwareGettingStarted(docText, tier) {
@@ -24953,7 +25066,7 @@ function registerGetStartedCommand(context) {
       try {
         await vscode11.commands.executeCommand("dabblerSessionSets.focus");
       } catch (err) {
-        console.warn("[gettingStarted] could not focus the Session Sets view", err);
+        console.warn("[gettingStarted] could not focus the Work Explorer view", err);
       }
       await openGettingStartedDoc(context);
     })
@@ -25008,6 +25121,7 @@ var CustomSessionSetsView = class {
     this.scanState = scanState;
     this.version = 0;
     this.cache = null;
+    this.collisionNotificationShown = false;
     // Set 060 Session 3 (D8): the static instructions doc auto-opens
     // ONCE per extension session, the first time a snapshot ships a
     // non-"list" Getting Started surface. One-shot so watcher ticks and
@@ -25031,6 +25145,7 @@ var CustomSessionSetsView = class {
   }
   refresh() {
     this.cache = null;
+    this.collisionNotificationShown = false;
     this.scheduleRender();
   }
   resolveWebviewView(webviewView, _context, _token) {
@@ -25211,6 +25326,13 @@ var CustomSessionSetsView = class {
       this.cache = readAllSessionSets();
     }
     const all = this.cache;
+    const duplicate = all.find((set) => set.duplicateNameError)?.duplicateNameError;
+    if (duplicate && !this.collisionNotificationShown) {
+      this.collisionNotificationShown = true;
+      void vscode12.window.showWarningMessage(
+        `Duplicate session-set name "${duplicate.name}" exists in ${duplicate.conflictingDirs.length} locations. Showing ${duplicate.chosenDir}; rename one copy to restore unique actions.`
+      );
+    }
     const visibleSlugs = new Set(all.map((s) => s.name));
     const current = this.getSuppression();
     const pruned = prune(current, visibleSlugs);
@@ -25322,16 +25444,29 @@ var CustomSessionSetsView = class {
       (root) => readTransportProfile(root)
     );
   }
-  // Set 087 Session 2: the module tier — group by validated module
-  // attribution (pure `groupByModule`, manifest order, implicit last),
-  // then run the EXISTING bucket pass per module. The whole payload
-  // assembly lives in SessionSetsModel.buildModulePayloads (verifier
-  // round 1: the payload SHAPE must be behavior-testable at Layer 2,
-  // and this class is not importable from the unit harness); the host
-  // contributes only its private `buildRow` — unchanged, per the spec —
-  // as the row builder. Module is grouping, never identity.
+  // Set 092 Session 1: compute the settled Q8 visible-module model for
+  // each discovered root, then merge those root-scoped results into the
+  // global Explorer list. The pure merge/payload helpers stay Layer-2
+  // testable; the host owns filesystem classification and plan presence.
   buildModules(all) {
-    return buildModulePayloads(all, (set) => this.buildRow(set));
+    const roots = new Set(
+      (vscode12.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath)
+    );
+    for (const set of all)
+      roots.add(set.root);
+    const byRoot = Array.from(roots).map(
+      (root) => computeVisibleModules(
+        classifyModulesManifest(root),
+        all.filter((set) => set.root === root),
+        {
+          legacyRootPlanExists: fs16.existsSync(path20.join(root, LEGACY_ROOT_PLAN_REL))
+        }
+      )
+    );
+    return buildVisibleModulePayloads(
+      mergeVisibleModules(byRoot),
+      (set) => this.buildRow(set)
+    );
   }
   buildRow(set) {
     const fraction = fractionFor(set);
@@ -25360,6 +25495,8 @@ var CustomSessionSetsView = class {
       // `v+`) + state-specific tooltip; click opens the row QuickPick.
       verificationMarker: verificationMarker(set),
       verificationTooltip: verificationTooltip(set),
+      duplicateNameBadge: set.duplicateNameError ? "!" : "",
+      duplicateNameTooltip: set.duplicateNameError ? `Duplicate session-set name in ${set.duplicateNameError.conflictingDirs.length} locations. Showing ${set.duplicateNameError.chosenDir}; rename one copy.` : "",
       accordionHtml: null,
       accordionUpdatedAt: null
     };
@@ -25390,7 +25527,7 @@ var CustomSessionSetsView = class {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <link rel="stylesheet" href="${cssUri}">
-  <title>Session Sets</title>
+  <title>Work Explorer</title>
 </head>
 <body>
   <main id="root" role="presentation"></main>
@@ -25434,8 +25571,8 @@ var ScanState = class {
 var vscode14 = __toESM(require("vscode"));
 
 // src/utils/migrateSessionState.ts
-var fs16 = __toESM(require("fs"));
-var path20 = __toESM(require("path"));
+var fs17 = __toESM(require("fs"));
+var path21 = __toESM(require("path"));
 var SESSION_STATE_FILENAME3 = "session-state.json";
 function isStrictPositiveInt2(v) {
   return typeof v === "number" && Number.isInteger(v) && v > 0 && !Number.isNaN(v);
@@ -25522,23 +25659,23 @@ function deriveLegacyTriple(sessions) {
   return { current, total: sessions.length, completed };
 }
 function atomicWriteJson2(filePath, data) {
-  const dir = path20.dirname(filePath);
-  const base = path20.basename(filePath);
-  const tmp = path20.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
-  const fd = fs16.openSync(tmp, "w");
+  const dir = path21.dirname(filePath);
+  const base = path21.basename(filePath);
+  const tmp = path21.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
+  const fd = fs17.openSync(tmp, "w");
   try {
-    fs16.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs16.fsyncSync(fd);
+    fs17.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs17.fsyncSync(fd);
   } finally {
-    fs16.closeSync(fd);
+    fs17.closeSync(fd);
   }
-  fs16.renameSync(tmp, filePath);
+  fs17.renameSync(tmp, filePath);
 }
 function migrateOneSet(setDir, options = {}) {
   const strategy = options.strategy ?? "regex";
   const dryRun = options.dryRun ?? false;
-  const statePath = path20.join(setDir, SESSION_STATE_FILENAME3);
-  if (!fs16.existsSync(statePath)) {
+  const statePath = path21.join(setDir, SESSION_STATE_FILENAME3);
+  if (!fs17.existsSync(statePath)) {
     return {
       setDir,
       action: "skipped-no-state",
@@ -25547,7 +25684,7 @@ function migrateOneSet(setDir, options = {}) {
   }
   let raw;
   try {
-    raw = fs16.readFileSync(statePath, "utf-8");
+    raw = fs17.readFileSync(statePath, "utf-8");
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {
@@ -25600,7 +25737,7 @@ function migrateOneSet(setDir, options = {}) {
       reason: "schemaVersion=3 but sessions[] is missing or not a list; this is a broken v3 file, not a v2 file. Hand-repair or restore from git."
     };
   }
-  const specMdPath = path20.join(setDir, "spec.md");
+  const specMdPath = path21.join(setDir, "spec.md");
   const specTitlesArr = extractSessionTitlesFromSpec(specMdPath);
   const specTitles = new Map(
     specTitlesArr.map((t2) => [t2.number, t2.title])
@@ -25755,8 +25892,8 @@ function handleMigrationResult(set, strategy, result, deps) {
 var vscode15 = __toESM(require("vscode"));
 
 // src/utils/migrateSessionStateV4.ts
-var fs17 = __toESM(require("fs"));
-var path21 = __toESM(require("path"));
+var fs18 = __toESM(require("fs"));
+var path22 = __toESM(require("path"));
 var SESSION_STATE_FILENAME4 = "session-state.json";
 var BACKUP_FILENAME = "session-state.v3.bak.json";
 var SWEEP_BACKUP_FILENAME = "session-state.pre-049-sweep.bak.json";
@@ -25870,38 +26007,38 @@ function buildV4OnDiskShape(normalized, original) {
   return out;
 }
 function atomicWriteJson3(filePath, data) {
-  const dir = path21.dirname(filePath);
-  const base = path21.basename(filePath);
-  const tmp = path21.join(
+  const dir = path22.dirname(filePath);
+  const base = path22.basename(filePath);
+  const tmp = path22.join(
     dir,
     `.${base}.tmp.${process.pid}.${Date.now()}`
   );
-  const fd = fs17.openSync(tmp, "w");
+  const fd = fs18.openSync(tmp, "w");
   try {
-    fs17.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs17.fsyncSync(fd);
+    fs18.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs18.fsyncSync(fd);
   } finally {
-    fs17.closeSync(fd);
+    fs18.closeSync(fd);
   }
   try {
-    fs17.renameSync(tmp, filePath);
+    fs18.renameSync(tmp, filePath);
   } catch (exc) {
     try {
-      fs17.unlinkSync(tmp);
+      fs18.unlinkSync(tmp);
     } catch {
     }
     throw exc;
   }
 }
 function atomicCopyJson(src, dst) {
-  const raw = JSON.parse(fs17.readFileSync(src, "utf-8"));
+  const raw = JSON.parse(fs18.readFileSync(src, "utf-8"));
   atomicWriteJson3(dst, raw);
 }
 function migrateOneSetV4(setDir, options = {}) {
   const dryRun = options.dryRun ?? false;
-  const statePath = path21.join(setDir, SESSION_STATE_FILENAME4);
-  const backupPath = path21.join(setDir, BACKUP_FILENAME);
-  if (!fs17.existsSync(statePath)) {
+  const statePath = path22.join(setDir, SESSION_STATE_FILENAME4);
+  const backupPath = path22.join(setDir, BACKUP_FILENAME);
+  if (!fs18.existsSync(statePath)) {
     return {
       setDir,
       action: "skipped-no-state",
@@ -25910,7 +26047,7 @@ function migrateOneSetV4(setDir, options = {}) {
   }
   let raw;
   try {
-    raw = fs17.readFileSync(statePath, "utf-8");
+    raw = fs18.readFileSync(statePath, "utf-8");
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {
@@ -25970,7 +26107,7 @@ function migrateOneSetV4(setDir, options = {}) {
         after: sweptState
       };
     }
-    const sweepBackupPath = path21.join(setDir, SWEEP_BACKUP_FILENAME);
+    const sweepBackupPath = path22.join(setDir, SWEEP_BACKUP_FILENAME);
     try {
       atomicCopyJson(statePath, sweepBackupPath);
     } catch (exc) {
@@ -26021,7 +26158,7 @@ function migrateOneSetV4(setDir, options = {}) {
       before: state
     };
   }
-  const specMdPath = path21.join(setDir, "spec.md");
+  const specMdPath = path22.join(setDir, "spec.md");
   let normalized;
   try {
     normalized = normalizeToV4Shape(stateObj, specMdPath);
@@ -26210,12 +26347,12 @@ function handleMigrationResultV4(set, result, deps) {
 
 // src/commands/openFile.ts
 var vscode16 = __toESM(require("vscode"));
-var fs18 = __toESM(require("fs"));
-var path22 = __toESM(require("path"));
+var fs19 = __toESM(require("fs"));
+var path23 = __toESM(require("path"));
 function openIfExists(filePath, label) {
-  if (!filePath || !fs18.existsSync(filePath)) {
+  if (!filePath || !fs19.existsSync(filePath)) {
     vscode16.window.showInformationMessage(
-      `${label} does not exist yet: ${filePath ? path22.basename(filePath) : "<unknown>"}`
+      `${label} does not exist yet: ${filePath ? path23.basename(filePath) : "<unknown>"}`
     );
     return;
   }
@@ -26258,8 +26395,8 @@ async function openPrerequisiteSpec(set) {
 function findPlaywrightTests(set) {
   const cfg = vscode16.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
-  const playwrightDir = path22.join(set.root, testDirRel);
-  if (!fs18.existsSync(playwrightDir))
+  const playwrightDir = path23.join(set.root, testDirRel);
+  if (!fs19.existsSync(playwrightDir))
     return [];
   const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
   const testRefs = set.uatSummary?.e2eRefs ?? [];
@@ -26269,12 +26406,12 @@ function findPlaywrightTests(set) {
       return;
     let entries;
     try {
-      entries = fs18.readdirSync(dir, { withFileTypes: true });
+      entries = fs19.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
-      const p2 = path22.join(dir, e.name);
+      const p2 = path23.join(dir, e.name);
       if (e.isDirectory()) {
         if (e.name === "bin" || e.name === "obj" || e.name === "node_modules")
           continue;
@@ -26290,7 +26427,7 @@ function findPlaywrightTests(set) {
       }
       if (testRefs.length > 0) {
         try {
-          const txt = fs18.readFileSync(p2, "utf8");
+          const txt = fs19.readFileSync(p2, "utf8");
           for (const ref of testRefs) {
             const short = String(ref).split(".").pop();
             if (short && txt.includes(short)) {
@@ -26369,8 +26506,8 @@ function registerOpenFileCommands(context) {
         }
         const picked = await vscode16.window.showQuickPick(
           tests.map((p2) => ({
-            label: path22.basename(p2),
-            description: path22.relative(item.set.root, p2),
+            label: path23.basename(p2),
+            description: path23.relative(item.set.root, p2),
             absolute: p2
           })),
           { placeHolder: `Playwright tests matching "${item.set.name}"` }
@@ -26423,8 +26560,8 @@ function registerCopyCommands(context) {
 }
 
 // src/commands/copyPromptCommands.ts
-var fs19 = __toESM(require("fs"));
-var path23 = __toESM(require("path"));
+var fs20 = __toESM(require("fs"));
+var path24 = __toESM(require("path"));
 var vscode18 = __toESM(require("vscode"));
 var REVIEW_CRITERIA_DIRNAME = "review-criteria";
 var REVIEW_CRITERIA_MAX_CHARS = 8e3;
@@ -26433,21 +26570,21 @@ var defaultBuildContext = {
   fileExists: defaultFileExists
 };
 function defaultFileExists(filePath) {
-  return fs19.existsSync(filePath);
+  return fs20.existsSync(filePath);
 }
 function defaultReadReviewCriteria(root, kind) {
-  const candidate = path23.join(root, "docs", REVIEW_CRITERIA_DIRNAME, `${kind}.md`);
+  const candidate = path24.join(root, "docs", REVIEW_CRITERIA_DIRNAME, `${kind}.md`);
   try {
-    if (!fs19.existsSync(candidate))
+    if (!fs20.existsSync(candidate))
       return null;
-    const text = fs19.readFileSync(candidate, "utf8");
+    const text = fs20.readFileSync(candidate, "utf8");
     return text.length > 0 ? text : null;
   } catch {
     return null;
   }
 }
 function relFromRoot(root, abs) {
-  return path23.relative(root, abs).split(path23.sep).join("/");
+  return path24.relative(root, abs).split(path24.sep).join("/");
 }
 function reviewCriteriaTrailer(root, kind, ctx) {
   const content = ctx.readReviewCriteria(root, kind);
@@ -26475,7 +26612,7 @@ First read \`${CROSS_PROVIDER_VERIFICATION_REL_PATH}\` (repo root) \u2014 it car
 function verificationArtifactClose(set, kind) {
   const artifactRel = relFromRoot(
     set.root,
-    path23.join(set.dir, "external-verification.md")
+    path24.join(set.dir, "external-verification.md")
   );
   const scopeLine = kind === "spec" ? ` Because this is a pre-work SPECIFICATION review, put the line \`Scope: specification\` directly under your round header \u2014 a spec-only verdict must not read as work verification.` : "";
   return `Non-negotiable final step: YOU (the reviewing engine) must write your verdict as a new dated round section appended to \`${artifactRel}\` (UTF-8, append-only \u2014 never rewrite earlier rounds).${scopeLine} A verdict that exists only in this chat does not count.`;
@@ -26484,26 +26621,26 @@ function ensureCrossProviderVerificationDoc(extensionPath, root) {
   try {
     const bundle = loadTemplateBundle(resolveBundledTemplateDir(extensionPath));
     const ctx = structureOnlyContext(
-      path23.basename(root),
+      path24.basename(root),
       "lightweight",
       (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
     );
     const rendered = renderCrossProviderVerification(bundle, ctx);
-    const target = path23.join(
+    const target = path24.join(
       root,
       ...CROSS_PROVIDER_VERIFICATION_REL_PATH.split("/")
     );
     let existing = null;
     try {
-      existing = fs19.readFileSync(target, "utf8");
+      existing = fs20.readFileSync(target, "utf8");
     } catch {
       existing = null;
     }
     if (existing !== null && existing.replace(/\r\n/g, "\n") === rendered) {
       return true;
     }
-    fs19.mkdirSync(path23.dirname(target), { recursive: true });
-    fs19.writeFileSync(target, rendered, { encoding: "utf8" });
+    fs20.mkdirSync(path24.dirname(target), { recursive: true });
+    fs20.writeFileSync(target, rendered, { encoding: "utf8" });
     return true;
   } catch {
     return false;
@@ -26768,8 +26905,8 @@ function registerCopyPromptCommands(context) {
 
 // src/commands/troubleshoot.ts
 var vscode19 = __toESM(require("vscode"));
-var fs20 = __toESM(require("fs"));
-var path24 = __toESM(require("path"));
+var fs21 = __toESM(require("fs"));
+var path25 = __toESM(require("path"));
 var cp4 = __toESM(require("child_process"));
 function workspaceRoot() {
   return vscode19.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -26785,8 +26922,8 @@ function checkActivation() {
     ch.show();
     return;
   }
-  const dir = path24.join(root, SESSION_SETS_REL);
-  const exists2 = fs20.existsSync(dir);
+  const dir = path25.join(root, SESSION_SETS_REL);
+  const exists2 = fs21.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
   if (!exists2) {
@@ -26872,15 +27009,15 @@ function checkLayout() {
     return;
   }
   const dirs = [
-    path24.join("docs", "session-sets"),
-    path24.join("docs", "planning"),
+    path25.join("docs", "session-sets"),
+    path25.join("docs", "planning"),
     "ai_router"
   ];
   ch.appendLine(`Expected layout under: ${root}`);
   ch.appendLine("");
   for (const d of dirs) {
-    const full = path24.join(root, d);
-    const exists2 = fs20.existsSync(full);
+    const full = path25.join(root, d);
+    const exists2 = fs21.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
   ch.appendLine("");
@@ -27007,22 +27144,22 @@ function registerCancelLifecycleCommands(context, deps) {
 
 // src/dashboard/CostDashboard.ts
 var vscode21 = __toESM(require("vscode"));
-var fs23 = __toESM(require("fs"));
-var path26 = __toESM(require("path"));
+var fs24 = __toESM(require("fs"));
+var path27 = __toESM(require("path"));
 
 // src/utils/metrics.ts
-var fs22 = __toESM(require("fs"));
+var fs23 = __toESM(require("fs"));
 
 // src/utils/routerConfig.ts
-var fs21 = __toESM(require("fs"));
-var path25 = __toESM(require("path"));
+var fs22 = __toESM(require("fs"));
+var path26 = __toESM(require("path"));
 var YAML3 = __toESM(require_dist());
 var DEFAULT_METRICS_FILENAME = "router-metrics.jsonl";
 var DEFAULT_REVIEW_FREQUENCY_DAYS = 30;
 function findAiRouterDir(workspaceRoot2) {
-  const candidate = path25.join(workspaceRoot2, "ai_router");
+  const candidate = path26.join(workspaceRoot2, "ai_router");
   try {
-    if (fs21.existsSync(path25.join(candidate, "router-config.yaml"))) {
+    if (fs22.existsSync(path26.join(candidate, "router-config.yaml"))) {
       return candidate;
     }
   } catch {
@@ -27036,10 +27173,10 @@ function readRouterConfig(workspaceRoot2) {
   const aiRouterDir = findAiRouterDir(workspaceRoot2);
   if (!aiRouterDir)
     return null;
-  const configPath = path25.join(aiRouterDir, "router-config.yaml");
+  const configPath = path26.join(aiRouterDir, "router-config.yaml");
   let doc = {};
   try {
-    doc = YAML3.parse(fs21.readFileSync(configPath, "utf8")) ?? {};
+    doc = YAML3.parse(fs22.readFileSync(configPath, "utf8")) ?? {};
   } catch {
     doc = {};
   }
@@ -27058,7 +27195,7 @@ function readRouterConfig(workspaceRoot2) {
     aiRouterDir,
     metricsEnabled,
     metricsFilename,
-    metricsPath: path25.join(aiRouterDir, metricsFilename),
+    metricsPath: path26.join(aiRouterDir, metricsFilename),
     pricingReviewed,
     reviewFrequencyDays
   };
@@ -27103,10 +27240,10 @@ function sessionSetDisplayName(raw) {
   return name === "" ? "(no session set)" : name;
 }
 function readMetricsFromPath(metricsPath) {
-  if (!fs22.existsSync(metricsPath))
+  if (!fs23.existsSync(metricsPath))
     return [];
   try {
-    const lines = fs22.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
+    const lines = fs23.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
     return lines.map((line) => {
       try {
         return JSON.parse(line);
@@ -27323,9 +27460,9 @@ var CostDashboard = class _CostDashboard {
     }
     const entries = readMetrics(root);
     const csv = exportToCsv(entries);
-    const outPath = path26.join(root, "ai_router", "cost-export.csv");
+    const outPath = path27.join(root, "ai_router", "cost-export.csv");
     try {
-      fs23.writeFileSync(outPath, csv, "utf8");
+      fs24.writeFileSync(outPath, csv, "utf8");
       vscode21.commands.executeCommand("vscode.open", vscode21.Uri.file(outPath));
     } catch (err) {
       vscode21.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -27384,7 +27521,7 @@ var CostDashboard = class _CostDashboard {
     const banner = stalenessBannerHtml(computeStaleness(info));
     const htmlPath = vscode21.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
     try {
-      let html = fs23.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs24.readFileSync(htmlPath.fsPath, "utf8");
       const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
         ([slug, d]) => `<tr><td>${esc(slug)}</td><td>${d.sessions}</td><td>$${d.cost.toFixed(3)}</td><td>${d.lastRun ? new Date(d.lastRun).toLocaleDateString("en-CA") : "\u2014"}</td></tr>`
       ).join("\n");
@@ -27413,16 +27550,16 @@ function registerCostDashboardCommand(context) {
 // src/configEditor/ConfigEditorPanel.ts
 var cp5 = __toESM(require("child_process"));
 var vscode22 = __toESM(require("vscode"));
-var fs25 = __toESM(require("fs"));
-var path27 = __toESM(require("path"));
+var fs26 = __toESM(require("fs"));
+var path28 = __toESM(require("path"));
 
 // src/configEditor/yamlReadWrite.ts
 var import_yaml = __toESM(require_dist());
-var fs24 = __toESM(require("fs"));
+var fs25 = __toESM(require("fs"));
 function readYamlFile(filePath) {
-  if (!fs24.existsSync(filePath))
+  if (!fs25.existsSync(filePath))
     return null;
-  const text = fs24.readFileSync(filePath, "utf8");
+  const text = fs25.readFileSync(filePath, "utf8");
   const doc = parseDocumentFromText(text);
   return { doc, text, parseErrors: collectParseErrors(doc) };
 }
@@ -27731,10 +27868,10 @@ function _checkLocalOverridesAllowlist(localOverrides, routerConfig, errors) {
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-function getByPath(obj, path38) {
+function getByPath(obj, path39) {
   if (!obj)
     return void 0;
-  const parts = path38.split(".");
+  const parts = path39.split(".");
   let cur = obj;
   for (const p2 of parts) {
     if (cur === null || cur === void 0 || typeof cur !== "object")
@@ -28175,9 +28312,9 @@ function collectOverrideRows(localOverrides, state) {
   if (!localOverrides)
     return [];
   const rows = [];
-  walk(localOverrides, [], (path38, value) => {
-    const dotted = path38.join(".");
-    const sharedSource = pickSharedSource(path38[0]);
+  walk(localOverrides, [], (path39, value) => {
+    const dotted = path39.join(".");
+    const sharedSource = pickSharedSource(path39[0]);
     const sharedVal = sharedSource === "routerConfig" ? getByPath(state.routerConfig, dotted) : sharedSource === "budget" ? getByPath(state.budget, dotted) : void 0;
     rows.push({
       path: dotted,
@@ -28209,11 +28346,11 @@ function formatValue(v) {
 }
 function walk(obj, prefix, emit) {
   for (const [k2, v] of Object.entries(obj)) {
-    const path38 = [...prefix, k2];
+    const path39 = [...prefix, k2];
     if (v !== null && typeof v === "object" && !Array.isArray(v)) {
-      walk(v, path38, emit);
+      walk(v, path39, emit);
     } else {
-      emit(path38, v);
+      emit(path39, v);
     }
   }
 }
@@ -28348,40 +28485,40 @@ function applyPatch(routerConfigDoc, budgetDoc, localOverridesDoc, payload) {
   }
   return result;
 }
-function applyOverridableField(routerConfigDoc, localOverridesDoc, path38, value, source, result) {
+function applyOverridableField(routerConfigDoc, localOverridesDoc, path39, value, source, result) {
   if (source === "local") {
-    if (setIfChanged(localOverridesDoc, path38, value)) {
+    if (setIfChanged(localOverridesDoc, path39, value)) {
       result.localOverridesChanged = true;
     }
-    deleteIfPresent(routerConfigDoc, path38, result, "routerConfigChanged");
+    deleteIfPresent(routerConfigDoc, path39, result, "routerConfigChanged");
   } else {
-    if (setIfChanged(routerConfigDoc, path38, value)) {
+    if (setIfChanged(routerConfigDoc, path39, value)) {
       result.routerConfigChanged = true;
     }
-    deleteIfPresent(localOverridesDoc, path38, result, "localOverridesChanged");
+    deleteIfPresent(localOverridesDoc, path39, result, "localOverridesChanged");
   }
 }
-function setIfChanged(doc, path38, value) {
-  const current = doc.getIn(path38);
+function setIfChanged(doc, path39, value) {
+  const current = doc.getIn(path39);
   if (current === value)
     return false;
-  doc.setIn(path38, value);
+  doc.setIn(path39, value);
   return true;
 }
-function deleteIfPresent(doc, path38, result, flag) {
-  if (doc.hasIn(path38)) {
-    doc.deleteIn(path38);
+function deleteIfPresent(doc, path39, result, flag) {
+  if (doc.hasIn(path39)) {
+    doc.deleteIn(path39);
     result[flag] = true;
   }
 }
-function pruneEmptyContainer(doc, path38, result, flag) {
-  if (!doc.hasIn(path38))
+function pruneEmptyContainer(doc, path39, result, flag) {
+  if (!doc.hasIn(path39))
     return;
-  const node = doc.getIn(path38);
+  const node = doc.getIn(path39);
   if (node && typeof node === "object" && "items" in node) {
     const items = node.items;
     if (Array.isArray(items) && items.length === 0) {
-      doc.deleteIn(path38);
+      doc.deleteIn(path39);
       result[flag] = true;
     }
   }
@@ -28488,8 +28625,8 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
     if (!roots?.length)
       return null;
     for (const folder of roots) {
-      const candidate = path27.join(folder.uri.fsPath, "ai_router");
-      if (fs25.existsSync(candidate))
+      const candidate = path28.join(folder.uri.fsPath, "ai_router");
+      if (fs26.existsSync(candidate))
         return candidate;
     }
     return null;
@@ -28501,9 +28638,9 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
       this._validation = null;
       return;
     }
-    const routerConfigPath = path27.join(aiRouterDir, "router-config.yaml");
-    const budgetPath = path27.join(aiRouterDir, "budget.yaml");
-    const localOverridesPath = path27.join(aiRouterDir, "local-overrides.yaml");
+    const routerConfigPath = path28.join(aiRouterDir, "router-config.yaml");
+    const budgetPath = path28.join(aiRouterDir, "budget.yaml");
+    const localOverridesPath = path28.join(aiRouterDir, "local-overrides.yaml");
     const routerResult = readYamlFile(routerConfigPath);
     const budgetResult = readYamlFile(budgetPath);
     const localResult = readYamlFile(localOverridesPath);
@@ -28686,13 +28823,13 @@ ${msgs}`,
     const writeAtomic = (file, target, content) => {
       const tmp = target + ".tmp";
       try {
-        fs25.writeFileSync(tmp, content, "utf8");
-        fs25.renameSync(tmp, target);
+        fs26.writeFileSync(tmp, content, "utf8");
+        fs26.renameSync(tmp, target);
         succeeded.push(file);
       } catch (err) {
         try {
-          if (fs25.existsSync(tmp))
-            fs25.unlinkSync(tmp);
+          if (fs26.existsSync(tmp))
+            fs26.unlinkSync(tmp);
         } catch {
         }
         failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
@@ -28790,13 +28927,13 @@ ${msgs}`,
       }
       const tmp = target + ".tmp";
       try {
-        fs25.writeFileSync(tmp, cachedContent, "utf8");
-        fs25.renameSync(tmp, target);
+        fs26.writeFileSync(tmp, cachedContent, "utf8");
+        fs26.renameSync(tmp, target);
         newSucceeded.push(f.file);
       } catch (err) {
         try {
-          if (fs25.existsSync(tmp))
-            fs25.unlinkSync(tmp);
+          if (fs26.existsSync(tmp))
+            fs26.unlinkSync(tmp);
         } catch {
         }
         stillFailed.push({ file: f.file, reason: err instanceof Error ? err.message : String(err) });
@@ -28863,13 +29000,13 @@ ${msgs}`,
       pendingContents[file] = content;
       const tmp = target + ".tmp";
       try {
-        fs25.writeFileSync(tmp, content, "utf8");
-        fs25.renameSync(tmp, target);
+        fs26.writeFileSync(tmp, content, "utf8");
+        fs26.renameSync(tmp, target);
         succeeded.push(file);
       } catch (err) {
         try {
-          if (fs25.existsSync(tmp))
-            fs25.unlinkSync(tmp);
+          if (fs26.existsSync(tmp))
+            fs26.unlinkSync(tmp);
         } catch {
         }
         failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
@@ -28879,9 +29016,9 @@ ${msgs}`,
     reapply("budget.yaml", this._loaded.budgetPath, this._lastSaveSnapshot.budgetText);
     if (this._lastSaveSnapshot.localOverridesText !== null) {
       reapply("local-overrides.yaml", this._loaded.localOverridesPath, this._lastSaveSnapshot.localOverridesText);
-    } else if (fs25.existsSync(this._loaded.localOverridesPath)) {
+    } else if (fs26.existsSync(this._loaded.localOverridesPath)) {
       try {
-        fs25.unlinkSync(this._loaded.localOverridesPath);
+        fs26.unlinkSync(this._loaded.localOverridesPath);
         succeeded.push("local-overrides.yaml");
       } catch (err) {
         failed.push({
@@ -28942,7 +29079,7 @@ ${msgs}`,
       );
       return;
     }
-    const pythonPath = resolvePythonInterpreter(path27.dirname(aiRouterDir));
+    const pythonPath = resolvePythonInterpreter(path28.dirname(aiRouterDir));
     const script = [
       "import json, sys",
       "try:",
@@ -28954,7 +29091,7 @@ ${msgs}`,
     ].join("\n");
     const env8 = { ...process.env, PUSHOVER_API_KEY: apiKeyValue, PUSHOVER_USER_KEY: userKeyValue };
     const child = cp5.spawn(pythonPath, ["-c", script], {
-      cwd: path27.dirname(aiRouterDir),
+      cwd: path28.dirname(aiRouterDir),
       env: env8,
       windowsHide: true
     });
@@ -29003,7 +29140,7 @@ ${msgs}`,
     if (!this._loaded)
       return;
     const target = this._loaded.localOverridesPath;
-    if (!fs25.existsSync(target)) {
+    if (!fs26.existsSync(target)) {
       vscode22.window.showInformationMessage(
         "local-overrides.yaml does not exist yet. Save any per-operator override and the file is created automatically."
       );
@@ -29370,7 +29507,7 @@ ${msgs}`,
     </body></html>`;
   }
   _missingFilesHtml(nonce, cspSource, missingFilePath) {
-    const fileName = path27.basename(missingFilePath);
+    const fileName = path28.basename(missingFilePath);
     return `<!DOCTYPE html><html lang="en"><head>
       <meta charset="UTF-8">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline';">
@@ -29396,16 +29533,16 @@ function escapeHtml3(str) {
 
 // src/commands/flagDecisionForReview.ts
 var vscode23 = __toESM(require("vscode"));
-var path29 = __toESM(require("path"));
+var path30 = __toESM(require("path"));
 
 // src/commands/decisionReviewQueue.ts
-var fs26 = __toESM(require("fs"));
-var path28 = __toESM(require("path"));
+var fs27 = __toESM(require("fs"));
+var path29 = __toESM(require("path"));
 var QUEUE_FILENAME = "decision-review-queue.jsonl";
 function appendQueueEntry(sessionSetDir, entry) {
-  const queuePath = path28.join(sessionSetDir, QUEUE_FILENAME);
+  const queuePath = path29.join(sessionSetDir, QUEUE_FILENAME);
   const line = JSON.stringify(entry) + "\n";
-  fs26.appendFileSync(queuePath, line, "utf8");
+  fs27.appendFileSync(queuePath, line, "utf8");
 }
 function findActiveSessionSetDir(provider) {
   const all = provider();
@@ -29456,7 +29593,7 @@ function registerFlagDecisionForReview(context) {
           );
           return;
         }
-        const slug = path29.basename(activeDir);
+        const slug = path30.basename(activeDir);
         vscode23.window.showInformationMessage(
           `Flagged for cross-provider review in ${slug}/${QUEUE_FILENAME}. Will surface in the next session's planning checklist.`
         );
@@ -29467,8 +29604,8 @@ function registerFlagDecisionForReview(context) {
 
 // src/commands/scanAnnotationsForActiveSet.ts
 var vscode24 = __toESM(require("vscode"));
-var fs28 = __toESM(require("fs"));
-var path31 = __toESM(require("path"));
+var fs29 = __toESM(require("fs"));
+var path32 = __toESM(require("path"));
 
 // src/configEditor/annotationParser.ts
 var ANNOTATION_RE = /(?:#|\/\/)\s*@dabbler:outsource-review\(\s*"((?:\\.|[^"\\\r\n])*)"\s*\)/g;
@@ -29546,8 +29683,8 @@ function unescapeReason(raw) {
 }
 
 // src/commands/annotationScanner.ts
-var fs27 = __toESM(require("fs"));
-var path30 = __toESM(require("path"));
+var fs28 = __toESM(require("fs"));
+var path31 = __toESM(require("path"));
 var SCAN_EXTENSIONS = [
   "ts",
   "tsx",
@@ -29581,7 +29718,7 @@ var SCAN_EXCLUDE_GLOB = "{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**
 function toPosixPath(p2) {
   return p2.replace(/\\/g, "/");
 }
-function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs27.readFileSync(p2, "utf8")) {
+function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs28.readFileSync(p2, "utf8")) {
   const out = [];
   for (const abs of files) {
     let text;
@@ -29590,7 +29727,7 @@ function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE_
     } catch {
       continue;
     }
-    const rel = toPosixPath(path30.relative(workspaceRoot2, abs));
+    const rel = toPosixPath(path31.relative(workspaceRoot2, abs));
     const anns = findAnnotations(text, rel, now);
     for (const a of anns)
       out.push(a);
@@ -29598,7 +29735,7 @@ function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE_
   return out;
 }
 function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
-  const candidate = path30.join(workspaceRoot2, "ai_router", "local-overrides.yaml");
+  const candidate = path31.join(workspaceRoot2, "ai_router", "local-overrides.yaml");
   const parsed = readYaml(candidate);
   if (parsed == null)
     return true;
@@ -29610,9 +29747,9 @@ function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
     return v;
   return true;
 }
-function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs27.readFileSync(p2, "utf8")) {
-  const queuePath = path30.join(sessionSetDir, QUEUE_FILENAME);
-  if (!fs27.existsSync(queuePath))
+function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs28.readFileSync(p2, "utf8")) {
+  const queuePath = path31.join(sessionSetDir, QUEUE_FILENAME);
+  if (!fs28.existsSync(queuePath))
     return [];
   let text;
   try {
@@ -29638,7 +29775,7 @@ function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs27.readFil
 
 // src/commands/scanAnnotationsForActiveSet.ts
 function defaultReadYaml(absPath) {
-  if (!fs28.existsSync(absPath))
+  if (!fs29.existsSync(absPath))
     return null;
   try {
     const result = readYamlFile(absPath);
@@ -29666,7 +29803,7 @@ function registerScanAnnotationsForActiveSet(context) {
           return;
         }
         const activeSet = all.find((s) => s.dir === activeDir);
-        const workspaceRoot2 = activeSet?.root ?? path31.dirname(path31.dirname(activeDir));
+        const workspaceRoot2 = activeSet?.root ?? path32.dirname(path32.dirname(activeDir));
         if (!loadHonorAnnotationsToggle(workspaceRoot2, defaultReadYaml)) {
           vscode24.window.showInformationMessage(
             "Annotation scanning is disabled for this project (local-overrides.yaml \u2192 decision_review.honor_annotations: false). No queue entries appended."
@@ -29700,7 +29837,7 @@ function registerScanAnnotationsForActiveSet(context) {
           );
           return;
         }
-        const slug = path31.basename(activeDir);
+        const slug = path32.basename(activeDir);
         vscode24.window.showInformationMessage(
           `Appended ${fresh.length} new annotation(s) to ${slug}/${QUEUE_FILENAME}.`
         );
@@ -29711,14 +29848,14 @@ function registerScanAnnotationsForActiveSet(context) {
 
 // src/commands/openOrchestratorWriterLog.ts
 var vscode25 = __toESM(require("vscode"));
-var fs29 = __toESM(require("fs"));
+var fs30 = __toESM(require("fs"));
 var os3 = __toESM(require("os"));
-var path32 = __toESM(require("path"));
+var path33 = __toESM(require("path"));
 function registerOpenOrchestratorWriterLog(context) {
   context.subscriptions.push(
     vscode25.commands.registerCommand("dabbler.openOrchestratorWriterLog", async () => {
-      const logPath = path32.join(os3.homedir(), ".dabbler", "orchestrator-writer.log");
-      if (!fs29.existsSync(logPath)) {
+      const logPath = path33.join(os3.homedir(), ".dabbler", "orchestrator-writer.log");
+      if (!fs30.existsSync(logPath)) {
         vscode25.window.showInformationMessage(
           `No writer log yet \u2014 ${logPath} hasn't been touched. Logged entries appear on every start_session call: successful check-outs, H3 hard-coordination refusals, and --force overrides.`
         );
@@ -29732,8 +29869,8 @@ function registerOpenOrchestratorWriterLog(context) {
 
 // src/commands/regenerateNarrationTemplates.ts
 var cp6 = __toESM(require("child_process"));
-var fs30 = __toESM(require("fs"));
-var path33 = __toESM(require("path"));
+var fs31 = __toESM(require("fs"));
+var path34 = __toESM(require("path"));
 var vscode26 = __toESM(require("vscode"));
 var COMMAND_ID = "dabbler.regenerateNarrationTemplates";
 function registerRegenerateNarrationTemplatesCommand(context) {
@@ -29762,10 +29899,10 @@ async function runRegenerate() {
   if (!set)
     return;
   const pythonPath = resolvePythonInterpreter(set.root);
-  const outDir = path33.join(set.dir, "narration-templates");
-  fs30.mkdirSync(outDir, { recursive: true });
-  const claudeOut = path33.join(outDir, "CLAUDE.md");
-  const agentsOut = path33.join(outDir, "AGENTS.md");
+  const outDir = path34.join(set.dir, "narration-templates");
+  fs31.mkdirSync(outDir, { recursive: true });
+  const claudeOut = path34.join(outDir, "CLAUDE.md");
+  const agentsOut = path34.join(outDir, "AGENTS.md");
   const render7 = await vscode26.window.withProgress(
     {
       location: vscode26.ProgressLocation.Notification,
@@ -29798,8 +29935,8 @@ async function runRegenerate() {
     );
     return;
   }
-  const relClaude = path33.relative(set.root, claudeOut).replace(/\\/g, "/");
-  const relAgents = path33.relative(set.root, agentsOut).replace(/\\/g, "/");
+  const relClaude = path34.relative(set.root, claudeOut).replace(/\\/g, "/");
+  const relAgents = path34.relative(set.root, agentsOut).replace(/\\/g, "/");
   const COPY_ACTION = "Copy to consumer workspace\u2026";
   const OPEN_ACTION = "Open Rendered CLAUDE.md";
   const choice = await vscode26.window.showInformationMessage(
@@ -29836,8 +29973,8 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   if (!dirUri || !dirUri.length)
     return;
   const destDir = dirUri[0].fsPath;
-  const destPath = path33.join(destDir, pick2.target);
-  if (fs30.existsSync(destPath)) {
+  const destPath = path34.join(destDir, pick2.target);
+  if (fs31.existsSync(destPath)) {
     const overwrite = await vscode26.window.showWarningMessage(
       `${pick2.target} already exists in the chosen folder. Overwrite?`,
       { modal: true },
@@ -29847,7 +29984,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
       return;
   }
   try {
-    fs30.copyFileSync(pick2.source, destPath);
+    fs31.copyFileSync(pick2.source, destPath);
   } catch (err) {
     vscode26.window.showErrorMessage(
       `Failed to copy ${pick2.target} to ${destDir}: ${err.message}`
@@ -29864,7 +30001,7 @@ async function pickSet(inProgress) {
   const choices = inProgress.map((s) => ({
     label: s.name,
     description: `session ${s.liveSession?.currentSession ?? "?"} of ${s.totalSessions ?? "?"}`,
-    detail: path33.relative(s.root, s.dir).replace(/\\/g, "/"),
+    detail: path34.relative(s.root, s.dir).replace(/\\/g, "/"),
     set: s
   }));
   const picked = await vscode26.window.showQuickPick(choices, {
@@ -29911,7 +30048,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
       message: `python -m ai_router.narration exited ${result.status}: ${stderr}`
     };
   }
-  if (!fs30.existsSync(args.outputPath)) {
+  if (!fs31.existsSync(args.outputPath)) {
     return {
       ok: false,
       message: `python -m ai_router.narration exited 0 but did not write ${args.outputPath}`
@@ -29922,8 +30059,8 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
 
 // src/commands/externalVerification.ts
 var vscode27 = __toESM(require("vscode"));
-var fs31 = __toESM(require("fs"));
-var path34 = __toESM(require("path"));
+var fs32 = __toESM(require("fs"));
+var path35 = __toESM(require("path"));
 var FILE_NAME = "external-verification.md";
 function buildExternalVerificationTemplate(setName, date) {
   return `# External Verification \u2014 ${setName}
@@ -29960,14 +30097,14 @@ async function pickSet2(sets) {
   return picked?.set;
 }
 async function openOrCreate(set) {
-  const filePath = path34.join(set.dir, FILE_NAME);
-  if (!fs31.existsSync(filePath)) {
+  const filePath = path35.join(set.dir, FILE_NAME);
+  if (!fs32.existsSync(filePath)) {
     const template = buildExternalVerificationTemplate(
       set.name,
       (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
     );
     try {
-      fs31.writeFileSync(filePath, template, { encoding: "utf-8", flag: "wx" });
+      fs32.writeFileSync(filePath, template, { encoding: "utf-8", flag: "wx" });
     } catch (err) {
       const e = err;
       if (e?.code !== "EEXIST") {
@@ -30122,14 +30259,14 @@ async function presentActions(slug, set) {
 // src/commands/upgradeOlderSets.ts
 var vscode29 = __toESM(require("vscode"));
 var cp7 = __toESM(require("child_process"));
-var path35 = __toESM(require("path"));
-var fs32 = __toESM(require("fs"));
+var path36 = __toESM(require("path"));
+var fs33 = __toESM(require("fs"));
 var BULK_UPGRADE_MODULES = [
   "ai_router.migrate_session_state",
   "ai_router.migrate_lightweight_to_canonical_v4",
   "ai_router.migrate_v3_to_v4"
 ];
-var SESSION_SETS_REL3 = path35.join("docs", "session-sets");
+var SESSION_SETS_REL3 = path36.join("docs", "session-sets");
 function runMigrator2(pythonPath, module2, cwd) {
   return new Promise((resolve6) => {
     const args = [
@@ -30197,7 +30334,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
       "dabblerSessionSets.upgradeOlderSets",
       async () => {
         const roots = discoverRoots().filter(
-          (r2) => fs32.existsSync(path35.join(r2, SESSION_SETS_REL3))
+          (r2) => fs33.existsSync(path36.join(r2, SESSION_SETS_REL3))
         );
         if (roots.length === 0) {
           vscode29.window.showInformationMessage(
@@ -30224,7 +30361,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
             for (const root of roots) {
               const pythonPath = resolvePythonInterpreter(root);
               for (const module2 of BULK_UPGRADE_MODULES) {
-                progress.report({ message: `${path35.basename(root)}: ${module2}` });
+                progress.report({ message: `${path36.basename(root)}: ${module2}` });
                 const res = await runMigrator2(pythonPath, module2, root);
                 if (res.ok) {
                   summaries.push(`${module2}: ${res.detail}`);
@@ -30254,8 +30391,8 @@ function registerUpgradeOlderSetsCommand(context, deps) {
 
 // src/commands/switchTier.ts
 var vscode30 = __toESM(require("vscode"));
-var fs33 = __toESM(require("fs"));
-var path36 = __toESM(require("path"));
+var fs34 = __toESM(require("fs"));
+var path37 = __toESM(require("path"));
 
 // src/utils/tierRewrite.ts
 var CONFIG_BLOCK_RE = /(##\s*Session Set Configuration[\s\S]*?```ya?ml\s*)([\s\S]*?)(```)/i;
@@ -30321,7 +30458,7 @@ async function switchTier(set) {
     return;
   let specText;
   try {
-    specText = fs33.readFileSync(set.specPath, "utf8");
+    specText = fs34.readFileSync(set.specPath, "utf8");
   } catch {
     vscode30.window.showErrorMessage(
       `Could not read ${set.specPath} \u2014 tier not switched.`
@@ -30342,7 +30479,7 @@ async function switchTier(set) {
     return;
   }
   try {
-    fs33.writeFileSync(set.specPath, result.text, "utf8");
+    fs34.writeFileSync(set.specPath, result.text, "utf8");
   } catch {
     vscode30.window.showErrorMessage(
       `Could not write ${set.specPath} \u2014 tier not switched.`
@@ -30363,8 +30500,8 @@ async function switchTier(set) {
     result.previousTier === target ? `Repaired "${set.name}"'s malformed tier declaration \u2014 now explicitly ${target}.` : `Switched "${set.name}" to the ${target} tier.`
   );
   if (target === "full") {
-    const routerConfigExists = fs33.existsSync(
-      path36.join(setRoot, ROUTER_CONFIG_REL2)
+    const routerConfigExists = fs34.existsSync(
+      path37.join(setRoot, ROUTER_CONFIG_REL2)
     );
     for (const warning of switchToFullWarnings(routerConfigExists, process.env)) {
       vscode30.window.showWarningMessage(warning);
@@ -30391,7 +30528,7 @@ function registerSwitchTierCommand(context) {
 // src/commands/setupVerification.ts
 var vscode31 = __toESM(require("vscode"));
 var cp8 = __toESM(require("child_process"));
-var fs34 = __toESM(require("fs"));
+var fs35 = __toESM(require("fs"));
 
 // src/utils/verificationModeRewrite.ts
 var CONFIG_BLOCK_RE2 = /(##\s*Session Set Configuration[\s\S]*?```ya?ml\s*)([\s\S]*?)(```)/i;
@@ -30606,8 +30743,8 @@ async function applyCompletedSetTransition(set, pythonPath, deps) {
 function realCompletedSetDeps() {
   return {
     runWriter: runChangeWriter,
-    readFile: (p2) => fs34.readFileSync(p2, "utf8"),
-    writeFile: (p2, text) => fs34.writeFileSync(p2, text, "utf8"),
+    readFile: (p2) => fs35.readFileSync(p2, "utf8"),
+    writeFile: (p2, text) => fs35.writeFileSync(p2, text, "utf8"),
     copyToClipboard: (text) => Promise.resolve(vscode31.env.clipboard.writeText(text)),
     showInfo: (m) => void vscode31.window.showInformationMessage(m),
     showWarning: (m) => void vscode31.window.showWarningMessage(m),
@@ -30654,10 +30791,10 @@ async function setupVerification(set) {
     );
     return;
   }
-  if (fs34.existsSync(set.activityPath)) {
+  if (fs35.existsSync(set.activityPath)) {
     let activityLogText = null;
     try {
-      activityLogText = fs34.readFileSync(set.activityPath, "utf8");
+      activityLogText = fs35.readFileSync(set.activityPath, "utf8");
     } catch {
       activityLogText = null;
     }
@@ -30693,7 +30830,7 @@ async function setupVerification(set) {
   }
   let specText;
   try {
-    specText = fs34.readFileSync(set.specPath, "utf8");
+    specText = fs35.readFileSync(set.specPath, "utf8");
   } catch {
     vscode31.window.showErrorMessage(
       `Could not read ${set.specPath} \u2014 verification mode not changed.`
@@ -30714,7 +30851,7 @@ async function setupVerification(set) {
     return;
   }
   try {
-    fs34.writeFileSync(set.specPath, result.text, "utf8");
+    fs35.writeFileSync(set.specPath, result.text, "utf8");
   } catch {
     vscode31.window.showErrorMessage(
       `Could not write ${set.specPath} \u2014 verification mode not changed.`
@@ -30744,7 +30881,7 @@ function registerSetupVerificationCommand(context) {
 }
 
 // src/extension.ts
-var SESSION_SETS_REL4 = path37.join("docs", "session-sets");
+var SESSION_SETS_REL4 = path38.join("docs", "session-sets");
 function evaluateRouterCapabilityContextKey() {
   const folders = vscode32.workspace.workspaceFolders ?? [];
   let routes = false;
@@ -30812,7 +30949,7 @@ function activate(context) {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      const sessionSetsAbs = path37.join(root, SESSION_SETS_REL4);
+      const sessionSetsAbs = path38.join(root, SESSION_SETS_REL4);
       const pattern = new vscode32.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json}"
@@ -30942,7 +31079,7 @@ function activate(context) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs35.existsSync(path37.join(r2, SESSION_SETS_REL4));
+        return fs36.existsSync(path38.join(r2, SESSION_SETS_REL4));
       } catch {
         return false;
       }

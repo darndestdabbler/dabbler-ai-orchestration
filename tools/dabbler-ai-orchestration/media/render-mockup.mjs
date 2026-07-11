@@ -1,10 +1,10 @@
 // One-shot renderer: opens screenshot-mockup.html in headless Chromium
 // (via the Playwright already installed for Layer-3 tests), then takes a
 // screenshot of just the .frame element. Output goes to
-// session-set-explorer-in-action.png alongside this script.
+// session-set-explorer-and-spec.png alongside this script.
 //
 // Run: node tools/dabbler-ai-orchestration/media/render-mockup.mjs
-// Output: tools/dabbler-ai-orchestration/media/session-set-explorer-in-action.png
+// Output: tools/dabbler-ai-orchestration/media/session-set-explorer-and-spec.png
 
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const htmlPath = path.join(__dirname, "screenshot-mockup.html");
-const outPath = path.join(__dirname, "session-set-explorer-in-action.png");
+const outPath = path.join(__dirname, "session-set-explorer-and-spec.png");
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({

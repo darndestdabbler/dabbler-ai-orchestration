@@ -1,0 +1,8 @@
+{
+  "model_name": "gemini-pro",
+  "model_id": "gemini-2.5-pro",
+  "tier": 2,
+  "cost_usd": 0.00222625,
+  "truncated": false,
+  "content": "Session 1 recommendation: github-copilot / openai / gpt-5.4 / high\nRationale: The task requires a large-scale, atomic refactoring across a wide variety of file types, from core TypeScript logic to Playwright tests and documentation. The specified model possesses the highest capability for precise, broad-scope code generation and transformation, ensuring consistency across the entire change set.\nEstimated routed cost: high\nSession 2 recommendation: claude / anthropic / Opus-class / medium\nRationale: This session implements new, cross-cutting logic for diagnostics and guardrails which is well-suited to this model's reasoning capabilities across system components.\nDelegation split: The large-scale Session 1 refactor will be a routed job, while the new feature implementation in Session 2 will be direct work."
+}

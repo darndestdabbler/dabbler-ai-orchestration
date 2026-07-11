@@ -5,14 +5,14 @@ sessions, mandatory cross-provider verification, cost tracking, and
 git-worktree-aware session-set state — all from the activity bar, in
 two tiers that let you trade API spend against your own attention.
 
-![The Session Set Explorer beside a session-set spec: in-progress, not-started (blocked), and complete sets with their session fractions](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/session-set-explorer-and-spec.png)
+![The Work Explorer beside a session-set spec: the muted Default module contains in-progress, not-started, and complete sets](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/session-set-explorer-and-spec.png)
 
 ---
 
 ## Two tiers — pay with dollars or pay with attention
 
 Both tiers run the **same workflow**: the same session lifecycle, the
-same Session Set Explorer, the same state files and close-out gates.
+same Work Explorer, the same state files and close-out gates.
 They differ in how much of the workflow is automated — and therefore
 in what each one costs you:
 
@@ -47,7 +47,7 @@ cost.
 - **Ongoing visibility into AI work.** Every session leaves an
   AI-generated paper trail in predictable places — the spec, an
   activity log of every step, per-session state with verification
-  verdicts, a change log at close. The Session Set Explorer reads it
+  verdicts, a change log at close. The Work Explorer reads it
   all back at a glance: what's in flight, what's queued, what's
   blocked on prerequisites, what's done and verified. You can step
   away and know exactly what happened while you weren't watching.
@@ -80,7 +80,7 @@ Open a project folder with no session sets yet and the Session Set
 Explorer renders the staged **Getting Started form**, with companion
 step-by-step instructions in the editor:
 
-![The Getting Started form in the Session Set Explorer: build project structure with a Full/Lightweight tier choice, create or import a project plan, build session sets](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
+![The Getting Started form in the Work Explorer: build project structure with a Full/Lightweight tier choice, create or import a project plan, build session sets](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
 
 1. **Build project structure** — pick your tier (Full or
    Lightweight, the cost/attention tradeoff described above). Choosing
@@ -226,7 +226,7 @@ Sign-up links and a full prerequisites checklist live in the
   attestation, and the soft gate prompts when an
   `external-verification.md` artifact is missing
   (`Dabbler: Open External Verification Document` creates or opens
-  it). Same Session Set Explorer, same `session-state.json`
+  it). Same Work Explorer, same `session-state.json`
   lifecycle, same close-out gates — just no API spend on
   verification.
 - **Lightweight verification at a glance.** Lightweight rows carry a

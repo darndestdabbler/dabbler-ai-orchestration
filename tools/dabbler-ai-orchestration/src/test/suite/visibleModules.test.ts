@@ -9,10 +9,8 @@
 // test that pins it BY NAME — renaming a test here means updating the
 // matrix in the same pass.
 //
-// NOTHING in the shipping render path consumes computeVisibleModules
-// until Set 092: the byte-stability suite at the bottom pins that the
-// host and the webview client still render through groupByModule /
-// buildModulePayloads only.
+// Set 092 consumes this model in the shipping host. The renderer-switch
+// suite at the bottom pins the host wiring and the multi-root merge.
 
 import * as assert from "assert";
 import * as fs from "fs";
@@ -22,8 +20,10 @@ import {
   PSEUDO_MODULE_COEXIST_NAME,
   PSEUDO_MODULE_SOLE_NAME,
   VisibleModule,
+  buildVisibleModulePayloads,
   computeVisibleModules,
   groupByModule,
+  mergeVisibleModules,
 } from "../../providers/SessionSetsModel";
 import {
   LEGACY_ROOT_PLAN_REL,
@@ -704,38 +704,73 @@ suite("Set 091 S2 — never-persist `module: default` guard", () => {
   });
 });
 
-// ---------- rendering byte-stability (nothing consumes the new model yet) ----------
+// ---------- Set 092 renderer assembly ----------
 
-suite("Set 091 S2 — rendering byte-stability: computeVisibleModules is exported, not consumed", () => {
+suite("Set 092 S1 — visible-module renderer assembly", () => {
   const extRoot = path.resolve(__dirname, "..", "..", "..");
 
-  test("the shipping host still renders through buildModulePayloads only", () => {
+  test("the shipping host consumes computeVisibleModules", () => {
     const view = fs.readFileSync(
       path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
       "utf8",
     );
     assert.ok(
-      view.includes("buildModulePayloads(all, (set) => this.buildRow(set))"),
-      "the pre-092 render path is unchanged",
+      view.includes("computeVisibleModules("),
+      "the host must consume the Set 091 model",
     );
     assert.ok(
-      !view.includes("computeVisibleModules"),
-      "the renderer switch is Set 092 — the host must not consume the new model yet",
+      view.includes("mergeVisibleModules(byRoot)"),
+      "root-scoped results must pass through the global merge",
     );
   });
 
-  test("the webview client knows nothing of the new model (no pseudo-module naming in the shipped bundle)", () => {
+  test("multi-root merge keeps declared/fallback identities separate and pseudo last", () => {
+    const rootA = computeVisibleModules(
+      present([entry("billing"), entry("ops")]),
+      [stamped("a", "billing"), stamped("typo-a", "typo")],
+      NO_PLAN,
+    );
+    const rootB = computeVisibleModules(
+      present([entry("ops"), entry("billing")]),
+      [stamped("b", "billing"), stamped("typo-b", "typo"), fakeSet({ name: "plain" })],
+      NO_PLAN,
+    );
+    const merged = mergeVisibleModules([rootA, rootB]);
+    assert.deepStrictEqual(
+      merged.map((module) => [module.kind, module.slug, module.displayName, module.sets.length]),
+      [
+        ["declared", "billing", "Title of billing", 2],
+        ["declared", "ops", "Title of ops", 0],
+        ["fallback", "typo", "typo", 2],
+        ["pseudo", null, "Unassigned", 1],
+      ],
+    );
+    assert.deepStrictEqual(merged[2].warning, { code: "undeclared-slug", rawSlug: "typo" });
+  });
+
+  test("visible-module payload carries semantic kind and warning", () => {
+    const modules = computeVisibleModules(INVALID, [stamped("bad", "typo")], NO_PLAN);
+    const payload = buildVisibleModulePayloads(modules, (set) => ({
+      slug: set.name,
+    } as never));
+    assert.strictEqual(payload[0].kind, "fallback");
+    assert.deepStrictEqual(payload[0].warning, { code: "undeclared-slug", rawSlug: "typo" });
+  });
+
+  test("the webview client renders semantic module inputs without recomputing the model", () => {
     const client = fs.readFileSync(
       path.join(extRoot, "media", "session-sets-tree", "client.js"),
       "utf8",
     );
     assert.ok(!client.includes("computeVisibleModules"));
-    assert.ok(!client.includes("Unassigned"));
+    assert.ok(client.includes('mod.title || mod.slug || "Default"'));
+    assert.ok(client.includes("moduleWarningText(mod.warning)"));
+    assert.ok(client.includes('warning.code === "undeclared-slug"'));
   });
 
-  test("groupByModule semantics are untouched: undeclared stamps still land in the implicit group for the shipping renderer", () => {
-    // The scanner nulls unvalidated stamps, so the shipping path renders
-    // them inside the implicit module exactly as before this set.
+  test("legacy groupByModule semantics remain stable for callers outside the shipping renderer", () => {
+    // The scanner still nulls unvalidated stamps for legacy callers of
+    // groupByModule; the shipping renderer now uses computeVisibleModules.
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-bytestable-"));
     try {
       fs.mkdirSync(path.join(root, "docs"), { recursive: true });
@@ -760,7 +795,7 @@ suite("Set 091 S2 — rendering byte-stability: computeVisibleModules is exporte
       assert.deepStrictEqual(
         groups.map((g) => g.slug),
         ["billing", null],
-        "shipping grouping: validated module + one implicit group, exactly pre-091-S2",
+        "legacy grouping: validated module + one implicit group",
       );
       assert.deepStrictEqual(
         groups[1].sets.map((s) => s.name),

@@ -431,6 +431,110 @@ export function buildModulePayloads(
   }));
 }
 
+/**
+ * Merge root-scoped visible-module computations into the Explorer's global
+ * module list. Declared modules share identity by slug; fallback modules stay
+ * distinct from declared modules with the same slug so their warning cannot
+ * disappear. One pseudo-module combines all unstamped work and renders last.
+ */
+export function mergeVisibleModules(
+  roots: readonly (readonly VisibleModule[])[],
+): VisibleModule[] {
+  type RankedModule = {
+    module: VisibleModule;
+    order: number;
+    firstSeen: number;
+  };
+  const declared = new Map<string, RankedModule>();
+  const fallback = new Map<string, VisibleModule>();
+  let pseudo: VisibleModule | null = null;
+  let firstSeen = 0;
+
+  const warningRank = (warning: VisibleModuleWarning | null): number => {
+    if (!warning) return 0;
+    if (warning.code === "manifest-invalid") return 3;
+    if (warning.code === "manifest-missing") return 2;
+    return 1;
+  };
+
+  for (const modules of roots) {
+    let declaredOrder = 0;
+    for (const module of modules) {
+      if (module.kind === "declared") {
+        const slug = module.slug!;
+        const existing = declared.get(slug);
+        if (existing) {
+          existing.module = {
+            ...existing.module,
+            sets: [...existing.module.sets, ...module.sets],
+          };
+          existing.order = Math.min(existing.order, declaredOrder);
+        } else {
+          declared.set(slug, {
+            module: { ...module, sets: [...module.sets] },
+            order: declaredOrder,
+            firstSeen: firstSeen++,
+          });
+        }
+        declaredOrder++;
+        continue;
+      }
+      if (module.kind === "fallback") {
+        const slug = module.slug!;
+        const existing = fallback.get(slug);
+        fallback.set(
+          slug,
+          existing
+            ? { ...existing, sets: [...existing.sets, ...module.sets] }
+            : { ...module, sets: [...module.sets] },
+        );
+        continue;
+      }
+      if (!pseudo) {
+        pseudo = { ...module, sets: [...module.sets] };
+      } else {
+        const existingPseudo = pseudo as VisibleModule;
+        pseudo = {
+          ...existingPseudo,
+          warning:
+            warningRank(module.warning) > warningRank(existingPseudo.warning)
+              ? module.warning
+              : existingPseudo.warning,
+          sets: [...existingPseudo.sets, ...module.sets],
+        };
+      }
+    }
+  }
+
+  const out = Array.from(declared.values())
+    .sort((a, b) => a.order - b.order || a.firstSeen - b.firstSeen)
+    .map((entry) => entry.module);
+  out.push(...Array.from(fallback.values()).sort((a, b) => a.slug!.localeCompare(b.slug!)));
+  const mergedPseudo = pseudo as VisibleModule | null;
+  if (mergedPseudo) {
+    out.push({
+      ...mergedPseudo,
+      displayName: out.length === 0
+        ? PSEUDO_MODULE_SOLE_NAME
+        : PSEUDO_MODULE_COEXIST_NAME,
+    });
+  }
+  return out;
+}
+
+export function buildVisibleModulePayloads(
+  modules: readonly VisibleModule[],
+  rowFor: (set: SessionSet) => RowPayload,
+): ModulePayload[] {
+  return modules.map((module) => ({
+    slug: module.slug ?? "",
+    title: module.displayName,
+    kind: module.kind,
+    warning: module.warning,
+    buckets: buildBucketPayloads([...module.sets], rowFor),
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Set 091 S2 — the visible-module computation (verdict amendment 2 + the
 // Q8 compat matrix; routed rulings saved raw at

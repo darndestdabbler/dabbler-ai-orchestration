@@ -85,7 +85,7 @@ function stampModule(h: FixtureHandle, moduleSlug: string): void {
   fs.writeFileSync(specPath, patched, "utf8");
 }
 
-test("multi-module workspace renders the 3-level module tier with manifest order and (ungrouped) last", async () => {
+test("multi-module workspace renders one dialect with fallback warning and Unassigned last", async () => {
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-modtier");
@@ -97,9 +97,11 @@ test("multi-module workspace renders the 3-level module tier with manifest order
     const b = makeAdditionalSet(a, "087-greeter-core", 2);
     const c = makeAdditionalSet(a, "087-compose-both", 2);
     const d = makeAdditionalSet(a, "087-loose-end", 2);
+    const e = makeAdditionalSet(a, "087-undeclared", 2);
     stampModule(a, "clock");
     stampModule(b, "greeter");
     stampModule(c, "integration");
+    stampModule(e, "not-in-manifest");
     void d; // deliberately unlabeled
     fs.writeFileSync(
       path.join(a.repo_root, "docs", "modules.yaml"),
@@ -111,7 +113,7 @@ test("multi-module workspace renders the 3-level module tier with manifest order
     const inner = await openSessionSetsView(per.launch.page);
     await triggerRefresh(per.launch.page);
 
-    const tree = inner.locator('[role="tree"][aria-label*="Session Sets" i]');
+    const tree = inner.getByTestId("work-explorer-tree");
     await expect(tree).toBeVisible({ timeout: 30_000 });
 
     // Module groups render in manifest file order, implicit last —
@@ -121,13 +123,20 @@ test("multi-module workspace renders the 3-level module tier with manifest order
       "Greeter",
       "Clock",
       "Cross-Module Integration",
-      "(ungrouped)",
+      "not-in-manifest",
+      "Unassigned",
     ]);
+    const fallbackModule = inner.getByTestId("module-fallback-not-in-manifest");
+    await expect(fallbackModule.locator(".module-warning")).toHaveCount(1);
+    await expect(fallbackModule.locator(".module-warning")).toHaveAttribute(
+      "title",
+      /not declared in docs\/modules\.yaml/,
+    );
 
     // 3-level ARIA tree contract (ruling Q4 + the R2 conformance fix):
     // module and bucket are treeitems carrying aria-level/aria-expanded
     // themselves, with children nested in role="group" containers.
-    const greeterModule = inner.locator('.module[data-module-key="greeter"]');
+    const greeterModule = inner.getByTestId("module-declared-greeter");
     await expect(greeterModule).toHaveAttribute("role", "treeitem");
     await expect(greeterModule).toHaveAttribute("aria-level", "1");
     await expect(greeterModule.locator("> .module-body")).toHaveAttribute(
@@ -135,7 +144,7 @@ test("multi-module workspace renders the 3-level module tier with manifest order
       "group",
     );
     const greeterNotStarted = greeterModule.locator(
-      '[data-bucket-key="greeter/not-started"]',
+      '[data-bucket-key="declared-greeter/not-started"]',
     );
     await expect(greeterNotStarted).toHaveCount(1);
     await expect(greeterNotStarted).toHaveAttribute("role", "treeitem");
@@ -157,7 +166,7 @@ test("multi-module workspace renders the 3-level module tier with manifest order
     await expect(
       greeterModule.locator('[role="treeitem"][data-slug="087-clock-widget"]'),
     ).toHaveCount(0);
-    const implicitModule = inner.locator('.module[data-module-key=""]');
+    const implicitModule = inner.getByTestId("module-pseudo-default");
     await expect(
       implicitModule.locator('[role="treeitem"][data-slug="087-loose-end"]'),
     ).toHaveCount(1);

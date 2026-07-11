@@ -1,6 +1,6 @@
 <!doctype html>
 <!--
-  Session Set Explorer screenshot mockup (extension v0.23.0).
+  Work Explorer screenshot mockup.
 
   Visual values pulled directly from
   tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css:
@@ -34,7 +34,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Session Set Explorer — 0.23.0 mockup</title>
+<title>Work Explorer mockup</title>
 <style>
   html, body {
     margin: 0; padding: 0;
@@ -80,7 +80,7 @@
   }
   .ab-icon svg { width: 22px; height: 22px; fill: currentColor; }
 
-  /* ----- Sidebar / Session Set Explorer ----- */
+  /* ----- Sidebar / Work Explorer ----- */
   .sidebar {
     background: #252526;
     border-right: 1px solid #2b2b2b;
@@ -98,6 +98,24 @@
     display: flex; align-items: center; justify-content: space-between;
   }
   .sb-title .actions { font-size: 16px; opacity: 0.65; letter-spacing: 0; }
+
+  .module-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8a8a8a;
+  }
+  .module-chevron {
+    display: inline-block;
+    width: 12px;
+    text-align: center;
+    opacity: 0.7;
+  }
+  .module-body .bucket-header,
+  .module-body .row-header { padding-left: 24px; }
 
   /* Bucket: padding 6px 12px 8px 12px, font 11px / 600 / uppercase /
    * letter-spacing 0.05em / opacity 0.72.  Matches tree.css. */
@@ -267,7 +285,7 @@
       <div class="ab-icon" title="Source Control">
         <svg viewBox="0 0 16 16"><circle cx="4" cy="3" r="2"/><circle cx="4" cy="13" r="2"/><circle cx="13" cy="13" r="2"/><path d="M4 5v6M5.5 13H11" stroke="#858585" fill="none" stroke-width="1.5"/></svg>
       </div>
-      <div class="ab-icon active" title="Session Set Explorer">
+      <div class="ab-icon active" title="Work Explorer">
         <svg viewBox="0 0 16 16"><path d="M2 3h4l1 1h7v9H2z" fill="currentColor"/></svg>
       </div>
       <div class="ab-icon" title="Extensions">
@@ -275,9 +293,13 @@
       </div>
     </div>
 
-    <!-- Sidebar / Session Set Explorer -->
+    <!-- Sidebar / Work Explorer -->
     <div class="sidebar">
-      <div class="sb-title">Session Set Explorer <span class="actions">⋯</span></div>
+      <div class="sb-title">Work Explorer <span class="actions">⋯</span></div>
+
+      <div class="module">
+        <div class="module-header"><span class="module-chevron">▾</span>Default</div>
+        <div class="module-body">
 
       <div class="bucket">
         <div class="bucket-header"><span class="bucket-chevron">▾</span>In Progress&nbsp;&nbsp;(1)</div>
@@ -312,6 +334,8 @@
         <div class="row-header">
           <span class="row-fraction row-fraction-complete">5&nbsp;/&nbsp;5</span>
           <span class="row-name">033-orchestrator-checkout-checkin</span>
+        </div>
+      </div>
         </div>
       </div>
     </div>

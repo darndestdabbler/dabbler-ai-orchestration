@@ -2,10 +2,10 @@
 
 An AI-led coding-session workflow for VS Code. Structured AI sessions
 with mandatory cross-provider verification, automatic cost tracking, git-
-worktree-aware session-set state, and a Session Set Explorer in the
+worktree-aware session-set state, and a Work Explorer in the
 activity bar.
 
-![The Session Set Explorer beside a session-set spec: in-progress, not-started (blocked), and complete sets with their session fractions](tools/dabbler-ai-orchestration/media/session-set-explorer-and-spec.png)
+![The Work Explorer beside a session-set spec: the muted Default module contains in-progress, not-started, and complete sets](tools/dabbler-ai-orchestration/media/session-set-explorer-and-spec.png)
 
 ---
 
@@ -30,7 +30,7 @@ on poor responses, and runs cross-provider verification by a
 
 Every routed call is appended to `ai_router/router-metrics.jsonl`, so
 per-set, per-task, and per-model spend is fully auditable. The
-Session Set Explorer extension is the at-a-glance companion: it reads
+Work Explorer extension view is the at-a-glance companion: it reads
 the same files the router writes and renders three groups in the
 activity bar (**In Progress**, **Not Started**, **Done**), with
 worktree auto-discovery so parallel sessions surface across sibling
@@ -89,7 +89,7 @@ deeper feature descriptions live at
   the AI router makes metered API calls. **Lightweight is router-off,
   not Python-off:** both tiers use a `.venv` + `dabbler-ai-router`, the
   same `session-state.json` lifecycle, the same close-out gate, and the
-  same Session Set Explorer. Full adds cost-minded routing and the
+  same Work Explorer. Full adds cost-minded routing and the
   mandatory Step 6 cross-provider verification command on every session;
   Lightweight makes zero metered calls and
   verifies per-set (copyable review prompts pasted into a different
@@ -141,7 +141,7 @@ palette.
 If you're starting a new project — greenfield, or an existing local
 project that hasn't yet adopted the workflow — the recommended
 starting point is **`Dabbler: Get Started`** from the command palette.
-The Session Set Explorer's Getting Started form walks you through tier
+The Work Explorer's Getting Started form walks you through tier
 choice (Full vs. Lightweight — see
 [docs/concepts/tier-model.md](docs/concepts/tier-model.md)); picking
 Full surfaces a second choice for provider access — direct `DABBLER_*`
@@ -203,7 +203,7 @@ has somewhere to route to).
 - **Getting-started docs:**
   [code.visualstudio.com/docs](https://code.visualstudio.com/docs) —
   the Extensions view (`Ctrl+Shift+X`) is what you'll use to install
-  the Session Set Explorer in the [Quick start](#quick-start) above.
+  the Work Explorer in the [Quick start](#quick-start) above.
 
 ### Orchestrator agents (install at least one)
 

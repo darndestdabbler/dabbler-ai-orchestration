@@ -84,6 +84,11 @@ export interface RowPayload {
   // an action surface, never a mutation path.
   verificationMarker: string;
   verificationTooltip: string;
+  // Set 092 Session 1: the one winner retained for a duplicate global
+  // session-set name fails loud in the tree. Empty strings keep the
+  // unique-name path visually unchanged.
+  duplicateNameBadge: string;
+  duplicateNameTooltip: string;
   // Set 034: the per-row orchestrator-tracking accordion is retired.
   // These fields remain on the protocol so older host/webview pairings
   // stay structurally compatible, but the host always emits null and
@@ -113,6 +118,15 @@ export interface BucketPayload {
 export interface ModulePayload {
   slug: string;
   title: string;
+  // Set 092 Session 1: semantic renderer inputs from computeVisibleModules.
+  // Optional only for compatibility with pre-092 fixture payloads.
+  kind?: "declared" | "fallback" | "pseudo";
+  warning?:
+    | { code: "manifest-missing" }
+    | { code: "manifest-invalid" }
+    | { code: "unstamped-sets" }
+    | { code: "undeclared-slug"; rawSlug: string }
+    | null;
   buckets: BucketPayload[];
 }
 

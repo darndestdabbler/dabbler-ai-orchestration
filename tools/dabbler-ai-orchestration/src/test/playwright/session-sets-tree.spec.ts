@@ -63,29 +63,25 @@ test("renders ARIA tree structure with bucket grouping for an in-progress set", 
     const inner = await openSessionSetsView(per.launch.page);
     await triggerRefresh(per.launch.page);
 
-    // The webview's <div role="tree"> wraps bucket <div role="group">
-    // wrappers, each containing 0+ <div role="treeitem"> rows.
-    const tree = inner.locator('[role="tree"][aria-label*="Session Sets" i]');
+    const tree = inner.getByTestId("work-explorer-tree");
     await expect(tree).toBeVisible({ timeout: 30_000 });
 
-    const groups = inner.locator('[role="group"]');
-    // Three default buckets + possibly Cancelled if any cancelled set
-    // exists. The fixture has only one in-progress set, so we should
-    // see exactly three groups (In Progress / Not Started / Complete).
-    expect(await groups.count()).toBeGreaterThanOrEqual(3);
+    const buckets = inner.locator('[data-testid^="bucket-pseudo-default-"]');
+    // Three default buckets; empty buckets are ARIA leaf treeitems and
+    // therefore intentionally do not carry role="group".
+    await expect(buckets).toHaveCount(3);
 
     // Row exists and carries WAI-ARIA tree attributes.
     const row = inner.locator(
       '[role="treeitem"][data-slug="029-scenario-in-progress"]',
     );
     await expect(row).toBeVisible();
-    await expect(row).toHaveAttribute("aria-level", "2");
-    // Set 087 Session 2 (routed ruling Q4): a no-manifest workspace is
-    // the single-implicit-module case and must render exactly the
-    // pre-087 two-level view — no module wrapper, no module header,
-    // rows staying at aria-level 2 (asserted above).
-    await expect(inner.locator(".module")).toHaveCount(0);
-    await expect(inner.locator(".module-header")).toHaveCount(0);
+    await expect(row).toHaveAttribute("aria-level", "3");
+    const defaultModule = inner.getByTestId("module-pseudo-default");
+    await expect(defaultModule).toHaveCount(1);
+    await expect(defaultModule).toHaveClass(/module-default/);
+    await expect(defaultModule).toHaveAttribute("aria-expanded", "true");
+    await expect(defaultModule.locator(".module-title")).toHaveText("Default");
     // Set 036 Session 6: dropped the aria-expanded assertion. Set 034
     // retired the per-row accordion (rows are no longer expandable);
     // the renderRow helper in client.js stopped emitting aria-expanded
@@ -131,6 +127,42 @@ test("HTML-escapes a set name containing < and > so it renders as text", async (
     // textContent.
     const rendered = (await row.textContent()) ?? "";
     expect(rendered).toContain("name-with-amp-and-lt");
+  } finally {
+    await teardown(per);
+  }
+});
+
+test("duplicate names across workspace roots render one flagged winner row", async () => {
+  const per: PerTest = {};
+  try {
+    per.tmpPath = makeTmpDir("dabbler-pw-duplicate-name");
+    const rootATmp = path.join(per.tmpPath, "root-a");
+    const rootBTmp = path.join(per.tmpPath, "root-b");
+    fs.mkdirSync(rootATmp, { recursive: true });
+    fs.mkdirSync(rootBTmp, { recursive: true });
+    const rootA = makeSet(rootATmp, "092-collided", 2);
+    const rootB = makeSet(rootBTmp, "092-collided", 2);
+    const workspacePath = path.join(per.tmpPath, "collision.code-workspace");
+    fs.writeFileSync(
+      workspacePath,
+      JSON.stringify({
+        folders: [
+          { path: rootA.repo_root },
+          { path: rootB.repo_root },
+        ],
+      }, null, 2),
+      "utf8",
+    );
+
+    per.launch = await launchVSCode(workspacePath);
+    const inner = await openSessionSetsView(per.launch.page);
+    await triggerRefresh(per.launch.page);
+
+    const row = inner.getByTestId("session-set-092-collided");
+    await expect(row).toHaveCount(1);
+    const marker = row.locator(".row-duplicate-name-marker");
+    await expect(marker).toHaveText("!");
+    await expect(marker).toHaveAttribute("title", /Duplicate session-set name in 2 locations/);
   } finally {
     await teardown(per);
   }

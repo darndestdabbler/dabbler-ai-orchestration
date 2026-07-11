@@ -292,6 +292,8 @@ suite("Set 087 S2 — buildModulePayloads payload shape (Layer 2 fixture)", () =
       blockedTooltip: "",
       verificationMarker: "",
       verificationTooltip: "",
+      duplicateNameBadge: "",
+      duplicateNameTooltip: "",
       accordionHtml: null,
       accordionUpdatedAt: null,
     };
@@ -488,14 +490,14 @@ suite("Set 087 S2 — buildModulePayloads payload shape (Layer 2 fixture)", () =
 suite("Set 087 S2 — module tier payload + rendering source scans", () => {
   const extRoot = path.resolve(__dirname, "..", "..", "..");
 
-  test("host ships modules by delegating to the behavior-tested builder; no top-level buckets", () => {
+  test("host ships visible modules through the behavior-tested builder; no top-level buckets", () => {
     const view = fs.readFileSync(
       path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
       "utf8",
     );
     assert.ok(view.includes("modules: this.buildModules(all)"));
     assert.ok(
-      view.includes("buildModulePayloads(all, (set) => this.buildRow(set))"),
+      view.includes("buildVisibleModulePayloads("),
       "buildModules must delegate to the extracted, behavior-tested builder",
     );
     assert.ok(
@@ -522,23 +524,22 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     );
   });
 
-  test("webview renders both dialects: byte-identical implicit-only and a conformant 3-level ARIA tree", () => {
+  test("webview renders one conformant 3-level ARIA dialect", () => {
     const client = fs.readFileSync(
       path.join(extRoot, "media", "session-sets-tree", "client.js"),
       "utf8",
     );
-    // Implicit-only branch renders through the pre-087 bucket dialect.
-    assert.ok(client.includes('modules.length === 1 && modules[0].slug === ""'));
-    assert.ok(client.includes("renderBucket(bucket, null)"));
+    assert.ok(!client.includes("implicitOnly"));
+    assert.ok(!client.includes("renderBucket(bucket, null)"));
     // Module nodes: role="treeitem" carrying aria-level 1 +
     // aria-expanded (R2 conformance fix), children nested in
-    // role="group", quiet fallback label for the unlabeled implicit
-    // module, per-module collapse state, composite per-(module, bucket)
+    // role="group", semantic Default label, per-module collapse state,
+    // composite per-(module, bucket)
     // collapse keys, rows at aria-level 3.
     assert.ok(client.includes('class="module-header"'));
-    assert.ok(client.includes('"(ungrouped)"'));
-    assert.ok(client.includes("moduleCollapsed[slug]"));
-    assert.ok(client.includes('moduleSlug + "/" + bucket.key'));
+    assert.ok(client.includes('mod.slug || "Default"'));
+    assert.ok(client.includes("moduleCollapsed[moduleKey]"));
+    assert.ok(client.includes('moduleKey + "/" + bucket.key'));
     assert.ok(
       client.includes('\'<div role="treeitem" tabindex="-1" aria-level="1"\''),
       "the module node itself is a treeitem at level 1",
@@ -549,7 +550,8 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     );
     assert.ok(client.includes('class="module-body" role="group"'));
     assert.ok(client.includes('class="bucket-body" role="group"'));
-    assert.ok(client.includes("renderRow(row, inModule ? 3 : 2)"));
+    assert.ok(client.includes("renderRow(row, 3)"));
+    assert.ok(client.includes('data-testid="work-explorer-tree"'));
     // Keyboard operability: shared toggler wired to Enter/Space and
     // ArrowRight/ArrowLeft; arrow navigation walks visible nodes only.
     assert.ok(client.includes("function toggleCollapsible(nodeEl"));

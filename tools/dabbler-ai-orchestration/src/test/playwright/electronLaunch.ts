@@ -683,7 +683,7 @@ export async function triggerRefresh(page: Page): Promise<void> {
   await page.keyboard.press("F1");
   const palette = page.locator(".quick-input-widget input");
   await palette.waitFor({ state: "visible", timeout: 10_000 });
-  await palette.fill("Dabbler: Refresh Session Sets");
+  await palette.fill("Dabbler: Refresh Work Explorer");
   await page.keyboard.press("Enter");
   // Small settle window for the provider's getChildren() to run and
   // the tree to repaint. The view itself emits no public event.

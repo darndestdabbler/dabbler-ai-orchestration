@@ -55,7 +55,7 @@
         {
           "type": "webview",
           "id": "dabblerSessionSets",
-          "name": "Session Sets",
+          "name": "Work Explorer",
           "contextualTitle": "Dabbler AI Orchestration"
         }
       ]
@@ -63,7 +63,7 @@
     "commands": [
       {
         "command": "dabblerSessionSets.refresh",
-        "title": "Refresh Session Sets",
+        "title": "Refresh Work Explorer",
         "category": "Dabbler",
         "icon": "$(refresh)"
       },

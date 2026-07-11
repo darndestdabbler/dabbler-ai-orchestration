@@ -68,7 +68,7 @@ The editor opens a panel with six sections:
 | Notifications | Pushover toggle; API-key / user-key env-var names; test-notification button |
 | Local overrides summary | Read-only view of `local-overrides.yaml` (gitignored, per-machine settings) |
 
-Changes to provider API keys and Pushover credentials belong in `local-overrides.yaml` (per-machine, gitignored). The editor's shared/local toggle on each field controls which file is written. The Getting Started form in the Session Set Explorer (`Dabbler: Get Started`) is the recommended first-time setup path; the config editor is the recommended surface for ongoing tuning.
+Changes to provider API keys and Pushover credentials belong in `local-overrides.yaml` (per-machine, gitignored). The editor's shared/local toggle on each field controls which file is written. The Getting Started form in the Work Explorer (`Dabbler: Get Started`) is the recommended first-time setup path; the config editor is the recommended surface for ongoing tuning.
 
 ---
 
@@ -160,7 +160,7 @@ The agent then:
    lifecycle these files follow is documented in
    [`docs/guidance-lifecycle.md`](guidance-lifecycle.md).
 2. **Reads the spec** and the activity log to find its current step; registers
-   the session start so the VS Code Explorer shows the set as in-progress
+   the session start so the Work Explorer shows the set as in-progress
    (Step 1–3).
 3. **Implements** — writes code, edits files, runs builds and tests. Delegates
    reasoning tasks (code review, architecture, analysis) to

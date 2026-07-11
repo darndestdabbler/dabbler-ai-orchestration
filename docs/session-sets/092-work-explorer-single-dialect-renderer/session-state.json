@@ -1,15 +1,21 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "092-work-explorer-single-dialect-renderer",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-11T12:12:09.541699-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "github-copilot",
+        "provider": "openai",
+        "model": "gpt-5.4",
+        "effort": "high",
+        "identityProvenance": "asserted"
+      },
       "verificationVerdict": null
     },
     {

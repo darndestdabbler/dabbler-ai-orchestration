@@ -27,6 +27,8 @@
 // name / fraction / description only.
 
 import * as crypto from "crypto";
+import * as fs from "fs";
+import * as path from "path";
 import * as vscode from "vscode";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { SessionSet } from "../types";
@@ -34,13 +36,15 @@ import { ScanState } from "./scanState";
 import {
   blockedMarker,
   blockedTooltip,
-  buildModulePayloads,
+  buildVisibleModulePayloads,
+  computeVisibleModules,
   forceClosedBadge,
   fractionTooltip,
   ICON_FILES,
   isCurrentSessionInFlight,
   migrationMarker,
   migrationTooltip,
+  mergeVisibleModules,
   tierMarker,
   tierTooltip,
   touchedDate,
@@ -50,6 +54,10 @@ import {
   verificationOwedText,
   verificationTooltip,
 } from "./SessionSetsModel";
+import {
+  LEGACY_ROOT_PLAN_REL,
+  classifyModulesManifest,
+} from "../utils/moduleAuthoring";
 import {
   ActionSupports,
   RowAction,
@@ -205,6 +213,7 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   private version = 0;
   private renderTimer: NodeJS.Timeout | undefined;
   private cache: SessionSet[] | null = null;
+  private collisionNotificationShown = false;
   // Set 060 Session 2: bound once at construction; injectable for tests.
   private readonly gettingStartedHandlers: GettingStartedHandlers;
   // Set 060 Session 3 (D8): the static instructions doc auto-opens
@@ -239,6 +248,7 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
 
   public refresh(): void {
     this.cache = null;
+    this.collisionNotificationShown = false;
     this.scheduleRender();
   }
 
@@ -466,6 +476,15 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       this.cache = readAllSessionSets();
     }
     const all = this.cache;
+    const duplicate = all.find((set) => set.duplicateNameError)?.duplicateNameError;
+    if (duplicate && !this.collisionNotificationShown) {
+      this.collisionNotificationShown = true;
+      void vscode.window.showWarningMessage(
+        `Duplicate session-set name "${duplicate.name}" exists in ` +
+          `${duplicate.conflictingDirs.length} locations. Showing ` +
+          `${duplicate.chosenDir}; rename one copy to restore unique actions.`,
+      );
+    }
 
     // Prune suppression for slugs that no longer exist.
     const visibleSlugs = new Set(all.map((s) => s.name));
@@ -595,16 +614,28 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     );
   }
 
-  // Set 087 Session 2: the module tier — group by validated module
-  // attribution (pure `groupByModule`, manifest order, implicit last),
-  // then run the EXISTING bucket pass per module. The whole payload
-  // assembly lives in SessionSetsModel.buildModulePayloads (verifier
-  // round 1: the payload SHAPE must be behavior-testable at Layer 2,
-  // and this class is not importable from the unit harness); the host
-  // contributes only its private `buildRow` — unchanged, per the spec —
-  // as the row builder. Module is grouping, never identity.
+  // Set 092 Session 1: compute the settled Q8 visible-module model for
+  // each discovered root, then merge those root-scoped results into the
+  // global Explorer list. The pure merge/payload helpers stay Layer-2
+  // testable; the host owns filesystem classification and plan presence.
   private buildModules(all: SessionSet[]): ModulePayload[] {
-    return buildModulePayloads(all, (set) => this.buildRow(set));
+    const roots = new Set(
+      (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
+    );
+    for (const set of all) roots.add(set.root);
+    const byRoot = Array.from(roots).map((root) =>
+      computeVisibleModules(
+        classifyModulesManifest(root),
+        all.filter((set) => set.root === root),
+        {
+          legacyRootPlanExists: fs.existsSync(path.join(root, LEGACY_ROOT_PLAN_REL)),
+        },
+      ),
+    );
+    return buildVisibleModulePayloads(
+      mergeVisibleModules(byRoot),
+      (set) => this.buildRow(set),
+    );
   }
 
   private buildRow(set: SessionSet): RowPayload {
@@ -665,6 +696,11 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // `v+`) + state-specific tooltip; click opens the row QuickPick.
       verificationMarker: verificationMarker(set),
       verificationTooltip: verificationTooltip(set),
+      duplicateNameBadge: set.duplicateNameError ? "!" : "",
+      duplicateNameTooltip: set.duplicateNameError
+        ? `Duplicate session-set name in ${set.duplicateNameError.conflictingDirs.length} ` +
+          `locations. Showing ${set.duplicateNameError.chosenDir}; rename one copy.`
+        : "",
       accordionHtml: null,
       accordionUpdatedAt: null,
     };
@@ -710,7 +746,7 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <link rel="stylesheet" href="${cssUri}">
-  <title>Session Sets</title>
+  <title>Work Explorer</title>
 </head>
 <body>
   <main id="root" role="presentation"></main>

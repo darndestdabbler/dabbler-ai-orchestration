@@ -67,7 +67,7 @@ async function teardown(per: PerTest): Promise<void> {
 async function treeitemTexts(
   tree: import("@playwright/test").FrameLocator,
 ): Promise<string[]> {
-  const items = tree.locator('[role="treeitem"]');
+  const items = tree.locator('[data-testid^="session-set-"]');
   const count = await items.count();
   const out: string[] = [];
   for (let i = 0; i < count; i++) {

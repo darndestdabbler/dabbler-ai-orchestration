@@ -1,6 +1,6 @@
 // Set 060 Session 3 (spec D8): open the static Getting Started
 // instructions doc in the editor pane. The interactive form (the
-// Session Set Explorer's Getting Started surface) carries the live
+// Work Explorer's Getting Started surface) carries the live
 // state; this doc is its static teaching companion — the operator's
 // 5-step copy from the design mockup, no live checkmarks (D2).
 //
@@ -76,7 +76,7 @@ export function tierCalloutMarkdown(tier: Tier): string {
     "`.dabbler/tier`). Step 1's tier descriptions below cover both " +
     `options for reference — the **${other}-tier** setup notes do not ` +
     "apply to this project. To change tiers, right-click a session set " +
-    "in the Session Set Explorer and use **Switch Tier…**.\n"
+    "in the Work Explorer and use **Switch Tier…**.\n"
   );
 }
 
@@ -167,7 +167,7 @@ export async function openGettingStartedDoc(
 /**
  * Set 060 S3 (spec S3 step 4): `dabbler.getStarted` repointed. The
  * Set 021 WizardPanel webview (webview/wizard.html) is retired — the
- * Session Set Explorer's Getting Started form IS the interactive
+ * Work Explorer's Getting Started form IS the interactive
  * surface now (D1), and this command converges on it: focus the
  * Explorer view (which renders the form when the workspace has no
  * session sets) and open the static instructions doc beside it (D8).
@@ -181,7 +181,7 @@ export function registerGetStartedCommand(
       try {
         await vscode.commands.executeCommand("dabblerSessionSets.focus");
       } catch (err) {
-        console.warn("[gettingStarted] could not focus the Session Sets view", err);
+        console.warn("[gettingStarted] could not focus the Work Explorer view", err);
       }
       await openGettingStartedDoc(context);
     }),

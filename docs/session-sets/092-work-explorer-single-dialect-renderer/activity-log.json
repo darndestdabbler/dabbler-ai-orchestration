@@ -1,0 +1,115 @@
+{
+  "sessionSetName": "092-work-explorer-single-dialect-renderer",
+  "createdDate": "2026-07-11T16:12:09.557582+00:00",
+  "totalSessions": 2,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-11T16:12:09.557582+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/suggestion-disposition",
+      "dateTime": "2026-07-11T16:13:05.130034+00:00",
+      "description": "Operator answered the UAT/E2E suggested-state prompt: both.",
+      "status": "complete",
+      "kind": "suggestion_disposition",
+      "choice": "both"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/design-and-assignment",
+      "dateTime": "2026-07-11T12:25:44.152164-04:00",
+      "description": "Read the settled verdict, Q8 compat matrix, and Set 087 renderer architecture; routed the required assignment and bounded multi-root assembly decision.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/visible-module-host",
+      "dateTime": "2026-07-11T12:25:44.152164-04:00",
+      "description": "Switched the host snapshot to per-root computeVisibleModules with a pure global merge/payload adapter; added duplicate-name winner payload and one notification per fresh cache cycle.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/single-dialect-client",
+      "dateTime": "2026-07-11T12:25:44.152164-04:00",
+      "description": "Deleted the implicit-only flat branch; every repo state now renders module -> bucket -> row with stable testids, muted auto-expanded Default, fallback warnings, and duplicate-name badge/tooltip. Renamed the contributed label to Work Explorer with the view ID unchanged.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/atomic-pins-docs",
+      "dateTime": "2026-07-11T12:25:44.152164-04:00",
+      "description": "Updated Layer 2 source pins, Playwright fixtures, live README/onboarding names, and regenerated the hero screenshot from the Work Explorer mockup.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/focused-validation",
+      "dateTime": "2026-07-11T12:25:44.154381-04:00",
+      "description": "Focused validation passed: 61 Layer 2 tests, extension compile/typecheck, six initial Layer 3 passes plus repaired stale bucket assertion, manifest-less rerun green, and duplicate-name multi-root Playwright green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/full-automated-gates",
+      "dateTime": "2026-07-11T12:47:57.640907-04:00",
+      "description": "Canonical full pass: Python 2,922 passed / 6 skipped; guidance ceilings OK; TypeScript typecheck + Layer 2 1,413 passed; Layer 3 21 passed after updating stale flat-tree selectors; local 0.41.0 VSIX packaged for armed UAT.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-001/operator-uat",
+      "dateTime": "2026-07-11T17:13:23.778812+00:00",
+      "description": "Operator completed and saved the ad-hoc checklist, then explicitly confirmed acceptance: all three substantive Work Explorer UAT walks passed; blank Other rows are optional feedback slots.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-001/cross-provider-verification",
+      "dateTime": "2026-07-11T17:18:47.205792+00:00",
+      "description": "After two Anthropic HTTP 400 attempts, the sanctioned remaining-provider fallback ran through the canonical stamped verification pipeline on Google gemini-3-1-pro: VERIFIED, zero findings, two non-blocking nits. This was round 1, before the final ai-assignment actuals write.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "session-001/anthropic-round-2",
+      "dateTime": "2026-07-11T17:26:47.284796+00:00",
+      "description": "Anthropic Opus round 2 restored freshness against the final work state and returned ISSUES_FOUND: one Major inferred that a retained negative Layer 2 client guard contradicted the single-dialect renderer and likely made the suite red.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 12,
+      "stepKey": "session-001/round-2-remediation",
+      "dateTime": "2026-07-11T17:28:01.416561+00:00",
+      "description": "Inspected the full guard body: the predicted red test was disproven, but its title and negative intent were stale. Replaced it with a positive semantic-input/no-recomputation contract, corrected adjacent legacy-helper wording, and passed the focused 5-test renderer suite plus all 1,413 Layer 2 tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 13,
+      "stepKey": "session-001/anthropic-round-3",
+      "dateTime": "2026-07-11T17:32:21.246739+00:00",
+      "description": "Final permitted Anthropic Opus confirmation reviewed the corrected work state: VERIFIED, zero findings. Session 1 verification is terminal and non-blocking.",
+      "status": "complete"
+    }
+  ]
+}

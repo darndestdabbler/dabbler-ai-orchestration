@@ -1,0 +1,18 @@
+**VERIFIED**
+
+I attacked the actual work — the `mergeVisibleModules` ordering/identity logic against its Layer-2 test, the client `renderModule`/`renderBucket`/`renderRow` DOM against every Playwright/source-pin selector, the ARIA level scheme (module=1/bucket=2/row=3, empty-bucket leaf with no `aria-expanded`), the data-testid ↔ selector correspondence, the rename sweep, and the round-2 remediation. All of it holds up.
+
+Specifically confirmed:
+- The round-2 Major (retained stale client guard test) **is genuinely fixed** in this tree: `visibleModules.test.ts`'s client guard was rewritten from the negative `!client.includes("Unassigned")`/pseudo-name form to positive assertions (`mod.title || mod.slug || "Default"`, `moduleWarningText(mod.warning)`, `warning.code === "undeclared-slug"`), and every one of those literals is present verbatim in `client.js`. The `moduleTier.test.ts` pins (`!implicitOnly`, `renderBucket(row, 3)`, `data-testid="work-explorer-tree"`, `class="module-body" role="group"`, etc.) all match source.
+- `mergeVisibleModules` produces the exact tuple the merge test asserts (declared by min-order/firstSeen tiebreak → billing before ops; fallback sorted; pseudo last, "Unassigned" when coexisting). The Playwright module-tier order `[Greeter, Clock, Cross-Module Integration, not-in-manifest, Unassigned]` and the `module-declared-greeter`/`module-fallback-not-in-manifest`/`module-pseudo-default` testids all derive correctly from `moduleKey = kind + "-" + (slug || "default")`.
+- The `blocked-by-prereqs` selector switch from `[role="treeitem"]` to `[data-testid^="session-set-"]` is a **necessary** fix (modules and buckets are now treeitems too), not gratuitous.
+- Muted auto-expand: `.module-default` class gated on `kind === "pseudo" && label === "Default"`, `aria-expanded="true"` via `moduleCollapsed[moduleKey] !== false` default — matches the tree spec's assertion.
+
+The spec deliverables (single dialect, deleted legacy branch, muted Default, fallback warnings, duplicate-name badge/tooltip/throttled notification, Work Explorer rename with ID unchanged, testids, ARIA, fixture/pin/doc updates) are all present. Close-out artifacts correctly absent per review scope.
+
+#### NITS
+
+- **Nit:** `media/screenshot-mockup.html` hardcodes `color: #8a8a8a` on `.module-header` generically rather than mirroring the real `.module-default` class; harmless in a one-shot mockup that only renders a Default module.
+- **Nit:** The duplicate-name notification uses `all.find(...)`, so only the first collided slug per refresh cycle is announced. Satisfies "at most one throttled notification per refresh cycle," but multiple distinct collisions surface one-at-a-time across refreshes.
+- **Nit:** The regenerated hero image keeps the legacy filename `session-set-explorer-and-spec.png` while all alt-text/titles say "Work Explorer." Spec permits the docs sweep to spill into Session 2, so acceptable.
+- **Nit (escalation-considered, unverifiable):** `buildModules` unions `workspaceFolders` fsPaths with each `set.root` into a `Set` with no path normalization, then runs `computeVisibleModules` per root and merges. In a multi-root workspace containing an unrelated/empty folder (0 sets after `all.filter(set.root === root)`), the merged output could plausibly gain a spurious 0-set pseudo module or a stray warning depending on `computeVisibleModules`'s empty-input behavior — which is not visible in this diff and is not asserted by either the single-root or the duplicate-name multi-root Playwright test (neither checks Default for warning absence or module count). Cannot be substantiated as a defect from what's in front of me and the common single-repo path is correct; flagged for a normalization/empty-root guard.

@@ -231,23 +231,13 @@
     // is the supported case — every in-progress row carries its own
     // accordion below.
     //
-    // Set 087 Session 2: the snapshot ships `modules` (module →
-    // status-bucket → row). A single implicit module (slug "") renders
-    // exactly the pre-087 two-level bucket view — no module header, no
-    // wrapper, bare bucket keys, rows at aria-level 2 — byte-identical
-    // per the routed ruling Q4. Anything else renders one collapsible
-    // module group per entry (manifest order, implicit last).
+    // Set 092 Session 1: one rendering dialect for every repo state.
+    // Every snapshot renders module → status-bucket → row; the sole
+    // pseudo-module arrives as `Default` and is visually de-emphasized.
     const modules = lastSnapshot.modules || [];
-    const implicitOnly = modules.length === 1 && modules[0].slug === "";
-    parts.push('<div role="tree" aria-label="Session Sets" class="tree">');
-    if (implicitOnly) {
-      for (const bucket of modules[0].buckets) {
-        parts.push(renderBucket(bucket, null));
-      }
-    } else {
-      for (const mod of modules) {
-        parts.push(renderModule(mod));
-      }
+    parts.push('<div role="tree" aria-label="Work Explorer" class="tree" data-testid="work-explorer-tree">');
+    for (const mod of modules) {
+      parts.push(renderModule(mod));
     }
     parts.push('</div>');
     root.innerHTML = parts.join("");
@@ -441,16 +431,22 @@
     el.hidden = !message;
   }
 
-  // Set 087 Session 2: one collapsible module node of the 3-level tree
-  // (module → status-bucket → row). Only rendered in the multi-module
-  // view — the single-implicit view goes straight to renderBucket with
-  // moduleSlug null (byte-identical pre-087 DOM, routed ruling Q4).
-  // The implicit module ships slug "" / title "" and renders LAST with
-  // the quiet "(ungrouped)" fallback label (routed ruling Q1 — the data
-  // model stays unlabeled; the fallback is presentation only).
-  //
-  // R2 verifier Major, operator-adjudicated FIX-NOW: the multi-module
-  // dialect follows the WAI-ARIA tree pattern properly — the module is
+  function moduleWarningText(warning) {
+    if (!warning) return "";
+    if (warning.code === "undeclared-slug") {
+      return 'Module "' + warning.rawSlug + '" is not declared in docs/modules.yaml.';
+    }
+    if (warning.code === "manifest-invalid") {
+      return "docs/modules.yaml is invalid; showing recoverable work groups.";
+    }
+    if (warning.code === "manifest-missing") {
+      return "docs/modules.yaml is missing; work remains visible under fallback groups.";
+    }
+    return "Some session sets are not assigned to a declared module.";
+  }
+
+  // One collapsible module node of the sole 3-level tree dialect. The
+  // module is
   // a `role="treeitem"` carrying aria-level="1" + aria-expanded, its
   // children live in a nested `role="group"`, and the node is
   // keyboard-focusable/operable (roving tabindex; Enter/Space toggle;
@@ -460,60 +456,56 @@
   // descendant text.
   function renderModule(mod) {
     const slug = mod.slug;
-    const label = mod.title || mod.slug || "(ungrouped)";
-    const expanded = moduleCollapsed[slug] !== false;
+    const kind = mod.kind || (slug ? "declared" : "pseudo");
+    const label = mod.title || mod.slug || "Default";
+    const moduleKey = kind + "-" + (slug || "default");
+    const expanded = moduleCollapsed[moduleKey] !== false;
     const chevronGlyph = expanded ? "▾" : "▸";
-    const headerId = "module-" + slug;
+    const headerId = "module-" + moduleKey;
+    const warningText = moduleWarningText(mod.warning);
+    const warning = warningText
+      ? '<span class="module-warning" title="' + escAttr(warningText) +
+          '" aria-label="' + escAttr(warningText) + '">!</span>'
+      : "";
+    const moduleClasses = "module module-" + kind +
+      (kind === "pseudo" && label === "Default" ? " module-default" : "");
     const buckets = mod.buckets
-      .map(function (bucket) { return renderBucket(bucket, slug); })
+      .map(function (bucket) { return renderBucket(bucket, moduleKey); })
       .join("");
     return (
       '<div role="treeitem" tabindex="-1" aria-level="1"' +
         ' aria-selected="false" aria-expanded="' + (expanded ? "true" : "false") + '"' +
-        ' aria-labelledby="' + escAttr(headerId) + '" class="module"' +
-        ' data-module-key="' + escAttr(slug) + '">' +
+        ' aria-labelledby="' + escAttr(headerId) + '" class="' + moduleClasses + '"' +
+        ' data-module-key="' + escAttr(moduleKey) + '"' +
+        ' data-module-kind="' + escAttr(kind) + '"' +
+        ' data-testid="module-' + escAttr(moduleKey) + '">' +
         '<div id="' + escAttr(headerId) + '" class="module-header" data-collapsible="true">' +
           '<span class="module-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
           '<span class="module-title">' + escHtml(label) + '</span>' +
+          warning +
         '</div>' +
         '<div class="module-body" role="group">' + buckets + '</div>' +
       '</div>'
     );
   }
 
-  // Set 087 Session 2: `moduleSlug` distinguishes the two DOM dialects.
-  // null → the pre-087 single-implicit markup, byte-identical (bare
-  // data-bucket-key, ids "group-<key>"/"body-<key>", role="group"
-  // wrapper, rows at aria-level 2). A string (may be "" for the
-  // implicit module inside a mixed view) → the ARIA tree pattern: the
-  // bucket is a `role="treeitem"` at aria-level="2" (aria-expanded on
+  // The bucket is always a `role="treeitem"` at aria-level="2"
+  // (aria-expanded on
   // the treeitem when it has rows; an empty bucket is a leaf node with
   // no aria-expanded, per the APG), children in a nested
   // `role="group"`, composite "<module>/<key>" collapse key, rows at
   // aria-level 3.
-  function renderBucket(bucket, moduleSlug) {
-    const inModule = moduleSlug !== null;
+  function renderBucket(bucket, moduleKey) {
     const labelText = bucket.label + "  (" + bucket.count + ")";
-    const idSuffix = inModule ? moduleSlug + "-" + bucket.key : bucket.key;
+    const idSuffix = moduleKey + "-" + bucket.key;
     const groupId = "group-" + idSuffix;
-    const bodyId = "body-" + idSuffix;
-    const collapseKey = inModule ? moduleSlug + "/" + bucket.key : bucket.key;
+    const collapseKey = moduleKey + "/" + bucket.key;
     if (bucket.count === 0) {
-      if (inModule) {
-        // Leaf tree node: no children, no aria-expanded (APG end node).
-        return (
-          '<div role="treeitem" tabindex="-1" aria-level="2"' +
-            ' aria-selected="false" aria-labelledby="' + escAttr(groupId) + '"' +
-            ' class="bucket bucket-empty">' +
-            '<div id="' + escAttr(groupId) + '" class="bucket-header">' +
-              '<span class="bucket-chevron" aria-hidden="true"></span>' +
-              '<span>' + escHtml(labelText) + '</span>' +
-            '</div>' +
-          '</div>'
-        );
-      }
+      // Leaf tree node: no children, no aria-expanded (APG end node).
       return (
-        '<div role="group" aria-labelledby="' + escAttr(groupId) + '" class="bucket bucket-empty">' +
+        '<div role="treeitem" tabindex="-1" aria-level="2"' +
+          ' aria-selected="false" aria-labelledby="' + escAttr(groupId) + '"' +
+          ' class="bucket bucket-empty" data-testid="bucket-' + escAttr(idSuffix) + '">' +
           '<div id="' + escAttr(groupId) + '" class="bucket-header">' +
             '<span class="bucket-chevron" aria-hidden="true"></span>' +
             '<span>' + escHtml(labelText) + '</span>' +
@@ -526,32 +518,19 @@
     const expanded = bucketCollapsed[collapseKey] !== false;
     const chevronGlyph = expanded ? "▾" : "▸";
     const rows = bucket.rows
-      .map(function (row) { return renderRow(row, inModule ? 3 : 2); })
+      .map(function (row) { return renderRow(row, 3); })
       .join("");
-    if (inModule) {
-      return (
-        '<div role="treeitem" tabindex="-1" aria-level="2"' +
-          ' aria-selected="false" aria-expanded="' + (expanded ? "true" : "false") + '"' +
-          ' aria-labelledby="' + escAttr(groupId) + '" class="bucket"' +
-          ' data-bucket-key="' + escAttr(collapseKey) + '">' +
-          '<div id="' + escAttr(groupId) + '" class="bucket-header" data-collapsible="true">' +
-            '<span class="bucket-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
-            '<span>' + escHtml(labelText) + '</span>' +
-          '</div>' +
-          '<div class="bucket-body" role="group">' + rows + '</div>' +
-        '</div>'
-      );
-    }
     return (
-      '<div role="group" aria-labelledby="' + escAttr(groupId) + '" class="bucket"' +
-        ' aria-expanded="' + (expanded ? "true" : "false") + '"' +
-        ' data-bucket-key="' + escAttr(collapseKey) + '">' +
-        '<div id="' + escAttr(groupId) + '" class="bucket-header" data-collapsible="true"' +
-        ' aria-controls="' + escAttr(bodyId) + '">' +
+      '<div role="treeitem" tabindex="-1" aria-level="2"' +
+        ' aria-selected="false" aria-expanded="' + (expanded ? "true" : "false") + '"' +
+        ' aria-labelledby="' + escAttr(groupId) + '" class="bucket"' +
+        ' data-bucket-key="' + escAttr(collapseKey) + '"' +
+        ' data-testid="bucket-' + escAttr(idSuffix) + '">' +
+        '<div id="' + escAttr(groupId) + '" class="bucket-header" data-collapsible="true">' +
           '<span class="bucket-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
           '<span>' + escHtml(labelText) + '</span>' +
         '</div>' +
-        '<div class="bucket-body" id="' + escAttr(bodyId) + '">' + rows + '</div>' +
+        '<div class="bucket-body" role="group">' + rows + '</div>' +
       '</div>'
     );
   }
@@ -618,6 +597,12 @@
           escAttr(row.verificationTooltip || "") + '">' +
           escHtml(row.verificationMarker) + '</span>'
       : "";
+      const duplicateNameSpan = row.duplicateNameBadge
+        ? '<span class="row-duplicate-name-marker" title="' +
+          escAttr(row.duplicateNameTooltip || "") + '" aria-label="' +
+          escAttr(row.duplicateNameTooltip || "") + '">' +
+          escHtml(row.duplicateNameBadge) + '</span>'
+        : "";
     // Set 061 S1 (D1): when the fraction carries the `+` suffix, the
     // host ships a tooltip explaining why the denominator can grow.
     // It rides the fraction span's title attribute; the marker stays
@@ -628,6 +613,7 @@
     return (
       '<div role="treeitem" tabindex="-1" aria-level="' + (ariaLevel || 2) + '"' +
       ' aria-selected="false" data-slug="' + escAttr(row.slug) + '"' +
+      ' data-testid="session-set-' + escAttr(row.slug) + '"' +
       ' data-state="' + escAttr(row.state) + '"' +
       ' data-context-value="' + escAttr(row.contextValue) + '"' +
       ' class="row row-' + escAttr(row.state) + '">' +
@@ -639,6 +625,7 @@
             migrationSpan +
             blockedSpan +
             verificationSpan +
+            duplicateNameSpan +
             descSpan +
           '</span>' +
         '</div>' +

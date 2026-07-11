@@ -1,0 +1,79 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "dabbler-ai-orchestration 0.41.0 local VSIX (Set 092, Session 1 of 2; no Marketplace publish)",
+  "DocumentDate": "7/11/2026, 1:13:20 PM",
+  "Notes": "Ad-hoc per-session UAT for the Work Explorer renderer switch. Automation has already exercised the complete functional surface before this checklist was offered: 2,922 Python tests passed (6 skipped), 1,413 extension unit tests passed, and all 21 Playwright Electron tests passed. The human walk is deliberately limited to native VS Code details that need visual/operator confirmation: the contributed view label, the muted Default wrapper treatment, and notification behavior. Install only the local VSIX produced from this working tree; do not publish it.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Work Explorer identity",
+      "Subarea": "Walk 1 - contributed view label and stable layout",
+      "ItemLabel": "The activity-bar view is labeled Work Explorer without creating a second view",
+      "HumanAction": "1. Install the local dabbler-ai-orchestration-0.41.0.vsix when prompted, then run Developer: Reload Window.\n2. Open this repository.\n3. Click the Dabbler AI Orchestration icon in the Activity Bar.\n4. Inspect the view header above the session-set tree.",
+      "Expectation": "The view header reads exactly 'WORK EXPLORER'. There is one Dabbler work view, not a new duplicate beside a retained 'Session Sets' view. Existing saved activity-bar placement remains usable because the internal view ID is still dabblerSessionSets.",
+      "ProgrammaticVerification": "package.json pins name='Work Explorer' while id='dabblerSessionSets'; extension compile/typecheck and the full 21-test Playwright suite passed.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Single-dialect rendering",
+      "Subarea": "Walk 2 - manifest-less repository uses the module tree",
+      "ItemLabel": "The sole Default module is visible, expanded, and quieter than real module headings",
+      "HumanAction": "1. With this repository still open, locate the 'Default' module row in Work Explorer.\n2. Confirm its child status buckets and session-set rows are visible without clicking it first.\n3. Compare the visual weight/color of 'Default' with normal row names and bucket labels.\n4. Collapse Default once and expand it again to confirm the row remains operable.",
+      "Expectation": "A visible module header labeled exactly 'Default' wraps the status buckets. It starts expanded. Its text is visually de-emphasized (muted description color and lighter weight), but remains readable and has the normal disclosure chevron. There is no legacy flat rendering where status buckets sit directly at the tree root.",
+      "ProgrammaticVerification": "session-sets-tree.spec.ts asserts module-pseudo-default exists, is module-default, starts aria-expanded=true, and rows are aria-level=3; moduleTier.test.ts source-pins removal of implicitOnly/renderBucket(bucket, null).",
+      "IsJudgmentItem": true,
+      "Result": "",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Warning affordances",
+      "Subarea": "Walk 3 - duplicate-name notification remains bounded",
+      "ItemLabel": "A duplicate global set name is loud once per refresh cycle, not repeatedly noisy",
+      "HumanAction": "Use the prepared automated evidence unless you already have a multi-root workspace with two distinct session-set directories sharing one slug. If you do: open that workspace, run 'Dabbler: Refresh Work Explorer', confirm one warning notification appears, dismiss it, then leave the view open for at least 10 seconds without refreshing.",
+      "Expectation": "The warning names the duplicate session-set slug and says which directory is shown. The retained winner row carries a red '!' marker with a tooltip explaining the collision. No second notification appears from ordinary repaint/watcher activity during the wait; running Refresh Work Explorer deliberately starts a new refresh cycle and may show one new warning.",
+      "ProgrammaticVerification": "modulesManifest.test.ts proves one deterministic flagged winner across two roots; session-sets-tree.spec.ts renders one winner row with the '!' tooltip in a real multi-root Electron workspace; CustomSessionSetsView resets its notification latch only when refresh clears the scan cache.",
+      "Result": "",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Work Explorer identity",
+      "Subarea": "Walk 1 - contributed view label and stable layout",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Single-dialect rendering",
+      "Subarea": "Walk 2 - manifest-less repository uses the module tree",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Warning affordances",
+      "Subarea": "Walk 3 - duplicate-name notification remains bounded",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    }
+  ]
+}

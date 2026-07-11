@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "095-module-hello-world-walkthrough",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Session 1",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

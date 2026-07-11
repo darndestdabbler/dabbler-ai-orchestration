@@ -155,8 +155,29 @@ copy and from the modules.yaml header comments.
 - Set 087 **S4 (Hello World tutorial) and the S3 UAT walk are DEFERRED**
   until this redesign lands, so both document the new UX. Set 087 stays
   open meanwhile.
+  - **Superseded later the same day (operator instruction, 2026-07-11):**
+    Set 087 is **retired** (cancelled via the sanctioned lifecycle
+    writer; restorable) rather than left open. S1–S3 remain shipped on
+    master; the S4 scope is re-homed to
+    `docs/session-sets/095-module-hello-world-walkthrough/` (prerequisite
+    Set 094 — still "after Set D"), the S3 UAT walk is superseded by the
+    redesign sets' own UAT plus Set 095's end-to-end sign-off, and each
+    087 deferral's new home is recorded in `087-…/CANCELLED.md`. The
+    verdict's decomposition Sets A–D are authored as
+    **091-module-first-model-and-manifest-compat**,
+    **092-work-explorer-single-dialect-renderer**,
+    **093-work-explorer-module-row-interactions**, and
+    **094-getting-started-shrink-and-manifest-lifecycle** (single
+    release boundary after 094).
 - This proposal reshapes what Sets 088/089 inherit; their specs are
   re-cut after the verdict.
+  - **Numbering note (2026-07-11):** "088/089" here mean the *planned
+    module follow-on sets* from the 087 spec (locator API + codeRoots
+    scope check; optional physical moves). Those numbers were since
+    consumed by unrelated sets on disk, so the follow-ons will be
+    authored under fresh numbers at their re-attach points — the
+    locator/scope-check set after Set 091 closes, the physical-moves set
+    after Sets 091 + 093.
 
 ## Questions the panel must answer (adversarial critique wanted)
 

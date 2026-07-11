@@ -66,6 +66,15 @@ export function defaultModulePlanPath(slug: string): string {
  * null for both, so this classifier re-checks the directory entry the
  * same way the reader does (lstat, so a dangling symlink still counts as
  * present).
+ *
+ * Set 091 S1 (verdict amendment 3): a VALID EMPTY manifest — flow-style
+ * `modules: []` or a bare `modules:` (YAML null) — classifies
+ * `{ kind: "present", entries: [] }`, and every authoring flow treats
+ * zero entries exactly like an absent manifest (single pseudo-module, no
+ * QuickPick, no `module:` stamp). Whether the empty form is *textually
+ * replaceable* is the appender's separate concern (routed architecture
+ * ruling, s1-empty-manifest-architecture.json — no distinct
+ * "present-empty" union member).
  */
 export type ModulesManifestClassification =
   | { kind: "absent" }
@@ -99,11 +108,11 @@ export const INVALID_MANIFEST_MESSAGE =
   `before using the module-aware flows.`;
 
 /**
- * Header comment written when the scaffold CREATES docs/modules.yaml
- * (ruling Q1: an absent manifest is created with a purpose + syntax
- * explainer before the first entry).
+ * The Set 087 header comment block — the purpose + syntax explainer that
+ * opens every scaffolded docs/modules.yaml (shared by the append-path
+ * header and the Set 091 canonical template).
  */
-export const MODULES_YAML_HEADER = `# docs/modules.yaml — the module manifest (Dabbler module-organized projects).
+const MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml — the module manifest (Dabbler module-organized projects).
 #
 # Each entry declares one module of this repo:
 #   slug:      machine identity (kebab-case). Session sets declare
@@ -119,7 +128,43 @@ export const MODULES_YAML_HEADER = `# docs/modules.yaml — the module manifest 
 # Explorer display order = this file's order. Session-set NAMES stay
 # globally unique across ALL modules — \`module\` is a grouping attribute,
 # never part of a set's identity.
-modules:
+`;
+
+/**
+ * Header comment written when the scaffold CREATES docs/modules.yaml
+ * (ruling Q1: an absent manifest is created with a purpose + syntax
+ * explainer before the first entry).
+ */
+export const MODULES_YAML_HEADER = `${MODULES_YAML_HEADER_COMMENTS}modules:
+`;
+
+/**
+ * Set 091 S1 (verdict amendment 3): the canonical always-present
+ * modules.yaml template — the Set 087 header comments, commented-out
+ * example entries, and a valid EMPTY \`modules: []\` list (gpt-5-4's
+ * adopted shape). It classifies as a valid empty manifest and the
+ * appender grows it into its first block-style entry (round-trip
+ * test-pinned). Defined and tested here; Set 094 wires it into the
+ * scaffold / ensure-write triggers (adjudication A: explicit user
+ * action only, never activation).
+ */
+export const MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
+# Example entries (copy below \`modules:\`, uncommented, to declare this
+# repo's modules — or leave the list empty for a single-module repo):
+#
+# - slug: payment-api
+#   title: "Payment API"
+#   codeRoots:
+#     - src/payment
+#   planPath: docs/modules/payment-api/project-plan.md
+# - slug: integration
+#   title: "Cross-Module Integration"
+#   codeRoots: []
+#   planPath: docs/modules/integration/project-plan.md
+#   touches:
+#     - payment-api
+
+modules: []
 `;
 
 /**
@@ -170,18 +215,85 @@ export interface NewModuleScaffoldResult {
 }
 
 /**
+ * Set 091 S1 (verdict amendment 3): an EMPTY `modules:` line —
+ * flow-style `modules: []` or a `modules:` that parses to YAML null. The
+ * null alternation mirrors the YAML 1.2 core-schema spellings the reader
+ * accepts (S1 verification R3: bare, `~`, `null`, `Null`, `NULL` — the
+ * accepted and appendable domains must match; other casings like `nUll`
+ * parse as strings and stay invalid on both sides). YAML permits the
+ * root mapping to be indented, so leading whitespace is captured (S1
+ * verification R1: a root-indented `  modules: []` classifies valid-empty
+ * and must grow like the column-0 form) — commented examples still never
+ * match. An optional trailing comment on the line is captured (and
+ * preserved by the replacement). A NESTED `modules:` key under another
+ * mapping can also match (S1 verification R2), which is why the caller
+ * receives one candidate per match and validates each against the
+ * parse-after-append guard before selecting a write. A quoted key
+ * (`"modules":` / `'modules':`) matches too, quote style preserved (S1
+ * R4 third-provider adjudication: quoted keys are the cheap hardening;
+ * remaining exotic serializations — multiline flow lists, tags, anchors
+ * — are an adjudicated-minor residual that refuses loudly by design).
+ */
+const EMPTY_MODULES_LINE_RE =
+  /^([ \t]*)(["']?)modules\2:[ \t]*(?:\[[ \t]*\]|~|null|Null|NULL)?[ \t]*(#[^\r\n]*)?\r?$/gm;
+
+/**
+ * Candidate rewrites that replace an empty `modules:` list marker with
+ * its first block-style entry — one candidate per matching line, in file
+ * order. Each is format-preserving (every other byte of the file
+ * survives; a trailing comment on the `modules:` line is kept; an
+ * indented key keeps its indentation, with the entry block re-indented
+ * to nest under it). The caller MUST validate a candidate with the
+ * parse-after-append guard before writing it: a matching line may be a
+ * nested `modules:` key under another mapping (S1 verification R2), and
+ * only the guard can tell whether the ROOT modules list gained the entry
+ * (routed architecture ruling, s1-empty-manifest-architecture.json).
+ * Empty array = no empty-form line exists; the caller falls back to the
+ * plain append.
+ */
+export function replaceEmptyModulesList(
+  text: string,
+  entryBlock: string,
+): string[] {
+  const out: string[] = [];
+  for (const m of text.matchAll(EMPTY_MODULES_LINE_RE)) {
+    const indent = m[1];
+    const quote = m[2];
+    const comment = m[3] ? ` ${m[3]}` : "";
+    const after = text.slice(m.index! + m[0].length);
+    const block = (entryBlock.endsWith("\n") ? entryBlock.slice(0, -1) : entryBlock)
+      .split("\n")
+      .map((line) => indent + line)
+      .join("\n");
+    out.push(
+      text.slice(0, m.index) +
+        `${indent}${quote}modules${quote}:${comment}\n` +
+        block +
+        (after === "" ? "\n" : after),
+    );
+  }
+  return out;
+}
+
+/**
  * Scaffold one new module: write the plan stub (skip-existing — an
  * operator's real plan is never clobbered), then append the manifest
  * entry. The stub is written FIRST: an orphan stub is harmless, while a
  * manifest entry pointing at a missing plan would dangle.
+ *
+ * A valid EMPTY manifest (`modules: []` or a bare `modules:` — Set 091
+ * S1, verdict amendment 3) is grown by replacing the empty-list marker
+ * with the first block-style entry; populated manifests keep the plain
+ * text append.
  *
  * Fail-loud contract (ruling Q1 + the repo's untrusted-input posture):
  * throws an operator-readable Error — never writes — when the slug fails
  * validation, when a PRESENT docs/modules.yaml is not a valid module
  * manifest (appending to a broken file would compound the damage), or
  * when the appended candidate text does not parse back to the expected
- * entry list (e.g. a flow-style `modules: []`, or `modules:` not being
- * the last top-level key — YAML shapes a plain append cannot extend).
+ * entry list (e.g. a populated flow-style `modules: [...]`, or
+ * `modules:` not being the last top-level key — YAML shapes a plain
+ * append cannot extend).
  */
 export function scaffoldNewModule(
   root: string,
@@ -208,13 +320,43 @@ export function scaffoldNewModule(
 
   // Build + validate the manifest candidate BEFORE any write, so a
   // refusal leaves the workspace untouched.
-  let candidate: string;
+  let candidate: string | null = null;
   const manifestCreated = classified.kind === "absent";
   if (manifestCreated) {
     candidate = MODULES_YAML_HEADER + entryBlock;
   } else {
     const current = fs.readFileSync(manifestAbs, "utf8");
-    candidate = (current.endsWith("\n") ? current : current + "\n") + entryBlock;
+    // Set 091 S1: a valid-empty manifest (zero parsed entries) grows by
+    // replacing the empty `modules:` marker with the first block-style
+    // entry — a plain text append cannot extend either empty form. S1
+    // verification R2: several lines can look like the empty form (e.g.
+    // a NESTED modules: key under another mapping earlier in the file),
+    // so each candidate is checked against the parse guard and the first
+    // one that lands the entry in the ROOT modules list wins.
+    if (existing.length === 0) {
+      for (const replaced of replaceEmptyModulesList(current, entryBlock)) {
+        try {
+          assertAppendedManifestParses(
+            replaced,
+            slug,
+            existing.length + 1,
+            entryBlock,
+          );
+          candidate = replaced;
+          break;
+        } catch {
+          // Wrong site (nested key) or unappendable — try the next line.
+        }
+      }
+    }
+    if (candidate === null) {
+      // No empty-form line produced a valid result: plain append, with
+      // the guard below as the loud refusal path (e.g. an
+      // all-dropped-entries manifest must refuse on the entry-count
+      // check, never write).
+      candidate =
+        (current.endsWith("\n") ? current : current + "\n") + entryBlock;
+    }
   }
   assertAppendedManifestParses(
     candidate,
@@ -246,9 +388,13 @@ export function scaffoldNewModule(
 /**
  * The parse-after-append guard: the candidate text must parse to a
  * mapping whose `modules:` list gained exactly the new entry. Anything
- * else (parse error, flow-style empty list, `modules:` not last, the
- * entry attaching to a different key) is a refusal with the copyable
- * entry block so the operator can place it by hand.
+ * else (parse error, populated flow-style list, `modules:` not last, the
+ * entry attaching to a different key, an all-dropped-entries list the
+ * empty-form replacement mistook for empty) is a refusal with the
+ * copyable entry block so the operator can place it by hand. Set 091 S1:
+ * this guard now PASSES on the empty→first-entry transition it
+ * previously refused, because the empty form is replaced upstream rather
+ * than appended past.
  */
 function assertAppendedManifestParses(
   candidate: string,
@@ -287,7 +433,8 @@ function assertAppendedManifestParses(
   if (modules.length !== expectedCount || !slugs.includes(slug)) {
     return refuse(
       'the appended entry did not land in the "modules:" list — the list ' +
-        "is probably flow-style ([]) or not the last top-level key",
+        "is probably flow-style, holds entries the manifest reader " +
+        "dropped, or is not the last top-level key",
     );
   }
 }
@@ -388,7 +535,9 @@ export type ModulePickOutcome =
 /**
  * Resolve the module an authoring flow should target. Reads the manifest
  * itself so every caller shares one precedence: truly ABSENT manifest →
- * repo-level flow; PRESENT-but-invalid manifest → error + abort (S3
+ * repo-level flow (a valid EMPTY manifest — `modules: []` or a bare
+ * `modules:`, Set 091 S1 — resolves identically: single pseudo-module,
+ * no QuickPick, no notice); PRESENT-but-invalid manifest → error + abort (S3
  * verification R1 — a config error must never silently produce
  * unstamped repo-level output in a module-organized repo); one module →
  * auto-selected with a notice (ruling Q2 — the operator must see which

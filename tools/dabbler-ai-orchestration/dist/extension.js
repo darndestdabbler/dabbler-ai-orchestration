@@ -16519,6 +16519,8 @@ function readModulesManifest(root) {
     return null;
   }
   const rawModules = doc.modules;
+  if (rawModules === null)
+    return [];
   if (!Array.isArray(rawModules)) {
     console.warn(
       `[dabblerSessionSets] ${manifestPath} has no "modules:" list \u2014 falling back to the single implicit module.`
@@ -24037,7 +24039,7 @@ function manifestEntryExists(abs) {
   }
 }
 var INVALID_MANIFEST_MESSAGE = `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest (expected a YAML mapping with a "modules:" list). Fix the file by hand before using the module-aware flows.`;
-var MODULES_YAML_HEADER = `# docs/modules.yaml \u2014 the module manifest (Dabbler module-organized projects).
+var MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml \u2014 the module manifest (Dabbler module-organized projects).
 #
 # Each entry declares one module of this repo:
 #   slug:      machine identity (kebab-case). Session sets declare
@@ -24053,7 +24055,26 @@ var MODULES_YAML_HEADER = `# docs/modules.yaml \u2014 the module manifest (Dabbl
 # Explorer display order = this file's order. Session-set NAMES stay
 # globally unique across ALL modules \u2014 \`module\` is a grouping attribute,
 # never part of a set's identity.
-modules:
+`;
+var MODULES_YAML_HEADER = `${MODULES_YAML_HEADER_COMMENTS}modules:
+`;
+var MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
+# Example entries (copy below \`modules:\`, uncommented, to declare this
+# repo's modules \u2014 or leave the list empty for a single-module repo):
+#
+# - slug: payment-api
+#   title: "Payment API"
+#   codeRoots:
+#     - src/payment
+#   planPath: docs/modules/payment-api/project-plan.md
+# - slug: integration
+#   title: "Cross-Module Integration"
+#   codeRoots: []
+#   planPath: docs/modules/integration/project-plan.md
+#   touches:
+#     - payment-api
+
+modules: []
 `;
 function renderModuleManifestEntry(slug, title, planRelPath) {
   return `  - slug: ${slug}
@@ -24076,6 +24097,22 @@ Explorer. Session-set names stay globally unique across all modules; we
 recommend including \`${slug}\` in each set's name.
 `;
 }
+var EMPTY_MODULES_LINE_RE = /^([ \t]*)(["']?)modules\2:[ \t]*(?:\[[ \t]*\]|~|null|Null|NULL)?[ \t]*(#[^\r\n]*)?\r?$/gm;
+function replaceEmptyModulesList(text, entryBlock) {
+  const out = [];
+  for (const m of text.matchAll(EMPTY_MODULES_LINE_RE)) {
+    const indent = m[1];
+    const quote = m[2];
+    const comment = m[3] ? ` ${m[3]}` : "";
+    const after = text.slice(m.index + m[0].length);
+    const block = (entryBlock.endsWith("\n") ? entryBlock.slice(0, -1) : entryBlock).split("\n").map((line) => indent + line).join("\n");
+    out.push(
+      text.slice(0, m.index) + `${indent}${quote}modules${quote}:${comment}
+` + block + (after === "" ? "\n" : after)
+    );
+  }
+  return out;
+}
 function scaffoldNewModule(root, rawSlug, rawTitle) {
   const slug = (rawSlug ?? "").trim();
   const classified = classifyModulesManifest(root);
@@ -24093,13 +24130,30 @@ function scaffoldNewModule(root, rawSlug, rawTitle) {
   const title = (rawTitle ?? "").trim() || slug;
   const planRel = defaultModulePlanPath(slug);
   const entryBlock = renderModuleManifestEntry(slug, title, planRel);
-  let candidate;
+  let candidate = null;
   const manifestCreated = classified.kind === "absent";
   if (manifestCreated) {
     candidate = MODULES_YAML_HEADER + entryBlock;
   } else {
     const current = fs12.readFileSync(manifestAbs, "utf8");
-    candidate = (current.endsWith("\n") ? current : current + "\n") + entryBlock;
+    if (existing.length === 0) {
+      for (const replaced of replaceEmptyModulesList(current, entryBlock)) {
+        try {
+          assertAppendedManifestParses(
+            replaced,
+            slug,
+            existing.length + 1,
+            entryBlock
+          );
+          candidate = replaced;
+          break;
+        } catch {
+        }
+      }
+    }
+    if (candidate === null) {
+      candidate = (current.endsWith("\n") ? current : current + "\n") + entryBlock;
+    }
   }
   assertAppendedManifestParses(
     candidate,
@@ -24150,7 +24204,7 @@ ${entryBlock}`
   ).map((m) => typeof m.slug === "string" ? m.slug.trim() : "").filter((s) => s !== "");
   if (modules.length !== expectedCount || !slugs.includes(slug)) {
     return refuse(
-      'the appended entry did not land in the "modules:" list \u2014 the list is probably flow-style ([]) or not the last top-level key'
+      'the appended entry did not land in the "modules:" list \u2014 the list is probably flow-style, holds entries the manifest reader dropped, or is not the last top-level key'
     );
   }
 }

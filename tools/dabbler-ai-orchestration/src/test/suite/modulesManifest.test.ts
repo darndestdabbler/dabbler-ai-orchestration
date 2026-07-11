@@ -275,14 +275,78 @@ suite("Set 087 — readModulesManifest", () => {
     }
   });
 
-  test("manifest present but entries empty returns []", () => {
+  // Set 091 S1 (verdict amendment 3): BOTH empty-manifest shapes read as
+  // a valid empty manifest — flow-style `modules: []` and a bare
+  // `modules:` (YAML null) — silently (no config-error warning; the
+  // pre-091 code warned 'no "modules:" list' on the bare form).
+  test("valid-empty manifest: `modules: []` and bare `modules:` both return [] silently (Set 091 S1)", () => {
     const root = makeTmpDir();
+    const origWarn = console.warn;
+    const warnings: string[] = [];
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(" "));
+    };
     try {
       writeManifest(root, "modules: []\n");
       assert.deepStrictEqual(readModulesManifest(root), []);
+      writeManifest(root, "modules:\n");
+      assert.deepStrictEqual(readModulesManifest(root), []);
+      writeManifest(root, "# a comment the operator wrote\nmodules:\n");
+      assert.deepStrictEqual(readModulesManifest(root), []);
+      assert.deepStrictEqual(warnings, [], "a valid empty manifest never warns");
     } finally {
+      console.warn = origWarn;
       fs.rmSync(root, { recursive: true });
     }
+  });
+
+  // Routed architecture ruling (s1-empty-manifest-architecture.json),
+  // byte-stability mandate: the Explorer read path must treat a bare
+  // `modules:` manifest exactly like `modules: []` and (for rendering
+  // attribution) like no manifest at all — module and moduleOrder stay
+  // null on every set, so the rendered tree is unchanged.
+  test("bare `modules:` manifest: set attribution identical to `modules: []` and to no manifest (Set 091 S1)", () => {
+    const attribution = (manifest: string | null) => {
+      const root = makeTmpDir();
+      const origWarn = console.warn;
+      const warnings: string[] = [];
+      console.warn = (...args: unknown[]) => {
+        warnings.push(args.map(String).join(" "));
+      };
+      try {
+        if (manifest !== null) writeManifest(root, manifest);
+        writeSet(root, "001-unstamped");
+        writeSet(root, "002-stamped", { module: "billing" });
+        const byName = new Map(readSessionSets(root).map((s) => [s.name, s]));
+        return {
+          rows: ["001-unstamped", "002-stamped"].map((n) => ({
+            module: byName.get(n)!.module,
+            moduleTitle: byName.get(n)!.moduleTitle,
+            moduleOrder: byName.get(n)!.moduleOrder,
+          })),
+          unknownSlugWarns: warnings.filter((w) => w.includes("not a slug")).length,
+        };
+      } finally {
+        console.warn = origWarn;
+        fs.rmSync(root, { recursive: true });
+      }
+    };
+    const absent = attribution(null);
+    const emptyFlow = attribution("modules: []\n");
+    const emptyNull = attribution("modules:\n");
+    // Rendering attribution: identical across all three states.
+    assert.deepStrictEqual(emptyFlow.rows, absent.rows);
+    assert.deepStrictEqual(emptyNull.rows, absent.rows);
+    for (const row of absent.rows) {
+      assert.deepStrictEqual(row, { module: null, moduleTitle: null, moduleOrder: null });
+    }
+    // Diagnostic parity between the two LOADED empty forms: a stamped
+    // set's slug is undeclared in a loaded-but-empty manifest, so the
+    // per-set unknown-slug warning fires for both (and, by design, not
+    // for the truly absent manifest).
+    assert.strictEqual(absent.unknownSlugWarns, 0);
+    assert.strictEqual(emptyFlow.unknownSlugWarns, 1);
+    assert.strictEqual(emptyNull.unknownSlugWarns, 1);
   });
 });
 

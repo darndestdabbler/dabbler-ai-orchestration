@@ -10,6 +10,7 @@ import * as path from "path";
 import {
   INVALID_MANIFEST_MESSAGE,
   MODULES_YAML_HEADER,
+  MODULES_YAML_TEMPLATE,
   ModulePickItem,
   ModulePickUi,
   classifyModulesManifest,
@@ -19,6 +20,7 @@ import {
   pickModuleForAuthoring,
   renderModuleManifestEntry,
   renderModulePlanStub,
+  replaceEmptyModulesList,
   resolveModuleTarget,
   scaffoldNewModule,
   validateNewModuleSlug,
@@ -168,12 +170,232 @@ suite("moduleAuthoring — scaffoldNewModule (Set 087 S3)", () => {
     }
   });
 
-  test("flow-style `modules: []` refuses with the copyable entry block (parse-after-append guard)", () => {
+  // Set 091 S1 (verdict amendment 3): the empty→first-entry transition
+  // the guard previously refused. Both empty forms grow into a valid
+  // one-module manifest, format-preserving.
+  test("flow-style `modules: []` grows into the first block-style entry (Set 091 S1)", () => {
     const root = tmpRoot("mod-scaffold-flow-");
     try {
-      writeManifest(root, "modules: []\n");
+      writeManifest(root, "# operator header\nmodules: []\n");
+      const r = scaffoldNewModule(root, "clock", "Clock");
+      assert.strictEqual(r.manifestCreated, false);
+      const text = readManifestText(root);
+      assert.ok(text.startsWith("# operator header\nmodules:\n"), "header preserved, empty form replaced");
+      assert.ok(!text.includes("modules: []"), "the empty-list marker is gone");
+      const parsed = readModulesManifest(root)!;
+      assert.strictEqual(parsed.length, 1);
+      assert.strictEqual(parsed[0].slug, "clock");
+      assert.strictEqual(parsed[0].title, "Clock");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("bare `modules:` (YAML null) grows into the first block-style entry (Set 091 S1)", () => {
+    const root = tmpRoot("mod-scaffold-null-");
+    try {
+      writeManifest(root, "# operator header\nmodules:\n");
+      const r = scaffoldNewModule(root, "clock", "Clock");
+      assert.strictEqual(r.manifestCreated, false);
+      const text = readManifestText(root);
+      assert.ok(text.startsWith("# operator header\nmodules:\n  - slug: clock\n"));
+      assert.strictEqual(readModulesManifest(root)!.length, 1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // S1 verification R3 (Major): explicit YAML null spellings classify
+  // valid-empty at the reader, so the scaffold must grow them too —
+  // end to end for each spelling the YAML 1.2 core schema accepts.
+  test("explicit null spellings (`null` / `Null` / `NULL` / `~`) classify valid-empty AND grow (S1 verification R3)", () => {
+    for (const nullSpelling of ["null", "Null", "NULL", "~"]) {
+      const root = tmpRoot("mod-scaffold-nullword-");
+      try {
+        writeManifest(root, `modules: ${nullSpelling}\n`);
+        assert.deepStrictEqual(
+          classifyModulesManifest(root),
+          { kind: "present", entries: [] },
+          `classifies valid-empty: modules: ${nullSpelling}`,
+        );
+        const r = scaffoldNewModule(root, "clock", "Clock");
+        assert.strictEqual(r.manifestCreated, false);
+        const parsed = readModulesManifest(root)!;
+        assert.strictEqual(parsed.length, 1, `grows: modules: ${nullSpelling}`);
+        assert.strictEqual(parsed[0].slug, "clock");
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+    // A non-core casing parses as a STRING: invalid on both sides —
+    // classification refuses and the scaffold aborts loud.
+    const root = tmpRoot("mod-scaffold-nullstring-");
+    try {
+      writeManifest(root, "modules: nUll\n");
+      assert.deepStrictEqual(classifyModulesManifest(root), { kind: "invalid" });
+      assert.throws(() => scaffoldNewModule(root, "clock", "Clock"), /not a valid module manifest/);
+      assert.strictEqual(readManifestText(root), "modules: nUll\n", "refusal must not write");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // S1 R4 third-provider adjudication: quoted keys are the accepted
+  // cheap hardening — they classify valid-empty and grow end to end,
+  // quote style preserved. The remaining exotic serializations (e.g. a
+  // MULTILINE empty flow list) stay an adjudicated-minor residual: they
+  // classify valid-empty but the scaffold refuses LOUDLY without
+  // writing (the copyable-entry-block fallback), never corrupts.
+  test("quoted `modules` keys grow; a multiline empty flow list refuses loudly (S1 R4 adjudication)", () => {
+    for (const quoted of ['"modules": []\n', "'modules': ~\n"]) {
+      const root = tmpRoot("mod-scaffold-quoted-");
+      try {
+        writeManifest(root, quoted);
+        assert.deepStrictEqual(classifyModulesManifest(root), { kind: "present", entries: [] });
+        scaffoldNewModule(root, "clock", "Clock");
+        const parsed = readModulesManifest(root)!;
+        assert.strictEqual(parsed.length, 1, `grows: ${JSON.stringify(quoted)}`);
+        assert.ok(
+          readManifestText(root).startsWith(quoted[0]),
+          "quote style preserved",
+        );
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+    const root = tmpRoot("mod-scaffold-multiline-");
+    const multiline = "modules: [\n]\n";
+    try {
+      writeManifest(root, multiline);
+      assert.deepStrictEqual(classifyModulesManifest(root), { kind: "present", entries: [] });
       assert.throws(() => scaffoldNewModule(root, "clock", "Clock"), /by hand/);
-      assert.strictEqual(readManifestText(root), "modules: []\n", "refusal must not write");
+      assert.strictEqual(readManifestText(root), multiline, "refusal must not write");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("empty form with a trailing comment keeps the comment on the `modules:` line (Set 091 S1)", () => {
+    const root = tmpRoot("mod-scaffold-emptycomment-");
+    try {
+      writeManifest(root, "modules: []  # declare modules here\n");
+      scaffoldNewModule(root, "clock", "Clock");
+      const text = readManifestText(root);
+      assert.ok(
+        text.startsWith("modules: # declare modules here\n  - slug: clock\n"),
+        `comment survives the replacement: ${JSON.stringify(text.split("\n")[0])}`,
+      );
+      assert.strictEqual(readModulesManifest(root)!.length, 1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // S1 verification R1 (Major): YAML permits root-node indentation, so a
+  // root-indented empty manifest classifies valid-empty and must grow
+  // exactly like the column-0 forms — end to end through the scaffold.
+  test("root-INDENTED empty forms classify valid-empty AND grow into the first entry (S1 verification R1)", () => {
+    for (const empty of ["  modules: []\n", "  modules:\n"]) {
+      const root = tmpRoot("mod-scaffold-indented-");
+      try {
+        writeManifest(root, empty);
+        assert.deepStrictEqual(
+          classifyModulesManifest(root),
+          { kind: "present", entries: [] },
+          `classifies valid-empty: ${JSON.stringify(empty)}`,
+        );
+        const r = scaffoldNewModule(root, "clock", "Clock");
+        assert.strictEqual(r.manifestCreated, false);
+        const text = readManifestText(root);
+        assert.ok(
+          text.startsWith("  modules:\n    - slug: clock\n"),
+          `key keeps its indentation, entries nest under it: ${JSON.stringify(text.slice(0, 40))}`,
+        );
+        const parsed = readModulesManifest(root)!;
+        assert.strictEqual(parsed.length, 1);
+        assert.strictEqual(parsed[0].slug, "clock");
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  // S1 verification R2 (Major): an earlier NESTED `modules:` key under
+  // another mapping must not swallow the replacement — the appender
+  // validates each candidate line and grows the ROOT list.
+  test("nested `modules:` key earlier in the file: the ROOT empty list still grows (S1 verification R2)", () => {
+    for (const rootForm of ["modules: []\n", "modules:\n"]) {
+      const root = tmpRoot("mod-scaffold-nested-");
+      const text = `metadata:\n  modules: []\n${rootForm}`;
+      try {
+        writeManifest(root, text);
+        assert.deepStrictEqual(classifyModulesManifest(root), { kind: "present", entries: [] });
+        const r = scaffoldNewModule(root, "clock", "Clock");
+        assert.strictEqual(r.manifestCreated, false);
+        const grown = readManifestText(root);
+        assert.ok(
+          grown.startsWith("metadata:\n  modules: []\n"),
+          `nested key untouched: ${JSON.stringify(grown.slice(0, 40))}`,
+        );
+        assert.ok(grown.includes("modules:\n  - slug: clock\n"), "root list gained the entry");
+        const parsed = readModulesManifest(root)!;
+        assert.strictEqual(parsed.length, 1);
+        assert.strictEqual(parsed[0].slug, "clock");
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  test("empty form with no trailing newline still grows cleanly (Set 091 S1)", () => {
+    const root = tmpRoot("mod-scaffold-emptynoeol-");
+    try {
+      writeManifest(root, "modules: []"); // no trailing \n
+      scaffoldNewModule(root, "clock", "Clock");
+      assert.strictEqual(readModulesManifest(root)![0].slug, "clock");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Routed architecture ruling mandate 3: "classifies empty" is DISTINCT
+  // from "is textually replaceable". An all-dropped-entries manifest
+  // (entries the tolerant reader rejects) classifies present with zero
+  // entries, but the appender must REFUSE, never write.
+  test("all-dropped block-style entries: classifies zero entries but the appender refuses without writing", () => {
+    const root = tmpRoot("mod-scaffold-alldropped-");
+    const text = "modules:\n  - title: No Slug Here\n";
+    try {
+      writeManifest(root, text);
+      const classified = classifyModulesManifest(root);
+      assert.strictEqual(classified.kind, "present");
+      assert.strictEqual((classified as { entries: unknown[] }).entries.length, 0);
+      assert.throws(() => scaffoldNewModule(root, "clock", "Clock"), /by hand/);
+      assert.strictEqual(readManifestText(root), text, "refusal must not write");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("all-dropped flow-style entries refuse too (parse-after-append backstop)", () => {
+    const root = tmpRoot("mod-scaffold-alldroppedflow-");
+    const text = 'modules: [{ title: "no slug" }]\n';
+    try {
+      writeManifest(root, text);
+      assert.throws(() => scaffoldNewModule(root, "clock", "Clock"), /by hand/);
+      assert.strictEqual(readManifestText(root), text, "refusal must not write");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("POPULATED flow-style list still refuses with the copyable entry block", () => {
+    const root = tmpRoot("mod-scaffold-popflow-");
+    const text = "modules: [{ slug: greeter }]\n";
+    try {
+      writeManifest(root, text);
+      assert.throws(() => scaffoldNewModule(root, "clock", "Clock"), /by hand/);
+      assert.strictEqual(readManifestText(root), text, "refusal must not write");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -214,6 +436,122 @@ suite("moduleAuthoring — scaffoldNewModule (Set 087 S3)", () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  // Set 091 S1: the canonical always-present template (verdict amendment
+  // 3, gpt-5-4's adopted shape) — header comments + commented example
+  // entries + a valid empty `modules: []`.
+  test("MODULES_YAML_TEMPLATE shape: header comments + commented examples + `modules: []` (Set 091 S1)", () => {
+    assert.ok(
+      MODULES_YAML_TEMPLATE.startsWith("# docs/modules.yaml — the module manifest"),
+      "opens with the Set 087 header comments",
+    );
+    assert.ok(MODULES_YAML_TEMPLATE.includes("# - slug: payment-api"), "commented example entries present");
+    assert.ok(MODULES_YAML_TEMPLATE.includes("#   touches:"), "example covers the optional touches field");
+    assert.ok(MODULES_YAML_TEMPLATE.endsWith("\nmodules: []\n"), "ends with the valid empty list");
+    // Every non-empty line before the final key is a comment — the
+    // template must contain exactly one uncommented YAML key.
+    const uncommented = MODULES_YAML_TEMPLATE.split("\n").filter(
+      (l) => l.trim() !== "" && !l.startsWith("#"),
+    );
+    assert.deepStrictEqual(uncommented, ["modules: []"]);
+  });
+
+  test("template round-trip: classifies valid-empty AND the appender grows it into a one-module manifest (Set 091 S1)", () => {
+    const root = tmpRoot("mod-template-roundtrip-");
+    try {
+      writeManifest(root, MODULES_YAML_TEMPLATE);
+      // Classifies as a valid EMPTY manifest (present, zero entries)...
+      const classified = classifyModulesManifest(root);
+      assert.strictEqual(classified.kind, "present");
+      assert.deepStrictEqual((classified as { entries: unknown[] }).entries, []);
+      // ...and the appender extends it into a valid one-module manifest,
+      // preserving the header and example comments byte-for-byte.
+      const commentBlock = MODULES_YAML_TEMPLATE.slice(
+        0,
+        MODULES_YAML_TEMPLATE.lastIndexOf("modules: []"),
+      );
+      const r = scaffoldNewModule(root, "greeter", "Greeter Service");
+      assert.strictEqual(r.manifestCreated, false);
+      const text = readManifestText(root);
+      assert.ok(text.startsWith(commentBlock), "header + example comments survive verbatim");
+      const parsed = readModulesManifest(root)!;
+      assert.strictEqual(parsed.length, 1);
+      assert.strictEqual(parsed[0].slug, "greeter");
+      assert.strictEqual(parsed[0].planPath, "docs/modules/greeter/project-plan.md");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // The pure replacement helper (routed ruling Q3: textual line
+  // replacement; the guard selects among candidates — S1 verification R2).
+  test("replaceEmptyModulesList: one candidate per empty-form line (Set 091 S1)", () => {
+    const block = "  - slug: x\n";
+    // Both empty forms, with and without whitespace variants.
+    assert.deepStrictEqual(replaceEmptyModulesList("modules: []\n", block), ["modules:\n  - slug: x\n"]);
+    assert.deepStrictEqual(replaceEmptyModulesList("modules:\n", block), ["modules:\n  - slug: x\n"]);
+    assert.deepStrictEqual(replaceEmptyModulesList("modules: [ ]\n", block), ["modules:\n  - slug: x\n"]);
+    assert.deepStrictEqual(replaceEmptyModulesList("modules:   \n", block), ["modules:\n  - slug: x\n"]);
+    // Trailing comment preserved.
+    assert.deepStrictEqual(
+      replaceEmptyModulesList("modules: [] # keep me\n", block),
+      ["modules: # keep me\n  - slug: x\n"],
+    );
+    // Preceding/following lines survive verbatim.
+    assert.deepStrictEqual(
+      replaceEmptyModulesList("# header\nmodules: []\nowner: me\n", block),
+      ["# header\nmodules:\n  - slug: x\nowner: me\n"],
+    );
+    // S1 verification R1 (Major): YAML permits a root-indented mapping,
+    // so an indented empty form matches too — the key keeps its
+    // indentation and the entry block re-indents to nest under it.
+    assert.deepStrictEqual(
+      replaceEmptyModulesList("  modules: []\n", block),
+      ["  modules:\n    - slug: x\n"],
+    );
+    assert.deepStrictEqual(
+      replaceEmptyModulesList("  modules:\n", block),
+      ["  modules:\n    - slug: x\n"],
+    );
+    // S1 verification R3 (Major): every YAML null spelling the reader
+    // accepts is appendable too — the accepted and appendable domains
+    // must match. Other casings (e.g. `nUll`) parse as strings and stay
+    // non-matching (they classify invalid at the reader).
+    for (const nullSpelling of ["null", "Null", "NULL", "~"]) {
+      assert.deepStrictEqual(
+        replaceEmptyModulesList(`modules: ${nullSpelling}\n`, block),
+        ["modules:\n  - slug: x\n"],
+        `null spelling: ${nullSpelling}`,
+      );
+    }
+    assert.deepStrictEqual(replaceEmptyModulesList("modules: nUll\n", block), []);
+    // S1 R4 third-provider adjudication (cheap hardening): quoted keys
+    // match, quote style preserved; mismatched quotes never match.
+    assert.deepStrictEqual(
+      replaceEmptyModulesList('"modules": []\n', block),
+      ['"modules":\n  - slug: x\n'],
+    );
+    assert.deepStrictEqual(
+      replaceEmptyModulesList("'modules': ~\n", block),
+      ["'modules':\n  - slug: x\n"],
+    );
+    assert.deepStrictEqual(replaceEmptyModulesList("\"modules': []\n", block), []);
+    // S1 verification R2 (Major): a nested `modules:` key yields a
+    // candidate PER matching line, in file order — the caller's parse
+    // guard picks the one whose ROOT list gains the entry.
+    assert.deepStrictEqual(
+      replaceEmptyModulesList("metadata:\n  modules: []\nmodules: []\n", block),
+      [
+        "metadata:\n  modules:\n    - slug: x\nmodules: []\n",
+        "metadata:\n  modules: []\nmodules:\n  - slug: x\n",
+      ],
+    );
+    // Non-empty, commented, and non-key shapes never match.
+    assert.deepStrictEqual(replaceEmptyModulesList("modules: [a]\n", block), []);
+    assert.deepStrictEqual(replaceEmptyModulesList("# modules: []\n", block), []);
+    assert.deepStrictEqual(replaceEmptyModulesList("themodules: []\n", block), []);
+    assert.deepStrictEqual(replaceEmptyModulesList("", block), []);
   });
 
   test("renderModuleManifestEntry / renderModulePlanStub shapes", () => {
@@ -319,6 +657,46 @@ suite("moduleAuthoring — module-target resolution (Set 087 S3)", () => {
     }
   });
 
+  // Set 091 S1 classification matrix (verdict amendment 3): both empty
+  // forms classify as a VALID empty manifest; genuinely malformed shapes
+  // keep the fail-loud invalid classification.
+  test("classifyModulesManifest matrix: empty forms valid, malformed shapes invalid (Set 091 S1)", () => {
+    const root = tmpRoot("mod-classify-091-");
+    try {
+      for (const empty of [
+        "modules: []\n",
+        "modules:\n",
+        "# note\nmodules: [ ]  # empty\n",
+        "modules: null\n",
+        "modules: ~\n",
+      ]) {
+        writeManifest(root, empty);
+        assert.deepStrictEqual(
+          classifyModulesManifest(root),
+          { kind: "present", entries: [] },
+          `valid empty: ${JSON.stringify(empty)}`,
+        );
+      }
+      for (const invalid of [
+        "just a string\n",
+        "- a\n- sequence\n",
+        "somethingElse: true\n", // no modules key
+        "modules: not-a-list\n", // wrong-typed value
+        "modules: nUll\n", // non-core null casing parses as a string
+        "modules:\n  - slug: [unclosed\n\tmix", // broken YAML
+      ]) {
+        writeManifest(root, invalid);
+        assert.deepStrictEqual(
+          classifyModulesManifest(root),
+          { kind: "invalid" },
+          `still invalid: ${JSON.stringify(invalid)}`,
+        );
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("pickModuleForAuthoring: a PRESENT-but-invalid manifest errors and aborts — never the repo-level fallback (S3 verification R1)", async () => {
     const root = tmpRoot("mod-pick-invalid-");
     const log = { infos: [] as string[], picks: [] as ModulePickItem[][], errors: [] as string[] };
@@ -344,6 +722,28 @@ suite("moduleAuthoring — module-target resolution (Set 087 S3)", () => {
       assert.strictEqual(log.picks.length, 0);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 091 S1 (verdict amendment 3): a valid EMPTY manifest resolves
+  // exactly like an absent one — single pseudo-module, no QuickPick, no
+  // notice, no error. Every S3 authoring flow shares this picker, so
+  // this pins the empty-parity behavior for the plan prompt, plan
+  // import, and decomposition-prompt flows in one place.
+  test("pickModuleForAuthoring: valid-empty manifests (`modules: []` / bare `modules:` / template) → none, no UI (Set 091 S1)", async () => {
+    for (const empty of ["modules: []\n", "modules:\n", MODULES_YAML_TEMPLATE]) {
+      const root = tmpRoot("mod-pick-empty-");
+      const log = { infos: [] as string[], picks: [] as ModulePickItem[][], errors: [] as string[] };
+      try {
+        writeManifest(root, empty);
+        const out = await pickModuleForAuthoring(root, pickUi(log));
+        assert.deepStrictEqual(out, { kind: "none", entry: null }, JSON.stringify(empty.slice(0, 30)));
+        assert.strictEqual(log.infos.length, 0, "no auto-select notice");
+        assert.strictEqual(log.picks.length, 0, "no QuickPick");
+        assert.strictEqual(log.errors.length, 0, "no invalid-manifest error");
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
     }
   });
 
@@ -487,11 +887,30 @@ suite("runNewModuleFlow (Set 087 S3)", () => {
     const root = tmpRoot("mod-flow-refuse-");
     const log = freshFlowLog();
     try {
-      writeManifest(root, "modules: []\n"); // flow-style — the append guard refuses
+      // `modules:` not the last top-level key — the append guard refuses.
+      // (Set 091 S1 flipped the old `modules: []` fixture: empty forms
+      // now grow into their first entry instead of refusing.)
+      writeManifest(root, "modules:\n  - slug: greeter\nowner: someone\n");
       const ok = await runNewModuleFlow(flowUi(root, ["clock", "Clock"], log));
       assert.strictEqual(ok, false);
       assert.strictEqual(log.errors.length, 1);
       assert.ok(log.errors[0].includes("New module was not created"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 091 S1: the New Module flow over an empty manifest — the
+  // end-to-end path an operator hits on a template-scaffolded repo.
+  test("new-module flow grows an empty manifest (the template) into its first entry", async () => {
+    const root = tmpRoot("mod-flow-empty-");
+    const log = freshFlowLog();
+    try {
+      writeManifest(root, MODULES_YAML_TEMPLATE);
+      const ok = await runNewModuleFlow(flowUi(root, ["greeter", "Greeter"], log));
+      assert.strictEqual(ok, true);
+      assert.strictEqual(log.errors.length, 0);
+      assert.strictEqual(readModulesManifest(root)![0].slug, "greeter");
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

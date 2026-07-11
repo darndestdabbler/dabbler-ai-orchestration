@@ -819,6 +819,83 @@ suite("planImport — module-aware targeting (Set 087 S3)", () => {
     }
   });
 
+  // Set 091 S1 (verdict amendment 3): a valid EMPTY manifest —
+  // `modules: []` or a bare `modules:` — behaves exactly like an absent
+  // one: repo-level prompt/destination, no module notice, no QuickPick,
+  // no error. The pre-091 code aborted the bare form as invalid.
+  test("copyPlanningPrompt: valid-empty manifests behave exactly like no manifest (Set 091 S1)", async () => {
+    // The no-manifest baseline the empty forms must match byte-for-byte.
+    const baseline = freshLog();
+    const bareRoot = fs.mkdtempSync(path.join(os.tmpdir(), "gs-mod-empty-baseline-"));
+    try {
+      await copyPlanningPrompt(makeUi({ workspaceRoot: () => bareRoot }, baseline));
+    } finally {
+      fs.rmSync(bareRoot, { recursive: true, force: true });
+    }
+    assert.strictEqual(baseline.clipboard.length, 1);
+
+    for (const empty of ["modules: []\n", "modules:\n"]) {
+      const log = freshLog();
+      const root = moduleRoot("gs-mod-empty-prompt-", empty);
+      let quickPickShown = false;
+      try {
+        await copyPlanningPrompt(
+          makeUi(
+            {
+              workspaceRoot: () => root,
+              showQuickPick: async () => {
+                quickPickShown = true;
+                return undefined;
+              },
+            },
+            log,
+          ),
+        );
+        assert.strictEqual(log.clipboard.length, 1, JSON.stringify(empty));
+        assert.strictEqual(
+          log.clipboard[0],
+          baseline.clipboard[0],
+          "byte-identical to the no-manifest prompt",
+        );
+        assert.strictEqual(log.infos.length, 1, "only the copied confirmation — no auto-select notice");
+        assert.strictEqual(log.errors.length, 0);
+        assert.strictEqual(quickPickShown, false);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
+  test("importPlanFromFile: a valid-empty manifest imports to the repo-level plan (Set 091 S1)", async () => {
+    for (const empty of ["modules: []\n", "modules:\n"]) {
+      const log = freshLog();
+      const root = moduleRoot("gs-mod-empty-import-", empty);
+      const src = path.join(os.tmpdir(), `gs-mod-empty-src-${process.pid}.md`);
+      fs.writeFileSync(src, "# plan\nEMPTY_MANIFEST_MARKER\n");
+      try {
+        const ok = await importPlanFromFile(
+          makeUi(
+            {
+              workspaceRoot: () => root,
+              showOpenDialog: (async () => [
+                { fsPath: src },
+              ]) as unknown as PlanImportUi["showOpenDialog"],
+            },
+            log,
+          ),
+        );
+        assert.strictEqual(ok, true, JSON.stringify(empty));
+        const dest = path.join(root, "docs", "planning", "project-plan.md");
+        assert.ok(fs.existsSync(dest), "repo-level destination, exactly like no manifest");
+        assert.ok(fs.readFileSync(dest, "utf8").includes("EMPTY_MANIFEST_MARKER"));
+        assert.strictEqual(log.errors.length, 0);
+      } finally {
+        fs.rmSync(src, { force: true });
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
+
   test("copyPlanningPrompt: a PRESENT-but-invalid manifest errors and copies NOTHING (S3 verification R1)", async () => {
     const log = freshLog();
     const root = moduleRoot("gs-mod-invalid-prompt-", "just a string, not a manifest\n");

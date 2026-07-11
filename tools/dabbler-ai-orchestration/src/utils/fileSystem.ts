@@ -462,7 +462,11 @@ export function parsePrerequisites(
  * exactly today's flat view. Returns the entries in FILE ORDER (which is
  * the Explorer's module display order) otherwise; an empty array means
  * "manifest present but no usable entries" and behaves like the implicit
- * module downstream.
+ * module downstream. Set 091 S1 (verdict amendment 3): a bare
+ * ``modules:`` key (YAML null) is a VALID empty manifest — it reads as
+ * ``[]`` exactly like a flow-style ``modules: []``, silently; only a
+ * missing ``modules`` key or a wrong-typed value keeps the warn+degrade
+ * path.
  *
  * Tolerant read, mirroring `parseSessionSetConfig` / `parsePrerequisites`
  * posture: entries missing a ``slug`` are dropped; a duplicate ``slug``
@@ -526,6 +530,9 @@ export function readModulesManifest(root: string): ModuleManifestEntry[] | null 
     return null;
   }
   const rawModules = (doc as Record<string, unknown>).modules;
+  // Set 091 S1 (verdict amendment 3): a bare `modules:` parses as null
+  // and is a valid EMPTY manifest, not a config error — no warning.
+  if (rawModules === null) return [];
   if (!Array.isArray(rawModules)) {
     console.warn(
       `[dabblerSessionSets] ${manifestPath} has no "modules:" list — ` +

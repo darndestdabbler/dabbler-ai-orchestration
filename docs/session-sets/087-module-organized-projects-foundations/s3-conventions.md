@@ -160,6 +160,21 @@ precedent — so gemini-pro ruled; auto-verified VERIFIED by gpt-5-4-mini):
   and an end-to-end import with `planPath: ../escaped.md` asserting the
   file lands at the in-workspace default and NOTHING is written outside
   the root); unit suite 1350 → 1353.
+- R3 (Major, Correctness) "workspace containment is bypassable through
+  repository-planted symlinks (lexical path.relative does not resolve
+  them)": **DEFERRED by operator adjudication (2026-07-10)** — past the
+  2-round automatic cap the loop suspended to the human per the
+  constitution; the orchestrator disputed MATERIALITY (not technical
+  correctness): VS Code Workspace Trust is the operative boundary (the
+  attacker must already control the workspace the operator deliberately
+  opened), the honest-mistake class is closed by the R2 fix, and the
+  prescribed realpath/symlink/atomic-rename hardening is additive
+  complexity on a convenience scaffold (operator simplicity-first
+  directive) that telegraphs a TOCTOU follow-on goalpost. The operator —
+  the final authority — chose DEFER AS RESIDUAL; recorded in
+  `disposition.deferred` as a candidate for set 088's
+  hardening/enforcement scope. A deferred-by-adjudication finding is
+  settled — do not re-raise it under fresh wording.
 
 ## Layer-3 / CI evidence of record
 - This session's code commit `66ed06d` runs the full CI matrix (Python

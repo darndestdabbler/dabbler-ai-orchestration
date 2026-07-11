@@ -1,0 +1,16 @@
+ISSUES FOUND
+
+- **Issue 1: Workspace containment is bypassable through symlinks**
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Location:** `src/wizard/planImport.ts` → destination containment check; `src/utils/moduleAuthoring.ts` → `scaffoldNewModule()`
+  - **Details:**
+    - **Violation:** The work claims imported plans “NEVER write outside the workspace” and that the containment backstop protects every filesystem write. The implementation only performs lexical containment with `path.resolve()` and `path.relative()`; neither resolves filesystem symlinks.
+    - **Impact:** A repository-controlled symlink can cause the extension to overwrite files outside the workspace. For example, if `docs/modules/greeter` is a symlink to an external directory, importing the default greeter plan passes the containment check but `fs.copyFileSync()` follows the symlink and writes externally. Similarly, `docs/modules.yaml` or `docs/modules` can be symlinked outside before `scaffoldNewModule()` writes the manifest or plan stub. This filesystem-safety defect should block merge.
+    - **Evidence:** `planImport.ts` checks `path.relative(path.resolve(root), path.resolve(destPath))`, which remains `docs/modules/greeter/project-plan.md` regardless of where an intermediate symlink points. It then calls `fs.mkdirSync()`/`fs.copyFileSync()` on that path. `scaffoldNewModule()` performs no realpath or symlink containment check before `fs.writeFileSync(planAbs, ...)` and `fs.writeFileSync(manifestAbs, ...)`. The tests cover `..` and absolute paths but no symlink escape.
+    - **Fix:** Resolve the workspace and nearest existing destination ancestor with `fs.realpathSync`, require the resolved destination parent to remain under the resolved workspace, and reject existing symlink components/final targets before writes. Prefer writing to a verified in-workspace temporary file and atomically renaming it over the destination. Add real-filesystem tests for symlinked plan directories and a symlinked `docs/modules.yaml`, asserting no external file is created or modified.
+
+## NITS
+
+- **Nit:** The UAT checklist repeatedly identifies the exact button label as `New module...`, while `gettingStartedHtml.js` renders `New module…` with a Unicode ellipsis.
+- **Nit:** The checklist says tests pin exact validation and hover strings, but the shown tests generally assert only nonempty/substring presence rather than complete literal equality.

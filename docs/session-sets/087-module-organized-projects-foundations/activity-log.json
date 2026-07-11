@@ -387,6 +387,22 @@
       "dateTime": "2026-07-10T20:09:56.013553-04:00",
       "description": "CI run 29131667184 on ff63f4d (the R1 remediation commit) completed fully green: Playwright Layer 3 on all three OSes, Python tests on all three OSes, drift guards, preload ceiling, template snapshot. Every code commit in this session now has its own fully green CI run (66ed06d -> 29131125452; ff63f4d -> 29131667184). ff63f4d supersedes as the Layer-3 evidence of record.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "session-003/r2-remediation-and-ci",
+      "dateTime": "2026-07-10T20:27:30.313584-04:00",
+      "description": "Verification round 2 (gpt-5-6, \\.29): ISSUES_FOUND, 1 fresh Major (Correctness/filesystem-safety) - a manifest-controlled planPath (e.g. ../outside.md) could steer importPlanFromFile fs.copyFileSync outside the workspace. Fixed two-layer: modulePlanRelPath validates via isSafeRepoRelativePath (absolute/drive/UNC/traversal/empty-segment rejected; unsafe degrades to the in-workspace default with console.warn) + importPlanFromFile refuses any resolved destination escaping path.relative(root,dest) before any fs access. 3 new tests incl. an end-to-end escape attempt; unit suite 1350 -> 1353; VSIX rebuilt. Fix commit 36238f4; CI run 29132313651 fully green (supersedes as Layer-3 evidence of record). Raw artifacts: s3-verification-round-2.md + s3-issues-round-2.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 13,
+      "stepKey": "session-003/r3-adjudication",
+      "dateTime": "2026-07-10T20:30:46.878254-04:00",
+      "description": "Verification round 3 (gpt-5-6, \\.23): ISSUES_FOUND, 1 FRESH Major - lexical containment is bypassable via repository-planted symlinks (symlinked docs/modules/<slug>/ or docs/modules.yaml could route scaffold/import writes outside the workspace). Past the 2-round automatic cap the loop suspended to the human per the constitution. Orchestrator disputed MATERIALITY (not technical correctness): VS Code Workspace Trust is the operative boundary - the attacker must already control the workspace the operator deliberately opened; the honest-mistake class (typo/traversal planPath) is closed by the R2 fix; the prescribed hardening (realpath ancestor walks, symlink rejection, atomic rename) is additive complexity on a convenience scaffold and telegraphs a TOCTOU follow-on goalpost; Windows git does not materialize symlinks by default. OPERATOR ADJUDICATED (2026-07-10): DEFER AS RESIDUAL - recorded in disposition.deferred as a candidate for set 088 hardening/enforcement scope. Raw artifacts: s3-verification-round-3.md + s3-issues-round-3.json (immutable).",
+      "status": "complete"
     }
   ]
 }

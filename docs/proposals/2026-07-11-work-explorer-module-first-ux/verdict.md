@@ -1,8 +1,16 @@
 # Verdict — Work Explorer module-first UX panel
 
-> **Status:** SYNTHESIS — pending operator confirmation (the panel is
-> generate-diverse → adversarial cross-critique → synthesize →
-> operator-confirm; never a vote).
+> **Status:** OPERATOR-CONFIRMED 2026-07-11 — this verdict is the design
+> of record for the Work Explorer module-first UX. Confirmed decisions:
+> all four convergent amendments accepted; adjudication A = ensure-write
+> on EXPLICIT USER ACTION ONLY (never on activation); adjudication B =
+> the DE-EMPHASIZED WRAPPER (one dialect always; the sole `Default`
+> pseudo-module renders as an auto-expanded, visually muted header row);
+> the four-set decomposition A–D with a SINGLE release boundary is
+> approved (088 re-attaches after Set A, 089 after A+C; 087 S4 + the S3
+> UAT re-cut land after Set D).
+> (Panel shape: generate-diverse → adversarial cross-critique →
+> synthesize → operator-confirm; never a vote.)
 > **Panel:** gemini-3-1-pro (`consensus-gemini-3-1-pro.md`) and gpt-5-4
 > (`consensus-gpt-5-4.md`), routed independently 2026-07-11, neither saw
 > the other's review. Raw critiques are immutable.

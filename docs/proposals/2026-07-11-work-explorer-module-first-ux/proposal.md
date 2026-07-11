@@ -1,6 +1,6 @@
 ---
 title: Work Explorer module-first UX (Getting Started shrink + always-present modules.yaml)
-status: DRAFT — pending two-provider adversarial critique + operator verdict
+status: PROPOSAL OF RECORD — panel run 2026-07-11; verdict.md operator-confirmed same day (amendments supersede the sketch where they conflict)
 date: 2026-07-11
 authors: operator (design sketch) + Claude (claude-fable-5, analysis & drafting)
 applies-to: dabbler-ai-orchestration VS Code extension (Session Set Explorer, Getting Started form, consumer scaffold)

@@ -34,16 +34,16 @@
     {
       "number": 3,
       "title": "Session 3",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-10T18:32:37.218379-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-10T20:33:04.987591-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
         "model": "claude-fable-5",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "ISSUES_FOUND"
     },
     {
       "number": 4,

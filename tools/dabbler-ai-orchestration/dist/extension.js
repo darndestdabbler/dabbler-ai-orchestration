@@ -16985,6 +16985,277 @@ function readAllSessionSets() {
 // src/providers/SessionSetsModel.ts
 var vscode2 = __toESM(require("vscode"));
 
+// src/utils/moduleAuthoring.ts
+var fs6 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
+var YAML2 = __toESM(require_dist());
+var MODULES_MANIFEST_DISPLAY = MODULES_MANIFEST_REL.replace(/\\/g, "/");
+var MODULE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+function validateNewModuleSlug(raw, existingSlugs) {
+  const slug = (raw ?? "").trim();
+  if (slug === "") {
+    return "Enter a module slug (kebab-case, e.g. greeter).";
+  }
+  if (!MODULE_SLUG_RE.test(slug)) {
+    return 'Module slugs are kebab-case: lowercase letters and digits, joined by single hyphens (e.g. "greeter", "payment-api").';
+  }
+  if (existingSlugs.includes(slug)) {
+    return `Module "${slug}" already exists in ${MODULES_MANIFEST_DISPLAY}.`;
+  }
+  return null;
+}
+function defaultModulePlanPath(slug) {
+  return `docs/modules/${slug}/project-plan.md`;
+}
+function classifyModulesManifest(root) {
+  const entries = readModulesManifest(root);
+  if (entries !== null)
+    return { kind: "present", entries };
+  return manifestEntryExists(path7.join(root, MODULES_MANIFEST_REL)) ? { kind: "invalid" } : { kind: "absent" };
+}
+function manifestEntryExists(abs) {
+  try {
+    fs6.lstatSync(abs);
+    return true;
+  } catch {
+    return false;
+  }
+}
+var INVALID_MANIFEST_MESSAGE = `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest (expected a YAML mapping with a "modules:" list). Fix the file by hand before using the module-aware flows.`;
+var MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml \u2014 the module manifest (Dabbler module-organized projects).
+#
+# Each entry declares one module of this repo:
+#   slug:      machine identity (kebab-case). Session sets declare
+#              \`module: <slug>\` in their spec.md configuration block and the
+#              Session Set Explorer groups them under this module.
+#   title:     the display name the Explorer shows for the group.
+#   codeRoots: the code paths this module owns ([] for an integration
+#              module that only composes other modules).
+#   planPath:  the module's project plan (decomposed into session sets).
+#   touches:   optional \u2014 the modules an integration module is sanctioned
+#              to work across; owners of every touched module review its PRs.
+#
+# Explorer display order = this file's order. Session-set NAMES stay
+# globally unique across ALL modules \u2014 \`module\` is a grouping attribute,
+# never part of a set's identity.
+`;
+var MODULES_YAML_HEADER = `${MODULES_YAML_HEADER_COMMENTS}modules:
+`;
+var MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
+# Example entries (copy below \`modules:\`, uncommented, to declare this
+# repo's modules \u2014 or leave the list empty for a single-module repo):
+#
+# - slug: payment-api
+#   title: "Payment API"
+#   codeRoots:
+#     - src/payment
+#   planPath: docs/modules/payment-api/project-plan.md
+# - slug: integration
+#   title: "Cross-Module Integration"
+#   codeRoots: []
+#   planPath: docs/modules/integration/project-plan.md
+#   touches:
+#     - payment-api
+
+modules: []
+`;
+function renderModuleManifestEntry(slug, title, planRelPath) {
+  return `  - slug: ${slug}
+    title: ${JSON.stringify(title)}
+    codeRoots: []                # TODO: the code paths this module owns, e.g. [src/${slug}]
+    planPath: ${planRelPath}
+`;
+}
+function renderModulePlanStub(slug, title) {
+  return `# ${title} \u2014 module project plan
+
+> Module: \`${slug}\` (declared in \`docs/modules.yaml\`)
+> Owner: TODO \u2014 name the developer(s) who own this module.
+
+TODO: describe this module's goals, phases, and key deliverables. When the
+plan is ready, decompose it into session sets: run "Dabbler: Generate
+Session-Set Prompt" and pick this module \u2014 each generated set is stamped
+\`module: ${slug}\` and grouped under this module in the Session Set
+Explorer. Session-set names stay globally unique across all modules; we
+recommend including \`${slug}\` in each set's name.
+`;
+}
+var EMPTY_MODULES_LINE_RE = /^([ \t]*)(["']?)modules\2:[ \t]*(?:\[[ \t]*\]|~|null|Null|NULL)?[ \t]*(#[^\r\n]*)?\r?$/gm;
+function replaceEmptyModulesList(text, entryBlock) {
+  const out = [];
+  for (const m of text.matchAll(EMPTY_MODULES_LINE_RE)) {
+    const indent = m[1];
+    const quote = m[2];
+    const comment = m[3] ? ` ${m[3]}` : "";
+    const after = text.slice(m.index + m[0].length);
+    const block = (entryBlock.endsWith("\n") ? entryBlock.slice(0, -1) : entryBlock).split("\n").map((line) => indent + line).join("\n");
+    out.push(
+      text.slice(0, m.index) + `${indent}${quote}modules${quote}:${comment}
+` + block + (after === "" ? "\n" : after)
+    );
+  }
+  return out;
+}
+function scaffoldNewModule(root, rawSlug, rawTitle) {
+  const slug = (rawSlug ?? "").trim();
+  const classified = classifyModulesManifest(root);
+  const existing = classified.kind === "present" ? classified.entries : [];
+  const slugError = validateNewModuleSlug(
+    slug,
+    existing.map((e) => e.slug)
+  );
+  if (slugError)
+    throw new Error(slugError);
+  const manifestAbs = path7.join(root, MODULES_MANIFEST_REL);
+  if (classified.kind === "invalid") {
+    throw new Error(INVALID_MANIFEST_MESSAGE);
+  }
+  const title = (rawTitle ?? "").trim() || slug;
+  const planRel = defaultModulePlanPath(slug);
+  const entryBlock = renderModuleManifestEntry(slug, title, planRel);
+  let candidate = null;
+  const manifestCreated = classified.kind === "absent";
+  if (manifestCreated) {
+    candidate = MODULES_YAML_HEADER + entryBlock;
+  } else {
+    const current = fs6.readFileSync(manifestAbs, "utf8");
+    if (existing.length === 0) {
+      for (const replaced of replaceEmptyModulesList(current, entryBlock)) {
+        try {
+          assertAppendedManifestParses(
+            replaced,
+            slug,
+            existing.length + 1,
+            entryBlock
+          );
+          candidate = replaced;
+          break;
+        } catch {
+        }
+      }
+    }
+    if (candidate === null) {
+      candidate = (current.endsWith("\n") ? current : current + "\n") + entryBlock;
+    }
+  }
+  assertAppendedManifestParses(
+    candidate,
+    slug,
+    existing.length + 1,
+    entryBlock
+  );
+  const planAbs = path7.join(root, ...planRel.split("/"));
+  let planCreated = false;
+  if (!fs6.existsSync(planAbs)) {
+    fs6.mkdirSync(path7.dirname(planAbs), { recursive: true });
+    fs6.writeFileSync(planAbs, renderModulePlanStub(slug, title), {
+      encoding: "utf8"
+    });
+    planCreated = true;
+  }
+  fs6.writeFileSync(manifestAbs, candidate, { encoding: "utf8" });
+  return {
+    manifestRel: MODULES_MANIFEST_DISPLAY,
+    planRel,
+    manifestCreated,
+    planCreated
+  };
+}
+function assertAppendedManifestParses(candidate, slug, expectedCount, entryBlock) {
+  const refuse = (why) => {
+    throw new Error(
+      `Could not append the module entry to ${MODULES_MANIFEST_DISPLAY} automatically (${why}). Add this entry to the "modules:" list by hand:
+${entryBlock}`
+    );
+  };
+  let doc;
+  try {
+    doc = YAML2.parse(candidate);
+  } catch {
+    return refuse(
+      'appending requires the "modules:" block list to be the last top-level key'
+    );
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return refuse("the result is not a YAML mapping");
+  }
+  const modules = doc.modules;
+  if (!Array.isArray(modules))
+    return refuse('no "modules:" list survived');
+  const slugs = modules.filter(
+    (m) => m !== null && typeof m === "object" && !Array.isArray(m)
+  ).map((m) => typeof m.slug === "string" ? m.slug.trim() : "").filter((s) => s !== "");
+  if (modules.length !== expectedCount || !slugs.includes(slug)) {
+    return refuse(
+      'the appended entry did not land in the "modules:" list \u2014 the list is probably flow-style, holds entries the manifest reader dropped, or is not the last top-level key'
+    );
+  }
+}
+function resolveModuleTarget(entries) {
+  if (!entries || entries.length === 0)
+    return { kind: "none" };
+  if (entries.length === 1)
+    return { kind: "auto", entry: entries[0] };
+  return { kind: "pick", entries };
+}
+function isSafeRepoRelativePath(p2) {
+  if (p2 === "")
+    return false;
+  if (p2.startsWith("/"))
+    return false;
+  if (/^[A-Za-z]:/.test(p2))
+    return false;
+  return p2.split("/").every((seg) => seg !== ".." && seg !== "");
+}
+function resolveModulePlanRelPath(entry) {
+  const fallback = defaultModulePlanPath(entry.slug);
+  const raw = entry.planPath && entry.planPath.trim() !== "" ? entry.planPath.trim().replace(/\\/g, "/") : "";
+  if (raw === "")
+    return { path: fallback, degraded: false };
+  if (!isSafeRepoRelativePath(raw))
+    return { path: fallback, degraded: true };
+  return { path: raw, degraded: false };
+}
+function modulePlanRelPath(entry) {
+  const resolved = resolveModulePlanRelPath(entry);
+  if (resolved.degraded) {
+    console.warn(
+      `[dabblerSessionSets] module "${entry.slug}" declares planPath ${JSON.stringify(entry.planPath)}, which is not a safe repo-relative path \u2014 using the default ${resolved.path} instead.`
+    );
+  }
+  return resolved.path;
+}
+async function pickModuleForAuthoring(root, ui) {
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return { kind: "invalid-manifest", entry: null };
+  }
+  const target = resolveModuleTarget(
+    classified.kind === "present" ? classified.entries : null
+  );
+  if (target.kind === "none")
+    return { kind: "none", entry: null };
+  if (target.kind === "auto") {
+    ui.showInformationMessage(
+      `Using module "${target.entry.title}" (${target.entry.slug}) \u2014 the only module in ${MODULES_MANIFEST_DISPLAY}.`
+    );
+    return { kind: "picked", entry: target.entry };
+  }
+  const picked = await ui.showQuickPick(
+    target.entries.map((e) => ({
+      label: e.title,
+      description: e.slug,
+      detail: `plan: ${modulePlanRelPath(e)}`,
+      entry: e
+    })),
+    { placeHolder: "Which module is this for?", ignoreFocusOut: true }
+  );
+  if (!picked)
+    return { kind: "cancelled", entry: null };
+  return { kind: "picked", entry: picked.entry };
+}
+
 // src/providers/inProgressSetsService.ts
 function listInProgressSets(all) {
   const sets = all ?? readAllSessionSets();
@@ -17377,40 +17648,40 @@ function prune(state, visibleSlugs) {
 }
 
 // src/utils/gettingStartedDetection.ts
-var fs6 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var fs7 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
 var ENGINE_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"];
-var PROJECT_PLAN_REL = path7.join("docs", "planning", "project-plan.md");
-var SESSION_SETS_REL2 = path7.join("docs", "session-sets");
+var PROJECT_PLAN_REL = path8.join("docs", "planning", "project-plan.md");
+var SESSION_SETS_REL2 = path8.join("docs", "session-sets");
 var NNN_DIR_RE = /^\d{3,}-/;
 function routerInstalled(root, fsi) {
-  const venvDir = path7.join(root, ".venv");
+  const venvDir = path8.join(root, ".venv");
   if (!fsi.isDirectory(venvDir))
     return false;
   const siteCandidates = [
     // Windows venv
-    path7.join(venvDir, "Lib", "site-packages")
+    path8.join(venvDir, "Lib", "site-packages")
   ];
-  const libDir = path7.join(venvDir, "lib");
+  const libDir = path8.join(venvDir, "lib");
   if (fsi.isDirectory(libDir)) {
     for (const entry of fsi.readdir(libDir)) {
-      siteCandidates.push(path7.join(libDir, entry, "site-packages"));
+      siteCandidates.push(path8.join(libDir, entry, "site-packages"));
     }
   }
-  return siteCandidates.some((sp) => fsi.isDirectory(path7.join(sp, "ai_router")));
+  return siteCandidates.some((sp) => fsi.isDirectory(path8.join(sp, "ai_router")));
 }
 function fileExists(p2, fsi) {
   return fsi.exists(p2) && !fsi.isDirectory(p2);
 }
 function engineFilesPresent(root, fsi) {
-  return ENGINE_FILES.every((f) => fileExists(path7.join(root, f), fsi));
+  return ENGINE_FILES.every((f) => fileExists(path8.join(root, f), fsi));
 }
 function sessionSetsPresent(root, fsi) {
-  const dir = path7.join(root, SESSION_SETS_REL2);
+  const dir = path8.join(root, SESSION_SETS_REL2);
   if (!fsi.isDirectory(dir))
     return false;
   return fsi.readdir(dir).some(
-    (name) => NNN_DIR_RE.test(name) && fsi.isDirectory(path7.join(dir, name))
+    (name) => NNN_DIR_RE.test(name) && fsi.isDirectory(path8.join(dir, name))
   );
 }
 function detectCompletion(root, fsi) {
@@ -17418,7 +17689,7 @@ function detectCompletion(root, fsi) {
     structureBuilt: routerInstalled(root, fsi) && engineFilesPresent(root, fsi),
     // A directory named project-plan.md must NOT satisfy step 2 (S1
     // verifier Issue 2) — require a regular file.
-    planPresent: fileExists(path7.join(root, PROJECT_PLAN_REL), fsi),
+    planPresent: fileExists(path8.join(root, PROJECT_PLAN_REL), fsi),
     sessionSetsPresent: sessionSetsPresent(root, fsi)
   };
 }
@@ -17462,21 +17733,21 @@ function computeGettingStarted(hasFolder, root, hasAnySets, fsi, env8 = {}, reso
 var nodeDetectionFs = {
   exists(p2) {
     try {
-      return fs6.existsSync(p2);
+      return fs7.existsSync(p2);
     } catch {
       return false;
     }
   },
   isDirectory(p2) {
     try {
-      return fs6.statSync(p2).isDirectory();
+      return fs7.statSync(p2).isDirectory();
     } catch {
       return false;
     }
   },
   readdir(p2) {
     try {
-      return fs6.readdirSync(p2);
+      return fs7.readdirSync(p2);
     } catch {
       return [];
     }
@@ -17484,24 +17755,24 @@ var nodeDetectionFs = {
 };
 
 // src/utils/pythonInterpreter.ts
-var fs7 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
+var fs8 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
 var vscode3 = __toESM(require("vscode"));
 var realExists = (p2) => {
   try {
-    return fs7.statSync(p2).isFile();
+    return fs8.statSync(p2).isFile();
   } catch {
     return false;
   }
 };
 function venvInterpreterCandidate(workspaceRoot2) {
-  return process.platform === "win32" ? path8.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path8.join(workspaceRoot2, ".venv", "bin", "python");
+  return process.platform === "win32" ? path9.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path9.join(workspaceRoot2, ".venv", "bin", "python");
 }
 function detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2 = realExists) {
   if (!workspaceRoot2)
     return null;
-  const venvRoot = path8.join(workspaceRoot2, ".venv");
-  if (!fileExists2(path8.join(venvRoot, "pyvenv.cfg")))
+  const venvRoot = path9.join(workspaceRoot2, ".venv");
+  if (!fileExists2(path9.join(venvRoot, "pyvenv.cfg")))
     return null;
   const interp = venvInterpreterCandidate(workspaceRoot2);
   return fileExists2(interp) ? interp : null;
@@ -17515,10 +17786,10 @@ function explicitPythonPathSetting() {
   return trimmed2 === "" ? void 0 : trimmed2;
 }
 function normalizeExplicit(value, workspaceRoot2) {
-  if (path8.isAbsolute(value))
+  if (path9.isAbsolute(value))
     return value;
-  if (value.includes(path8.sep) || value.includes("/")) {
-    return path8.resolve(workspaceRoot2, value);
+  if (value.includes(path9.sep) || value.includes("/")) {
+    return path9.resolve(workspaceRoot2, value);
   }
   return value;
 }
@@ -17537,7 +17808,7 @@ function findCommandOnPath(cmd, env8 = process.env, fileExists2 = realExists, pl
   if (!rawPath)
     return null;
   const isWin = platform === "win32";
-  const p2 = isWin ? path8.win32 : path8.posix;
+  const p2 = isWin ? path9.win32 : path9.posix;
   const delimiter = isWin ? ";" : ":";
   for (const dir of rawPath.split(delimiter)) {
     const entry = dir.trim();
@@ -17554,7 +17825,7 @@ function findCommandOnPath(cmd, env8 = process.env, fileExists2 = realExists, pl
   return null;
 }
 function resolveBootstrapPythonCore(explicitSetting, workspaceRoot2, env8 = process.env, fileExists2 = realExists, platform = process.platform) {
-  const p2 = platform === "win32" ? path8.win32 : path8.posix;
+  const p2 = platform === "win32" ? path9.win32 : path9.posix;
   if (explicitSetting) {
     const normalized = normalizeExplicit(explicitSetting, workspaceRoot2);
     if (p2.isAbsolute(normalized)) {
@@ -17601,11 +17872,11 @@ function probePythonPresenceCore(explicitSetting, workspaceRoot2, env8 = process
 function interpreterResolves(pythonPath, env8 = process.env, fileExists2 = realExists, platform = process.platform) {
   if (!pythonPath)
     return false;
-  const p2 = platform === "win32" ? path8.win32 : path8.posix;
+  const p2 = platform === "win32" ? path9.win32 : path9.posix;
   if (p2.isAbsolute(pythonPath))
     return fileExists2(pythonPath);
   if (pythonPath.includes("\\") || pythonPath.includes("/")) {
-    return fileExists2(path8.resolve(pythonPath));
+    return fileExists2(path9.resolve(pythonPath));
   }
   return findCommandOnPath(pythonPath, env8, fileExists2, platform) !== null;
 }
@@ -17622,13 +17893,13 @@ function describeMissingPython(actionLabel) {
 }
 
 // src/utils/copilotCli.ts
-var fs8 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
+var fs9 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
 var vscode4 = __toESM(require("vscode"));
 var COPILOT_CLI_COMMAND = "copilot";
 var realExists2 = (p2) => {
   try {
-    return fs8.statSync(p2).isFile();
+    return fs9.statSync(p2).isFile();
   } catch {
     return false;
   }
@@ -17642,7 +17913,7 @@ function explicitCopilotCliPathSetting() {
   return trimmed2 === "" ? void 0 : trimmed2;
 }
 function probeCopilotCliPresenceCore(explicitSetting, workspaceRoot2, env8 = process.env, fileExists2, platform = process.platform) {
-  const p2 = platform === "win32" ? path9.win32 : path9.posix;
+  const p2 = platform === "win32" ? path10.win32 : path10.posix;
   if (explicitSetting) {
     if (p2.isAbsolute(explicitSetting))
       return fileExists2(explicitSetting);
@@ -17665,7 +17936,7 @@ function probeCopilotCliPresence(workspaceRoot2, fileExists2 = realExists2) {
 function resolveCopilotCliBinaryCore(explicitSetting, workspaceRoot2, platform = process.platform) {
   if (!explicitSetting)
     return void 0;
-  const p2 = platform === "win32" ? path9.win32 : path9.posix;
+  const p2 = platform === "win32" ? path10.win32 : path10.posix;
   if (p2.isAbsolute(explicitSetting))
     return explicitSetting;
   if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
@@ -17683,9 +17954,9 @@ function resolveCopilotCliBinary(workspaceRoot2) {
 
 // src/utils/copilotSeatSetup.ts
 var crypto = __toESM(require("crypto"));
-var fs9 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
-var CATALOG_LOCKFILE_REL = path10.posix.join(
+var fs10 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
+var CATALOG_LOCKFILE_REL = path11.posix.join(
   "ai_router",
   "copilot-catalog.lock"
 );
@@ -17695,7 +17966,7 @@ function deriveSeatId(hostname2, username) {
   return `seat-${digest.slice(0, 12)}`;
 }
 function deriveSeatLabel(projectDir) {
-  const base = path10.basename(projectDir);
+  const base = path11.basename(projectDir);
   return base === "" ? "workspace" : base;
 }
 function buildRefreshArgs(seatId, seatLabel, explicitBinary) {
@@ -17791,17 +18062,17 @@ function renderTransportProfile(configText, profile) {
 var nodeSeedReadOps = {
   exists(p2) {
     try {
-      return fs9.existsSync(p2);
+      return fs10.existsSync(p2);
     } catch {
       return false;
     }
   },
   readFile(p2) {
-    return fs9.readFileSync(p2, "utf8");
+    return fs10.readFileSync(p2, "utf8");
   }
 };
 function readTransportProfile(root, ops = nodeSeedReadOps) {
-  const abs = path10.join(root, ROUTER_CONFIG_REL);
+  const abs = path11.join(root, ROUTER_CONFIG_REL);
   if (!ops.exists(abs))
     return null;
   let text;
@@ -17817,7 +18088,7 @@ function readTransportProfile(root, ops = nodeSeedReadOps) {
 }
 var DEFAULT_KILL_SETTLE_TIMEOUT_MS = 1e4;
 function runCatalogRefresh(deps) {
-  const lockfileAbs = path10.join(deps.projectDir, CATALOG_LOCKFILE_REL);
+  const lockfileAbs = path11.join(deps.projectDir, CATALOG_LOCKFILE_REL);
   const existedBefore = deps.fileOps.exists(lockfileAbs);
   let priorContent = null;
   if (existedBefore) {
@@ -18066,7 +18337,7 @@ async function performCopilotSeatSetup(deps) {
       if (distinct.length < 2) {
         return { kind: "insufficient-providers", ...base };
       }
-      const configAbs = path10.join(deps.projectDir, ROUTER_CONFIG_REL);
+      const configAbs = path11.join(deps.projectDir, ROUTER_CONFIG_REL);
       if (!deps.fileOps.exists(configAbs)) {
         return {
           kind: "config-write-failed",
@@ -18108,7 +18379,7 @@ var vscode10 = __toESM(require("vscode"));
 var vscode6 = __toESM(require("vscode"));
 var cp3 = __toESM(require("child_process"));
 var os2 = __toESM(require("os"));
-var path14 = __toESM(require("path"));
+var path15 = __toESM(require("path"));
 
 // node_modules/simple-git/dist/esm/index.js
 var import_file_exists = __toESM(require_dist2(), 1);
@@ -23074,9 +23345,9 @@ var esm_default = gitInstanceFactory;
 
 // src/commands/installAiRouterCommands.ts
 var cp2 = __toESM(require("child_process"));
-var fs10 = __toESM(require("fs"));
+var fs11 = __toESM(require("fs"));
 var os = __toESM(require("os"));
-var path11 = __toESM(require("path"));
+var path12 = __toESM(require("path"));
 var vscode5 = __toESM(require("vscode"));
 
 // src/utils/utf8ChunkDecoder.ts
@@ -23134,8 +23405,8 @@ async function runInstallFlow(mode) {
     return;
   }
   vscode5.window.showInformationMessage(outcome.message);
-  const routerConfig = path11.join(root, ROUTER_CONFIG_REL);
-  if (fs10.existsSync(routerConfig)) {
+  const routerConfig = path12.join(root, ROUTER_CONFIG_REL);
+  if (fs11.existsSync(routerConfig)) {
     try {
       const doc = await vscode5.workspace.openTextDocument(routerConfig);
       await vscode5.window.showTextDocument(doc, { preview: false });
@@ -23205,8 +23476,8 @@ function makeSpawner() {
 }
 function makeFileOps() {
   return {
-    exists: (p2) => fs10.existsSync(p2),
-    readFile: (p2) => fs10.readFileSync(p2, "utf8"),
+    exists: (p2) => fs11.existsSync(p2),
+    readFile: (p2) => fs11.readFileSync(p2, "utf8"),
     // Always ensure the parent directory exists before writing. The
     // GitHub-fallback flow can momentarily leave the destination
     // ai_router/ directory missing (between `removeRecursive(dst)` and
@@ -23216,34 +23487,34 @@ function makeFileOps() {
     // cost of dropping it is silent data loss in a narrow but real
     // failure window. Round-3 verifier catch.
     writeFile: (p2, content) => {
-      fs10.mkdirSync(path11.dirname(p2), { recursive: true });
-      fs10.writeFileSync(p2, content, "utf8");
+      fs11.mkdirSync(path12.dirname(p2), { recursive: true });
+      fs11.writeFileSync(p2, content, "utf8");
     },
-    mkdirp: (p2) => fs10.mkdirSync(p2, { recursive: true }),
+    mkdirp: (p2) => fs11.mkdirSync(p2, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),
     removeRecursive: (p2) => {
-      if (fs10.existsSync(p2))
-        fs10.rmSync(p2, { recursive: true, force: true });
+      if (fs11.existsSync(p2))
+        fs11.rmSync(p2, { recursive: true, force: true });
     },
-    mkdtemp: (prefix) => fs10.mkdtempSync(path11.join(os.tmpdir(), prefix)),
+    mkdtemp: (prefix) => fs11.mkdtempSync(path12.join(os.tmpdir(), prefix)),
     // Set 079 S3: same-directory atomic replace for the seat-setup config
     // write (fs.rename replaces an existing destination file on both NTFS
     // and POSIX filesystems).
-    rename: (oldP, newP) => fs10.renameSync(oldP, newP)
+    rename: (oldP, newP) => fs11.renameSync(oldP, newP)
   };
 }
 function copyDirSync(src, dst) {
-  fs10.mkdirSync(dst, { recursive: true });
-  for (const entry of fs10.readdirSync(src, { withFileTypes: true })) {
-    const s = path11.join(src, entry.name);
-    const d = path11.join(dst, entry.name);
+  fs11.mkdirSync(dst, { recursive: true });
+  for (const entry of fs11.readdirSync(src, { withFileTypes: true })) {
+    const s = path12.join(src, entry.name);
+    const d = path12.join(dst, entry.name);
     if (entry.isDirectory()) {
       copyDirSync(s, d);
     } else if (entry.isSymbolicLink()) {
-      const target = fs10.readlinkSync(s);
-      fs10.symlinkSync(target, d);
+      const target = fs11.readlinkSync(s);
+      fs11.symlinkSync(target, d);
     } else {
-      fs10.copyFileSync(s, d);
+      fs11.copyFileSync(s, d);
     }
   }
 }
@@ -23292,8 +23563,8 @@ function makePrompts() {
 }
 
 // src/utils/consumerBootstrap.ts
-var fs11 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
+var fs12 = __toESM(require("fs"));
+var path13 = __toESM(require("path"));
 var DEFAULT_VERIFICATION_MODE = "out-of-band-or-none";
 var BUNDLE_FILES = {
   specTemplate: "spec.md.template",
@@ -23313,10 +23584,10 @@ var BUNDLE_FILES = {
 };
 var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
 function resolveBundledTemplateDir(extensionPath) {
-  return path12.join(extensionPath, "dist", "templates", "consumer-bootstrap");
+  return path13.join(extensionPath, "dist", "templates", "consumer-bootstrap");
 }
 function loadTemplateBundle(bundleDir) {
-  const read = (name) => fs11.readFileSync(path12.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
+  const read = (name) => fs12.readFileSync(path13.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
   return {
     specTemplate: read(BUNDLE_FILES.specTemplate),
     sessionStateTemplate: read(BUNDLE_FILES.sessionStateTemplate),
@@ -23452,18 +23723,18 @@ function renderStartHere(bundle, ctx) {
   return substituteTokens(bundle.startHereTemplate, ctx);
 }
 function specRelPath(ctx) {
-  return path12.posix.join("docs", "session-sets", ctx.slug, "spec.md");
+  return path13.posix.join("docs", "session-sets", ctx.slug, "spec.md");
 }
 function sessionStateRelPath(ctx) {
-  return path12.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
+  return path13.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
 }
-var START_HERE_REL_PATH = path12.posix.join("docs", "dabbler", "start-here.md");
-var GETTING_STARTED_REL_PATH = path12.posix.join(
+var START_HERE_REL_PATH = path13.posix.join("docs", "dabbler", "start-here.md");
+var GETTING_STARTED_REL_PATH = path13.posix.join(
   "docs",
   "dabbler",
   "getting-started.md"
 );
-var CROSS_PROVIDER_VERIFICATION_REL_PATH = path12.posix.join(
+var CROSS_PROVIDER_VERIFICATION_REL_PATH = path13.posix.join(
   "docs",
   "dabbler",
   "cross-provider-verification.md"
@@ -23471,11 +23742,11 @@ var CROSS_PROVIDER_VERIFICATION_REL_PATH = path12.posix.join(
 function renderCrossProviderVerification(bundle, ctx) {
   return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
 }
-var LESSONS_LEARNED_REL_PATH = path12.posix.join("docs", "planning", "lessons-learned.md");
-var PROJECT_GUIDANCE_REL_PATH = path12.posix.join("docs", "planning", "project-guidance.md");
-var LESSONS_ARCHIVE_REL_PATH = path12.posix.join("docs", "planning", "lessons-archive.md");
-var CODEOWNERS_REL_PATH = path12.posix.join(".github", "CODEOWNERS");
-var MONOREPO_CI_REL_PATH = path12.posix.join(
+var LESSONS_LEARNED_REL_PATH = path13.posix.join("docs", "planning", "lessons-learned.md");
+var PROJECT_GUIDANCE_REL_PATH = path13.posix.join("docs", "planning", "project-guidance.md");
+var LESSONS_ARCHIVE_REL_PATH = path13.posix.join("docs", "planning", "lessons-archive.md");
+var CODEOWNERS_REL_PATH = path13.posix.join(".github", "CODEOWNERS");
+var MONOREPO_CI_REL_PATH = path13.posix.join(
   ".github",
   "workflows",
   "monorepo-ci.yml"
@@ -23572,8 +23843,8 @@ function structureOnlyContext(repoName, tier, created, verificationMode = DEFAUL
 }
 
 // src/utils/budgetYaml.ts
-var path13 = __toESM(require("path"));
-var BUDGET_YAML_REL = path13.join("ai_router", "budget.yaml");
+var path14 = __toESM(require("path"));
+var BUDGET_YAML_REL = path14.join("ai_router", "budget.yaml");
 function deriveBudgetMode(thresholdUsd) {
   if (thresholdUsd === 0)
     return "zero-budget";
@@ -23620,7 +23891,7 @@ function writeBudgetYaml(projectDir, budget, fileOps, now = /* @__PURE__ */ new 
   const method = resolveVerificationMethod(budget.thresholdUsd, budget.zeroMethod);
   if (!method)
     return { outcome: "skipped-unresolved", relPath };
-  const abs = path13.join(projectDir, relPath);
+  const abs = path14.join(projectDir, relPath);
   if (fileOps.exists(abs))
     return { outcome: "skipped-exists", relPath };
   fileOps.writeFile(
@@ -23642,7 +23913,7 @@ async function scaffoldConsumerRepo(deps) {
   const written = [];
   const skipped = [];
   for (const [rel, content] of Object.entries(files)) {
-    const abs = path14.join(deps.projectDir, rel);
+    const abs = path15.join(deps.projectDir, rel);
     if (deps.fileOps.exists(abs)) {
       skipped.push(rel);
       continue;
@@ -23663,7 +23934,7 @@ async function scaffoldConsumerRepo(deps) {
   const install = await deps.installRouter();
   let routerConfigRemoved = false;
   if (deps.ctx.tier === "lightweight") {
-    const cfg = path14.join(deps.projectDir, ROUTER_CONFIG_REL);
+    const cfg = path15.join(deps.projectDir, ROUTER_CONFIG_REL);
     if (deps.fileOps.exists(cfg)) {
       deps.fileOps.removeRecursive(cfg);
       routerConfigRemoved = true;
@@ -23797,7 +24068,7 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
     return void 0;
   }
   const ctx = structureOnlyContext(
-    path14.basename(projectDir),
+    path15.basename(projectDir),
     tier,
     isoDate(),
     verificationMode
@@ -24001,274 +24272,6 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
 var vscode7 = __toESM(require("vscode"));
 var fs13 = __toESM(require("fs"));
 var path16 = __toESM(require("path"));
-
-// src/utils/moduleAuthoring.ts
-var fs12 = __toESM(require("fs"));
-var path15 = __toESM(require("path"));
-var YAML2 = __toESM(require_dist());
-var MODULES_MANIFEST_DISPLAY = MODULES_MANIFEST_REL.replace(/\\/g, "/");
-var MODULE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-function validateNewModuleSlug(raw, existingSlugs) {
-  const slug = (raw ?? "").trim();
-  if (slug === "") {
-    return "Enter a module slug (kebab-case, e.g. greeter).";
-  }
-  if (!MODULE_SLUG_RE.test(slug)) {
-    return 'Module slugs are kebab-case: lowercase letters and digits, joined by single hyphens (e.g. "greeter", "payment-api").';
-  }
-  if (existingSlugs.includes(slug)) {
-    return `Module "${slug}" already exists in ${MODULES_MANIFEST_DISPLAY}.`;
-  }
-  return null;
-}
-function defaultModulePlanPath(slug) {
-  return `docs/modules/${slug}/project-plan.md`;
-}
-function classifyModulesManifest(root) {
-  const entries = readModulesManifest(root);
-  if (entries !== null)
-    return { kind: "present", entries };
-  return manifestEntryExists(path15.join(root, MODULES_MANIFEST_REL)) ? { kind: "invalid" } : { kind: "absent" };
-}
-function manifestEntryExists(abs) {
-  try {
-    fs12.lstatSync(abs);
-    return true;
-  } catch {
-    return false;
-  }
-}
-var INVALID_MANIFEST_MESSAGE = `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest (expected a YAML mapping with a "modules:" list). Fix the file by hand before using the module-aware flows.`;
-var MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml \u2014 the module manifest (Dabbler module-organized projects).
-#
-# Each entry declares one module of this repo:
-#   slug:      machine identity (kebab-case). Session sets declare
-#              \`module: <slug>\` in their spec.md configuration block and the
-#              Session Set Explorer groups them under this module.
-#   title:     the display name the Explorer shows for the group.
-#   codeRoots: the code paths this module owns ([] for an integration
-#              module that only composes other modules).
-#   planPath:  the module's project plan (decomposed into session sets).
-#   touches:   optional \u2014 the modules an integration module is sanctioned
-#              to work across; owners of every touched module review its PRs.
-#
-# Explorer display order = this file's order. Session-set NAMES stay
-# globally unique across ALL modules \u2014 \`module\` is a grouping attribute,
-# never part of a set's identity.
-`;
-var MODULES_YAML_HEADER = `${MODULES_YAML_HEADER_COMMENTS}modules:
-`;
-var MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
-# Example entries (copy below \`modules:\`, uncommented, to declare this
-# repo's modules \u2014 or leave the list empty for a single-module repo):
-#
-# - slug: payment-api
-#   title: "Payment API"
-#   codeRoots:
-#     - src/payment
-#   planPath: docs/modules/payment-api/project-plan.md
-# - slug: integration
-#   title: "Cross-Module Integration"
-#   codeRoots: []
-#   planPath: docs/modules/integration/project-plan.md
-#   touches:
-#     - payment-api
-
-modules: []
-`;
-function renderModuleManifestEntry(slug, title, planRelPath) {
-  return `  - slug: ${slug}
-    title: ${JSON.stringify(title)}
-    codeRoots: []                # TODO: the code paths this module owns, e.g. [src/${slug}]
-    planPath: ${planRelPath}
-`;
-}
-function renderModulePlanStub(slug, title) {
-  return `# ${title} \u2014 module project plan
-
-> Module: \`${slug}\` (declared in \`docs/modules.yaml\`)
-> Owner: TODO \u2014 name the developer(s) who own this module.
-
-TODO: describe this module's goals, phases, and key deliverables. When the
-plan is ready, decompose it into session sets: run "Dabbler: Generate
-Session-Set Prompt" and pick this module \u2014 each generated set is stamped
-\`module: ${slug}\` and grouped under this module in the Session Set
-Explorer. Session-set names stay globally unique across all modules; we
-recommend including \`${slug}\` in each set's name.
-`;
-}
-var EMPTY_MODULES_LINE_RE = /^([ \t]*)(["']?)modules\2:[ \t]*(?:\[[ \t]*\]|~|null|Null|NULL)?[ \t]*(#[^\r\n]*)?\r?$/gm;
-function replaceEmptyModulesList(text, entryBlock) {
-  const out = [];
-  for (const m of text.matchAll(EMPTY_MODULES_LINE_RE)) {
-    const indent = m[1];
-    const quote = m[2];
-    const comment = m[3] ? ` ${m[3]}` : "";
-    const after = text.slice(m.index + m[0].length);
-    const block = (entryBlock.endsWith("\n") ? entryBlock.slice(0, -1) : entryBlock).split("\n").map((line) => indent + line).join("\n");
-    out.push(
-      text.slice(0, m.index) + `${indent}${quote}modules${quote}:${comment}
-` + block + (after === "" ? "\n" : after)
-    );
-  }
-  return out;
-}
-function scaffoldNewModule(root, rawSlug, rawTitle) {
-  const slug = (rawSlug ?? "").trim();
-  const classified = classifyModulesManifest(root);
-  const existing = classified.kind === "present" ? classified.entries : [];
-  const slugError = validateNewModuleSlug(
-    slug,
-    existing.map((e) => e.slug)
-  );
-  if (slugError)
-    throw new Error(slugError);
-  const manifestAbs = path15.join(root, MODULES_MANIFEST_REL);
-  if (classified.kind === "invalid") {
-    throw new Error(INVALID_MANIFEST_MESSAGE);
-  }
-  const title = (rawTitle ?? "").trim() || slug;
-  const planRel = defaultModulePlanPath(slug);
-  const entryBlock = renderModuleManifestEntry(slug, title, planRel);
-  let candidate = null;
-  const manifestCreated = classified.kind === "absent";
-  if (manifestCreated) {
-    candidate = MODULES_YAML_HEADER + entryBlock;
-  } else {
-    const current = fs12.readFileSync(manifestAbs, "utf8");
-    if (existing.length === 0) {
-      for (const replaced of replaceEmptyModulesList(current, entryBlock)) {
-        try {
-          assertAppendedManifestParses(
-            replaced,
-            slug,
-            existing.length + 1,
-            entryBlock
-          );
-          candidate = replaced;
-          break;
-        } catch {
-        }
-      }
-    }
-    if (candidate === null) {
-      candidate = (current.endsWith("\n") ? current : current + "\n") + entryBlock;
-    }
-  }
-  assertAppendedManifestParses(
-    candidate,
-    slug,
-    existing.length + 1,
-    entryBlock
-  );
-  const planAbs = path15.join(root, ...planRel.split("/"));
-  let planCreated = false;
-  if (!fs12.existsSync(planAbs)) {
-    fs12.mkdirSync(path15.dirname(planAbs), { recursive: true });
-    fs12.writeFileSync(planAbs, renderModulePlanStub(slug, title), {
-      encoding: "utf8"
-    });
-    planCreated = true;
-  }
-  fs12.writeFileSync(manifestAbs, candidate, { encoding: "utf8" });
-  return {
-    manifestRel: MODULES_MANIFEST_DISPLAY,
-    planRel,
-    manifestCreated,
-    planCreated
-  };
-}
-function assertAppendedManifestParses(candidate, slug, expectedCount, entryBlock) {
-  const refuse = (why) => {
-    throw new Error(
-      `Could not append the module entry to ${MODULES_MANIFEST_DISPLAY} automatically (${why}). Add this entry to the "modules:" list by hand:
-${entryBlock}`
-    );
-  };
-  let doc;
-  try {
-    doc = YAML2.parse(candidate);
-  } catch {
-    return refuse(
-      'appending requires the "modules:" block list to be the last top-level key'
-    );
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return refuse("the result is not a YAML mapping");
-  }
-  const modules = doc.modules;
-  if (!Array.isArray(modules))
-    return refuse('no "modules:" list survived');
-  const slugs = modules.filter(
-    (m) => m !== null && typeof m === "object" && !Array.isArray(m)
-  ).map((m) => typeof m.slug === "string" ? m.slug.trim() : "").filter((s) => s !== "");
-  if (modules.length !== expectedCount || !slugs.includes(slug)) {
-    return refuse(
-      'the appended entry did not land in the "modules:" list \u2014 the list is probably flow-style, holds entries the manifest reader dropped, or is not the last top-level key'
-    );
-  }
-}
-function resolveModuleTarget(entries) {
-  if (!entries || entries.length === 0)
-    return { kind: "none" };
-  if (entries.length === 1)
-    return { kind: "auto", entry: entries[0] };
-  return { kind: "pick", entries };
-}
-function isSafeRepoRelativePath(p2) {
-  if (p2 === "")
-    return false;
-  if (p2.startsWith("/"))
-    return false;
-  if (/^[A-Za-z]:/.test(p2))
-    return false;
-  return p2.split("/").every((seg) => seg !== ".." && seg !== "");
-}
-function modulePlanRelPath(entry) {
-  const fallback = defaultModulePlanPath(entry.slug);
-  const raw = entry.planPath && entry.planPath.trim() !== "" ? entry.planPath.trim().replace(/\\/g, "/") : "";
-  if (raw === "")
-    return fallback;
-  if (!isSafeRepoRelativePath(raw)) {
-    console.warn(
-      `[dabblerSessionSets] module "${entry.slug}" declares planPath ${JSON.stringify(entry.planPath)}, which is not a safe repo-relative path \u2014 using the default ${fallback} instead.`
-    );
-    return fallback;
-  }
-  return raw;
-}
-async function pickModuleForAuthoring(root, ui) {
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
-    return { kind: "invalid-manifest", entry: null };
-  }
-  const target = resolveModuleTarget(
-    classified.kind === "present" ? classified.entries : null
-  );
-  if (target.kind === "none")
-    return { kind: "none", entry: null };
-  if (target.kind === "auto") {
-    ui.showInformationMessage(
-      `Using module "${target.entry.title}" (${target.entry.slug}) \u2014 the only module in ${MODULES_MANIFEST_DISPLAY}.`
-    );
-    return { kind: "picked", entry: target.entry };
-  }
-  const picked = await ui.showQuickPick(
-    target.entries.map((e) => ({
-      label: e.title,
-      description: e.slug,
-      detail: `plan: ${modulePlanRelPath(e)}`,
-      entry: e
-    })),
-    { placeHolder: "Which module is this for?", ignoreFocusOut: true }
-  );
-  if (!picked)
-    return { kind: "cancelled", entry: null };
-  return { kind: "picked", entry: picked.entry };
-}
-
-// src/wizard/planImport.ts
 var PLAN_DEST_POSIX = "docs/planning/project-plan.md";
 function buildPlanningPrompt(module2, destPosix) {
   const subject = module2 ? `the "${module2.title}" module (\`${module2.slug}\`) of my software project` : "my software project";

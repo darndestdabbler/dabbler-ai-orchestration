@@ -1,0 +1,13 @@
+{
+  "purpose": "Set 091 S2 routed architecture decision - visible-module computation signature/home (Q1), pseudo-module presence (Q2), Default/Unassigned mechanics (Q3), declared-but-empty modules (Q4), fallback-group semantics (Q5), never-persist guard test shape (Q6), legacy root-plan mapping mechanics (Q7)",
+  "taskType": "architecture",
+  "model": "gpt-5-4",
+  "modelId": "gpt-5.4",
+  "tier": 3,
+  "cost": 0.48503749999999995,
+  "truncated": true,
+  "escalated": false,
+  "content": "## Q1\n\n**Ruling:** Use **(a)**. Add a new pure export in `SessionSetsModel.ts`:\n\n`computeVisibleModules(classification, allSets, { legacyRootPlanExists })`\n\nThe legacy-root-plan existence check stays **outside** the function as a caller-supplied boolean. Do **not** collapse the manifest input to `entries | null` plus `manifestInvalid`, and do **not** move this into `fileSystem.ts`.\n\n**Rationale:** The absent vs present-empty vs invalid distinction is semantically meaningful in Q8. This is model interpretation, not filesystem work. A pure function is easy to test and keeps the current `groupByModule` / `buildModulePayloads` path byte-stable until Set 092.\n\n**Output shape:** use semantic values, not the current webview `\"\"` sentinels.\n\n- `kind: \"declared\" | \"fallback\" | \"pseudo\"`\n- `slug: string | null`\n  - declared: manifest slug\n  - fallback: exact raw `config.module`\n  - pseudo: `null`\n- `displayName: string`\n  - declared: manifest title\n  - fallback: raw slug\n  - pseudo: `\"Default\" | \"Unassigned\"`\n- `warning: VisibleModuleWarning | null`\n- `planPath: string | null`\n  - declared: manifest `planPath`\n  - fallback: `null`\n  - pseudo: legacy root-plan constant\n- `sets: readonly SessionSet[]`\n\nUse a **structured** warning, not prose, e.g.:\n\n- `{ code: \"manifest-missing\" }`\n- `{ code: \"manifest-invalid\" }`\n- `{ code: \"unstamped-sets\" }`\n- `{ code: \"undeclared-slug\"; rawSlug: string }`\n\n## Q2\n\n**Ruling:** Confirm the predicate, with one precision:\n\n`pseudo appears iff declaredEntryCount === 0",
+  "input_tokens": 2015,
+  "output_tokens": 32000
+}

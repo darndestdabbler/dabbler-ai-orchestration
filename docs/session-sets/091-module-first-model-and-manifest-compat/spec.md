@@ -100,13 +100,20 @@ the suite.
 1. Register (`start_session`); read this spec, the proposal, and the
    verdict (amendment 3 especially).
 2. `classifyModulesManifest` (`src/utils/moduleAuthoring.ts` /
-   `src/utils/fileSystem.ts`): introduce a **present-empty** outcome —
-   `modules: []` and bare `modules:` both classify as a valid empty
-   manifest. Genuinely malformed files keep the fail-loud
+   `src/utils/fileSystem.ts`): make the valid-empty manifest a legal
+   outcome — `modules: []` and bare `modules:` both classify as
+   `{ kind: "present", entries: [] }`. *(Amended at close per the S1
+   routed architecture ruling, `s1-empty-manifest-architecture.json`,
+   surfaced by the end-of-set path-aware critique: the classification
+   union gains **no** new `present-empty` member — valid-empty IS
+   `present` with zero entries; textual appendability stays the
+   appender's separate concern. This step originally read "introduce a
+   present-empty outcome", which contradicted the shipped contract.)*
+   Genuinely malformed files keep the fail-loud
    `INVALID_MANIFEST_MESSAGE` abort. Every Set 087 S3 authoring flow
    (`copyPlanningPrompt`, `importPlanFromFile`, `copySessionSetGenPrompt`,
-   `scaffoldNewModule`) treats present-empty exactly like absent: single
-   pseudo-module, no QuickPick, no `module:` stamp.
+   `scaffoldNewModule`) treats a valid-empty manifest exactly like
+   absent: single pseudo-module, no QuickPick, no `module:` stamp.
 3. Appender: the format-preserving append replaces EITHER empty form with
    the first block-style entry (the parse-after-append refusal guard stays;
    it must now pass on the empty→first-entry transition it previously
@@ -114,8 +121,9 @@ the suite.
 4. Author the canonical always-present template as an exported constant
    (or bundled template file): Set 087 header comments + commented-out
    example module entries + `modules: []`, per the verdict's adopted shape.
-   Round-trip test: the template classifies present-empty AND the appender
-   extends it into a valid one-module manifest.
+   Round-trip test: the template classifies as a valid empty manifest
+   (`present` with zero entries) AND the appender extends it into a
+   valid one-module manifest.
 5. Tests: classification matrix (absent / invalid / empty-flow /
    empty-null / populated) × (classify / append / each authoring-flow
    behavior); template round-trip; existing invalid-manifest abort paths

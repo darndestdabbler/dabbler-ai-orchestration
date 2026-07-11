@@ -1,7 +1,7 @@
 {
   "sessionSetName": "091-module-first-model-and-manifest-compat",
   "createdDate": "2026-07-11T13:15:00.735265+00:00",
-  "totalSessions": 0,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -99,6 +99,102 @@
       "stepKey": "close-out",
       "dateTime": "2026-07-11T10:10:40.206233-04:00",
       "description": "disposition.json authored (status completed, verdict VERIFIED preserved, next_orchestrator per routed analysis: claude-code/anthropic/claude-opus-4-8/medium, adjudication recorded, lessons cited L-064-8 L-064-9 L-065-1); ai-assignment actuals updated; commit + push + close_session + notification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register-and-read",
+      "dateTime": "2026-07-11T10:19:50.978236-04:00",
+      "description": "Registered session 2 (start_session, claude/anthropic/claude-fable-5); read spec, S1 disposition/ai-assignment, verdict amendment 2, the Q8 matrix in both consensus files, and the constitution preload; mapped the S2 seams (SessionSetsModel.groupByModule, fileSystem module attribution, the three writer paths for the never-persist audit).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "routed-architecture",
+      "dateTime": "2026-07-11T10:28:36.795992-04:00",
+      "description": "Routed the visible-module design cluster (task_type=architecture; anthropic 400 x3 -> excluded, S1 precedent). Round 1 (gpt-5-4, s2-visible-module-architecture.json) ruled Q1 (pure computeVisibleModules(classification, allSets, {legacyRootPlanExists}) in SessionSetsModel.ts; structured VisibleModule output with semantic warning codes) then truncated; continuation round (gemini-pro, s2-visible-module-architecture-2.json) ruled Q2-Q7. Synthesis note: the continuation's Q2 presence predicate (pseudo iff unstamped OR legacy plan) is AMENDED by the operator-confirmed Q8 matrix rows 'no manifest, no sets -> sole pseudo Default' / 'empty manifest, no sets -> sole pseudo' (the settled record outranks the advisory ruling): pseudo appears iff unstamped sets exist OR legacyRootPlanExists OR no other module group is visible. All other rulings adopted: fallback groups do not count as declared for presence but DO count as coexisting for Unassigned naming; declared-but-empty modules always visible; fallback groups alphabetical, after declared, before pseudo, displayName = raw slug; module: default with no declared default slug = fallback group, never merged; never-persist guard = pseudo-selection writes no module: key + declared literal default stamps module: default legitimately; legacy root-plan path is an exported constant always carried on the pseudo element.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "visible-module-computation",
+      "dateTime": "2026-07-11T10:39:12.572696-04:00",
+      "description": "computeVisibleModules exported from SessionSetsModel.ts (pure; classification + SessionSet[] + {legacyRootPlanExists} -> ordered VisibleModule[] with kind declared|fallback|pseudo, structured warning codes, planPath). Declared modules render in manifest order including zero-set entries; fallback groups one per undeclared raw stamp (alphabetical, undeclared-slug warning, never hidden); pseudo-module last, present iff unstamped sets OR legacy root plan OR otherwise-empty tree (Q8-amended predicate). Attribution re-derived from config.module against the classification so the function is total over its inputs. NOT consumed by any render path (Set 092).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "default-unassigned-naming",
+      "dateTime": "2026-07-11T10:39:12.572696-04:00",
+      "description": "Naming rule: PSEUDO_MODULE_SOLE_NAME 'Default' when the pseudo-module is the only visible group; PSEUDO_MODULE_COEXIST_NAME 'Unassigned' once any declared or fallback group coexists (routed ruling Q3: fallback groups count). A declared literal `default` slug renders as a normal declared module and forces Unassigned (pinned).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "never-persist-default-guard",
+      "dateTime": "2026-07-11T10:39:12.573375-04:00",
+      "description": "Writer audit + guard tests over all three module: writer paths (consumerBootstrap {{MODULE_LINE}}, sessionGenPrompt exemplar stamp, planImport prompt) plus scaffoldNewModule and pickModuleForAuthoring: pseudo-module resolution can never emit a module: line; only a picked manifest entry is ever stamped (declared literal `default` stamps legitimately); reader treats hand-written module: default with no declared default slug as an undeclared stamp -> fallback group, warning included, never merged into the pseudo-module (end-to-end from-disk test).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "legacy-root-plan-mapping",
+      "dateTime": "2026-07-11T10:39:12.574194-04:00",
+      "description": "LEGACY_ROOT_PLAN_REL = docs/planning/project-plan.md exported from moduleAuthoring.ts; always carried as the pseudo-module's planPath (existence is the consumer's separate check, ruling Q7); declared modules resolve through modulePlanRelPath; fallback groups carry null. Wizard modules' equal local literals deliberately untouched (byte-stability) - unification named as Set 093 work in the compat matrix.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "compat-matrix-authored",
+      "dateTime": "2026-07-11T10:39:12.574194-04:00",
+      "description": "docs/planning/work-explorer-compat-matrix.md authored: the nine verbatim Q8 rows + cross-cutting rows (legacy-plan visibility, declared-but-empty, literal-default, hand-written default, ordering, plan mappings, never-persist guard, byte-stability), each row citing its pinning test in visibleModules.test.ts by name; per-set consumption notes for 092/093/094 including the S1 adjudicated-minor residual handoff to 092 guardrails.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "verification-r1-remediation",
+      "dateTime": "2026-07-11T10:56:12.764724-04:00",
+      "description": "Round 1 (gpt-5-6): ISSUES_FOUND, 2 Major. (1) compat-matrix row 9 overstated pseudo-module presence for invalid manifests - row reworded to the standard presence rule + new pinning test 'Q8 invalid-manifest-all-stamped' (fallback groups only, no pseudo). (2) never-persist guard tests too weak - pseudo-path assertions strengthened to reject ANY module stamp/wording (not just 'module: default'); session-gen stamp uniqueness asserted; two provenance integration tests added coupling pickModuleForAuthoring to all three writers (absent manifest -> none -> zero module output everywhere; declared literal 'default' -> auto-picked entry -> exactly that slug stamped, operator-visible notice). Unit suite 1407 passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "verification-r2-remediation",
+      "dateTime": "2026-07-11T11:00:16.584029-04:00",
+      "description": "Round 2 (gpt-5-6): ISSUES_FOUND, 2 fresh Major (both matrix-contract gaps, distinct from R1's). (1) empty-manifest x stamped-set states undocumented - matrix rows 5a/5b added (all-stamped: fallback only, no manifest-missing; stamped+unstamped: fallback + pseudo Unassigned with unstamped-sets) with two named pinning tests. (2) legacy-plan cross-cutting row over-promised 'no warning' - reworded to the standard warning precedence (legacy plan keeps the pseudo VISIBLE but never masks manifest faults) + a three-classification pinning test (absent->manifest-missing, invalid->manifest-invalid, valid-empty->quiet). Unit suite 1410 passing. Ledger note: R1 and R2 findings are all fixed; nothing disputed, nothing resurrected.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "verification-r3-dispute-adjudicated",
+      "dateTime": "2026-07-11T11:05:01.554320-04:00",
+      "description": "Round 3 (gpt-5-6): 1 fresh Major - 'declared-default guard unproven for the plan-import writer' (demands a module: default frontmatter pin on buildPlanningPrompt / end-to-end inspection of generated spec.md). Second fresh same-class Major (guard completeness) -> DISPUTED per the S1 calibration note. Implementable kernel applied first: the plan prompt's full output surface pinned exactly (verbatim scoping note with the picked slug, exact planPath destination, negative no-module: assertion); 38 suite tests green. Third-provider adjudication (gemini-pro, s2-third-opinion-plan-import-stamp.json): ADJUDICATED-MINOR-RESIDUAL, finding dismissed as resolved - the premise misidentified the writer (plan prompts carry no spec frontmatter by design; the two frontmatter writers are already literal-pinned with provenance; the demanded e2e is not automatable in-repo). Proceeding to the confirming round.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "verification-r4-remediation",
+      "dateTime": "2026-07-11T11:09:20.883422-04:00",
+      "description": "Round 4 (gpt-5-6): 1 fresh Major, new class (purity) - computeVisibleModules called modulePlanRelPath, which console.warns on an unsafe declared planPath, so the promised pure model function had an observable side effect. Fixed by splitting the resolver: new pure resolveModulePlanRelPath (returns {path, degraded} - degradation is data, no logging) consumed by computeVisibleModules; modulePlanRelPath stays as the warning wrapper for the interactive flows. Two new tests: a console.warn spy proving the computation is side-effect-free on unsafe plan paths, and the resolver/wrapper split pin. Compat matrix 'Declared plan resolution' row updated. tsc clean; unit suite 1411 passing; dist rebuilt.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 13,
+      "stepKey": "verification-r5-nit-cleanup",
+      "dateTime": "2026-07-11T11:52:26.403527-04:00",
+      "description": "Round 5 returned VERIFIED with two nits: abbreviated compat-matrix test citations and mutable VisibleModule.sets type. Fixed both nits; focused Set 091 S2 unit suite 39 passing; npx tsc --noEmit clean. The VS Code-hosted grep run compiled cleanly but failed before executing tests because out/media/session-sets-tree/gettingStartedHtml.js was not copied into the test out tree.",
       "status": "complete"
     }
   ]

@@ -58,6 +58,21 @@ export function defaultModulePlanPath(slug: string): string {
 }
 
 /**
+ * Set 091 S2 (verdict amendment 2, legacy root-plan mapping): the
+ * repo-level project plan is the PSEUDO-module's plan — the default
+ * `planPath` for the module that holds unstamped sets — so the Set 093
+ * `Plan` node state and the Set 094 form semantics inherit one rule.
+ * Always carried on the pseudo-module's `VisibleModule` element; whether
+ * the file exists is the consumer's separate present/missing check
+ * (routed ruling Q7, s2-visible-module-architecture-2.json). The wizard
+ * flows (`planImport.ts`, `sessionGenPrompt.ts`) predate this constant
+ * and keep equal local literals; unifying them onto this export is Set
+ * 093's interaction-model work, not this set's (no behavior seam here —
+ * the strings are identical).
+ */
+export const LEGACY_ROOT_PLAN_REL = "docs/planning/project-plan.md";
+
+/**
  * S3 verification round 1 (Major): the authoring flows must distinguish a
  * truly ABSENT manifest (the designed repo-level fallback) from a PRESENT
  * but unusable one (a config error that must fail loud — silently
@@ -476,31 +491,48 @@ export function isSafeRepoRelativePath(p: string): boolean {
 }
 
 /**
- * A module's plan path (forward-slashed, repo-relative): the manifest's
- * explicit `planPath` when present AND safely repo-relative, the
- * canonical default otherwise. An unsafe manifest value (absolute,
- * drive-qualified, or traversal — S3 verification R2) degrades to the
- * default with a console.warn, mirroring the S1 tolerant-reader posture;
- * `importPlanFromFile` additionally refuses any resolved destination
- * outside the workspace before touching the filesystem (defense in
- * depth — e.g. a hostile `slug` composed into the default).
+ * PURE resolution of a module's plan path (forward-slashed,
+ * repo-relative): the manifest's explicit `planPath` when present AND
+ * safely repo-relative, the canonical default otherwise. `degraded`
+ * reports that an unsafe manifest value (absolute, drive-qualified, or
+ * traversal — S3 verification R2) was replaced by the default, so a
+ * boundary caller can surface the diagnostic. No side effects — Set 091
+ * S2 verification R4: `computeVisibleModules` is a pure model function
+ * and must not log; warning emission stays in {@link modulePlanRelPath},
+ * the interactive flows' wrapper.
  */
-export function modulePlanRelPath(entry: ModuleManifestEntry): string {
+export function resolveModulePlanRelPath(entry: ModuleManifestEntry): {
+  path: string;
+  degraded: boolean;
+} {
   const fallback = defaultModulePlanPath(entry.slug);
   const raw =
     entry.planPath && entry.planPath.trim() !== ""
       ? entry.planPath.trim().replace(/\\/g, "/")
       : "";
-  if (raw === "") return fallback;
-  if (!isSafeRepoRelativePath(raw)) {
+  if (raw === "") return { path: fallback, degraded: false };
+  if (!isSafeRepoRelativePath(raw)) return { path: fallback, degraded: true };
+  return { path: raw, degraded: false };
+}
+
+/**
+ * A module's plan path, with the unsafe-value degradation logged
+ * (mirroring the S1 tolerant-reader posture) — the wrapper the
+ * interactive authoring flows call. `importPlanFromFile` additionally
+ * refuses any resolved destination outside the workspace before touching
+ * the filesystem (defense in depth — e.g. a hostile `slug` composed into
+ * the default).
+ */
+export function modulePlanRelPath(entry: ModuleManifestEntry): string {
+  const resolved = resolveModulePlanRelPath(entry);
+  if (resolved.degraded) {
     console.warn(
       `[dabblerSessionSets] module "${entry.slug}" declares planPath ` +
         `${JSON.stringify(entry.planPath)}, which is not a safe ` +
-        `repo-relative path — using the default ${fallback} instead.`,
+        `repo-relative path — using the default ${resolved.path} instead.`,
     );
-    return fallback;
   }
-  return raw;
+  return resolved.path;
 }
 
 /** One QuickPick row of the module picker. */

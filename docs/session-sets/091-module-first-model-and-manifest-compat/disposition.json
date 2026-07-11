@@ -1,43 +1,45 @@
 {
   "status": "completed",
-  "summary": "Session 1: empty-manifest validity landed. Both modules: [] and bare modules: (plus every YAML 1.2 core null spelling and quoted keys) now read as a VALID empty manifest and behave exactly like an absent one across all four S3 authoring flows (no QuickPick, no module: stamp, no notice); the format-preserving appender grows an empty manifest into its first block-style entry via guard-validated textual line replacement (root-indented forms, trailing comments, and nested modules: keys handled); the canonical always-present modules.yaml template (Set 087 header comments + commented examples + modules: []) ships as MODULES_YAML_TEMPLATE, round-trip tested, with scaffold/ensure-write wiring deferred to Set 094; malformed manifests keep the fail-loud abort; rendering byte-stable (attribution pinned identical across absent/empty forms). Verification: 5 rounds — R1 root-indentation Major fixed, R2 nested-key Major fixed, R3 null-spelling Major fixed, R4 disputed and third-provider adjudicated (gemini-pro, s1-third-opinion-empty-forms.json) as adjudicated-minor residual with quoted-key hardening applied, R5 VERIFIED zero findings. Residual (adjudicated-minor, deferred to Set 092-094 manifest guardrails): exotic empty-list serializations (multiline flow lists, tags, anchors) classify valid-empty but refuse loudly with the copyable entry block, no write.",
+  "summary": "Session 2 (final): pseudo-module semantics, the visible-module computation, and the compat matrix landed; the set is complete with no rendering change. computeVisibleModules (SessionSetsModel.ts) is the pure, exported, ordered module list the Set 092 renderer will consume: declared modules in manifest order (including declared-but-empty ones for Set 093's persistent children), one warning-flagged fallback group per undeclared stamped slug (alphabetical, never hidden), then the pseudo-module holding unstamped sets. Presence rule (routed ruling Q2 amended by the operator-confirmed Q8 matrix, which outranks it): pseudo appears iff unstamped sets exist OR the legacy root plan exists OR no other group is visible. Naming: Default when sole, Unassigned once any declared/fallback group coexists (a declared literal default slug forces Unassigned). Never-persist guard pinned with provenance-coupled tests across all three writer paths (pseudo-module authoring emits no module: field; only a picked manifest entry is ever stamped; hand-written undeclared module: default reads as a fallback group). Legacy root-plan mapping: LEGACY_ROOT_PLAN_REL always carried on the pseudo element; declared plans resolve through the new pure resolveModulePlanRelPath (degradation as data; the interactive modulePlanRelPath wrapper keeps the console warning). docs/planning/work-explorer-compat-matrix.md authored with every row citing its pinning test by name. Rendering byte-stable (computeVisibleModules exported, unconsumed; suite pins host+client). Suite: unit 1411 / pytest 2922+6 skipped / Playwright 20, all green. Verification: 5 rounds (gpt-5-6) — R1+R2 fixed in flight (matrix row-9 predicate, guard strength, empty-manifest x stamped rows 5a/5b, legacy-plan warning precedence), R3 disputed per the S1 calibration note and third-provider adjudicated minor-residual/dismissed (plan prompts carry no spec frontmatter by design; exact-string kernel applied), R4 purity Major fixed via the resolver/wrapper split, R5 VERIFIED zero findings. Advisory path-aware critique ran before close; its spec-contract finding was fixed in the close commit without re-running the raw artifact. No release: single boundary after Set 094 (verdict). Pending operator follow-through: author the locator/scope-check re-attach set.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/providers/SessionSetsModel.ts",
     "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/moduleAuthoring.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/modulesManifest.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/visibleModules.test.ts",
     "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "docs/planning/work-explorer-compat-matrix.md",
     "docs/session-sets/091-module-first-model-and-manifest-compat/ai-assignment.md",
-    "docs/session-sets/091-module-first-model-and-manifest-compat/s1-empty-manifest-architecture.json",
-    "docs/session-sets/091-module-first-model-and-manifest-compat/s1-next-orchestrator-analysis.json",
-    "docs/session-sets/091-module-first-model-and-manifest-compat/s1-third-opinion-empty-forms.json"
+    "docs/session-sets/091-module-first-model-and-manifest-compat/change-log.md",
+    "docs/session-sets/091-module-first-model-and-manifest-compat/spec.md",
+    "docs/session-sets/091-module-first-model-and-manifest-compat/path-aware-critique.json",
+    "docs/session-sets/091-module-first-model-and-manifest-compat/s2-visible-module-architecture.json",
+    "docs/session-sets/091-module-first-model-and-manifest-compat/s2-visible-module-architecture-2.json",
+    "docs/session-sets/091-module-first-model-and-manifest-compat/s2-next-orchestrator-analysis.json",
+    "docs/session-sets/091-module-first-model-and-manifest-compat/s2-third-opinion-plan-import-stamp.json",
+    "docs/session-sets/091-module-first-model-and-manifest-compat/s2-verification-round-5.md"
   ],
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-opus-4-8",
-    "effort": "medium",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Routed analysis (s1-next-orchestrator-analysis.json, gemini-pro tier 2): S2's visible-module computation is multi-conditional model-layer logic and the compat matrix + armed advisory path-aware critique are synthesis tasks above a Sonnet-class seat; Opus-class at medium effort is the cheapest-capable step-down from the Mythos-class seat. Operator owns the final seat choice."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": [],
   "lessons_cited": [
-    "L-064-8",
     "L-064-9",
-    "L-065-1"
+    "L-065-1",
+    "L-064-12"
   ],
   "adjudications": [
     {
-      "finding": "s1-issues-round-4.json — 'appender still rejects semantically valid empty-flow manifests' (quoted keys, multiline flow lists), rated Major by gpt-5-6",
+      "finding": "s2-issues-round-3.json — 'declared-default guard remains unproven for the plan-import writer' (demands a module: default frontmatter pin on buildPlanningPrompt or end-to-end inspection of generated spec.md), rated Major by gpt-5-6",
       "resolution": "disputed-then-third-provider-adjudicated",
-      "third_opinion": "s1-third-opinion-empty-forms.json (gemini-pro): ADJUDICATED-MINOR RESIDUAL — quoted-key hardening applied and test-pinned; remaining exotic serializations refuse loudly with the copyable entry block (fail-loud posture, no write, no corruption); CST rewrite rejected as re-litigating the settled routed architecture ruling; residual deferred to the Set 092-094 manifest-guardrails work.",
-      "confirming_round": "s1-verification-round-5.md — VERIFIED, zero findings"
+      "third_opinion": "s2-third-opinion-plan-import-stamp.json (gemini-pro): ADJUDICATED-MINOR-RESIDUAL, dismissed as resolved — the finding's premise misidentified the writer (buildPlanningPrompt authors plan documents and emits no SessionSet frontmatter by design, so the demanded pin cannot exist); the two frontmatter-emitting writers carry literal module: default pins coupled to picker provenance; the plan prompt's entire output surface is pinned exactly (verbatim scoping note, exact save destination, negative no-module: assertion); an end-to-end inspection of externally-AI-authored spec.md files is not automatable in-repo.",
+      "confirming_round": "s2-verification-round-5.md — VERIFIED, zero findings"
+    },
+    {
+      "finding": "Advisory path-aware critique (path-aware-critique.json, produced via the sanctioned automated producer python -m ai_router.pull_critique): gemini-2.5-pro VERIFIED zero findings; gpt-5.4 ISSUES_FOUND, 1 Major contract-drift — spec.md S1 step 2 still said 'introduce a present-empty outcome', contradicting the S1 routed ruling and the shipped classification contract (no new union member; valid-empty = present with zero entries)",
+      "resolution": "fixed",
+      "third_opinion": "Spec prose amended at close with a dated amendment note pointing at s1-empty-manifest-architecture.json; the template round-trip step's same phrasing fixed in the same pass (L-065-1 echo discipline); code, tests, and matrix already carried the correct contract. Per the iterative-dogfood convention (project-guidance, promoted L-070-1) the critique artifact stays as-written (raw, pre-fix evidence) and is NOT re-run: the fix is doc-only — no new code change — so the loop is converged; the authoritative VERIFIED comes from the cross-provider session verification (5 rounds, R5 zero findings), a different surface.",
+      "confirming_round": "s2-verification-round-5.md (session surface) + the doc-only spec amendment in the close commit"
     }
   ]
 }

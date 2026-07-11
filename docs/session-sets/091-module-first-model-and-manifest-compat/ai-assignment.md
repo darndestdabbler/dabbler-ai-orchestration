@@ -69,3 +69,77 @@ before the set-terminal close. The operator owns the final seat choice.
   empty-form domain (and the adjudicated residual) up front, and any
   dispute should go to the third-provider path after the second fresh
   same-class Major, not the fourth.
+
+## Session 2 of 2 — Pseudo-module semantics, visible-module computation & compat matrix
+
+Orchestrator: **claude / anthropic / claude-fable-5** (the operator kept
+the Mythos-class seat rather than the routed S1 recommendation's
+Opus-class step-down; seat choice is operator-owned).
+
+| Step | Handled by | Rationale |
+| :--- | :--- | :--- |
+| Read the spec, S1 outcome, verdict amendment 2, the Q8 matrix in both consensus files + map the S2 seams (SessionSetsModel, the module-attribution scan, the three `module:` writer paths) | Orchestrator (direct) | Read-only reconnaissance over files the spec names explicitly. |
+| **Visible-module design cluster** (Q1 signature/home + output shape; Q2 pseudo-module presence; Q3 `Default`/`Unassigned` vs fallback groups; Q4 declared-but-empty modules; Q5 fallback ordering/identity; Q6 never-persist guard test shape; Q7 legacy root-plan mechanics) | **Routed — architecture (round 1 gpt-5-4 tier 3, truncated after Q1; continuation gemini-pro tier 2; anthropic excluded after 400 ×3, S1 precedent)** | The oracle-free, solution-divergent cluster of the session (`delegation.always_route_task_types` includes architecture). Saved raw: `s2-visible-module-architecture.json` + `-2.json`. Synthesis note: the continuation's Q2 presence predicate is amended by the operator-confirmed Q8 matrix (settled record outranks advisory ruling) — pseudo appears iff unstamped sets exist OR the legacy root plan exists OR no other module group is visible. |
+| `computeVisibleModules` / naming rule / never-persist guard / root-plan constant / test matrix implementation | Orchestrator (direct) | Flows deterministically from the rulings + the verdict; mirrors existing pure-model house patterns (groupByModule et al.). |
+| Compat-matrix doc authoring (`docs/planning/work-explorer-compat-matrix.md`) | Orchestrator (direct) | Transcription of the settled Q8 matrix + rulings with per-row test citations; no open reasoning. |
+| **Session verification (Step 6)** | **Routed — cross-provider, non-anthropic** | Mandatory no-skip cross-provider check (no-skip-verification-mandate). |
+| **End-of-set path-aware critique (advisory)** | **Routed — multi-provider (≥2 distinct providers)** | Armed policy recorded at set start; runs before the set-terminal close. |
+| Next-work AI assignment | **Routed — analysis (gemini-pro, tier 2)** | L-064-6: never self-opine on model choice. Saved raw at `s2-next-orchestrator-analysis.json`. |
+
+**Delegation note.** The routed analysis sanity-checked this split and
+recommended no changes (routed = independent-perspective + architecture;
+direct = deterministic execution downstream of rulings).
+
+## Next-work recommendation (routed analysis, made in S2)
+
+For the two follow-on work items the routed analysis
+(`s2-next-orchestrator-analysis.json`, gemini-pro, tier 2) recommends:
+
+- **(A) Locator/scope-check set authoring** (re-attach point; fresh
+  number after this set closes): **claude / anthropic / Fable-class /
+  medium effort** — abstract spec design over a TS+Python API contract
+  needs the conceptual grasp; medium effort suffices for authoring from
+  an existing detailed follow-on description.
+- **(B) Set 092 (renderer switch)**: **a capable code-execution seat /
+  high effort** — meticulous multi-file UI implementation + Layer 2/3
+  test surgery, not novel architecture; the analysis names an
+  OpenAI-provider coding-class seat as cheapest-capable.
+
+Caveat recorded verbatim-adjacent: the analysis' literal model ids
+("claude-fable-3.5", "gpt-journeyman-5-o") are not registry-valid model
+names — the capability classes above are the durable content, and the
+operator owns the mapping onto real seats.
+
+Supervision points (routed): (1) row-by-row review of
+`work-explorer-compat-matrix.md` against the Q8 rulings and the cited
+tests (it is the contract Sets 092–094 consume), (2) completeness of the
+never-persist guard matrix across all three writer paths, (3) strictness
+of the byte-stability assertion, (4) the advisory path-aware critique
+must yield specific findings, not generic commentary.
+
+### Actuals (S2)
+- Orchestrator used: claude / anthropic / claude-fable-5
+- Routed cost (pre-verification): architecture round 1 (tier 3, gpt-5-4,
+  $0.485, truncated after Q1 — 32k output tokens consumed by reasoning)
+  + continuation (tier 2, gemini-pro, $0.039) + analysis (tier 2,
+  gemini-pro, $0.007); all saved raw. Anthropic-as-provider failed 400
+  ×3 on both architecture rounds and was excluded-and-rerouted (S1/087
+  precedent).
+- Verification: 5 rounds, all gpt-5-6 (~$0.81 total): R1 ISSUES_FOUND
+  (2 Major — matrix row-9 predicate overstatement; guard tests too weak)
+  fixed in-flight; R2 ISSUES_FOUND (2 fresh Major — empty-manifest ×
+  stamped rows missing; legacy-plan row over-promised "no warning")
+  fixed in-flight; R3 ISSUES_FOUND (1 Major — plan-import frontmatter
+  pin) DISPUTED per the S1 calibration note (second fresh same-class
+  Major → third-provider path immediately, not after round grinding):
+  gemini-pro adjudication ($0.006, saved raw at
+  `s2-third-opinion-plan-import-stamp.json`) ruled adjudicated-minor-
+  residual / dismissed-as-resolved, with the implementable kernel
+  (exact-string plan-prompt pins) applied pre-adjudication; R4
+  ISSUES_FOUND (1 fresh Major, new class — console.warn side effect in
+  the pure computation) fixed via the resolveModulePlanRelPath /
+  modulePlanRelPath split; R5: **VERIFIED, zero findings**.
+- Calibration note applied and validated: disputing at the second fresh
+  same-class Major (instead of S1's fourth-round dispute) saved two
+  grind rounds; the verifier accepted the pre-declared adjudication in
+  the conventions block and did not resurrect the class in R4/R5.

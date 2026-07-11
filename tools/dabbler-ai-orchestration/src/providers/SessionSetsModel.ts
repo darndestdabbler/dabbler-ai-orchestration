@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
 import { SessionSet, SessionState } from "../types";
 import {
+  LEGACY_ROOT_PLAN_REL,
+  resolveModulePlanRelPath,
+} from "../utils/moduleAuthoring";
+import type { ModulesManifestClassification } from "../utils/moduleAuthoring";
+import {
   BucketPayload,
   ModulePayload,
   RowPayload,
@@ -424,4 +429,192 @@ export function buildModulePayloads(
     title: group.title ?? "",
     buckets: buildBucketPayloads(group.sets, rowFor),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Set 091 S2 — the visible-module computation (verdict amendment 2 + the
+// Q8 compat matrix; routed rulings saved raw at
+// docs/session-sets/091-.../s2-visible-module-architecture.json + -2.json).
+//
+// This is the ordered module list the Set 092 renderer will consume:
+// declared modules in manifest order (ALL of them — a declared module
+// with zero sets still renders, because Set 093 gives every module
+// persistent `Plan` / `Session sets` children), then one FALLBACK group
+// per undeclared stamped slug (alphabetical, warning-flagged, never
+// hidden — fail loud, never hide work), then the PSEUDO-module holding
+// unstamped sets. NOTHING consumes it yet: until Set 092 lands, the
+// shipping render path stays `groupByModule` / `buildModulePayloads`
+// above, byte-stable.
+
+/** The pseudo-module's label when it is the only visible module. */
+export const PSEUDO_MODULE_SOLE_NAME = "Default";
+/** The pseudo-module's label once any other module group coexists. */
+export const PSEUDO_MODULE_COEXIST_NAME = "Unassigned";
+
+/**
+ * Structured, renderer-agnostic warning on a visible module (ruling Q1:
+ * semantic codes, not prose — Set 092's diagnostics strip owns the
+ * operator-facing wording). Module-level warnings COMPLEMENT the
+ * classification-level diagnostics the renderer derives from the
+ * manifest classification it already holds; when the pseudo-module is
+ * not visible (e.g. an invalid manifest over fully-stamped sets), the
+ * manifest-level fault still reaches the operator through that
+ * classification surface plus the per-fallback-group warnings.
+ */
+export type VisibleModuleWarning =
+  | { code: "manifest-missing" }
+  | { code: "manifest-invalid" }
+  | { code: "unstamped-sets" }
+  | { code: "undeclared-slug"; rawSlug: string };
+
+export interface VisibleModule {
+  /**
+   * `declared` = a docs/modules.yaml entry (even with zero sets);
+   * `fallback` = an observed stamp slug the manifest does not declare;
+   * `pseudo` = the module of unstamped sets (never persisted — sets
+   * authored under it carry NO `module:` field, verdict amendment 2).
+   */
+  kind: "declared" | "fallback" | "pseudo";
+  /**
+   * declared: the manifest slug; fallback: the raw stamped value
+   * (`config.module`), verbatim; pseudo: null.
+   */
+  slug: string | null;
+  /**
+   * declared: the manifest title; fallback: the raw slug (bare — the
+   * warning field carries the anomaly, ruling Q5); pseudo: `Default`
+   * when it is the only visible module, `Unassigned` once any declared
+   * or fallback group coexists (ruling Q3 — fallback groups count). A
+   * user-declared literal `default` slug therefore always forces
+   * `Unassigned`: the declared module renders unconditionally, so the
+   * pseudo-module is never sole beside it.
+   */
+  displayName: string;
+  warning: VisibleModuleWarning | null;
+  /**
+   * declared: the manifest planPath resolved through the PURE
+   * {@link resolveModulePlanRelPath} (safe-degraded, defaulted, no
+   * logging — verification R4: this model function must stay
+   * side-effect-free; the interactive flows' `modulePlanRelPath` wrapper
+   * owns the warning); fallback: null (an undeclared slug has no
+   * manifest entry to read); pseudo: always {@link LEGACY_ROOT_PLAN_REL}
+   * — existence is the consumer's separate present/missing check
+   * (ruling Q7).
+   */
+  planPath: string | null;
+  /** Input order preserved; per-bucket sorting stays downstream. */
+  sets: readonly SessionSet[];
+}
+
+export interface VisibleModulesOptions {
+  /**
+   * Whether the repo-level `docs/planning/project-plan.md` exists. A
+   * caller-supplied fact so the computation stays pure (ruling Q1); the
+   * legacy root plan keeps the pseudo-module visible even when every
+   * set is stamped (gpt-5-4 Critical #1 — the plan must not vanish).
+   */
+  legacyRootPlanExists: boolean;
+}
+
+/**
+ * Compute the ordered visible-module list from the manifest
+ * classification plus the scanned sets.
+ *
+ * Attribution is RE-DERIVED here from each set's raw declared stamp
+ * (`config.module`) against the classification's entries, rather than
+ * trusting the scan-time `set.module` field: the scanner validates
+ * against the same manifest, but re-deriving makes this a total
+ * function of its declared inputs (fixture-testable, and correct for
+ * the absent/invalid classifications, where the scanner stamps null on
+ * every set and the raw value is the ONLY record of an observed slug).
+ *
+ * Pseudo-module presence (routed ruling Q2, amended by the
+ * operator-confirmed Q8 matrix, which outranks it): the pseudo-module
+ * appears iff unstamped sets exist, OR the legacy root plan exists, OR
+ * no other module group is visible (the Q8 "no manifest, no sets" and
+ * "empty manifest, no sets" rows both render the sole `Default`
+ * pseudo-module — an empty tree is never the answer). Fallback groups
+ * count as visible groups for this predicate and for naming, but never
+ * as declared modules.
+ */
+export function computeVisibleModules(
+  classification: ModulesManifestClassification,
+  allSets: SessionSet[],
+  opts: VisibleModulesOptions,
+): VisibleModule[] {
+  const declared =
+    classification.kind === "present" ? classification.entries : [];
+  const declaredSlugs = new Set(declared.map((e) => e.slug));
+
+  const declaredSets = new Map<string, SessionSet[]>();
+  const fallbackSets = new Map<string, SessionSet[]>();
+  const unstamped: SessionSet[] = [];
+  for (const s of allSets) {
+    const raw = s.config?.module ?? null;
+    if (raw === null) {
+      unstamped.push(s);
+    } else if (declaredSlugs.has(raw)) {
+      const list = declaredSets.get(raw);
+      if (list) list.push(s);
+      else declaredSets.set(raw, [s]);
+    } else {
+      const list = fallbackSets.get(raw);
+      if (list) list.push(s);
+      else fallbackSets.set(raw, [s]);
+    }
+  }
+
+  const out: VisibleModule[] = declared.map((entry) => ({
+    kind: "declared" as const,
+    slug: entry.slug,
+    displayName: entry.title,
+    warning: null,
+    planPath: resolveModulePlanRelPath(entry).path,
+    sets: declaredSets.get(entry.slug) ?? [],
+  }));
+
+  for (const rawSlug of Array.from(fallbackSets.keys()).sort()) {
+    out.push({
+      kind: "fallback",
+      slug: rawSlug,
+      displayName: rawSlug,
+      warning: { code: "undeclared-slug", rawSlug },
+      planPath: null,
+      sets: fallbackSets.get(rawSlug)!,
+    });
+  }
+
+  const otherGroupsVisible = out.length > 0;
+  const pseudoVisible =
+    unstamped.length > 0 || opts.legacyRootPlanExists || !otherGroupsVisible;
+  if (pseudoVisible) {
+    // Warning precedence: a manifest-level fault outranks the
+    // unstamped-sets advisory. `manifest-missing` fires only when sets
+    // exist (Q8 row 1: a pristine repo's sole `Default` module is the
+    // designed starting point, not a fault — the create-manifest CTA is
+    // Set 094's affordance, not a warning); a valid-empty manifest is
+    // never a fault (Q8 rows 4–5: "no warning"). `unstamped-sets` fires
+    // only when other groups coexist (Q8 row 7's "Assign legacy sets…"
+    // moment) — unstamped is the normal state while the pseudo-module
+    // is sole.
+    let warning: VisibleModuleWarning | null = null;
+    if (classification.kind === "invalid") {
+      warning = { code: "manifest-invalid" };
+    } else if (classification.kind === "absent" && allSets.length > 0) {
+      warning = { code: "manifest-missing" };
+    } else if (unstamped.length > 0 && otherGroupsVisible) {
+      warning = { code: "unstamped-sets" };
+    }
+    out.push({
+      kind: "pseudo",
+      slug: null,
+      displayName: otherGroupsVisible
+        ? PSEUDO_MODULE_COEXIST_NAME
+        : PSEUDO_MODULE_SOLE_NAME,
+      warning,
+      planPath: LEGACY_ROOT_PLAN_REL,
+      sets: unstamped,
+    });
+  }
+  return out;
 }

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "091-module-first-model-and-manifest-compat",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-07-11T11:26:33.494693-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Reviewed the shipped implementation and its contract artifacts for Set 091: `SessionSetsModel.ts`, `moduleAuthoring.ts`, `fileSystem.ts`, `visibleModules.test.ts`, `planImport.ts`, `sessionGenPrompt.ts`, `CustomSessionSetsView.ts`, `docs/planning/work-explorer-compat-matrix.md`, and the set's `spec.md`, `change-log.md`, and routed-architecture artifacts. The code and most of the close-out docs line up, but the set spec still states a load-bearing type/contract change that the implementation explicitly did not make, and that drift is contradicted by the raw architecture ruling saved in the same set.",
+      "findings": [
+        {
+          "description": "Violation: the closed set spec still says Session 1 step 2 must \"introduce a **present-empty** outcome\" for `classifyModulesManifest` (`docs/session-sets/091-module-first-model-and-manifest-compat/spec.md:103-109`), but the implementation and the saved routed ruling both define the opposite contract: `ModulesManifestClassification` in `tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts:83-99` has only `absent | invalid | present`, and the ruling saved at `docs/session-sets/091-module-first-model-and-manifest-compat/s1-empty-manifest-architecture.json` explicitly says \"Keep the classifier's return type as { kind: \\\"present\\\"; entries }\" and \"NO new union member.\" Impact: this is not a cosmetic wording issue; it misstates the public model-layer contract for future maintainers and follow-on sets, so a reader implementing against the spec can reasonably branch on a nonexistent `present-empty` kind or assume the classifier distinguishes textual empty-manifest forms when the code deliberately does not. Because this set is largely contract work for later sets, shipping it with its primary spec contradicting the code and its own architecture record is merge-material. Evidence: `spec.md` claims the new outcome, `moduleAuthoring.ts` exports no such type member, and the routed artifact says not to add one. Fix: update `spec.md` so Session 1 step 2 matches the implemented contract: valid-empty manifests classify as `{ kind: \"present\", entries: [] }`, and textual appendability remains the appender's separate concern.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have conducted a final, comprehensive review of the submitted changes. The core logic resides in `computeVisibleModules` in `tools/dabbler-ai-orchestration/src/providers/SessionSetsModel.ts`, which I have validated against its detailed specification in `docs/planning/work-explorer-compat-matrix.md`. The implementation correctly handles all specified cases, including nuanced edge cases around pseudo-module visibility driven by the legacy root plan, and correctly distinguishes between absent and empty manifests for warning generation.\n\nThe pinning tests in `tools/dabbler-ai-orchestration/src/test/suite/visibleModules.test.ts` are exhaustive and directly correspond to the compatibility matrix, providing a high degree of confidence in correctness. I have also verified the critical claim that this new functionality is not yet consumed by the production rendering path, ensuring the change is non-disruptive as intended. The code is well-structured, the contracts are clear, and the verification is robust.",
+      "findings": []
+    }
+  ]
+}

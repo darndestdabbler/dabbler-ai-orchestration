@@ -1,0 +1,13 @@
+{
+  "purpose": "Set 091 S2 third-provider adjudication - round-3 Major 'declared-default guard unproven for the plan-import writer' disputed by the orchestrator (plan prompts carry no spec frontmatter; decomposition specs are externally authored). Round-1/2 findings were all fixed undisputed; exact-string hardening of the plan-prompt contract applied before this adjudication.",
+  "taskType": "analysis",
+  "model": "gemini-pro",
+  "modelId": "gemini-2.5-pro",
+  "tier": 2,
+  "cost": 0.0055025,
+  "truncated": false,
+  "escalated": false,
+  "content": "### Adjudication\n\n**RULING: ADJUDICATED-MINOR-RESIDUAL**\n\n---\n\n### Reasoning\n\n1.  **Finding's Premise is Flawed:** The verifier's finding rests on the incorrect premise that the `buildPlanningPrompt` function writes, or is supposed to write, `module: default` frontmatter. The orchestrator's rebuttal correctly clarifies that this function's sole purpose is to generate a prompt for an external AI to author a high-level *plan*, not a SessionSet `spec.md`. The function has no frontmatter-writing responsibility by design.\n\n2.  **Applied Hardening is Sufficient and Correct:** The implemented test hardening is the correct approach for the function's actual behavior. It pins the function's *entire output surface*:\n    *   **Positive Assertion:** The exact, verbatim scoping prose and the target plan path are asserted.\n    *   **Negative Assertion:** The test explicitly asserts the *absence* of a `module:` instruction.\n    This combination proves the function behaves as designed and does not introduce the potential vulnerability the verifier is concerned about.\n\n3.  **Demanded Fixes are Not Implementable:**\n    *   **Pinning `module: default`:** This is impossible for a function that does not, and should not, emit this string.\n    *   **End-to-End Test:** The described workflow involves a human operator and an external AI service. This cannot be automated in a repository integration test. Pinning the prompt content that is fed into this manual process is the maximal possible in-repo guarantee.\n\n### Concrete Third Path\n\nNone. The verifier has misidentified the code path responsible for the guarded behavior. The orchestrator confirms that the two functions that *do* emit SessionSet frontmatter (`renderSpec` and `buildSessionGenPrompt`) are already covered by tests that pin the literal `module: default` instruction. The applied hardening on the plan-import writer is complete for its specified function. The finding is dismissed as resolved.",
+  "input_tokens": 978,
+  "output_tokens": 428
+}

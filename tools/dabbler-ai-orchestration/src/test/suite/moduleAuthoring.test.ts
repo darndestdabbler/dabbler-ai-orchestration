@@ -14,6 +14,7 @@ import {
   ModulePickUi,
   classifyModulesManifest,
   defaultModulePlanPath,
+  isSafeRepoRelativePath,
   modulePlanRelPath,
   pickModuleForAuthoring,
   renderModuleManifestEntry,
@@ -251,6 +252,42 @@ suite("moduleAuthoring — module-target resolution (Set 087 S3)", () => {
       modulePlanRelPath(entry({ planPath: "docs\\plans\\greeter.md" })),
       "docs/plans/greeter.md",
     );
+  });
+
+  test("modulePlanRelPath: escaping/absolute planPath degrades to the default (S3 verification R2)", () => {
+    for (const hostile of [
+      "../outside.md",
+      "docs/../../outside.md",
+      "/etc/passwd",
+      "C:/evil.md",
+      "c:\\evil.md",
+      "\\\\server\\share\\evil.md",
+      "docs//weird.md",
+    ]) {
+      assert.strictEqual(
+        modulePlanRelPath(entry({ planPath: hostile })),
+        "docs/modules/greeter/project-plan.md",
+        `must degrade: ${hostile}`,
+      );
+    }
+  });
+
+  test("isSafeRepoRelativePath matrix (S3 verification R2)", () => {
+    for (const ok of ["docs/plans/x.md", "a.md", "docs/modules/g/plan.md"]) {
+      assert.strictEqual(isSafeRepoRelativePath(ok), true, ok);
+    }
+    for (const bad of [
+      "",
+      "/abs.md",
+      "//unc/share.md",
+      "C:/x.md",
+      "..",
+      "../x.md",
+      "a/../../x.md",
+      "a//b.md",
+    ]) {
+      assert.strictEqual(isSafeRepoRelativePath(bad), false, bad);
+    }
   });
 
   function pickUi(log: {

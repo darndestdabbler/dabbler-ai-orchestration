@@ -379,6 +379,14 @@
       "dateTime": "2026-07-10T20:00:28.568296-04:00",
       "description": "Verification round 1 (gpt-5-6, \\.20): ISSUES_FOUND, 1 Major (Correctness) - a PRESENT-but-invalid docs/modules.yaml was treated like an absent one by pickModuleForAuthoring, silently degrading module-targeted authoring to unstamped repo-level output. Fixed: classifyModulesManifest (absent/invalid/present, lstat entry check so a dangling symlink is present, matching the S1 reader posture); invalid now errors with the shared INVALID_MANIFEST_MESSAGE and aborts copyPlanningPrompt / importPlanFromFile (before its file dialog) / copySessionSetGenPrompt; scaffoldNewModule reuses the classifier. 4 new tests (classifier matrix, picker abort, both planImport flows); unit suite 1346 -> 1350, tsc/esbuild clean, remediated files lint clean. VSIX rebuilt with the fix. Raw artifacts: s3-verification.md + s3-issues.json.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "session-003/remediation-ci-green",
+      "dateTime": "2026-07-10T20:09:56.013553-04:00",
+      "description": "CI run 29131667184 on ff63f4d (the R1 remediation commit) completed fully green: Playwright Layer 3 on all three OSes, Python tests on all three OSes, drift guards, preload ceiling, template snapshot. Every code commit in this session now has its own fully green CI run (66ed06d -> 29131125452; ff63f4d -> 29131667184). ff63f4d supersedes as the Layer-3 evidence of record.",
+      "status": "complete"
     }
   ]
 }

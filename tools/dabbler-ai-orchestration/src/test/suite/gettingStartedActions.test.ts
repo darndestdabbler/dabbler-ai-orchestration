@@ -859,6 +859,48 @@ suite("planImport — module-aware targeting (Set 087 S3)", () => {
     }
   });
 
+  test("importPlanFromFile: an escaping manifest planPath NEVER writes outside the workspace (S3 verification R2)", async () => {
+    // The manifest is repository-controlled input; a traversal planPath
+    // must not steer the import outside the workspace. The choke point
+    // (modulePlanRelPath) degrades it to the module's default plan path,
+    // and the write-time containment guard backstops the class.
+    const log = freshLog();
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), "gs-mod-escape-"));
+    const root = path.join(parent, "repo");
+    fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "docs", "modules.yaml"),
+      "modules:\n  - slug: greeter\n    title: Greeter\n    planPath: ../escaped.md\n",
+      "utf8",
+    );
+    const src = path.join(os.tmpdir(), `gs-mod-src-${process.pid}-esc.md`);
+    fs.writeFileSync(src, "ESCAPE_ATTEMPT\n");
+    try {
+      const ok = await importPlanFromFile(
+        makeUi(
+          {
+            workspaceRoot: () => root,
+            showOpenDialog: (async () => [
+              { fsPath: src },
+            ]) as unknown as PlanImportUi["showOpenDialog"],
+          },
+          log,
+        ),
+      );
+      assert.strictEqual(ok, true);
+      assert.ok(
+        !fs.existsSync(path.join(parent, "escaped.md")),
+        "must never write outside the workspace root",
+      );
+      const safeDest = path.join(root, "docs", "modules", "greeter", "project-plan.md");
+      assert.ok(fs.existsSync(safeDest), "import lands at the module's default plan path");
+      assert.ok(fs.readFileSync(safeDest, "utf8").includes("ESCAPE_ATTEMPT"));
+    } finally {
+      fs.rmSync(src, { force: true });
+      fs.rmSync(parent, { recursive: true, force: true });
+    }
+  });
+
   test("importPlanFromFile: Esc on the module picker never opens the file dialog", async () => {
     const log = freshLog();
     const root = moduleRoot("gs-mod-import-esc-", TWO_MODULES);

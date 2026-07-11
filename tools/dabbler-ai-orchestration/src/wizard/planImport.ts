@@ -146,6 +146,23 @@ export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promis
   }
 
   const destPath = path.join(root, ...target.destPosix.split("/"));
+  // S3 verification R2 (Major): the destination derives from
+  // repository-controlled configuration (a manifest planPath), so refuse
+  // any resolved path that escapes the workspace BEFORE any filesystem
+  // access. modulePlanRelPath already degrades unsafe manifest values to
+  // the in-workspace default; this is the write-time backstop (e.g. a
+  // hostile slug composed into that default).
+  const containment = path.relative(path.resolve(root), path.resolve(destPath));
+  if (
+    containment === "" ||
+    containment.startsWith("..") ||
+    path.isAbsolute(containment)
+  ) {
+    void ui.showErrorMessage(
+      `Refusing to write outside the workspace: ${target.destPosix}`,
+    );
+    return false;
+  }
   const destDir = path.dirname(destPath);
   try {
     if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });

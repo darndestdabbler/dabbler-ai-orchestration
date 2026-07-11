@@ -13,17 +13,19 @@ the code, tests, templates, and docs in the diff. (The same settled point
 as the S1 R1/R4 and S2 workflow-order dismissals.)
 
 ## Suite baseline — FINAL totals (the ONLY authoritative counts)
-- Extension unit suite (`npm run test:unit`): **1350 passing, 0 failing**
-  — 37 net-new Set-087-S3 tests (`moduleAuthoring.test.ts` new file:
+- Extension unit suite (`npm run test:unit`): **1353 passing, 0 failing**
+  — 40 net-new Set-087-S3 tests (`moduleAuthoring.test.ts` new file:
   validation matrix, scaffold matrix incl. all refusal cases, target
-  resolution, picker, flow tests, and the R1-remediation
-  classify/invalid-manifest tests; module-targeting suite in
-  `sessionGenPrompt.test.ts`; module-aware planImport suite incl. the two
-  R1 invalid-manifest tests in `gettingStartedActions.test.ts`;
-  MODULE_LINE render in `consumerBootstrap.test.ts`; the form-button test
-  in `gettingStartedHtml.test.ts`) plus updated artifact-count/golden
-  fixtures. (The 1346 count in earlier log entries is the pre-remediation
-  chronology, not a contradiction.)
+  resolution, picker, flow tests, the R1-remediation
+  classify/invalid-manifest tests, and the R2-remediation
+  path-containment matrix; module-targeting suite in
+  `sessionGenPrompt.test.ts`; module-aware planImport suite incl. the R1
+  invalid-manifest tests and the R2 escaping-planPath end-to-end test in
+  `gettingStartedActions.test.ts`; MODULE_LINE render in
+  `consumerBootstrap.test.ts`; the form-button test in
+  `gettingStartedHtml.test.ts`) plus updated artifact-count/golden
+  fixtures. (The 1346/1350 counts in earlier log entries are the
+  pre-remediation chronology, not a contradiction.)
 - `npx tsc --noEmit`: clean. `npm run compile` (esbuild): clean, exit 0.
 - `eslint src --ext ts`: **7 pre-existing errors** (6×`no-var-requires`,
   1×`no-regex-spaces`) — the identical pre-existing set S1/S2 recorded;
@@ -141,6 +143,23 @@ precedent — so gemini-pro ruled; auto-verified VERIFIED by gpt-5-4-mini):
   copySessionSetGenPrompt); `scaffoldNewModule` reuses the same
   classifier/message. Four new tests pin it (classifier matrix, picker
   abort, both planImport flows); unit suite 1346 → 1350.
+- R2 (Major, Correctness) "a manifest-controlled `planPath` can escape
+  the workspace and cause an arbitrary file write
+  (`../outside.md` → `fs.copyFileSync` outside the root)": **fixed, two
+  layers** — (1) the choke point `modulePlanRelPath` validates the
+  manifest value with `isSafeRepoRelativePath` (rejects absolute,
+  drive-qualified, UNC, `..`, and empty segments) and degrades an unsafe
+  value to the module's in-workspace default plan path with a
+  console.warn (the S1 tolerant-reader posture — every consumer,
+  including the decomposition prompt reference, gets the safe path);
+  (2) `importPlanFromFile` refuses any resolved destination whose
+  `path.relative(root, dest)` escapes the workspace BEFORE any
+  filesystem access (write-time backstop for the class, e.g. a hostile
+  slug composed into the default). Three new tests pin it (the
+  isSafeRepoRelativePath matrix, the modulePlanRelPath degrade matrix,
+  and an end-to-end import with `planPath: ../escaped.md` asserting the
+  file lands at the in-workspace default and NOTHING is written outside
+  the root); unit suite 1350 → 1353.
 
 ## Layer-3 / CI evidence of record
 - This session's code commit `66ed06d` runs the full CI matrix (Python

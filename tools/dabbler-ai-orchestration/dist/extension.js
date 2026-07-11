@@ -11171,7 +11171,7 @@ var require_compile = __commonJS({
       const schOrFunc = root.refs[ref];
       if (schOrFunc)
         return schOrFunc;
-      let _sch = resolve5.call(this, root, ref);
+      let _sch = resolve6.call(this, root, ref);
       if (_sch === void 0) {
         const schema = (_a2 = root.localRefs) === null || _a2 === void 0 ? void 0 : _a2[ref];
         const { schemaId } = this.opts;
@@ -11198,7 +11198,7 @@ var require_compile = __commonJS({
     function sameSchemaEnv(s1, s2) {
       return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
     }
-    function resolve5(root, ref) {
+    function resolve6(root, ref) {
       let sch;
       while (typeof (sch = this.refs[ref]) == "string")
         ref = sch;
@@ -11774,55 +11774,55 @@ var require_fast_uri = __commonJS({
       }
       return uri;
     }
-    function resolve5(baseURI, relativeURI, options) {
+    function resolve6(baseURI, relativeURI, options) {
       const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
       const resolved = resolveComponent(parse4(baseURI, schemelessOptions), parse4(relativeURI, schemelessOptions), schemelessOptions, true);
       schemelessOptions.skipEscape = true;
       return serialize(resolved, schemelessOptions);
     }
-    function resolveComponent(base, relative6, options, skipNormalization) {
+    function resolveComponent(base, relative7, options, skipNormalization) {
       const target = {};
       if (!skipNormalization) {
         base = parse4(serialize(base, options), options);
-        relative6 = parse4(serialize(relative6, options), options);
+        relative7 = parse4(serialize(relative7, options), options);
       }
       options = options || {};
-      if (!options.tolerant && relative6.scheme) {
-        target.scheme = relative6.scheme;
-        target.userinfo = relative6.userinfo;
-        target.host = relative6.host;
-        target.port = relative6.port;
-        target.path = removeDotSegments(relative6.path || "");
-        target.query = relative6.query;
+      if (!options.tolerant && relative7.scheme) {
+        target.scheme = relative7.scheme;
+        target.userinfo = relative7.userinfo;
+        target.host = relative7.host;
+        target.port = relative7.port;
+        target.path = removeDotSegments(relative7.path || "");
+        target.query = relative7.query;
       } else {
-        if (relative6.userinfo !== void 0 || relative6.host !== void 0 || relative6.port !== void 0) {
-          target.userinfo = relative6.userinfo;
-          target.host = relative6.host;
-          target.port = relative6.port;
-          target.path = removeDotSegments(relative6.path || "");
-          target.query = relative6.query;
+        if (relative7.userinfo !== void 0 || relative7.host !== void 0 || relative7.port !== void 0) {
+          target.userinfo = relative7.userinfo;
+          target.host = relative7.host;
+          target.port = relative7.port;
+          target.path = removeDotSegments(relative7.path || "");
+          target.query = relative7.query;
         } else {
-          if (!relative6.path) {
+          if (!relative7.path) {
             target.path = base.path;
-            if (relative6.query !== void 0) {
-              target.query = relative6.query;
+            if (relative7.query !== void 0) {
+              target.query = relative7.query;
             } else {
               target.query = base.query;
             }
           } else {
-            if (relative6.path[0] === "/") {
-              target.path = removeDotSegments(relative6.path);
+            if (relative7.path[0] === "/") {
+              target.path = removeDotSegments(relative7.path);
             } else {
               if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative6.path;
+                target.path = "/" + relative7.path;
               } else if (!base.path) {
-                target.path = relative6.path;
+                target.path = relative7.path;
               } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative6.path;
+                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative7.path;
               }
               target.path = removeDotSegments(target.path);
             }
-            target.query = relative6.query;
+            target.query = relative7.query;
           }
           target.userinfo = base.userinfo;
           target.host = base.host;
@@ -11830,7 +11830,7 @@ var require_fast_uri = __commonJS({
         }
         target.scheme = base.scheme;
       }
-      target.fragment = relative6.fragment;
+      target.fragment = relative7.fragment;
       return target;
     }
     function equal(uriA, uriB, options) {
@@ -12002,7 +12002,7 @@ var require_fast_uri = __commonJS({
     var fastUri = {
       SCHEMES,
       normalize: normalize2,
-      resolve: resolve5,
+      resolve: resolve6,
       resolveComponent,
       equal,
       serialize,
@@ -17835,7 +17835,7 @@ function runCatalogRefresh(deps) {
     } catch {
     }
   };
-  return new Promise((resolve5) => {
+  return new Promise((resolve6) => {
     let settled = false;
     let stdout = "";
     let stderr = "";
@@ -17851,7 +17851,7 @@ function runCatalogRefresh(deps) {
         clearTimeout(killSettleTimer);
       cancelReg?.dispose();
       disposal?.dispose();
-      resolve5(outcome);
+      resolve6(outcome);
     };
     if (deps.cancellation.isCancellationRequested) {
       settle({ kind: "cancelled", by: "operator" });
@@ -23150,7 +23150,7 @@ function resolveAiRouterRepoUrl() {
   return raw === "" ? void 0 : raw;
 }
 function makeSpawner() {
-  return (cmd, args, opts) => new Promise((resolve5) => {
+  return (cmd, args, opts) => new Promise((resolve6) => {
     const child = cp2.spawn(cmd, args, {
       cwd: opts?.cwd,
       env: process.env,
@@ -23179,7 +23179,7 @@ function makeSpawner() {
       if (timer)
         clearTimeout(timer);
       flush();
-      resolve5({
+      resolve6({
         exitCode: null,
         stdout,
         stderr: stderr + (stderr ? "\n" : "") + `spawn error: ${err.message}`
@@ -23190,13 +23190,13 @@ function makeSpawner() {
         clearTimeout(timer);
       flush();
       if (timedOut) {
-        resolve5({
+        resolve6({
           exitCode: code ?? -1,
           stdout,
           stderr: stderr + (stderr ? "\n" : "") + "process killed by timeout"
         });
       } else {
-        resolve5({ exitCode: code, stdout, stderr });
+        resolve6({ exitCode: code, stdout, stderr });
       }
     });
   });
@@ -24161,9 +24161,27 @@ function resolveModuleTarget(entries) {
     return { kind: "auto", entry: entries[0] };
   return { kind: "pick", entries };
 }
+function isSafeRepoRelativePath(p2) {
+  if (p2 === "")
+    return false;
+  if (p2.startsWith("/"))
+    return false;
+  if (/^[A-Za-z]:/.test(p2))
+    return false;
+  return p2.split("/").every((seg) => seg !== ".." && seg !== "");
+}
 function modulePlanRelPath(entry) {
-  const p2 = entry.planPath && entry.planPath.trim() !== "" ? entry.planPath.trim() : defaultModulePlanPath(entry.slug);
-  return p2.replace(/\\/g, "/");
+  const fallback = defaultModulePlanPath(entry.slug);
+  const raw = entry.planPath && entry.planPath.trim() !== "" ? entry.planPath.trim().replace(/\\/g, "/") : "";
+  if (raw === "")
+    return fallback;
+  if (!isSafeRepoRelativePath(raw)) {
+    console.warn(
+      `[dabblerSessionSets] module "${entry.slug}" declares planPath ${JSON.stringify(entry.planPath)}, which is not a safe repo-relative path \u2014 using the default ${fallback} instead.`
+    );
+    return fallback;
+  }
+  return raw;
 }
 async function pickModuleForAuthoring(root, ui) {
   const classified = classifyModulesManifest(root);
@@ -24275,6 +24293,13 @@ async function importPlanFromFile(ui = defaultUi()) {
     return false;
   }
   const destPath = path16.join(root, ...target.destPosix.split("/"));
+  const containment = path16.relative(path16.resolve(root), path16.resolve(destPath));
+  if (containment === "" || containment.startsWith("..") || path16.isAbsolute(containment)) {
+    void ui.showErrorMessage(
+      `Refusing to write outside the workspace: ${target.destPosix}`
+    );
+    return false;
+  }
   const destDir = path16.dirname(destPath);
   try {
     if (!fs13.existsSync(destDir))
@@ -30049,7 +30074,7 @@ var BULK_UPGRADE_MODULES = [
 ];
 var SESSION_SETS_REL3 = path35.join("docs", "session-sets");
 function runMigrator2(pythonPath, module2, cwd) {
-  return new Promise((resolve5) => {
+  return new Promise((resolve6) => {
     const args = [
       "-m",
       module2,
@@ -30068,7 +30093,7 @@ function runMigrator2(pythonPath, module2, cwd) {
     child.stderr?.on("data", (c3) => stderr += errDec.write(c3));
     child.on("error", (err) => {
       spawnErrored = true;
-      resolve5({
+      resolve6({
         ok: false,
         module: module2,
         detail: `could not spawn Python (${err.message})`
@@ -30080,15 +30105,15 @@ function runMigrator2(pythonPath, module2, cwd) {
       stdout += outDec.end();
       stderr += errDec.end();
       if (code === 0) {
-        resolve5({ ok: true, module: module2, detail: summarizeJson(stdout) });
+        resolve6({ ok: true, module: module2, detail: summarizeJson(stdout) });
       } else if (isAiRouterNotInstalled(stderr)) {
-        resolve5({
+        resolve6({
           ok: false,
           module: module2,
           detail: describeAiRouterImportFailure(pythonPath)
         });
       } else {
-        resolve5({
+        resolve6({
           ok: false,
           module: module2,
           detail: (stderr.trim() || stdout.trim() || `exit ${code}`).slice(0, 400)
@@ -30432,7 +30457,7 @@ function runChangeWriter(pythonPath, setDir, cwd) {
       reason: describeMissingPython("Set Up Dedicated Verification")
     });
   }
-  return new Promise((resolve5) => {
+  return new Promise((resolve6) => {
     const child = cp8.spawn(pythonPath, buildChangeWriterArgs(setDir), {
       cwd,
       windowsHide: true
@@ -30446,7 +30471,7 @@ function runChangeWriter(pythonPath, setDir, cwd) {
     child.stderr?.on("data", (c3) => stderr += errDec.write(c3));
     child.on("error", (err) => {
       spawnErrored = true;
-      resolve5({
+      resolve6({
         ok: false,
         code: "spawn-error",
         reason: `could not spawn Python (${err.message}) \u2014 install Python / create the workspace .venv, or set dabblerSessionSets.pythonPath.`
@@ -30459,18 +30484,18 @@ function runChangeWriter(pythonPath, setDir, cwd) {
       stderr += errDec.end();
       const parsed = parseChangeWriterOutput(stdout);
       if (parsed) {
-        resolve5(parsed);
+        resolve6(parsed);
         return;
       }
       if (isAiRouterNotInstalled(stderr)) {
-        resolve5({
+        resolve6({
           ok: false,
           code: "router-not-installed",
           reason: describeAiRouterImportFailure(pythonPath)
         });
         return;
       }
-      resolve5({
+      resolve6({
         ok: false,
         code: "writer-error",
         reason: (stderr.trim() || stdout.trim() || `exit ${exitCode}`).slice(

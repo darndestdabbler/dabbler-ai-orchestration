@@ -315,15 +315,45 @@ export function resolveModuleTarget(
 }
 
 /**
+ * S3 verification R2 (Major): a manifest `planPath` is a WRITE
+ * destination (`importPlanFromFile` copies onto it), so a
+ * repository-controlled value must never escape the workspace. True iff
+ * the (already forward-slashed) path is non-empty, not absolute, not
+ * drive-qualified, and free of `..` / empty segments.
+ */
+export function isSafeRepoRelativePath(p: string): boolean {
+  if (p === "") return false;
+  if (p.startsWith("/")) return false; // absolute (and "//" UNC)
+  if (/^[A-Za-z]:/.test(p)) return false; // drive-qualified
+  return p.split("/").every((seg) => seg !== ".." && seg !== "");
+}
+
+/**
  * A module's plan path (forward-slashed, repo-relative): the manifest's
- * explicit `planPath` when present, the canonical default otherwise.
+ * explicit `planPath` when present AND safely repo-relative, the
+ * canonical default otherwise. An unsafe manifest value (absolute,
+ * drive-qualified, or traversal — S3 verification R2) degrades to the
+ * default with a console.warn, mirroring the S1 tolerant-reader posture;
+ * `importPlanFromFile` additionally refuses any resolved destination
+ * outside the workspace before touching the filesystem (defense in
+ * depth — e.g. a hostile `slug` composed into the default).
  */
 export function modulePlanRelPath(entry: ModuleManifestEntry): string {
-  const p =
+  const fallback = defaultModulePlanPath(entry.slug);
+  const raw =
     entry.planPath && entry.planPath.trim() !== ""
-      ? entry.planPath.trim()
-      : defaultModulePlanPath(entry.slug);
-  return p.replace(/\\/g, "/");
+      ? entry.planPath.trim().replace(/\\/g, "/")
+      : "";
+  if (raw === "") return fallback;
+  if (!isSafeRepoRelativePath(raw)) {
+    console.warn(
+      `[dabblerSessionSets] module "${entry.slug}" declares planPath ` +
+        `${JSON.stringify(entry.planPath)}, which is not a safe ` +
+        `repo-relative path — using the default ${fallback} instead.`,
+    );
+    return fallback;
+  }
+  return raw;
 }
 
 /** One QuickPick row of the module picker. */

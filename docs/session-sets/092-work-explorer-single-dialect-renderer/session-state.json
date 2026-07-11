@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "092-work-explorer-single-dialect-renderer",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -21,9 +21,9 @@
     {
       "number": 2,
       "title": "Session 2",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-11T14:12:38.936359-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-11T14:56:08.322939-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
@@ -31,7 +31,7 @@
         "effort": "medium",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Session 1",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-11T12:12:09.541699-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-11T13:33:31.877540-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "openai",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

@@ -27,7 +27,11 @@
     }
   },
   "blockers": [],
-  "lessons_cited": ["L-064-8", "L-064-9", "L-065-1"],
+  "lessons_cited": [
+    "L-064-8",
+    "L-064-9",
+    "L-065-1"
+  ],
   "adjudications": [
     {
       "finding": "s1-issues-round-4.json — 'appender still rejects semantically valid empty-flow manifests' (quoted keys, multiline flow lists), rated Major by gpt-5-6",

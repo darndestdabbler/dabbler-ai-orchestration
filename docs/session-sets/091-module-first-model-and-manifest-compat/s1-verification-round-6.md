@@ -1,0 +1,1 @@
+VERIFIED — I checked empty/null classification, candidate-based root-key replacement, parse-after-append refusal behavior, shared authoring-flow targeting, malformed-manifest aborts, and the canonical template round-trip. The implementation and tests substantiate the required behavior without a remaining blocking correctness or completeness defect.

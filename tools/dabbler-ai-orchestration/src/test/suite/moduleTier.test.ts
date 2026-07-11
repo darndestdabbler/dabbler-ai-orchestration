@@ -497,7 +497,8 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     );
     assert.ok(view.includes("const moduleSnapshot = this.buildModules(all)"));
     assert.ok(view.includes("modules: moduleSnapshot.modules"));
-    assert.ok(view.includes("systemStatus: this.buildSystemStatus(moduleSnapshot.manifestFaults)"));
+    assert.ok(view.includes("systemStatus: this.buildSystemStatus("));
+    assert.ok(view.includes("moduleSnapshot.manifestFaults"));
     assert.ok(
       view.includes("buildVisibleModulePayloads("),
       "buildModules must delegate to the extracted, behavior-tested builder",

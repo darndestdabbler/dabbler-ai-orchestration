@@ -25351,7 +25351,10 @@ var CustomSessionSetsView = class {
       modules: moduleSnapshot.modules,
       hasAnySets: all.length > 0,
       gettingStarted: this.buildGettingStarted(all),
-      systemStatus: this.buildSystemStatus(moduleSnapshot.manifestFaults)
+      systemStatus: this.buildSystemStatus(
+        moduleSnapshot.manifestFaults,
+        all.length > 0
+      )
     };
     if (payload.gettingStarted?.mode !== "list" && !this.instructionsOpened) {
       this.instructionsOpened = true;
@@ -25453,7 +25456,7 @@ var CustomSessionSetsView = class {
       (root) => readTransportProfile(root)
     );
   }
-  buildSystemStatus(manifestFaults) {
+  buildSystemStatus(manifestFaults, hasAnySets) {
     const root = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
       return {
@@ -25469,7 +25472,16 @@ var CustomSessionSetsView = class {
     }
     return {
       workspaceOpen: true,
-      workspaceInitialized: detectCompletion(root, nodeDetectionFs).structureBuilt,
+      // Set 092 S2 (UAT Walk 4): a workspace that already has session
+      // sets is initialized by construction — the sets could not have
+      // been authored without a working setup — so `hasAnySets` alone
+      // clears the fault. The `structureBuilt` scaffold proxy is only
+      // consulted for the pre-first-set getting-started state, where it
+      // is the right signal; it under-reports an editable `pip install
+      // -e .` (this repo), which put no `ai_router` dir under
+      // site-packages, and that false negative must never surface a
+      // workspace-init fault on a working repo.
+      workspaceInitialized: hasAnySets || detectCompletion(root, nodeDetectionFs).structureBuilt,
       providerKeyPresent: providerKeyPresent(process.env),
       pythonPresent: probePythonPresence(root),
       copilotCliPresent: probeCopilotCliPresence(root),

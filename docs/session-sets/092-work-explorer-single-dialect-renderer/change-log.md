@@ -112,11 +112,42 @@ round's raw record; per-finding adjudication is in `disposition.json`.
 > L-064-12), `tsc --noEmit` clean, guidance ceilings OK. No release out
 > of this set — single boundary after Set 094 (verdict).
 
+## Post-close UAT remediation (2026-07-11, after set close)
+
+The operator ran the armed Session 2 walks after close. **Walk 6 passed;
+Walk 4 failed** — the System Status strip appeared in this repository
+claiming "Workspace initialization is incomplete" even though the repo
+is fully working. **Root cause:** the `structureBuilt` scaffold proxy
+(`gettingStartedDetection.routerInstalled`) looks for an `ai_router`
+package directory under `.venv/.../site-packages`, but this repo installs
+`ai_router` **editable** (`pip install -e .`), which puts only a
+`.pth` + finder + `dist-info` there and no package dir — so the proxy
+read the workspace as uninitialized. Harmless before this set (the proxy
+fed only the Getting Started form, which never renders in a repo that has
+session sets), it became visible when S2's strip began rendering in list
+mode. **Fix:** `buildSystemStatus` now computes
+`workspaceInitialized = hasAnySets || structureBuilt` — a workspace that
+already has session sets is initialized by construction, so the proxy's
+false negative can never surface a workspace-init fault on a working
+repo. The runtime provider-key / Python / Copilot faults still persist in
+list mode by design (amendment 5). Pinned by a new Playwright falsifier
+(`module-tier.spec.ts` — "list-mode repo without a scaffolded router
+package shows no System Status strip"), **confirmed failing pre-fix and
+passing post-fix**; suite at this rebuild: pytest 2,922/6 skipped,
+Layer 2 1,406, Playwright **23** passed, tsc clean. Re-verified
+cross-provider (see below). **Walk 4/5 re-walk is pending the operator**
+against the rebuilt VSIX.
+
+> Known follow-up (not fixed here — out of scope, feeds the Getting
+> Started form indicator owned by Set 094): `routerInstalled` still
+> under-reports an editable install in the pre-first-set getting-started
+> state. Masked for any repo with sets by the fix above.
+
 ## Deferred / pending
 
-- **Session 2 operator UAT walk** (walks 4–6 of the set checklist)
-  against the rebuilt local 0.41.0 VSIX — armed, mechanical floor
-  satisfied, pending the operator.
+- **Session 2 operator UAT re-walk** (walks 4 and 5 of the set
+  checklist) against the rebuilt local 0.41.0 VSIX — Walk 4 fixed and
+  re-armed, Walk 5 ready; Walk 6 already passed.
 - The `gettingStarted` payload's probe fields (`pythonPresent`,
   `copilotCliPresent`, `providerKeyPresent`) are retained but no longer
   webview-consumed — removal belongs to Set 094's form rework.

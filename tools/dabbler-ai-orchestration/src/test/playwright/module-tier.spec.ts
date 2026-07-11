@@ -261,3 +261,55 @@ test("invalid manifest pins System Status and retains the last-known-good tree u
     await teardown(per);
   }
 });
+
+// Set 092 S2 (UAT Walk 4): a working repo that already has session sets
+// must show NO System Status strip, even when the scaffold-structure
+// proxy (`detectCompletion().structureBuilt`) reads false — which is the
+// on-disk shape of the canonical dev repo's editable `pip install -e .`:
+// a `.venv` exists but no `ai_router` package dir sits under
+// site-packages. The invalid-manifest fixture above happens to scaffold
+// that dir, so it could not catch this; this fixture deliberately omits
+// it and asserts the strip stays absent (`hasAnySets` clears the fault).
+test("list-mode repo without a scaffolded router package shows no System Status strip", async () => {
+  const per: PerTest = {};
+  try {
+    per.tmpPath = makeTmpDir("dabbler-pw-editable-install");
+    const fixture = makeSet(per.tmpPath, "092-editable-install", 2);
+
+    for (const name of ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]) {
+      fs.writeFileSync(path.join(fixture.repo_root, name), `# ${name}\n`, "utf8");
+    }
+    // A venv EXISTS but carries no site-packages/ai_router dir — the
+    // editable-install shape that makes structureBuilt read false.
+    fs.mkdirSync(path.join(fixture.repo_root, ".venv", "Scripts"), { recursive: true });
+    fs.writeFileSync(
+      path.join(fixture.repo_root, ".venv", "Scripts", "python.exe"),
+      "",
+      "utf8",
+    );
+    // Lightweight tier so the provider-key fault is gated out, isolating
+    // the workspace-init behavior (the runner has Python, so no Python
+    // fault either — the only fault that could fire here is workspace-init).
+    fs.mkdirSync(path.join(fixture.repo_root, ".dabbler"), { recursive: true });
+    fs.writeFileSync(
+      path.join(fixture.repo_root, ".dabbler", "tier"),
+      "lightweight\n",
+      "utf8",
+    );
+
+    per.launch = await launchVSCode(fixture.repo_root);
+    const inner = await openSessionSetsView(per.launch.page);
+    await triggerRefresh(per.launch.page);
+
+    // The tree renders (list mode — the repo has a session set)...
+    await expect(inner.getByTestId("work-explorer-tree")).toBeVisible({
+      timeout: 30_000,
+    });
+    // ...and no System Status strip appears: a repo with sets is
+    // initialized by construction, so the false structureBuilt proxy
+    // must not surface a workspace-init fault.
+    await expect(inner.getByTestId("system-status")).toHaveCount(0);
+  } finally {
+    await teardown(per);
+  }
+});

@@ -69,6 +69,8 @@ interface CallLog {
   buildStructureProfiles: Array<string | undefined>;
   // Set 094: the Define-modules "Open modules.yaml" action (no riders).
   openModules: number;
+  // Set 094 S2: the Define-modules "Copy AI decomposition prompt" action (D6).
+  copyDecompositionPrompt: number;
 }
 
 function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog } {
@@ -78,6 +80,7 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
     buildStructureBudgets: [],
     buildStructureProfiles: [],
     openModules: 0,
+    copyDecompositionPrompt: 0,
   };
   const handlers: GettingStartedHandlers = {
     openFolder: async () => void calls.openFolder++,
@@ -87,17 +90,19 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
       calls.buildStructureProfiles.push(transportProfile);
     },
     openModules: async () => void calls.openModules++,
+    copyDecompositionPrompt: async () => void calls.copyDecompositionPrompt++,
   };
   return { handlers, calls };
 }
 
 suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
-  test("dispatches each known action to its handler (Set 094: three actions)", async () => {
+  test("dispatches each known action to its handler (Set 094 S2: four actions)", async () => {
     const { handlers, calls } = recordingHandlers();
     for (const action of [
       "open-folder",
       "build-structure",
       "open-modules",
+      "copy-decomposition-prompt",
     ] as const) {
       const handled = await routeGettingStartedAction(
         // Set 063 S2: Full build-structure REQUIRES a budget rider (the
@@ -112,6 +117,7 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     assert.strictEqual(calls.openFolder, 1);
     assert.strictEqual(calls.buildStructure.length, 1);
     assert.strictEqual(calls.openModules, 1);
+    assert.strictEqual(calls.copyDecompositionPrompt, 1);
   });
 
   test("open-modules dispatches to the openModules handler (no riders)", async () => {
@@ -124,6 +130,19 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     assert.strictEqual(calls.openModules, 1);
     // It never touches the scaffold path.
     assert.strictEqual(calls.buildStructure.length, 0);
+  });
+
+  test("copy-decomposition-prompt dispatches to the copyDecompositionPrompt handler (Set 094 S2, no riders)", async () => {
+    const { handlers, calls } = recordingHandlers();
+    const handled = await routeGettingStartedAction(
+      { type: "gettingStartedAction", action: "copy-decomposition-prompt" },
+      handlers,
+    );
+    assert.strictEqual(handled, true);
+    assert.strictEqual(calls.copyDecompositionPrompt, 1);
+    // It never touches the scaffold or the open-modules path.
+    assert.strictEqual(calls.buildStructure.length, 0);
+    assert.strictEqual(calls.openModules, 0);
   });
 
   test("forwards a valid tier rider; absent defaults to full; unknown is REJECTED (Set 077 A11)", async () => {
@@ -219,6 +238,7 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     assert.strictEqual(calls.openFolder, 0);
     assert.strictEqual(calls.buildStructure.length, 0);
     assert.strictEqual(calls.openModules, 0);
+    assert.strictEqual(calls.copyDecompositionPrompt, 0);
   });
 });
 
@@ -1224,6 +1244,7 @@ suite("verification-mode rider — dispatch threading (Set 077 S3)", () => {
         calls.buildStructure.push({ tier, budget, verificationMode });
       },
       openModules: async () => undefined,
+      copyDecompositionPrompt: async () => undefined,
     };
     return { handlers, calls };
   }

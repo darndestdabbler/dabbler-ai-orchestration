@@ -86,7 +86,7 @@ config edit with a stated reason, never an in-session fix.
 
 ## UAT fixture workspace
 
-Operator UAT of the Session Set Explorer never requires hand-built
+Operator UAT of the Work Explorer never requires hand-built
 sample projects. The committed fixture matrix at
 [`tools/dabbler-ai-orchestration/test-fixtures/uat-matrix/`](tools/dabbler-ai-orchestration/test-fixtures/uat-matrix/)
 holds two trivial hello-world consumer projects whose session sets

@@ -76,11 +76,11 @@ cost.
 
 ## Get started
 
-Open a project folder with no session sets yet and the Session Set
-Explorer renders the staged **Getting Started form**, with companion
-step-by-step instructions in the editor:
+Open a project folder with no session sets yet and the Work Explorer
+renders the staged **Getting Started form** (two sections), with
+companion step-by-step instructions in the editor:
 
-![The Getting Started form in the Work Explorer: build project structure with a Full/Lightweight tier choice, create or import a project plan, build session sets](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
+![The two-section Getting Started form in the Work Explorer: Build project structure with a Full/Lightweight tier choice, then Define modules (optional)](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
 
 1. **Build project structure** — pick your tier (Full or
    Lightweight, the cost/attention tradeoff described above). Choosing
@@ -117,18 +117,38 @@ step-by-step instructions in the editor:
    provider family and fail the two-provider check even though the
    guided flow itself ran — the form says so honestly rather than
    leaving a silently broken router.
-2. **Create or import a project plan** — import an existing
-   `project-plan.md`, or copy a planning prompt and let your AI
-   agent draft the plan with you.
-3. **Build session sets** — copy the decomposition prompt; your AI
-   agent turns the plan into ordered session sets under
-   `docs/session-sets/`, each with a spec you review before any work
-   starts.
+2. **Define modules (optional)** — for a project split across areas
+   or teams, declare **modules** in `docs/modules.yaml` so the Work
+   Explorer groups your session sets by module. **Open modules.yaml**
+   creates the file from a commented template (on this explicit
+   action only — the extension never writes it just because you
+   opened the repo) and opens it to edit; **Copy AI decomposition
+   prompt** hands your AI assistant a ready-made prompt that fills the
+   file in for you. Save the file and the tree regroups. Solo or
+   single-area projects can skip this — your work stays under one
+   default group.
 
-Then tell your AI agent: **"start the next session."** Once the
-first session set exists, the form gives way to the standard
-Explorer tree. (You can re-focus the form anytime with
-**`Dabbler: Get Started`** from the command palette.)
+Project-plan authoring and decomposition-into-session-sets — the old
+steps 2 and 3 — left the form. The Getting Started form shows only
+while the repo has **no session sets yet**; it is replaced by the Work
+Explorer **tree** as soon as the **first session set exists**. So the
+first plan and the first session set are created from the **Command
+Palette**, which works while the form is still up:
+
+1. **`Dabbler: Import Project Plan`** — import an existing
+   `docs/planning/project-plan.md`, or draft one with your AI agent.
+2. **`Dabbler: Generate Session-Set Prompt`** — copy a
+   decomposition prompt (module-aware when `docs/modules.yaml` declares
+   modules); your AI agent turns the plan into ordered session sets,
+   which you review and **save** under `docs/session-sets/`.
+
+Saving that first set flips the Explorer from the form to the tree.
+From then on the **same actions are one click on each module's row**
+(the row action strip: *AI Plan*, *Import Plan*, *Open Plan*,
+*AI Sets*) — that's how you add *more* sets to a module — and you tell
+your AI agent **"start the next session"** to work through them. (You
+can re-focus the form anytime with **`Dabbler: Get Started`** from the
+command palette.)
 
 ---
 

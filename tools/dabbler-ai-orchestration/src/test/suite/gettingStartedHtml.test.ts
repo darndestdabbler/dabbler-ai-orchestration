@@ -56,6 +56,7 @@ const gsHtml = requireFromPackageRoot(
   DEFINE_MODULES_INTRO_TEXT: string;
   DEFINE_MODULES_SAVE_TEXT: string;
   OPEN_MODULES_BUTTON_LABEL: string;
+  COPY_DECOMPOSITION_BUTTON_LABEL: string;
   BUDGET_LABEL_TEXT: string;
   BUDGET_HELP_TEXT: string;
   BUDGET_ZERO_CHOICE_TEXT: string;
@@ -156,7 +157,11 @@ suite("gettingStartedHtml — two-section form structure (Set 094)", () => {
       2,
       "exactly two sections",
     );
-    for (const action of ["build-structure", "open-modules"]) {
+    for (const action of [
+      "build-structure",
+      "open-modules",
+      "copy-decomposition-prompt",
+    ]) {
       assert.ok(
         html.includes(`data-gs-action="${action}"`),
         `missing action button ${action}`,
@@ -179,16 +184,27 @@ suite("gettingStartedHtml — two-section form structure (Set 094)", () => {
     assert.ok(!html.includes('name="gs-parallel"'), "parallel checkbox removed");
   });
 
-  test("the Define-modules section carries the open-modules button + SAVE copy", () => {
+  test("the Define-modules section carries the open-modules + copy-decomposition buttons + SAVE copy", () => {
     const html = gsHtml.renderGettingStarted(gs(), FULL);
     assert.ok(html.includes("Define modules (optional)"), "section title");
     assert.ok(html.includes('data-gs-action="open-modules"'), "open-modules button");
     assert.ok(html.includes(gsHtml.OPEN_MODULES_BUTTON_LABEL));
+    // Set 094 S2 (spec D6): the decomposition-prompt button + its label.
+    assert.ok(
+      html.includes('data-gs-action="copy-decomposition-prompt"'),
+      "copy-decomposition-prompt button",
+    );
+    assert.ok(html.includes(gsHtml.COPY_DECOMPOSITION_BUTTON_LABEL));
     assert.ok(html.includes(gsHtml.DEFINE_MODULES_INTRO_TEXT), "intro copy");
     assert.ok(html.includes(gsHtml.DEFINE_MODULES_SAVE_TEXT), "save copy");
-    // The save copy names the file AND instructs the human to SAVE (spec D1).
+    // The save copy names the file AND instructs the human to SAVE (spec D1),
+    // and references the decomposition-prompt button (spec D6).
     assert.ok(gsHtml.DEFINE_MODULES_SAVE_TEXT.includes("docs/modules.yaml"));
     assert.ok(/SAVE/.test(gsHtml.DEFINE_MODULES_SAVE_TEXT));
+    assert.ok(
+      gsHtml.DEFINE_MODULES_SAVE_TEXT.includes(gsHtml.COPY_DECOMPOSITION_BUTTON_LABEL),
+      "the SAVE copy references the decomposition-prompt button (D6)",
+    );
     // Define modules follows Build in the flow.
     const buildIdx = html.indexOf('data-gs-action="build-structure"');
     const openIdx = html.indexOf('data-gs-action="open-modules"');

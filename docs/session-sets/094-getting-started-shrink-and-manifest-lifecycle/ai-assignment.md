@@ -46,3 +46,33 @@ architecture decision. Fable's capability suffices for the coding + the routed
 implementation while being efficient for the significant prose/structured-text
 volume; `high` effort is retained not for architectural novelty but for the
 diligence and breadth this release-boundary close demands.
+
+### Actuals (filled at close)
+
+- Orchestrator used: **claude-code / anthropic / claude-opus-4-8 / high effort**
+  (operator invoked this session on Opus; the S1 routed rec was Fable-5 for
+  cost — advisory, and the operator's invocation stands).
+- Routed calls: the S2 architecture ruling (gpt-5-4 / openai, tier 3,
+  `s2-parallel-and-d6-architecture.json`); the next-set analysis
+  (`s2-next-set-analysis.json`); the two session-verification rounds (gpt-5-6,
+  anthropic excluded); the advisory path-aware critique (openai + google).
+- Deviations from recommendation: orchestrator model (Opus vs the recommended
+  Fable) — operator's choice; no functional impact.
+- Notes for next-set calibration: the release-boundary close is broad but
+  low-novelty; the one non-trivial risk was **doc↔behavior fidelity** on the
+  shipping README (two verification rounds spent on the onboarding-sequence
+  Major — an L-064-8 instance). Set 095's docs/UAT work carries the same risk
+  profile, so budget for a doc-claim-vs-code re-check pass.
+
+## Next session set — routed recommendation
+
+Recommended orchestrator for **Set 095** (Hello World walkthrough + UAT re-cut +
+the deferred teaching-doc rewrite / screenshot refresh):
+**claude-code / anthropic / claude-sonnet-5 / medium effort**
+(routed analysis, saved raw at `s2-next-set-analysis.json`).
+
+Rationale (routed): documentation- and UAT-authoring-heavy with a high prose
+quality bar but negligible architectural novelty; Sonnet-5 is the
+cheapest-capable fit and leaves gpt-5-x / gemini-3-pro for the cross-provider
+verification pool. Escalate to a higher tier only if the teaching-doc golden
+regeneration or the cold-start dogfood surfaces real complexity.

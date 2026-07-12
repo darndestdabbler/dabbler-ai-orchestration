@@ -89,7 +89,7 @@ Set-050 number handle, "Start the next session of `50`."). Conventions:
   the set's creation-order sequence number, zero-padded to at least three
   digits, and it is **required for newly-created sets** in this canonical
   repo and in any scaffolder output. The number gives every set a short,
-  stable handle (`Set 50`) and makes the Session Set Explorer sort in
+  stable handle (`Set 50`) and makes the Work Explorer sort in
   creation order instead of alphabetically. See **Numbering** below for
   how the next number is chosen.
 
@@ -248,7 +248,7 @@ prerequisites:           # optional; sets that must complete before this one is 
 - **`tier: "lightweight"`** (Set 048+) — the set runs under
   `--no-router` mode: no metered API calls, no auto-verification.
   The orchestrator follows the same write discipline as Full (same
-  state-file shape, same Session Set Explorer UX, same model /
+  state-file shape, same Work Explorer UX, same model /
   effort / session identification), but verification is handled
   per-set (not per-session) via one of two `verificationMode` flows
   (see below). See `docs/ai-led-session-workflow.md` Step 6

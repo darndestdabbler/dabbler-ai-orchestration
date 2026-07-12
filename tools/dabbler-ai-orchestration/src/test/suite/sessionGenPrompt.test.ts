@@ -344,3 +344,58 @@ suite("buildSessionGenPrompt — verification-mode truth (Set 077 S3)", () => {
     assert.ok(prompt.includes("`full` sets OMIT"));
   });
 });
+
+// Set 094 S2 (verdict amendment 7): the parallel-session-sets UI is SHELVED,
+// the MECHANISM is not. The primary decomposition paths omit the parallel
+// guidance; the escape hatch (`{ parallel: true }`, fed only by the
+// `dabbler.generateParallelSessionSetPrompt` command) still emits it; and the
+// `prerequisites:` field + the parallel-session worktree commands survive. This
+// suite is the regression pin that "shelving != removal" (routed ruling
+// s2-parallel-and-d6-architecture.json Q2).
+suite("parallel-sets shelving + escape hatch (Set 094 S2)", () => {
+  test("default prompt (primary paths) OMITS the parallel guidance", () => {
+    const prompt = buildSessionGenPrompt(bundle);
+    assert.ok(
+      !prompt.includes("Decompose for parallel execution"),
+      "no parallel guidance on the common path",
+    );
+  });
+
+  test("default prompt STILL documents the `prerequisites:` field (mechanism intact)", () => {
+    // The worked-example spec carries the commented `prerequisites:` field, so
+    // the ordering mechanism the shelving preserves is still taught even
+    // without the parallel guidance block.
+    const prompt = buildSessionGenPrompt(bundle);
+    assert.ok(
+      /prerequisites:/.test(prompt),
+      "the prerequisites: ordering field must survive the UI shelving",
+    );
+  });
+
+  test("escape hatch ({ parallel: true }) re-emits the parallel guidance + worktree/prereq wording", () => {
+    const prompt = buildSessionGenPrompt(bundle, { parallel: true });
+    assert.ok(prompt.includes("Decompose for parallel execution"), "hatch works");
+    assert.ok(/git worktrees/.test(prompt), "still teaches the worktree model");
+    assert.ok(/prerequisites:/.test(prompt), "still teaches explicit ordering");
+  });
+
+  test("the parallel-SESSION worktree commands remain contributed (worktree tooling untouched)", () => {
+    // Amendment 7 keeps the worktree tooling: the per-existing-set "start next
+    // parallel session" commands are a different feature from parallel session
+    // SETS and must NOT be removed by the shelving. Pin their package.json
+    // contributions so a future cleanup cannot silently drop them.
+    const pkgPath = path.resolve(__dirname, "../../..", "package.json");
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    const ids = new Set(
+      (pkg.contributes?.commands ?? []).map((c: { command: string }) => c.command),
+    );
+    for (const id of [
+      "dabblerSessionSets.copyStartCommand.parallel",
+      "dabbler.copyStartNextParallelSessionPrompt",
+      // The escape hatch itself is contributed.
+      "dabbler.generateParallelSessionSetPrompt",
+    ]) {
+      assert.ok(ids.has(id), `command ${id} must stay contributed`);
+    }
+  });
+});

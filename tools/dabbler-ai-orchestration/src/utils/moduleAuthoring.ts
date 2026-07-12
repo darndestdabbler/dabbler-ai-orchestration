@@ -148,6 +148,11 @@ const MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml — the module manifes
 # Explorer display order = this file's order. Session-set NAMES stay
 # globally unique across ALL modules — \`module\` is a grouping attribute,
 # never part of a set's identity.
+#
+# To have an AI assistant decompose this project into modules and fill this
+# file in, run the "Dabbler: Copy Module Decomposition Prompt" command
+# (Command Palette) — or the "Copy AI decomposition prompt" button in the
+# Getting Started form — then paste the copied prompt into your assistant.
 `;
 
 /**

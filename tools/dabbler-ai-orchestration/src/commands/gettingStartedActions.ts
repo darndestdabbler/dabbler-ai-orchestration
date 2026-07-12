@@ -16,12 +16,18 @@
 //   - open-modules    → openModulesManifestFlow (Set 094: ensure
 //                       docs/modules.yaml from the canonical template on
 //                       this explicit action, then open it — adjudication A)
+//   - copy-decomposition-prompt → runCopyModuleDecompositionPromptFlow (Set
+//                       094 S2 / spec D6: ensure docs/modules.yaml, then copy
+//                       the module-decomposition prompt — the FOURTH
+//                       ensure-write site; the same flow the palette command
+//                       dabbler.copyModuleDecompositionPrompt drives)
 //
 // Set 094: the plan / session-set actions left the form. The plan flows
-// (importPlanFromFile / copyPlanningPrompt), the decomposition prompt
-// (copySessionSetGenPrompt) and the New-module scaffold (runNewModuleFlow)
-// still ship — Set 093's per-module row actions + the Command Palette own
-// them now — but the Getting Started form no longer surfaces them.
+// (importPlanFromFile / copyPlanningPrompt), the SESSION-SET decomposition
+// prompt (copySessionSetGenPrompt) and the New-module scaffold
+// (runNewModuleFlow) still ship — Set 093's per-module row actions + the
+// Command Palette own them now — but the Getting Started form no longer
+// surfaces them.
 
 import * as vscode from "vscode";
 import { GettingStartedActionMsg } from "../types/sessionSetsWebviewProtocol";
@@ -35,6 +41,7 @@ import {
   asZeroBudgetMethod,
 } from "../utils/budgetYaml";
 import { openModulesManifestFlow } from "./openModulesManifest";
+import { runCopyModuleDecompositionPromptFlow } from "./copyModuleDecompositionPrompt";
 
 export interface GettingStartedHandlers {
   openFolder(): Promise<void>;
@@ -46,6 +53,9 @@ export interface GettingStartedHandlers {
   ): Promise<void>;
   /** Set 094 (spec D1): create docs/modules.yaml if absent, then open it. */
   openModules(): Promise<void>;
+  /** Set 094 S2 (spec D6): create docs/modules.yaml if absent, then copy the
+   * module-decomposition prompt (the fourth ensure-write site). */
+  copyDecompositionPrompt(): Promise<void>;
 }
 
 /**
@@ -223,6 +233,12 @@ export async function routeGettingStartedAction(
       // opens it. The ensure-write is idempotent and skip-existing.
       await handlers.openModules();
       return true;
+    case "copy-decomposition-prompt":
+      // Set 094 S2 (spec D6): no riders — ensure docs/modules.yaml exists
+      // (from the canonical template — the fourth ensure-write site) and copy
+      // the module-decomposition prompt. Idempotent and skip-existing.
+      await handlers.copyDecompositionPrompt();
+      return true;
     default:
       console.warn(
         `[gettingStarted] ignored unknown form action "${String((msg as { action?: unknown })?.action)}"`,
@@ -307,6 +323,15 @@ export function makeGettingStartedHandlers(
     // exist yet, then open it. Shares the flow the toolbar command drives.
     async openModules(): Promise<void> {
       await openModulesManifestFlow();
+    },
+
+    // Set 094 S2 (spec D6 + adjudication A): the Define-modules "Copy AI
+    // decomposition prompt" button — ensure docs/modules.yaml from the
+    // canonical template (the fourth ensure-write site), then copy the
+    // module-decomposition prompt. Shares the flow the palette command
+    // (dabbler.copyModuleDecompositionPrompt) drives.
+    async copyDecompositionPrompt(): Promise<void> {
+      await runCopyModuleDecompositionPromptFlow();
     },
   };
 }

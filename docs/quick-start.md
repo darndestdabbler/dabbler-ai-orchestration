@@ -196,7 +196,7 @@ Sessions on different sets can run in parallel using worktrees — see
 | `ai_router/close_session.py` | Close-out gate: runs deterministic checks, flips state |
 | `ai_router/session_state.py` | Lifecycle snapshot (`session-state.json`) + events ledger |
 | `ai_router/router-config.yaml` | Model selection, task types, tier mapping |
-| `tools/dabbler-ai-orchestration/` | VS Code extension (Session Set Explorer, Cost Dashboard) |
+| `tools/dabbler-ai-orchestration/` | VS Code extension (Work Explorer, Cost Dashboard) |
 
 ---
 

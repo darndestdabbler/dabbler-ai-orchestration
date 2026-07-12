@@ -28,7 +28,7 @@ If you came looking for content that used to live in the README:
 | Old README section | Now lives at |
 |---|---|
 | Highlighted features (sections 1–6 + "Other features worth knowing") | [Highlighted features (deep dive)](#highlighted-features-deep-dive) below |
-| The Session Set Explorer in action | [Highlighted features (deep dive) → Session sets and sessions](#1-work-is-organized-into-session-sets-and-sessions) below |
+| The Work Explorer in action | [Highlighted features (deep dive) → Session sets and sessions](#1-work-is-organized-into-session-sets-and-sessions) below |
 | Repos that need UAT and/or E2E support | [UAT and E2E support: when to opt in](#uat-and-e2e-support-when-to-opt-in) below |
 | End-of-session output (worked example) | [End-of-session output (worked example)](#end-of-session-output-worked-example) below |
 | Repository file map | [Repository file map](#repository-file-map) below |
@@ -398,7 +398,7 @@ Legacy `session-reviews/` and `issue-logs/` directories may still appear
 when older helpers or one-off scripts run, but they are not part of the
 current required layout.
 
-The Session Set Explorer renders the active inventory across all
+The Work Explorer renders the active inventory across all
 session sets in the workspace. State is derived from file presence,
 mirroring `ai_router.find_active_session_set()`:
 
@@ -518,7 +518,7 @@ manager report and informs router-config tuning.
 Every session ends with `git add -A && git commit && git push`. There
 is no manual step for the human between verification and the commit
 landing on `main`. Session set status is then flipped to `complete` in
-`session-state.json` so the Session Set Explorer (and any external
+`session-state.json` so the Work Explorer (and any external
 dashboard) updates immediately.
 
 Two or more session sets can run **in parallel** when the human's
@@ -529,7 +529,7 @@ isolated git worktree at `../<repo>-<slug>` on a `session-set/<slug>`
 branch. The set's last session merges `origin/main` back into the
 session-set branch (resolving conflicts), then merges into main and
 pushes — so parallel sets converge cleanly without the human shuffling
-worktrees by hand. The Session Set Explorer's worktree auto-discovery
+worktrees by hand. The Work Explorer's worktree auto-discovery
 surfaces in-progress sessions running in sibling worktrees of the same
 repo, so a parallel session shows up in the activity bar even when its
 worktree isn't opened as a separate workspace folder.
@@ -649,7 +649,7 @@ The matrix:
 
 | Repo type | Flags | What runs / what is gated |
 |---|---|---|
-| **Console / library / CLI / no-UI repo.** Examples: a pure refactor repo, a Python data tool, an internal SDK. | `requiresUAT: false`, `requiresE2E: false` (or block omitted entirely — same effect) | Universal core only: build, test, cross-provider verification, commit, notify. The router never invokes `uat-plan-generation` or `uat-coverage-review`. The Session Set Explorer renders each set as a minimal entry — no UAT badge, no UAT/E2E commands, no Playwright lookup. |
+| **Console / library / CLI / no-UI repo.** Examples: a pure refactor repo, a Python data tool, an internal SDK. | `requiresUAT: false`, `requiresE2E: false` (or block omitted entirely — same effect) | Universal core only: build, test, cross-provider verification, commit, notify. The router never invokes `uat-plan-generation` or `uat-coverage-review`. The Work Explorer renders each set as a minimal entry — no UAT badge, no UAT/E2E commands, no Playwright lookup. |
 | **Repo with E2E coverage but no human UAT.** Examples: a service whose behavior is fully testable end-to-end without human judgment. | `requiresUAT: false`, `requiresE2E: true` | Behavioral changes must ship with matching Playwright coverage; the orchestrator confirms via test discovery before notifying. No UAT checklist is built. The *Reveal Playwright Tests for This Set* command appears in the extension's right-click menu. |
 | **Repo with human UAT but no E2E framework.** Examples: legacy UIs not yet wired to Playwright. | `requiresUAT: true`, `requiresE2E: false` | The orchestrator authors `<slug>-uat-checklist.json` during the set, the human runs it via the [UAT checklist editor](https://darndestdabbler.github.io/uat-checklist-editor/), pending review blocks downstream sessions (Rule #9). The extension shows `[UAT n]` / `[UAT done]` badges. The E2E coverage gate is skipped. |
 | **Full-stack UI repo.** Examples: any Blazor / React / Vue UI app. | `requiresUAT: true`, `requiresE2E: true` | Full gating: every functional checklist item must have matching Playwright coverage and pass `uat-coverage-review` before the checklist is committed and the human is notified. Judgment items (`IsJudgmentItem: true` in the checklist JSON) are exempt from matching-test parity but still need a sequence-reachability test. |
@@ -803,7 +803,7 @@ covered elsewhere in this doc.
 | [ai_router/prompt-templates/task-prompts.md](../ai_router/prompt-templates/task-prompts.md) | One H1 section per task type — the user-message template `prompting.py` applies for that task type. |
 | [ai_router/prompt-templates/verification.md](../ai_router/prompt-templates/verification.md) | The independent-verifier prompt template, including the structured JSON response schema (`{verdict, issues}`) that closes the bare-paragraph-misclassified-as-VERIFIED hole. |
 
-### `tools/dabbler-ai-orchestration/` — Session Set Explorer extension (TypeScript)
+### `tools/dabbler-ai-orchestration/` — Work Explorer extension (TypeScript)
 
 | Path | Purpose |
 |---|---|
@@ -811,7 +811,7 @@ covered elsewhere in this doc.
 | [tools/dabbler-ai-orchestration/src/providers/](../tools/dabbler-ai-orchestration/src/providers/) | TreeDataProvider implementations: `SessionSetsProvider` (the activity-bar inventory), `ProviderQueuesProvider`, `ProviderHeartbeatsProvider`. Both queue/heartbeat providers render a graceful "ai_router not installed → click to install" tree-item when `python -m ai_router.queue_status` / `heartbeat_status` exit with `ModuleNotFoundError`. |
 | [tools/dabbler-ai-orchestration/src/commands/](../tools/dabbler-ai-orchestration/src/commands/) | Command implementations: `installAiRouterCommands` (`Dabbler: Install ai-router` / `Update ai-router` — pure-logic core in `src/utils/aiRouterInstall.ts`), `cancelLifecycleCommands` (cancel/restore session set), `copyCommand` (the trigger-phrase commands), `gitScaffold`, `openFile`, `queueActions`, `troubleshoot`. (The Set 013 `copyAdoptionBootstrapPrompt` command was retired in Set 063.) |
 | [tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts](../tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts) | Pure-logic install core for the install command. Dependency-injected `ProcessSpawner` / `FileOps` / `InstallPrompts` so the test suite can exercise both PyPI and GitHub-sparse-checkout paths without spawning real subprocesses. Exports `isAiRouterNotInstalled()` (the detector both providers use), `resolveLatestReleaseTag()`, `deriveVenvFromPythonPath()`. |
-| [tools/dabbler-ai-orchestration/src/wizard/](../tools/dabbler-ai-orchestration/src/wizard/) | `planImport.ts` (`Dabbler: Import Project Plan`) and `sessionGenPrompt.ts` (`Dabbler: Generate Session-Set Prompt`). The Set 021 `WizardPanel.ts` Get Started webview was retired in Set 060 S3 — `dabbler.getStarted` now focuses the Session Set Explorer's Getting Started form (`src/commands/gettingStartedDoc.ts` opens the static instructions; `src/commands/gettingStartedActions.ts` handles the form's actions), and `dabbler.setupNewProject` (`gitScaffold.ts`) drives the same no-prompt structure-only scaffold. |
+| [tools/dabbler-ai-orchestration/src/wizard/](../tools/dabbler-ai-orchestration/src/wizard/) | `planImport.ts` (`Dabbler: Import Project Plan`) and `sessionGenPrompt.ts` (`Dabbler: Generate Session-Set Prompt`). The Set 021 `WizardPanel.ts` Get Started webview was retired in Set 060 S3 — `dabbler.getStarted` now focuses the Work Explorer's Getting Started form (`src/commands/gettingStartedDoc.ts` opens the static instructions; `src/commands/gettingStartedActions.ts` handles the form's actions), and `dabbler.setupNewProject` (`gitScaffold.ts`) drives the same no-prompt structure-only scaffold. |
 | [tools/dabbler-ai-orchestration/src/dashboard/CostDashboard.ts](../tools/dabbler-ai-orchestration/src/dashboard/CostDashboard.ts) | The `Dabbler: Show Cost Dashboard` webview — reads `ai_router/router-metrics.jsonl` (filename resolved through [src/utils/routerConfig.ts](../tools/dabbler-ai-orchestration/src/utils/routerConfig.ts) from `metrics.log_filename`), plots cumulative spend, per-set breakdown, 30-day sparkline, model mix, CSV export. The icon/command is contributed only when the workspace actually routes (the `dabblerSessionSets.routesCost` context key — a resolvable `ai_router/router-config.yaml`), so it is absent on Lightweight. Renders three honest states (disabled when `metrics.enabled == false` / on-but-empty / on-with-data — never the fictional `config.py METRICS_ENABLED` flag) plus a non-blocking staleness banner when `metadata.pricing_reviewed` is older than `review_frequency_days` (default 30). Pure HTML builders live in [src/dashboard/dashboardHtml.ts](../tools/dabbler-ai-orchestration/src/dashboard/dashboardHtml.ts). |
 | [tools/dabbler-ai-orchestration/src/configEditor/](../tools/dabbler-ai-orchestration/src/configEditor/) | The `Dabbler: Open Dabbler Config Editor` visual config editor. Reads and writes `ai_router/router-config.yaml`, `ai_router/budget.yaml`, and `ai_router/local-overrides.yaml` (gitignored). Key files: `ConfigEditorPanel.ts` (webview panel — load/save, drift-detect, Python subprocess dispatch); `yamlReadWrite.ts` (comment-preserving YAML round-trip via the `yaml` package); `schemaValidator.ts` (AJV validation of all three config files); `sections/` (one file per section — routing, budget, providers, significance, notifications, local-overrides-summary); `patch.ts` (`applyPatch()` translates the webview `SavePayload` into YAML mutations). |
 | [tools/dabbler-ai-orchestration/src/test/suite/](../tools/dabbler-ai-orchestration/src/test/suite/) | Standalone-mocha test suite. ~140 tests covering install paths, router-config preservation, provider tree-item rendering, cancel/restore lifecycle, force-closed badge rendering, fileSystem discovery, etc. |

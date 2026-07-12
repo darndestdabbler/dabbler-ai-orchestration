@@ -66,7 +66,7 @@ Full and Lightweight tiers), consulted on demand whenever a state-file
 question arises (Set 085) — the blessed writers own the shape at
 runtime, and an orchestrator that hand-touches a state file without
 consulting the schema is the usual cause of the N−1/N display drift the
-Session Set Explorer surfaces. The per-session `orchestrator` block (the four `engine` /
+Work Explorer surfaces. The per-session `orchestrator` block (the four `engine` /
 `provider` / `model` / `effort` fields, written omit-null) and the Set 049
 writer contract live there too; the engine-agnostic narrative of the
 coordination-layer rip-out — the `writer-bypass` (D3) check in

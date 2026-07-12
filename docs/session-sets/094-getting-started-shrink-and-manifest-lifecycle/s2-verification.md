@@ -1,0 +1,11 @@
+# ISSUES FOUND
+
+- **Issue 1: The shipping extension README gives an invalid onboarding sequence**
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Location:** `tools/dabbler-ai-orchestration/README.md`, **Get started**, final two paragraphs
+  - **Details:**
+    - **Violation:** The docs pass was required to update the shipping READMEs for the new workflow where project-plan and session-set generation moved to module-row actions. Instead, the README says: “Once your project plan exists, tell your AI agent: **‘start the next session.’**” It also says the form gives way to the tree only “Once the first session set exists.”
+    - **Impact:** A project plan alone provides no session to start; the operator must first run **AI Sets** and save at least one generated session set. Moreover, saying module-row actions create the first set while claiming those rows appear only after the first set exists describes a circular onboarding path. This is the primary shipping onboarding document for a release centered on that redesigned flow and should be corrected before merge.
+    - **Evidence:** The immediately preceding text says decomposition into session sets moved to the module-row **AI Sets** action, but the next sentence conditions “start the next session” only on project-plan existence. The same diff’s CHANGELOG says the Getting Started completion model is now based on `structureBuilt`, conflicting with the README’s first-session-set transition claim.
+  - **Fix:** Document the actual sequence and transition trigger: build structure, access the Work Explorer/module row, create or import the plan, run **AI Sets** and save the generated session sets, then invoke “start the next session.” Replace the first-session-set form-transition claim with behavior matching the implemented `structureBuilt` completion model.

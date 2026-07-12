@@ -176,10 +176,13 @@ one-time per-machine setup — install the `copilot` CLI, log in to your
 tenant, run the auth-preflight — walked through in
 [docs/copilot-seat-setup-checklist.md](docs/copilot-seat-setup-checklist.md);
 an unauthenticated seat is blocked at session start rather than silently
-faking verification.) From there the form hands you copyable
-prompts for drafting `docs/planning/project-plan.md` and decomposing
-it into session sets with your AI agent. The four-tier budget mapping
-is documented in
+faking verification.) The form's optional second section, **Define
+modules**, creates `docs/modules.yaml` on demand (explicit action only)
+so the Work Explorer can group session sets by module — with a copyable
+AI prompt that fills it in. Drafting `docs/planning/project-plan.md` and
+decomposing it into session sets now happen from the **per-module row
+actions** in the tree (and the Command Palette), one click from the
+module they belong to. The four-tier budget mapping is documented in
 [docs/ai-led-session-workflow.md → Cost-budgeted verification modes](docs/ai-led-session-workflow.md#cost-budgeted-verification-modes).
 
 Setting up without VS Code? See the manual-setup note in

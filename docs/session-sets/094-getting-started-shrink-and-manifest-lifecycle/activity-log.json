@@ -1,7 +1,7 @@
 {
   "sessionSetName": "094-getting-started-shrink-and-manifest-lifecycle",
   "createdDate": "2026-07-12T08:40:40.912379+00:00",
-  "totalSessions": 0,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -75,6 +75,70 @@
       "stepKey": "session-001/step-5-tests",
       "dateTime": "2026-07-12T05:27:41.607203-04:00",
       "description": "Updated html/actions/detection/moduleAuthoring/scaffold suites for the two-section form + payload; added ensureModulesManifest matrix, no-write-on-read, openModulesManifestFlow flow, two-section render, scaffold skip-existing-manifest tests; watcher-inventory allowlist updated; Layer 3 Define-modules smoke added.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/step-1-register",
+      "dateTime": "2026-07-12T07:01:44.915301-04:00",
+      "description": "Registered Session 2 (claude/anthropic/claude-opus-4-8/high, per operator invocation; S1 routed rec was Fable-5 for cost \u2014 advisory). Read spec + S1 disposition/ai-assignment/next-orchestrator analysis; preload complete; keys present.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/step-2-architecture",
+      "dateTime": "2026-07-12T07:10:48.292961-04:00",
+      "description": "Routed architecture ruling (gpt-5-4/openai, tier 3, $0.20) on the two S2 design decisions; saved s2-parallel-and-d6-architecture.json. Adopted: (1a) Command-Palette escape hatch dabbler.generateParallelSessionSetPrompt (parallelHint setting flagged Major \u2014 sticky state contaminates common path); keep options.parallel/PARALLEL_GUIDANCE fed solely by the new command; regression test pins default prompt still documents prerequisites: (shelving != removal). (2a) D6 form button + palette command; ensureModulesManifest before building the pointer prompt in the shared command body only (never a render path).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/step-2-d6-command",
+      "dateTime": "2026-07-12T07:36:09.181110-04:00",
+      "description": "D6 module-decomposition copy-prompt: new dabbler.copyModuleDecompositionPrompt command + Define-modules 'Copy AI decomposition prompt' form button (copy-decomposition-prompt gettingStartedAction) sharing one flow; ensureModulesManifest BEFORE building the pointer prompt (4th ensure-write site, explicit-action only); manifest header references the command. Unit tests: copyModuleDecompositionPrompt.test.ts + gettingStartedActions/Html + moduleAuthoring header pin; Layer-3 smoke asserts the new button. 239 relevant tests green, tsc clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/step-3-parallel-shelving",
+      "dateTime": "2026-07-12T07:36:09.444918-04:00",
+      "description": "Parallel-sets UI shelved with escape hatch (routed 1a): dabbler.generateParallelSessionSetPrompt Command-Palette command is now the sole live feeder of options.parallel/PARALLEL_GUIDANCE; primary paths omit it. prerequisites: machinery + worktree tooling untouched. Regression suite pins default omits guidance but still documents prerequisites:, hatch re-emits it, and the parallel-session commands stay contributed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/step-4-docs-pass",
+      "dateTime": "2026-07-12T07:36:09.779519-04:00",
+      "description": "Docs pass: compat matrix marked shipped-state (Sets 092-094 landed); quick-start + both READMEs updated for the two-section form + Work Explorer rename; 092 rename residue swept across repository-reference/workflow/authoring-guide/CLAUDE/AGENTS/GEMINI/CONTRIBUTING (20 renames, 2 historical release-records preserved). getting-started.md.template teaching-doc rewrite DEFERRED to Set 095 (verdict-assigned onboarding rewrite); screenshots pending refresh \u2014 both recorded as pre-publish caveats.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/step-5-release-prep",
+      "dateTime": "2026-07-12T07:36:10.127148-04:00",
+      "description": "Release prep: extension bumped 0.41.0->0.42.0 as the single 091-094 release-boundary VSIX; CHANGELOG omnibus 0.42.0 entry covering Sets 087+091-094, superseding the never-published 0.41.0 (086 folds in); publish runbook confirmed runnable + fully tag-driven/operator-gated (push vsix-v0.42.0; workflow verifies tag vs package.json; needs green Test). Extension-only \u2014 no coordinated router bump. UAT (suggested/non-gating): 092 human walks pending operator, comprehensive UX UAT re-cut is Set 095's (verdict); 094 surface Layer-2/3 covered \u2014 pre-publish UAT is operator-adjudicated.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/step-6-build-verify",
+      "dateTime": "2026-07-12T08:32:22.414928-04:00",
+      "description": "Build+full suite green: compile clean, tsc clean, extension unit 1487, Playwright 26 (incl. two-section+D6 button smoke + no-write-on-activation E2E), pytest 2922/6 (unchanged \u2014 zero Python touched). Cross-provider verify (gpt-5-6, anthropic excluded): R1+R2 each 1 Major on the shipping README onboarding sequence (circular first-run path). Fixed in flight by tracing selectExplorerMode + documenting the palette-first path; operator adjudicated the fix as resolving at the 2-round cap (ISSUES_FOUND_RESOLVED_IN_FLIGHT).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/step-9-guidance-review",
+      "dateTime": "2026-07-12T08:32:22.695908-04:00",
+      "description": "Step 9 reorg review of project-guidance.md / lessons-learned.md: NO structural changes recommended. The README onboarding-sequence Major is a textbook L-064-8 instance (verify current-behavior doc claims against code before verification) \u2014 already active, cite it; admission test fails 'recent recurrence' for a first occurrence, so no new always-loaded lesson. Layer-3-before-close (L-064-12) applied (Playwright ran locally for the form button change). lessons_cited: L-064-8, L-064-12.",
       "status": "complete"
     }
   ]

@@ -81,12 +81,19 @@ export type SessionGenTierSource = "form" | "marker" | "inference";
 
 export interface SessionGenPromptOptions {
   /**
-   * Set 060 S2 (spec D4/D7): when the operator checks "Create parallel
-   * session sets where possible", the copied prompt instructs the AI to
-   * decompose for concurrency — independent sets, explicit ordering via
-   * the existing ``prerequisites:`` spec field (no new schema), so any
-   * set without prerequisites can run in parallel in its own git
-   * worktree.
+   * When true, the copied prompt instructs the AI to decompose for
+   * concurrency — independent sets, explicit ordering via the existing
+   * ``prerequisites:`` spec field (no new schema), so any set without
+   * prerequisites can run in parallel in its own git worktree.
+   *
+   * Set 094 S2 (verdict amendment 7): the "Create parallel session sets where
+   * possible" form checkbox that used to set this (Set 060 S2 spec D4/D7) is
+   * RETIRED. The sole live feeder is now the advanced
+   * ``dabbler.generateParallelSessionSetPrompt`` Command-Palette command — the
+   * escape hatch for the narrow multiple-branches-in-one-module case. The
+   * primary decomposition paths (the palette ``generateSessionSetPrompt`` and
+   * the Set 093 ``ai-sets`` row action) leave this unset, so ``PARALLEL_GUIDANCE``
+   * never contaminates a normal prompt.
    */
   parallel?: boolean;
   /**
@@ -130,7 +137,17 @@ export interface SessionGenPromptOptions {
   module?: { slug: string; planPath: string };
 }
 
-const PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** The operator asked for parallel session sets
+// Set 094 S2 (verdict amendment 7): the parallel-session-sets UI is SHELVED —
+// the "Create parallel session sets where possible" form checkbox is gone
+// (Set 094 S1) and no primary path sets `parallel: true`. This block is now
+// fed ONLY by the advanced escape hatch (the
+// `dabbler.generateParallelSessionSetPrompt` Command-Palette command below,
+// for the narrow multiple-branches-in-one-module case). The `prerequisites:`
+// MACHINERY and the worktree tooling are untouched — shelving the UI is not
+// removing the mechanism (routed ruling s2-parallel-and-d6-architecture.json
+// Q1/Q2: 1a Command-Palette variant, not a sticky `parallelHint` setting that
+// would silently contaminate the common decomposition path).
+const PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** You asked for parallel session sets
   where possible: the orchestration runs independent session sets concurrently in
   separate git worktrees, merged back to the main branch when the sets complete.
   Minimize cross-set dependencies; when one set genuinely must follow another,
@@ -419,6 +436,18 @@ export function registerSessionGenPromptCommand(context: vscode.ExtensionContext
   context.subscriptions.push(
     vscode.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
       await copySessionSetGenPrompt(context);
-    })
+    }),
+    // Set 094 S2 (verdict amendment 7): the shelved parallel-sets UI's escape
+    // hatch — the ONLY live feeder of `parallel: true`. A deliberate,
+    // per-invocation Command-Palette variant for the narrow
+    // multiple-branches-in-one-module case (routed ruling 1a, chosen over a
+    // sticky `parallelHint` setting). The `prerequisites:` machinery + worktree
+    // tooling it references are untouched — this is UI shelving, reversible.
+    vscode.commands.registerCommand(
+      "dabbler.generateParallelSessionSetPrompt",
+      async () => {
+        await copySessionSetGenPrompt(context, { parallel: true });
+      },
+    ),
   );
 }

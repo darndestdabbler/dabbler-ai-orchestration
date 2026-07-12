@@ -274,9 +274,10 @@ test("Getting Started renders exactly two sections with the Define-modules butto
   // Rendering-only smoke on the shrunken form (requiresE2E: suggested; the
   // ensure-write ACTIONS stay Layer-2-covered): the empty-repo form paints
   // (1) exactly two sections — Build project structure + Define modules,
-  // (2) the Define-modules "Open modules.yaml" button, and (3) none of the
-  // retired plan / session-set / New-module actions or the parallel
-  // checkbox that left the form in Set 094.
+  // (2) the Define-modules "Open modules.yaml" + "Copy AI decomposition
+  // prompt" (Set 094 S2, D6) buttons, and (3) none of the retired plan /
+  // session-set / New-module actions or the parallel checkbox that left the
+  // form in Set 094.
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-two-section");
@@ -298,9 +299,13 @@ test("Getting Started renders exactly two sections with the Define-modules butto
     await expect(
       inner.locator(".gs-step-title", { hasText: "Define modules (optional)" }),
     ).toBeVisible();
-    // (2) the Define-modules "Open modules.yaml" button.
+    // (2) the Define-modules "Open modules.yaml" + "Copy AI decomposition
+    // prompt" (Set 094 S2, D6) buttons.
     await expect(
       inner.locator('[data-gs-action="open-modules"]'),
+    ).toBeVisible();
+    await expect(
+      inner.locator('[data-gs-action="copy-decomposition-prompt"]'),
     ).toBeVisible();
     // (3) the retired actions + parallel checkbox are gone from the form.
     for (const gone of [

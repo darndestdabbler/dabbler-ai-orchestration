@@ -3,12 +3,108 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.41.0] — Unreleased (Set 086 — Copilot-seat verdict legibility + setup-checklist onboarding)
+## [0.42.0] — Unreleased (Sets 087 + 091–094 — Work Explorer module-first redesign)
 
-> Prepared in Set 086 (S2); **not yet published**. The Marketplace
-> publish is an operator-gated action (tag `vsix-v0.41.0`). Until then
-> the registry-live extension remains `0.40.0`. Accompanies
-> `dabbler-ai-router 0.31.0`.
+> **The single 091–094 release-boundary VSIX** (verdict: no Marketplace
+> publish until Sets A–D of the Work Explorer module-first redesign are all
+> in — a half-migrated UX is worse than either whole). The Marketplace +
+> Open VSX publish stays an **operator-gated** action (push tag
+> `vsix-v0.42.0` per the [CONTRIBUTING publish runbook](../../CONTRIBUTING.md#publishing);
+> the workflow verifies the tag against this `package.json` version). Until
+> then the registry-live extension remains `0.40.0`.
+>
+> **Supersedes the never-published `0.41.0`** (Set 086, below): `0.41.0` was
+> prepared but never tagged/published, so a `0.40.0 → 0.42.0` upgrade also
+> delivers the Set-086 diagnostics/verdict-legibility changes documented
+> under `0.41.0`. Extension-only — no coordinated `dabbler-ai-router` bump
+> is required (the module-first redesign adds no new router dependency; the
+> router's own 088–090 work is a separate, independently-gated release).
+>
+> **Pre-publish note:** the scaffolded `getting-started.md` teaching doc
+> still describes the pre-redesign Getting Started flow; **Set 095** (the
+> re-homed 087 S4 Hello World walkthrough) rewrites it for the new
+> two-section form + modules UX. Recommend Set 095 lands before (or with)
+> this Marketplace publish so newly-scaffolded repos get an accurate
+> onboarding doc.
+
+### Added
+
+- **(Set 087) Module-organized projects — the `docs/modules.yaml` manifest
+  + Work Explorer module grouping.** A tolerant manifest reader
+  (`slug`/`title`/`codeRoots`/`planPath`/`touches`), fail-loud global
+  session-set-name uniqueness, the "New Module" scaffold + module-target
+  picker the authoring flows share, and an Explorer tier that groups
+  session sets by module (module → status buckets → rows), with CODEOWNERS
+  + monorepo-CI ownership templates.
+- **(Set 091) Empty-manifest validity + the always-present canonical
+  template.** `modules: []` and a bare `modules:` now read as a VALID empty
+  manifest; the appender grows either empty form into its first block-style
+  entry; `MODULES_YAML_TEMPLATE` (header comments + commented examples +
+  `modules: []`) is the canonical scaffold. Pseudo-module semantics
+  (`Default`/`Unassigned`), undeclared-slug fallback groups, and the legacy
+  root-plan mapping ship the Q8 compat matrix
+  ([`docs/planning/work-explorer-compat-matrix.md`](../../docs/planning/work-explorer-compat-matrix.md)).
+- **(Set 093) Persistent per-module `Plan` / `Session sets` child nodes**
+  (state-bearing: present/missing, blocked-until-plan/empty/bucketed) and
+  the **module-row action strip / context menu** (AI plan, import plan,
+  open plan, AI sets, and the `Unassigned`-only "Assign legacy sets to
+  module…" atomic stamp flow).
+- **(Set 094) Create-on-demand `docs/modules.yaml` + the two-section
+  Getting Started form.** The form shrinks to **Build project structure**
+  + **Define modules (optional)**; `docs/modules.yaml` is created from the
+  canonical template on **explicit user actions only** (never on
+  activation — adjudication A) across five call sites (scaffold, the form's
+  and toolbar's **Open modules.yaml**, **Add module**, and the D6 copy).
+  New Work Explorer toolbar **Open modules.yaml** button
+  (`dabbler.openModulesManifest`).
+- **(Set 094 S2) The D6 module-decomposition copy-prompt command**
+  (`dabbler.copyModuleDecompositionPrompt`, plus a **Copy AI decomposition
+  prompt** button in the Define-modules section) — a pointer-style prompt
+  that has an AI agent decompose the project into modules and fill in
+  `docs/modules.yaml`; it is the fourth ensure-write site and is referenced
+  from the manifest header comment.
+- **(Set 094 S2) `dabbler.generateParallelSessionSetPrompt`** — the
+  advanced Command-Palette escape hatch that re-enables the parallel-sets
+  decomposition guidance for the narrow multiple-branches-in-one-module
+  case (see Changed).
+
+### Changed
+
+- **(Set 092) Single-dialect renderer + the "Work Explorer" rename.** The
+  host/webview render through one module-aware dialect
+  (`computeVisibleModules` / `buildVisibleModulePayloads`); the sole
+  pseudo-module auto-expands and is de-emphasized; a **System Status /
+  diagnostics strip** surfaces provider-key/Python/workspace-init faults
+  and `modules.yaml` validation warnings (last-known-good render; never
+  auto-overwrites an invalid manifest). The tree view's display label is
+  now **Work Explorer** (the contributed view id is unchanged).
+- **(Set 094 S2) Parallel-session-sets UI shelved (reversible).** The
+  "Create parallel session sets where possible" form checkbox and its
+  primary-path prompt guidance are removed; the `prerequisites:` ordering
+  machinery and the worktree tooling are untouched (the parallel guidance
+  survives only behind the new `dabbler.generateParallelSessionSetPrompt`
+  escape hatch).
+- **(Set 094) Getting Started completion model re-derived** to the single
+  `structureBuilt` flag; the orphaned `planPresent`/`sessionSetsPresent`
+  flags and the retired plan / session-set / New-module form actions left
+  the form (Set 093's per-module row actions + the Command Palette own them
+  now).
+
+### Rollback
+
+- Install `0.40.0` (confirmed live on the VS Code Marketplace, published
+  2026-07-07): `code --install-extension
+  DarndestDabbler.dabbler-ai-orchestration@0.40.0`. `0.40.0` predates the
+  module-first redesign — the Work Explorer renders the pre-087 flat
+  session-set list; no state or config migration is involved (the
+  `docs/modules.yaml` manifest is simply ignored by the older renderer).
+
+## [0.41.0] — Unreleased, superseded by 0.42.0 (Set 086 — Copilot-seat verdict legibility + setup-checklist onboarding)
+
+> Prepared in Set 086 (S2) but **never tagged or published standalone** —
+> **superseded by `0.42.0` above**, which is the VSIX that actually ships
+> these changes to the Marketplace. Left here as the record of the Set-086
+> work folded into that release. Accompanies `dabbler-ai-router 0.31.0`.
 
 ### Added
 

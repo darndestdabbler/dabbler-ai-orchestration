@@ -39,12 +39,17 @@
     "Modules group your session sets by area of the project — one team per " +
     "module. Solo or single-area projects can skip this: your work stays " +
     "under a single default group.";
+  // Set 094 S2 (spec D6): the SAVE copy references the decomposition-prompt
+  // button (the copy command is the fourth ensure-write site). The button
+  // hands an AI a ready-made prompt that fills docs/modules.yaml in; the human
+  // still SAVEs (the ensure-write only creates the scaffold).
   var DEFINE_MODULES_SAVE_TEXT =
-    "Open docs/modules.yaml and declare your modules — or ask an AI " +
-    "assistant to decompose the project into modules for you — then SAVE " +
-    "the file. The Work Explorer regroups your session sets as soon as you " +
-    "save.";
+    "Open docs/modules.yaml and declare your modules — or use Copy AI " +
+    "decomposition prompt to hand an AI assistant a ready-made prompt that " +
+    "fills the file in for you — then SAVE the file. The Work Explorer " +
+    "regroups your session sets as soon as you save.";
   var OPEN_MODULES_BUTTON_LABEL = "Open modules.yaml";
+  var COPY_DECOMPOSITION_BUTTON_LABEL = "Copy AI decomposition prompt";
 
   // Set 063 S2 (spec D1): the Full-tier budget / NTE step inside the
   // Build-project-structure step. The label/help copy frames the value
@@ -505,6 +510,12 @@
       '<div class="gs-note" role="note">' + escHtml(DEFINE_MODULES_SAVE_TEXT) + '</div>' +
       '<button class="gs-button" type="button" data-gs-action="open-modules">' +
         escHtml(OPEN_MODULES_BUTTON_LABEL) +
+      '</button>' +
+      // Set 094 S2 (spec D6): the decomposition-prompt button — ensures
+      // docs/modules.yaml (the fourth ensure-write site) then copies the
+      // module-decomposition prompt for an AI assistant.
+      '<button class="gs-button" type="button" data-gs-action="copy-decomposition-prompt">' +
+        escHtml(COPY_DECOMPOSITION_BUTTON_LABEL) +
       '</button>',
     );
     return (
@@ -532,6 +543,7 @@
     DEFINE_MODULES_INTRO_TEXT: DEFINE_MODULES_INTRO_TEXT,
     DEFINE_MODULES_SAVE_TEXT: DEFINE_MODULES_SAVE_TEXT,
     OPEN_MODULES_BUTTON_LABEL: OPEN_MODULES_BUTTON_LABEL,
+    COPY_DECOMPOSITION_BUTTON_LABEL: COPY_DECOMPOSITION_BUTTON_LABEL,
     BUDGET_LABEL_TEXT: BUDGET_LABEL_TEXT,
     BUDGET_HELP_TEXT: BUDGET_HELP_TEXT,
     BUDGET_ZERO_CHOICE_TEXT: BUDGET_ZERO_CHOICE_TEXT,

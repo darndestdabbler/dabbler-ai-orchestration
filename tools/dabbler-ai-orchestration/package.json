@@ -1,8 +1,8 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Getting Started form (the onboarding entry point), session-set explorer, and cost dashboard for the Dabbler AI-led workflow.",
-  "version": "0.41.0",
+  "description": "Getting Started form (the onboarding entry point), Work Explorer, and cost dashboard for the Dabbler AI-led workflow.",
+  "version": "0.42.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -208,6 +208,16 @@
       {
         "command": "dabbler.generateSessionSetPrompt",
         "title": "Generate Session-Set Prompt",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.generateParallelSessionSetPrompt",
+        "title": "Generate Parallel Session-Set Prompt (advanced)",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.copyModuleDecompositionPrompt",
+        "title": "Copy Module Decomposition Prompt",
         "category": "Dabbler"
       },
       {

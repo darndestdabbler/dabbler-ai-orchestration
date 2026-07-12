@@ -4,10 +4,13 @@
 > current repo state, adopted from the operator-confirmed verdict of the
 > Work Explorer module-first UX panel (gpt-5-4's Q8 matrix; see
 > [`docs/proposals/2026-07-11-work-explorer-module-first-ux/verdict.md`](../proposals/2026-07-11-work-explorer-module-first-ux/verdict.md)).
-> Authored in Set 091 S2. **Sets 092–094 consume this matrix as their
-> compat test checklist**: every row names the Set 091 test that pins its
-> model-layer behavior, and the renderer/interaction sets add their own
-> row-level pins on top without changing the model semantics below.
+> Authored in Set 091 S2. **This is now the shipped-state contract** —
+> Sets 092 (renderer), 093 (interaction model), and 094
+> (onboarding/lifecycle) all landed against this matrix and ship together
+> at the single 091–094 release boundary. Every row names the Set 091 test
+> that pins its model-layer behavior; the renderer/interaction sets added
+> their own row-level pins on top without changing the model semantics
+> below.
 >
 > **Model source of truth:** `computeVisibleModules(classification,
 > allSets, {legacyRootPlanExists})` in
@@ -83,26 +86,29 @@ unless another file is named. Warning codes are the structured
 | Pseudo-module plan mapping | Always `LEGACY_ROOT_PLAN_REL` regardless of file existence | `the pseudo-module always carries LEGACY_ROOT_PLAN_REL as planPath, whether or not the file exists (ruling Q7)` |
 | Declared plan resolution | Explicit safe `planPath` kept; absent defaults; unsafe degrades to the default. Inside the **pure** `computeVisibleModules` the degradation is silent data (`resolveModulePlanRelPath`); the interactive flows' `modulePlanRelPath` wrapper carries the console warning | `declared modules resolve planPath purely: explicit value kept, absent defaults, unsafe degrades WITHOUT any console side effect` and `resolveModulePlanRelPath reports the degradation as data; the modulePlanRelPath wrapper still warns for the interactive flows` |
 | Never-persist guard | Pseudo-module authoring writes no `module:` line on any writer path (`{{MODULE_LINE}}`, session-gen prompt, planning prompt, scaffold); only a picked manifest entry is ever stamped | the `Set 091 S2 — never-persist module: default guard` suite |
-| Rendering byte-stability until Set 092 | The shipping host/webview still render exclusively through `groupByModule`/`buildModulePayloads`; `computeVisibleModules` is exported, unconsumed | the `Set 091 S2 — rendering byte-stability` suite + the Layer 3 smoke (`session-sets-tree.spec.ts`) |
+| Rendering path (shipped) | Set 092 switched the host/webview to render through `computeVisibleModules` / `buildVisibleModulePayloads` (the single dialect); the pre-092 `groupByModule`/`buildModulePayloads` path survives only as the test-only legacy producer. (Historically, Set 091 S2 shipped `computeVisibleModules` exported-but-unconsumed, pinned by the `Set 091 S2 — rendering byte-stability` suite.) | the Set 092 per-row rendering pins + the Layer 3 smoke (`session-sets-tree.spec.ts`) |
 
-## Notes for Sets 092–094
+## How Sets 092–094 implemented this matrix (shipped)
 
-- **Set 092 (renderer switch):** consume `computeVisibleModules` as the
-  single dialect's input; render `warning` codes in the diagnostics
-  strip; auto-expand + visually de-emphasize the sole pseudo-module
-  (adjudication B); update every Playwright pin/testid/doc atomically;
-  add a per-row rendering pin for each matrix row above. Manifest-level
-  faults must also surface when the pseudo-module is hidden (rows 3/9
-  all-stamped variants) — the renderer derives that from the manifest
-  classification it already holds; the module-level warning codes
-  complement, never replace, that surface. The Set 091 S1
+- **Set 092 (renderer switch) — shipped.** The single dialect consumes
+  `computeVisibleModules`; the diagnostics strip renders the `warning`
+  codes; the sole pseudo-module auto-expands and is visually
+  de-emphasized (adjudication B); the Playwright pins/testids/docs moved
+  atomically; a per-row rendering pin covers each matrix row above.
+  Manifest-level faults surface even when the pseudo-module is hidden
+  (rows 3/9 all-stamped variants), derived from the manifest
+  classification the renderer already holds — the module-level warning
+  codes complement, never replace, that surface. The Set 091 S1
   adjudicated-minor residual (exotic empty-list serializations refuse
-  loudly with a copyable entry block) belongs to this set's manifest
+  loudly with a copyable entry block) shipped in this set's manifest
   guardrails.
-- **Set 093 (interaction model):** the pseudo-module's `Plan` node state
-  derives from `planPath` + existence; `Assign legacy sets to module…`
-  acts on row-7 state; unify the wizard modules' local
-  `docs/planning/project-plan.md` literals onto `LEGACY_ROOT_PLAN_REL`.
-- **Set 094 (onboarding/lifecycle):** ensure-writes are explicit-action
-  only (adjudication A); the always-present template
+- **Set 093 (interaction model) — shipped.** The pseudo-module's `Plan`
+  node state derives from `planPath` + existence; `Assign legacy sets to
+  module…` acts on row-7 state; the wizard flows' local
+  `docs/planning/project-plan.md` literals unified onto
+  `LEGACY_ROOT_PLAN_REL`.
+- **Set 094 (onboarding/lifecycle) — shipped.** Ensure-writes are
+  explicit-action only (adjudication A) across the five call sites
+  (scaffold, form + toolbar Open modules.yaml, Add module, copy
+  decomposition prompt); the always-present template
   (`MODULES_YAML_TEMPLATE`, Set 091 S1) classifies as row 4/5 state.

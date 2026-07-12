@@ -22,6 +22,7 @@ import { registerInstallAiRouterCommands } from "./commands/installAiRouterComma
 import { registerGetStartedCommand } from "./commands/gettingStartedDoc";
 import { registerNewModuleCommand } from "./commands/newModule";
 import { registerOpenModulesManifestCommand } from "./commands/openModulesManifest";
+import { registerCopyModuleDecompositionPromptCommand } from "./commands/copyModuleDecompositionPrompt";
 import { registerAssignLegacySetsCommand } from "./commands/assignLegacySets";
 import { registerPlanImportCommand } from "./wizard/planImport";
 import { registerSessionGenPromptCommand } from "./wizard/sessionGenPrompt";
@@ -309,6 +310,9 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerNewModuleCommand", () => registerNewModuleCommand(context));
   safeRegister("registerOpenModulesManifestCommand", () =>
     registerOpenModulesManifestCommand(context),
+  );
+  safeRegister("registerCopyModuleDecompositionPromptCommand", () =>
+    registerCopyModuleDecompositionPromptCommand(context),
   );
   safeRegister("registerAssignLegacySetsCommand", () =>
     registerAssignLegacySetsCommand(context),

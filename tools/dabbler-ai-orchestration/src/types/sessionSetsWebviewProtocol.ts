@@ -394,10 +394,17 @@ export interface ReadyMsg {
 // Set 093's per-module row actions + the Command Palette own them now — and
 // `open-modules` joined for the Define-modules "Open modules.yaml" button
 // (create-if-absent from the canonical template, then open the file).
+//
+// Set 094 Session 2 (spec D6 / verdict amendment 8): `copy-decomposition-prompt`
+// joined for the Define-modules "Copy AI decomposition prompt" button — the
+// FOURTH ensure-write site (ensure docs/modules.yaml, then copy the pointer-
+// style module-decomposition prompt; runs the same shared flow the
+// `dabbler.copyModuleDecompositionPrompt` palette command drives).
 export type GettingStartedActionId =
-  | "open-folder"          // no-folder surface: showOpenDialog -> vscode.openFolder
-  | "build-structure"      // Build project structure: no-prompt structure-only scaffold (D5)
-  | "open-modules";        // Define modules: ensure docs/modules.yaml, then open it (D1)
+  | "open-folder"                // no-folder surface: showOpenDialog -> vscode.openFolder
+  | "build-structure"            // Build project structure: no-prompt structure-only scaffold (D5)
+  | "open-modules"               // Define modules: ensure docs/modules.yaml, then open it (D1)
+  | "copy-decomposition-prompt"; // Define modules: ensure docs/modules.yaml, then copy the D6 prompt
 
 export interface GettingStartedActionMsg {
   type: "gettingStartedAction";

@@ -482,7 +482,7 @@ not-in-flight session, regardless of who ran the previous one.
 
 **Across-set parallel is supported.** Two different session sets can
 each have their own in-progress session at the same time, with any
-combination of orchestrators. The Session Set Explorer renders
+combination of orchestrators. The Work Explorer renders
 multiple in-progress sets natively.
 
 **Per-orchestrator declaration contract (T3).** Hooks pass only the
@@ -537,7 +537,7 @@ Set 051 S2 when the orphaned `ai_router/joiner/` subpackage — whose
 only live caller, the Explorer harvest surface, was reverted in
 Set 049 — was deleted.)
 
-**Set 045 Explorer surface is reverted.** The Session Set Explorer
+**Set 045 Explorer surface is reverted.** The Work Explorer
 does not render orchestrator info, harvest-record badges, or
 coordination-conflict pills (operator-locked P4). The `ai_router/joiner/`
 log-harvest subpackage was removed entirely in Set 051 S2 (no live
@@ -581,7 +581,7 @@ time.
 
 **How the operator triggers it:**
 
-- **Right-click in the Session Set Explorer.** The `Cancel Session
+- **Right-click in the Work Explorer.** The `Cancel Session
   Set` action is visible on in-progress / not-started / complete
   items; `Restore Session Set` is visible on cancelled items. Both
   prompt for confirmation and offer an optional reason that is
@@ -1241,7 +1241,7 @@ system a consumer happens to use.
 
 The orchestrator declares "session N is in flight" on disk **before
 any other work in the session**. This is the prevention layer that
-keeps the Session Set Explorer's bucket transitions clean: the set
+keeps the Work Explorer's bucket transitions clean: the set
 moves to **In Progress** (or advances its fraction between sessions)
 the moment the boundary write lands, not whenever the first
 activity-log entry happens to flush. The v0.13.11 defensive guards
@@ -1742,7 +1742,7 @@ any write:
   always (the not-started spec-seed rewrite is the only sanctioned B→A
   surface, and only while no activity-log record exists).
 
-The Session Set Explorer's `Set Up Dedicated Verification…` action on a
+The Work Explorer's `Set Up Dedicated Verification…` action on a
 **completed** Mode-A row runs this writer (and only on writer success
 aligns the spec seed and copies the verification kickoff prompt); on a
 **not-started** row the same action rewrites the spec seed instead (no
@@ -2017,7 +2017,7 @@ same ladder so they can never disagree with the gate:
   latest-round `WAIVED` (with its required reason) is a durable opt-out
   and is never nagged; bare absence always is. The banner names the exact
   next action and never blocks the start.
-- The Session Set Explorer's row description carries the words
+- The Work Explorer's row description carries the words
   `verification owed` / `remediation owed`, and the row's **Start Next
   Session** copy action auto-routes to the verification-kickoff or
   remediation-handoff prompt in those states instead of handing out a
@@ -3136,7 +3136,7 @@ This is the authoritative rules list. Instruction files (`CLAUDE.md`,
     never held up by the human reviewing proposals.
 16. **Register session start before the first activity-log entry.** Run
     `python -m ai_router.start_session` (Full tier) at Step 1 so
-    external tooling (VS Code Session Set Explorer, dashboards) sees
+    external tooling (VS Code Work Explorer, dashboards) sees
     the set as in-progress immediately. `close_session` handles the
     flip to `complete` at Step 8, including reading
     `verification_verdict` from `disposition.json` and persisting it to

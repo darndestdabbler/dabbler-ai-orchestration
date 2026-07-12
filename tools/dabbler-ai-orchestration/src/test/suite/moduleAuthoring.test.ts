@@ -103,6 +103,20 @@ suite("moduleAuthoring — ensureModulesManifest (Set 094)", () => {
     }
   });
 
+  test("the canonical template header references the D6 decomposition command (spec D6)", () => {
+    // Verdict amendment 8: the decomposition prompt is REFERENCED from the
+    // manifest header — never embedded as a giant comment block. Pin the
+    // pointer (the command title) and the absence of a pasted prompt body.
+    assert.ok(
+      MODULES_YAML_TEMPLATE.includes("Copy Module Decomposition Prompt"),
+      "header names the decomposition command",
+    );
+    assert.ok(
+      !MODULES_YAML_TEMPLATE.includes("Module-decomposition request"),
+      "the prompt body is not embedded in the manifest header",
+    );
+  });
+
   test("present (valid) manifest: never overwritten, created:false (idempotent)", () => {
     const root = tmpRoot("ensure-present-");
     try {

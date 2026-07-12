@@ -694,3 +694,38 @@ each id is in the active tier (D2: one id, one trailer).
   2026-06-12 (commits 4cc135e, a139f22, 61a9bbf — first-ever green
   run 27420899764); if the workflow goes red again, fix it in-flight
   rather than letting a standing failure re-accumulate.
+
+---
+
+## Archived by Set 095 (preload-ceiling triage — L-095-1 admission)
+
+## Pin `max_tier` On Wording-Only Re-Verifies; Never Pin A Substantive One Below Round 1
+<!-- lesson: id="L-064-7" added-set="064" last-used-set="083" status="archived" scope="portable" -->
+
+- A wording-only re-verify (substance correct, verdict format off —
+  gpt-5-4 has returned format-shortfall on clean reviews twice, Sets
+  081/082) legitimately produces a short response, which trips the
+  short-response escalation to another tier and provider (one observed
+  case added an excluded $0.54 Opus call). Pin
+  `max_tier=<the verifier's own tier>` (gpt-5-4 = 3) on wording-only
+  re-verifies. The pin is a **ceiling only**: a *substantive* re-verify
+  must stay on or above the Round-1 verifier's tier — a Set 070 misapply
+  pinned below it and silently broke the cross-provider guarantee.
+- **Archival rationale (Set 095):** now executable-gate-encoded — the
+  `verify_session` CLI refuses a sub-Round-1 `--max-tier` on substantive
+  re-verifies unless `--wording-only` is passed, so the admission test's
+  "no executable-gate equivalent" criterion no longer holds.
+
+## A Rollback Recipe Must Name A Registry-Live Version
+<!-- lesson: id="L-078-1" added-set="078" last-used-set="085" status="archived" scope="portable" -->
+
+- "Decided in the repo" and "installable by an operator" are different
+  facts: a rollback step naming a not-yet-published version fails at the
+  exact moment it is needed — a live incident. Before shipping any
+  rollback/downgrade instruction, confirm every named version is actually
+  installable from the target registry (PyPI, npm, Marketplace); for a
+  coordinated multi-package release, check each named version
+  independently — one half being live does not imply the other.
+- **Archival rationale (Set 095):** situational trigger (authoring a
+  rollback/release instruction), not per-session context; search the
+  archive at that trigger moment.

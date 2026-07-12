@@ -85,18 +85,16 @@ whose trigger moment is situational, moved full-text to
   fail-open branch around such I/O must NAME the skip in operator-facing
   output.
 
-## Pin `max_tier` On Wording-Only Re-Verifies; Never Pin A Substantive One Below Round 1
-<!-- lesson: id="L-064-7" added-set="064" last-used-set="083" status="active" scope="portable" -->
+## Archived lessons (Set 095 preload-ceiling triage)
+<!-- lesson-pointer: archived-set="095" -->
 
-- A wording-only re-verify (substance correct, verdict format off —
-  gpt-5-4 has returned format-shortfall on clean reviews twice, Sets
-  081/082) legitimately produces a short response, which trips the
-  short-response escalation to another tier and provider (one observed
-  case added an excluded $0.54 Opus call). Pin
-  `max_tier=<the verifier's own tier>` (gpt-5-4 = 3) on wording-only
-  re-verifies. The pin is a **ceiling only**: a *substantive* re-verify
-  must stay on or above the Round-1 verifier's tier — a Set 070 misapply
-  pinned below it and silently broke the cross-provider guarantee.
+L-095-1's admission required demotions (ceilings ratchet down only);
+full text in `lessons-archive.md`:
+
+| id | where the rule lives now |
+| :--- | :--- |
+| L-064-7 | executable-gate-encoded in the `verify_session` CLI (sub-Round-1 `--max-tier` refused without `--wording-only`) |
+| L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
 <!-- lesson: id="L-064-8" added-set="063" last-used-set="095" status="active" scope="portable" -->
@@ -139,16 +137,19 @@ whose trigger moment is situational, moved full-text to
   imports and parses the exact args the downstream step will pass. Record
   the resolved installed version at close, not just the declared floor.
 
-## A Rollback Recipe Must Name A Registry-Live Version
-<!-- lesson: id="L-078-1" added-set="078" last-used-set="085" status="active" scope="portable" -->
+## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
+<!-- lesson: id="L-095-1" added-set="095" last-used-set="095" status="active" scope="portable" -->
 
-- "Decided in the repo" and "installable by an operator" are different
-  facts: a rollback step naming a not-yet-published version fails at the
-  exact moment it is needed — a live incident. Before shipping any
-  rollback/downgrade instruction, confirm every named version is actually
-  installable from the target registry (PyPI, npm, Marketplace); for a
-  coordinated multi-package release, check each named version
-  independently — one half being live does not imply the other.
+- Reviewers are salience-limited, not context-limited: each pass returns
+  the most salient handful of technically-real findings, and fixing them
+  reshuffles salience for the next (Set 095: 17 rounds, 39 fresh Majors,
+  zero disputed, no convergence). Grade severity by CONSEQUENCE —
+  probability the stated failure scenario materializes for a real user ×
+  impact on the deliverable's objectives; low-probability OR low-impact
+  is Minor even when technically correct; no plausible failure scenario
+  ⇒ Minor by definition. The first rubric-graded round returned VERIFIED.
+  Until the rubric ships in the verification template, carry it in each
+  round's up-front conventions block.
 
 ---
 

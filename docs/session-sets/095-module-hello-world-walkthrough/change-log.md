@@ -74,8 +74,9 @@
 
 ## Verification & suite
 
-- Suite at close: pytest 2922 passed / 6 skipped; extension unit 1487
-  (including the moved template pins + regenerated goldens); Playwright
+- Suite at close: pytest 2922 passed / 6 skipped (re-run after the final
+  doc state); extension unit 1487 (re-run after each template change,
+  including the moved pins + twice-regenerated goldens); Playwright
   Layer 3 26 passed (run locally per L-064-12); `tsc --noEmit` clean.
 - Cross-provider verification (gpt-5-6, anthropic excluded): **R1
   ISSUES_FOUND — four Majors, all accepted and fixed in flight**: (1) the
@@ -155,23 +156,67 @@
   **last-match-wins** semantics — effective owner sets, final matching
   pattern cited, override blind spots called out (P5 recheck, P4 coverage
   fact, extraction instruction, and the report template all updated).
-- **Loop suspension (operator adjudication requested).** Five rounds
-  produced 19 findings — every one fresh, all accepted and fixed in
-  flight, none disputed — with the grain getting steadily finer (R1:
-  manifest-vs-walkthrough contradiction → R5: a missing `git pull` line
-  and CODEOWNERS rule-ordering). Per the severity-gated stop rule
-  (operator order, Sets 085/086) and the constitution's bounded-round
-  discipline, the orchestrator stopped opening rounds after R5 rather
-  than grinding a sixth: a hands-on tutorial has effectively unbounded
-  reviewable surface, and the verifier — while genuinely useful every
-  round — shows no sign of converging to zero on it. **State at
-  suspension:** all R5 fixes are applied and committed; the R5 fixes
-  themselves are the only unverified delta; the suite is green; the
-  dogfood acceptance has held across three consecutive runs. Operator
-  options: (a) adjudicate the R5 fixes as resolving and close via the
-  attested path (the 094 S2 precedent), (b) request verification round 6
-  (~$0.30) on the R5 delta, (c) request a third-provider opinion, or
-  (d) reshape any finding. The disposition records `requires_review`.
+- **Loop suspension and operator directive.** After R5 the orchestrator
+  suspended the loop per the severity-gated stop rule (5 rounds, 19
+  findings, all fresh, all fixed, none disputed, steadily finer grain)
+  and requested adjudication. The **operator directed the loop to
+  continue** while findings remain genuinely Major ("if reviews continue
+  to uncover undisputed major issues, they are doing their job"), and
+  opened a separate design discussion on containing discovery-phase
+  scope (see `s1-next-set-analysis.json` follow-ons and the session
+  report).
+- **R6 — VOID-BY-EVIDENCE.** The session had been committed at
+  suspension, so R6's default diff-vs-HEAD bundle was ~empty and the
+  verifier's single finding correctly reports "nothing to review" — an
+  orchestrator process error (`--diff-base` not repointed), not a
+  substantive round. Artifact retained raw; all later rounds run with
+  `--diff-base 34d4149` (the pre-session ref).
+- **R7 ISSUES_FOUND — two fresh Majors, both accepted and fixed**: (1)
+  the walkthrough's all-modules CI command is now guarded for the
+  pre-implementation `main` (`if [ -d services ]` — the guardrails PR
+  merges before any module code exists, so the bare discover command
+  would have turned `main` red immediately); (2) the evidence script's
+  remote-branch dedupe now compares commit IDs, so a stale local branch
+  can no longer suppress its newer remote twin. No dogfood re-run for
+  R7 (recorded, not silent: the dedupe is remote-repo logic the
+  remote-less scratch repo cannot exercise; the doc-embedded script was
+  re-syntax-checked).
+- **R8–R17 — ten more rounds, 13 more Majors, all accepted and fixed,
+  none disputed** (full per-round detail in `s1-cross-round-ledger.md`;
+  raw rounds in `s1-verification-round-*.md`): one-coherent-repo-state
+  evidence gathering (`git show` at the review base; branch-added specs
+  from their branches); the complete final `monorepo-ci.yml` in Part 7
+  (three path-scoped jobs + a never-vacuously-green all-modules
+  guardrail — per-module zero-test failure, absent-dir handling) with
+  the `contents: read` permissions fix applied to the shipped
+  `monorepo-ci.yml.template`'s worked example too (L-069-1 sibling;
+  goldens + dist regenerated); serialized authoring with explicit
+  command blocks for every PR; branch protection moved after the solo
+  setup pushes with admin-bypass and auto-delete-head-branches settings;
+  per-merge sync + branch cleanup everywhere (one global squash/rebase
+  rule); hotfix validated at the exact tagged commit before tagging;
+  per-machine `Dabbler: Install ai-router` for fresh clones; teammate
+  Write-access grants at repo creation; dated branch tips + divergence
+  counts in the evidence bundle with P1/P7 ADVISORY caps; P5
+  last-match-wins effective-owner resolution; P6 production-target
+  evidence rule; P4 coverage re-keyed to the changed touched paths'
+  aggregated effective owners (both integration shapes). Dogfood parity
+  re-ran through round 8 — the planted violation FAILed with exact
+  citations in every one of the eight runs.
+- **Severity re-grounding and termination (operator, 2026-07-12).** At
+  R16 the operator set a consequence-based severity rubric (Major =
+  probable failure scenario for a real user × material impact on the
+  solution's objectives; low-probability OR low-impact = Minor even when
+  technically correct) and a hard cap of 21 rounds. The rubric entered
+  the conventions block at R18 — which returned **VERIFIED, zero
+  findings**, terminating the loop three rounds under the cap. Totals:
+  18 rounds (1 void — the R6 empty-evidence process error), 39 blocking
+  findings, all accepted and fixed in flight, zero disputed;
+  verification spend $4.88 of a $5.25 session total. The loop's shape
+  (real-but-ever-finer findings, no convergence until severity was
+  consequence-graded) is the primary input to the phased-verification
+  framework proposal recorded in the session report and
+  `s1-next-set-analysis.json` follow-ons.
 - UAT: `requiresUAT: suggested` was **not armed** (no operator opt-in at
   session start; this close ran autonomously). The walkthrough itself is
   authored to the UAT instruction bar and doubles as the operator's

@@ -32,7 +32,8 @@ jobs:
   # changes:
   #   runs-on: ubuntu-latest
   #   permissions:
-  #     pull-requests: read
+  #     contents: read        # declaring ANY permission zeroes the rest;
+  #     pull-requests: read   # checkout needs contents, the filter needs PRs
   #   outputs:
   #     greeter: ${{ steps.filter.outputs.greeter }}
   #     clock: ${{ steps.filter.outputs.clock }}

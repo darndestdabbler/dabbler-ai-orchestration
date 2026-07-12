@@ -119,7 +119,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   per-session routed verification had missed.
 
 ## A Bug Is A Bug CLASS — Fix Every Sibling Site, Not Just The Reported One
-<!-- lesson: id="L-069-1" added-set="069" last-used-set="093" status="archived" scope="portable" -->
+<!-- lesson: id="L-069-1" added-set="069" last-used-set="095" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-19**
   after application across Sets 068 (origin: the `contract_gate` `UnicodeError` fix),

@@ -30,8 +30,6 @@ On Full-tier repos you can run the review through the router, which picks the mo
 3.  Run it with the workspace venv: `.venv\Scripts\python.exe run_review.py` on Windows, `.venv/bin/python run_review.py` on macOS/Linux.
 
 ```python
-import glob
-import io
 import os
 import re
 import subprocess
@@ -53,26 +51,49 @@ def sh(*args):
         return f"(command unavailable: {err})"
 
 
-# Gather the evidence the prompt names (a routed model cannot read files).
-paths = (
-    ["docs/modules.yaml", ".github/CODEOWNERS"]
-    + sorted(glob.glob("docs/session-sets/*/spec.md"))
-    + sorted(glob.glob("docs/modules/*/project-plan.md"))
-    + sorted(glob.glob(".github/workflows/*.yml"))
-    + sorted(glob.glob(".github/workflows/*.yaml"))
-)
 evidence = []
-for p in paths:
-    try:
-        evidence.append(f"--- {p} ---\n" + io.open(p, encoding="utf-8").read())
-    except OSError as err:
-        evidence.append(f"--- {p} --- (unreadable: {err})")
-# Fetch first, and RECORD the outcome — a silent fetch failure would let
+# Fetch FIRST, and RECORD the outcome — a silent fetch failure would let
 # the review confidently score stale remote refs.
 fetch = subprocess.run(["git", "fetch", "--all", "--prune"],
                        capture_output=True, text=True)
 evidence.append("--- git fetch --all --prune (freshness; nonzero = STALE remote evidence) ---\n"
                 + f"exit={fetch.returncode}\n" + (fetch.stdout + fetch.stderr or "(ok)"))
+
+# Resolve ONE coherent review base — the freshest main available — and read
+# every policy file FROM THAT COMMIT, never from the working tree. A stale
+# or dirty checkout must not mix repository states into the evidence.
+base = "origin/main" if sh("git", "rev-parse", "--verify", "-q",
+                           "origin/main").strip() else "main"
+base_sha = sh("git", "rev-parse", "--short", base).strip()
+evidence.append(f"--- review base: {base} ({base_sha}) ---\n"
+                "All policy files below are read from this commit, so file "
+                "evidence and branch-diff evidence share one repository state. "
+                "If the fetch above failed, treat every principle scored from "
+                "remote state as ADVISORY.")
+
+
+def at_base(path):
+    p = subprocess.run(["git", "show", f"{base}:{path}"],
+                       capture_output=True, text=True)
+    return p.stdout if p.returncode == 0 else None
+
+
+listed = sh("git", "ls-tree", "-r", "--name-only", base,
+            "docs/session-sets", "docs/modules", ".github/workflows").splitlines()
+paths = (
+    ["docs/modules.yaml", ".github/CODEOWNERS"]
+    + sorted(p for p in listed
+             if p.startswith("docs/session-sets/") and p.endswith("/spec.md"))
+    + sorted(p for p in listed
+             if p.startswith("docs/modules/") and p.endswith("project-plan.md"))
+    + sorted(p for p in listed
+             if p.startswith(".github/workflows/")
+             and (p.endswith(".yml") or p.endswith(".yaml")))
+)
+for p in paths:
+    body = at_base(p)
+    evidence.append(f"--- {base}:{p} ---\n"
+                    + (body if body is not None else "(absent at the review base)"))
 evidence.append("--- git log --oneline --graph --decorate --all -50 ---\n"
                 + sh("git", "log", "--oneline", "--graph", "--decorate",
                      "--all", "-50"))
@@ -101,27 +122,44 @@ for fam_tags in families.values():
         evidence.append(f"--- ancestry {older} -> {newer} ---\n"
                         + (f"NOT an ancestor; commits only in {older}:\n{rev}"
                            if rev.strip() else f"{older} is an ancestor of {newer}"))
-# Diff every session branch against the FRESHEST main we have. Enumerate
-# LOCAL AND REMOTE branches — a teammate's pushed branch is exactly where
-# a scope violation hides. Skip main, origin/HEAD, and remote duplicates
-# of local branches.
-base = "origin/main" if sh("git", "rev-parse", "--verify", "-q",
-                           "origin/main").strip() else "main"
-evidence.append(f"--- scope-diff base: {base} ---\n(diffs below use {base})")
-locals_ = set(sh("git", "for-each-ref", "refs/heads",
-                 "--format=%(refname:short)").split())
-remotes = [b for b in sh("git", "for-each-ref", "refs/remotes",
-                         "--format=%(refname:short)").split()
-           if not b.endswith("/HEAD")]
-branches = sorted(locals_ - {"main"}) + sorted(
-    b for b in remotes
-    if b.split("/", 1)[-1] not in locals_ and b.split("/", 1)[-1] != "main")
+# Diff every session branch against the review base. Enumerate LOCAL AND
+# REMOTE branches — a teammate's pushed branch is exactly where a scope
+# violation hides. Skip main and origin/HEAD; treat a remote ref as a
+# duplicate of a local branch ONLY when both point at the SAME commit —
+# a stale local twin must never suppress the newer remote ref.
+local_sha = {}
+for line in sh("git", "for-each-ref", "refs/heads",
+               "--format=%(refname:short) %(objectname)").splitlines():
+    if line.strip():
+        name, sha = line.split()
+        local_sha[name] = sha
+remote_refs = []
+for line in sh("git", "for-each-ref", "refs/remotes",
+               "--format=%(refname:short) %(objectname)").splitlines():
+    if not line.strip():
+        continue
+    name, sha = line.split()
+    short = name.split("/", 1)[-1]
+    if name.endswith("/HEAD") or short == "main":
+        continue
+    if local_sha.get(short) == sha:
+        continue  # true duplicate: same commit as the local ref
+    remote_refs.append(name)
+branches = sorted(set(local_sha) - {"main"}) + sorted(remote_refs)
 for branch in branches:
-    evidence.append(f"--- git diff {base}...{branch} --name-only ---\n"
-                    + sh("git", "diff", f"{base}...{branch}", "--name-only"))
+    diff_out = sh("git", "diff", f"{base}...{branch}", "--name-only")
+    evidence.append(f"--- git diff {base}...{branch} --name-only ---\n" + diff_out)
     evidence.append(f"--- divergence {base}...{branch} (behind / ahead) ---\n"
                     + sh("git", "rev-list", "--left-right", "--count",
                          f"{base}...{branch}"))
+    # A branch that ADDS a session set carries the only copy of its spec
+    # (and so its module: stamp) — gather it from the branch itself.
+    for p in diff_out.splitlines():
+        if p.startswith("docs/session-sets/") and p.endswith("/spec.md"):
+            bs = subprocess.run(["git", "show", f"{branch}:{p}"],
+                                capture_output=True, text=True)
+            if bs.returncode == 0:
+                evidence.append(f"--- {branch}:{p} (branch spec) ---\n" + bs.stdout)
 # PR review data, best-effort: needs the gh CLI, a GitHub remote, and auth.
 # A failure here just means "review evidence unavailable" — the prompt
 # scores the owner-review principle ADVISORY in that case, never guesses.
@@ -154,6 +192,8 @@ Your tone must be that of a helpful coach, not a scolding linter. Your feedback 
 **Process:**
 
 First, gather evidence by reading the specified files and running the git commands from the repository root. If an "EVIDENCE BUNDLE" section is appended below this prompt, treat it as the gathered evidence and work from it instead of reading files yourself. Do not hallucinate or guess file contents. If a file or command output is unavailable, state that.
+
+Gather from ONE coherent repository state: fetch first and review against the freshest `main` (prefer `origin/main`). If the checkout you are reading files from is not synchronized with that state — or the fetch failed — say so and cap the principles that depend on the out-of-sync evidence at `ADVISORY`. Never mix policy files from one commit with branch diffs against another.
 
 Second, for each of the seven principles below, evaluate the evidence you gathered.
 
@@ -249,11 +289,11 @@ Evaluate the gathered evidence against these seven principles.
 
 **Principle 4: Integration `touches` & Owner Review**
 *   **Check:** Work that intentionally spans multiple modules must belong to a module whose declaration in `docs/modules.yaml` includes a `touches:` list naming the other modules — and the touched modules' owners must actually review that work. Keep four different facts separate, and say which ones you have evidence for:
-    1.  **Coverage** — the integration module's paths resolve (last-match-wins — see Principle 5) to an effective owner set that includes the touched modules' owners. Proven by `.github/CODEOWNERS` contents alone, but only via that ordered resolution — the mere existence of a listing rule is not coverage if a later rule overrides it.
+    1.  **Coverage** — judged on the CHANGED PATHS, not on the integration module's own directories: for every changed path admitted through `touches` (i.e. inside a touched module's `codeRoots`), the final matching CODEOWNERS rule (last-match-wins — see Principle 5) must include that touched module's owner, and the aggregated effective owners across the PR must therefore include every touched module's owner. When the integration module also owns composition code of its own (`codeRoots` non-empty) and the PR changes it, that path's effective owners should include the touched owners too. An integration module with the legal `codeRoots: []` shape has no paths of its own — coverage for it is ONLY the changed-path aggregation; never report deficient coverage merely because no integration-owned path lists all owners.
     2.  **Auto-request** — GitHub requests those owners on a PR (never the PR's own author). Follows from coverage, but only for hosted PRs.
     3.  **Enforcement** — branch protection actually requires approvals (or code-owner reviews) before merge. Proven only by protection/ruleset data or PR `reviewDecision` output.
     4.  **Completed approvals** — the touched owners approved specific PRs. Proven only by PR review data (the `gh pr list` output above).
-*   **Good:** A set in the `reporting` module, which has `touches: [auth, billing]`, changes `auth` and `billing` code; CODEOWNERS composes `@auth-team` and `@billing-team` on the relevant paths (coverage), and the gathered PR data shows both teams' approving reviews on that PR (completed approvals).
+*   **Good:** A set in the `reporting` module (`codeRoots: []`, `touches: [auth, billing]`) changes `auth/**` and `billing/**`; resolving those changed paths gives effective owners `@auth-team` and `@billing-team` respectively, so the PR's aggregated owners include both (coverage), and the gathered PR data shows both teams' approving reviews (completed approvals).
 *   **Bad:** Cross-module changes without a `touches` declaration; CODEOWNERS not composing the touched owners; or — an evidence failure, not a workflow failure — claiming owner review happened based on CODEOWNERS contents or a merge-commit message alone.
 *   **Evidence rule:** with no PR review data, cap this principle at `ADVISORY`: report coverage (fact 1) from CODEOWNERS, state that request/enforcement/approval evidence is unavailable, and name what would settle it (an authenticated `gh` run, or a screenshot of the PR's review panel). Never infer completed reviews from local git artifacts.
 
@@ -269,6 +309,7 @@ Evaluate the gathered evidence against these seven principles.
 *   **Good:** `git for-each-ref` shows annotated tags with a clear scheme, and the range log between consecutive tags shows only the intended commits.
 *   **Bad:** Lightweight tags, inconsistent schemes, long-lived `release/*` branches, or a patch tag placed on post-merge `main` that sweeps in unreleased work.
 *   **Evidence rule:** if the evidence at hand does not show tag targets and ancestry (no decorated log, no range logs), cap this principle at `ADVISORY` and say which command would settle it. Never write "presumably" — an unverifiable claim is unavailable evidence.
+*   **Production-target rule:** tag MECHANICS (annotated, consistent scheme, correct ancestry, hotfix-from-tag) are provable from git alone — score them as above. Whether PRODUCTION actually runs a tag is a separate fact that git history cannot prove: look for a tag-triggered deploy job in the gathered workflows (`on: push: tags:`), or an environment/release record naming the deployed tag. With such evidence, say so and score the whole principle; without it, report the mechanics result, state that the production-target half is unevidenced, cap the principle at `ADVISORY`, and name what would settle it. Never infer "production runs the tag" from the tags merely existing.
 
 **Principle 7: Integration-Bomb Symptoms**
 *   **Check:** This is a meta-principle looking for signs of deferred integration pain. Look for multiple completed but unmerged session-set branches piling up. Check for a disabled or missing all-modules integration job in CI for the `main` branch. Scan for branches that have drifted from `main` for more than a week or two — judge drift from the dated branch tips and the per-branch divergence counts (behind/ahead), not from names or an undated graph.
@@ -298,7 +339,7 @@ Produce a single Markdown document. Do not include any text before the first hea
 *   **Coaching:** [Explain the risk of scope creep. Advise on how to fix it, e.g., "The set 'add-user-avatar' in the 'profile' module modified files in the 'notifications' module. This work should be moved to a dedicated integration set owned by a module with a `touches: [notifications]` declaration."]
 
 ### 4. Integration `touches` & Owner Review — <PASS | ADVISORY | FAIL>
-*   **Evidence:** [Cite the `touches` declarations and the CODEOWNERS coverage of the integration paths. Cite completed approvals ONLY from gathered PR review data; if that data is unavailable, say so, score ADVISORY, and name what would settle it. Never cite a merge-commit message as proof of review.]
+*   **Evidence:** [Cite the `touches` declarations, and coverage as the effective owners of the CHANGED touched paths (final matching rule per path, aggregated across the PR — not the integration module's own directories). Cite completed approvals ONLY from gathered PR review data; if that data is unavailable, say so, score ADVISORY, and name what would settle it. Never cite a merge-commit message as proof of review.]
 *   **Coaching:** [Reinforce the importance of making dependencies explicit and of the touched owners actually approving. If there's a gap, recommend updating `modules.yaml` / `CODEOWNERS`, or tightening branch protection.]
 
 ### 5. CODEOWNERS Coverage — <PASS | ADVISORY | FAIL>
@@ -306,8 +347,8 @@ Produce a single Markdown document. Do not include any text before the first hea
 *   **Coaching:** [Explain that missing or overridden ownership leads to missed reviews. Suggest the specific rule to add — or to move above/below the overriding rule.]
 
 ### 6. Tag Correctness / Production-as-a-Tag — <PASS | ADVISORY | FAIL>
-*   **Evidence:** [Cite `git for-each-ref` for tag types AND the decorated log / per-tag range logs for where tags point and what each release added. A PASS requires ancestry evidence; without it, score ADVISORY and name the missing command. No "presumably".]
-*   **Coaching:** [Explain why annotated tags on the right commits are crucial for releases. Recommend a consistent scheme and process for tagging.]
+*   **Evidence:** [Cite `git for-each-ref` for tag types AND the decorated log / per-tag range logs for where tags point and what each release added. A PASS requires ancestry evidence AND production-target evidence (e.g. a tag-triggered deploy workflow); with mechanics-only evidence, report the mechanics result and score ADVISORY, naming the missing deployment evidence. No "presumably".]
+*   **Coaching:** [Explain why annotated tags on the right commits — and a production that provably runs them — are crucial for releases. Recommend a consistent scheme and process for tagging.]
 
 ### 7. Integration-Bomb Symptoms — <PASS | ADVISORY | FAIL>
 *   **Evidence:** [Cite long-lived, unmerged branches. Mention the status of the all-modules CI job on the `main` branch (present and active, or missing/disabled).]

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 12,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The all-modules guardrail can skip an untested module and still pass\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The walkthrough promises an **“all-modules guardrail”** that tests the entire integrated codebase and says the job iterates module directories “with the same count guard.” A green job must not omit one module merely because other modules have tests.\n  - **Impact:** If one module has zero discoverable tests while another has tests, the zero-test module is silently skipped and the aggregate job succeeds. This produces a false-green integration result despite claiming that all modules were tested.\n  - **Evidence:** In `docs/tutorials/module-team-hello-world.md`, Part 7, the loop runs a module only when its count is positive:\n    ```bash\n    if [ \"$n\" -gt 0 ]; then\n      total=$((total + n))\n      python -m unittest discover -s \"${d%/}\" -v\n    fi\n    ```\n    It fails only when the aggregate `total` is zero:\n    ```bash\n    if [ \"$total\" -eq 0 ]; then\n      exit 1\n    fi\n    ```\n    Therefore, counts such as `greeter=0`, `clock=1`, and `integration=1` produce a green job without running any greeter tests.\n  - **Correct answer:** Fail inside the loop whenever any expected module directory collects zero tests, then run that module’s suite. Alternatively, iterate an explicit list of expected modules and require a positive test count for each one.",
+      "category": "Correctness",
+      "severity": "Major"
+    },
+    {
+      "description": "The hotfix cleanup omits the required post-merge synchronization\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The tutorial must be **“copy-pasteable, runnable”** and its final checklist requires that no merged branches linger. Browser merges update `origin/main`, so local `main` must be pulled before deleting a branch with `git branch -d`.\n  - **Impact:** Following Part 10 literally leaves local `main` stale and can make `git branch -d hotfix/greeting-typo` fail with “not fully merged.” The walkthrough therefore cannot reliably reach its promised clean end state.\n  - **Evidence:** Part 10 says to merge the hotfix PR and immediately clean up with:\n    ```bash\n    git branch -d hotfix/greeting-typo\n    ```\n    Unlike Parts 4, 5, 7, 8, and 9, it provides no intervening:\n    ```bash\n    git switch main\n    git pull --ff-only\n    ```\n    If the local checkout remains on the hotfix branch, deletion also fails because Git cannot delete the currently checked-out branch.\n  - **Correct answer:** After the browser merge, explicitly run:\n    ```bash\n    git switch main\n    git pull --ff-only\n    git branch -d hotfix/greeting-typo\n    git fetch --prune\n    ```\n    The walkthrough should also specify a merge strategy compatible with `-d`, or explain safe cleanup after a squash/rebase merge.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 11,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The `changes` job denies `actions/checkout` the repository permission it requires\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The task requires a “copy-pasteable, runnable” walkthrough with functioning path-scoped CI.\n  - **Impact:** The `changes` job can fail at `actions/checkout@v4`, blocking every PR once `changes` becomes a required check. GitHub sets every unspecified `GITHUB_TOKEN` permission to `none` when a job declares any explicit permission, so granting only `pull-requests: read` removes `contents: read`.\n  - **Evidence:** The complete workflow in `docs/tutorials/module-team-hello-world.md` Part 7 defines:\n    ```yaml\n    changes:\n      permissions:\n        pull-requests: read\n      steps:\n        - uses: actions/checkout@v4\n    ```\n    `actions/checkout` requires repository-content access, particularly for private repositories, but this job explicitly provides none.\n  - **Correct answer:** Grant both permissions:\n    ```yaml\n    permissions:\n      contents: read\n      pull-requests: read\n    ```\n- **Location:** `docs/tutorials/module-team-hello-world.md`, Part 7 step 2, `changes` job.\n- **Fix:** Add `contents: read` to the job’s permissions and validate the complete workflow with GitHub Actions or an appropriate workflow checker.",
+      "category": "Correctness",
+      "severity": "Major"
+    },
+    {
+      "description": "Every path-scoped required check can pass without executing a test\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Details:**\n  - **Violation:** The tutorial claims each module PR “is tested before merge” and must provide runnable path-scoped CI.\n  - **Impact:** `unittest discover` exits successfully when it discovers zero tests. A module PR can therefore receive a green required check despite having no discoverable tests—for example, when an AI omits the promised test or places it under a non-package nested directory. The all-modules guardrail runs only after merge, so it cannot prevent that untested PR from landing.\n  - **Evidence:** All three PR jobs run only:\n    ```yaml\n    python -m unittest discover -s services/<module> -v\n    ```\n    Unlike the later `all-modules` job, none checks that at least one test was collected. The walkthrough requires “a unit test” but does not prescribe a file/package layout that guarantees discovery.\n  - **Correct answer:** Give each module job a deterministic test layout or runner and fail when `countTestCases()` is zero, while also failing on ordinary test failures.\n- **Location:** `docs/tutorials/module-team-hello-world.md`, Part 7 step 2, `greeter`, `clock`, and `integration` jobs.\n- **Fix:** Add a nonzero-test assertion to every path-scoped job or prescribe and validate an explicit test layout that cannot produce a vacuous green check.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

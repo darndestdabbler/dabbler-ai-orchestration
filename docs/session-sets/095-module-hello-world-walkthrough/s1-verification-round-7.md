@@ -1,0 +1,28 @@
+ISSUES FOUND
+
+## Issue 1: Activating the all-modules command makes `main` fail before any module code exists
+
+- **Category:** Correctness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The walkthrough must be “copy-pasteable, runnable” and teaches that the unconditional `all-modules` job keeps `main` green after every merge. Part 7 instructs users to replace its placeholder with `python -m unittest discover -s services`.
+  - **Impact:** The guardrails PR merges before any session implementation PR. At that point, `services/` does not exist on `main`, so `unittest discover -s services` fails because its start directory is missing. Following the walkthrough therefore immediately produces a red `main`, contradicting the CI guardrail being taught.
+  - **Evidence:** Part 7 merges the workflow while Priya’s and Sam’s implementation code remains only in worktrees; those branches do not merge until Part 8. The only prior changes are scaffolding, module metadata, plans, and session-set files. Nevertheless, Part 7 replaces the active push-to-`main` job with:
+    > `python -m unittest discover -s services`
+- **Location:** `docs/tutorials/module-team-hello-world.md`, Part 7 steps 2–3.
+- **Fix:** Make the initial all-modules command tolerate the pre-implementation state, for example by explicitly succeeding when `services/` is absent and running discovery once it exists. Alternatively, provide a committed placeholder test/package structure before activating that command.
+
+## Issue 2: The evidence script can discard a newer remote branch as a supposed duplicate
+
+- **Category:** Correctness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The review prompt requires inspection of “BOTH local and remote session-set branches” because “a teammate’s pushed branch is exactly where a violation hides.” Only actual duplicate refs may be skipped.
+  - **Impact:** If a local branch and its fetched remote-tracking branch have the same short name but different commits—a normal stale-local scenario—the script inspects only the stale local ref. A scope violation present in the teammate’s newer remote branch can therefore be omitted from the evidence bundle, allowing Principle 3 to return a false `PASS`.
+  - **Evidence:** Remote refs are excluded solely by short-name equality:
+    ```python
+    if b.split("/", 1)[-1] not in locals_
+    ```
+    No object-ID or ancestry comparison establishes that the local and remote refs are duplicates. After `git fetch`, `session-set/X` can remain stale while `origin/session-set/X` advances, yet the latter is suppressed.
+- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md`, routed evidence script’s `branches` construction.
+- **Fix:** Skip a remote ref only when it resolves to the same commit as the corresponding local ref. Otherwise gather diffs and divergence for both, or prefer the fetched remote ref when a matching local branch exists.

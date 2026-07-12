@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 8,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The routed review mixes fresh remote diffs with potentially stale or unmerged local policy files**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The deliverable requires “per-principle scoring with cited evidence,” and the prompt mandates that every claim be backed by gathered evidence. The routed recipe must therefore review one coherent repository state.\n    - **Impact:** Running the documented recipe from a stale `main` checkout or any feature branch can produce materially false scores. For example, it may evaluate a remote session branch against `origin/main` while using an outdated local `modules.yaml`, or report CODEOWNERS coverage as passing based on an unmerged local CODEOWNERS edit. This invalidates Principles 2–5 and can give teams incorrect guardrail advice.\n    - **Evidence:** In `docs/tutorials/module-team-hello-world-review-prompt.md`, the script expands local globs and reads `docs/modules.yaml`, `.github/CODEOWNERS`, session-set specs, plans, and workflows **before** running `git fetch`. Fetching afterward does not update the working tree. The script then explicitly selects `origin/main` as the scope-diff base, so configuration evidence and branch-diff evidence can come from different commits. The run instructions only say to execute at the repository root; they neither require a clean, synchronized `main` checkout nor disclose/cap scoring when the checked-out policy files differ from `origin/main`.\n    - **Fix:** Fetch first, resolve the canonical fresh base, and gather policy files directly from that commit using `git show <base>:<path>`/`git ls-tree`, or require and verify a clean checkout exactly synchronized with that base before reading files. Gather a branch’s `spec.md` from the branch when it is not present on the base. If synchronization or fetch fails, record that and cap every affected principle at `ADVISORY`.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

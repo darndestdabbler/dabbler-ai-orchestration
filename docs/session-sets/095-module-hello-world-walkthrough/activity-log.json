@@ -108,6 +108,102 @@
       "dateTime": "2026-07-12T09:55:08.296751-04:00",
       "description": "Round-5 verification (gpt-5-6, USD 0.30): ISSUES_FOUND, 2 fresh Majors - both accepted and fixed (pull-after-browser-merge sync in Parts 5/8/9; CODEOWNERS last-match-wins effective-owner resolution in the review prompt P4/P5/extraction/template). LOOP SUSPENDED at the declared hard stop per the severity-gated stop rule: 5 rounds, 19 findings, all fresh, all fixed, none disputed, grain steadily finer - no convergence to zero on an unbounded doc surface. R5 fixes are the only unverified delta. Disposition set to requires_review; work committed+pushed; operator adjudication requested (attested close / round 6 / third opinion / reshape).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 13,
+      "stepKey": "session-001/step-7-round-6-void",
+      "dateTime": "2026-07-12T12:37:45.240808-04:00",
+      "description": "Round 6 (operator-requested) mis-ran: session work was already committed (3429fe5), so the default diff-vs-HEAD evidence bundle was ~empty (1.2KB) and the verifier's single Major correctly says 'nothing to review'. Round declared void-by-evidence (orchestrator process error - forgot --diff-base after the suspension commit); artifact retained raw. Re-running as round 7 with --diff-base 34d4149 (pre-session ref) so the verifier sees the full session delta including the R5 fixes.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 14,
+      "stepKey": "session-001/step-7-remediation-r7",
+      "dateTime": "2026-07-12T12:41:40.422320-04:00",
+      "description": "Round 7 (correct --diff-base 34d4149; gpt-5-6, USD 0.25): ISSUES_FOUND, 2 fresh Majors - both accepted and fixed per the operator's continue-while-Major directive: (1) walkthrough's all-modules CI command guarded for the pre-implementation main (guardrails PR merges before any services/ exists - bare unittest discover would red main immediately); (2) evidence-script remote dedupe now commit-id-based (stale local branch can no longer hide its newer remote twin). Doc script re-syntax-checked; no dogfood re-run (remote-only logic; remote-less scratch repo cannot exercise it - recorded, not silent). Round 8 dispatched with --diff-base.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 15,
+      "stepKey": "session-001/step-7-remediation-r8",
+      "dateTime": "2026-07-12T12:46:44.404549-04:00",
+      "description": "Round 8 (gpt-5-6, USD 0.25): ISSUES_FOUND, 1 fresh Major (trend: 4-5-6-2-2-void-2-1) - accepted and fixed: the routed recipe read policy files from the working tree while diffing branches against origin/main (mixed repository states on a stale checkout). Recipe restructured: fetch first; resolve one review base; read all policy files from that commit (git show/ls-tree); gather branch-added specs from their branches; prompt mandates disclose+ADVISORY on checkout/base mismatch. Dogfood parity round 6 dispatched with the updated gathering.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 16,
+      "stepKey": "session-001/step-7-remediation-r9",
+      "dateTime": "2026-07-12T12:52:21.804688-04:00",
+      "description": "Round 9 (gpt-5-6, USD 0.25): ISSUES_FOUND, 2 fresh Majors - both accepted and fixed: (1) the guarded all-modules command could pass vacuously (unittest discover does not descend into non-package subdirs; Ran-0-tests exits 0) - Part 7 now ships a per-module-dir iteration with a zero-tests fail guard; (2) Part 7 asked newcomers to hand-assemble the workflow - it now carries the complete final monorepo-ci.yml (changes filter + three module jobs matching the required-check names + the never-vacuously-green guardrail). Scratch repo rebuilt with the same final YAML; dogfood parity round 7 dispatched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 17,
+      "stepKey": "session-001/step-7-remediation-r10",
+      "dateTime": "2026-07-12T12:57:59.110667-04:00",
+      "description": "Round 10 (gpt-5-6, USD 0.25): ISSUES_FOUND, 2 fresh Majors - both accepted and fixed: (1) branch cleanup taught end-to-end (GitHub auto-delete-head-branches setting + per-merge git branch -d + fetch --prune + checklist item); (2) P6 production-target rule (tag mechanics provable from git; production-runs-a-tag needs deploy-workflow/release evidence; ADVISORY cap without it). Materiality trend flagged in the ledger: R10 findings are polish-grade vs R1-R3 - approaching the severity-gate boundary. Dogfood parity round 8 dispatched (P6 expected ADVISORY on the deploy-less scratch repo - honest cap, not regression).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 18,
+      "stepKey": "session-001/step-7-remediation-r11",
+      "dateTime": "2026-07-12T13:05:38.979867-04:00",
+      "description": "Round 11 (gpt-5-6, USD 0.25): ISSUES_FOUND, 2 fresh Majors - both accepted and fixed: (1) changes job permissions now include contents: read (explicit permissions zero the rest; checkout would fail on private repos) - fixed in the tutorial AND the shipped monorepo-ci.yml.template worked example (L-069-1 sibling; goldens+dist regenerated, unit 1487 green twice); (2) per-module PR jobs now fail on zero collected tests (countTestCases runner); all-modules guard counts collected tests. Scratch repo rebuilt; parity dogfood skipped this round (recorded: CI internals do not alter the review verdict shape). Round 12 dispatched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 19,
+      "stepKey": "session-001/step-7-remediation-r12",
+      "dateTime": "2026-07-12T13:08:48.913805-04:00",
+      "description": "Round 12 (gpt-5-6, USD 0.25): ISSUES_FOUND, 2 fresh Majors - both in remediation-added code (fix-churn regime): (1) all-modules guardrail now fails on ANY zero-test module dir (and empty services/), not just zero-total; (2) Part 10 hotfix cleanup gained the full sync block + squash/rebase -d note. Scratch repo rebuilt. Round 13 dispatched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 20,
+      "stepKey": "session-001/step-7-remediation-r13",
+      "dateTime": "2026-07-12T13:11:50.478084-04:00",
+      "description": "Round 13 (gpt-5-6, USD 0.25): ISSUES_FOUND, 2 fresh Majors - both accepted and fixed: (1) Sam/Alex per-machine setup (Dabbler: Install ai-router after cloning; .venv is gitignored and never transfers); (2) hotfix drill now validates before tagging (branch push -> PR CI green + approval -> tag the validated commit -> deploy -> merge). Round 14 dispatched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 21,
+      "stepKey": "session-001/step-7-remediation-r14",
+      "dateTime": "2026-07-12T13:16:24.129926-04:00",
+      "description": "Round 14 (gpt-5-6, USD 0.25): ISSUES_FOUND, 2 fresh Majors - both fixed: (1) explicit authoring-branch command blocks for Sam and Alex (placeholder retired); (2) guardrail claim scoped honestly (existing-dirs-only) + explicit declared-codeRoots self-check item - claim-scoping over more CI machinery (simplicity-first). Round 15 dispatched. Cumulative: 14 rounds (1 void), 32 blocking findings, all accepted+fixed, zero disputed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 22,
+      "stepKey": "session-001/step-7-remediation-r15",
+      "dateTime": "2026-07-12T13:19:05.808185-04:00",
+      "description": "Round 15 (gpt-5-6, USD 0.25): ISSUES_FOUND, 2 fresh Majors - both fixed: (1) hotfix drill validates the exact tagged commit locally (PR checks run on the preview merge - now said in the text); (2) squash/rebase branch -d caveat promoted to a single global rule at the first cleanup point. Round 16 dispatched. Cumulative: 15 rounds (1 void), 36 blocking findings, all accepted+fixed, zero disputed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 23,
+      "stepKey": "session-001/step-7-remediation-r16",
+      "dateTime": "2026-07-12T13:22:35.437134-04:00",
+      "description": "Round 16 (gpt-5-6, USD 0.25): ISSUES_FOUND, 1 fresh Major - fixed: Part 1 now grants Sam and Alex Write access (collaborator invites accepted before Part 4; org-team alternative). Cumulative: 16 rounds (1 void), 37 findings, all accepted+fixed, zero disputed. Round 17 dispatched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 24,
+      "stepKey": "session-001/step-7-remediation-r17",
+      "dateTime": "2026-07-12T13:26:46.941538-04:00",
+      "description": "Round 17 (gpt-5-6, USD 0.25): ISSUES_FOUND, 1 Major - graded genuinely Major under the operator's new consequence-based rubric (high probability on house-default codeRoots:[] integration repos; material impact on the review's trustworthy-coaching objective) and fixed: P4 coverage now = changed-touched-paths' effective owners aggregated per PR. OPERATOR DIRECTIVES now in force: consequence-based severity rubric added to the conventions block (rounds 18+); HARD STOP after round 21. Round 18 dispatched.",
+      "status": "complete"
     }
   ]
 }

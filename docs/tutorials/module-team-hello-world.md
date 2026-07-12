@@ -55,6 +55,8 @@ Before you begin, every team member needs:
     git push -u origin main
     ```
 
+4. **Give your teammates access.** A fresh repo belongs to its creator alone — nothing later works (pushes, qualifying approvals, CODEOWNERS review requests) until Sam and Alex can write to it. On the repository page: **Settings** > **Collaborators** (or **Collaborators and teams**) > **Add people** — invite `@sam-gh` and `@alex-gh` with the **Write** role, and have them **accept the email invitations** before Part 4. (On an organization repo, granting an existing team Write access does the same job.)
+
 > **Expect:** `main` exists on GitHub with two files. It is not protected yet — Priya still has two solo setup pushes to make (Parts 2–3); protection goes on at the end of Part 3, before any teammate starts work.
 
 ## Part 2 — Build project structure
@@ -157,6 +159,7 @@ Before you begin, every team member needs:
     - Check **Require a pull request before merging** (leave the default of 1 required approval).
     - Check **Require status checks to pass before merging**. There are no checks to select yet — GitHub can only list checks it has already seen run, so you will come back and select the CI job names in Part 7, after the first workflow run.
     - If you want the rule to bind repository **administrators** too (it should — Priya is an admin), enable the rule's do-not-allow-bypass / include-administrators option; without it, GitHub lets admins push past the rule.
+    - While you are in Settings, also enable **Automatically delete head branches** (under **Settings** > **General**). GitHub then deletes each PR's remote branch on merge — merged branches piling up is exactly the clutter trunk hygiene forbids, and this setting handles the remote half for free. (The local half is one `git branch -d` after each merge; the tutorial reminds you at each spot.)
     - Save the rule. (GitHub's setting names drift over time; the intent is: no direct pushes to `main` for anyone, one approval, green CI.)
 
     > **Expect:** from this point on, a direct `git push` of a `main` commit is rejected — every later change in this tutorial lands through a pull request.
@@ -204,13 +207,22 @@ Before you begin, every team member needs:
     git switch main
     ```
 
-    Open the PR on GitHub and have Sam or Alex approve it — reviewing happens in the browser, so they don't need a clone yet. Merge, then `git pull` on `main`.
+    Open the PR on GitHub and have Sam or Alex approve it — reviewing happens in the browser, so they don't need a clone yet. Merge (GitHub deletes the remote branch automatically per the Part 3 setting), then tidy up locally on `main`:
+
+    ```bash
+    git pull
+    git branch -d authoring/001-greeter-hello
+    ```
+
+    > **One rule for every cleanup in this tutorial:** the steps assume GitHub's default **Create a merge commit** strategy. If your repo merges PRs by **squash** or **rebase** instead, the merged commit gets a new identity, so `git branch -d` will refuse with "not fully merged" at *every* cleanup point from here on — that is git protecting you, not an error in the flow. Verify the PR's changes are on your pulled `main`, then delete with `git branch -D`.
 
     > **Expect:** `origin/main` now contains the greeter plan and `001-greeter-hello`. (The scaffolded CI's placeholder job runs and passes on the PR — the real per-module jobs arrive in Part 7.)
 
 ## Part 5 — Meet the tree ("the tree is the checklist")
 
 **Where you are:** Priya's plan + first set are merged to `origin/main` (Part 4 step 6). Sam and Alex now clone the repo and open it in VS Code. Everyone sees the same tree.
+
+One per-machine setup step first: the `.venv` is ignored by git (Part 1) and exists only on Priya's machine, so **Sam and Alex each run `Dabbler: Install ai-router` from the Command Palette once** after opening their clone — it detects or creates the local `.venv` with the router package. The Work Explorer tree needs no setup, but the worktree commands in Parts 6 and 9 do.
 
 What the Work Explorer now shows, top to bottom:
 
@@ -234,11 +246,21 @@ Do these two in order — **Sam first, then Alex** — because the AI picks each
 
     - Paste it into the AI chat; the agent writes `docs/modules/clock/project-plan.md` (scope: a `now_text()` function in `services/clock/` returning the time as `HH:MM`, plus a test). Save it.
     - Click **AI Sets** on the **Clock** row, paste the copied prompt, and let the agent write `docs/session-sets/002-clock-hello/`.
-    - Land the plan + set on `main` as a small PR (branch, push, teammate approves, merge) — then sync your local checkout, because a browser merge updates only `origin/main`:
+    - Land the plan + set on `main` as a small PR, exactly like Priya did in Part 4:
 
       ```bash
+      git switch -c authoring/002-clock-hello
+      git add docs/modules/clock/project-plan.md docs/session-sets/002-clock-hello
+      git commit -m "docs: clock plan + session set 002-clock-hello"
+      git push -u origin authoring/002-clock-hello
       git switch main
+      ```
+
+      Open the PR, have a teammate approve, merge — then sync and clean up (a browser merge updates only `origin/main`):
+
+      ```bash
       git pull --ff-only
+      git branch -d authoring/002-clock-hello
       ```
 
 2. **Alex (Integration) — after Sam's PR merges:**
@@ -254,7 +276,17 @@ Do these two in order — **Sam first, then Alex** — because the AI picks each
           condition: complete
       ```
 
-    - Land the plan + set on `main` as a small PR, like Sam did.
+    - Land the plan + set on `main` as a small PR, same shape as Sam's:
+
+      ```bash
+      git switch -c authoring/003-integration-compose
+      git add docs/modules/integration/project-plan.md docs/session-sets/003-integration-compose
+      git commit -m "docs: integration plan + session set 003-integration-compose"
+      git push -u origin authoring/003-integration-compose
+      git switch main
+      ```
+
+      PR, approval, merge, then `git pull --ff-only && git branch -d authoring/003-integration-compose`.
 
     > **Expect:** clicking **AI Sets** on a module whose **Plan** node still says missing pops a warning naming the missing plan path and offering **Import Plan** — author the plan first. And once the prerequisites are declared, Alex's set renders as blocked in the tree (its row offers **Open Prerequisite Spec**) until both dependencies complete.
 
@@ -312,9 +344,110 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
 
     Note the integration rule: Alex owns the folder, but Priya and Sam are listed too — the integration module composes *their* code (`touches: [greeter, clock]`), so the owners of every touched module review its PRs.
 
-2. Open `.github/workflows/monorepo-ci.yml`. The template ships with a two-layer contract:
-    - **Path-scoped module jobs** (commented out): uncomment the `changes` filter job and the per-module jobs, and point each filter at that module's `codeRoots` — **one filter + one job per module with code**: `services/greeter/**` for greeter, `services/clock/**` for clock, and add a third pair for `services/integration/**` (the template shows only two as its worked example — every module with a `codeRoot` gets one, so the integration PR in Part 9 is tested before merge too). Replace the placeholder `echo` steps with each module's real test command (for this toy: `python -m unittest discover -s services/greeter`, and likewise for the others).
-    - **The `all-modules` guardrail** (already active): runs on **every** push to `main`, never path-filtered. Replace its placeholder with a command that tests everything, e.g. `python -m unittest discover -s services`. This is the anti-integration-bomb rule: cross-module breakage surfaces on the merge that caused it.
+2. Open `.github/workflows/monorepo-ci.yml`. The scaffolded template teaches a two-layer contract — **path-scoped module jobs** for fast PR feedback, and the **`all-modules` guardrail** on every push to `main` (the anti-integration-bomb rule: cross-module breakage surfaces on the merge that caused it). Rather than hand-assembling it from the template's two commented examples, replace the whole file with this complete, final workflow for our three modules:
+
+    ```yaml
+    name: Monorepo CI
+
+    on:
+      push:
+        branches: [main]
+      pull_request:
+
+    jobs:
+      changes:
+        runs-on: ubuntu-latest
+        permissions:
+          contents: read        # declaring ANY permission zeroes the rest;
+          pull-requests: read   # checkout needs contents, the filter needs PRs
+        outputs:
+          greeter: ${{ steps.filter.outputs.greeter }}
+          clock: ${{ steps.filter.outputs.clock }}
+          integration: ${{ steps.filter.outputs.integration }}
+        steps:
+          - uses: actions/checkout@v4
+          - uses: dorny/paths-filter@v3
+            id: filter
+            with:
+              filters: |
+                greeter:
+                  - 'services/greeter/**'
+                clock:
+                  - 'services/clock/**'
+                integration:
+                  - 'services/integration/**'
+
+      greeter:
+        needs: changes
+        if: needs.changes.outputs.greeter == 'true'
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Test the greeter module (fails on zero tests)
+            run: >
+              python -c "import sys,unittest;
+              s=unittest.defaultTestLoader.discover('services/greeter');
+              sys.exit('ERROR: no tests found in services/greeter') if s.countTestCases()==0
+              else sys.exit(0 if unittest.TextTestRunner(verbosity=2).run(s).wasSuccessful() else 1)"
+
+      clock:
+        needs: changes
+        if: needs.changes.outputs.clock == 'true'
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Test the clock module (fails on zero tests)
+            run: >
+              python -c "import sys,unittest;
+              s=unittest.defaultTestLoader.discover('services/clock');
+              sys.exit('ERROR: no tests found in services/clock') if s.countTestCases()==0
+              else sys.exit(0 if unittest.TextTestRunner(verbosity=2).run(s).wasSuccessful() else 1)"
+
+      integration:
+        needs: changes
+        if: needs.changes.outputs.integration == 'true'
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Test the integration module (fails on zero tests)
+            run: >
+              python -c "import sys,unittest;
+              s=unittest.defaultTestLoader.discover('services/integration');
+              sys.exit('ERROR: no tests found in services/integration') if s.countTestCases()==0
+              else sys.exit(0 if unittest.TextTestRunner(verbosity=2).run(s).wasSuccessful() else 1)"
+
+      all-modules:
+        # Runs on every merge to main, NEVER path-filtered.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - name: Test ALL modules (never vacuously green)
+            run: |
+              if [ ! -d services ]; then
+                echo "No services/ on main yet - guardrail passes vacuously."
+                exit 0
+              fi
+              shopt -s nullglob
+              dirs=(services/*/)
+              if [ ${#dirs[@]} -eq 0 ]; then
+                echo "ERROR: services/ exists but has no module directories."
+                exit 1
+              fi
+              for d in "${dirs[@]}"; do
+                n=$(python -c "import unittest,sys; sys.stdout.write(str(unittest.defaultTestLoader.discover('${d%/}').countTestCases()))")
+                if [ "$n" -eq 0 ]; then
+                  echo "ERROR: no tests collected in ${d%/} - every module must be tested."
+                  exit 1
+                fi
+                python -m unittest discover -s "${d%/}" -v
+              done
+    ```
+
+    Three details worth noticing:
+    - Every module with a `codeRoot` gets its own filter + job (the filters mirror `docs/modules.yaml`), so the integration PR in Part 9 is tested before merge too — and the job names (`greeter`, `clock`, `integration`) are exactly what you select as required checks in step 4.
+    - **An existing module can't go green while testing nothing.** `unittest discover` exits 0 on "Ran 0 tests" (and top-level discovery does not descend into plain, non-package subfolders), so a naive command can pass vacuously — for example when a PR forgot its promised test. Every module job therefore counts collected tests and fails on zero, and the `all-modules` job applies the same count guard to every `services/` directory that exists. One honest boundary: a module whose directory is *entirely missing* is invisible to this job — that gap is owned by the module's own PR review and by the final self-check item that asserts all three declared `codeRoots` exist on `main`.
+    - This guardrails PR merges **before** any module code exists on `main` (the implementation PRs land in Part 8), so the missing-`services/` branch passes vacuously exactly once, at rollout — and says so in the log.
 
 3. Land both files on `main` as a small PR:
 
@@ -325,7 +458,7 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
     git push -u origin chore/guardrails
     ```
 
-    Open the PR on GitHub, have a teammate approve, and merge. From this merge on, the ownership rules and CI jobs are live on `main`.
+    Open the PR on GitHub, have a teammate approve, and merge — then `git switch main && git pull --ff-only && git branch -d chore/guardrails`. From this merge on, the ownership rules and CI jobs are live on `main`.
 
 4. **Finish the Part 3 branch-protection setup.** Now that the workflow has run at least once, GitHub can see the check names. Go back to **Settings** > **Branches** > the `main` rule, and under **Require status checks to pass before merging** search for and select the `changes` filter job **and** the module jobs (`greeter`, `clock`, `integration`). Without this step the checks run but are *not required* — a red check would not block a merge.
 
@@ -356,6 +489,9 @@ The core habit: **merge a set when it completes.** Small, frequent, boring merge
     .venv\Scripts\python.exe -m ai_router.worktree close 001-greeter-hello
     # macOS/Linux:
     .venv/bin/python -m ai_router.worktree close 001-greeter-hello
+    # worktree close leaves the branch for you to delete once merged:
+    git branch -d session-set/001-greeter-hello
+    git fetch --prune
     ```
 
     > **Expect:** the merge to `main` runs the **all-modules** job. After the pull, the Work Explorer in the main checkout shows `001-greeter-hello` in the **Complete** bucket under **Greeter** (the tree reads your *local* files — it can't see a merge you haven't pulled).
@@ -382,7 +518,7 @@ The core habit: **merge a set when it completes.** Small, frequent, boring merge
 
     > **Expect:** because the merged CODEOWNERS rule for `services/integration/` names `@alex-gh @priya-gh @sam-gh`, GitHub automatically requests reviews from **Priya and Sam** (Alex is the author, so he is not asked to review himself). This is the `touches` discipline in practice: the owners of every composed module see the composition before it lands. One honest nuance: CODEOWNERS *requests* those reviews; branch protection is what *requires* an approval before merge (the one-approval rule from Part 1 — the stricter **Require review from Code Owners** option exists too, but with single-owner modules it can deadlock an owner's own PRs, so this tutorial leaves it off).
 
-3. Priya and Sam approve; CI is green; Alex merges, pulls `main` (`git switch main && git pull --ff-only`), and closes his worktree (same `worktree close` command with his slug).
+3. Priya and Sam approve; CI is green; Alex merges, pulls `main` (`git switch main && git pull --ff-only`), closes his worktree (same `worktree close` command with his slug), and deletes the merged branch (`git branch -d session-set/003-integration-compose && git fetch --prune`).
 
     > **Expect:** the all-modules job passes on `main` — the composed program's tests ran together for the first time on the merge that composed them.
 
@@ -406,18 +542,34 @@ The core habit: **merge a set when it completes.** Small, frequent, boring merge
     git switch main
     ```
 
-3. **Hotfix drill.** A bug is found in production (say, the greeting's capitalization) while `main` has already moved on. Fix it **from the deployed tag**, never from `main` — `main` may contain unreleased work you do not want to ship:
+3. **Hotfix drill.** A bug is found in production (say, the greeting's capitalization) while `main` has already moved on. Fix it **from the deployed tag**, never from `main` — `main` may contain unreleased work you do not want to ship. And validate **before** you tag: a pushed annotated tag is immutable-by-convention, so it goes on only after review and green CI.
 
     ```bash
     git switch -c hotfix/greeting-typo v0.1.0
     # ...fix the string in services/greeter/ ...
     git commit -am "fix(greeter): correct the greeting"
-    git tag -a v0.1.1 -m "hello-modules 0.1.1 (hotfix)"
     git push -u origin hotfix/greeting-typo
+    ```
+
+    Open the PR (the path-scoped `greeter` job runs on it — pull requests trigger CI regardless of branch name), get a teammate's approval, and wait for green. One subtlety: the PR check runs against GitHub's *preview merge* of your branch with `main` — good for compatibility, but not literally the snapshot you are about to tag. So validate the exact hotfix commit locally, **then** tag and deploy — and only merge after:
+
+    ```bash
+    git switch hotfix/greeting-typo
+    python -m unittest discover -s services/greeter -v   # the exact snapshot v0.1.1 will point at
+    git tag -a v0.1.1 -m "hello-modules 0.1.1 (hotfix)"
     git push origin v0.1.1
     ```
 
-    Note where the tag went: **`v0.1.1` is on the hotfix commit itself** — exactly `v0.1.0` plus the fix, nothing else. Do *not* merge first and tag `main`: if `main` has unreleased work, a tag placed there would ship it. Deploy `v0.1.1`, then PR the hotfix branch and merge it back to `main` (with an approval, as always) so the fix is not lost from the trunk.
+    Note where the tag went: **`v0.1.1` is on the hotfix commit itself** — exactly `v0.1.0` plus the reviewed, CI-validated fix, nothing else. Do *not* merge first and tag `main`: if `main` has unreleased work, a tag placed there would ship it. Deploy `v0.1.1`, then merge the PR so the fix is not lost from the trunk. After the browser merge, sync and clean up like every other merge:
+
+    ```bash
+    git switch main
+    git pull --ff-only
+    git branch -d hotfix/greeting-typo
+    git fetch --prune
+    ```
+
+    (The tag keeps the release commit reachable forever, so deleting the merged branch loses nothing. If your repo merges PRs by squash or rebase instead of a merge commit, `-d` will refuse — that's git protecting you; verify the fix landed on `main`, then use `-D`.)
 
 4. **Rollback drill.** Pretend `v0.1.1` turns out worse. Rolling back is *not* git surgery — it is deploying the previous tag again:
 
@@ -441,7 +593,9 @@ Tick these off; each one is directly verifiable:
 - [ ] The GitHub **Actions** tab shows path-scoped jobs for all three modules on their PRs (including `integration` on Alex's), and the `all-modules` job on every merge to `main`.
 - [ ] The `changes` filter job and the module jobs are selected as **required** status checks in the `main` branch-protection rule (Part 7 step 4) — a failing check blocks the merge (see Part 7's note on the skipped-check limitation and the production-grade aggregate gate).
 - [ ] `git tag -l` lists `v0.1.0` and `v0.1.1`, and `git for-each-ref refs/tags --format="%(refname:short) %(objecttype)"` shows both as `tag` (annotated).
+- [ ] Every declared `codeRoot` exists on `main` with code and tests: `services/greeter/`, `services/clock/`, and `services/integration/` all match what `docs/modules.yaml` declares (a missing directory is the one gap the `all-modules` job cannot see — this check owns it).
 - [ ] Checking out `v0.1.1` and running the integration program prints the greeting with the time (`Hello, ... It is HH:MM.`).
 - [ ] Worktrees are closed: `.venv/Scripts/python.exe -m ai_router.worktree list` (Windows; `.venv/bin/python` on macOS/Linux) reports no session-set worktrees left open.
+- [ ] No merged branches linger: `git branch --merged main` lists only `main`, and `git branch -r` shows no leftover authoring/guardrails/session-set/hotfix branches (GitHub's auto-delete plus the per-merge `git branch -d` cleanups did their job).
 
 Where to go next: decompose a real project the same way — and run the [module workflow review prompt](./module-team-hello-world-review-prompt.md) on a cadence to keep the habits honest.

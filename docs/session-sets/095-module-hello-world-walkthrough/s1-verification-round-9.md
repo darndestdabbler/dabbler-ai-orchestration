@@ -1,0 +1,31 @@
+ISSUES FOUND
+
+## Issue 1: The all-modules CI command can succeed without running any module tests
+
+- **Category:** Correctness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The walkthrough claims the unconditional `all-modules` job “tests everything” and is the “anti-integration-bomb rule.”
+  - **Impact:** On the supported Python 3.10 path, `unittest discover -s services` does not recursively descend into module directories unless they are importable packages containing `__init__.py`. The tutorial never requires `services/greeter/`, `services/clock/`, or `services/integration/` to contain those files. A valid AI-generated layout can therefore produce `Ran 0 tests` with a successful exit code, allowing cross-module regressions to merge while the advertised integration guardrail remains green.
+  - **Evidence:** Part 7 uses:
+    ```yaml
+    if [ -d services ]; then
+      python -m unittest discover -s services
+    fi
+    ```
+    Parts 4, 5, and 9 require functions and tests under the module directories but never require Python package markers or otherwise ensure recursive discovery. The R7 guard addresses only an absent `services/` directory, not vacuous discovery once that directory exists.
+  - **Correct answer:** Invoke each module suite explicitly, guard each directory independently during incremental rollout, or require package structure and assert that a nonzero number of tests was collected.
+- **Location:** `docs/tutorials/module-team-hello-world.md`, Parts 4, 5, 7, and 9.
+- **Fix:** Replace the all-modules command with a deterministic suite that explicitly discovers all three module directories, or specify and verify the package layout needed for recursive discovery. Add a zero-tests-found failure guard.
+
+## Issue 2: The core path-scoped CI setup is not copy-pasteable
+
+- **Category:** Completeness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The task requires a “copy-pasteable, runnable” walkthrough that exercises “path-scoped / all-module CI.”
+  - **Impact:** The tutorial requires a newcomer to invent the most error-prone part of the workflow: the complete `changes` filter, its outputs, three conditional jobs, and their `needs`/`if` expressions. An incorrect reconstruction can leave the named checks absent or permanently skipped, preventing Part 7’s required-check selection from working and invalidating the PR-CI guarantees used in Parts 8–9.
+  - **Evidence:** Part 7 supplies only the all-modules shell fragment. For path-scoped CI it says to “uncomment” two examples, “add a third pair,” and replace commands, while explicitly acknowledging that the scaffold contains only two worked examples. It never shows the resulting runnable workflow for the three declared modules.
+  - **Correct answer:** Provide the complete final `.github/workflows/monorepo-ci.yml` for this tutorial, including triggers, the three filters, exposed outputs, all three conditional module jobs, and the all-modules push job.
+- **Location:** `docs/tutorials/module-team-hello-world.md`, Part 7 step 2.
+- **Fix:** Add a full copy-pasteable YAML block matching the exact `greeter`, `clock`, and `integration` job names later selected as required checks.

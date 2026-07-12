@@ -34,14 +34,18 @@ doc-claim-vs-code re-check pass is budgeted before verification.
 ### Actuals (filled at close)
 
 - Orchestrator used: claude-code / anthropic / claude-fable-5 (operator-invoked).
-- Routed calls: two documentation drafts (gemini-2.5-pro tier 2 — walkthrough
-  ~$0.10 incl. the router's second-provider auto-verify, review-prompt ~$0.08);
-  five dogfood analysis runs (gemini-2.5-pro, ~$0.02 each,
-  `s1-dogfood-review*.md`); the next-set analysis (gemini-2.5-pro, ~$0.005,
-  `s1-next-set-analysis.json`); five cross-provider verification rounds
-  (gpt-5-6, $0.18 + $0.22 + $0.24 + $0.23 + $0.30 ≈ $1.17). Session total
-  ≈ $1.45. Verification suspended after R5 per the severity-gated stop
-  rule — see `s1-cross-round-ledger.md` and the change-log.
+- Routed calls (final, from `router-metrics.jsonl`): 18 session-verification
+  rounds (gpt-5-6, $4.88 — 1 round void by empty evidence) and 13 other
+  routed calls ($0.37: two documentation drafts incl. the router's
+  auto-verify, eight dogfood analysis runs, the next-set analysis).
+  Session routed total ≈ $5.25.
+- Verification loop story (the set's most instructive output): suspended
+  after R5 per the severity-gated stop rule → operator directed
+  continuation while findings stayed genuinely Major → R6-R17 kept
+  yielding 1-2 real-but-narrowing Majors per round (39 total, all fixed,
+  none disputed) → the operator set a consequence-based severity rubric
+  + a 21-round cap at R17 → R18, the first rubric-graded round, returned
+  **VERIFIED zero findings**. Full ledger: `s1-cross-round-ledger.md`.
 - Deviations from recommendation: orchestrator model (Fable-5 vs the routed
   Sonnet-5/medium) — operator's invocation; recorded above.
 - Notes for next-set calibration: the 094 doc↔behavior-fidelity warning was

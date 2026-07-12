@@ -99,7 +99,7 @@ whose trigger moment is situational, moved full-text to
   pinned below it and silently broke the cross-provider guarantee.
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="094" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="095" status="active" scope="portable" -->
 
 - Prose carried over from a superseded doc was true (or tolerated) in the
   old context and reads authoritative in the new one — a defect class of
@@ -109,7 +109,7 @@ whose trigger moment is situational, moved full-text to
   verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="093" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="095" status="active" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and
@@ -118,7 +118,7 @@ whose trigger moment is situational, moved full-text to
   alongside the diff so additions are visible.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="092" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="095" status="active" scope="portable" -->
 
 - A consistency finding is rarely local: the same claim echoes in the
   summary table, body prose, per-row cells, and the bottom line, and each
@@ -155,7 +155,7 @@ whose trigger moment is situational, moved full-text to
 ## Repo-Specific Lessons
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="094" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="095" status="active" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families

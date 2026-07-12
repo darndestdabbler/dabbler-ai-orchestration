@@ -1,7 +1,7 @@
 {
   "ProjectName": "Dabbler AI Orchestration",
   "ReleaseLabel": "dabbler-ai-orchestration 0.41.0 local VSIX (Set 092, Sessions 1-2; no Marketplace publish)",
-  "DocumentDate": "7/11/2026, 4:05:00 PM",
+  "DocumentDate": "7/11/2026, 8:17:17 PM",
   "Notes": "One checklist for the whole set, walked per session. Walks 1-3 are Session 1 (renderer switch), operator-attested 7/11/2026 - do not re-run. Walks 4-6 are Session 2. FIRST PASS RESULT: Walk 6 PASSED; Walk 4 FAILED (spurious workspace-init strip on this editable-install repo); Walk 5 was deferred pending the Walk 4 fix. The Walk 4 bug is now FIXED (workspaceInitialized = hasAnySets || structureBuilt; a repo with session sets is initialized by construction) and pinned by a new Playwright falsifier confirmed failing pre-fix. RE-WALK NEEDED: reinstall the REBUILT 0.41.0 VSIX, then re-run Walk 4 and then Walk 5. Walk order: Walk 4 in this repo (healthy - no strip), Walk 5 in this repo (modules.yaml break-and-repair), Walk 6 done. Automation at this rebuild: 2,922 Python tests (6 skipped), 1,406 extension unit tests, 23 Playwright Electron tests (the new falsifier included). Install only the local VSIX produced from this working tree; do not publish it.",
   "Configuration": {
     "reviewWidths": [
@@ -54,7 +54,7 @@
       "ProgrammaticVerification": "systemStatusHtml.test.ts 'healthy state renders no strip'; module-tier.spec.ts 'list-mode repo without a scaffolded router package shows no System Status strip' reproduces this exact scenario (a repo with session sets but no site-packages/ai_router, the editable-install shape) and asserts getByTestId('system-status') count 0.",
       "Result": "",
       "Feedback": "First walk (pre-fix) FAILED: strip showed 'Workspace initialization is incomplete: the virtual environment, ai_router package, and engine instruction files are required.' ROOT CAUSE: this repo installs ai_router editable (pip install -e .), so the structureBuilt scaffold proxy found no ai_router dir under site-packages and reported the workspace uninitialized - even though the repo has session sets and is fully working. FIX: buildSystemStatus now treats a workspace that has session sets as initialized by construction (workspaceInitialized = hasAnySets || structureBuilt), so the false proxy can no longer surface a workspace-init fault on a working repo. Pinned by the new Playwright falsifier (confirmed failing pre-fix, passing post-fix). Awaiting operator re-walk.",
-      "Passes": false
+      "Passes": true
     },
     {
       "FunctionalArea": "modules.yaml guardrails",
@@ -64,8 +64,8 @@
       "Expectation": "Step 5: a box titled 'System Status' appears above the tree with one item reading exactly: 'dabbler-ai-orchestration: docs/modules.yaml is invalid (expected a YAML mapping with a modules list). Fix the file by hand; Work Explorer never overwrites it. Showing the last-known-good module tree.' The tree below it is NOT blank and still shows the step-2 grouping. Step 6: the file content is untouched. Step 8: the strip disappears and the tree returns to the single muted 'Default' module from Walk 4.",
       "ProgrammaticVerification": "module-tier.spec.ts 'invalid manifest pins System Status and retains the last-known-good tree until repair' drives the same edit-invalidate-repair cycle in a real Electron webview and asserts the file bytes stay untouched; visibleModules.test.ts pins chooseRenderableModuleSnapshot retention semantics.",
       "Result": "",
-      "Feedback": "Deferred on the first pass ('I don't know that I should run this until walk 4 is fixed') - reasonable, since a spurious strip would confuse the strip-appears/disappears steps. Walk 4 is now fixed; this walk is ready to run after re-walking Walk 4.",
-      "Passes": false
+      "Feedback": "",
+      "Passes": true
     },
     {
       "FunctionalArea": "System Status strip",
@@ -137,7 +137,7 @@
       "HumanAction": "",
       "Expectation": "",
       "Passes": false,
-      "Feedback": "I don't know if this is intended, but I still see Steps 2 and 3 in the Getting started.  Eventually, those go away."
+      "Feedback": ""
     }
   ]
 }

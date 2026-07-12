@@ -135,8 +135,13 @@ list mode by design (amendment 5). Pinned by a new Playwright falsifier
 package shows no System Status strip"), **confirmed failing pre-fix and
 passing post-fix**; suite at this rebuild: pytest 2,922/6 skipped,
 Layer 2 1,406, Playwright **23** passed, tsc clean. Re-verified
-cross-provider (see below). **Walk 4/5 re-walk is pending the operator**
-against the rebuilt VSIX.
+cross-provider (gpt-5-6, anthropic excluded): **VERIFIED**
+(`s2-postclose-walk4-verification.md`).
+
+**Operator UAT — all six walks PASS (2026-07-11).** Walk 4 passed on
+re-walk against the rebuilt VSIX; Walk 5 (modules.yaml break-and-repair,
+previously deferred) passed; Walks 1–3 and Walk 6 already passed. The
+set-level UAT gate is fully satisfied.
 
 > Known follow-up (not fixed here — out of scope, feeds the Getting
 > Started form indicator owned by Set 094): `routerInstalled` still
@@ -145,9 +150,8 @@ against the rebuilt VSIX.
 
 ## Deferred / pending
 
-- **Session 2 operator UAT re-walk** (walks 4 and 5 of the set
-  checklist) against the rebuilt local 0.41.0 VSIX — Walk 4 fixed and
-  re-armed, Walk 5 ready; Walk 6 already passed.
+- Operator UAT is **complete — all six walks pass**; no set-level UAT
+  work remains.
 - The `gettingStarted` payload's probe fields (`pythonPresent`,
   `copilotCliPresent`, `providerKeyPresent`) are retained but no longer
   webview-consumed — removal belongs to Set 094's form rework.

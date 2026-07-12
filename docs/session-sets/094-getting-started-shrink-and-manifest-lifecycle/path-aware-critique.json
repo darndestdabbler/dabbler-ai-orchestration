@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "094-getting-started-shrink-and-manifest-lifecycle",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-07-12T08:37:53.919224-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "VERIFIED",
+      "summary": "I reviewed the Set 094/Session 2 implementation and supporting artifacts directly in the repo: the new module-manifest primitives and D6 flow in src/utils/moduleAuthoring.ts, src/commands/openModulesManifest.ts, src/commands/copyModuleDecompositionPrompt.ts, the Getting Started protocol/dispatch/rendering in src/types/sessionSetsWebviewProtocol.ts, src/commands/gettingStartedActions.ts, media/session-sets-tree/gettingStartedHtml.js, media/session-sets-tree/client.js, the mode/detection logic in src/utils/gettingStartedDetection.ts and src/providers/CustomSessionSetsView.ts, the watcher/command registration in src/extension.ts, plus package.json and the shipping README. The key load-bearing claims I checked all line up with the code on disk: docs/modules.yaml is only ensured on explicit user actions, the README's zero-set onboarding path now matches selectExplorerMode/command behavior, the advanced parallel prompt survives only as a palette command, and the new toolbar/form commands are actually contributed and wired. I did not find a blocking correctness or contract-drift issue that would change a reasonable merge decision.",
+      "findings": []
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the changes for the 'Getting Started Shrink & Manifest Lifecycle' set. My review focused on verifying the claims made in the summary against the provided code artifacts. I specifically inspected the implementation of the new two-section Getting Started form, the simplification of the completion model, and the corresponding updates to the webview protocol and tests.\n\nI have read the following files:\n- `tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js`: Confirmed the form has been rebuilt into two distinct sections ('Build project structure' and 'Define modules (optional)').\n- `tools/dabbler-ai-orchestration/media/session-sets-tree/client.js`: Verified the client-side wiring for the new form actions, including `open-modules` and `copy-decomposition-prompt`.\n- `tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts`: Confirmed that the `GettingStartedPayload` has been simplified, removing the `planPresent` and `sessionSetsPresent` flags and retaining only `structureBuilt` as the completion signal.\n- `tools/dabbler-ai-orchestration/src/utils/gettingStartedDetection.ts`: Checked the `detectCompletion` and `computeGettingStarted` functions and confirmed their logic aligns with the simplified completion model.\n- `tools/dabbler-ai-orchestration/src/test/suite/gettingStartedDetection.test.ts`: Verified that the unit tests have been updated to reflect and validate the new single-flag completion logic.\n\nThe code is internally consistent, and the changes accurately reflect the detailed summary. The refactoring of the Getting Started experience is logical, and the underlying model has been simplified correctly. The tests have been updated appropriately to cover these changes. No issues were found.",
+      "findings": []
+    }
+  ]
+}

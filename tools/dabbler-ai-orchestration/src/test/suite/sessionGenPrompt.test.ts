@@ -106,11 +106,11 @@ suite("Getting Started instructions doc (Set 060 S3, D8)", () => {
     assert.deepStrictEqual(doc.match(/{{[A-Z_]+}}/g), null);
   });
 
-  test("carries the operator's five step headings (the SVG copy)", () => {
+  test("carries the operator's five step headings (Set 095 re-cut of the SVG copy)", () => {
     for (const heading of [
       "## 1. Scaffold Project Structure",
-      "## 2. Create/Import Project Plan",
-      "## 3. Decompose Plan Into Session Sets",
+      "## 2. Define Modules (Optional)",
+      "## 3. Create the Project Plan and First Session Set",
       "## 4. Start the First Session",
       "## 5. Trust But Verify",
     ]) {
@@ -118,9 +118,10 @@ suite("Getting Started instructions doc (Set 060 S3, D8)", () => {
     }
   });
 
-  test("has the start-first-session closure (Copy Prompt > Start Next Session)", () => {
-    assert.ok(/Start Next\s+Session/i.test(doc));
-    assert.ok(doc.includes("`001-`"));
+  test("has the start-first-session closure (left-click copies the starter line)", () => {
+    assert.ok(/Start the next\s+session of/i.test(doc));
+    assert.ok(doc.includes("`001-"));
+    assert.ok(/Copy Eval/.test(doc), "right-click mirror is named");
   });
 
   test("teaches the project-plan contract and both tiers", () => {

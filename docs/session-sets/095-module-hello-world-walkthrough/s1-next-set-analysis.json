@@ -1,0 +1,10 @@
+{
+  "purpose": "Set 095 S1 routed next-set + next-orchestrator recommendation",
+  "model": "gemini-pro",
+  "model_id": "gemini-2.5-pro",
+  "tier": 2,
+  "cost_usd": 0.004905,
+  "total_cost_usd": 0.004905,
+  "truncated": false,
+  "content": "### Next Session Set Recommendation\n\n1.  **Set 077 UAT-Checklist Redo:** Author and run this session set next.\n2.  *(Post-077 Action)* Publish `dabbler-ai-router` 0.32.0.\n3.  Module Locator/Scope-Check Set.\n4.  Physical Moves Set.\n\n**Rationale:** The highest priority is to reduce operator-facing risk by closing open loops before initiating new, large-scale feature development. The open release gates from Set 077 represent a significant process debt and a potential source of instability for all subsequent releases. Resolving this ensures the integrity of the project's quality assurance framework. After stabilizing the release process, shipping the completed router fix is a quick win that closes another risk vector. Only after these stabilization tasks are complete should the team proceed with the Module Locator API, which is the next logical feature but introduces new complexity. The optional Physical Moves set remains the lowest priority.\n\n### Orchestrator Recommendation\n\n*   **Engine:** `claude-code`\n*   **Provider:** `anthropic`\n*   **Model:** `claude-sonnet-5`\n*   **Effort:** Low\n\n**Rationale:** The Set 077 UAT-Checklist Redo is a process and documentation task, not a complex code generation challenge. It requires understanding historical project context and generating structured text. The cheapest-capable orchestrator is a balanced, cost-effective model with strong reasoning and instruction-following abilities. `claude-sonnet-5` is ideal for this workload, offering sufficient intelligence to draft a comprehensive checklist based on project goals while being significantly faster and more economical than top-tier models like Fable, Opus, or the GPT-5 series, which would be overkill for this task."
+}

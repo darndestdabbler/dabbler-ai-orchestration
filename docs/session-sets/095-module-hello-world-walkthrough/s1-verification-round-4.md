@@ -1,0 +1,23 @@
+# ISSUES FOUND
+
+## Issue 1: The first session set is never actually landed through the protected-trunk workflow
+
+- **Category:** Completeness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The walkthrough must be “**copy-pasteable, runnable**” and exercise “**small PRs to `main`**.”
+  - **Impact:** Part 4 leaves `001-greeter-hello` and its plan as uncommitted local changes in Priya’s checkout after `main` has been protected. Part 5 then assumes those files have already merged and tells Sam and Alex to clone the repository. Following the numbered steps literally leaves the first set absent from `origin/main`, so collaborators cannot see the expected tree or safely generate `002` and `003`. Attempting to commit and push directly to `main` would be rejected by the protection configured in Part 3.
+  - **Evidence:** Part 4 ends after generating and reviewing the set, with no branch, commit, push, PR, approval, or merge step. Part 5’s “Where you are” paragraph merely asserts that Priya “lands the plan + set on `main` as a small PR” and immediately proceeds to Sam and Alex cloning; it never provides the action that performs this transition.
+- **Location:** `docs/tutorials/module-team-hello-world.md`, end of Part 4 and opening of Part 5.
+- **Fix:** Add an explicit numbered step after generating `001`: create a branch while preserving the working changes, commit the plan and set, push the branch, open a PR, obtain a teammate’s approval, merge it, and confirm `origin/main` contains `001` before Sam and Alex clone or pull.
+
+## Issue 2: The routed review cannot determine whether branches are short-lived or stale
+
+- **Category:** Completeness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The reusable prompt must provide evidence-cited scoring for trunk hygiene and integration-bomb symptoms. Its own Principle 1 requires finding branches that “haven’t been updated in weeks,” while Principle 7 requires scanning for branches that “have drifted from `main` for more than a week or two.”
+  - **Impact:** A repository can have a years-old unmerged session branch yet receive a `PASS` because the routed model sees only its name and an undated commit graph. That makes two required principles incapable of detecting one of their explicitly defined failure conditions and can produce materially false workflow-health conclusions.
+  - **Evidence:** The routed evidence script gathers `git branch -a` and `git log --oneline --graph --decorate --all -50`. Neither command includes branch-tip timestamps or commit dates, and the `-50` limit can omit old branch-tip commits entirely. Because the routed API model cannot inspect the repository itself, no other supplied evidence establishes branch age.
+- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md`, routed evidence-gathering script and Principles 1 and 7.
+- **Fix:** Gather dated branch-tip evidence, such as `git for-each-ref refs/heads refs/remotes --format="%(refname:short) %(objectname:short) %(committerdate:iso-strict)"`, along with divergence counts from the fresh main reference. Require `ADVISORY` for Principles 1 and 7 when freshness or age evidence is unavailable.

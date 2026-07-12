@@ -20,12 +20,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > is required (the module-first redesign adds no new router dependency; the
 > router's own 088–090 work is a separate, independently-gated release).
 >
-> **Pre-publish note:** the scaffolded `getting-started.md` teaching doc
-> still describes the pre-redesign Getting Started flow; **Set 095** (the
-> re-homed 087 S4 Hello World walkthrough) rewrites it for the new
-> two-section form + modules UX. Recommend Set 095 lands before (or with)
-> this Marketplace publish so newly-scaffolded repos get an accurate
-> onboarding doc.
+> **Pre-publish note — teaching doc resolved by Set 095; screenshot still
+> pending:** the scaffolded `getting-started.md` teaching doc is re-cut
+> for the two-section form + modules UX (see Changed below), so
+> newly-scaffolded repos get an accurate onboarding doc. Still open for
+> the operator before (or shortly after) publish: `media/getting-started.png`
+> shows the pre-redesign three-step form while the README captions it as
+> the two-section form — retake that screenshot in a live VS Code window
+> (the hero `session-set-explorer-and-spec.png` was already retaken in
+> Set 092).
 
 ### Added
 
@@ -89,6 +92,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   flags and the retired plan / session-set / New-module form actions left
   the form (Set 093's per-module row actions + the Command Palette own them
   now).
+- **(Set 095) Getting Started teaching doc re-cut for the module-first
+  UX.** The scaffolded `getting-started.md` (from
+  `getting-started.md.template`) now teaches the shipped flow: the
+  two-section form, the new **Define Modules (Optional)** step
+  (`Open modules.yaml` / `Copy AI decomposition prompt`), the
+  palette-first creation of the first plan + set (the form is replaced by
+  the tree once the first set exists), the per-module row actions, and
+  the left-click starter line (parallel guidance re-homed to the advanced
+  palette command). Cold-start goldens + bundled `dist/templates`
+  regenerated. Ships with the new team tutorials the READMEs and
+  quick-start now link:
+  [`docs/tutorials/module-team-hello-world.md`](../../docs/tutorials/module-team-hello-world.md)
+  (the three-person Hello World walkthrough) and its
+  [module workflow review prompt](../../docs/tutorials/module-team-hello-world-review-prompt.md).
 
 ### Rollback
 

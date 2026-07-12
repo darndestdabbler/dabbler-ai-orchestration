@@ -93,8 +93,10 @@ version 1.2.0."
 - **Deploying** means: deploy the commit that tag points to.
 - **Rolling back** means: redeploy the previous tag. No git surgery.
 - **Hotfixing** means: branch *from the deployed tag* (not from `main`,
-  which may have moved on and contain unfinished work), fix, merge the fix
-  back to `main`, and cut a new tag.
+  which may have moved on and contain unfinished work), fix, **tag the
+  fixed commit** as the new release (so the new tag is exactly the old
+  release plus the fix), and merge the fix back to `main` so the trunk
+  keeps it too.
 
 **Semantic versioning** (semver) is the naming convention inside the tag:
 `MAJOR.MINOR.PATCH` — bump PATCH for fixes, MINOR for backward-compatible
@@ -281,8 +283,10 @@ Meet Priya (owns `billing`) and Sam (owns `notifications`).
 4. **Release day:** the team tags the current `main` commit
    `billing-v1.3.0` and deploys it. A week later a bug surfaces in
    production while `main` already contains unreleased work — the fix
-   branches from the `billing-v1.3.0` tag, merges back to `main`, and
-   ships as `billing-v1.3.1`. Nobody has to untangle anything.
+   branches from the `billing-v1.3.0` tag, ships as `billing-v1.3.1`
+   (tagged on the fix commit itself, so the release carries none of the
+   unreleased work), and merges back to `main`. Nobody has to untangle
+   anything.
 
 That's the whole system: **short branches, disjoint directories, one
 truthful trunk, immovable tags, and a designated lane for the work that

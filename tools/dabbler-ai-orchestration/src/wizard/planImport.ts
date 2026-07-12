@@ -45,11 +45,12 @@ sessions.
 Format as a clean Markdown document I can save as ${destPosix}.`;
 }
 
-// Set 060 S2: the two halves of the old QuickPick command are exported
-// individually so the Getting Started form's two step-2 buttons
-// ("Import project-plan.md…" / "Copy prompt for planning") drive each
-// path directly without the intermediate picker. The `dabbler.importPlan`
-// command keeps the QuickPick and delegates to the same functions.
+// Set 060 S2 split the old QuickPick command into these two exported
+// halves; the form buttons that first consumed them were retired in
+// Set 094's two-section shrink. Today's callers: the `dabbler.importPlan`
+// palette command (QuickPick, delegating to the same functions) and the
+// Set 093 module-row actions (`AI Plan` → copyPlanningPrompt,
+// `Import Plan…` → importPlanFromFile).
 //
 // `ui` is the injectable VS Code surface (the showQuickPick-injection
 // pattern from CustomSessionSetsView.showContextMenu) so the handlers

@@ -1,0 +1,56 @@
+# ISSUES FOUND
+
+## Issue 1: The review prompt gives contradictory rules for valid `touches` work
+
+- **Category:** Correctness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The required review must assess both “directory discipline vs `codeRoots`” and intentional integration through `touches:`. The tutorial states that a path is valid when it is either inside the owning module’s `codeRoots` **or sanctioned by `touches`**.
+  - **Impact:** A valid integration set that edits a touched module’s code would receive a Principle 3 `FAIL` while simultaneously satisfying Principle 4. This makes the reusable review internally inconsistent and can coach teams to reject the workflow it is supposed to teach.
+  - **Evidence:** Principle 3 confines changes to the owning module’s `codeRoots` plus its session-set directory. Principle 4’s “Good” example explicitly allows an integration module with `touches: [auth, billing]` to change `auth` and `billing` code. The tutorial likewise says `touches` sanctions cross-module work.
+- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md`, Principles 3 and 4; `docs/tutorials/module-team-hello-world.md`, Part 3.
+- **Fix:** Define Principle 3’s allowed paths as the owner’s `codeRoots`, its session-set artifacts, and—only for modules explicitly named by `touches`—the touched modules’ `codeRoots`. Principle 4 should then verify the declaration and owner-review evidence for that exception.
+
+## Issue 2: The routed review cannot verify tag ancestry, yet the dogfood reports a tag-correctness PASS
+
+- **Category:** False Positive
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The task requires evidence-cited scoring for “tag correctness / production-as-a-tag,” and the prompt’s final rule says unavailable evidence must produce `ADVISORY`, not a guess.
+  - **Impact:** The review can mark a release process correct merely because tags are annotated, even if the hotfix tag points at the wrong commit or includes unreleased `main` work—the exact failure this tutorial is meant to prevent.
+  - **Evidence:** The routed evidence gathers only tag names/types and an undecorated `git log --oneline --graph --all -50`. It does not show the commits tags resolve to or prove that `v0.1.1` is descended from `v0.1.0` with only the hotfix. The round-2 dogfood nevertheless gives Principle 6 `PASS` and says the tag was “**presumably** created from the hotfix commit on `main`,” which is explicitly a guess. The same report also says CODEOWNERS coverage “ensures that no code change can be merged without the appropriate module owner’s review,” contradicting its own Principle 4 explanation that coverage alone does not enforce review.
+- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md`, routed evidence script and Principle 6; `docs/session-sets/095-module-hello-world-walkthrough/s1-dogfood-review-round-2.md`, Principles 5 and 6.
+- **Fix:** Gather tag targets and ancestry, such as decorated tag logs, peeled refs, and explicit ancestry/diff checks between release tags. Require `ADVISORY` when that evidence is absent. Explicitly prohibit enforcement claims under Principle 5, then rerun the dogfood and retain a report without unsupported PASS conclusions.
+
+## Issue 3: The tutorial does not actually configure complete or enforceable PR CI
+
+- **Category:** Completeness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The walkthrough must exercise “CODEOWNERS + path-scoped /all-module CI” and repeatedly claims that PRs require green CI.
+  - **Impact:** The integration PR can receive no path-scoped test before merge, and branch protection may not require any of the later-created checks. A team can therefore follow the walkthrough exactly and merge an untested or failing integration change despite the stated guardrail.
+  - **Evidence:** There are three modules with `codeRoots`, but Part 7 instructs users to configure path filters/jobs only for `services/greeter/**` and `services/clock/**`; it never adds a `services/integration/**` job. The `all-modules` job is described as running only on pushes to `main`, after a PR has merged. Separately, Part 1 enables “Require status checks” before any workflow checks exist, but never instructs the user to select the concrete checks after they have run; GitHub does not automatically make subsequently observed checks required.
+- **Location:** `docs/tutorials/module-team-hello-world.md`, Parts 1, 7, 8, and 9.
+- **Fix:** Add an integration path filter and integration test job, or run the all-modules job on integration PRs. After the workflows have produced checks, explicitly revisit branch protection/rulesets and add the intended check names as required checks.
+
+## Issue 4: Sam and Alex can generate colliding globally unique set names
+
+- **Category:** Correctness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The walkthrough must be copy-pasteable and preserve globally unique session-set names.
+  - **Impact:** Following the stated team flow can make both agents generate the same next prefix, causing conflicting PRs and invalidating the expected `002-clock-hello` / `003-integration-compose` sequence.
+  - **Evidence:** Part 5 starts Sam and Alex from the same `main`, where only `001-greeter-hello` exists. Sam generates his set, then Alex generates his set, but neither contribution is merged before the shared landing step afterward. “Everyone pulls `main` before generating sets” does not help when both pull the same state; both AIs can choose `002`.
+- **Location:** `docs/tutorials/module-team-hello-world.md`, Part 5.
+- **Fix:** Serialize decomposition: Sam generates and merges `002`, then Alex pulls that updated `main` before generating `003`. Alternatively, explicitly assign and verify the unique prefixes before either agent writes files.
+
+## Issue 5: The routed review omits scope diffs for teammates’ remote branches
+
+- **Category:** Completeness
+- **Severity:** Major
+- **Details:**
+  - **Violation:** The reusable team review must inspect active branches for directory-discipline violations.
+  - **Impact:** A pushed branch belonging to another teammate can contain the exact planted scope violation and still be missed, allowing Principle 3 to return a false PASS or unsupported assessment.
+  - **Evidence:** The script records `git branch -a`, but its diff loop uses `git branch --format=%(refname:short)`, which enumerates only local branches. It never runs diffs for `origin/session-set/*` branches that are not checked out locally.
+- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md`, routed evidence script’s per-branch diff loop.
+- **Fix:** Fetch and enumerate both local and remote session-set refs, exclude symbolic `origin/HEAD` and duplicate local/upstream pairs, and gather each active branch’s diff against the appropriate current `main` reference.

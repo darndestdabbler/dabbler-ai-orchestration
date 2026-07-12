@@ -283,6 +283,10 @@ and say:
 ## Where to go next
 
 - **Session procedure in full:** [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md) — Steps 0–10, rules, config flags. Use the quick-nav at the top to jump past the UAT reference material for simple sessions.
+- **Working as a 2–4 person team (modules):** the hands-on
+  [three-person Hello World walkthrough](tutorials/module-team-hello-world.md)
+  and its companion [module workflow review prompt](tutorials/module-team-hello-world-review-prompt.md);
+  concepts in the [primer](planning/module-organized-projects-primer.md).
 - **Writing a spec:** [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md).
 - **Setting up a new project:** the extension's Getting Started form (`Dabbler: Get Started`); without VS Code, the manual-setup note under [Two adoption tiers](#two-adoption-tiers) above.
 - **UAT checklists, outsource-last, adjudication, advanced flags:** Reference section of the workflow doc — only read what applies to your set's configuration.

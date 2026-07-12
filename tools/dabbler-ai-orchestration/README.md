@@ -150,6 +150,13 @@ your AI agent **"start the next session"** to work through them. (You
 can re-focus the form anytime with **`Dabbler: Get Started`** from the
 command palette.)
 
+Working as a small team? The hands-on
+[three-person Hello World walkthrough](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world.md)
+drives this whole flow end to end (modules, worktrees, CODEOWNERS +
+monorepo CI, tags), and its companion
+[module workflow review prompt](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world-review-prompt.md)
+gives your team evidence-cited coaching on the workflow afterward.
+
 ---
 
 ## What it'll cost

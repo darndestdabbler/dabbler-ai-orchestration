@@ -31,5 +31,11 @@
   ],
   "next_orchestrator": null,
   "blockers": [],
-  "lessons_cited": ["L-064-8", "L-064-9", "L-064-12", "L-065-1", "L-069-1"]
+  "lessons_cited": [
+    "L-064-8",
+    "L-064-9",
+    "L-064-12",
+    "L-065-1",
+    "L-069-1"
+  ]
 }

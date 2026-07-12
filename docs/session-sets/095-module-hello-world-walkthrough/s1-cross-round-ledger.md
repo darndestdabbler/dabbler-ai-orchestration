@@ -139,6 +139,18 @@ definition. Do not label hardening opportunities as Major.
   claim-scoping chosen over more CI machinery per the operator's
   simplicity-first principle.
 
+- Close-backstop round (post-R18, ran WITHOUT this conventions block —
+  provider had just recovered from 429s): 2 findings. (a) "end-to-end
+  dogfood not performed" — BY-DESIGN, pre-declared since round 1 in this
+  block's scope section: the dogfood exercised the walkthrough's
+  file/git/CLI end-state 8 times with a planted violation via the
+  prompt's own routed recipe; the UI click-walk is the operator's
+  optional UAT (requiresUAT: suggested, unarmed; the UI itself shipped
+  with its own gates in Sets 092-094). Settled — do not resurrect.
+  (b) missing GitHub plan/visibility prerequisite for branch protection
+  — ACCEPTED and FIXED: Part 0 now requires a public repo or a plan
+  supporting private-repo protection (GitHub Free = public only), and
+  Part 3 points back to it on rule-application failure.
 - R17 (1 Major, fixed — graded Major under the operator's new
   consequence rubric): P4's coverage fact is now judged on the CHANGED
   touched paths' effective owners aggregated per PR (never on the

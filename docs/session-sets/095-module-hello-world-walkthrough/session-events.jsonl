@@ -1,1 +1,13 @@
 {"timestamp": "2026-07-12T12:41:51.033129Z", "session_number": 1, "event_type": "work_started"}
+{"timestamp": "2026-07-12T17:43:02.727440Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-12T17:43:29.027693Z", "session_number": 1, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "route_failed"}
+{"timestamp": "2026-07-12T17:47:53.201692Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-12T17:48:20.029404Z", "session_number": 1, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "route_failed"}
+{"timestamp": "2026-07-12T18:02:26.446895Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-12T18:02:50.452776Z", "session_number": 1, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "route_failed"}
+{"timestamp": "2026-07-12T18:33:56.349152Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-12T18:34:20.563176Z", "session_number": 1, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "route_failed"}
+{"timestamp": "2026-07-12T18:41:56.158036Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-12T18:43:34.318297Z", "session_number": 1, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "blocking_findings"}
+{"timestamp": "2026-07-12T18:47:29.583732Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-12T18:47:37.815942Z", "session_number": 1, "event_type": "closeout_failed", "failed_checks": ["working_tree_clean"]}

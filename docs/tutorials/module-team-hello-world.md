@@ -28,7 +28,7 @@ Before you begin, every team member needs:
 3. **Python** version 3.10 or newer.
 4. An **orchestrator AI agent** installed as a VS Code extension (Claude Code, Codex/GitHub Copilot, or Gemini Code Assist — the workflow is agent-agnostic). The agent must be able to read and write files in your workspace; all three named agents can.
 5. **API keys** for the Full tier, set as environment variables: `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY`. All three are required so cross-provider verification always has a second provider to route to.
-6. A **GitHub repository** the team can push to and administer.
+6. A **GitHub repository** the team can push to and administer — either **public**, or on a plan that supports branch protection on private repos (on **GitHub Free, branch protection rules only work on public repositories**; the Part 3 guardrails depend on them).
 
 ## Part 1 — Init the trunk
 
@@ -154,7 +154,7 @@ Before you begin, every team member needs:
     git push
     ```
 
-5. **Now protect `main`**, so every later change — from anyone, including you — arrives by reviewed pull request. On the GitHub repository page:
+5. **Now protect `main`**, so every later change — from anyone, including you — arrives by reviewed pull request. (If GitHub won't apply the rule, check Part 0's plan/visibility prerequisite: on GitHub Free this needs a **public** repo.) On the GitHub repository page:
     - Go to **Settings** > **Branches** and add a branch protection rule for `main`.
     - Check **Require a pull request before merging** (leave the default of 1 required approval).
     - Check **Require status checks to pass before merging**. There are no checks to select yet — GitHub can only list checks it has already seen run, so you will come back and select the CI job names in Part 7, after the first workflow run.

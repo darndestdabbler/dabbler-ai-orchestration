@@ -8,8 +8,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import {
+  EnsureManifestIo,
   INVALID_MANIFEST_MESSAGE,
-  MODULES_YAML_HEADER,
   MODULES_YAML_TEMPLATE,
   ModulePickItem,
   ModulePickUi,
@@ -17,6 +17,7 @@ import {
   assignLegacySetsToModule,
   classifyModulesManifest,
   defaultModulePlanPath,
+  ensureModulesManifest,
   isSafeRepoRelativePath,
   modulePlanRelPath,
   pickModuleForAuthoring,
@@ -62,6 +63,212 @@ function entry(over: Partial<ModuleManifestEntry> = {}): ModuleManifestEntry {
   };
 }
 
+// ---------------------------------------------------------------------
+// Set 094 Session 1 (adjudication A) — the shared ensure-write primitive.
+// docs/modules.yaml is CREATED from the canonical template ONLY on an
+// explicit user action, and NEVER overwritten (a present manifest, valid
+// or invalid, is left byte-for-byte intact). The read / classify path — the
+// passive snapshot path the tree render runs — never writes.
+// ---------------------------------------------------------------------
+
+suite("moduleAuthoring — ensureModulesManifest (Set 094)", () => {
+  const manifestAbs = (root: string) =>
+    path.join(root, "docs", "modules.yaml");
+
+  test("absent manifest: creates it from MODULES_YAML_TEMPLATE, created:true", () => {
+    const root = tmpRoot("ensure-absent-");
+    try {
+      const r = ensureModulesManifest(root);
+      assert.strictEqual(r.created, true);
+      assert.strictEqual(r.manifestRel, "docs/modules.yaml");
+      assert.strictEqual(
+        fs.readFileSync(manifestAbs(root), "utf8"),
+        MODULES_YAML_TEMPLATE,
+        "the created file is the canonical template verbatim",
+      );
+      // It classifies as a valid EMPTY manifest (row 4/5 state).
+      const classified = classifyModulesManifest(root);
+      assert.strictEqual(classified.kind, "present");
+      assert.deepStrictEqual(
+        classified.kind === "present" ? classified.entries : null,
+        [],
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("present (valid) manifest: never overwritten, created:false (idempotent)", () => {
+    const root = tmpRoot("ensure-present-");
+    try {
+      const existing = "modules:\n  - slug: greeter\n    title: Greeter\n";
+      writeManifest(root, existing);
+      const r = ensureModulesManifest(root);
+      assert.strictEqual(r.created, false);
+      assert.strictEqual(
+        readManifestText(root),
+        existing,
+        "an existing manifest survives byte-for-byte",
+      );
+      // A second ensure is likewise a no-op.
+      assert.strictEqual(ensureModulesManifest(root).created, false);
+      assert.strictEqual(readManifestText(root), existing);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("present (INVALID) manifest: never overwritten — the guardrails own it", () => {
+    const root = tmpRoot("ensure-invalid-");
+    try {
+      const broken = "just a string, not a manifest\n";
+      writeManifest(root, broken);
+      assert.strictEqual(classifyModulesManifest(root).kind, "invalid");
+      const r = ensureModulesManifest(root);
+      assert.strictEqual(r.created, false, "never creates over a present entry");
+      assert.strictEqual(
+        readManifestText(root),
+        broken,
+        "an invalid manifest is left intact — ensure never auto-overwrites",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("existing DIRECTORY at the manifest path: created:false, never overwritten (O_EXCL)", () => {
+    const root = tmpRoot("ensure-dir-");
+    try {
+      // A directory entry named docs/modules.yaml must fail the exclusive
+      // create (EEXIST) exactly like a file — never clobbered.
+      fs.mkdirSync(manifestAbs(root), { recursive: true });
+      const r = ensureModulesManifest(root);
+      assert.strictEqual(r.created, false);
+      assert.ok(
+        fs.statSync(manifestAbs(root)).isDirectory(),
+        "the directory entry survives untouched",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("DANGLING symlink at the manifest path: created:false, never followed (Round-2 Major)", () => {
+    // The Round-2 correctness finding: an exists()-then-write emulation
+    // would see a dangling symlink as ABSENT and write THROUGH it to a
+    // target outside the workspace. The O_EXCL create (`wx`) — the SAME
+    // primitive makeFileOps.writeFileExclusive uses on the scaffold path —
+    // fails EEXIST on the symlink itself and never follows it.
+    const root = tmpRoot("ensure-symlink-");
+    const outsideTarget = path.join(root, "..", `escaped-${path.basename(root)}.yaml`);
+    try {
+      fs.mkdirSync(path.join(root, "docs"), { recursive: true });
+      try {
+        fs.symlinkSync(outsideTarget, manifestAbs(root)); // dangling: target absent
+      } catch (err) {
+        // Windows without Developer Mode / admin cannot create symlinks —
+        // skip rather than fail (the guarantee is an OS-level O_EXCL property).
+        if ((err as NodeJS.ErrnoException).code === "EPERM") return;
+        throw err;
+      }
+      const r = ensureModulesManifest(root);
+      assert.strictEqual(r.created, false, "never creates over a dangling symlink");
+      assert.ok(
+        fs.lstatSync(manifestAbs(root)).isSymbolicLink(),
+        "the symlink entry survives untouched",
+      );
+      assert.ok(
+        !fs.existsSync(outsideTarget),
+        "the write is NEVER followed through the symlink to an outside target",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(outsideTarget, { force: true });
+    }
+  });
+
+  test("maps an EEXIST-coded exclusive-write failure to created:false (injected io)", () => {
+    const calls: { mkdirp: string[]; write: Array<[string, string]> } = {
+      mkdirp: [],
+      write: [],
+    };
+    const eexistIo: EnsureManifestIo = {
+      mkdirp: (dir) => void calls.mkdirp.push(dir),
+      writeFileExclusive: (abs, data) => {
+        calls.write.push([abs, data]);
+        const err: NodeJS.ErrnoException = new Error("EEXIST");
+        err.code = "EEXIST";
+        throw err;
+      },
+    };
+    const r = ensureModulesManifest("/repo", eexistIo);
+    assert.strictEqual(r.created, false);
+    assert.strictEqual(calls.mkdirp.length, 1, "parent dir ensured first");
+    assert.strictEqual(calls.write.length, 1, "exclusive create attempted once");
+    assert.strictEqual(calls.write[0][1], MODULES_YAML_TEMPLATE);
+  });
+
+  test("re-throws a non-EEXIST write failure (a real I/O error is not swallowed)", () => {
+    const io: EnsureManifestIo = {
+      mkdirp: () => {},
+      writeFileExclusive: () => {
+        const err: NodeJS.ErrnoException = new Error("EACCES");
+        err.code = "EACCES";
+        throw err;
+      },
+    };
+    assert.throws(() => ensureModulesManifest("/repo", io), /EACCES/);
+  });
+
+  test("the pure read / classify model functions never write docs/modules.yaml", () => {
+    // Supplemental (model-level) coverage: the pure functions the passive
+    // snapshot path composes — classify + read + computeVisibleModules — never
+    // create the manifest over an ABSENT fixture. The end-to-end activation /
+    // snapshot / refresh no-write guarantee is proven at Layer 3
+    // (session-sets-tree.spec.ts "opening/refreshing an empty workspace never
+    // creates docs/modules.yaml"); the structural guard below pins that no
+    // passive host / activation call site reaches ensureModulesManifest.
+    const root = tmpRoot("ensure-noread-write-");
+    try {
+      const classified = classifyModulesManifest(root);
+      assert.strictEqual(classified.kind, "absent");
+      assert.strictEqual(readModulesManifest(root), null);
+      computeVisibleModules(classified, [], { legacyRootPlanExists: false });
+      assert.ok(
+        !fs.existsSync(manifestAbs(root)),
+        "reading / classifying must never CREATE the manifest — adjudication A",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("structural guard: no passive host / activation / watcher path calls ensureModulesManifest (adjudication A)", () => {
+    // Adjudication A / routed ruling Q4: the ensure-write is an EXPLICIT-ACTION
+    // primitive. This pins the trust boundary at the SOURCE level — the passive
+    // snapshot builders (buildGettingStarted / buildModules / buildSystemStatus)
+    // and the activation + watcher wiring must NEVER reference
+    // ensureModulesManifest, so a future edit that made "opening or refreshing a
+    // repo" write the manifest fails this test immediately (no live host / VSIX
+    // launch required). The legitimate callers are the explicit-action sites
+    // (openModulesManifest.ts, gitScaffold.ts scaffold, moduleAuthoring.ts
+    // Add-module, and Session 2's copy-decomposition command) — not asserted here.
+    const srcDir = path.resolve(process.cwd(), "src");
+    const passivePaths = [
+      path.join(srcDir, "providers", "CustomSessionSetsView.ts"),
+      path.join(srcDir, "extension.ts"),
+    ];
+    for (const file of passivePaths) {
+      const text = fs.readFileSync(file, "utf8");
+      assert.ok(
+        !/\bensureModulesManifest\b/.test(text),
+        `${path.basename(file)} must not reference ensureModulesManifest — the ` +
+          `passive snapshot / activation / watcher path must never write the manifest`,
+      );
+    }
+  });
+});
+
 suite("moduleAuthoring — slug validation (Set 087 S3)", () => {
   test("accepts kebab-case slugs", () => {
     for (const ok of ["greeter", "payment-api", "a1", "x-2-y"]) {
@@ -87,7 +294,7 @@ suite("moduleAuthoring — slug validation (Set 087 S3)", () => {
 });
 
 suite("moduleAuthoring — scaffoldNewModule (Set 087 S3)", () => {
-  test("absent manifest: creates docs/modules.yaml with header + entry, plus the plan stub", () => {
+  test("absent manifest: creates docs/modules.yaml from the canonical template + entry, plus the plan stub (Set 094)", () => {
     const root = tmpRoot("mod-scaffold-fresh-");
     try {
       const r = scaffoldNewModule(root, "greeter", "Greeter Service");
@@ -96,10 +303,20 @@ suite("moduleAuthoring — scaffoldNewModule (Set 087 S3)", () => {
       assert.strictEqual(r.planRel, "docs/modules/greeter/project-plan.md");
 
       const text = readManifestText(root);
-      assert.ok(text.startsWith(MODULES_YAML_HEADER.slice(0, 20)), "header present");
-      // The tolerant reader parses the created file back to one entry
-      // with the explicit planPath (ruling Q1: never rely on a runtime
-      // default).
+      // Set 094: a created manifest now starts from MODULES_YAML_TEMPLATE
+      // (header comments + commented example entries), grown into its first
+      // block-style entry — the SAME shape the ensure-write sites write.
+      assert.ok(
+        text.startsWith(MODULES_YAML_TEMPLATE.slice(0, 40)),
+        "template header present",
+      );
+      assert.ok(
+        text.includes("# - slug: payment-api"),
+        "the commented example entries carry over from the template",
+      );
+      // The tolerant reader parses the created file back to exactly one
+      // (live) entry with the explicit planPath (the commented examples are
+      // comments, never parsed as entries).
       const parsed = readModulesManifest(root);
       assert.ok(parsed && parsed.length === 1);
       assert.strictEqual(parsed![0].slug, "greeter");

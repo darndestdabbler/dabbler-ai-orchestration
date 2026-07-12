@@ -270,6 +270,89 @@ test("Getting Started form renders the Lightweight three-way choice from durable
   }
 });
 
+test("Getting Started renders exactly two sections with the Define-modules button (Set 094)", async () => {
+  // Rendering-only smoke on the shrunken form (requiresE2E: suggested; the
+  // ensure-write ACTIONS stay Layer-2-covered): the empty-repo form paints
+  // (1) exactly two sections — Build project structure + Define modules,
+  // (2) the Define-modules "Open modules.yaml" button, and (3) none of the
+  // retired plan / session-set / New-module actions or the parallel
+  // checkbox that left the form in Set 094.
+  const per: PerTest = {};
+  try {
+    per.tmpPath = makeTmpDir("dabbler-pw-two-section");
+    const seed = makeSet(per.tmpPath, "seed-to-remove", 2);
+    const repoRoot = seed.repo_root;
+    fs.rmSync(seed.set_dir, { recursive: true, force: true });
+
+    per.launch = await launchVSCode(repoRoot);
+    const inner = await openSessionSetsView(per.launch.page);
+
+    await expect(inner.locator(".getting-started")).toBeVisible({
+      timeout: 30_000,
+    });
+    // (1) exactly two sections.
+    expect(await inner.locator(".gs-step-head").count()).toBe(2);
+    await expect(
+      inner.locator(".gs-step-title", { hasText: "Build project structure" }),
+    ).toBeVisible();
+    await expect(
+      inner.locator(".gs-step-title", { hasText: "Define modules (optional)" }),
+    ).toBeVisible();
+    // (2) the Define-modules "Open modules.yaml" button.
+    await expect(
+      inner.locator('[data-gs-action="open-modules"]'),
+    ).toBeVisible();
+    // (3) the retired actions + parallel checkbox are gone from the form.
+    for (const gone of [
+      "import-plan",
+      "copy-plan-prompt",
+      "new-module",
+      "build-session-sets",
+    ]) {
+      expect(await inner.locator(`[data-gs-action="${gone}"]`).count()).toBe(0);
+    }
+    expect(await inner.locator('input[name="gs-parallel"]').count()).toBe(0);
+  } finally {
+    await teardown(per);
+  }
+});
+
+test("opening / refreshing an empty workspace never creates docs/modules.yaml (Set 094 adjudication A)", async () => {
+  // The trust-boundary invariant end-to-end: an extension that edits a repo
+  // because it was OPENED is a trust violation. Drive the REAL activation +
+  // snapshot + scan->ready refresh path (not just the pure model functions the
+  // Layer-2 supplemental test covers) over a workspace with NO docs/modules.yaml,
+  // and assert the file is still absent afterward. The manifest is created ONLY
+  // on an explicit user action (the Open modules.yaml button / toolbar command /
+  // scaffold / Add-module), never on this passive path.
+  const per: PerTest = {};
+  try {
+    per.tmpPath = makeTmpDir("dabbler-pw-no-write-activation");
+    const seed = makeSet(per.tmpPath, "seed-to-remove", 2);
+    const repoRoot = seed.repo_root;
+    fs.rmSync(seed.set_dir, { recursive: true, force: true });
+    const manifestPath = path.join(repoRoot, "docs", "modules.yaml");
+    // Precondition: the workspace has no manifest before the extension runs.
+    expect(fs.existsSync(manifestPath)).toBe(false);
+
+    // launchVSCode activates the extension; openSessionSetsView drives the
+    // initial snapshot AND the scan->ready re-render (postScanState ->
+    // scheduleRender), so the getting-started form only paints after >= 1 full
+    // passive snapshot/refresh cycle has run.
+    per.launch = await launchVSCode(repoRoot);
+    const inner = await openSessionSetsView(per.launch.page);
+    await expect(inner.locator(".getting-started")).toBeVisible({
+      timeout: 30_000,
+    });
+    // A settle beat so the workspace watcher / poll backstop cannot land a
+    // late write after the first paint, then re-assert.
+    await per.launch.page.waitForTimeout(1500);
+    expect(fs.existsSync(manifestPath)).toBe(false);
+  } finally {
+    await teardown(per);
+  }
+});
+
 // ---------------------------------------------------------------------
 // Set 033 Session 2: orchestrator-block driven accordion rendering.
 // Replaces the pre-Set-033 marker-seeded scenarios — the per-set

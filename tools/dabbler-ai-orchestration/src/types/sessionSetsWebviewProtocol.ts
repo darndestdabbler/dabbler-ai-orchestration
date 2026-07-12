@@ -194,17 +194,14 @@ export type ExplorerMode = "no-folder" | "getting-started" | "list";
 // instead; in "no-folder" mode there is no root to inspect).
 export interface GettingStartedPayload {
   mode: ExplorerMode;
-  structureBuilt: boolean;      // D3 step 1
-  planPresent: boolean;         // D3 step 2
-  sessionSetsPresent: boolean;  // D3 step 3
-  // Set 060 Session 3 (spec D6): true iff at least one provider API key
-  // (DABBLER_ANTHROPIC_API_KEY / DABBLER_OPENAI_API_KEY /
-  // DABBLER_GEMINI_API_KEY) is present in
-  // the extension host's environment. When false AND the form's tier
-  // radio is on Full, the webview renders the "set a key + reload
-  // window" warning under the Build button. Computed host-side from
-  // `process.env` (which merges Windows System + User vars at launch).
-  providerKeyPresent: boolean;
+  // Set 094: the two-section form's SOLE completion flag (`.venv` + router
+  // importable + the three engine files) — it greys/checks the Build
+  // section. The old step-2 `planPresent` and step-3 `sessionSetsPresent`
+  // flags retired with the plan / session-set steps. The Set 092 S2 probe
+  // copies (`providerKeyPresent` / `pythonPresent` / `copilotCliPresent`)
+  // are gone too — the System Status strip computes those independently
+  // (SystemStatusPayload), so the form payload no longer carries them.
+  structureBuilt: boolean;
   // Set 077 Session 2 (Feature 1, A1): the workspace's durable tier
   // resolution — the `.dabbler/tier` marker first, then the
   // router-config inference (see utils/tierMarkerStore.ts) — or null
@@ -227,28 +224,11 @@ export interface GettingStartedPayload {
   // same (rootId, seed) application semantics as tierSeed. Populated
   // only in "getting-started" mode.
   verificationModeSeed: "dedicated-sessions" | "out-of-band-or-none" | null;
-  // Set 077 S3 (A10): the host's Python-presence probe — false when no
-  // interpreter resolves (no explicit pythonPath setting, no workspace
-  // venv, nothing usable on PATH). Set 092 S2: the operator-facing
-  // fault moved to the System Status strip, which reads the
-  // SystemStatusPayload's own copy of this probe; this field is
-  // retained for payload-shape stability until Set 094's form rework
-  // and is no longer consumed by the webview.
-  pythonPresent: boolean;
-  // Set 079 S1 (Feature 1): the host's Copilot-CLI presence probe —
-  // false when no `copilot` executable resolves (no explicit
-  // copilotCliPath setting, nothing usable on PATH). Set 092 S2: same
-  // relocation as pythonPresent — the strip renders the fault from
-  // SystemStatusPayload; this copy is retained for payload-shape
-  // stability until Set 094 and is no longer consumed by the webview.
-  copilotCliPresent: boolean;
   // Set 079 S1 (Feature 1): the durable seat-profile seed for the
   // Full-tier sub-choice radios ("api" = direct provider keys, the
   // default; "copilot-cli" = Set 078's Copilot seat profile). Same
   // (rootId, seed) application semantics as tierSeed /
-  // verificationModeSeed. Null until Session 2 wires the durable
-  // source (the scaffold's transport.profile write); populated only in
-  // "getting-started" mode.
+  // verificationModeSeed. Populated only in "getting-started" mode.
   transportProfileSeed: "api" | "copilot-cli" | null;
 }
 
@@ -399,46 +379,45 @@ export interface ReadyMsg {
   type: "ready";
 }
 
-// Set 060 Session 2: the five Getting Started form actions. The webview
-// posts one of these when the operator clicks a `data-gs-action` button;
-// the host validates the action id against this closed set, runs the
-// handler (see commands/gettingStartedActions.ts), and refreshes the
-// snapshot so the form's live completion state repaints. This channel is
-// separate from `executeCommand` on purpose — the actions carry typed
-// form state (tier / parallel) rather than a command id, so the
-// COMMAND_ALLOWLIST defense-in-depth contract is untouched.
+// Set 060 Session 2: the Getting Started form actions. The webview posts
+// one of these when the operator clicks a `data-gs-action` button; the
+// host validates the action id against this closed set, runs the handler
+// (see commands/gettingStartedActions.ts), and refreshes the snapshot so
+// the form's live completion state repaints. This channel is separate from
+// `executeCommand` on purpose — the actions carry typed form state (tier /
+// budget / seat profile) rather than a command id, so the COMMAND_ALLOWLIST
+// defense-in-depth contract is untouched.
+//
+// Set 094: the form shrank to two sections (Build project structure +
+// Define modules). The old plan / session-set actions (`import-plan`,
+// `copy-plan-prompt`, `new-module`, `build-session-sets`) left the form —
+// Set 093's per-module row actions + the Command Palette own them now — and
+// `open-modules` joined for the Define-modules "Open modules.yaml" button
+// (create-if-absent from the canonical template, then open the file).
 export type GettingStartedActionId =
   | "open-folder"          // no-folder surface: showOpenDialog -> vscode.openFolder
-  | "build-structure"      // step 1: no-prompt structure-only scaffold (D5)
-  | "import-plan"          // step 2: file picker -> docs/planning/project-plan.md
-  | "copy-plan-prompt"     // step 2 alt: copy the plan-authoring prompt
-  | "new-module"           // step 2 opt (Set 087 S3): docs/modules.yaml entry + plan stub
-  | "build-session-sets";  // step 3: copy the decomposition prompt (D4)
+  | "build-structure"      // Build project structure: no-prompt structure-only scaffold (D5)
+  | "open-modules";        // Define modules: ensure docs/modules.yaml, then open it (D1)
 
 export interface GettingStartedActionMsg {
   type: "gettingStartedAction";
   action: GettingStartedActionId;
-  // Form state riders. `tier` rides build-structure (the Full/Lightweight
-  // radio) AND — since Set 060 S4 — build-session-sets, where it steers
-  // the copied decomposition prompt's exemplars/guidance to the
-  // operator's tier. `parallel` rides build-session-sets (the "create
-  // parallel session sets where possible" checkbox, D7). All riders are
-  // untrusted webview input — the host narrows them before use.
+  // Form state riders (all untrusted webview input — the host narrows them
+  // before use), carried only by build-structure. `tier` is the
+  // Full/Lightweight radio.
   tier?: "full" | "lightweight";
-  parallel?: boolean;
   // Set 063 S2 (spec D1): the budget / NTE step's riders on
-  // build-structure, Full tier only (the webview omits both on
-  // Lightweight). `budgetUsd` is the validated dollar amount (>= 0);
-  // `zeroBudgetMethod` is the operator's required zero-rule pick, sent
-  // only when budgetUsd === 0. Host narrowing lives in
-  // utils/budgetYaml.ts (asBudgetUsd / asZeroBudgetMethod).
+  // build-structure, Full + Direct-API only (the webview omits both on
+  // Lightweight and on the Copilot seat). `budgetUsd` is the validated
+  // dollar amount (>= 0); `zeroBudgetMethod` is the operator's required
+  // zero-rule pick, sent only when budgetUsd === 0. Host narrowing lives
+  // in utils/budgetYaml.ts (asBudgetUsd / asZeroBudgetMethod).
   budgetUsd?: number;
   zeroBudgetMethod?: "manual-via-other-engine" | "skipped";
-  // Set 077 S3 (Feature 2): the Lightweight verification-mode pick.
-  // Rides build-structure (seeds the durable `.dabbler/verification-mode`
-  // marker + the scaffold context) and build-session-sets (steers the
-  // decomposition prompt's exemplar). The webview omits it on Full (the
-  // field is inert there); untrusted — the host narrows before use.
+  // Set 077 S3 (Feature 2): the Lightweight verification-mode pick. Rides
+  // build-structure (seeds the durable `.dabbler/verification-mode` marker
+  // + the scaffold context). The webview omits it on Full (the field is
+  // inert there); untrusted — the host narrows before use.
   verificationMode?: "dedicated-sessions" | "out-of-band-or-none";
   // Set 079 S2 (Feature 1): the Full-tier seat-profile pick. Rides
   // build-structure only — on "copilot-cli" the host runs the guided

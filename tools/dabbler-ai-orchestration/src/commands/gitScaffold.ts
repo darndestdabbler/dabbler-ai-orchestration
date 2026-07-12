@@ -44,6 +44,7 @@ import {
   structureOnlyContext,
 } from "../utils/consumerBootstrap";
 import { BudgetChoice, BudgetWriteOutcome, writeBudgetYaml } from "../utils/budgetYaml";
+import { ensureModulesManifest } from "../utils/moduleAuthoring";
 import {
   TIER_MARKER_REL,
   VERIFICATION_MODE_MARKER_REL,
@@ -132,6 +133,20 @@ export async function scaffoldConsumerRepo(
     deps.fileOps.writeFile(abs, content); // writeFile mkdirps the parent
     written.push(rel);
   }
+
+  // Set 094 (adjudication A): create docs/modules.yaml from the canonical
+  // template on this EXPLICIT scaffold action (the Build project structure
+  // button / the setupNewProject palette command — audited as the only
+  // callers, never activation). ensureModulesManifest is the SOLE writer of
+  // the manifest (it is deliberately NOT in the template bundle's static
+  // file set), so there is one creator, skip-existing, both tiers. FileOps
+  // structurally satisfies EnsureManifestIo (mkdirp + the O_EXCL
+  // writeFileExclusive), so the scaffold's exclusive create is the SAME
+  // symlink-safe primitive the interactive Open paths use — a dangling
+  // manifest symlink fails EEXIST, never followed. Reported in
+  // written/skipped so the scaffold summary count stays honest.
+  const ensured = ensureModulesManifest(deps.projectDir, deps.fileOps);
+  (ensured.created ? written : skipped).push(ensured.manifestRel);
 
   // Set 077 S2 (Feature 1, A1 + Critique-2 M1/M2): persist the operator's
   // choice as durable markers, written by the same path that shapes the

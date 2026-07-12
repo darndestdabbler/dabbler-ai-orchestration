@@ -29,14 +29,22 @@
       .replace(/>/g, "&gt;");
   }
 
-  // D7 (Set 060 S3, carries verifier issue S060-S2-V1-001): the
-  // parallel-worktree info note under the checkbox. Shown only while
-  // the box is checked; client.js toggles `hidden` on checkbox
-  // changes.
-  var WORKTREE_NOTE_TEXT =
-    "Parallel session sets use git worktrees: each parallel set works " +
-    "in its own worktree and is merged back to the main branch when " +
-    "the sets complete.";
+  // Set 094 (spec D1): the Define-modules section copy. Modules group
+  // session sets by project area; the section encourages AI-assisted
+  // decomposition (D6) and explicitly instructs the human to SAVE the file
+  // (the ensure-write only creates it — the operator's declarations are the
+  // point). Solo / single-area projects skip this and stay in the single
+  // default group (the pseudo-module).
+  var DEFINE_MODULES_INTRO_TEXT =
+    "Modules group your session sets by area of the project — one team per " +
+    "module. Solo or single-area projects can skip this: your work stays " +
+    "under a single default group.";
+  var DEFINE_MODULES_SAVE_TEXT =
+    "Open docs/modules.yaml and declare your modules — or ask an AI " +
+    "assistant to decompose the project into modules for you — then SAVE " +
+    "the file. The Work Explorer regroups your session sets as soon as you " +
+    "save.";
+  var OPEN_MODULES_BUTTON_LABEL = "Open modules.yaml";
 
   // Set 063 S2 (spec D1): the Full-tier budget / NTE step inside the
   // Build-project-structure step. The label/help copy frames the value
@@ -68,17 +76,6 @@
   var VERIFICATION_MODE_DEDICATED_TEXT =
     "Separate verification sessions — a dedicated session on a different " +
     "AI engine or provider reviews the work before the set can close.";
-
-  // Set 087 S3 (routed ruling Q1): the optional "New module" affordance in
-  // step 2 — hover copy for the button that posts the `new-module` action
-  // (slug/title are collected host-side via input boxes; the button carries
-  // no riders). Modules are the multi-developer grouping layer; a solo
-  // project skips this entirely.
-  var NEW_MODULE_BUTTON_TITLE =
-    "Optional, for teams: declare a module in docs/modules.yaml and " +
-    "create its plan stub at docs/modules/<slug>/project-plan.md. Session " +
-    "sets authored for a module are grouped under it in the Session Set " +
-    "Explorer. Solo projects can skip this.";
 
   // Set 079 S1 (Feature 1): the Full-tier seat-profile sub-choice — how
   // Full's routed calls dispatch. "api" keeps the current direct
@@ -139,8 +136,8 @@
    * state — whatever `vscode.getState()` returned across a webview
    * teardown — back to a well-formed `gsState`. Untrusted input: every
    * field is validated and unrecognized values fall back to the
-   * defaults (Full radio, unchecked parallel, empty budget, no zero
-   * pick). `tierSeed` is the host's durable tier resolution (the
+   * defaults (Full radio, empty budget, no zero pick). `tierSeed` is
+   * the host's durable tier resolution (the
    * `.dabbler/tier` marker → router-config inference chain) and
    * `rootId` is the workspace root that resolution belongs to.
    * Semantics (Set 077 S2 review Major 1 + verification round 1):
@@ -189,7 +186,6 @@
     }
     var state = {
       tier: p.tier === "lightweight" || p.tier === "full" ? p.tier : "full",
-      parallel: p.parallel === true,
       budget: typeof p.budget === "string" ? p.budget : "",
       zeroMethod:
         p.zeroMethod === "manual-via-other-engine" || p.zeroMethod === "skipped"
@@ -253,17 +249,6 @@
       state.lastProfileSeed = profileSeed;
     }
     return state;
-  }
-
-  /** The D7 worktree note element. `visible` = the checkbox is checked. */
-  function worktreeNoteHtml(visible) {
-    return (
-      '<div class="gs-note" data-gs-note="worktree" role="note"' +
-      (visible ? "" : " hidden") +
-      ">" +
-      escHtml(WORKTREE_NOTE_TEXT) +
-      "</div>"
-    );
   }
 
   function escAttr(s) {
@@ -456,9 +441,11 @@
     );
   }
 
-  // Folder open, no session sets yet (D1). The three-step setup form.
-  // Each step greys out + shows a green check when its D3 completion
-  // flag is set. Live state lives ONLY here (D2).
+  // Folder open, no session sets yet (D1). Set 094: the two-section setup
+  // form. Section 1 (Build project structure) greys out + shows a green
+  // check when its `structureBuilt` completion flag is set; section 2
+  // (Define modules) is optional and carries no completion flag. Live
+  // control state lives ONLY here (D2).
   function gsStep(num, title, complete, bodyHtml) {
     var cls = complete ? "gs-step gs-step-complete" : "gs-step";
     var check = complete ? "✓" : "";
@@ -474,20 +461,24 @@
   }
 
   /**
-   * The full Getting Started form. `gs` is the host's
-   * GettingStartedPayload (the three D3 completion flags; its probe
-   * fields are unconsumed here since Set 092 S2 moved the environment
-   * faults to the System Status strip); `controls` is the webview-local
-   * control state `{ tier: "full"|"lightweight", parallel: boolean,
-   * budget: string, zeroMethod: string|null }` so re-renders keep the
-   * operator's picks (Set 060 S2; budget controls Set 063 S2). Set 081
-   * S1: the budget block renders inside the transport-profile block
-   * (nested under the Direct-API option row), not as a sibling.
+   * The full Getting Started form (Set 094: two sections). `gs` is the
+   * host's GettingStartedPayload — only `structureBuilt` (the Build
+   * section's completion flag) and the durable seeds are consumed here;
+   * the environment faults live on the System Status strip (Set 092 S2).
+   * `controls` is the webview-local control state
+   * `{ tier: "full"|"lightweight", budget: string, zeroMethod: string|null,
+   * transportProfile, verificationMode }` so re-renders keep the operator's
+   * picks (Set 060 S2; budget controls Set 063 S2). Set 081 S1: the budget
+   * block renders inside the transport-profile block (nested under the
+   * Direct-API option row), not as a sibling.
    */
   function renderGettingStarted(gs, controls) {
     var fullChecked = controls.tier === "lightweight" ? "" : " checked";
     var lightChecked = controls.tier === "lightweight" ? " checked" : "";
-    var parallelChecked = controls.parallel ? " checked" : "";
+    // Section 1 — Build project structure (substantially as before, NOT
+    // collapsible per the operator correction). The tier radio, the
+    // Full-tier seat-profile sub-choice (with the nested budget block), the
+    // Lightweight verification-mode sub-choice, and the no-prompt scaffold.
     var step1 = gsStep(
       1,
       "Build project structure",
@@ -502,42 +493,27 @@
         'Build project structure' +
       '</button>',
     );
+    // Section 2 — Define modules (optional). No completion flag: it is
+    // guidance, not a gated step. The button ensures docs/modules.yaml
+    // exists (from the canonical template, on this explicit action only —
+    // adjudication A) and opens it; the copy tells the human to SAVE.
     var step2 = gsStep(
       2,
-      "Create or import a project plan",
-      gs.planPresent,
-      '<button class="gs-button" type="button" data-gs-action="import-plan">' +
-        'Import project-plan.md…' +
-      '</button>' +
-      '<button class="gs-button gs-button-secondary" type="button" data-gs-action="copy-plan-prompt">' +
-        'Copy prompt for planning' +
-      '</button>' +
-      // Set 087 S3 (ruling Q1): the optional module scaffold. Same typed
-      // gettingStartedAction channel; no riders (host-side input boxes).
-      '<button class="gs-button gs-button-secondary" type="button" data-gs-action="new-module"' +
-        ' title="' + escAttr(NEW_MODULE_BUTTON_TITLE) + '">' +
-        'New module…' +
+      "Define modules (optional)",
+      false,
+      '<div class="gs-note" role="note">' + escHtml(DEFINE_MODULES_INTRO_TEXT) + '</div>' +
+      '<div class="gs-note" role="note">' + escHtml(DEFINE_MODULES_SAVE_TEXT) + '</div>' +
+      '<button class="gs-button" type="button" data-gs-action="open-modules">' +
+        escHtml(OPEN_MODULES_BUTTON_LABEL) +
       '</button>',
-    );
-    var step3 = gsStep(
-      3,
-      "Build session sets",
-      gs.sessionSetsPresent,
-      '<button class="gs-button" type="button" data-gs-action="build-session-sets">' +
-        'Copy prompt to build session sets' +
-      '</button>' +
-      '<label class="gs-checkbox">' +
-        '<input type="checkbox" name="gs-parallel"' + parallelChecked + '> Create parallel session sets where possible' +
-      '</label>' +
-      worktreeNoteHtml(!!controls.parallel),
     );
     return (
       '<div class="getting-started">' +
         '<div class="gs-header">' +
           '<div class="gs-title">Getting Started</div>' +
-          '<div class="gs-subtitle">Complete each step to set up your project, then start your first session.</div>' +
+          '<div class="gs-subtitle">Build your project structure, then start your first session. Defining modules is optional.</div>' +
         '</div>' +
-        step1 + step2 + step3 +
+        step1 + step2 +
       '</div>'
     );
   }
@@ -547,21 +523,21 @@
     renderGettingStarted: renderGettingStarted,
     restoreGsState: restoreGsState,
     gsStep: gsStep,
-    worktreeNoteHtml: worktreeNoteHtml,
     budgetBlockHtml: budgetBlockHtml,
     optionRowHtml: optionRowHtml,
     verificationModeBlockHtml: verificationModeBlockHtml,
     transportProfileBlockHtml: transportProfileBlockHtml,
     parseBudgetInput: parseBudgetInput,
     validateBudgetControls: validateBudgetControls,
-    WORKTREE_NOTE_TEXT: WORKTREE_NOTE_TEXT,
+    DEFINE_MODULES_INTRO_TEXT: DEFINE_MODULES_INTRO_TEXT,
+    DEFINE_MODULES_SAVE_TEXT: DEFINE_MODULES_SAVE_TEXT,
+    OPEN_MODULES_BUTTON_LABEL: OPEN_MODULES_BUTTON_LABEL,
     BUDGET_LABEL_TEXT: BUDGET_LABEL_TEXT,
     BUDGET_HELP_TEXT: BUDGET_HELP_TEXT,
     BUDGET_ZERO_CHOICE_TEXT: BUDGET_ZERO_CHOICE_TEXT,
     VERIFICATION_MODE_LABEL_TEXT: VERIFICATION_MODE_LABEL_TEXT,
     VERIFICATION_MODE_OUT_OF_BAND_TEXT: VERIFICATION_MODE_OUT_OF_BAND_TEXT,
     VERIFICATION_MODE_DEDICATED_TEXT: VERIFICATION_MODE_DEDICATED_TEXT,
-    NEW_MODULE_BUTTON_TITLE: NEW_MODULE_BUTTON_TITLE,
     TRANSPORT_PROFILE_LABEL_TEXT: TRANSPORT_PROFILE_LABEL_TEXT,
     TRANSPORT_PROFILE_API_TEXT: TRANSPORT_PROFILE_API_TEXT,
     TRANSPORT_PROFILE_COPILOT_TEXT: TRANSPORT_PROFILE_COPILOT_TEXT,

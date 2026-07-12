@@ -1,0 +1,51 @@
+{
+  "status": "completed",
+  "summary": "Set 094 Session 1 — Form shrink + create-on-demand manifest lifecycle. Rebuilt the Getting Started webview form to two sections (Build project structure + Define modules (optional) with an Open modules.yaml button + SAVE copy); removed the old plan/session-set steps, the New-module button, and the parallel checkbox + worktree note (the underlying flows survive for Set 093's row actions + the palette). Added ensureModulesManifest — a shared create-if-absent primitive that writes the canonical MODULES_YAML_TEMPLATE on EXPLICIT user action only (adjudication A), backed by a cross-platform exclusive create (lstat no-follow precheck + O_EXCL wx) that never overwrites or follows an existing/invalid/symlinked manifest — wired into the scaffold (sole writer), the form's open-modules action, and the new dabbler.openModulesManifest toolbar command; Add-module now derives a created manifest from the same template. Re-derived the completion model to structureBuilt only, retiring the orphaned planPresent/sessionSetsPresent flags and the three dead payload probes (092 cleanup), and dropped the orphaned docs/session-sets/* watcher glob. The never-write-on-activation invariant is proven end-to-end at Layer 3 plus a structural source-level guard. Suite green across all three layers (pytest 2922/6, unit 1468, Playwright 26); cross-provider VERIFIED at round 3 (R1 Major test-completeness + R2 Major symlink-correctness both fixed).",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts",
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts",
+    "tools/dabbler-ai-orchestration/src/utils/gettingStartedDetection.ts",
+    "tools/dabbler-ai-orchestration/src/commands/openModulesManifest.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gettingStartedActions.ts",
+    "tools/dabbler-ai-orchestration/src/commands/installAiRouterCommands.ts",
+    "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
+    "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/gettingStartedHtml.js",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleAuthoring.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/openModulesManifest.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedHtml.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedDetection.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldCore.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/budgetYaml.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionGenPrompt.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/installAiRouter.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/session-sets-tree.spec.ts",
+    "docs/session-sets/094-getting-started-shrink-and-manifest-lifecycle/ai-assignment.md",
+    "docs/session-sets/094-getting-started-shrink-and-manifest-lifecycle/s1-ensure-write-seam-architecture.json",
+    "docs/session-sets/094-getting-started-shrink-and-manifest-lifecycle/s1-next-orchestrator-analysis.json"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-fable-5",
+    "effort": "high",
+    "reason": {
+      "code": "switch-due-to-cost",
+      "specifics": "Session 2 is prose/docs/release-prep heavy (D6 copy-prompt command, parallel-UI shelving + escape hatch, docs pass, single-boundary release prep for Sets 091-094) with one routed architecture call — Fable right-sizes the model to that character (efficient on the prose volume, capable enough for the command + routed implementation) while retaining high effort for the release-boundary diligence. Routed recommendation saved raw in s1-next-orchestrator-analysis.json."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": ["L-064-12", "L-064-8"]
+}

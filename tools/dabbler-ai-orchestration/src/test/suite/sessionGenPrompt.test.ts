@@ -191,6 +191,15 @@ suite("buildSessionGenPrompt — tier truth (Set 077 S2)", () => {
         return c;
       },
       writeFile: (p: string, c: string) => void store.set(norm(p), c),
+      writeFileExclusive: (p: string, c: string) => {
+        const k = norm(p);
+        if (store.has(k)) {
+          const e: NodeJS.ErrnoException = new Error(`EEXIST: ${p} exists`);
+          e.code = "EEXIST";
+          throw e;
+        }
+        store.set(k, c);
+      },
       mkdirp: () => {},
       copyDir: () => {},
       removeRecursive: (p: string) => void store.delete(norm(p)),

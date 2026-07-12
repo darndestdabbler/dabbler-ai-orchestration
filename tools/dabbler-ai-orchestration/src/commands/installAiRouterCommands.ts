@@ -13,6 +13,7 @@ import {
 } from "../utils/aiRouterInstall";
 import { resolveExplicitPythonPath } from "../utils/pythonInterpreter";
 import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
+import { writeFileExclusiveSync } from "../utils/fileSystem";
 
 /**
  * VS Code wiring for the ``Dabbler: Install ai-router`` and
@@ -178,6 +179,12 @@ export function makeFileOps(): FileOps {
       fs.mkdirSync(path.dirname(p), { recursive: true });
       fs.writeFileSync(p, content, "utf8");
     },
+    // Set 094: cross-platform exclusive create (lstat no-follow precheck +
+    // O_EXCL `wx`) — fails EEXIST when the path already exists, INCLUDING a
+    // dangling symlink, which it never follows (O_EXCL alone follows reparse
+    // points on Windows; round-2 verifier catch). The caller
+    // (ensureModulesManifest) mkdirps the parent first.
+    writeFileExclusive: (p, content) => writeFileExclusiveSync(p, content),
     mkdirp: (p) => fs.mkdirSync(p, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),
     removeRecursive: (p) => {

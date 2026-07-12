@@ -47,10 +47,11 @@
   const moduleCollapsed = {};
   // Set 060 Session 3: the Getting Started surface HTML builders moved
   // to gettingStartedHtml.js (a UMD-lite module loaded as a second
-  // <script> before this file) so the rendering — including the D7
-  // worktree note — is unit-testable without a webview. This file keeps
-  // the wiring only. (Set 092 S2: the form-local environment warnings
-  // moved to the System Status strip, systemStatusHtml.js.)
+  // <script> before this file) so the rendering is unit-testable without
+  // a webview. This file keeps the wiring only. (Set 092 S2: the
+  // form-local environment warnings moved to the System Status strip,
+  // systemStatusHtml.js. Set 094: the form shrank to two sections — Build
+  // project structure + Define modules.)
   const gsHtml = window.DabblerGettingStartedHtml;
   const systemStatusHtml = window.DabblerSystemStatusHtml;
   // Set 060 Session 2: the Getting Started form's control state. Kept
@@ -106,7 +107,6 @@
       Object.assign({}, prior && typeof prior === "object" ? prior : {}, {
         gsState: {
           tier: gsState.tier,
-          parallel: gsState.parallel,
           budget: gsState.budget,
           zeroMethod: gsState.zeroMethod,
           tierDirty: gsState.tierDirty,
@@ -276,12 +276,12 @@
   // this section owns only the event wiring.
 
   // Set 060 Session 2: wire the Getting Started surfaces. Buttons post a
-  // typed `gettingStartedAction` message carrying the relevant form
-  // state (tier for build-structure, parallel for build-session-sets);
-  // the clicked button disables until the host's post-action snapshot
-  // re-renders the surface (double-click guard). Radio / checkbox
-  // changes update gsState and toggle the D7 note / System Status
-  // faults in place — no host round-trip.
+  // typed `gettingStartedAction` message; build-structure carries the
+  // form state (tier / seat profile / budget / verification mode), and
+  // open-modules carries none (Set 094). The clicked button disables until
+  // the host's post-action snapshot re-renders the surface (double-click
+  // guard). Radio changes update gsState and re-render / toggle the System
+  // Status faults in place — no host round-trip.
   function wireGettingStarted() {
     Array.from(root.querySelectorAll('input[name="gs-tier"]')).forEach(function (input) {
       input.addEventListener("change", function () {
@@ -296,13 +296,6 @@
         // re-renders the form surface locally. gsState carries every
         // control value, so nothing is lost; no host round-trip.
         render();
-      });
-    });
-    Array.from(root.querySelectorAll('input[name="gs-parallel"]')).forEach(function (input) {
-      input.addEventListener("change", function () {
-        gsState.parallel = !!input.checked;
-        persistGsState();
-        syncWorktreeNote();
       });
     });
     // Set 063 S2 (spec D1): budget input + the $0 zero-rule radio pair.
@@ -404,18 +397,9 @@
             msg.verificationMode = gsState.verificationMode;
           }
         }
-        if (action === "build-session-sets") {
-          msg.parallel = gsState.parallel;
-          // Set 060 S4: the tier radio also rides build-session-sets so
-          // the copied decomposition prompt steers the planner to the
-          // operator's tier. Set 077 S3: on Lightweight the
-          // verification-mode pick rides too, so the decomposition
-          // prompt's exemplar declares the operator's mode.
-          msg.tier = gsState.tier;
-          if (gsState.tier === "lightweight") {
-            msg.verificationMode = gsState.verificationMode;
-          }
-        }
+        // Set 094: `open-modules` carries no riders — the generic
+        // { type, action } message above is all the Define-modules button
+        // needs (the host ensures docs/modules.yaml and opens it).
         btn.disabled = true;
         vscode.postMessage(msg);
       });
@@ -428,14 +412,6 @@
   // controls. Tier and profile radio changes re-render the surface
   // (see the listeners above), so no standalone visibility-flip helper
   // remains.
-
-  // D7 (Set 060 S3): show the worktree note only while the parallel
-  // checkbox is checked.
-  function syncWorktreeNote() {
-    var note = root.querySelector('[data-gs-note="worktree"]');
-    if (!note) return;
-    note.hidden = !gsState.parallel;
-  }
 
   // Set 063 S2 (spec D1): the nested $0 zero-rule pair shows only
   // while the parsed value is exactly 0. Pure visibility flip on input

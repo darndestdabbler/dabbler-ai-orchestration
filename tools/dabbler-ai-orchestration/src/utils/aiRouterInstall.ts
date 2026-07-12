@@ -52,6 +52,20 @@ export interface FileOps {
   exists: (absPath: string) => boolean;
   readFile: (absPath: string) => string;
   writeFile: (absPath: string, content: string) => void;
+  /**
+   * Set 094: an exclusive create — write `content` to `absPath`, or throw an
+   * `EEXIST`-coded error when a directory entry already exists there (a regular
+   * file, a directory, OR a symlink, including a DANGLING one — the create must
+   * NOT follow the link). Backs the create-on-demand docs/modules.yaml
+   * ensure-write on the scaffold path (adjudication A). The real ops use
+   * `writeFileExclusiveSync` (utils/fileSystem.ts) — an `lstat` no-follow
+   * precheck + O_EXCL `wx` write; the precheck is what guards the symlink case
+   * cross-platform, because O_EXCL ALONE follows reparse points on Windows.
+   * So a dangling manifest symlink can never be written THROUGH to a target
+   * outside the workspace. Unlike the optional `rename`, this is REQUIRED — the
+   * scaffold ensure-write reaches every FileOps that flows into it.
+   */
+  writeFileExclusive: (absPath: string, content: string) => void;
   mkdirp: (absPath: string) => void;
   /** Recursively copy a directory (overwrites destination contents). */
   copyDir: (srcAbs: string, dstAbs: string) => void;

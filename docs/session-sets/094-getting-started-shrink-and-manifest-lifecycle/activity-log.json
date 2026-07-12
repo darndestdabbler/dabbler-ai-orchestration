@@ -1,0 +1,81 @@
+{
+  "sessionSetName": "094-getting-started-shrink-and-manifest-lifecycle",
+  "createdDate": "2026-07-12T08:40:40.912379+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-12T08:40:40.912379+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/step-1-prereqs",
+      "dateTime": "2026-07-12T05:27:41.606203-04:00",
+      "description": "Read spec, verdict (adjudication A), Q8 compat matrix, Sets 092/093 outcomes; confirmed prerequisites; provider keys present.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/step-1-architecture",
+      "dateTime": "2026-07-12T05:27:41.606203-04:00",
+      "description": "Routed architecture ruling (Opus tier 3) on the ensure-write seam; saved s1-ensure-write-seam-architecture.json. Adopted: atomic exclusive-create (wx/O_EXCL) closing TOCTOU + subsuming the symlink rule; Add-module routed through the canonical template; core-placement scaffold ensure-write; caller audit (both scaffold entrypoints explicit-action only).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/step-2-form-shrink",
+      "dateTime": "2026-07-12T05:27:41.606203-04:00",
+      "description": "gettingStartedHtml.js rebuilt to two sections (Build project structure + Define modules); removed old steps 2/3, the New-module button, the parallel checkbox + worktree note; Define-modules section carries the open-modules button + SAVE copy. client.js rewired; parallel/worktree machinery removed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/step-2-flags",
+      "dateTime": "2026-07-12T05:27:41.607203-04:00",
+      "description": "Re-derived the completion model: CompletionState/detectCompletion/computeGettingStarted shrank to structureBuilt; retired planPresent/sessionSetsPresent + the dead providerKeyPresent/pythonPresent/copilotCliPresent payload probes (092-deferred cleanup). Protocol GettingStartedActionId/Msg/Payload updated; watcher dropped docs/session-sets/* (recorded loss).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/step-2-ensure-write",
+      "dateTime": "2026-07-12T05:27:41.607203-04:00",
+      "description": "moduleAuthoring.ensureModulesManifest (atomic wx, skip-existing, never overwrites invalid); Add-module unified through MODULES_YAML_TEMPLATE; MODULES_YAML_HEADER removed. openModulesManifest.ts shared Open flow + dabbler.openModulesManifest command.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/step-3-toolbar",
+      "dateTime": "2026-07-12T05:27:41.607203-04:00",
+      "description": "Work Explorer toolbar 'Open modules.yaml' button (package.json command + view/title menu + registration).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/step-4-ensure-audit",
+      "dateTime": "2026-07-12T05:27:41.607203-04:00",
+      "description": "Scaffold ensure-write wired into scaffoldConsumerRepo (sole writer; not in the static bundle); both tiers, skip-existing. Verified exactly the explicit-action sites write; no-write-on-activation test-pinned.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-001/step-5-tests",
+      "dateTime": "2026-07-12T05:27:41.607203-04:00",
+      "description": "Updated html/actions/detection/moduleAuthoring/scaffold suites for the two-section form + payload; added ensureModulesManifest matrix, no-write-on-read, openModulesManifestFlow flow, two-section render, scaffold skip-existing-manifest tests; watcher-inventory allowlist updated; Layer 3 Define-modules smoke added.",
+      "status": "complete"
+    }
+  ]
+}

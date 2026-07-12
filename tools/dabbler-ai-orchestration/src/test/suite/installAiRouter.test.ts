@@ -21,6 +21,7 @@ import {
   GITHUB_CHECKOUT_REL,
   REPO_URL,
 } from "../../utils/aiRouterInstall";
+import { writeFileExclusiveSync } from "../../utils/fileSystem";
 
 // Standalone-mocha pattern: no electron host required. Each test wires up
 // a sandbox workspace under os.tmpdir(), an in-process spawner that
@@ -40,6 +41,7 @@ function realFileOps(): FileOps {
       fs.mkdirSync(path.dirname(p), { recursive: true });
       fs.writeFileSync(p, c, "utf8");
     },
+    writeFileExclusive: (p, c) => writeFileExclusiveSync(p, c),
     mkdirp: (p) => fs.mkdirSync(p, { recursive: true }),
     copyDir: (src, dst) => {
       fs.mkdirSync(dst, { recursive: true });

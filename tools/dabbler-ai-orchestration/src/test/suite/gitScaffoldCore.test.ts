@@ -88,6 +88,15 @@ function memFileOps(seed: Record<string, string> = {}): {
     exists: (p) => store.has(norm(p)),
     readFile: (p) => store.get(norm(p)) ?? "",
     writeFile: (p, c) => void store.set(norm(p), c),
+    writeFileExclusive: (p, c) => {
+      const k = norm(p);
+      if (store.has(k)) {
+        const e: NodeJS.ErrnoException = new Error(`EEXIST: ${p} exists`);
+        e.code = "EEXIST";
+        throw e;
+      }
+      store.set(k, c);
+    },
     mkdirp: () => {},
     copyDir: () => {},
     removeRecursive: (p) => void store.delete(norm(p)),
@@ -123,14 +132,14 @@ suite("scaffoldConsumerRepo — file writes", () => {
       fileOps: ops,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Fourteen writes: thirteen artifacts (the seven Set-060 artifacts,
+    // Fifteen writes: thirteen artifacts (the seven Set-060 artifacts,
     // the three Set 064 D7 docs/planning/ guidance-lifecycle starters,
     // the Set 077 S4 cross-provider verification doc, and the two Set
-    // 087 S3 ownership/CI teaching templates) plus the Set 077 S2
-    // durable tier marker. (The verification-mode marker is
-    // Lightweight-only as of Set 082; this is a Full scaffold, so it is
-    // not written.)
-    assert.strictEqual(result.written.length, 14);
+    // 087 S3 ownership/CI teaching templates), the Set 077 S2 durable
+    // tier marker, and the Set 094 docs/modules.yaml ensure-write. (The
+    // verification-mode marker is Lightweight-only as of Set 082; this is
+    // a Full scaffold, so it is not written.)
+    assert.strictEqual(result.written.length, 15);
     assert.strictEqual(result.skipped.length, 0);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
@@ -146,6 +155,8 @@ suite("scaffoldConsumerRepo — file writes", () => {
     // Set 087 S3 (ruling Q3): ownership + monorepo-CI teaching templates.
     assert.ok(store.has("/repo/.github/CODEOWNERS"));
     assert.ok(store.has("/repo/.github/workflows/monorepo-ci.yml"));
+    // Set 094 (adjudication A): the scaffold ensures docs/modules.yaml.
+    assert.ok(store.has("/repo/docs/modules.yaml"), "modules.yaml ensured");
   });
 
   test("never clobbers an existing file (records it as skipped)", async () => {
@@ -159,7 +170,9 @@ suite("scaffoldConsumerRepo — file writes", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 13); // 12 artifacts + tier marker (Full: no verification-mode marker, Set 082)
+    // 12 artifacts + tier marker + modules.yaml (Full: no verification-mode
+    // marker, Set 082; Set 094: + the modules.yaml ensure-write).
+    assert.strictEqual(result.written.length, 14);
   });
 });
 
@@ -211,7 +224,8 @@ suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
     });
     assert.strictEqual(result.installOk, false);
     assert.strictEqual(result.installMessage, "pip failed");
-    assert.strictEqual(result.written.length, 14); // artifacts + tier marker still written (Full)
+    // artifacts + tier marker + modules.yaml still written (Full); Set 094.
+    assert.strictEqual(result.written.length, 15);
   });
 });
 

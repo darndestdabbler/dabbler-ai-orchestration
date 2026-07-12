@@ -9,17 +9,19 @@
 // The router (`routeGettingStartedAction`) is pure dispatch + input
 // narrowing over an injected handler set, so the validation rules —
 // unknown actions ignored, untrusted tier narrowed with a "full"
-// default, parallel coerced to a strict boolean — are unit-testable
-// without VS Code. `makeGettingStartedHandlers` binds the real
-// implementations, each of which reuses an existing engine:
-//   - open-folder        → showOpenDialog → vscode.openFolder (D5)
-//   - build-structure    → buildProjectStructureNoPrompt (Set 058 writer)
-//   - import-plan        → importPlanFromFile (wizard/planImport)
-//   - copy-plan-prompt   → copyPlanningPrompt (wizard/planImport)
-//   - new-module         → runNewModuleFlow (Set 087 S3 — modules.yaml
-//                          entry + plan stub; shared with dabbler.newModule)
-//   - build-session-sets → copySessionSetGenPrompt (D4 — copies the
-//                          decomposition prompt; never an inline router call)
+// default — are unit-testable without VS Code. `makeGettingStartedHandlers`
+// binds the real implementations, each of which reuses an existing engine:
+//   - open-folder     → showOpenDialog → vscode.openFolder (D5)
+//   - build-structure → buildProjectStructureNoPrompt (Set 058 writer)
+//   - open-modules    → openModulesManifestFlow (Set 094: ensure
+//                       docs/modules.yaml from the canonical template on
+//                       this explicit action, then open it — adjudication A)
+//
+// Set 094: the plan / session-set actions left the form. The plan flows
+// (importPlanFromFile / copyPlanningPrompt), the decomposition prompt
+// (copySessionSetGenPrompt) and the New-module scaffold (runNewModuleFlow)
+// still ship — Set 093's per-module row actions + the Command Palette own
+// them now — but the Getting Started form no longer surfaces them.
 
 import * as vscode from "vscode";
 import { GettingStartedActionMsg } from "../types/sessionSetsWebviewProtocol";
@@ -32,9 +34,7 @@ import {
   asBudgetUsd,
   asZeroBudgetMethod,
 } from "../utils/budgetYaml";
-import { copyPlanningPrompt, importPlanFromFile } from "../wizard/planImport";
-import { copySessionSetGenPrompt } from "../wizard/sessionGenPrompt";
-import { runNewModuleFlow } from "./newModule";
+import { openModulesManifestFlow } from "./openModulesManifest";
 
 export interface GettingStartedHandlers {
   openFolder(): Promise<void>;
@@ -44,15 +44,8 @@ export interface GettingStartedHandlers {
     verificationMode?: VerificationMode,
     transportProfile?: TransportProfile,
   ): Promise<void>;
-  importPlan(): Promise<void>;
-  copyPlanPrompt(): Promise<void>;
-  /** Set 087 S3: the "New module" scaffold (docs/modules.yaml entry + plan stub). */
-  newModule(): Promise<void>;
-  buildSessionSets(
-    parallel: boolean,
-    tier: Tier,
-    verificationMode?: VerificationMode,
-  ): Promise<void>;
+  /** Set 094 (spec D1): create docs/modules.yaml if absent, then open it. */
+  openModules(): Promise<void>;
 }
 
 /**
@@ -224,39 +217,12 @@ export async function routeGettingStartedAction(
       await handlers.buildStructure(tier, budget, verificationMode, transportProfile);
       return true;
     }
-    case "import-plan":
-      await handlers.importPlan();
+    case "open-modules":
+      // Set 094 (spec D1): no riders — the Define-modules button just
+      // ensures docs/modules.yaml exists (from the canonical template) and
+      // opens it. The ensure-write is idempotent and skip-existing.
+      await handlers.openModules();
       return true;
-    case "copy-plan-prompt":
-      await handlers.copyPlanPrompt();
-      return true;
-    case "new-module":
-      // Set 087 S3: no riders — slug/title are collected host-side via
-      // input boxes (validated fail-loud in the flow itself).
-      await handlers.newModule();
-      return true;
-    case "build-session-sets": {
-      // Set 060 S4: the tier radio rides this action too (same untrusted
-      // narrowing as build-structure) so the copied decomposition prompt
-      // steers the planner to the operator's tier. Set 077 S2 (A11):
-      // malformed rider ⇒ reject, same as build-structure.
-      let genTier: Tier;
-      let genMode: VerificationMode | undefined;
-      try {
-        genTier = asTier(msg.tier) ?? "full";
-        genMode = resolveVerificationMode(msg, genTier);
-      } catch (err) {
-        vscode.window.showErrorMessage(
-          `Copy session-set prompt was rejected: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        console.warn(
-          `[gettingStarted] rejected build-session-sets with malformed rider: ${err instanceof Error ? err.message : String(err)}`,
-        );
-        return false;
-      }
-      await handlers.buildSessionSets(msg.parallel === true, genTier, genMode);
-      return true;
-    }
     default:
       console.warn(
         `[gettingStarted] ignored unknown form action "${String((msg as { action?: unknown })?.action)}"`,
@@ -336,31 +302,11 @@ export function makeGettingStartedHandlers(
       await vscode.commands.executeCommand("vscode.openFolder", picked[0]);
     },
 
-    // Step 2: file picker → docs/planning/project-plan.md.
-    async importPlan(): Promise<void> {
-      await importPlanFromFile();
-    },
-
-    // Step 2 alternative: copy the plan-authoring prompt.
-    async copyPlanPrompt(): Promise<void> {
-      await copyPlanningPrompt();
-    },
-
-    // Set 087 S3 (ruling Q1): the "New module" scaffold — same flow the
-    // dabbler.newModule palette command drives.
-    async newModule(): Promise<void> {
-      await runNewModuleFlow();
-    },
-
-    // Step 3 (D4): copy the decomposition prompt, honoring the parallel
-    // checkbox, the tier radio, and (Set 077 S3) the Lightweight
-    // verification-mode pick in the prompt text.
-    async buildSessionSets(
-      parallel: boolean,
-      tier: Tier,
-      verificationMode?: VerificationMode,
-    ): Promise<void> {
-      await copySessionSetGenPrompt(context, { parallel, tier, verificationMode });
+    // Set 094 (spec D1 + adjudication A): the Define-modules button —
+    // create docs/modules.yaml from the canonical template if it does not
+    // exist yet, then open it. Shares the flow the toolbar command drives.
+    async openModules(): Promise<void> {
+      await openModulesManifestFlow();
     },
   };
 }

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The required no-write-on-activation/refresh regression test is not implemented**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Location:** `src/test/suite/moduleAuthoring.test.ts`, test named `\"the read / classify path NEVER writes docs/modules.yaml (no-write-on-activation)\"`\n  - **Details:**\n    - **Violation:** The session requires “**test-pin that activation and refresh NEVER write**” and says the explicit-only invariant must be “**proven by tests**.” The saved architecture ruling likewise calls for exercising the host snapshot/refresh path.\n    - **Impact:** The current test would continue passing if `activate()`, `CustomSessionSetsView` snapshot construction, watcher refresh handling, or command registration later began calling `ensureModulesManifest`. That leaves the operator-designated trust boundary—opening or passively refreshing a repository must never modify it—without the required regression protection. This should be fixed before merge.\n    - **Evidence:** The cited test only invokes `classifyModulesManifest`, `readModulesManifest`, and `computeVisibleModules` directly. It never calls `activate()`, constructs or refreshes `CustomSessionSetsView`, triggers a watcher refresh, or otherwise traverses an actual activation/snapshot path. Its name and comments therefore overstate what it proves.\n  - **Fix:** Add an activation/provider-level test using a temporary workspace without `docs/modules.yaml`: invoke extension activation and at least one initial and explicit view refresh/snapshot cycle, then assert the file remains absent. Retain the existing utility-level test as supplemental coverage.",
+      "category": "Completeness",
+      "severity": "Major"
+    }
+  ]
+}

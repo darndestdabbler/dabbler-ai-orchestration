@@ -712,15 +712,15 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
   // together. Do not "consolidate" these onto the bare-dir probe.
   private buildGettingStarted(all: SessionSet[]): GettingStartedPayload {
     const folders = vscode.workspace.workspaceFolders ?? [];
+    // Set 094: the two-section form consumes only structureBuilt + the
+    // durable seeds; the environment probes (provider key / Python /
+    // Copilot CLI) that fed the retired form warnings are computed
+    // independently by buildSystemStatus for the System Status strip.
     return computeGettingStarted(
       folders.length > 0,
       folders[0]?.uri.fsPath,
       all.length > 0,
       nodeDetectionFs,
-      // D6 (Set 060 S3): process.env is the extension host's merged
-      // Windows System + User environment, captured at launch — hence
-      // the warning's "reload the window" instruction.
-      process.env,
       // Set 077 S2 (Feature 1, A1): the durable tier seed for the form —
       // `.dabbler/tier` marker first, router-config inference second.
       // Runs only in "getting-started" mode (computeGettingStarted gates
@@ -729,12 +729,6 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       // Set 077 S3 (Feature 2): the durable verification-mode seed —
       // the `.dabbler/verification-mode` marker (no inference rung).
       (root) => readVerificationModeMarker(root),
-      // Set 077 S3 (A10): the Python-presence probe (explicit setting →
-      // workspace venv → PATH scan). Same getting-started-only gating.
-      (root) => probePythonPresence(root),
-      // Set 079 S1 (Feature 1): the Copilot-CLI presence probe (explicit
-      // copilotCliPath setting → PATH). Same getting-started-only gating.
-      (root) => probeCopilotCliPresence(root),
       // Set 079 S2 (Feature 1): the durable seat-profile seed — the
       // workspace router-config.yaml's transport.profile value (the
       // durable source the scaffold's config write creates). Tolerant:

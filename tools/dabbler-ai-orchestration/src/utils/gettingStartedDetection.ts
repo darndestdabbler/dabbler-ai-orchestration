@@ -32,14 +32,18 @@ import {
   GettingStartedPayload,
 } from "../types/sessionSetsWebviewProtocol";
 
-/** The three D3 completion flags for the Getting Started form. */
+/**
+ * The completion flag(s) for the Getting Started form. Set 094: the form
+ * shrank to two sections (Build project structure + Define modules), so the
+ * old step-2 `planPresent` and step-3 `sessionSetsPresent` flags are retired
+ * — `structureBuilt` is the sole surviving completion signal (it still
+ * greys/checks the Build section AND feeds the System Status strip's
+ * `workspaceInitialized` computation). Kept as an interface (not a bare
+ * boolean) so the field carries its D3 doc and future signals can join.
+ */
 export interface CompletionState {
-  /** D3 step 1 — `.venv` + router importable + 3 engine files. */
+  /** `.venv` + router importable + all three engine files. */
   structureBuilt: boolean;
-  /** D3 step 2 — `docs/planning/project-plan.md` exists. */
-  planPresent: boolean;
-  /** D3 step 3 — ≥1 `docs/session-sets/NNN-* ` directory. */
-  sessionSetsPresent: boolean;
 }
 
 /**
@@ -59,17 +63,6 @@ export interface DetectionFs {
 
 // The three root-level engine instruction files the scaffolder writes.
 const ENGINE_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"];
-
-// Relative path of the project plan the planning step produces.
-const PROJECT_PLAN_REL = path.join("docs", "planning", "project-plan.md");
-
-// Relative path of the session-sets container.
-const SESSION_SETS_REL = path.join("docs", "session-sets");
-
-// A numbered session-set directory: a `NNN-` sequence prefix (>=3
-// digits) followed by a kebab body. Matches the authoring-guide slug
-// convention; for detection we only need the leading numeric prefix.
-const NNN_DIR_RE = /^\d{3,}-/;
 
 /**
  * Filesystem proxy for "`dabbler-ai-router` importable": an `ai_router`
@@ -111,29 +104,15 @@ function engineFilesPresent(root: string, fsi: DetectionFs): boolean {
   return ENGINE_FILES.every((f) => fileExists(path.join(root, f), fsi));
 }
 
-/** True iff at least one `docs/session-sets/NNN-* ` directory exists. */
-function sessionSetsPresent(root: string, fsi: DetectionFs): boolean {
-  const dir = path.join(root, SESSION_SETS_REL);
-  if (!fsi.isDirectory(dir)) return false;
-  return fsi
-    .readdir(dir)
-    .some(
-      (name) =>
-        NNN_DIR_RE.test(name) && fsi.isDirectory(path.join(dir, name)),
-    );
-}
-
 /**
- * Compute the three D3 completion flags for `root`. Pure: depends only
- * on the injected `fsi`. Never throws — a missing root yields all-false.
+ * Compute the Build-section completion flag for `root`. Pure: depends only
+ * on the injected `fsi`. Never throws — a missing root yields false. Set
+ * 094: `planPresent` / `sessionSetsPresent` retired with the form's plan and
+ * session-set steps.
  */
 export function detectCompletion(root: string, fsi: DetectionFs): CompletionState {
   return {
     structureBuilt: routerInstalled(root, fsi) && engineFilesPresent(root, fsi),
-    // A directory named project-plan.md must NOT satisfy step 2 (S1
-    // verifier Issue 2) — require a regular file.
-    planPresent: fileExists(path.join(root, PROJECT_PLAN_REL), fsi),
-    sessionSetsPresent: sessionSetsPresent(root, fsi),
   };
 }
 
@@ -186,62 +165,48 @@ export function selectExplorerMode(hasFolder: boolean, hasAnySets: boolean): Exp
 }
 
 /**
- * Compose the full `GettingStartedPayload` the webview consumes from the
- * host's observable inputs. Pure (fs injected) so the host stays a thin
- * adapter and the composition — including the optimization that the
- * fs probe runs ONLY in "getting-started" mode — is unit-testable.
+ * Compose the `GettingStartedPayload` the webview consumes from the host's
+ * observable inputs. Pure (fs injected) so the host stays a thin adapter
+ * and the composition — including the optimization that the fs probe runs
+ * ONLY in "getting-started" mode — is unit-testable.
  *
- * `root` is the detection root (the first open workspace folder, per
- * D5); `hasAnySets` is the merged-across-roots count signal (which
- * includes worktrees) that flips the mode to "list". In any mode other
- * than "getting-started" the three completion flags are reported false
- * (they are only meaningful for the form surface) and no probe runs.
+ * `root` is the detection root (the first open workspace folder, per D5);
+ * `hasAnySets` is the merged-across-roots count signal (which includes
+ * worktrees) that flips the mode to "list". In any mode other than
+ * "getting-started" the completion flag reports false and no probe runs.
  *
- * `env` feeds the D6 provider-key check (Set 060 Session 3); the host
- * passes `process.env`. Unlike the fs probe it is mode-independent —
- * an env lookup is free and the value only renders on the form surface
- * anyway.
+ * Set 094: the environment/probe inputs that fed the OLD form warnings
+ * (`env` provider-key check, `resolvePythonPresent`, `resolveCopilotCliPresent`)
+ * are gone — Set 092 S2 moved those faults to the System Status strip, which
+ * computes them independently (`buildSystemStatus`), so the payload copies
+ * were dead. The two-section form needs only the tier / verification-mode /
+ * seat-profile seeds below.
  *
- * `resolveTierSeed` (Set 077 S2, Feature 1 A1) resolves the workspace's
- * durable tier (the `.dabbler/tier` marker → router-config inference
- * chain in utils/tierMarkerStore.ts). Injected as a thunk — like the fs
- * probe it runs ONLY in "getting-started" mode, the one mode that
- * renders the form the seed feeds.
- *
- * `resolveVerificationModeSeed` (Set 077 S3, Feature 2) resolves the
- * durable `.dabbler/verification-mode` marker the same way (no
- * inference rung — marker or null). `resolvePythonPresent` (A10) is the
- * host's Python-presence probe. Both are gated to "getting-started"
- * mode like the other probes; `pythonPresent` defaults to true (quiet)
- * when the probe is absent or the mode renders no form.
- *
- * `resolveCopilotCliPresent` (Set 079 S1, Feature 1) is the host's
- * Copilot-CLI presence probe (explicit copilotCliPath setting → PATH),
- * feeding the step-1 Copilot-missing warning; same gating and same
- * quiet true default as `pythonPresent`. `resolveTransportProfileSeed`
- * is the durable seat-profile seed for the Full-tier sub-choice —
- * Session 2 wires the durable source (the scaffold's transport.profile
- * write); until then hosts omit the thunk and the seed is null.
+ * `resolveTierSeed` (Set 077 S2, A1) resolves the workspace's durable tier
+ * (the `.dabbler/tier` marker → router-config inference chain). Injected as
+ * a thunk — it runs ONLY in "getting-started" mode, the one mode that renders
+ * the form the seed feeds. `resolveVerificationModeSeed` (Set 077 S3)
+ * resolves the durable `.dabbler/verification-mode` marker the same way (no
+ * inference rung — marker or null). `resolveTransportProfileSeed` (Set 079)
+ * resolves the durable Full-tier seat-profile seed. All three are
+ * getting-started-mode-gated; hosts that omit a thunk get null.
  */
 export function computeGettingStarted(
   hasFolder: boolean,
   root: string | undefined,
   hasAnySets: boolean,
   fsi: DetectionFs,
-  env: Record<string, string | undefined> = {},
   resolveTierSeed?: (root: string) => "full" | "lightweight" | null,
   resolveVerificationModeSeed?: (
     root: string,
   ) => "dedicated-sessions" | "out-of-band-or-none" | null,
-  resolvePythonPresent?: (root: string) => boolean,
-  resolveCopilotCliPresent?: (root: string) => boolean,
   resolveTransportProfileSeed?: (root: string) => "api" | "copilot-cli" | null,
 ): GettingStartedPayload {
   const mode = selectExplorerMode(hasFolder, hasAnySets);
   const completion =
     mode === "getting-started" && root
       ? detectCompletion(root, fsi)
-      : { structureBuilt: false, planPresent: false, sessionSetsPresent: false };
+      : { structureBuilt: false };
   const tierSeed =
     mode === "getting-started" && root && resolveTierSeed
       ? resolveTierSeed(root)
@@ -250,14 +215,6 @@ export function computeGettingStarted(
     mode === "getting-started" && root && resolveVerificationModeSeed
       ? resolveVerificationModeSeed(root)
       : null;
-  const pythonPresent =
-    mode === "getting-started" && root && resolvePythonPresent
-      ? resolvePythonPresent(root)
-      : true;
-  const copilotCliPresent =
-    mode === "getting-started" && root && resolveCopilotCliPresent
-      ? resolveCopilotCliPresent(root)
-      : true;
   const transportProfileSeed =
     mode === "getting-started" && root && resolveTransportProfileSeed
       ? resolveTransportProfileSeed(root)
@@ -268,12 +225,9 @@ export function computeGettingStarted(
   return {
     mode,
     ...completion,
-    providerKeyPresent: providerKeyPresent(env),
     tierSeed,
     rootId,
     verificationModeSeed,
-    pythonPresent,
-    copilotCliPresent,
     transportProfileSeed,
   };
 }

@@ -193,6 +193,15 @@ function memFileOps(seed: Record<string, string> = {}): {
     exists: (p) => store.has(norm(p)),
     readFile: (p) => store.get(norm(p)) ?? "",
     writeFile: (p, c) => void store.set(norm(p), c),
+    writeFileExclusive: (p, c) => {
+      const k = norm(p);
+      if (store.has(k)) {
+        const e: NodeJS.ErrnoException = new Error(`EEXIST: ${p} exists`);
+        e.code = "EEXIST";
+        throw e;
+      }
+      store.set(k, c);
+    },
     mkdirp: () => {},
     copyDir: () => {},
     removeRecursive: (p) => void store.delete(norm(p)),

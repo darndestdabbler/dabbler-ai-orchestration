@@ -17,7 +17,11 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import * as YAML from "yaml";
-import { MODULES_MANIFEST_REL, readModulesManifest } from "./fileSystem";
+import {
+  MODULES_MANIFEST_REL,
+  readModulesManifest,
+  writeFileExclusiveSync,
+} from "./fileSystem";
 import { ModuleManifestEntry } from "../types";
 
 /** The manifest path as shown to operators (forward-slashed on every OS). */
@@ -147,14 +151,6 @@ const MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml — the module manifes
 `;
 
 /**
- * Header comment written when the scaffold CREATES docs/modules.yaml
- * (ruling Q1: an absent manifest is created with a purpose + syntax
- * explainer before the first entry).
- */
-export const MODULES_YAML_HEADER = `${MODULES_YAML_HEADER_COMMENTS}modules:
-`;
-
-/**
  * Set 091 S1 (verdict amendment 3): the canonical always-present
  * modules.yaml template — the Set 087 header comments, commented-out
  * example entries, and a valid EMPTY \`modules: []\` list (gpt-5-4's
@@ -182,6 +178,73 @@ export const MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
 
 modules: []
 `;
+
+/**
+ * Set 094 (adjudication A): the injectable fs surface {@link
+ * ensureModulesManifest} needs. `writeFileExclusive` MUST fail with an
+ * `EEXIST`-coded error when a directory entry already exists at the path — a
+ * file, a directory, or a symlink (including a DANGLING one, never followed) —
+ * so the ensure-write can never overwrite an existing / invalid / symlinked
+ * manifest (the Set 092 guardrails keep owning a present-but-invalid one). The
+ * real implementations use the cross-platform {@link writeFileExclusiveSync}
+ * (lstat no-follow precheck + O_EXCL `wx` write): O_EXCL alone is NOT
+ * symlink-safe on Windows (round-2 verifier catch), so the lstat precheck
+ * restores the symlink guard on both platforms while `wx` closes the
+ * concurrent plain-file create race.
+ */
+export interface EnsureManifestIo {
+  /** Create the parent directory (recursive; no-op when present). */
+  mkdirp(absDir: string): void;
+  /**
+   * Create `abs` with `data`, or throw an `EEXIST`-coded error when a
+   * directory entry already exists there (a symlink counts, never followed).
+   */
+  writeFileExclusive(abs: string, data: string): void;
+}
+
+const NODE_ENSURE_MANIFEST_IO: EnsureManifestIo = {
+  mkdirp: (dir) => fs.mkdirSync(dir, { recursive: true }),
+  writeFileExclusive: (abs, data) => writeFileExclusiveSync(abs, data),
+};
+
+export interface EnsureModulesManifestResult {
+  /** True iff this call CREATED docs/modules.yaml (false: it already existed). */
+  created: boolean;
+  /** Repo-relative manifest path (forward-slashed, for display). */
+  manifestRel: string;
+}
+
+/**
+ * Set 094 (adjudication A): create `docs/modules.yaml` from the canonical
+ * {@link MODULES_YAML_TEMPLATE} IFF it does not already exist — the
+ * idempotent, skip-existing "ensure" the explicit-action sites share (the
+ * scaffold, the form's + toolbar's *Open modules.yaml*, and the
+ * copy-decomposition prompt), mirroring the Set 077 S4
+ * `ensureCrossProviderVerificationDoc` precedent.
+ *
+ * NEVER inspects validity: a present-but-invalid manifest is left untouched
+ * (the Set 092 guardrails own it) — the exclusive create fails `EEXIST` on
+ * ANY existing entry (valid, invalid, or symlink) and the call reports
+ * `created: false`. It is an EXPLICIT-ACTION primitive: no activation,
+ * watcher, or tree-render path may call it (the never-write-on-activation
+ * invariant, adjudication A).
+ */
+export function ensureModulesManifest(
+  root: string,
+  io: EnsureManifestIo = NODE_ENSURE_MANIFEST_IO,
+): EnsureModulesManifestResult {
+  const abs = path.join(root, MODULES_MANIFEST_REL);
+  io.mkdirp(path.dirname(abs));
+  try {
+    io.writeFileExclusive(abs, MODULES_YAML_TEMPLATE);
+    return { created: true, manifestRel: MODULES_MANIFEST_DISPLAY };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
+      return { created: false, manifestRel: MODULES_MANIFEST_DISPLAY };
+    }
+    throw err;
+  }
+}
 
 /**
  * The statically formatted YAML block for one new module entry — appended
@@ -336,43 +399,49 @@ export function scaffoldNewModule(
 
   // Build + validate the manifest candidate BEFORE any write, so a
   // refusal leaves the workspace untouched.
-  let candidate: string | null = null;
   const manifestCreated = classified.kind === "absent";
-  if (manifestCreated) {
-    candidate = MODULES_YAML_HEADER + entryBlock;
-  } else {
-    const current = fs.readFileSync(manifestAbs, "utf8");
-    // Set 091 S1: a valid-empty manifest (zero parsed entries) grows by
-    // replacing the empty `modules:` marker with the first block-style
-    // entry — a plain text append cannot extend either empty form. S1
-    // verification R2: several lines can look like the empty form (e.g.
-    // a NESTED modules: key under another mapping earlier in the file),
-    // so each candidate is checked against the parse guard and the first
-    // one that lands the entry in the ROOT modules list wins.
-    if (existing.length === 0) {
-      for (const replaced of replaceEmptyModulesList(current, entryBlock)) {
-        try {
-          assertAppendedManifestParses(
-            replaced,
-            slug,
-            existing.length + 1,
-            entryBlock,
-          );
-          candidate = replaced;
-          break;
-        } catch {
-          // Wrong site (nested key) or unappendable — try the next line.
-        }
+  // Set 094 (adjudication A): a CREATED manifest starts from the canonical
+  // MODULES_YAML_TEMPLATE — the SAME shape the ensure-write sites (scaffold,
+  // Open modules.yaml, copy prompt) write — so `New module` on an empty repo
+  // produces the identical starting file, then grows it. Otherwise the source
+  // is the existing file. Both go through ONE append primitive that differs
+  // only in this source string.
+  const sourceText = manifestCreated
+    ? MODULES_YAML_TEMPLATE
+    : fs.readFileSync(manifestAbs, "utf8");
+
+  let candidate: string | null = null;
+  // Set 091 S1: a valid-empty manifest (zero parsed entries) — and the
+  // created template, which is exactly that shape — grows by replacing the
+  // empty `modules:` marker with the first block-style entry (a plain text
+  // append cannot extend either empty form). S1 verification R2: several
+  // lines can look like the empty form (e.g. a NESTED modules: key under
+  // another mapping earlier in the file), so each candidate is checked
+  // against the parse guard and the first one that lands the entry in the
+  // ROOT modules list wins.
+  if (existing.length === 0) {
+    for (const replaced of replaceEmptyModulesList(sourceText, entryBlock)) {
+      try {
+        assertAppendedManifestParses(
+          replaced,
+          slug,
+          existing.length + 1,
+          entryBlock,
+        );
+        candidate = replaced;
+        break;
+      } catch {
+        // Wrong site (nested key) or unappendable — try the next line.
       }
     }
-    if (candidate === null) {
-      // No empty-form line produced a valid result: plain append, with
-      // the guard below as the loud refusal path (e.g. an
-      // all-dropped-entries manifest must refuse on the entry-count
-      // check, never write).
-      candidate =
-        (current.endsWith("\n") ? current : current + "\n") + entryBlock;
-    }
+  }
+  if (candidate === null) {
+    // No empty-form line produced a valid result: plain append (a populated
+    // manifest), with the guard below as the loud refusal path (e.g. an
+    // all-dropped-entries manifest must refuse on the entry-count check,
+    // never write).
+    candidate =
+      (sourceText.endsWith("\n") ? sourceText : sourceText + "\n") + entryBlock;
   }
   assertAppendedManifestParses(
     candidate,

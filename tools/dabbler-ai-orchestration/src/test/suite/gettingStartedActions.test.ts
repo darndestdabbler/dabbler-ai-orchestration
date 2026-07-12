@@ -67,12 +67,8 @@ interface CallLog {
   buildStructureBudgets: Array<BudgetChoice | undefined>;
   // Set 081 S1: the narrowed seat-profile rider build-structure forwards.
   buildStructureProfiles: Array<string | undefined>;
-  importPlan: number;
-  copyPlanPrompt: number;
-  // Set 087 S3: the New-module scaffold action.
-  newModule: number;
-  // Set 060 S4: build-session-sets carries (parallel, tier).
-  buildSessionSets: Array<{ parallel: boolean; tier: "full" | "lightweight" }>;
+  // Set 094: the Define-modules "Open modules.yaml" action (no riders).
+  openModules: number;
 }
 
 function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog } {
@@ -81,10 +77,7 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
     buildStructure: [],
     buildStructureBudgets: [],
     buildStructureProfiles: [],
-    importPlan: 0,
-    copyPlanPrompt: 0,
-    newModule: 0,
-    buildSessionSets: [],
+    openModules: 0,
   };
   const handlers: GettingStartedHandlers = {
     openFolder: async () => void calls.openFolder++,
@@ -93,25 +86,18 @@ function recordingHandlers(): { handlers: GettingStartedHandlers; calls: CallLog
       calls.buildStructureBudgets.push(budget);
       calls.buildStructureProfiles.push(transportProfile);
     },
-    importPlan: async () => void calls.importPlan++,
-    copyPlanPrompt: async () => void calls.copyPlanPrompt++,
-    newModule: async () => void calls.newModule++,
-    buildSessionSets: async (parallel, tier) =>
-      void calls.buildSessionSets.push({ parallel, tier }),
+    openModules: async () => void calls.openModules++,
   };
   return { handlers, calls };
 }
 
 suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
-  test("dispatches each known action to its handler", async () => {
+  test("dispatches each known action to its handler (Set 094: three actions)", async () => {
     const { handlers, calls } = recordingHandlers();
     for (const action of [
       "open-folder",
       "build-structure",
-      "import-plan",
-      "copy-plan-prompt",
-      "new-module",
-      "build-session-sets",
+      "open-modules",
     ] as const) {
       const handled = await routeGettingStartedAction(
         // Set 063 S2: Full build-structure REQUIRES a budget rider (the
@@ -125,10 +111,19 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     }
     assert.strictEqual(calls.openFolder, 1);
     assert.strictEqual(calls.buildStructure.length, 1);
-    assert.strictEqual(calls.importPlan, 1);
-    assert.strictEqual(calls.copyPlanPrompt, 1);
-    assert.strictEqual(calls.newModule, 1);
-    assert.strictEqual(calls.buildSessionSets.length, 1);
+    assert.strictEqual(calls.openModules, 1);
+  });
+
+  test("open-modules dispatches to the openModules handler (no riders)", async () => {
+    const { handlers, calls } = recordingHandlers();
+    const handled = await routeGettingStartedAction(
+      { type: "gettingStartedAction", action: "open-modules" },
+      handlers,
+    );
+    assert.strictEqual(handled, true);
+    assert.strictEqual(calls.openModules, 1);
+    // It never touches the scaffold path.
+    assert.strictEqual(calls.buildStructure.length, 0);
   });
 
   test("forwards a valid tier rider; absent defaults to full; unknown is REJECTED (Set 077 A11)", async () => {
@@ -159,42 +154,6 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
       "full",
       "full",
     ]);
-  });
-
-  test("coerces the parallel rider to a strict boolean (=== true only)", async () => {
-    const { handlers, calls } = recordingHandlers();
-    const post = (parallel?: unknown) =>
-      routeGettingStartedAction(
-        { type: "gettingStartedAction", action: "build-session-sets", parallel } as GettingStartedActionMsg,
-        handlers,
-      );
-    await post(true);
-    await post(false);
-    await post(undefined);
-    await post("true");      // strings are not booleans
-    await post(1);
-    assert.deepStrictEqual(
-      calls.buildSessionSets.map((c) => c.parallel),
-      [true, false, false, false, false],
-    );
-  });
-
-  test("build-session-sets narrows its tier rider like build-structure (Set 060 S4)", async () => {
-    const { handlers, calls } = recordingHandlers();
-    const post = (tier?: unknown) =>
-      routeGettingStartedAction(
-        { type: "gettingStartedAction", action: "build-session-sets", tier } as GettingStartedActionMsg,
-        handlers,
-      );
-    assert.strictEqual(await post("lightweight"), true);
-    assert.strictEqual(await post("full"), true);
-    assert.strictEqual(await post(undefined), true);
-    assert.strictEqual(await post("LIGHTWEIGHT"), true); // Set 077: case-insensitive
-    assert.strictEqual(await post("lite"), false);       // Set 077 (A11): rejected
-    assert.deepStrictEqual(
-      calls.buildSessionSets.map((c) => c.tier),
-      ["lightweight", "full", "full", "lightweight"],
-    );
   });
 
   test("forwards narrowed budget riders on build-structure (Set 063 S2)", async () => {
@@ -259,9 +218,7 @@ suite("routeGettingStartedAction — dispatch + narrowing (Set 060 S2)", () => {
     assert.strictEqual(handled, false);
     assert.strictEqual(calls.openFolder, 0);
     assert.strictEqual(calls.buildStructure.length, 0);
-    assert.strictEqual(calls.importPlan, 0);
-    assert.strictEqual(calls.copyPlanPrompt, 0);
-    assert.strictEqual(calls.buildSessionSets.length, 0);
+    assert.strictEqual(calls.openModules, 0);
   });
 });
 
@@ -430,6 +387,15 @@ function memFileOps(seed: Record<string, string> = {}): {
     exists: (p) => store.has(norm(p)),
     readFile: (p) => store.get(norm(p)) ?? "",
     writeFile: (p, c) => void store.set(norm(p), c),
+    writeFileExclusive: (p, c) => {
+      const k = norm(p);
+      if (store.has(k)) {
+        const e: NodeJS.ErrnoException = new Error(`EEXIST: ${p} exists`);
+        e.code = "EEXIST";
+        throw e;
+      }
+      store.set(k, c);
+    },
     mkdirp: () => {},
     copyDir: () => {},
     removeRecursive: (p) => void store.delete(norm(p)),
@@ -452,14 +418,14 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
       structureOnly: true,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Twelve writes: eleven structure artifacts (the five Set-060
+    // Thirteen writes: eleven structure artifacts (the five Set-060
     // structure artifacts, the three Set 064 D7 docs/planning/
     // guidance-lifecycle starters, the Set 077 S4 cross-provider
     // verification doc, and the two Set 087 S3 ownership/CI teaching
-    // templates) plus the Set 077 S2 durable tier marker. (The
-    // verification-mode marker is Lightweight-only as of Set 082; this
-    // is a Full scaffold.)
-    assert.strictEqual(result.written.length, 12);
+    // templates), the Set 077 S2 durable tier marker, and the Set 094
+    // docs/modules.yaml ensure-write. (The verification-mode marker is
+    // Lightweight-only as of Set 082; this is a Full scaffold.)
+    assert.strictEqual(result.written.length, 13);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
@@ -472,6 +438,14 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     // Set 087 S3 (ruling Q3): ownership + monorepo-CI teaching templates.
     assert.ok(store.has("/repo/.github/CODEOWNERS"));
     assert.ok(store.has("/repo/.github/workflows/monorepo-ci.yml"));
+    // Set 094 (adjudication A): the scaffold is one of the explicit-action
+    // ensure-write sites — docs/modules.yaml is created from the canonical
+    // template (the sole writer; not part of the static template bundle).
+    assert.ok(store.has("/repo/docs/modules.yaml"), "modules.yaml ensured");
+    const manifest = store.get("/repo/docs/modules.yaml")!;
+    assert.ok(manifest.startsWith("# docs/modules.yaml"), "template header");
+    assert.ok(manifest.includes("modules: []"), "valid-empty modules list");
+    assert.ok(manifest.includes("# - slug: payment-api"), "commented examples");
     // The whole point of structureOnly: no docs/session-sets path is
     // materialized, so the dual-mode Explorer stays on the form
     // (hasAnySets keys on a renderable set) and no unnamed starter set
@@ -513,7 +487,34 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    assert.strictEqual(result.written.length, 11); // 10 artifacts + tier marker (Full: no verification-mode marker, Set 082)
+    // 10 artifacts + tier marker + modules.yaml (Full: no verification-mode
+    // marker, Set 082; Set 094: + the modules.yaml ensure-write).
+    assert.strictEqual(result.written.length, 12);
+  });
+
+  test("Set 094: a pre-existing docs/modules.yaml is kept, never overwritten (skipped)", async () => {
+    const existingManifest = "modules:\n  - slug: greeter\n    title: Greeter\n";
+    const { ops, store } = memFileOps({
+      "/repo/docs/modules.yaml": existingManifest,
+    });
+    const result = await scaffoldConsumerRepo({
+      projectDir: PROJECT,
+      ctx: structureOnlyContext("repo", "full", "2026-07-12"),
+      bundle,
+      fileOps: ops,
+      structureOnly: true,
+      installRouter: async () => ({ ok: true, message: "installed" }),
+    });
+    assert.ok(
+      result.skipped.includes("docs/modules.yaml"),
+      "an existing manifest is reported skipped, not written",
+    );
+    assert.ok(!result.written.includes("docs/modules.yaml"));
+    assert.strictEqual(
+      store.get("/repo/docs/modules.yaml"),
+      existingManifest,
+      "the operator's manifest survives the scaffold byte-for-byte",
+    );
   });
 });
 
@@ -1210,29 +1211,19 @@ suite("verification-mode rider — dispatch threading (Set 077 S3)", () => {
       budget: BudgetChoice | undefined;
       verificationMode: string | undefined;
     }>;
-    buildSessionSets: Array<{
-      parallel: boolean;
-      tier: "full" | "lightweight";
-      verificationMode: string | undefined;
-    }>;
   }
 
   function modeRecordingHandlers(): {
     handlers: GettingStartedHandlers;
     calls: ModeCallLog;
   } {
-    const calls: ModeCallLog = { buildStructure: [], buildSessionSets: [] };
+    const calls: ModeCallLog = { buildStructure: [] };
     const handlers: GettingStartedHandlers = {
       openFolder: async () => undefined,
       buildStructure: async (tier, budget, verificationMode) => {
         calls.buildStructure.push({ tier, budget, verificationMode });
       },
-      importPlan: async () => undefined,
-      copyPlanPrompt: async () => undefined,
-      newModule: async () => undefined,
-      buildSessionSets: async (parallel, tier, verificationMode) => {
-        calls.buildSessionSets.push({ parallel, tier, verificationMode });
-      },
+      openModules: async () => undefined,
     };
     return { handlers, calls };
   }
@@ -1290,45 +1281,6 @@ suite("verification-mode rider — dispatch threading (Set 077 S3)", () => {
     );
     assert.strictEqual(handled, false);
     assert.deepStrictEqual(calls.buildStructure, []);
-  });
-
-  test("build-session-sets threads the mode alongside parallel + tier", async () => {
-    const { handlers, calls } = modeRecordingHandlers();
-    const handled = await routeGettingStartedAction(
-      {
-        type: "gettingStartedAction",
-        action: "build-session-sets",
-        parallel: false,
-        tier: "lightweight",
-        verificationMode: "dedicated-sessions",
-      },
-      handlers,
-    );
-    assert.strictEqual(handled, true);
-    assert.deepStrictEqual(calls.buildSessionSets, [
-      {
-        parallel: false,
-        tier: "lightweight",
-        verificationMode: "dedicated-sessions",
-      },
-    ]);
-  });
-
-  test("build-session-sets on Full carries NO mode even when the rider is present", async () => {
-    const { handlers, calls } = modeRecordingHandlers();
-    await routeGettingStartedAction(
-      {
-        type: "gettingStartedAction",
-        action: "build-session-sets",
-        parallel: true,
-        tier: "full",
-        verificationMode: "dedicated-sessions",
-      },
-      handlers,
-    );
-    assert.deepStrictEqual(calls.buildSessionSets, [
-      { parallel: true, tier: "full", verificationMode: undefined },
-    ]);
   });
 });
 

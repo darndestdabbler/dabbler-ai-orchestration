@@ -21,6 +21,7 @@ import { registerInstallAiRouterCommands } from "./commands/installAiRouterComma
 // registrations.
 import { registerGetStartedCommand } from "./commands/gettingStartedDoc";
 import { registerNewModuleCommand } from "./commands/newModule";
+import { registerOpenModulesManifestCommand } from "./commands/openModulesManifest";
 import { registerAssignLegacySetsCommand } from "./commands/assignLegacySets";
 import { registerPlanImportCommand } from "./wizard/planImport";
 import { registerSessionGenPromptCommand } from "./wizard/sessionGenPrompt";
@@ -207,36 +208,33 @@ export function activate(context: vscode.ExtensionContext): void {
       watcherSubs.push(watcher);
       context.subscriptions.push(watcher);
 
-      // Set 060 Session 1: Getting Started form live-progress watcher.
-      // The form's per-step completion (D3) keys on scaffold artifacts
-      // that the session-sets watcher above does NOT cover. This watcher
-      // invalidates the view on a change to ANY D3 input so all three
-      // form steps grey/check live (the spec's Session-1 end-state),
-      // including when a step completes OUTSIDE the form — e.g. the D4
-      // "Copy prompt for planning" flow, where the AI writes
-      // docs/planning/project-plan.md, or an external structure-build
-      // that lands the engine files and the venv router package
-      // separately. The covered inputs, mapped to the D3 rules in
-      // gettingStartedDetection.ts:
-      //   - step 1 structureBuilt: CLAUDE.md / AGENTS.md / GEMINI.md
+      // Set 060 Session 1: Getting Started form + module-tree live-progress
+      // watcher. It invalidates the view on a change to any of the paths the
+      // form and the module tree derive state from — paths the spec.md-scoped
+      // session-sets watcher above does NOT cover. The covered inputs:
+      //   - Build-section `structureBuilt`: CLAUDE.md / AGENTS.md / GEMINI.md
       //     (engine files) + .venv/**/site-packages/ai_router/** (the
       //     router-importable filesystem proxy);
-      //   - step 2 planPresent: docs/planning/project-plan.md;
-      //   - step 3 sessionSetsPresent: docs/session-sets/* (a numbered
-      //     directory appearing — catches the bare-dir case the
-      //     spec.md-scoped session-sets watcher above misses).
-      // Set 092 S2 adds docs/modules.yaml to the same workspace-scoped
-      // watcher so invalid edits and repairs update the diagnostics strip
-      // and last-known-good tree without waiting for the poll interval.
-      // Watching these specific paths (the actual source of truth for the
-      // steps, not indirect orchestrator-state inference) is D1-permitted.
+      //   - docs/modules.yaml (Set 092 S2): edit → invalidate → repair updates
+      //     the diagnostics strip + last-known-good tree without the poll;
+      //   - docs/planning/project-plan.md: the pseudo-module's Plan node state
+      //     (Set 093 — LEGACY_ROOT_PLAN_REL) flips present/missing live.
+      // Set 094: the form shrank to two sections, so the retired step-2
+      // (planPresent) and step-3 (sessionSetsPresent) inputs left the form.
+      // project-plan.md is KEPT — its consumer moved from the form's step-2
+      // indicator to the Set 093 pseudo-module Plan node (list mode). The
+      // bare `docs/session-sets/*` glob was DROPPED: the getting-started →
+      // list flip keys on a MATERIALIZED set (spec.md), which the
+      // session-sets watcher above already catches; a bare numbered directory
+      // no longer greens any form step, so watching it bought only a no-op
+      // refresh (what the watcher contract loses — recorded per spec Step 2).
       // In-workspace globs ride VS Code's existing recursive workspace
       // watcher, so this adds event subscriptions, not a new OS watch —
       // even the .venv glob is cheap (and dead when a user excludes
       // .venv via files.watcherExclude, where the 30s poll backstops).
       const gsPattern = new vscode.RelativePattern(
         root,
-        "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/modules.yaml,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**,docs/session-sets/*}",
+        "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/modules.yaml,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**}",
       );
       const gsWatcher = vscode.workspace.createFileSystemWatcher(gsPattern);
       gsWatcher.onDidCreate(onEvent);
@@ -309,6 +307,9 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerGetStartedCommand", () => registerGetStartedCommand(context));
   safeRegister("registerPlanImportCommand", () => registerPlanImportCommand(context));
   safeRegister("registerNewModuleCommand", () => registerNewModuleCommand(context));
+  safeRegister("registerOpenModulesManifestCommand", () =>
+    registerOpenModulesManifestCommand(context),
+  );
   safeRegister("registerAssignLegacySetsCommand", () =>
     registerAssignLegacySetsCommand(context),
   );

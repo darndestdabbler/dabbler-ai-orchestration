@@ -200,6 +200,12 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.openModulesManifest",
+        "title": "Open modules.yaml",
+        "category": "Dabbler",
+        "icon": "$(list-tree)"
+      },
+      {
         "command": "dabbler.generateSessionSetPrompt",
         "title": "Generate Session-Set Prompt",
         "category": "Dabbler"
@@ -320,9 +326,14 @@
           "group": "navigation@3"
         },
         {
+          "command": "dabbler.openModulesManifest",
+          "when": "view == dabblerSessionSets",
+          "group": "navigation@4"
+        },
+        {
           "command": "dabblerSessionSets.upgradeOlderSets",
           "when": "view == dabblerSessionSets && dabblerSessionSets.hasSubCurrentSets",
-          "group": "navigation@4"
+          "group": "navigation@5"
         }
       ],
       "view/item/context": []

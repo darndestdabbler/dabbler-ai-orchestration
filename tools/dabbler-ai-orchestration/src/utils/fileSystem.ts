@@ -33,6 +33,37 @@ export const SESSION_SETS_REL = path.join("docs", "session-sets");
 export const MODULES_MANIFEST_REL = path.join("docs", "modules.yaml");
 export const PLAYWRIGHT_REL_DEFAULT = "tests";
 
+/**
+ * Set 094 (round-2 correctness fix): a CROSS-PLATFORM exclusive create.
+ * `fs.writeFileSync(p, data, {flag:"wx"})` (O_EXCL) alone is NOT symlink-safe
+ * on Windows — CreateFile follows a reparse point, so a DANGLING
+ * docs/modules.yaml symlink would be written THROUGH to its (possibly
+ * out-of-workspace) target (POSIX O_EXCL fails EEXIST on the link; Windows
+ * does not). An `lstat` no-follow precheck restores the symlink guard on BOTH
+ * platforms: a file, directory, or symlink — including a dangling one —
+ * counts as present and fails `EEXIST`, never followed. The `wx` write still
+ * closes the concurrent plain-file create race; the tiny lstat→wx window (a
+ * symlink materializing between the two) is an accepted low-risk residual for
+ * a user-initiated single manifest create. Backs `FileOps.writeFileExclusive`
+ * and `ensureModulesManifest`'s node default (the manifest ensure-write's
+ * trust boundary, adjudication A).
+ */
+export function writeFileExclusiveSync(absPath: string, content: string): void {
+  let entryExists = false;
+  try {
+    fs.lstatSync(absPath); // no-follow: a dangling symlink still counts as present
+    entryExists = true;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  }
+  if (entryExists) {
+    const err: NodeJS.ErrnoException = new Error(`EEXIST: ${absPath} already exists`);
+    err.code = "EEXIST";
+    throw err;
+  }
+  fs.writeFileSync(absPath, content, { encoding: "utf8", flag: "wx" });
+}
+
 // Cancelled sets sort below all other groups in the merge logic — Set 8
 // keeps cancelled state as the lowest precedence so a set that exists in
 // two roots (one cancelled, one active) prefers the active copy when

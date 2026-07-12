@@ -3,6 +3,13 @@
 // switch (D1/D5). The detection core takes an injected filesystem, so
 // these tests drive it with an in-memory fake — no real directory tree,
 // no VS Code host.
+//
+// Set 094: the form shrank to two sections. `detectCompletion` reports a
+// single `structureBuilt` flag (the old plan / session-set steps retired),
+// and `computeGettingStarted` no longer carries the environment probes
+// (provider key / Python / Copilot CLI) — the System Status strip computes
+// those independently — so the payload is `{ mode, structureBuilt, tierSeed,
+// rootId, verificationModeSeed, transportProfileSeed }`.
 
 import * as assert from "assert";
 import * as path from "path";
@@ -76,27 +83,34 @@ function fullyScaffolded(): FakeFs {
     .addDir(path.join(ROOT, ".venv", "Lib", "site-packages", "ai_router"))
     .addFile(path.join(ROOT, "CLAUDE.md"))
     .addFile(path.join(ROOT, "AGENTS.md"))
-    .addFile(path.join(ROOT, "GEMINI.md"))
-    .addFile(path.join(ROOT, "docs", "planning", "project-plan.md"))
-    .addDir(path.join(ROOT, "docs", "session-sets", "001-first-set"));
+    .addFile(path.join(ROOT, "GEMINI.md"));
 }
 
-suite("gettingStartedDetection — detectCompletion (Set 060 S1, D3)", () => {
-  test("empty root → all flags false", () => {
-    const r = detectCompletion(ROOT, new FakeFs());
-    assert.deepStrictEqual(r, {
+// The two-section-form payload shape (Set 094): every field except the two
+// under test defaults to its quiet value, so a test overrides only what it
+// asserts.
+function payload(over: Partial<ReturnType<typeof computeGettingStarted>> = {}) {
+  return {
+    mode: "getting-started",
+    structureBuilt: false,
+    tierSeed: null,
+    rootId: null,
+    verificationModeSeed: null,
+    transportProfileSeed: null,
+    ...over,
+  };
+}
+
+suite("gettingStartedDetection — detectCompletion (Set 060 S1, D3; Set 094 shrink)", () => {
+  test("empty root → structureBuilt false", () => {
+    assert.deepStrictEqual(detectCompletion(ROOT, new FakeFs()), {
       structureBuilt: false,
-      planPresent: false,
-      sessionSetsPresent: false,
     });
   });
 
-  test("fully scaffolded → all flags true", () => {
-    const r = detectCompletion(ROOT, fullyScaffolded());
-    assert.deepStrictEqual(r, {
+  test("fully scaffolded → structureBuilt true", () => {
+    assert.deepStrictEqual(detectCompletion(ROOT, fullyScaffolded()), {
       structureBuilt: true,
-      planPresent: true,
-      sessionSetsPresent: true,
     });
   });
 
@@ -133,44 +147,15 @@ suite("gettingStartedDetection — detectCompletion (Set 060 S1, D3)", () => {
     assert.strictEqual(detectCompletion(ROOT, posix).structureBuilt, true);
   });
 
-  test("planPresent keys exactly on docs/planning/project-plan.md", () => {
-    const fs = new FakeFs().addFile(path.join(ROOT, "docs", "planning", "project-plan.md"));
-    assert.strictEqual(detectCompletion(ROOT, fs).planPresent, true);
-
-    // A differently-named plan does NOT satisfy the step.
-    const wrong = new FakeFs().addFile(path.join(ROOT, "docs", "planning", "plan.md"));
-    assert.strictEqual(detectCompletion(ROOT, wrong).planPresent, false);
-  });
-
-  test("S1 verifier Issue 2: a DIRECTORY named like a file does NOT satisfy a step", () => {
-    // A directory named project-plan.md must NOT green step 2.
-    const planDir = new FakeFs().addDir(
-      path.join(ROOT, "docs", "planning", "project-plan.md"),
-    );
-    assert.strictEqual(detectCompletion(ROOT, planDir).planPresent, false);
-
+  test("S1 verifier Issue 2: a DIRECTORY named like an engine file does NOT green structureBuilt", () => {
     // A directory named CLAUDE.md (with the other two as real files +
-    // venv/router present) must NOT green step 1.
+    // venv/router present) must NOT green the Build section.
     const engineDir = new FakeFs()
       .addDir(path.join(ROOT, ".venv", "Lib", "site-packages", "ai_router"))
       .addDir(path.join(ROOT, "CLAUDE.md")) // directory, not a file
       .addFile(path.join(ROOT, "AGENTS.md"))
       .addFile(path.join(ROOT, "GEMINI.md"));
     assert.strictEqual(detectCompletion(ROOT, engineDir).structureBuilt, false);
-  });
-
-  test("sessionSetsPresent requires a NNN- prefixed directory", () => {
-    // A non-numbered session-set dir does NOT count.
-    const bare = new FakeFs().addDir(path.join(ROOT, "docs", "session-sets", "my-set"));
-    assert.strictEqual(detectCompletion(ROOT, bare).sessionSetsPresent, false);
-
-    // A NNN- prefixed dir counts.
-    const numbered = new FakeFs().addDir(path.join(ROOT, "docs", "session-sets", "060-redesign"));
-    assert.strictEqual(detectCompletion(ROOT, numbered).sessionSetsPresent, true);
-
-    // A NNN- prefixed *file* (not a dir) does NOT count.
-    const file = new FakeFs().addFile(path.join(ROOT, "docs", "session-sets", "060-note.md"));
-    assert.strictEqual(detectCompletion(ROOT, file).sessionSetsPresent, false);
   });
 });
 
@@ -189,98 +174,45 @@ suite("gettingStartedDetection — selectExplorerMode (Set 060 S1, D1/D5)", () =
   });
 });
 
-suite("gettingStartedDetection — computeGettingStarted (Set 060 S1 host composition)", () => {
-  test("no folder → no-folder mode, no probe (all flags false even if root would qualify)", () => {
+suite("gettingStartedDetection — computeGettingStarted (Set 094 payload)", () => {
+  test("no folder → no-folder mode, no probe (structureBuilt false even if root would qualify)", () => {
     // Pass a fully-scaffolded fs + root, but hasFolder=false: the probe
-    // must NOT run, and the flags report false.
+    // must NOT run, and the flag reports false.
     const p = computeGettingStarted(false, ROOT, false, fullyScaffolded());
-    assert.deepStrictEqual(p, {
-      mode: "no-folder",
-      structureBuilt: false,
-      planPresent: false,
-      sessionSetsPresent: false,
-      providerKeyPresent: false,
-      tierSeed: null,
-      rootId: null,
-      verificationModeSeed: null,
-      pythonPresent: true,
-      copilotCliPresent: true,
-      transportProfileSeed: null,
-    });
+    assert.deepStrictEqual(p, payload({ mode: "no-folder" }));
   });
 
-  test("list mode (sets exist) → no probe, all flags false", () => {
-    // hasAnySets=true forces list mode; the form never renders, so the
-    // flags are reported false and the (expensive) fs probe is skipped.
+  test("list mode (sets exist) → no probe, structureBuilt false", () => {
     const p = computeGettingStarted(true, ROOT, true, fullyScaffolded());
-    assert.deepStrictEqual(p, {
-      mode: "list",
-      structureBuilt: false,
-      planPresent: false,
-      sessionSetsPresent: false,
-      providerKeyPresent: false,
-      tierSeed: null,
-      rootId: null,
-      verificationModeSeed: null,
-      pythonPresent: true,
-      copilotCliPresent: true,
-      transportProfileSeed: null,
-    });
+    assert.deepStrictEqual(p, payload({ mode: "list" }));
   });
 
-  test("getting-started mode → probe runs, flags reflect the root", () => {
+  test("getting-started mode → probe runs, structureBuilt reflects the root, rootId ships", () => {
     const p = computeGettingStarted(true, ROOT, false, fullyScaffolded());
-    assert.deepStrictEqual(p, {
-      mode: "getting-started",
-      structureBuilt: true,
-      planPresent: true,
-      sessionSetsPresent: true,
-      providerKeyPresent: false,
-      tierSeed: null,
-      rootId: ROOT,
-      verificationModeSeed: null,
-      pythonPresent: true,
-      copilotCliPresent: true,
-      transportProfileSeed: null,
-    });
+    assert.deepStrictEqual(
+      p,
+      payload({ mode: "getting-started", structureBuilt: true, rootId: ROOT }),
+    );
   });
 
-  test("getting-started mode with an empty root → all flags false", () => {
+  test("getting-started mode with an empty root → structureBuilt false, rootId still ships", () => {
     const p = computeGettingStarted(true, ROOT, false, new FakeFs());
-    assert.deepStrictEqual(p, {
-      mode: "getting-started",
-      structureBuilt: false,
-      planPresent: false,
-      sessionSetsPresent: false,
-      providerKeyPresent: false,
-      tierSeed: null,
-      rootId: ROOT,
-      verificationModeSeed: null,
-      pythonPresent: true,
-      copilotCliPresent: true,
-      transportProfileSeed: null,
-    });
+    assert.deepStrictEqual(
+      p,
+      payload({ mode: "getting-started", rootId: ROOT }),
+    );
   });
 
-  test("getting-started mode but undefined root → no probe, flags false", () => {
+  test("getting-started mode but undefined root → no probe, rootId null", () => {
     const p = computeGettingStarted(true, undefined, false, fullyScaffolded());
-    assert.deepStrictEqual(p, {
-      mode: "getting-started",
-      structureBuilt: false,
-      planPresent: false,
-      sessionSetsPresent: false,
-      providerKeyPresent: false,
-      tierSeed: null,
-      rootId: null,
-      verificationModeSeed: null,
-      pythonPresent: true,
-      copilotCliPresent: true,
-      transportProfileSeed: null,
-    });
+    assert.deepStrictEqual(p, payload({ mode: "getting-started" }));
   });
 });
 
 suite("gettingStartedDetection — providerKeyPresent (Set 060 S3, D6)", () => {
+  // The predicate is retained (buildSystemStatus + the scaffold seat-setup
+  // consume it) even though the two-section form payload no longer carries
+  // its result.
   test("empty env → false", () => {
     assert.strictEqual(providerKeyPresent({}), false);
   });
@@ -313,25 +245,6 @@ suite("gettingStartedDetection — providerKeyPresent (Set 060 S3, D6)", () => {
       true,
     );
   });
-
-  test("computeGettingStarted carries the env signal into the payload (all modes)", () => {
-    const withKey = { DABBLER_GEMINI_API_KEY: "g" };
-    assert.strictEqual(
-      computeGettingStarted(true, ROOT, false, new FakeFs(), withKey).providerKeyPresent,
-      true,
-    );
-    // Mode-independent: the env lookup is free and only renders on the
-    // form surface anyway.
-    assert.strictEqual(
-      computeGettingStarted(true, ROOT, true, new FakeFs(), withKey).providerKeyPresent,
-      true,
-    );
-    // Omitted env param defaults to {} → false.
-    assert.strictEqual(
-      computeGettingStarted(true, ROOT, false, new FakeFs()).providerKeyPresent,
-      false,
-    );
-  });
 });
 
 // Set 077 Session 2 (Feature 1, A1): the durable tier seed rides the
@@ -342,7 +255,7 @@ suite("gettingStartedDetection — providerKeyPresent (Set 060 S3, D6)", () => {
 suite("gettingStartedDetection — tierSeed (Set 077 S2)", () => {
   test("getting-started mode calls the resolver and carries its value", () => {
     const calls: string[] = [];
-    const p = computeGettingStarted(true, ROOT, false, new FakeFs(), {}, (root) => {
+    const p = computeGettingStarted(true, ROOT, false, new FakeFs(), (root) => {
       calls.push(root);
       return "lightweight";
     });
@@ -351,7 +264,7 @@ suite("gettingStartedDetection — tierSeed (Set 077 S2)", () => {
   });
 
   test("resolver returning null carries null (rootId still rides)", () => {
-    const p = computeGettingStarted(true, ROOT, false, new FakeFs(), {}, () => null);
+    const p = computeGettingStarted(true, ROOT, false, new FakeFs(), () => null);
     assert.strictEqual(p.tierSeed, null);
     // S077-S2-V1-001: the root identity ships whenever the form renders,
     // so the webview can scope its persisted state per root.
@@ -360,7 +273,7 @@ suite("gettingStartedDetection — tierSeed (Set 077 S2)", () => {
 
   test("list mode never calls the resolver", () => {
     let called = false;
-    const p = computeGettingStarted(true, ROOT, true, new FakeFs(), {}, () => {
+    const p = computeGettingStarted(true, ROOT, true, new FakeFs(), () => {
       called = true;
       return "full";
     });
@@ -370,7 +283,7 @@ suite("gettingStartedDetection — tierSeed (Set 077 S2)", () => {
 
   test("no-folder mode never calls the resolver", () => {
     let called = false;
-    const p = computeGettingStarted(false, ROOT, false, new FakeFs(), {}, () => {
+    const p = computeGettingStarted(false, ROOT, false, new FakeFs(), () => {
       called = true;
       return "full";
     });
@@ -384,109 +297,18 @@ suite("gettingStartedDetection — tierSeed (Set 077 S2)", () => {
   });
 });
 
-// ---------------------------------------------------------------------
-// Set 077 Session 3 — the verification-mode seed + Python-presence
-// probe thunks on computeGettingStarted: getting-started-mode-gated,
-// quiet defaults everywhere else. Cases generated via routed
-// test-generation (gemini-pro) and adapted.
-// ---------------------------------------------------------------------
-
-suite("computeGettingStarted — S3 thunks (mode seed + pythonPresent)", () => {
+// Set 077 S3 / Set 079 — the verification-mode + seat-profile seed thunks:
+// getting-started-mode-gated, null everywhere else. (Set 094: the
+// Python-presence + Copilot-CLI probes these suites used to also exercise
+// left computeGettingStarted; the System Status strip owns them now.)
+suite("computeGettingStarted — seed thunks (verificationMode + transportProfile)", () => {
   function countingThunks() {
-    const calls = { modeSeed: 0, python: 0 };
+    const calls = { modeSeed: 0, profileSeed: 0 };
     return {
       calls,
       modeSeed: () => {
         calls.modeSeed++;
         return "dedicated-sessions" as const;
-      },
-      python: () => {
-        calls.python++;
-        return false;
-      },
-    };
-  }
-
-  test("getting-started mode: thunks run and their values flow through", () => {
-    const t = countingThunks();
-    const p = computeGettingStarted(
-      true,
-      ROOT,
-      false,
-      fullyScaffolded(),
-      {},
-      () => "lightweight",
-      t.modeSeed,
-      t.python,
-    );
-    assert.strictEqual(p.mode, "getting-started");
-    assert.strictEqual(t.calls.modeSeed, 1);
-    assert.strictEqual(t.calls.python, 1);
-    assert.strictEqual(p.verificationModeSeed, "dedicated-sessions");
-    assert.strictEqual(p.pythonPresent, false);
-  });
-
-  test("list mode: thunks never run; quiet defaults ship", () => {
-    const t = countingThunks();
-    const p = computeGettingStarted(
-      true,
-      ROOT,
-      true,
-      fullyScaffolded(),
-      {},
-      () => "lightweight",
-      t.modeSeed,
-      t.python,
-    );
-    assert.strictEqual(p.mode, "list");
-    assert.strictEqual(t.calls.modeSeed, 0);
-    assert.strictEqual(t.calls.python, 0);
-    assert.strictEqual(p.verificationModeSeed, null);
-    assert.strictEqual(p.pythonPresent, true);
-  });
-
-  test("no-folder mode: thunks never run; quiet defaults ship", () => {
-    const t = countingThunks();
-    const p = computeGettingStarted(
-      false,
-      undefined,
-      false,
-      fullyScaffolded(),
-      {},
-      () => "lightweight",
-      t.modeSeed,
-      t.python,
-    );
-    assert.strictEqual(p.mode, "no-folder");
-    assert.strictEqual(t.calls.modeSeed, 0);
-    assert.strictEqual(t.calls.python, 0);
-    assert.strictEqual(p.verificationModeSeed, null);
-    assert.strictEqual(p.pythonPresent, true);
-  });
-
-  test("omitted thunks yield the quiet defaults in getting-started mode", () => {
-    const p = computeGettingStarted(true, ROOT, false, fullyScaffolded());
-    assert.strictEqual(p.mode, "getting-started");
-    assert.strictEqual(p.verificationModeSeed, null);
-    assert.strictEqual(p.pythonPresent, true);
-  });
-});
-
-// ---------------------------------------------------------------------
-// Set 079 Session 1 — the Copilot-CLI presence probe + seat-profile
-// seed thunks on computeGettingStarted: same getting-started-mode
-// gating and quiet defaults as the S3 thunks above. Cases generated
-// via routed test-generation (gemini-pro) and adapted.
-// ---------------------------------------------------------------------
-
-suite("computeGettingStarted — S079 thunks (copilotCliPresent + transportProfileSeed)", () => {
-  function countingThunks() {
-    const calls = { cli: 0, profileSeed: 0 };
-    return {
-      calls,
-      cli: () => {
-        calls.cli++;
-        return false;
       },
       profileSeed: () => {
         calls.profileSeed++;
@@ -495,73 +317,79 @@ suite("computeGettingStarted — S079 thunks (copilotCliPresent + transportProfi
     };
   }
 
-  test("getting-started mode: thunks run and their values flow through", () => {
+  test("getting-started mode: both seeds run and flow through", () => {
     const t = countingThunks();
     const p = computeGettingStarted(
       true,
       ROOT,
       false,
       fullyScaffolded(),
-      {},
-      undefined,
-      undefined,
-      undefined,
-      t.cli,
+      () => "lightweight",
+      t.modeSeed,
       t.profileSeed,
     );
     assert.strictEqual(p.mode, "getting-started");
-    assert.strictEqual(t.calls.cli, 1);
+    assert.strictEqual(t.calls.modeSeed, 1);
     assert.strictEqual(t.calls.profileSeed, 1);
-    assert.strictEqual(p.copilotCliPresent, false);
+    assert.strictEqual(p.verificationModeSeed, "dedicated-sessions");
     assert.strictEqual(p.transportProfileSeed, "copilot-cli");
   });
 
-  test("list mode: thunks never run; quiet defaults ship", () => {
+  test("list mode: seed thunks never run; nulls ship", () => {
     const t = countingThunks();
     const p = computeGettingStarted(
       true,
       ROOT,
       true,
       fullyScaffolded(),
-      {},
-      undefined,
-      undefined,
-      undefined,
-      t.cli,
+      () => "lightweight",
+      t.modeSeed,
       t.profileSeed,
     );
     assert.strictEqual(p.mode, "list");
-    assert.strictEqual(t.calls.cli, 0);
+    assert.strictEqual(t.calls.modeSeed, 0);
     assert.strictEqual(t.calls.profileSeed, 0);
-    assert.strictEqual(p.copilotCliPresent, true);
+    assert.strictEqual(p.verificationModeSeed, null);
     assert.strictEqual(p.transportProfileSeed, null);
   });
 
-  test("no-folder mode: thunks never run; quiet defaults ship", () => {
+  test("no-folder mode: seed thunks never run; nulls ship", () => {
     const t = countingThunks();
     const p = computeGettingStarted(
       false,
       undefined,
       false,
       fullyScaffolded(),
-      {},
-      undefined,
-      undefined,
-      undefined,
-      t.cli,
+      () => "lightweight",
+      t.modeSeed,
       t.profileSeed,
     );
     assert.strictEqual(p.mode, "no-folder");
-    assert.strictEqual(t.calls.cli, 0);
+    assert.strictEqual(t.calls.modeSeed, 0);
     assert.strictEqual(t.calls.profileSeed, 0);
-    assert.strictEqual(p.copilotCliPresent, true);
+    assert.strictEqual(p.verificationModeSeed, null);
     assert.strictEqual(p.transportProfileSeed, null);
   });
 
-  test("omitted thunks yield the quiet defaults in getting-started mode", () => {
+  test("omitted thunks yield null in getting-started mode", () => {
     const p = computeGettingStarted(true, ROOT, false, fullyScaffolded());
     assert.strictEqual(p.mode, "getting-started");
-    assert.strictEqual(p.copilotCliPresent, true);
+    assert.strictEqual(p.verificationModeSeed, null);
     assert.strictEqual(p.transportProfileSeed, null);
+  });
+
+  test("regression: the tier seed still applies alongside the other seeds", () => {
+    const p = computeGettingStarted(
+      true,
+      ROOT,
+      false,
+      fullyScaffolded(),
+      () => "lightweight",
+      () => "dedicated-sessions",
+      () => "copilot-cli",
+    );
+    assert.strictEqual(p.tierSeed, "lightweight");
+    assert.strictEqual(p.verificationModeSeed, "dedicated-sessions");
+    assert.strictEqual(p.transportProfileSeed, "copilot-cli");
   });
 });

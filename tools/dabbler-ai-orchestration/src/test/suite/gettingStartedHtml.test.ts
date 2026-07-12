@@ -1,12 +1,13 @@
 // Set 060 Session 3 — unit tests for the pure Getting Started HTML
 // builders (media/session-sets-tree/gettingStartedHtml.js, the UMD-lite
-// module the webview loads before client.js). Covers:
+// module the webview loads before client.js).
 //
-//   - the D6 Full-tier provider-key warning under the Build button
-//     (visible only when tier=full AND providerKeyPresent=false), and
-//   - the D7 parallel-worktree note under the checkbox — the
-//     checked-vs-unchecked rendering test verifier issue
-//     S060-S2-V1-001 asked for, shipping with the note itself.
+// Set 094: the form shrank to TWO sections — (1) Build project structure
+// (tier radio + seat-profile / budget / verification-mode sub-choices +
+// the no-prompt scaffold) and (2) Define modules (optional) — the "Open
+// modules.yaml" button + SAVE copy. The old plan / session-set steps, the
+// New-module button, and the parallel-worktree checkbox/note left the form
+// (Set 093's per-module row actions + the palette own them now).
 //
 // The module is plain JS by design (the webview loads it raw, outside
 // the esbuild bundle), so the test requires it straight off disk.
@@ -28,7 +29,6 @@ const requireFromPackageRoot = createRequire(
 // treats absent budget fields as empty input / no zero-rule pick.
 interface GsControls {
   tier: "full" | "lightweight";
-  parallel: boolean;
   budget?: string;
   zeroMethod?: string | null;
   // Set 077 S3: the Lightweight verification-mode pick.
@@ -42,16 +42,9 @@ const gsHtml = requireFromPackageRoot(
 ) as {
   renderNoFolder(): string;
   renderGettingStarted(
-    gs: {
-      mode: string;
-      structureBuilt: boolean;
-      planPresent: boolean;
-      sessionSetsPresent: boolean;
-      providerKeyPresent: boolean;
-    },
+    gs: { mode: string; structureBuilt: boolean },
     controls: GsControls,
   ): string;
-  worktreeNoteHtml(visible: boolean): string;
   budgetBlockHtml(controls: GsControls): string;
   parseBudgetInput(raw: unknown):
     | { ok: true; value: number }
@@ -59,7 +52,10 @@ const gsHtml = requireFromPackageRoot(
   validateBudgetControls(controls: GsControls):
     | { ok: true; budgetUsd: number; zeroMethod: string | null }
     | { ok: false; error: string };
-  WORKTREE_NOTE_TEXT: string;
+  // Set 094: the Define-modules section copy.
+  DEFINE_MODULES_INTRO_TEXT: string;
+  DEFINE_MODULES_SAVE_TEXT: string;
+  OPEN_MODULES_BUTTON_LABEL: string;
   BUDGET_LABEL_TEXT: string;
   BUDGET_HELP_TEXT: string;
   BUDGET_ZERO_CHOICE_TEXT: string;
@@ -92,7 +88,6 @@ const gsHtml = requireFromPackageRoot(
     profileSeed?: unknown,
   ): {
     tier: "full" | "lightweight";
-    parallel: boolean;
     budget: string;
     zeroMethod: string | null;
     tierDirty: boolean;
@@ -107,26 +102,19 @@ const gsHtml = requireFromPackageRoot(
   };
 };
 
-function gs(overrides: Partial<{
-  structureBuilt: boolean;
-  planPresent: boolean;
-  sessionSetsPresent: boolean;
-  providerKeyPresent: boolean;
-  pythonPresent: boolean;
-  copilotCliPresent: boolean;
-}> = {}) {
+// Set 094: the two-section form payload the render consumes is just
+// `{ mode, structureBuilt }`. (The env probe fields moved to the System
+// Status strip and left the payload.)
+function gs(overrides: Partial<{ structureBuilt: boolean }> = {}) {
   return {
     mode: "getting-started",
     structureBuilt: false,
-    planPresent: false,
-    sessionSetsPresent: false,
-    providerKeyPresent: true,
     ...overrides,
   };
 }
 
-const FULL = { tier: "full" as const, parallel: false };
-const LIGHT = { tier: "lightweight" as const, parallel: false };
+const FULL = { tier: "full" as const };
+const LIGHT = { tier: "lightweight" as const };
 
 // The warning/note are always rendered and toggled via the `hidden`
 // attribute (so client.js can flip visibility without re-rendering).
@@ -160,100 +148,84 @@ function assertOptionCopy(html: string, constant: string): void {
   );
 }
 
-suite("gettingStartedHtml — form structure (Set 060 S1/S2 parity)", () => {
-  test("renders the three steps with their action buttons", () => {
+suite("gettingStartedHtml — two-section form structure (Set 094)", () => {
+  test("renders exactly two sections (Build project structure + Define modules)", () => {
     const html = gsHtml.renderGettingStarted(gs(), FULL);
-    for (const action of [
-      "build-structure",
+    assert.strictEqual(
+      (html.match(/gs-step-head/g) || []).length,
+      2,
+      "exactly two sections",
+    );
+    for (const action of ["build-structure", "open-modules"]) {
+      assert.ok(
+        html.includes(`data-gs-action="${action}"`),
+        `missing action button ${action}`,
+      );
+    }
+    // The plan / session-set actions + the parallel checkbox LEFT the form
+    // (Set 093's per-module row actions + the palette own them now).
+    for (const gone of [
       "import-plan",
       "copy-plan-prompt",
       "new-module",
       "build-session-sets",
     ]) {
       assert.ok(
-        html.includes(`data-gs-action="${action}"`),
-        `missing action button ${action}`,
+        !html.includes(`data-gs-action="${gone}"`),
+        `retired action ${gone} still rendered`,
       );
     }
-    assert.ok(html.includes('name="gs-tier"'));
-    assert.ok(html.includes('name="gs-parallel"'));
+    assert.ok(html.includes('name="gs-tier"'), "tier radio present");
+    assert.ok(!html.includes('name="gs-parallel"'), "parallel checkbox removed");
   });
 
-  test("the New module button carries its explainer hover copy (Set 087 S3)", () => {
+  test("the Define-modules section carries the open-modules button + SAVE copy", () => {
     const html = gsHtml.renderGettingStarted(gs(), FULL);
-    const btnIdx = html.indexOf('data-gs-action="new-module"');
-    assert.notStrictEqual(btnIdx, -1);
-    // The title attribute rides the same tag (host-side input boxes
-    // collect slug/title, so the button itself is riderless).
-    const tagEnd = html.indexOf(">", btnIdx);
-    const tag = html.slice(btnIdx, tagEnd);
-    assert.ok(tag.includes("title="), "new-module button must carry a title attr");
-    assert.ok(html.includes("docs/modules.yaml"));
+    assert.ok(html.includes("Define modules (optional)"), "section title");
+    assert.ok(html.includes('data-gs-action="open-modules"'), "open-modules button");
+    assert.ok(html.includes(gsHtml.OPEN_MODULES_BUTTON_LABEL));
+    assert.ok(html.includes(gsHtml.DEFINE_MODULES_INTRO_TEXT), "intro copy");
+    assert.ok(html.includes(gsHtml.DEFINE_MODULES_SAVE_TEXT), "save copy");
+    // The save copy names the file AND instructs the human to SAVE (spec D1).
+    assert.ok(gsHtml.DEFINE_MODULES_SAVE_TEXT.includes("docs/modules.yaml"));
+    assert.ok(/SAVE/.test(gsHtml.DEFINE_MODULES_SAVE_TEXT));
+    // Define modules follows Build in the flow.
+    const buildIdx = html.indexOf('data-gs-action="build-structure"');
+    const openIdx = html.indexOf('data-gs-action="open-modules"');
+    assert.ok(buildIdx !== -1 && buildIdx < openIdx, "Define modules follows Build");
   });
 
-  test("completion flags grey/check the steps (D2/D3)", () => {
-    const html = gsHtml.renderGettingStarted(
-      gs({ structureBuilt: true }),
-      FULL,
+  test("structureBuilt greys/checks the Build section; the optional section never completes", () => {
+    const built = gsHtml.renderGettingStarted(gs({ structureBuilt: true }), FULL);
+    assert.ok(built.includes("gs-step gs-step-complete"));
+    assert.ok(built.includes("✓"));
+    // Exactly one section is ever complete (the Build one) — the
+    // Define-modules section is optional and carries no completion flag.
+    assert.strictEqual(
+      (built.match(/gs-step-complete/g) || []).length,
+      1,
+      "only the Build section can be complete",
     );
-    assert.ok(html.includes("gs-step gs-step-complete"));
-    assert.ok(html.includes("✓"));
+    const notBuilt = gsHtml.renderGettingStarted(gs({ structureBuilt: false }), FULL);
+    assert.ok(!notBuilt.includes("gs-step-complete"));
   });
 
-  test("control state survives re-render (radio + checkbox checked attrs)", () => {
-    const html = gsHtml.renderGettingStarted(gs(), {
-      tier: "lightweight",
-      parallel: true,
-    });
+  test("tier control survives re-render (radio checked attr; no parallel checkbox)", () => {
+    const html = gsHtml.renderGettingStarted(gs(), LIGHT);
     assert.ok(/value="lightweight" checked/.test(html));
-    assert.ok(/name="gs-parallel" checked/.test(html));
+    assert.ok(!html.includes('name="gs-parallel"'));
   });
 
   test("no-folder surface renders the open-folder CTA", () => {
     const html = gsHtml.renderNoFolder();
     assert.ok(html.includes('data-gs-action="open-folder"'));
   });
-});
 
-suite("gettingStartedHtml — diagnostics relocated to System Status (Set 092 S2)", () => {
-  test("provider-key state never renders a form-local warning", () => {
+  test("the form renders no form-local environment warnings (relocated to System Status, Set 092 S2)", () => {
     for (const controls of [FULL, LIGHT]) {
-      const html = gsHtml.renderGettingStarted(
-        gs({ providerKeyPresent: false }),
-        controls,
-      );
-      assert.ok(!html.includes('data-gs-warning="env"'));
+      const html = gsHtml.renderGettingStarted(gs(), controls);
+      assert.ok(!html.includes("data-gs-warning"), "no inline warning surface");
     }
-  });
-});
-
-suite("gettingStartedHtml — D7 worktree note (S060-S2-V1-001)", () => {
-  test("checkbox CHECKED → worktree note visible with the git-worktrees copy", () => {
-    const html = gsHtml.renderGettingStarted(gs(), {
-      tier: "full",
-      parallel: true,
-    });
-    assert.strictEqual(isVisible(html, 'data-gs-note="worktree"'), true);
-    assert.ok(html.includes("git worktrees"));
-    assert.ok(html.includes("merged back to the main branch"));
-  });
-
-  test("checkbox UNCHECKED → worktree note rendered but hidden", () => {
-    const html = gsHtml.renderGettingStarted(gs(), {
-      tier: "full",
-      parallel: false,
-    });
-    assert.strictEqual(isVisible(html, 'data-gs-note="worktree"'), false);
-  });
-
-  test("note sits inside step 3, after the parallel checkbox", () => {
-    const html = gsHtml.renderGettingStarted(gs(), {
-      tier: "full",
-      parallel: true,
-    });
-    const checkboxIdx = html.indexOf('name="gs-parallel"');
-    const noteIdx = html.indexOf('data-gs-note="worktree"');
-    assert.ok(checkboxIdx < noteIdx, "note not after the checkbox");
   });
 });
 
@@ -269,10 +241,10 @@ suite("gettingStartedHtml — budget block rendering (Set 063 S2)", () => {
     const tierIdx = html.indexOf('name="gs-tier"');
     const budgetIdx = html.indexOf("data-gs-budget");
     const buildIdx = html.indexOf('data-gs-action="build-structure"');
-    const step2Idx = html.indexOf("2. Create or import a project plan");
+    const step2Idx = html.indexOf("2. Define modules (optional)");
     assert.ok(
       tierIdx < budgetIdx && budgetIdx < buildIdx && buildIdx < step2Idx,
-      "budget block must sit in step 1 between the tier radio and the Build button",
+      "budget block must sit in section 1 between the tier radio and the Build button",
     );
   });
 
@@ -288,7 +260,6 @@ suite("gettingStartedHtml — budget block rendering (Set 063 S2)", () => {
   test("control state survives re-render (input value + zero-rule pick)", () => {
     const html = gsHtml.renderGettingStarted(gs(), {
       tier: "full",
-      parallel: false,
       budget: "0",
       zeroMethod: "skipped",
     });
@@ -299,7 +270,6 @@ suite("gettingStartedHtml — budget block rendering (Set 063 S2)", () => {
   test("$0 input reveals the zero-rule radio pair with the locked copy", () => {
     const zero = gsHtml.renderGettingStarted(gs(), {
       tier: "full",
-      parallel: false,
       budget: "0",
       zeroMethod: null,
     });
@@ -313,7 +283,6 @@ suite("gettingStartedHtml — budget block rendering (Set 063 S2)", () => {
     for (const budget of ["25", "", "abc"]) {
       const html = gsHtml.renderGettingStarted(gs(), {
         tier: "full",
-        parallel: false,
         budget,
         zeroMethod: null,
       });
@@ -352,7 +321,6 @@ suite("gettingStartedHtml — parseBudgetInput / validateBudgetControls (Set 063
   test("validateBudgetControls: >0 passes with no zero-rule needed", () => {
     const r = gsHtml.validateBudgetControls({
       tier: "full",
-      parallel: false,
       budget: "25",
       zeroMethod: null,
     });
@@ -362,7 +330,6 @@ suite("gettingStartedHtml — parseBudgetInput / validateBudgetControls (Set 063
   test("validateBudgetControls: $0 blocks until a zero-rule is picked", () => {
     const blocked = gsHtml.validateBudgetControls({
       tier: "full",
-      parallel: false,
       budget: "0",
       zeroMethod: null,
     });
@@ -371,7 +338,6 @@ suite("gettingStartedHtml — parseBudgetInput / validateBudgetControls (Set 063
     for (const method of ["manual-via-other-engine", "skipped"]) {
       const r = gsHtml.validateBudgetControls({
         tier: "full",
-        parallel: false,
         budget: "0",
         zeroMethod: method,
       });
@@ -383,7 +349,6 @@ suite("gettingStartedHtml — parseBudgetInput / validateBudgetControls (Set 063
     for (const budget of ["", "abc", "-3"]) {
       const r = gsHtml.validateBudgetControls({
         tier: "full",
-        parallel: false,
         budget,
         zeroMethod: null,
       });
@@ -402,7 +367,6 @@ suite("gettingStartedHtml — parseBudgetInput / validateBudgetControls (Set 063
 suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
   const defaults = {
     tier: "full",
-    parallel: false,
     budget: "",
     zeroMethod: null,
     tierDirty: false,
@@ -429,7 +393,6 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
   test("round-trips a valid persisted state (simulated teardown/re-init)", () => {
     const persisted = {
       tier: "lightweight",
-      parallel: true,
       budget: "25",
       zeroMethod: "skipped",
       tierDirty: true,
@@ -449,11 +412,11 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
 
   test("malformed fields fall back individually, valid siblings survive", () => {
     assert.deepStrictEqual(
-      gsHtml.restoreGsState({ tier: "ful", parallel: true }, null),
-      { ...defaults, parallel: true },
+      gsHtml.restoreGsState({ tier: "ful" }, null),
+      defaults,
     );
     assert.deepStrictEqual(
-      gsHtml.restoreGsState({ tier: "lightweight", parallel: "yes" }, null),
+      gsHtml.restoreGsState({ tier: "lightweight", zeroMethod: "nope" }, null),
       { ...defaults, tier: "lightweight" },
     );
     assert.deepStrictEqual(
@@ -523,7 +486,7 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
     // Repo A's lightweight pick must not drive repo B's form; B's own
     // durable seed (or the defaults) win instead.
     const restored = gsHtml.restoreGsState(
-      { tier: "lightweight", parallel: true, budget: "25", rootId: "/repo-a" },
+      { tier: "lightweight", budget: "25", rootId: "/repo-a" },
       "full",
       "/repo-b",
     );
@@ -535,12 +498,12 @@ suite("gettingStartedHtml.js — restoreGsState (Set 077 S2)", () => {
     });
     // Same root: state survives and records the root.
     const same = gsHtml.restoreGsState(
-      { tier: "lightweight", parallel: true, rootId: "/repo-a" },
+      { tier: "lightweight", budget: "25", rootId: "/repo-a" },
       null,
       "/repo-a",
     );
     assert.strictEqual(same.tier, "lightweight");
-    assert.strictEqual(same.parallel, true);
+    assert.strictEqual(same.budget, "25");
     assert.strictEqual(same.rootId, "/repo-a");
   });
 
@@ -631,18 +594,6 @@ suite("gettingStartedHtml — verification-mode block (Set 077 S3)", () => {
     const full = gsHtml.renderGettingStarted(gs(), FULL);
     assert.ok(full.includes("data-gs-budget"));
     assert.ok(!full.includes("data-gs-verification-mode"));
-  });
-});
-
-suite("gettingStartedHtml — Python diagnostic relocation (Set 092 S2)", () => {
-  test("missing Python never renders a form-local warning on either tier", () => {
-    for (const controls of [FULL, LIGHT]) {
-      const html = gsHtml.renderGettingStarted(
-        gs({ pythonPresent: false }),
-        controls,
-      );
-      assert.ok(!html.includes('data-gs-warning="python"'));
-    }
   });
 });
 
@@ -796,16 +747,6 @@ suite("gettingStartedHtml — transport-profile block (Set 079 S1)", () => {
       tierIdx !== -1 && tierIdx < profileIdx && profileIdx < budgetIdx,
       "transport block not between the tier radios and the budget block",
     );
-  });
-});
-
-suite("gettingStartedHtml — Copilot diagnostic relocation (Set 092 S2)", () => {
-  test("missing Copilot CLI never renders a form-local warning", () => {
-    const html = gsHtml.renderGettingStarted(gs({ copilotCliPresent: false }), {
-      ...FULL,
-      transportProfile: "copilot-cli",
-    });
-    assert.ok(!html.includes('data-gs-warning="copilot"'));
   });
 });
 
@@ -1021,12 +962,10 @@ suite("gettingStartedHtml — sub-choice option rows (Set 080 S1)", () => {
 suite("gettingStartedHtml — budget block scoped to Direct-API (Set 081 S1)", () => {
   const FULL_API = {
     tier: "full" as const,
-    parallel: false,
     transportProfile: "api",
   };
   const FULL_COPILOT = {
     tier: "full" as const,
-    parallel: false,
     transportProfile: "copilot-cli",
   };
 
@@ -1068,14 +1007,12 @@ suite("gettingStartedHtml — budget block scoped to Direct-API (Set 081 S1)", (
   test("Lightweight: absent regardless of the sub-choice value", () => {
     const html = gsHtml.renderGettingStarted(gs(), {
       tier: "lightweight",
-      parallel: false,
       transportProfile: "api",
     });
     assert.ok(!html.includes("data-gs-budget"));
     assert.strictEqual(
       gsHtml.budgetBlockHtml({
         tier: "lightweight",
-        parallel: false,
         transportProfile: "api",
       }),
       "",
@@ -1092,7 +1029,6 @@ suite("gettingStartedHtml — budget block scoped to Direct-API (Set 081 S1)", (
   test("persistence: typed value survives an api → copilot → api flip", () => {
     const controls = {
       tier: "full" as const,
-      parallel: false,
       budget: "42.5",
       zeroMethod: null,
       transportProfile: "api",
@@ -1113,7 +1049,6 @@ suite("gettingStartedHtml — budget block scoped to Direct-API (Set 081 S1)", (
   test("persistence: the $0 zero-rule pick survives the flip round-trip too", () => {
     const controls = {
       tier: "full" as const,
-      parallel: false,
       budget: "0",
       zeroMethod: "skipped",
       transportProfile: "api",

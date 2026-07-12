@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 6,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Existing manifests are not reliably treated as `created:false` because the implementation writes the staging file before checking the destination**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Location:** `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts`, `writeFileExclusiveSync`\n  - **Details:**\n    - **Violation:** The contract says the primitive “throws an `EEXIST`-coded error when ANY directory entry already exists there,” and the session requires the present/invalid cases to open without overwriting. Instead, `fs.writeFileSync(tmp, ...)` executes before `fs.linkSync(tmp, absPath)`, which is the first operation capable of detecting the existing destination.\n    - **Impact:** If `docs` is read-only, the filesystem is out of space, or the user’s quota prevents creating the temporary file, an already-existing valid, invalid, directory, or symlink manifest produces `EACCES`, `EROFS`, or `ENOSPC` rather than `EEXIST`. `ensureModulesManifest` therefore cannot return `created:false`, and the form/toolbar action fails instead of opening the existing manifest and allowing Set 092 guardrails to handle it. Opening an existing file should not require successfully writing another file beside it.\n    - **Evidence:** The implementation unconditionally calls `fs.writeFileSync(tmp, ...)` before `fs.linkSync(tmp, absPath)`. The shown existing-directory and symlink tests use writable temporary directories, so they do not exercise this ordering defect.\n    - **Correct answer / Fix:** Perform a no-follow `lstatSync(absPath)` fast path first and synthesize `EEXIST` when an entry is present; only use the temporary-file plus hard-link publication path after `ENOENT`. This does not restore the dangerous race because the absent path still publishes through atomic `linkSync`. Add coverage where the destination exists but staging-file creation is denied or forced to fail.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

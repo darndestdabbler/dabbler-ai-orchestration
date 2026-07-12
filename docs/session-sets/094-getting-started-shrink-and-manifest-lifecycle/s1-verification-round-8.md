@@ -1,0 +1,1 @@
+VERIFIED — The hard-link publication now preserves atomic no-replace and final-component symlink safety, while the `lstat` fast path avoids staging writes for existing manifests. The injected tests substantiate the existing-destination, unsupported-filesystem, and raced-`EEXIST` branches, and the committed bundle is shown as regenerated.

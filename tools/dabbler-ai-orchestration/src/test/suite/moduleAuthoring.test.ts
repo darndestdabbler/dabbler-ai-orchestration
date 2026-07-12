@@ -31,7 +31,12 @@ import {
   validateNewModuleSlug,
 } from "../../utils/moduleAuthoring";
 import { runNewModuleFlow, NewModuleUi } from "../../commands/newModule";
-import { readModulesManifest, parseSessionSetConfig } from "../../utils/fileSystem";
+import {
+  ExclusiveWriteOps,
+  readModulesManifest,
+  parseSessionSetConfig,
+  writeFileExclusiveSync,
+} from "../../utils/fileSystem";
 import {
   buildVisibleModulePayloads,
   computeVisibleModules,
@@ -118,6 +123,89 @@ suite("moduleAuthoring — ensureModulesManifest (Set 094)", () => {
     }
   });
 
+  test("existing-destination fast-path never STAGES a temp (injected spy; round-6/7)", () => {
+    // Round-7: the round-6 "no stray temp remains" test could NOT distinguish
+    // the fast-path from a temp-first impl (which cleans up in finally). This
+    // injects the fs ops and asserts writeExclusive is NEVER called when the
+    // destination exists — the portable proof that opening an existing manifest
+    // needs no write beside it (so a read-only / full docs/ can't break it).
+    const calls = { lstat: 0, writeExclusive: 0, link: 0 };
+    const ops: ExclusiveWriteOps = {
+      lstat: () => void calls.lstat++, // returns normally => destination present
+      writeExclusive: () => void calls.writeExclusive++,
+      link: () => void calls.link++,
+      remove: () => {},
+    };
+    assert.throws(
+      () => writeFileExclusiveSync("/repo/docs/modules.yaml", "data", ops),
+      /EEXIST/,
+    );
+    assert.strictEqual(calls.lstat, 1, "the fast-path stat runs");
+    assert.strictEqual(
+      calls.writeExclusive,
+      0,
+      "no temp is staged when the destination exists",
+    );
+    assert.strictEqual(calls.link, 0, "no publish attempted for an existing dest");
+  });
+
+  test("link-unsupported filesystem fails LOUD (no racy fallback) and cleans the temp (round-7)", () => {
+    // Round-7: on a filesystem without hard links (FAT/exFAT, some network FS)
+    // linkSync throws ENOTSUP/EPERM. The primitive must NOT fall back to a
+    // create that could follow a racing symlink — it fails loud with an
+    // actionable message, staging temp cleaned.
+    const removed: string[] = [];
+    let staged = 0;
+    const ops: ExclusiveWriteOps = {
+      lstat: () => {
+        const e: NodeJS.ErrnoException = new Error("ENOENT");
+        e.code = "ENOENT";
+        throw e; // destination absent
+      },
+      writeExclusive: () => void staged++,
+      link: () => {
+        const e: NodeJS.ErrnoException = new Error("ENOTSUP");
+        e.code = "ENOTSUP";
+        throw e;
+      },
+      remove: (p) => void removed.push(p),
+    };
+    assert.throws(
+      () => writeFileExclusiveSync("/repo/docs/modules.yaml", "data", ops),
+      /does not support hard links/,
+    );
+    assert.strictEqual(staged, 1, "the temp is staged, then the link is attempted");
+    assert.strictEqual(removed.length, 1, "the staging temp is cleaned up on failure");
+    assert.ok(
+      removed[0].includes("dabbler-exclusive-tmp"),
+      "the cleaned path is the staging temp",
+    );
+  });
+
+  test("a destination that RACES in (link EEXIST) is surfaced as EEXIST → created:false (round-7)", () => {
+    // If an entry appears between the fast-path stat and the atomic link, link
+    // fails EEXIST and NEVER follows/replaces it — surfaced as EEXIST so
+    // ensureModulesManifest reports created:false (never a write-through).
+    const ops: ExclusiveWriteOps = {
+      lstat: () => {
+        const e: NodeJS.ErrnoException = new Error("ENOENT");
+        e.code = "ENOENT";
+        throw e; // absent at stat time...
+      },
+      writeExclusive: () => {},
+      link: () => {
+        const e: NodeJS.ErrnoException = new Error("EEXIST"); // ...but raced in by publish
+        e.code = "EEXIST";
+        throw e;
+      },
+      remove: () => {},
+    };
+    assert.throws(
+      () => writeFileExclusiveSync("/repo/docs/modules.yaml", "data", ops),
+      (e: NodeJS.ErrnoException) => e.code === "EEXIST",
+    );
+  });
+
   test("present (INVALID) manifest: never overwritten — the guardrails own it", () => {
     const root = tmpRoot("ensure-invalid-");
     try {
@@ -136,7 +224,7 @@ suite("moduleAuthoring — ensureModulesManifest (Set 094)", () => {
     }
   });
 
-  test("existing DIRECTORY at the manifest path: created:false, never overwritten (O_EXCL)", () => {
+  test("existing DIRECTORY at the manifest path: created:false, never overwritten (atomic publish)", () => {
     const root = tmpRoot("ensure-dir-");
     try {
       // A directory entry named docs/modules.yaml must fail the exclusive
@@ -153,12 +241,15 @@ suite("moduleAuthoring — ensureModulesManifest (Set 094)", () => {
     }
   });
 
-  test("DANGLING symlink at the manifest path: created:false, never followed (Round-2 Major)", () => {
-    // The Round-2 correctness finding: an exists()-then-write emulation
-    // would see a dangling symlink as ABSENT and write THROUGH it to a
-    // target outside the workspace. The O_EXCL create (`wx`) — the SAME
-    // primitive makeFileOps.writeFileExclusive uses on the scaffold path —
-    // fails EEXIST on the symlink itself and never follows it.
+  test("DANGLING symlink at the manifest path: created:false, never followed (Round-2/4 Major)", () => {
+    // The correctness finding across rounds 2 and 4: a dangling manifest
+    // symlink must never be written THROUGH to an out-of-workspace target,
+    // with no check-then-act window. The atomic hard-link publish
+    // (writeFileExclusiveSync: temp-write → link()) fails EEXIST on the
+    // symlink at the destination and never follows it — one syscall, no
+    // window — the SAME primitive makeFileOps.writeFileExclusive uses on the
+    // scaffold path. (An O_EXCL `wx` write alone would follow the reparse
+    // point on Windows; an lstat+wx pair reopened the race.)
     const root = tmpRoot("ensure-symlink-");
     const outsideTarget = path.join(root, "..", `escaped-${path.basename(root)}.yaml`);
     try {

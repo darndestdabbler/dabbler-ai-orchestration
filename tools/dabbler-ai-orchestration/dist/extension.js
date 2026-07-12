@@ -14686,13 +14686,14 @@ var fs36 = __toESM(require("fs"));
 var path39 = __toESM(require("path"));
 
 // src/providers/CustomSessionSetsView.ts
-var crypto3 = __toESM(require("crypto"));
+var crypto4 = __toESM(require("crypto"));
 var fs16 = __toESM(require("fs"));
 var path20 = __toESM(require("path"));
 var vscode13 = __toESM(require("vscode"));
 
 // src/utils/fileSystem.ts
 var vscode = __toESM(require("vscode"));
+var crypto = __toESM(require("crypto"));
 var fs5 = __toESM(require("fs"));
 var path6 = __toESM(require("path"));
 var YAML = __toESM(require_dist());
@@ -16228,6 +16229,52 @@ function repoRootForSpecPath(specPath) {
 var SESSION_SETS_REL = path6.join("docs", "session-sets");
 var MODULES_MANIFEST_REL = path6.join("docs", "modules.yaml");
 var PLAYWRIGHT_REL_DEFAULT = "tests";
+var NODE_EXCLUSIVE_WRITE_OPS = {
+  lstat: (p2) => void fs5.lstatSync(p2),
+  writeExclusive: (p2, data) => fs5.writeFileSync(p2, data, { encoding: "utf8", flag: "wx" }),
+  link: (from, to) => fs5.linkSync(from, to),
+  remove: (p2) => fs5.rmSync(p2, { force: true })
+};
+var LINK_UNSUPPORTED_CODES = /* @__PURE__ */ new Set([
+  "ENOTSUP",
+  "EOPNOTSUPP",
+  "EPERM",
+  "EMLINK",
+  "EXDEV"
+]);
+function writeFileExclusiveSync(absPath, content, ops = NODE_EXCLUSIVE_WRITE_OPS) {
+  let destExists = false;
+  try {
+    ops.lstat(absPath);
+    destExists = true;
+  } catch (e) {
+    if (e.code !== "ENOENT")
+      throw e;
+  }
+  if (destExists) {
+    const err = new Error(`EEXIST: ${absPath} already exists`);
+    err.code = "EEXIST";
+    throw err;
+  }
+  const tmp = `${absPath}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.dabbler-exclusive-tmp`;
+  ops.writeExclusive(tmp, content);
+  try {
+    ops.link(tmp, absPath);
+  } catch (e) {
+    const code = e.code;
+    if (code && LINK_UNSUPPORTED_CODES.has(code)) {
+      throw new Error(
+        `Could not create ${absPath} atomically: this workspace's filesystem does not support hard links (${code}). Move the project to a filesystem with hard-link support (NTFS, APFS, ext4, \u2026), then retry.`
+      );
+    }
+    throw e;
+  } finally {
+    try {
+      ops.remove(tmp);
+    } catch {
+    }
+  }
+}
 var STATE_RANK = {
   complete: 3,
   "in-progress": 2,
@@ -16988,7 +17035,7 @@ function readAllSessionSets() {
 var vscode2 = __toESM(require("vscode"));
 
 // src/utils/moduleAuthoring.ts
-var crypto = __toESM(require("crypto"));
+var crypto2 = __toESM(require("crypto"));
 var fs6 = __toESM(require("fs"));
 var path7 = __toESM(require("path"));
 var YAML2 = __toESM(require_dist());
@@ -17063,10 +17110,7 @@ modules: []
 `;
 var NODE_ENSURE_MANIFEST_IO = {
   mkdirp: (dir) => fs6.mkdirSync(dir, { recursive: true }),
-  // `wx` = O_CREAT | O_EXCL: fails with EEXIST when the path already
-  // exists, INCLUDING an existing (or dangling) symlink — it never
-  // follows or overwrites the target.
-  writeFileExclusive: (abs, data) => fs6.writeFileSync(abs, data, { encoding: "utf8", flag: "wx" })
+  writeFileExclusive: (abs, data) => writeFileExclusiveSync(abs, data)
 };
 function ensureModulesManifest(root, io = NODE_ENSURE_MANIFEST_IO) {
   const abs = path7.join(root, MODULES_MANIFEST_REL);
@@ -17496,7 +17540,7 @@ function assignLegacySetsToModule(root, targetSlug, sets, io = NODE_SPEC_IO) {
         `${item.name}'s spec.md changed after it was validated (a concurrent edit) \u2014 refused to overwrite it`
       );
     }
-    const tmp = `${item.specAbs}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.dabbler-assign-tmp`;
+    const tmp = `${item.specAbs}.${process.pid}.${crypto2.randomBytes(6).toString("hex")}.dabbler-assign-tmp`;
     let staged = false;
     try {
       io.writeFileSync(tmp, item.next);
@@ -19180,7 +19224,7 @@ function resolveCopilotCliBinary(workspaceRoot2) {
 }
 
 // src/utils/copilotSeatSetup.ts
-var crypto2 = __toESM(require("crypto"));
+var crypto3 = __toESM(require("crypto"));
 var fs13 = __toESM(require("fs"));
 var path14 = __toESM(require("path"));
 var CATALOG_LOCKFILE_REL = path14.posix.join(
@@ -19189,7 +19233,7 @@ var CATALOG_LOCKFILE_REL = path14.posix.join(
 );
 function deriveSeatId(hostname2, username) {
   const canonical = `${hostname2.trim().toLowerCase()}|${username.trim().toLowerCase()}`;
-  const digest = crypto2.createHash("sha256").update(canonical, "utf8").digest("hex");
+  const digest = crypto3.createHash("sha256").update(canonical, "utf8").digest("hex");
   return `seat-${digest.slice(0, 12)}`;
 }
 function deriveSeatLabel(projectDir) {
@@ -24717,6 +24761,12 @@ function makeFileOps() {
       fs14.mkdirSync(path15.dirname(p2), { recursive: true });
       fs14.writeFileSync(p2, content, "utf8");
     },
+    // Set 094: atomic, symlink-safe exclusive create (temp-write → hard-link
+    // publish) — fails EEXIST when the path already exists, INCLUDING a
+    // dangling symlink, which it never follows, with no check-then-act window
+    // (round-4 verifier catch). The caller (ensureModulesManifest) mkdirps the
+    // parent first.
+    writeFileExclusive: (p2, content) => writeFileExclusiveSync(p2, content),
     mkdirp: (p2) => fs14.mkdirSync(p2, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),
     removeRecursive: (p2) => {
@@ -24853,21 +24903,6 @@ function writeBudgetYaml(projectDir, budget, fileOps, now = /* @__PURE__ */ new 
 }
 
 // src/commands/gitScaffold.ts
-function fileOpsEnsureManifestIo(fileOps) {
-  return {
-    mkdirp: (dir) => fileOps.mkdirp(dir),
-    writeFileExclusive: (abs, data) => {
-      if (fileOps.exists(abs)) {
-        const err = new Error(
-          `EEXIST: ${abs} already exists`
-        );
-        err.code = "EEXIST";
-        throw err;
-      }
-      fileOps.writeFile(abs, data);
-    }
-  };
-}
 async function scaffoldConsumerRepo(deps) {
   const report = deps.reportProgress ?? (() => {
   });
@@ -24883,10 +24918,7 @@ async function scaffoldConsumerRepo(deps) {
     deps.fileOps.writeFile(abs, content);
     written.push(rel);
   }
-  const ensured = ensureModulesManifest(
-    deps.projectDir,
-    fileOpsEnsureManifestIo(deps.fileOps)
-  );
+  const ensured = ensureModulesManifest(deps.projectDir, deps.fileOps);
   (ensured.created ? written : skipped).push(ensured.manifestRel);
   writeTierMarker(deps.projectDir, deps.ctx.tier, deps.fileOps);
   written.push(TIER_MARKER_REL);
@@ -26109,7 +26141,7 @@ var CustomSessionSetsView = class {
     const statusHtmlUri = webview.asWebviewUri(
       vscode13.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "systemStatusHtml.js")
     );
-    const nonce = crypto3.randomBytes(16).toString("hex");
+    const nonce = crypto4.randomBytes(16).toString("hex");
     const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';`;
     return `<!DOCTYPE html>
 <html lang="en">

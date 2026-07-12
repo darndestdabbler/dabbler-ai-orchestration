@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import * as YAML from "yaml";
@@ -34,34 +35,131 @@ export const MODULES_MANIFEST_REL = path.join("docs", "modules.yaml");
 export const PLAYWRIGHT_REL_DEFAULT = "tests";
 
 /**
- * Set 094 (round-2 correctness fix): a CROSS-PLATFORM exclusive create.
- * `fs.writeFileSync(p, data, {flag:"wx"})` (O_EXCL) alone is NOT symlink-safe
- * on Windows — CreateFile follows a reparse point, so a DANGLING
- * docs/modules.yaml symlink would be written THROUGH to its (possibly
- * out-of-workspace) target (POSIX O_EXCL fails EEXIST on the link; Windows
- * does not). An `lstat` no-follow precheck restores the symlink guard on BOTH
- * platforms: a file, directory, or symlink — including a dangling one —
- * counts as present and fails `EEXIST`, never followed. The `wx` write still
- * closes the concurrent plain-file create race; the tiny lstat→wx window (a
- * symlink materializing between the two) is an accepted low-risk residual for
- * a user-initiated single manifest create. Backs `FileOps.writeFileExclusive`
- * and `ensureModulesManifest`'s node default (the manifest ensure-write's
- * trust boundary, adjudication A).
+ * Set 094: a genuinely ATOMIC, symlink-safe, no-replace create — the trust
+ * boundary for the create-on-demand docs/modules.yaml ensure-write
+ * (adjudication A). Writes `content` to `absPath`, or throws an
+ * `EEXIST`-coded error when ANY directory entry already exists there (a
+ * regular file, a directory, or a symlink — including a dangling one),
+ * NEVER following the link to its target.
+ *
+ * The SAFETY mechanism is the atomic publish, NOT any precheck. Round-4
+ * verifier catch: neither an O_EXCL `wx` write nor an `lstat`+`wx` pair is both
+ * atomic AND symlink-safe cross-platform — `wx` alone follows a reparse point
+ * on Windows (writing THROUGH a dangling symlink to an out-of-workspace
+ * target), and an `lstat` precheck GATING a `wx` write reintroduces a
+ * write-through race. Instead, the absent case publishes with a HARD LINK:
+ * write the content to an UNPREDICTABLE same-directory temp, then `fs.linkSync`
+ * creates the destination name in ONE syscall and fails `EEXIST` when any entry
+ * already exists there — on both POSIX (`link(2)`) and Windows
+ * (`CreateHardLink`), WITHOUT following a symlink. Even if an entry RACES in
+ * after the fast-path stat, `linkSync` still fails EEXIST and never
+ * follows/replaces it, so a dangling manifest symlink can never be written
+ * through. Hard links need no elevation (unlike symlink creation) and work on
+ * NTFS / POSIX filesystems.
+ *
+ * Round-6 verifier catch: the EXISTING case is short-circuited by a no-follow
+ * `lstat` FAST-PATH so it fails `EEXIST` WITHOUT staging a temp beside the
+ * file — opening an existing manifest must not require WRITING next to it (it
+ * would otherwise surface EACCES/EROFS/ENOSPC on a read-only or full `docs/`).
+ * The fast-path is an optimization only; the linkSync is what guards the race.
+ *
+ * Round-7 verifier catch: (1) hard links are unsupported on some filesystems
+ * (FAT/exFAT, some network/virtual FS), where `linkSync` fails ENOTSUP/EPERM.
+ * Rather than fall back to a create that could follow a racing symlink (the
+ * round-4 hazard), the primitive FAILS LOUD with an actionable message — a
+ * Dabbler workspace is expected on a hard-link-capable filesystem (NTFS / APFS
+ * / ext*). (2) `ops` is injectable so a test can PROVE the existing-destination
+ * fast-path never stages a temp, and exercise the link-unsupported branch,
+ * without an exotic real filesystem.
  */
-export function writeFileExclusiveSync(absPath: string, content: string): void {
-  let entryExists = false;
+export interface ExclusiveWriteOps {
+  /** `fs.lstatSync` — throws `ENOENT` when absent; never follows a symlink. */
+  lstat(absPath: string): void;
+  /** O_EXCL write (`fs.writeFileSync(p, data, { flag: "wx" })`). */
+  writeExclusive(absPath: string, data: string): void;
+  /** `fs.linkSync` — atomic no-replace, no-follow hard-link publish. */
+  link(fromAbs: string, toAbs: string): void;
+  /** Best-effort remove (`fs.rmSync(p, { force: true })`). */
+  remove(absPath: string): void;
+}
+
+const NODE_EXCLUSIVE_WRITE_OPS: ExclusiveWriteOps = {
+  lstat: (p) => void fs.lstatSync(p),
+  writeExclusive: (p, data) =>
+    fs.writeFileSync(p, data, { encoding: "utf8", flag: "wx" }),
+  link: (from, to) => fs.linkSync(from, to),
+  remove: (p) => fs.rmSync(p, { force: true }),
+};
+
+/** Error codes a hard-link create reports when the destination filesystem does
+ *  not support hard links (FAT/exFAT, some network / virtual filesystems). */
+const LINK_UNSUPPORTED_CODES = new Set([
+  "ENOTSUP",
+  "EOPNOTSUPP",
+  "EPERM",
+  "EMLINK",
+  "EXDEV",
+]);
+
+export function writeFileExclusiveSync(
+  absPath: string,
+  content: string,
+  ops: ExclusiveWriteOps = NODE_EXCLUSIVE_WRITE_OPS,
+): void {
+  // Fast path (round-6): an EXISTING destination fails `EEXIST` via a no-follow
+  // `lstat` WITHOUT staging a temp beside it — so opening an already-present
+  // manifest never fails merely because `docs/` is read-only or full. `lstat`
+  // never follows, so a file, directory, or dangling symlink all count as
+  // present. This stat is ONLY an optimization for the present case — the
+  // ABSENT case's safety comes entirely from the atomic `link` below.
+  let destExists = false;
   try {
-    fs.lstatSync(absPath); // no-follow: a dangling symlink still counts as present
-    entryExists = true;
+    ops.lstat(absPath);
+    destExists = true;
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; // a real stat error
   }
-  if (entryExists) {
+  if (destExists) {
     const err: NodeJS.ErrnoException = new Error(`EEXIST: ${absPath} already exists`);
     err.code = "EEXIST";
     throw err;
   }
-  fs.writeFileSync(absPath, content, { encoding: "utf8", flag: "wx" });
+
+  // Destination absent -> atomic, no-replace, no-follow publish. Same-directory
+  // temp so the hard link stays on one filesystem/volume; the pid + random
+  // suffix makes the staging name unpredictable and collision-free.
+  const tmp = `${absPath}.${process.pid}.${crypto
+    .randomBytes(6)
+    .toString("hex")}.dabbler-exclusive-tmp`;
+  ops.writeExclusive(tmp, content);
+  try {
+    // If an entry (file / directory / symlink) RACED in after the lstat above,
+    // `link` fails EEXIST here and NEVER follows or replaces it — no dangerous
+    // write-through window (round-4). One syscall.
+    ops.link(tmp, absPath);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code && LINK_UNSUPPORTED_CODES.has(code)) {
+      // Round-7: the filesystem lacks hard-link support. Fail loud with an
+      // actionable message rather than a racy O_EXCL fallback (which could
+      // follow a symlink on Windows — the round-4 hazard). No manifest written.
+      throw new Error(
+        `Could not create ${absPath} atomically: this workspace's filesystem ` +
+          `does not support hard links (${code}). Move the project to a ` +
+          `filesystem with hard-link support (NTFS, APFS, ext4, …), then retry.`,
+      );
+    }
+    throw e; // EEXIST (a racing create) or a genuine I/O error — surfaced as-is.
+  } finally {
+    // Best-effort: drop the staging link whether the publish succeeded (content
+    // now lives at absPath) or threw (absPath untouched). An orphaned
+    // unpredictable-named temp is harmless.
+    try {
+      ops.remove(tmp);
+    } catch {
+      /* leftover temp is harmless; the destination is what matters */
+    }
+  }
 }
 
 // Cancelled sets sort below all other groups in the merge logic — Set 8

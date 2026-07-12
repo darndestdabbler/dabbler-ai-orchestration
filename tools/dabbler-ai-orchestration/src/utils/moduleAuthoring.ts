@@ -186,11 +186,13 @@ modules: []
  * file, a directory, or a symlink (including a DANGLING one, never followed) —
  * so the ensure-write can never overwrite an existing / invalid / symlinked
  * manifest (the Set 092 guardrails keep owning a present-but-invalid one). The
- * real implementations use the cross-platform {@link writeFileExclusiveSync}
- * (lstat no-follow precheck + O_EXCL `wx` write): O_EXCL alone is NOT
- * symlink-safe on Windows (round-2 verifier catch), so the lstat precheck
- * restores the symlink guard on both platforms while `wx` closes the
- * concurrent plain-file create race.
+ * real implementations use the cross-platform {@link writeFileExclusiveSync}:
+ * a hard-link publish (temp-write → `link()`) is the safety mechanism — it
+ * fails `EEXIST` on any existing destination entry without following a symlink,
+ * even one that races in — with a no-follow `lstat` fast-path so an existing
+ * manifest is recognized without staging a temp beside it (round-4/6 verifier
+ * catches: an O_EXCL `wx` write follows reparse points on Windows; a
+ * temp-write-before-check breaks on a read-only `docs/`).
  */
 export interface EnsureManifestIo {
   /** Create the parent directory (recursive; no-op when present). */

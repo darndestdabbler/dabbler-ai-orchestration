@@ -1,0 +1,11 @@
+ISSUES FOUND
+
+- **Issue 1: The claimed cross-platform symlink-safe exclusive create retains the exact TOCTOU window it promises to close**
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Location:** `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts`, `writeFileExclusiveSync`
+  - **Details:**
+    - **Violation:** `EnsureManifestIo.writeFileExclusive` requires that an existing symlink, including a dangling one, be “never followed,” while the adopted architecture calls for an “atomic exclusive-create … closing TOCTOU + subsuming the symlink rule.” The implementation instead performs a separate `lstatSync` followed by `writeFileSync(..., { flag: "wx" })`.
+    - **Impact:** On Windows, under the implementation’s own stated premise that `wx` may follow reparse points, another process can create a dangling manifest symlink after the `lstat` reports `ENOENT` but before the write. The write can then create or modify the symlink target outside the workspace. This breaks the manifest trust boundary and warrants fixing before merge.
+    - **Evidence:** The function’s comment explicitly admits that “the tiny lstat→wx window (a symlink materializing between the two) is an accepted low-risk residual,” while the same comment states that `wx` alone follows reparse points on Windows. The dangling-symlink test only covers a symlink present before `lstat`; it cannot detect this race. Consequently, claims elsewhere that this is a cross-platform primitive that “never follows” symlinks are false.
+  - **Fix:** Use a genuinely atomic destination-publication primitive that fails when any destination directory entry exists without following it, including on Windows—for example, write an unpredictable temporary file and atomically publish it through a no-replace/no-follow operation such as an appropriately verified hard-link or platform-specific primitive. Add a deterministic test that inserts a symlink between the precheck and publication, and do not describe the implementation as closing the TOCTOU or never following symlinks until that test passes.

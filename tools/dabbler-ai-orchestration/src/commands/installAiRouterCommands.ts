@@ -179,11 +179,11 @@ export function makeFileOps(): FileOps {
       fs.mkdirSync(path.dirname(p), { recursive: true });
       fs.writeFileSync(p, content, "utf8");
     },
-    // Set 094: cross-platform exclusive create (lstat no-follow precheck +
-    // O_EXCL `wx`) — fails EEXIST when the path already exists, INCLUDING a
-    // dangling symlink, which it never follows (O_EXCL alone follows reparse
-    // points on Windows; round-2 verifier catch). The caller
-    // (ensureModulesManifest) mkdirps the parent first.
+    // Set 094: atomic, symlink-safe exclusive create (temp-write → hard-link
+    // publish) — fails EEXIST when the path already exists, INCLUDING a
+    // dangling symlink, which it never follows, with no check-then-act window
+    // (round-4 verifier catch). The caller (ensureModulesManifest) mkdirps the
+    // parent first.
     writeFileExclusive: (p, content) => writeFileExclusiveSync(p, content),
     mkdirp: (p) => fs.mkdirSync(p, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),

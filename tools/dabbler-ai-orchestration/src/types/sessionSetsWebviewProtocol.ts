@@ -145,17 +145,18 @@ export interface ModulePayload {
   //     none AND no plan exists. Set count wins over plan presence: real
   //     work is never hidden behind a blocked state (the missing plan
   //     surfaces on the Plan node, orthogonally).
-  // Optional only for the legacy `buildModulePayloads` / pre-093 fixture
-  // payloads; the shipping `buildVisibleModulePayloads` always emits both.
-  // NEVER-HIDE-WORK guard (Round 3 Major fix): because these are optional,
-  // the webview must not trust an absent/`empty`/`blocked-until-plan`
-  // `sessionSets` to mean "no buckets to show" — it renders "bucketed"
-  // whenever any bucket actually carries rows, so a type-valid payload
-  // that omits `sessionSets` can never silently drop existing session sets
-  // from the tree. The field only distinguishes empty vs blocked when
-  // there is genuinely nothing to render.
-  plan?: "present" | "missing";
-  sessionSets?: "blocked-until-plan" | "empty" | "bucketed";
+  // REQUIRED (Round 4 structural fix): both producers — the shipping
+  // `buildVisibleModulePayloads` and the test-only legacy
+  // `buildModulePayloads` — always emit these, so a type-valid payload
+  // can NEVER omit them. Making them required eliminates at the type
+  // level the never-hide-work vector a prior optional shape carried (a
+  // fields-less legacy payload degrading to a leaf that dropped its
+  // buckets). The webview additionally renders "bucketed" whenever any
+  // bucket actually carries rows (count OR rows.length), so even an
+  // inconsistent `sessionSets` can never hide existing session sets —
+  // defense in depth on top of the type-level guarantee.
+  plan: "present" | "missing";
+  sessionSets: "blocked-until-plan" | "empty" | "bucketed";
   buckets: BucketPayload[];
 }
 

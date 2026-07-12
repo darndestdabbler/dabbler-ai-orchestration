@@ -571,7 +571,10 @@
     // show. In the shipping path (buildVisibleModulePayloads) the field
     // and the row count always agree, so this is a pure robustness guard.
     const hasRows = (mod.buckets || []).some(function (b) {
-      return b && b.count > 0;
+      return (
+        b &&
+        (b.count > 0 || (Array.isArray(b.rows) && b.rows.length > 0))
+      );
     });
     const state = mod.sessionSets === "bucketed" || hasRows
       ? "bucketed"

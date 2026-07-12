@@ -600,6 +600,13 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
       client.includes("const hasRows = (mod.buckets || []).some("),
       "renderSessionSetsNode must compute hasRows from the buckets",
     );
+    // The guard consults BOTH bucket representations — count OR rows.length
+    // — so a payload with a stale/zero count but populated rows still
+    // renders its work (Round 4 fix).
+    assert.ok(
+      client.includes("b.count > 0 || (Array.isArray(b.rows) && b.rows.length > 0)"),
+      "hasRows must consult both count and rows.length",
+    );
     assert.ok(
       client.includes('mod.sessionSets === "bucketed" || hasRows'),
       "the Session sets node renders bucketed whenever rows exist (never hide work)",

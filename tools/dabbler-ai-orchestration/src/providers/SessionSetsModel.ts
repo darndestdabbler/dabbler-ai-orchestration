@@ -424,11 +424,23 @@ export function buildModulePayloads(
   all: SessionSet[],
   rowFor: (set: SessionSet) => RowPayload,
 ): ModulePayload[] {
-  return groupByModule(all).map((group) => ({
-    slug: group.slug ?? "",
-    title: group.title ?? "",
-    buckets: buildBucketPayloads(group.sets, rowFor),
-  }));
+  return groupByModule(all).map((group) => {
+    // Set 093 S1: `plan` / `sessionSets` are REQUIRED on the payload, so
+    // this legacy grouping (which predates the manifest/plan model and
+    // carries no plan knowledge) emits the honest no-plan derivation:
+    // plan "missing", and the session-sets state from the set count.
+    // buildModulePayloads is test-only — nothing renders its output — but
+    // keeping it type-complete means no producer can ever emit a
+    // field-less payload.
+    const children = deriveModuleChildren(false, group.sets.length);
+    return {
+      slug: group.slug ?? "",
+      title: group.title ?? "",
+      plan: children.plan,
+      sessionSets: children.sessionSets,
+      buckets: buildBucketPayloads(group.sets, rowFor),
+    };
+  });
 }
 
 /**
@@ -564,15 +576,15 @@ export function buildVisibleModulePayloads(
 // Q8 compat matrix; routed rulings saved raw at
 // docs/session-sets/091-.../s2-visible-module-architecture.json + -2.json).
 //
-// This is the ordered module list the Set 092 renderer will consume:
-// declared modules in manifest order (ALL of them — a declared module
-// with zero sets still renders, because Set 093 gives every module
+// This is the ordered module list the shipping renderer consumes (since
+// Set 092): declared modules in manifest order (ALL of them — a declared
+// module with zero sets still renders, because Set 093 gives every module
 // persistent `Plan` / `Session sets` children), then one FALLBACK group
 // per undeclared stamped slug (alphabetical, warning-flagged, never
 // hidden — fail loud, never hide work), then the PSEUDO-module holding
-// unstamped sets. NOTHING consumes it yet: until Set 092 lands, the
-// shipping render path stays `groupByModule` / `buildModulePayloads`
-// above, byte-stable.
+// unstamped sets. The host feeds it through `buildVisibleModulePayloads`;
+// the legacy `groupByModule` / `buildModulePayloads` pair above is no
+// longer on the shipping render path (test-only since Set 092).
 
 /** The pseudo-module's label when it is the only visible module. */
 export const PSEUDO_MODULE_SOLE_NAME = "Default";

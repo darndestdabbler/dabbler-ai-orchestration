@@ -611,6 +611,17 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
       client.includes('mod.sessionSets === "bucketed" || hasRows'),
       "the Session sets node renders bucketed whenever rows exist (never hide work)",
     );
+    // The TERMINAL row-rendering gate (renderBucket) decides emptiness from
+    // the rows array, not the display count, so a stale/zero count can
+    // never drop populated rows (Round 5 fix).
+    assert.ok(
+      client.includes("const rowCount = Array.isArray(bucket.rows) ? bucket.rows.length : 0"),
+      "renderBucket must measure emptiness from bucket.rows, not count",
+    );
+    assert.ok(
+      client.includes("if (rowCount === 0)"),
+      "renderBucket renders the empty leaf only when there are genuinely no rows",
+    );
   });
 
   test("the module header style ships (collapse affordance + hidden body)", () => {

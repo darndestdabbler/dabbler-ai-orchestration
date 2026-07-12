@@ -633,7 +633,15 @@
     const idSuffix = moduleKey + "-" + bucket.key;
     const groupId = "group-" + idSuffix;
     const collapseKey = moduleKey + "/" + bucket.key;
-    if (bucket.count === 0) {
+    // NEVER HIDE WORK (Round 5 fix): this is the TERMINAL row-rendering
+    // gate. Emptiness is decided from the actual rows array, not the
+    // display `count` — so a payload with a stale/zero count but a
+    // populated `rows` still renders every row. `count` drives only the
+    // "(N)" label. In the shipping path count === rows.length always
+    // (buildBucketPayloads sets both from one `sets` array), so this only
+    // matters as defense in depth against an inconsistent payload.
+    const rowCount = Array.isArray(bucket.rows) ? bucket.rows.length : 0;
+    if (rowCount === 0) {
       // Leaf tree node: no children, no aria-expanded (APG end node).
       return (
         '<div role="treeitem" tabindex="-1" aria-level="3"' +

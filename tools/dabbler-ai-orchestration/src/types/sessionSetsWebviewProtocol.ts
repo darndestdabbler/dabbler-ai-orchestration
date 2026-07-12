@@ -147,6 +147,13 @@ export interface ModulePayload {
   //     surfaces on the Plan node, orthogonally).
   // Optional only for the legacy `buildModulePayloads` / pre-093 fixture
   // payloads; the shipping `buildVisibleModulePayloads` always emits both.
+  // NEVER-HIDE-WORK guard (Round 3 Major fix): because these are optional,
+  // the webview must not trust an absent/`empty`/`blocked-until-plan`
+  // `sessionSets` to mean "no buckets to show" — it renders "bucketed"
+  // whenever any bucket actually carries rows, so a type-valid payload
+  // that omits `sessionSets` can never silently drop existing session sets
+  // from the tree. The field only distinguishes empty vs blocked when
+  // there is genuinely nothing to render.
   plan?: "present" | "missing";
   sessionSets?: "blocked-until-plan" | "empty" | "bucketed";
   buckets: BucketPayload[];

@@ -591,6 +591,19 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
       client.includes('.child-header[data-collapsible="true"]'),
       "the Session sets header is wired into the collapse toggler set",
     );
+    // Set 093 S1 (Round 3 Major fix): the Session sets node NEVER hides
+    // work — it renders "bucketed" whenever any bucket carries rows,
+    // regardless of the optional `sessionSets` field. A type-valid legacy
+    // payload that omits the field but carries rows must not degrade to a
+    // leaf that drops those rows from the tree.
+    assert.ok(
+      client.includes("const hasRows = (mod.buckets || []).some("),
+      "renderSessionSetsNode must compute hasRows from the buckets",
+    );
+    assert.ok(
+      client.includes('mod.sessionSets === "bucketed" || hasRows'),
+      "the Session sets node renders bucketed whenever rows exist (never hide work)",
+    );
   });
 
   test("the module header style ships (collapse affordance + hidden body)", () => {

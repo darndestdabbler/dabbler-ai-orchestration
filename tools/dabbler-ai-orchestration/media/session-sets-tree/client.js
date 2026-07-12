@@ -561,11 +561,22 @@
     return "";
   }
   function renderSessionSetsNode(mod, moduleKey) {
-    // Known states pass through; anything else (a legacy payload with no
-    // sessionSets field) degrades to the safe "blocked-until-plan" leaf.
-    const state =
-      mod.sessionSets === "bucketed" || mod.sessionSets === "empty"
-        ? mod.sessionSets
+    // NEVER HIDE WORK (verdict posture; Round 3 Major fix): if any bucket
+    // actually carries rows, render "bucketed" REGARDLESS of the state
+    // field — a type-valid legacy/pre-093 payload (or the test-only
+    // buildModulePayloads) can omit `sessionSets` while still carrying
+    // rows, and degrading that to a leaf would silently drop existing
+    // session sets from the tree. The field only decides the empty vs
+    // blocked-until-plan distinction, and only when there is nothing to
+    // show. In the shipping path (buildVisibleModulePayloads) the field
+    // and the row count always agree, so this is a pure robustness guard.
+    const hasRows = (mod.buckets || []).some(function (b) {
+      return b && b.count > 0;
+    });
+    const state = mod.sessionSets === "bucketed" || hasRows
+      ? "bucketed"
+      : mod.sessionSets === "empty"
+        ? "empty"
         : "blocked-until-plan";
     const headerId = "sessionsets-" + moduleKey;
     const common =

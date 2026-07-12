@@ -220,6 +220,14 @@
       "dateTime": "2026-07-12T14:44:43.083142-04:00",
       "description": "Provider recovered (operator added OpenAI credits). Close backstop verification (no conventions block on that surface) returned 2 findings: (a) dogfood-not-performed = pre-declared by-design scope (8 planted-violation runs on the file/git/CLI surface; UI walk = operator's optional UAT) - settled in the ledger; (b) missing GitHub plan/visibility prerequisite for branch protection - accepted+fixed (Part 0 public-or-paid-plan requirement; Part 3 pointer). Round 20 dispatched with the conventions ledger (operator cap: 21).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 27,
+      "stepKey": "session-001/step-9-guidance-review",
+      "dateTime": "2026-07-12T14:51:23.262764-04:00",
+      "description": "Step 9 (post-notify): admitted L-095-1 (consequence-graded severity; salience-limited reviewers); ceiling triage archived L-064-7 (executable-gate-encoded in verify_session) and L-078-1 (situational release trigger) with full text in lessons-archive.md; L-069-1 reactivation declined (promoted rule already in project-guidance preload). validate_guidance_meta OK; guidance_report --check OK. Recommended follow-on set: phased verification (discovery fan-out + scoped remediation review + rubric in the shipped template).",
+      "status": "complete"
     }
   ]
 }

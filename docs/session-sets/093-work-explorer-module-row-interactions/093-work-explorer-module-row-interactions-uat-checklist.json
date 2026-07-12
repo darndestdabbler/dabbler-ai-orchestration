@@ -1,0 +1,44 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "dabbler-ai-orchestration 0.41.0 local VSIX (Set 093 Session 1 — persistent Plan / Session sets child nodes; no Marketplace publish, single release boundary after Set 094)",
+  "DocumentDate": "7/11/2026",
+  "Notes": "Session 1 of 2 arms these three walks; UAT is SUGGESTED and per-session, so the human walk is optional and does not gate close. The exhaustive plan/sessionSets state matrix and the 4-level ARIA contract are already verified by automation (Layer 2 deriveModuleChildren + buildVisibleModulePayloads suites; Layer 3 Playwright module-tier.spec.ts + session-sets-tree.spec.ts, 23 tests, run locally). These human walks judge only what automation cannot: that the new child rows render clearly, read understandably, and feel right under keyboard. Install ONLY the local VSIX built from this working tree (tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.41.0.vsix); do not publish it. Walk order: Walk 1 then Walk 2 in THIS repository (dabbler-ai-orchestration), then Walk 3 in a fresh scratch folder. No steps are skipped or out of order. This session adds SEMANTIC child rows only — there are intentionally NO action buttons on them yet (the hover/focus action strip is Session 2).",
+  "Configuration": {
+    "reviewWidths": ["6%", "14%", "34%", "10%", "36%"]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Persistent child nodes — rendering",
+      "Subarea": "Walk 1 — Plan + Session sets children on the module row (this repo)",
+      "ItemLabel": "Every module row shows a Plan child and a Session sets child, with the status buckets nested UNDER Session sets",
+      "HumanAction": "WHERE YOU ARE: a fresh install, about to look at the Work Explorer tree in THIS repository (dabbler-ai-orchestration), which has many session sets and no docs/modules.yaml, so it renders a single muted 'Default' module.\n1. In this repository's VS Code window, install the local file tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.41.0.vsix (Extensions view -> '...' menu -> 'Install from VSIX...'), then run 'Developer: Reload Window'.\n2. Click the Dabbler AI Orchestration icon in the Activity Bar to open the Work Explorer.\n3. Find the single, visually muted 'Default' row at the top of the tree.\n4. Look at the two rows immediately indented beneath 'Default'.\n5. Read the first of those two rows (labeled 'Plan').\n6. Read the second of those two rows (labeled 'Session sets') and look at what is indented beneath IT.",
+      "Expectation": "Beneath the 'Default' module there are exactly two indented child rows, in this order: a row reading 'Plan' followed by the word 'missing' (this repository has no docs/planning/project-plan.md), and a row reading 'Session sets'. The status buckets (In Progress / Not Started / Complete, and Cancelled if any) are nested UNDERNEATH the 'Session sets' row — one indent level deeper than 'Session sets' — NOT directly under 'Default'. The session-set rows sit one level deeper still, under their bucket. Neither the 'Plan' row nor the 'Session sets' row carries any button, link, or clickable action — they are plain labels (actions arrive in Session 2).",
+      "ProgrammaticVerification": "Layer 3 session-sets-tree.spec.ts asserts module-pseudo-default-plan (aria-level 2, data-plan-state=missing) and module-pseudo-default-session-sets (aria-level 2, data-session-sets-state=bucketed) with the three buckets nested under the Session sets node; Layer 2 buildVisibleModulePayloads pins the state derivation.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    },
+    {
+      "FunctionalArea": "Persistent child nodes — keyboard & collapse",
+      "Subarea": "Walk 2 — keyboard reaches the children; Session sets collapses independently (this repo)",
+      "ItemLabel": "Arrow-key navigation reaches the Plan and Session sets rows; collapsing Session sets folds its buckets while the module and Plan stay visible",
+      "HumanAction": "WHERE YOU ARE: still in THIS repository's Work Explorer, immediately after Walk 1, with the 'Default' module expanded.\n1. Click once on the 'Default' module row to give the tree keyboard focus.\n2. Press the Down arrow key once and note which row is highlighted.\n3. Press the Down arrow key again and note which row is highlighted.\n4. With the 'Session sets' row highlighted, press Enter once.\n5. Look at the buckets that were nested under 'Session sets'.\n6. Look at whether the 'Default' row and the 'Plan' row are still visible.\n7. Press Enter again on the 'Session sets' row.",
+      "Expectation": "Pressing Down from 'Default' highlights the 'Plan' row first, then the 'Session sets' row (they are reachable, focusable tree items in reading order). Pressing Enter on 'Session sets' collapses it: its chevron flips from a down-triangle to a right-triangle and its buckets (and their session-set rows) disappear. The 'Default' module row and the 'Plan' row REMAIN visible — only the Session sets subtree folds away. Pressing Enter again re-expands 'Session sets' and the buckets reappear.",
+      "ProgrammaticVerification": "Layer 3 module-tier.spec.ts drives the Session sets header click, asserts aria-expanded flips to false, the row hides, and the Plan sibling stays visible; the shared roving-tabindex/keyboard handler covers arrow navigation across all treeitems.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    },
+    {
+      "FunctionalArea": "Persistent child nodes — state variety",
+      "Subarea": "Walk 3 — present / empty / missing / blocked states read clearly (scratch repo)",
+      "ItemLabel": "A declared module WITH a plan shows Plan present + Session sets empty; a declared module WITHOUT a plan shows Plan missing + Session sets blocked-until-plan",
+      "HumanAction": "WHERE YOU ARE: about to create a tiny throwaway workspace so you can see the plan-present and plan-missing states side by side (this repository can only show the missing/bucketed pair).\n1. Create a new empty folder, e.g. C:\\temp\\dabbler-093-uat.\n2. Inside it create the file docs\\modules.yaml with EXACTLY this content:\nmodules:\n  - slug: alpha\n    title: Alpha\n  - slug: beta\n    title: Beta\n3. Inside it also create the file docs\\modules\\alpha\\project-plan.md with any one line of text (e.g. '# Alpha plan').\n4. Do NOT create any session sets and do NOT create a plan for beta.\n5. Open that folder in a new VS Code window that has the 0.41.0 VSIX installed, and open the Work Explorer.\n6. Read the 'Alpha' module's two child rows.\n7. Read the 'Beta' module's two child rows.",
+      "Expectation": "Two module rows appear: 'Alpha' and 'Beta' (no 'Default' row, because declared modules exist, there are no unstamped sets, and there is no repo-level plan). Under 'Alpha': the 'Plan' row reads 'present' (its docs\\modules\\alpha\\project-plan.md exists) and the 'Session sets' row reads 'empty' (Alpha has no sets yet). Under 'Beta': the 'Plan' row reads 'missing' and the 'Session sets' row reads a short blocked message such as 'blocked — add a plan first'. The 'missing' plan and the 'blocked' session-sets read as a calm next-step cue (a quiet warning tint), not an error. Both modules show BOTH child rows even though neither has any session sets — the checklist is always visible.",
+      "ProgrammaticVerification": "Layer 2 deriveModuleChildren pins all four states (missing/blocked-until-plan, present/empty, present/bucketed, missing-but-bucketed); buildVisibleModulePayloads pins declared-with-plan -> present/empty and declared-without -> missing/blocked-until-plan.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    }
+  ]
+}

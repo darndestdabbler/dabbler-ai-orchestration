@@ -76,8 +76,13 @@ test("In Progress bucket header shows the multi-in-progress count", async () => 
     // regex. Set 034 prepended a chevron glyph (▾/▸) to the bucket
     // header, which lands at position 0 of the group's textContent
     // and broke the anchor; the orphan-test sweep caught it.
+    // Set 093 S1: scope the filter to `.bucket-header` — the persistent
+    // Session sets child node added a second role="group" (child-body)
+    // whose text now also spans the bucket label, so the old
+    // `[role="group"]` filter matched two elements (strict-mode
+    // violation). The bucket header is the single source of the count.
     const inProgressHeader = inner
-      .locator('[role="group"]')
+      .locator(".bucket-header")
       .filter({ hasText: /In Progress\s*\(2\)/ });
     await expect(inProgressHeader).toBeVisible({ timeout: 30_000 });
   } finally {

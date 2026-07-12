@@ -1,15 +1,20 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "093-work-explorer-module-row-interactions",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-11T20:19:46.245950-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "model": "claude-opus-4-8",
+        "effort": "high",
+        "identityProvenance": "direct"
+      },
       "verificationVerdict": null
     },
     {

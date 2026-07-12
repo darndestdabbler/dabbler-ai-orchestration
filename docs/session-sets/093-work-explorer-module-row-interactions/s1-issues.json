@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The fallback `Plan = missing` invariant is not enforced, and its test does not exercise the case it claims to cover.\n  - **Category:** Correctness / Completeness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The settled contract states: “Fallback groups: `Plan` is always `\"missing\"` (`planPath` is null).” The test further claims that even a leaked `planExists=true` must still yield `missing`.\n    - **Impact:** `buildVisibleModulePayloads` can emit `plan: \"present\"` for a fallback with no plan path, producing a semantically impossible and misleading UI state. The TypeScript model permits this input, while the test gives false confidence that it is guarded.\n    - **Evidence:** In `SessionSetsModel.ts`, state is derived solely from `module.planExists === true`; `module.planPath` is not checked:\n      ```ts\n      const children = deriveModuleChildren(\n        module.planExists === true,\n        module.sets.length,\n      );\n      ```\n      Therefore a fallback with `planPath: null` and `planExists: true` produces `plan: \"present\"`. In `visibleModules.test.ts`, the fallback test comments that it covers a leaked `planExists=true`, but never sets `planExists: true`, so it only tests the ordinary undefined/false case.\n    - **Fix:** Derive presence with the required null guard:\n      ```ts\n      const planPresent =\n        module.planPath !== null && module.planExists === true;\n      const children = deriveModuleChildren(planPresent, module.sets.length);\n      ```\n      Set `planExists: true` in the fallback test and assert that the resulting plan state remains `\"missing\"`.",
+      "category": "Correctness / Completeness",
+      "severity": "Major"
+    }
+  ]
+}

@@ -71,17 +71,40 @@ test("renders ARIA tree structure with bucket grouping for an in-progress set", 
     // therefore intentionally do not carry role="group".
     await expect(buckets).toHaveCount(3);
 
-    // Row exists and carries WAI-ARIA tree attributes.
+    // Set 093 S1: rows sit at aria-level 4 now — the persistent Plan /
+    // Session sets child nodes inserted a level (module 1 / children 2 /
+    // bucket 3 / row 4).
     const row = inner.locator(
       '[role="treeitem"][data-slug="029-scenario-in-progress"]',
     );
     await expect(row).toBeVisible();
-    await expect(row).toHaveAttribute("aria-level", "3");
+    await expect(row).toHaveAttribute("aria-level", "4");
     const defaultModule = inner.getByTestId("module-pseudo-default");
     await expect(defaultModule).toHaveCount(1);
     await expect(defaultModule).toHaveClass(/module-default/);
     await expect(defaultModule).toHaveAttribute("aria-expanded", "true");
     await expect(defaultModule.locator(".module-title")).toHaveText("Default");
+
+    // Set 093 S1: even the sole pseudo-module renders both persistent
+    // semantic children. This fixture has one in-progress set and no
+    // docs/planning/project-plan.md, so Plan reads "missing" and Session
+    // sets reads "bucketed" (the status buckets nest under it).
+    const planNode = defaultModule.getByTestId("module-pseudo-default-plan");
+    await expect(planNode).toHaveAttribute("aria-level", "2");
+    await expect(planNode).toHaveAttribute("data-plan-state", "missing");
+    const sessionSetsNode = defaultModule.getByTestId(
+      "module-pseudo-default-session-sets",
+    );
+    await expect(sessionSetsNode).toHaveAttribute("aria-level", "2");
+    await expect(sessionSetsNode).toHaveAttribute(
+      "data-session-sets-state",
+      "bucketed",
+    );
+    // The buckets live UNDER the Session sets node, not directly under
+    // the module (buckets nest, never replace the checklist).
+    await expect(
+      sessionSetsNode.locator('[data-testid^="bucket-pseudo-default-"]'),
+    ).toHaveCount(3);
     // Set 036 Session 6: dropped the aria-expanded assertion. Set 034
     // retired the per-row accordion (rows are no longer expandable);
     // the renderRow helper in client.js stopped emitting aria-expanded

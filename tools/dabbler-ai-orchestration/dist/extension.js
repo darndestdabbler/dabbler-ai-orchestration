@@ -17445,7 +17445,11 @@ function mergeVisibleModules(roots) {
         if (existing) {
           existing.module = {
             ...existing.module,
-            sets: [...existing.module.sets, ...module2.sets]
+            sets: [...existing.module.sets, ...module2.sets],
+            // Set 093 S1: a declared module's plan exists if it exists in
+            // ANY root that declares the slug (worktree checkouts share
+            // the tracked file, so this is the safe combine).
+            planExists: existing.module.planExists || module2.planExists
           };
           existing.order = Math.min(existing.order, declaredOrder);
         } else {
@@ -17463,7 +17467,11 @@ function mergeVisibleModules(roots) {
         const existing = fallback.get(slug);
         fallback.set(
           slug,
-          existing ? { ...existing, sets: [...existing.sets, ...module2.sets] } : { ...module2, sets: [...module2.sets] }
+          existing ? {
+            ...existing,
+            sets: [...existing.sets, ...module2.sets],
+            planExists: existing.planExists || module2.planExists
+          } : { ...module2, sets: [...module2.sets] }
         );
         continue;
       }
@@ -17474,7 +17482,10 @@ function mergeVisibleModules(roots) {
         pseudo = {
           ...existingPseudo,
           warning: warningRank(module2.warning) > warningRank(existingPseudo.warning) ? module2.warning : existingPseudo.warning,
-          sets: [...existingPseudo.sets, ...module2.sets]
+          sets: [...existingPseudo.sets, ...module2.sets],
+          // Set 093 S1: the legacy root plan is the same tracked file in
+          // every worktree root — present if any root sees it.
+          planExists: existingPseudo.planExists || module2.planExists
         };
       }
     }
@@ -17491,16 +17502,28 @@ function mergeVisibleModules(roots) {
   return out;
 }
 function buildVisibleModulePayloads(modules, rowFor) {
-  return modules.map((module2) => ({
-    slug: module2.slug ?? "",
-    title: module2.displayName,
-    kind: module2.kind,
-    warning: module2.warning,
-    buckets: buildBucketPayloads([...module2.sets], rowFor)
-  }));
+  return modules.map((module2) => {
+    const planPresent = module2.planPath !== null && module2.planExists === true;
+    const children = deriveModuleChildren(planPresent, module2.sets.length);
+    return {
+      slug: module2.slug ?? "",
+      title: module2.displayName,
+      kind: module2.kind,
+      warning: module2.warning,
+      plan: children.plan,
+      sessionSets: children.sessionSets,
+      buckets: buildBucketPayloads([...module2.sets], rowFor)
+    };
+  });
 }
 var PSEUDO_MODULE_SOLE_NAME = "Default";
 var PSEUDO_MODULE_COEXIST_NAME = "Unassigned";
+function deriveModuleChildren(planPresent, setCount) {
+  return {
+    plan: planPresent ? "present" : "missing",
+    sessionSets: setCount > 0 ? "bucketed" : planPresent ? "empty" : "blocked-until-plan"
+  };
+}
 function chooseRenderableModuleSnapshot(classification, current, lastKnownGood) {
   if (classification.kind === "invalid" && lastKnownGood) {
     return { modules: lastKnownGood, retainedLastKnownGood: true };
@@ -25509,7 +25532,10 @@ var CustomSessionSetsView = class {
         {
           legacyRootPlanExists: fs16.existsSync(path20.join(root, LEGACY_ROOT_PLAN_REL))
         }
-      );
+      ).map((module2) => ({
+        ...module2,
+        planExists: module2.planPath != null && fs16.existsSync(path20.join(root, module2.planPath))
+      }));
       const selected = chooseRenderableModuleSnapshot(
         classification,
         current,

@@ -5,15 +5,17 @@
 //   - one collapsible module group per manifest module (manifest file
 //     order), the unlabeled implicit module last with the quiet
 //     "(ungrouped)" fallback label (routed ruling Q1);
-//   - the 3-level ARIA contract: module header aria-level=1, bucket
-//     header aria-level=2, row aria-level=3 (ruling Q4);
+//   - the 4-level ARIA contract (Set 093 S1): module aria-level=1, the
+//     persistent Plan / Session sets child nodes aria-level=2, bucket
+//     aria-level=3, row aria-level=4 — the persistent children inserted a
+//     level above the Set 092 three-level tree;
 //   - per-(module, bucket) composite collapse keys (ruling Q4);
 //   - rows grouped under their own module;
 //   - module-header click collapses the whole group.
 //
-// The no-manifest backward-compat half of ruling Q4 (rows stay at
-// aria-level=2, zero .module elements) is asserted in
-// session-sets-tree.spec.ts against its manifest-less fixtures.
+// The no-manifest / sole-pseudo half of the contract (a repo with one
+// implicit module) is asserted in session-sets-tree.spec.ts against its
+// manifest-less fixtures.
 
 import { expect, test } from "@playwright/test";
 import * as fs from "fs";
@@ -133,9 +135,9 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
       /not declared in docs\/modules\.yaml/,
     );
 
-    // 3-level ARIA tree contract (ruling Q4 + the R2 conformance fix):
-    // module and bucket are treeitems carrying aria-level/aria-expanded
-    // themselves, with children nested in role="group" containers.
+    // Set 093 S1: 4-level ARIA tree contract — module 1 / Plan &
+    // Session sets 2 / bucket 3 / row 4. Every level is a treeitem;
+    // children nest in role="group" containers.
     const greeterModule = inner.getByTestId("module-declared-greeter");
     await expect(greeterModule).toHaveAttribute("role", "treeitem");
     await expect(greeterModule).toHaveAttribute("aria-level", "1");
@@ -143,12 +145,41 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
       "role",
       "group",
     );
-    const greeterNotStarted = greeterModule.locator(
+
+    // The two persistent semantic child nodes at level 2 (fixed pair).
+    // The fixture ships no plan file, so every module's Plan reads
+    // "missing"; greeter holds one (not-started) set, so its Session sets
+    // node is "bucketed" and expandable with the buckets nested under it.
+    const greeterPlan = greeterModule.getByTestId(
+      "module-declared-greeter-plan",
+    );
+    await expect(greeterPlan).toHaveAttribute("role", "treeitem");
+    await expect(greeterPlan).toHaveAttribute("aria-level", "2");
+    await expect(greeterPlan).toHaveAttribute("aria-setsize", "2");
+    await expect(greeterPlan).toHaveAttribute("aria-posinset", "1");
+    await expect(greeterPlan).toHaveAttribute("data-plan-state", "missing");
+
+    const greeterSessionSets = greeterModule.getByTestId(
+      "module-declared-greeter-session-sets",
+    );
+    await expect(greeterSessionSets).toHaveAttribute("role", "treeitem");
+    await expect(greeterSessionSets).toHaveAttribute("aria-level", "2");
+    await expect(greeterSessionSets).toHaveAttribute("aria-posinset", "2");
+    await expect(greeterSessionSets).toHaveAttribute(
+      "data-session-sets-state",
+      "bucketed",
+    );
+    await expect(greeterSessionSets).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      greeterSessionSets.locator("> .child-body"),
+    ).toHaveAttribute("role", "group");
+
+    const greeterNotStarted = greeterSessionSets.locator(
       '[data-bucket-key="declared-greeter/not-started"]',
     );
     await expect(greeterNotStarted).toHaveCount(1);
     await expect(greeterNotStarted).toHaveAttribute("role", "treeitem");
-    await expect(greeterNotStarted).toHaveAttribute("aria-level", "2");
+    await expect(greeterNotStarted).toHaveAttribute("aria-level", "3");
     await expect(greeterNotStarted.locator("> .bucket-body")).toHaveAttribute(
       "role",
       "group",
@@ -157,7 +188,7 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
       '[role="treeitem"][data-slug="087-greeter-core"]',
     );
     await expect(greeterRow).toBeVisible();
-    await expect(greeterRow).toHaveAttribute("aria-level", "3");
+    await expect(greeterRow).toHaveAttribute("aria-level", "4");
 
     // Rows land under their OWN module group.
     await expect(
@@ -179,6 +210,17 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
     await expect(greeterRow).toBeHidden();
     // Re-expand restores it.
     await greeterModule.locator(".module-header").click();
+    await expect(greeterRow).toBeVisible();
+
+    // Set 093 S1: the Session sets child node collapses independently —
+    // its buckets + rows fold away while the module and the Plan sibling
+    // stay visible (the checklist never vanishes).
+    await greeterSessionSets.locator(".child-header").click();
+    await expect(greeterSessionSets).toHaveAttribute("aria-expanded", "false");
+    await expect(greeterRow).toBeHidden();
+    await expect(greeterPlan).toBeVisible();
+    await greeterSessionSets.locator(".child-header").click();
+    await expect(greeterSessionSets).toHaveAttribute("aria-expanded", "true");
     await expect(greeterRow).toBeVisible();
 
     // Keyboard operability (R2 fix): the module node is focusable and

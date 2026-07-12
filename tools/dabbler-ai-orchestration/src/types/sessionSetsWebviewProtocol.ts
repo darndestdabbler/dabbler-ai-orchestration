@@ -127,6 +127,28 @@ export interface ModulePayload {
     | { code: "unstamped-sets" }
     | { code: "undeclared-slug"; rawSlug: string }
     | null;
+  // Set 093 Session 1 (verdict amendment 4): the two PERSISTENT semantic
+  // child nodes every module row always renders — the tree is the
+  // checklist. Both are pure derivations of (plan presence, set count)
+  // via `deriveModuleChildren`; the routed architecture ruling
+  // (s1-child-nodes-architecture.json) settled that ALL three kinds emit
+  // both children with no exemption.
+  //   - `plan`: the Plan node's state. "present"/"missing" from
+  //     `module.planPath` existence (a host filesystem check). A
+  //     `fallback` group has no `planPath` (null) and is therefore
+  //     ALWAYS "missing" — a fallback's plan is absent-pending-declaration,
+  //     stated loudly while the undeclared-slug warning owns remediation.
+  //   - `sessionSets`: the Session sets node's state. "bucketed" whenever
+  //     the module holds >= 1 set (the status buckets nest UNDER this
+  //     node — buckets never REPLACE the checklist); "empty" when it holds
+  //     none but a plan is present; "blocked-until-plan" when it holds
+  //     none AND no plan exists. Set count wins over plan presence: real
+  //     work is never hidden behind a blocked state (the missing plan
+  //     surfaces on the Plan node, orthogonally).
+  // Optional only for the legacy `buildModulePayloads` / pre-093 fixture
+  // payloads; the shipping `buildVisibleModulePayloads` always emits both.
+  plan?: "present" | "missing";
+  sessionSets?: "blocked-until-plan" | "empty" | "bucketed";
   buckets: BucketPayload[];
 }
 

@@ -155,13 +155,72 @@ html, body {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: -1px;
 }
-/* Nested buckets indent under their module header so the three levels
- * read at a glance. */
+/* Set 093 S1: the persistent Plan / Session sets child nodes sit at
+ * level 2 (indented under the module header); buckets nest under the
+ * Session sets node at level 3, rows at level 4. The staircase of
+ * padding makes the four levels read at a glance. */
+.module-child {
+  margin-bottom: 1px;
+}
+.child-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px 5px 24px;
+  font-size: 12px;
+  user-select: none;
+  cursor: default;
+}
+.child-header[data-collapsible="true"] {
+  cursor: pointer;
+}
+.child-header[data-collapsible="true"]:hover {
+  background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.10));
+}
+.child-chevron {
+  display: inline-block;
+  width: 12px;
+  text-align: center;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.child-label {
+  font-weight: 500;
+}
+.child-state {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.7;
+  font-style: italic;
+}
+/* A missing plan / blocked session-sets node is the checklist's calm
+ * next-step cue, not an error: a quiet warning tint, never hidden. */
+.module-plan-missing .child-state,
+.module-session-sets-blocked-until-plan .child-state {
+  color: var(--vscode-list-warningForeground, #cca700);
+  opacity: 0.9;
+}
+.module-child:focus {
+  outline: none;
+}
+.module-child[aria-selected="true"] > .child-header {
+  background: var(--vscode-list-focusBackground, rgba(127, 127, 127, 0.10));
+}
+.module-child:focus-visible > .child-header {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: -1px;
+}
+.module-session-sets[aria-expanded="false"] .child-body {
+  display: none;
+}
+/* Buckets + rows nest under the Session sets child node — indent past
+ * the level-2 child header (was 24px when buckets sat directly under the
+ * module in the Set 092 three-level tree). */
 .module-body .bucket-header {
-  padding-left: 24px;
+  padding-left: 40px;
 }
 .module-body .row-header {
-  padding-left: 24px;
+  padding-left: 40px;
 }
 
 .bucket {

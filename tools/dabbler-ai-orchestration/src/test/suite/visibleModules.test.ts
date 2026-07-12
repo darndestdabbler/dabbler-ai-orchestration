@@ -23,6 +23,7 @@ import {
   buildVisibleModulePayloads,
   chooseRenderableModuleSnapshot,
   computeVisibleModules,
+  deriveModuleChildren,
   groupByModule,
   mergeVisibleModules,
 } from "../../providers/SessionSetsModel";
@@ -839,5 +840,252 @@ suite("Set 092 S1 — visible-module renderer assembly", () => {
     } finally {
       fs.rmSync(root, { recursive: true });
     }
+  });
+});
+
+// ---------- Set 093 S1: persistent Plan / Session sets child nodes ----------
+//
+// Verdict amendment 4 + the routed architecture ruling
+// (docs/session-sets/093-.../s1-child-nodes-architecture.json): every
+// module renders two PERSISTENT semantic children, and NO kind is exempt.
+// `Plan` = present|missing (planPath existence, host-resolved; a fallback
+// has no planPath and is always missing). `Session sets` = bucketed
+// (sets nest under it) | empty | blocked-until-plan. Real work always
+// wins: sets>0 is bucketed even when the plan is missing.
+
+/** A VisibleModule fixture (planExists defaults false — host-populated). */
+function vm(
+  over: Partial<VisibleModule> &
+    Pick<VisibleModule, "kind" | "slug" | "displayName">,
+): VisibleModule {
+  return { warning: null, planPath: null, sets: [], ...over };
+}
+
+suite("Set 093 S1 — deriveModuleChildren state model", () => {
+  test("no plan, no sets -> Plan missing, Session sets blocked-until-plan", () => {
+    assert.deepStrictEqual(deriveModuleChildren(false, 0), {
+      plan: "missing",
+      sessionSets: "blocked-until-plan",
+    });
+  });
+
+  test("plan present, no sets -> Plan present, Session sets empty", () => {
+    assert.deepStrictEqual(deriveModuleChildren(true, 0), {
+      plan: "present",
+      sessionSets: "empty",
+    });
+  });
+
+  test("plan present, sets present -> Plan present, Session sets bucketed", () => {
+    assert.deepStrictEqual(deriveModuleChildren(true, 3), {
+      plan: "present",
+      sessionSets: "bucketed",
+    });
+  });
+
+  test("sets present but NO plan -> bucketed (real work wins; missing plan surfaces on the orthogonal Plan node, never hides work)", () => {
+    assert.deepStrictEqual(deriveModuleChildren(false, 2), {
+      plan: "missing",
+      sessionSets: "bucketed",
+    });
+  });
+});
+
+suite("Set 093 S1 — buildVisibleModulePayloads emits persistent child states (no kind exempt)", () => {
+  const stubRow = (set: SessionSet) => ({ slug: set.name } as never);
+
+  test("declared with plan + sets -> present / bucketed", () => {
+    const [p] = buildVisibleModulePayloads(
+      [
+        vm({
+          kind: "declared",
+          slug: "billing",
+          displayName: "Billing",
+          planPath: "docs/modules/billing/project-plan.md",
+          planExists: true,
+          sets: [fakeSet({ name: "a" })],
+        }),
+      ],
+      stubRow,
+    );
+    assert.strictEqual(p.plan, "present");
+    assert.strictEqual(p.sessionSets, "bucketed");
+  });
+
+  test("declared with NO plan + NO sets -> missing / blocked-until-plan", () => {
+    const [p] = buildVisibleModulePayloads(
+      [
+        vm({
+          kind: "declared",
+          slug: "ops",
+          displayName: "Ops",
+          planPath: "docs/modules/ops/project-plan.md",
+          planExists: false,
+          sets: [],
+        }),
+      ],
+      stubRow,
+    );
+    assert.strictEqual(p.plan, "missing");
+    assert.strictEqual(p.sessionSets, "blocked-until-plan");
+  });
+
+  test("fallback -> ALWAYS Plan missing + Session sets bucketed (planPath null, >= 1 set)", () => {
+    const [p] = buildVisibleModulePayloads(
+      [
+        vm({
+          kind: "fallback",
+          slug: "typo",
+          displayName: "typo",
+          warning: { code: "undeclared-slug", rawSlug: "typo" },
+          planPath: null,
+          sets: [fakeSet({ name: "t1" })],
+        }),
+      ],
+      stubRow,
+    );
+    assert.strictEqual(p.plan, "missing");
+    assert.strictEqual(p.sessionSets, "bucketed");
+  });
+
+  test("fallback with a LEAKED planExists=true is STILL missing (null-planPath guard, Round 1 Major fix)", () => {
+    // The host never sets planExists on a null-planPath module, but the
+    // pure payload builder must not trust `planExists` alone: with no
+    // planPath there is no plan to be present, so a stray/leaked
+    // planExists=true must never produce a semantically impossible
+    // "present" fallback. Guards the pure layer as a total function.
+    const [p] = buildVisibleModulePayloads(
+      [
+        vm({
+          kind: "fallback",
+          slug: "typo",
+          displayName: "typo",
+          warning: { code: "undeclared-slug", rawSlug: "typo" },
+          planPath: null,
+          planExists: true,
+          sets: [fakeSet({ name: "t1" })],
+        }),
+      ],
+      stubRow,
+    );
+    assert.strictEqual(p.plan, "missing");
+    assert.strictEqual(p.sessionSets, "bucketed");
+  });
+
+  test("pseudo with legacy plan present + unstamped sets -> present / bucketed", () => {
+    const [p] = buildVisibleModulePayloads(
+      [
+        vm({
+          kind: "pseudo",
+          slug: null,
+          displayName: PSEUDO_MODULE_SOLE_NAME,
+          planPath: LEGACY_ROOT_PLAN_REL,
+          planExists: true,
+          sets: [fakeSet({ name: "loose" })],
+        }),
+      ],
+      stubRow,
+    );
+    assert.strictEqual(p.plan, "present");
+    assert.strictEqual(p.sessionSets, "bucketed");
+  });
+
+  test("pseudo empty with legacy plan present -> present / empty (plan kept the pseudo visible, no sets yet)", () => {
+    const [p] = buildVisibleModulePayloads(
+      [
+        vm({
+          kind: "pseudo",
+          slug: null,
+          displayName: PSEUDO_MODULE_SOLE_NAME,
+          planPath: LEGACY_ROOT_PLAN_REL,
+          planExists: true,
+          sets: [],
+        }),
+      ],
+      stubRow,
+    );
+    assert.strictEqual(p.plan, "present");
+    assert.strictEqual(p.sessionSets, "empty");
+  });
+
+  test("an unset planExists (pure computeVisibleModules output, no host pass) reads as missing", () => {
+    // The pure model leaves planExists undefined; buildVisibleModulePayloads
+    // treats undefined as false (plan not resolved -> missing).
+    const [p] = buildVisibleModulePayloads(
+      [
+        vm({
+          kind: "declared",
+          slug: "billing",
+          displayName: "Billing",
+          planPath: "docs/modules/billing/project-plan.md",
+          sets: [],
+        }),
+      ],
+      stubRow,
+    );
+    assert.strictEqual(p.plan, "missing");
+    assert.strictEqual(p.sessionSets, "blocked-until-plan");
+  });
+});
+
+suite("Set 093 S1 — mergeVisibleModules ORs planExists across roots", () => {
+  test("declared module: plan exists in one root only -> merged present", () => {
+    const rootA = [
+      vm({
+        kind: "declared",
+        slug: "billing",
+        displayName: "Billing",
+        planPath: "docs/modules/billing/project-plan.md",
+        planExists: true,
+      }),
+    ];
+    const rootB = [
+      vm({
+        kind: "declared",
+        slug: "billing",
+        displayName: "Billing",
+        planPath: "docs/modules/billing/project-plan.md",
+        planExists: false,
+      }),
+    ];
+    assert.strictEqual(mergeVisibleModules([rootA, rootB])[0].planExists, true);
+    // Order-independent (the OR is commutative).
+    assert.strictEqual(mergeVisibleModules([rootB, rootA])[0].planExists, true);
+  });
+
+  test("declared module: absent in every root -> merged stays false", () => {
+    const rootA = [
+      vm({ kind: "declared", slug: "ops", displayName: "Ops", planExists: false }),
+    ];
+    const rootB = [
+      vm({ kind: "declared", slug: "ops", displayName: "Ops", planExists: false }),
+    ];
+    assert.strictEqual(mergeVisibleModules([rootA, rootB])[0].planExists, false);
+  });
+
+  test("pseudo module: legacy plan present in one root -> merged present", () => {
+    const rootA = [
+      vm({
+        kind: "pseudo",
+        slug: null,
+        displayName: PSEUDO_MODULE_SOLE_NAME,
+        planPath: LEGACY_ROOT_PLAN_REL,
+        planExists: false,
+        sets: [fakeSet({ name: "loose" })],
+      }),
+    ];
+    const rootB = [
+      vm({
+        kind: "pseudo",
+        slug: null,
+        displayName: PSEUDO_MODULE_SOLE_NAME,
+        planPath: LEGACY_ROOT_PLAN_REL,
+        planExists: true,
+        sets: [],
+      }),
+    ];
+    const merged = mergeVisibleModules([rootA, rootB]);
+    const pseudo = merged.find((m) => m.kind === "pseudo")!;
+    assert.strictEqual(pseudo.planExists, true);
   });
 });

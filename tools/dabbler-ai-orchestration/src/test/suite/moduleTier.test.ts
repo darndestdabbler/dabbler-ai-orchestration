@@ -11,12 +11,13 @@
 //     buildModules and the client.js IIFE are not importable from the
 //     unit harness; see verificationMarker.test.ts).
 //
-// The "no-manifest fixture renders unchanged" invariant is pinned three
-// ways: groupByModule's single-implicit-group contract here, the client
-// source scan asserting the implicit-only branch renders via the
-// pre-087 bucket dialect (renderBucket(bucket, null) → rows at
-// aria-level 2), and the Layer 3 smoke in session-sets-tree.spec.ts
-// (aria-level="2" rows + zero .module elements on a no-manifest repo).
+// groupByModule's single-implicit-group contract is pinned here; the
+// SHIPPING renderer no longer uses it (Set 092 switched to
+// computeVisibleModules / buildVisibleModulePayloads and deleted the
+// pre-087 implicit-only bucket dialect). Set 093 S1 then inserted the
+// persistent Plan / Session sets child level, so the shipping tree is
+// module 1 / Plan & Session sets 2 / bucket 3 / row 4 (asserted by the
+// 4-level source scan below and the Layer 3 smokes).
 
 import * as assert from "assert";
 import * as fs from "fs";
@@ -527,18 +528,16 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     );
   });
 
-  test("webview renders one conformant 3-level ARIA dialect", () => {
+  test("webview renders one conformant 4-level ARIA dialect (Set 093 S1)", () => {
     const client = fs.readFileSync(
       path.join(extRoot, "media", "session-sets-tree", "client.js"),
       "utf8",
     );
     assert.ok(!client.includes("implicitOnly"));
     assert.ok(!client.includes("renderBucket(bucket, null)"));
-    // Module nodes: role="treeitem" carrying aria-level 1 +
-    // aria-expanded (R2 conformance fix), children nested in
-    // role="group", semantic Default label, per-module collapse state,
-    // composite per-(module, bucket)
-    // collapse keys, rows at aria-level 3.
+    // Module nodes: role="treeitem" carrying aria-level 1 + aria-expanded,
+    // children nested in role="group", semantic Default label, per-module
+    // collapse state, composite per-(module, bucket) collapse keys.
     assert.ok(client.includes('class="module-header"'));
     assert.ok(client.includes('mod.slug || "Default"'));
     assert.ok(client.includes("moduleCollapsed[moduleKey]"));
@@ -547,20 +546,51 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
       client.includes('\'<div role="treeitem" tabindex="-1" aria-level="1"\''),
       "the module node itself is a treeitem at level 1",
     );
+    // Set 093 S1: the two PERSISTENT semantic child nodes (Plan / Session
+    // sets) render at aria-level 2 as a fixed pair (aria-setsize=2);
+    // buckets nest UNDER Session sets at level 3, rows at level 4.
+    assert.ok(client.includes("function renderPlanNode(mod, moduleKey)"));
+    assert.ok(client.includes("function renderSessionSetsNode(mod, moduleKey)"));
+    assert.ok(client.includes('data-module-child="plan"'));
+    assert.ok(client.includes('data-module-child="session-sets"'));
+    assert.ok(client.includes('data-plan-state="'));
+    assert.ok(client.includes('data-session-sets-state="'));
     assert.ok(
       client.includes('\'<div role="treeitem" tabindex="-1" aria-level="2"\''),
-      "the bucket node itself is a treeitem at level 2 in the module dialect",
+      "the Plan / Session sets child nodes are treeitems at level 2",
     );
+    assert.ok(
+      client.includes('aria-setsize="2" aria-posinset="1"'),
+      "the Plan node declares its fixed-pair position (posinset 1 of 2)",
+    );
+    assert.ok(
+      client.includes('aria-setsize="2" aria-posinset="2"'),
+      "the Session sets node declares its fixed-pair position (posinset 2 of 2)",
+    );
+    assert.ok(
+      client.includes('\'<div role="treeitem" tabindex="-1" aria-level="3"\''),
+      "the bucket node itself is a treeitem at level 3 under Session sets",
+    );
+    // The Session sets node collapse rides the shared bucketCollapsed map
+    // under a "<module>/sessionsets" key so toggleCollapsible needs no new
+    // wiring, and its buckets live in a nested child-body group.
+    assert.ok(client.includes('moduleKey + "/sessionsets"'));
     assert.ok(client.includes('class="module-body" role="group"'));
+    assert.ok(client.includes('class="child-body" role="group"'));
     assert.ok(client.includes('class="bucket-body" role="group"'));
-    assert.ok(client.includes("renderRow(row, 3)"));
+    assert.ok(client.includes("renderRow(row, 4)"));
     assert.ok(client.includes('data-testid="work-explorer-tree"'));
     // Keyboard operability: shared toggler wired to Enter/Space and
-    // ArrowRight/ArrowLeft; arrow navigation walks visible nodes only.
+    // ArrowRight/ArrowLeft; arrow navigation walks visible nodes only. The
+    // Session sets collapsible header joins the module/bucket toggler set.
     assert.ok(client.includes("function toggleCollapsible(nodeEl"));
     assert.ok(client.includes("toggleCollapsible(item, true)"));
     assert.ok(client.includes("toggleCollapsible(item, false)"));
     assert.ok(client.includes("function visibleTreeItems()"));
+    assert.ok(
+      client.includes('.child-header[data-collapsible="true"]'),
+      "the Session sets header is wired into the collapse toggler set",
+    );
   });
 
   test("the module header style ships (collapse affordance + hidden body)", () => {
@@ -570,5 +600,9 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     );
     assert.ok(css.includes(".module-header"));
     assert.ok(css.includes('.module[aria-expanded="false"] .module-body'));
+    // Set 093 S1: the persistent child nodes ship their own style +
+    // collapse affordance (Session sets body hidden when collapsed).
+    assert.ok(css.includes(".child-header"));
+    assert.ok(css.includes('.module-session-sets[aria-expanded="false"] .child-body'));
   });
 });

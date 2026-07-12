@@ -467,6 +467,10 @@ export function mergeVisibleModules(
           existing.module = {
             ...existing.module,
             sets: [...existing.module.sets, ...module.sets],
+            // Set 093 S1: a declared module's plan exists if it exists in
+            // ANY root that declares the slug (worktree checkouts share
+            // the tracked file, so this is the safe combine).
+            planExists: existing.module.planExists || module.planExists,
           };
           existing.order = Math.min(existing.order, declaredOrder);
         } else {
@@ -485,7 +489,11 @@ export function mergeVisibleModules(
         fallback.set(
           slug,
           existing
-            ? { ...existing, sets: [...existing.sets, ...module.sets] }
+            ? {
+                ...existing,
+                sets: [...existing.sets, ...module.sets],
+                planExists: existing.planExists || module.planExists,
+              }
             : { ...module, sets: [...module.sets] },
         );
         continue;
@@ -501,6 +509,9 @@ export function mergeVisibleModules(
               ? module.warning
               : existingPseudo.warning,
           sets: [...existingPseudo.sets, ...module.sets],
+          // Set 093 S1: the legacy root plan is the same tracked file in
+          // every worktree root — present if any root sees it.
+          planExists: existingPseudo.planExists || module.planExists,
         };
       }
     }
@@ -526,13 +537,26 @@ export function buildVisibleModulePayloads(
   modules: readonly VisibleModule[],
   rowFor: (set: SessionSet) => RowPayload,
 ): ModulePayload[] {
-  return modules.map((module) => ({
-    slug: module.slug ?? "",
-    title: module.displayName,
-    kind: module.kind,
-    warning: module.warning,
-    buckets: buildBucketPayloads([...module.sets], rowFor),
-  }));
+  return modules.map((module) => {
+    // Set 093 S1: derive the two persistent child-node states ONCE from
+    // (plan presence, set count). The null guard is enforced HERE too
+    // (not only at the host that populates `planExists`): a module with
+    // no `planPath` — every fallback group — can never be "present",
+    // regardless of a stray/leaked `planExists`. This keeps the pure
+    // layer a total function of its declared inputs (routed ruling
+    // Fix 1: guard planExists against a null planPath).
+    const planPresent = module.planPath !== null && module.planExists === true;
+    const children = deriveModuleChildren(planPresent, module.sets.length);
+    return {
+      slug: module.slug ?? "",
+      title: module.displayName,
+      kind: module.kind,
+      warning: module.warning,
+      plan: children.plan,
+      sessionSets: children.sessionSets,
+      buckets: buildBucketPayloads([...module.sets], rowFor),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -608,6 +632,47 @@ export interface VisibleModule {
   planPath: string | null;
   /** Input order preserved; per-bucket sorting stays downstream. */
   sets: readonly SessionSet[];
+  /**
+   * Set 093 S1: whether {@link planPath} resolves to a file that exists.
+   * A HOST-populated field — {@link computeVisibleModules} is pure and
+   * cannot touch the filesystem, so it leaves this unset (undefined ==
+   * unresolved == treated as false). The host resolves it per root
+   * (gated on a non-null `planPath`) after `computeVisibleModules`
+   * returns, and {@link mergeVisibleModules} ORs it across roots so a
+   * declared module whose plan exists in any worktree reads "present".
+   * The Plan child-node state derives from this via
+   * {@link deriveModuleChildren}.
+   */
+  planExists?: boolean;
+}
+
+// Set 093 S1 (verdict amendment 4; routed ruling
+// s1-child-nodes-architecture.json): the two PERSISTENT semantic
+// child-node states every module row renders. Pure function of
+// (plan presence, set count) so the host and tests share one source.
+//
+// Orthogonality is the whole point of amendment 4: `plan` and
+// `sessionSets` are independent. Real work ALWAYS wins — a module with
+// sets is "bucketed" even when its plan is missing (the missing plan
+// surfaces on the Plan node, never by hiding the sets). `blocked-until-plan`
+// is reserved strictly for the zero-sets-AND-no-plan case (nothing to
+// show and nothing can be authored yet). Plan presence is computed ONCE
+// and reused for both children so the two states cannot drift.
+export type ModulePlanState = "present" | "missing";
+export type ModuleSessionSetsState =
+  | "blocked-until-plan"
+  | "empty"
+  | "bucketed";
+
+export function deriveModuleChildren(
+  planPresent: boolean,
+  setCount: number,
+): { plan: ModulePlanState; sessionSets: ModuleSessionSetsState } {
+  return {
+    plan: planPresent ? "present" : "missing",
+    sessionSets:
+      setCount > 0 ? "bucketed" : planPresent ? "empty" : "blocked-until-plan",
+  };
 }
 
 export interface VisibleModulesOptions {

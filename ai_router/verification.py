@@ -242,6 +242,18 @@ def _parse_issue_blocks(body: str) -> list:
         )
         if sev_match:
             issue["severity"] = sev_match.group(1).strip()
+        # Failure scenario (Set 096): the consequence rubric makes a stated
+        # failure scenario mandatory for every blocking Issue. TOLERANT parse —
+        # optional field, value runs to end of line (the template asks for one
+        # scenario line); its absence never changes blocking classification
+        # (classify_blocking semantics are unchanged by design).
+        fs_match = re.search(
+            r'Failure[\s*_-]*scenario[\s*:.\-_]*([^\n]+)', match, re.IGNORECASE
+        )
+        if fs_match:
+            scenario = fs_match.group(1).strip().strip("*").strip()
+            if scenario:
+                issue["failureScenario"] = scenario
         if issue["description"]:
             issues.append(issue)
     return issues

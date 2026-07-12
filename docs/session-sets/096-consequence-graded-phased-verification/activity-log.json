@@ -1,0 +1,81 @@
+{
+  "sessionSetName": "096-consequence-graded-phased-verification",
+  "createdDate": "2026-07-12T20:57:25.370122+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-12T20:57:25.371271+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register-and-read",
+      "dateTime": "2026-07-12T17:05:42.061880-04:00",
+      "description": "Registered S1 (claude/anthropic/claude-fable-5); read spec, Set 095 evidence corpus (s1-cross-round-ledger.md, issues rounds), L-095-1, and current verify_session/verification/verification_stamp/template code. Scratch worktree for the fan-out replay created at C:/temp/replay-095 @ b16dd58.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "fanout-experiment-run",
+      "dateTime": "2026-07-12T17:19:41.918125-04:00",
+      "description": "Fan-out experiment run: frozen 095 pre-close corpus (worktree @ b16dd58, diff-base 34d4149), identical 130k-char bundles; K=3 gpt-5-6 discovery calls (3+4, 3+7, 1+5 issues+nits) + 1 gemini-3-1-pro cross-provider call (VERIFIED, 0 findings); \\.80 total (budget \\). Raw artifacts s1-fanout-run-{a,b,c,d}.md + s1-fanout-findings.json; overlap/sizing analysis routed (task_type=analysis).",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "rubric-in-template",
+      "dateTime": "2026-07-12T17:22:42.352031-04:00",
+      "description": "Consequence rubric (L-095-1, operator 2026-07-12) encoded in verification.md Severity anchoring + mandatory per-Issue Failure scenario line; merge-decision anchor and anti-laundering escalation preserved subordinated to the rubric; TEMPLATE_ID bumped to session-verification-v3 with new pinned hash (v1/v2 retained).",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "issue-schema-updated",
+      "dateTime": "2026-07-12T17:22:42.618121-04:00",
+      "description": "Parser: tolerant failureScenario extraction in _parse_issue_blocks (classify_blocking unchanged); session-issues.schema.json + session-issues-schema.md gain the optional verifier-emitted failureScenario field (both schema versions, additive).",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "ledger-machinery-live",
+      "dateTime": "2026-07-12T17:22:42.874628-04:00",
+      "description": "verify_session auto-assembles the settled-points cross-round ledger from prior rounds sN-issues*.json + sN-remediation-round-<R>.md sidecars and prepends it to the prompt (no-resurrection framing; explicit unreadable-artifact reporting; truncation markers); sidecar added to WORK_DIFF_SET_BOOKKEEPING; targeted tests green (305 passed: framing/rubric pins, parser, ledger assembly, stamp, run wiring).",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "build-and-suite",
+      "dateTime": "2026-07-12T17:33:11.973655-04:00",
+      "description": "Full suite green: pytest 2948 passed / 6 skipped (+26 new tests vs 095 baseline); extension Layer 2 1487 passing (untouched surfaces); tsc --noEmit clean. Playwright not required per L-064-12 scope (no Explorer/state-writer/fixture change).",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "verify-round-1-remediated",
+      "dateTime": "2026-07-12T17:40:43.841477-04:00",
+      "description": "Round 1 (gpt-5-6, v3 template) returned 1 Major with a parsed failureScenario (field works end-to-end): ledger applied settled/no-resurrection framing without settlement evidence. ACCEPTED + fixed fail-closed (earned settlement: settling resolution_status or non-empty round sidecar; unresolved block otherwise). Sidecar s1-remediation-round-1.md written (dogfoods the convention); targeted tests 163 green; re-verify round 2 next.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-closed",
+      "dateTime": "2026-07-12T17:44:28.060771-04:00",
+      "description": "Round 2 VERIFIED clean under the auto-assembled ledger (2 rounds, \\.37 total verification). Disposition authored (completed / api / VERIFIED; next_orchestrator claude-code/anthropic/claude-sonnet-5/medium per routed rec; 095-tutorial latent Majors recorded as deferred_issues). Committing, pushing, closing.",
+      "status": "in-progress"
+    }
+  ]
+}

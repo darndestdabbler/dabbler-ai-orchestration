@@ -925,3 +925,231 @@ class TestOversizedEvidenceGuard:
             _set_dir(repo), 1, "HEAD", (), max_evidence_chars=1_000_000
         )
         assert "y = 2" in bundle.diff
+
+
+# ---------------------------------------------------------------------------
+# Cross-round issue ledger machinery (Set 096)
+# ---------------------------------------------------------------------------
+
+class TestCrossRoundLedger:
+    """The settled-points ledger is MACHINERY (Set 096): assembled from prior
+    rounds' immutable sN-issues*.json + the orchestrator's remediation-note
+    sidecars, and prepended to the prompt -- retiring the hand-carried ledger
+    file for the no-resurrection function."""
+
+    def _write_issues(self, set_dir: Path, round_number: int, issues,
+                      verdict: str = "ISSUES_FOUND") -> None:
+        path = vs.issues_artifact_path(set_dir, 1, round_number)
+        path.write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 1,
+                    "sessionNumber": 1,
+                    "verificationRound": round_number,
+                    "verificationVerdict": verdict,
+                    "issues": issues,
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+    def test_round_1_has_no_ledger(self, tmp_path: Path):
+        assert vs.assemble_cross_round_ledger(tmp_path, 1, 1) == ""
+
+    def test_no_prior_artifacts_yields_empty_even_on_round_3(
+        self, tmp_path: Path
+    ):
+        assert vs.assemble_cross_round_ledger(tmp_path, 1, 3) == ""
+
+    def test_prior_findings_rendered_with_severity_id_and_scenario(
+        self, tmp_path: Path
+    ):
+        self._write_issues(tmp_path, 1, [
+            {
+                "description": "The gate fails open on a missing remote.",
+                "severity": "Major",
+                "issueId": "I-096-1",
+                "failureScenario": "A remote-less consumer repo skips the gate.",
+            },
+            {"description": "An unrated observation."},
+        ])
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        assert "**Round 1**" in ledger
+        assert "[Major] (id: I-096-1)" in ledger
+        assert "fails open on a missing remote" in ledger
+        assert "Failure scenario: A remote-less consumer repo" in ledger
+        assert "[unrated]" in ledger
+        assert "ISSUES_FOUND -- 2 finding(s)" in ledger
+
+    def test_no_resurrection_framing_requires_settlement_evidence(
+        self, tmp_path: Path
+    ):
+        """The S1 round-1 Major, encoded: an issues artifact proves a finding
+        was REPORTED, not settled. Settled framing is earned by a non-empty
+        remediation sidecar (or a settling resolution status), never by the
+        artifact's existence alone."""
+        self._write_issues(tmp_path, 1, [{"description": "x"}])
+        bare = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        # Without settlement evidence: the UNRESOLVED framing, and never the
+        # no-resurrection rule.
+        assert "NOT settled" in bare
+        assert "re-raising an unsettled point is not resurrection" in bare
+        assert "review error" not in bare
+        assert "do not resurrect" not in bare
+        # With the round's remediation note: the settled framing appears.
+        vs.remediation_note_path(tmp_path, 1, 1).write_text(
+            "Fixed and re-tested.", encoding="utf-8"
+        )
+        settled = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        assert "Settled points -- do not resurrect" in settled
+        assert "never reopens under fresh wording" in settled
+        # The one sanctioned reopen path: challenging a defective remediation.
+        assert "REMEDIATION itself is defective" in settled
+
+    def test_settling_resolution_status_earns_settled_framing(
+        self, tmp_path: Path
+    ):
+        self._write_issues(tmp_path, 1, [
+            {"description": "x", "severity": "Major",
+             "resolution_status": "fixed"},
+        ])
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        assert "Settled points -- do not resurrect" in ledger
+        assert "[resolution: fixed]" in ledger
+        assert "NOT settled" not in ledger
+
+    def test_open_resolution_status_stays_unresolved_despite_sidecar(
+        self, tmp_path: Path
+    ):
+        """A per-issue status takes precedence over the round sidecar: an
+        explicitly OPEN status (escalate-human / needs-more-context / an
+        unrecognized value) is never laundered into a settled point."""
+        self._write_issues(tmp_path, 1, [
+            {"description": "settled-one", "severity": "Major"},
+            {"description": "still-open-one", "severity": "Major",
+             "resolution_status": "escalate-human"},
+        ])
+        vs.remediation_note_path(tmp_path, 1, 1).write_text(
+            "settled-one fixed.", encoding="utf-8"
+        )
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        settled_block = ledger[ledger.index("Settled points"):
+                               ledger.index("WITHOUT settlement evidence")]
+        unresolved_block = ledger[ledger.index("WITHOUT settlement evidence"):]
+        assert "settled-one" in settled_block
+        assert "still-open-one" in unresolved_block
+
+    def test_empty_sidecar_is_not_settlement_evidence(self, tmp_path: Path):
+        self._write_issues(tmp_path, 1, [{"description": "x"}])
+        vs.remediation_note_path(tmp_path, 1, 1).write_text(
+            "", encoding="utf-8"
+        )
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        assert "NOT settled" in ledger
+        assert "it is not settlement evidence" in ledger
+        assert "do not resurrect" not in ledger
+
+    def test_remediation_sidecar_rendered(self, tmp_path: Path):
+        self._write_issues(tmp_path, 1, [{"description": "x"}])
+        vs.remediation_note_path(tmp_path, 1, 1).write_text(
+            "Fixed by guarding the fallback branch.", encoding="utf-8"
+        )
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        assert (
+            "Remediation notes (round 1): Fixed by guarding the fallback"
+            in ledger
+        )
+
+    def test_sidecar_without_issues_artifact_still_carried(
+        self, tmp_path: Path
+    ):
+        vs.remediation_note_path(tmp_path, 1, 1).write_text(
+            "Round 1 was adjudicated verbally.", encoding="utf-8"
+        )
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        assert "Round 1 was adjudicated verbally." in ledger
+
+    def test_unreadable_issues_artifact_reported_explicitly(
+        self, tmp_path: Path
+    ):
+        vs.issues_artifact_path(tmp_path, 1, 1).write_text(
+            "{not json", encoding="utf-8"
+        )
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        assert "unreadable" in ledger
+        assert "s1-issues.json" in ledger
+        # A parse failure is never settlement evidence: the unreadable round
+        # renders under the UNRESOLVED framing with a re-evaluate instruction.
+        assert "RE-EVALUATE" in ledger
+        assert "not settlement evidence" in ledger
+        assert "do not resurrect" not in ledger
+
+    def test_long_description_truncated_with_explicit_marker(
+        self, tmp_path: Path
+    ):
+        self._write_issues(
+            tmp_path, 1, [{"description": "word " * 500, "severity": "Major"}]
+        )
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
+        assert "...[truncated -- see the round artifact]" in ledger
+
+    def test_rounds_render_in_order(self, tmp_path: Path):
+        self._write_issues(tmp_path, 1, [{"description": "first-round-point"}])
+        self._write_issues(tmp_path, 2, [{"description": "second-round-point"}])
+        ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 3)
+        assert ledger.index("**Round 1**") < ledger.index("**Round 2**")
+        assert "first-round-point" in ledger
+        assert "second-round-point" in ledger
+
+    def test_remediation_note_path_naming(self, tmp_path: Path):
+        assert vs.remediation_note_path(tmp_path, 2, 3).name == (
+            "s2-remediation-round-3.md"
+        )
+
+    def test_build_prompt_places_ledger_after_conventions_before_plan(self):
+        evidence = vs.EvidenceBundle(
+            spec_excerpt="SPEC-EXCERPT-SENTINEL",
+            git_status="",
+            diff="",
+            diff_base="HEAD",
+        )
+        prompt = vs.build_prompt(
+            evidence, 1, 2,
+            conventions="CONV-SENTINEL",
+            ledger="LEDGER-SENTINEL",
+        )
+        i_conv = prompt.index("CONV-SENTINEL")
+        i_ledger = prompt.index("LEDGER-SENTINEL")
+        i_spec = prompt.index("SPEC-EXCERPT-SENTINEL")
+        assert i_conv < i_ledger < i_spec
+
+    def test_run_prepends_prior_round_ledger(self, repo: Path):
+        set_dir = _set_dir(repo)
+        # Round 1 already happened: raw artifact + findings envelope +
+        # the orchestrator's remediation note.
+        (set_dir / "s1-verification.md").write_text("r1", encoding="utf-8")
+        self._write_issues(set_dir, 1, [
+            {"description": "settled-point-alpha", "severity": "Major"},
+        ])
+        vs.remediation_note_path(set_dir, 1, 1).write_text(
+            "alpha fixed in commit deadbeef", encoding="utf-8"
+        )
+        fake = FakeRoute(response="VERIFIED -- fixes confirmed.")
+        rc = vs.run(_args(set_dir), route_fn=fake)
+        assert rc == vs.EXIT_OK
+        prompt = fake.calls[0]["prompt"]
+        assert "Settled points -- do not resurrect" in prompt
+        assert "settled-point-alpha" in prompt
+        assert "alpha fixed in commit deadbeef" in prompt
+        # The ledger rides BEFORE the session plan excerpt.
+        assert prompt.index("settled-point-alpha") < prompt.index(
+            "Build the widget"
+        )
+
+    def test_run_round_1_prompt_carries_no_ledger(self, repo: Path):
+        set_dir = _set_dir(repo)
+        fake = FakeRoute(response="VERIFIED -- checked.")
+        rc = vs.run(_args(set_dir), route_fn=fake)
+        assert rc == vs.EXIT_OK
+        assert "Cross-round issue ledger" not in fake.calls[0]["prompt"]

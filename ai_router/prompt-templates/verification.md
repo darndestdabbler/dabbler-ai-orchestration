@@ -66,11 +66,17 @@ A finding that cannot produce all three is a **nit, not a blocker** — record i
 
 **Judge semantic equivalence, not textual identity.** Two forms that behave identically are equivalent; do not flag a cosmetic difference as a defect. For example, a task that says `pytest` and a response that shows `python -m pytest -v` output ran the same test session — that is **not** a finding (`python -m pytest` and `pytest` resolve the same tests; `-v` is only verbosity). The sole exception: when the **exact text is itself the contract** (a required literal token, a public API name, a wire-format string), textual identity *is* correctness and a mismatch is a real defect.
 
-### Severity anchoring
+### Severity anchoring — grade by EXPECTED CONSEQUENCE (operator rubric, 2026-07-12)
 
-- **Critical / Major** — block. **Major = a defect that would change a reasonable reviewer's merge decision.** If a competent reviewer, seeing it, would say "fix this before merge," it is at least Major.
-- **Minor** — a real but immaterial observation that would **not** change a merge decision. Minor findings **do not block**.
-- **Plausible-path-to-harm escalation (anti-laundering):** to call something **Minor** you must be confident there is **no plausible path** by which it leads to a Major/Critical failure. **When in doubt, escalate.** A real bug mislabeled Minor and waved through is the failure mode this guards against — materiality lowers the noise floor, it must never launder a real defect.
+Severity is defined by the **expected consequence of not fixing the finding**: the probability that the stated failure scenario actually materializes for a real user of the deliverable, times the material impact on the deliverable's objectives.
+
+- **Critical** — block. The consequence is likely on the main path AND severely damages the objective (e.g. the deliverable fails unrecoverably for a typical user; a review asserts false violations as fact).
+- **Major** — block. The consequence is **LIKELY for a typical user AND materially impairs the objective** — you must state the concrete failure scenario and why it is **probable, not merely possible**. Major = a defect that would change a **reasonable reviewer's merge decision** *because of that expected consequence*: if the scenario is improbable or the impact immaterial, a reasonable reviewer does not block the merge, and the finding is Minor.
+- **Minor** — does not block. Everything where the **probability is low** (unusual configurations, edge-case states, adversarial or self-inflicted misuse) OR the **impact is small** (a confusing-but-recoverable moment, a wording nit, defense-in-depth hardening, epistemically-cleaner reporting). **Low-probability OR low-impact = Minor, even when the observation is technically correct.**
+
+**A finding with no stated, plausible failure scenario is Minor by definition.** Do not label hardening opportunities as Major.
+
+- **Anti-laundering escalation:** to call a finding whose failure scenario **is** stated and plausible **Minor**, you must be confident there is **no plausible path** by which it leads to a Major/Critical consequence — **when in doubt, escalate** and say why. This escalation resolves genuine uncertainty about a *stated* scenario's probability or impact; it is never a license to skip the scenario. A scenario you cannot state at all is not doubt — it is absence, and the finding is Minor by definition.
 
 ### Response Format
 
@@ -85,6 +91,7 @@ If ISSUES FOUND, list each issue:
 - **Issue N:** [description]
   - **Category:** Correctness / Completeness / False Positive
   - **Severity:** Critical / Major (a blocking Issue is never Minor — Minor goes under NITS)
+  - **Failure scenario:** MANDATORY — the concrete scenario in which the consequence materializes for a real user of the deliverable, plus why that scenario is **probable rather than merely possible**. An Issue whose failure scenario you cannot state plausibly is Minor by definition and belongs under NITS, not here.
   - **Details:** the three-part "so what?": the **violation** (quote it), the concrete **impact** (which merge decision it changes), and the **evidence** that proves it, plus the correct answer
 
 #### NITS (optional, non-blocking)

@@ -27,6 +27,12 @@
 > design record is
 > [`docs/proposals/2026-06-05-lightweight-dedicated-verification-sessions/verdict.md`](proposals/2026-06-05-lightweight-dedicated-verification-sessions/verdict.md)
 > → Q2.
+>
+> **Extended by** Set 096
+> (`docs/session-sets/096-consequence-graded-phased-verification/`):
+> the optional verifier-emitted `failureScenario` field is recognized on
+> the base issue object under **both** schema versions (additive; no
+> version bump — the issue object is open and the field is tolerant).
 
 ---
 
@@ -125,6 +131,7 @@ are tolerated (`additionalProperties` is open on the issue object).
 | `description` | string | yes | verifier |
 | `category` | string | no | verifier (loose) |
 | `severity` | string | no | verifier (loose) |
+| `failureScenario` | string | no | verifier (Set 096). The concrete failure scenario + probability justification the consequence-graded severity rubric requires per blocking Issue. Parsed tolerantly from the `Failure scenario:` line; valid under both schema versions; its absence never changes blocking classification (`classify_blocking` semantics unchanged). |
 | `resolution_status` | string | no | orchestrator annotation (advisory). v1: loose. v2: enum-enforced **when present** (see below). |
 | `resolution_notes` | string | no | orchestrator annotation (advisory) |
 | `resolved_in_round` | integer ≥ 1 | no | orchestrator annotation (advisory) |

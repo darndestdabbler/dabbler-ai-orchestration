@@ -1,0 +1,119 @@
+{
+  "experiment": "set-096-s1-fanout",
+  "frozenState": "b16dd58",
+  "diffBase": "34d4149",
+  "promptChars": 130010,
+  "identicalBundles": true,
+  "runs": [
+    {
+      "run": "a",
+      "model": "gpt-5-6",
+      "excluded_providers": [
+        "anthropic"
+      ],
+      "verdict": "ISSUES_FOUND",
+      "issues": [
+        {
+          "description": "The hotfix is tagged and deployed without running the integrated test suite\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Location:** `docs/tutorials/module-team-hello-world.md`, Part 10, step 3\n- **Details:**\n  - **Violation:** The walkthrough says to “validate **before** you tag,” calls the hotfix “CI-validated,” and teaches an all-module guardrail, but validates the exact release commit only with `python -m unittest discover -s services/greeter -v`.\n  - **Impact:** A literal follower can tag and deploy `v0.1.1` with broken integration behavior. This is probable in the tutorial’s own example: changing greeting capitalization can invalidate the integration test that exercises the real greeter output. The PR runs only the path-filtered `greeter` job; `integration` is skipped, and `all-modules` runs only after the PR is merged—after the tag has already been pushed and deployed.\n  - **Evidence:** The workflow defines `integration` as conditional only on `services/integration/**`, while `all-modules` is restricted to pushes to `main`. The hotfix changes `services/greeter/`, tags before merge, and runs only greeter tests locally.\n- **Fix:** Before creating `v0.1.1`, run the same complete per-directory test loop used by `all-modules`, or otherwise execute every module and integration test against the exact hotfix commit. Do not push or deploy the tag unless that full exact-snapshot validation passes.",
+          "category": "Correctness",
+          "severity": "Major"
+        },
+        {
+          "description": "`ADVISORY` caps suppress proven failures\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md`, Principles 4, 6, and 7\n- **Details:**\n  - **Violation:** The required review must provide trustworthy per-principle scoring, but the prompt mandates `ADVISORY` whenever one evidence category is unavailable—even when other evidence conclusively proves a violation.\n  - **Impact:** Common runs will understate real failures. For example:\n    - A branch can prove cross-module work lacks `touches`, yet Principle 4 must be capped at `ADVISORY` when `gh` is unavailable.\n    - Lightweight tags or incorrect tag ancestry can be conclusively proven, yet Principle 6 must be capped at `ADVISORY` when production deployment evidence is absent.\n    - A missing all-module CI job can be proven, yet Principle 7 must be capped at `ADVISORY` when dated branch evidence is unavailable.\n    This changes actionable `FAIL` results into uncertainty and materially weakens the coaching.\n  - **Evidence:** Principle 4 says “with no PR review data, cap this principle at `ADVISORY`”; Principle 6 says missing production-target evidence caps the whole principle at `ADVISORY`; Principle 7 similarly caps the whole principle when drift evidence is missing. Each principle also independently defines proven “Bad” conditions.\n- **Fix:** Apply missing-evidence caps only to an otherwise passing result: `FAIL` whenever available evidence proves any violation; `ADVISORY` only when no failure is proven but missing evidence prevents a `PASS`.",
+          "category": "Correctness",
+          "severity": "Major"
+        },
+        {
+          "description": "The prompt treats `reviewDecision` as proof of branch-protection enforcement\n\n- **Category:** False Positive\n- **Severity:** Major\n- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md`, Principle 4, fact 3; routed evidence script\n- **Details:**\n  - **Violation:** The prompt requires evidence-backed claims and says not to infer enforcement, but states that enforcement is “Proven only by protection/ruleset data or PR `reviewDecision` output.”\n  - **Impact:** A typical merged PR with an approving review can have `reviewDecision: APPROVED` even when no branch rule required that approval. The routed script gathers `reviewDecision` but gathers no branch-protection or ruleset configuration, so the model is explicitly licensed to assert enforcement that may not exist. That makes the reusable review untrustworthy on a common path.\n  - **Evidence:** The `gh pr list` call requests `reviewDecision`, reviews, and files, but no protection/ruleset data. `reviewDecision` describes the PR’s review state; it does not by itself prove that GitHub blocked merging until approval.\n- **Fix:** Treat `reviewDecision` and reviews only as evidence of review state/completed approvals. Prove enforcement with branch-protection or repository-ruleset data, such as authenticated GitHub API output; otherwise report enforcement as unavailable.",
+          "category": "False Positive",
+          "severity": "Major"
+        }
+      ],
+      "nits": [
+        "Part 10’s deployment commands assume `services/integration/app.py` even though the generated plan never requires that filename; “adjust to the entry point” makes this portion recoverable but not literally copy-pasteable.",
+        "Part 3 calls administrator enforcement optional (“If you want”) but later unconditionally expects Priya’s direct pushes to be rejected; an admin who skips that option can fail the self-check.",
+        "The routed review script overwrites an earlier review when run more than once on the same date because the output filename contains only `date.today()`.",
+        "Current-base CODEOWNERS coverage cannot prove that owners were auto-requested on historical merged PRs; CODEOWNERS may have changed since those PRs, and the script does not gather `reviewRequests` or the historical CODEOWNERS version."
+      ],
+      "truncated": false,
+      "cost_usd": 0.2708,
+      "seconds": 211.9
+    },
+    {
+      "run": "b",
+      "model": "gpt-5-6",
+      "excluded_providers": [
+        "anthropic"
+      ],
+      "verdict": "ISSUES_FOUND",
+      "issues": [
+        {
+          "description": "Owner identity and owner-approval claims are not supportable from the gathered evidence\n\n- **Category:** Completeness\n- **Severity:** Major\n- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md` — evidence-gathering script and Principles 4–5\n- **Details:** **Violation:** The task requires “trustworthy, evidence-cited coaching” about “integration `touches` + owner review” and “CODEOWNERS coverage.” The prompt requires checking the “intended” module owners and whether touched owners approved, but its inputs contain no authoritative module-to-owner mapping. `docs/modules.yaml` supplies only `slug`, `title`, `codeRoots`, `planPath`, and `touches`; `.github/CODEOWNERS` is the mapping being audited and therefore cannot independently prove that its listed owners are the intended owners. The script also gathers reviewer logins but not membership of CODEOWNERS teams such as `@org/greeter-team`. **Impact:** A typical repository can assign `services/greeter/**` to the wrong person or team consistently, and the review can report PASS because it has no independent expected-owner roster. It can likewise claim that a team owner approved without evidence that the approving user belongs to that team. These are false-confidence failures in the central review deliverable and would change a merge decision. **Evidence:** The evidence script reads `docs/modules.yaml`, CODEOWNERS, plans, specs, workflows, and `gh pr list`; it never asks for an ownership roster or resolves GitHub team membership. Principle 5 nevertheless asks whether effective owners are “the intended one,” and Principle 4 asks whether “the touched modules’ owners” approved.\n- **Fix:** Require an explicit owner mapping as an input, or add a supported owner field to the module manifest. For team CODEOWNERS entries, resolve membership through authenticated GitHub API evidence; otherwise mark team-member approval as unavailable. Without an independent owner source, limit the score to syntactic coverage and state that owner correctness is unverified.",
+          "category": "Completeness",
+          "severity": "Major"
+        },
+        {
+          "description": "`reviewDecision` is incorrectly treated as proof that approvals were enforced\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Location:** `docs/tutorials/module-team-hello-world-review-prompt.md` — Principle 4, fact 3\n- **Details:** **Violation:** The prompt states: “Enforcement — branch protection actually requires approvals … Proven only by protection/ruleset data or PR `reviewDecision` output.” A PR’s `reviewDecision` reports review disposition; an `APPROVED` result can arise from an optional approval and does not prove that branch protection or a ruleset required it. **Impact:** Repositories with voluntary reviews but no approval enforcement are common. The shipped prompt can therefore report that approvals were required when merges were actually unrestricted, producing untrustworthy coaching about a core guardrail. **Evidence:** The runner gathers `reviewDecision` through `gh pr list` but gathers no branch-protection or repository-ruleset configuration. The prompt explicitly authorizes treating the former as enforcement proof.\n- **Fix:** Treat `reviewDecision` and `reviews` only as evidence of review state and completed approvals. Gather branch protection/rulesets through the GitHub API to establish enforcement; otherwise report enforcement as unavailable and cap Principle 4 at `ADVISORY`.",
+          "category": "Correctness",
+          "severity": "Major"
+        },
+        {
+          "description": "The walkthrough does not establish the test framework required by its CI, so generated module PRs can be blocked on the main path\n\n- **Category:** Completeness\n- **Severity:** Major\n- **Location:** `docs/tutorials/module-team-hello-world.md` — Parts 4–7\n- **Details:** **Violation:** The walkthrough is required to be “copy-pasteable, runnable,” but the greeter and clock plans request only “a unit test,” while the supplied CI exclusively discovers `unittest` tests and deliberately fails when `unittest` finds zero cases. Priya and Sam start their sessions before the CI workflow is merged, so their agents cannot infer this hidden framework contract from the repository. **Impact:** AI agents commonly generate pytest-style tests. A literal follower can therefore reach the greeter or clock PR with real tests present, yet receive `ERROR: no tests found`; the required check blocks merging, the prerequisite sets never complete, and Alex’s integration set remains blocked. This materially interrupts the advertised end-to-end walkthrough for its novice audience. **Evidence:** Parts 4 and 5 say only “plus a unit test”; Part 6 starts both implementation sessions; Part 7 later installs commands based on `unittest.defaultTestLoader.discover(...)` and fails when its count is zero.\n- **Fix:** Before session generation, explicitly require standard-library `unittest.TestCase` tests in discoverable `test*.py` files, including concrete expected paths. Alternatively, make the workflow run the test framework selected by the generated project and commit that test configuration before opening the implementation worktrees.",
+          "category": "Completeness",
+          "severity": "Major"
+        }
+      ],
+      "nits": [
+        "The route script always selects `origin/main` when that ref exists; it does not prove it is the freshest main among multiple remotes despite claiming to review the “freshest main.”",
+        "The tag evidence format omits `%(objectname:short)`, so lightweight tags have no target SHA in the dedicated tag evidence even though the prompt asks for tag targets.",
+        "Principle 2 does not explicitly compare same-named session sets added independently on different local or remote branches, despite the runner collecting branch-specific specs and global uniqueness being the rule most exposed to concurrent authoring.",
+        "The routed review ignores uncommitted and staged changes, so an active dirty branch’s current scope violations are absent without an explicit warning that only committed ref state is reviewed.",
+        "Repository-controlled file contents are appended directly to the model prompt without an explicit instruction to treat embedded instructions as untrusted data, leaving the review vulnerable to prompt injection from specs, plans, or workflows.",
+        "Part 10 uses `python services/integration/app.py` with “adjust to the entry point your integration session produced”; because no earlier step requires `app.py`, this command is not literally copy-pasteable, though the correction is readily recoverable.",
+        "The final self-check verifies that Priya and Sam were auto-requested but does not explicitly verify that both actually approved Alex’s integration PR, despite that being a named walkthrough objective."
+      ],
+      "truncated": false,
+      "cost_usd": 0.2408,
+      "seconds": 174.1
+    },
+    {
+      "run": "c",
+      "model": "gpt-5-6",
+      "excluded_providers": [
+        "anthropic"
+      ],
+      "verdict": "ISSUES_FOUND",
+      "issues": [
+        {
+          "description": "** The walkthrough’s generated Python artifacts are not constrained to match the fixed CI and launch commands.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Details:** **Violation:** The task requires a “copy-pasteable, runnable” end-to-end walkthrough, but Parts 4–5 request only “a unit test” and an integration program without specifying the test framework, test layout, package structure, or entry-point filename. **Impact:** A typical AI may generate pytest-style tests or tests in a non-package `tests/` directory; Part 7 then runs only `unittest.defaultTestLoader.discover(...)` and deliberately fails when it collects zero tests. Because those jobs become required checks, Priya’s or Sam’s implementation PR cannot merge, stalling the walkthrough. Likewise, Part 10 assumes `services/integration/app.py`, although no earlier instruction requires that file, and direct script execution commonly fails for package imports even when integration tests pass. **Evidence:** Parts 4–5 say only “plus a unit test”; Part 7 hard-codes `unittest` discovery and zero-test failure; Part 10 uses `python services/integration/app.py` with “adjust to the entry point,” conceding that the documented command is not deterministic. The walkthrough should require discoverable `unittest.TestCase` files and a fixed package/entry-point contract, or make CI and launch commands detect and run the framework/layout actually generated.",
+          "category": "Completeness",
+          "severity": "Major"
+        }
+      ],
+      "nits": [
+        "`run_review.py` reads only `.github/CODEOWNERS`; GitHub also supports `CODEOWNERS` at the repository root and under `docs/`, so a valid repository using either location can receive a false missing-coverage finding.",
+        "The routed review output filename contains only the date, so a second review on the same day silently overwrites the first report.",
+        "The hotfix drill validates the exact tagged commit with only the greeter unit tests, not the integration or all-module suite, despite then deploying that exact snapshot.",
+        "After a failed fetch, the review script still prefers any existing `origin/main` over a potentially newer local `main`, despite describing the selected base as “the freshest main available”; the advisory cap limits the damage.",
+        "Repository files are appended directly to the routed prompt without explicitly instructing the model to treat their contents as untrusted evidence and ignore embedded instructions, leaving a prompt-injection hardening gap."
+      ],
+      "truncated": false,
+      "cost_usd": 0.2379,
+      "seconds": 173.1
+    },
+    {
+      "run": "d",
+      "model": "gemini-3-1-pro",
+      "excluded_providers": [
+        "anthropic",
+        "openai"
+      ],
+      "verdict": "VERIFIED",
+      "issues": [],
+      "nits": [],
+      "truncated": false,
+      "cost_usd": 0.0468,
+      "seconds": 85.4
+    }
+  ]
+}

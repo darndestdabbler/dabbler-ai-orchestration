@@ -71,7 +71,7 @@ STAMP_SOURCES = (STAMP_SOURCE_VERIFY_SESSION, STAMP_SOURCE_CLOSE_BACKSTOP)
 # template bumps this constant in the same change — the PINNED hash
 # registry below makes an unbumped edit fail closed rather than pass
 # accidentally.
-TEMPLATE_ID = "session-verification-v2"
+TEMPLATE_ID = "session-verification-v3"
 
 # The immutable id -> normalized-hash registry (I-084-S2-2): each
 # version id pins exactly one normalized content hash, recorded here at
@@ -87,10 +87,16 @@ TEMPLATE_HASHES = {
         "9d7c1f0cb474498187a2210076b8631dd3a0642a53375cea17e404088dfc45de"
     ),
     # Set 090: minted when the "Review scope" pre-close carve-out was added to
-    # verification.md (retiring the recurring circular category error). v1 is
-    # retained for historical rows; v2 is the active id.
+    # verification.md (retiring the recurring circular category error). v1/v2
+    # are retained for historical rows.
     "session-verification-v2": (
         "cd20129c39723a29c9903c9d92e6c36cf046824d4607a3b75f8cb4e0203ee3e1"
+    ),
+    # Set 096: minted when the operator's consequence-graded severity rubric
+    # (L-095-1, 2026-07-12) replaced the bare merge-decision anchor and the
+    # per-Issue "Failure scenario" line became mandatory. v3 is the active id.
+    "session-verification-v3": (
+        "3d3e946770b49bb7589e64e52db6b9cafbca22bf3ca05563a7bc781f99b8ad23"
     ),
 }
 
@@ -164,6 +170,11 @@ WORK_DIFF_BASE_EXCLUDES = (
 WORK_DIFF_SET_BOOKKEEPING = (
     "s*-verification*.md",
     "s*-issues*.json",
+    # Set 096: the per-round remediation-note sidecar the auto-assembled
+    # cross-round ledger reads (verify_session.remediation_note_path) —
+    # loop bookkeeping exactly like the issues envelopes it annotates. A
+    # note recorded after a clean final round must not stale the evidence.
+    "s*-remediation-round-*.md",
     "disposition.json",
     "session-events.jsonl",
     "session-state.json",

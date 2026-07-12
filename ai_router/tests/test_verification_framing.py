@@ -399,3 +399,109 @@ def test_parser_issue_set_unchanged_by_trailing_nits():
     assert any("off by one" in i["description"] for i in nits_issues), (
         "the real blocking issue must survive NITS parsing"
     )
+
+
+# --- Set 096: the consequence-graded severity rubric ------------------------
+#
+# Set 095 measured the failure mode the rubric retires: under an ungraded
+# "find issues" loop on an unbounded artifact surface, salience-limited
+# reviewers produced 17 non-converging rounds / 39 technically-real Majors;
+# the FIRST round graded by the operator's consequence rubric returned
+# VERIFIED (replicated). L-095-1 carried the rubric in per-session
+# conventions blocks until it shipped in the template; these pins make the
+# shipped rubric durable. Push-surface only (the pull template keeps its own
+# severity anchoring until a later set migrates it); the shared
+# MATERIALITY_PHRASES above stay pinned on BOTH surfaces.
+RUBRIC_PHRASES = [
+    'expected consequence of not fixing the finding',        # the rubric, named
+    'probability that the stated failure scenario actually materializes',
+    'low-probability or low-impact = minor, even when the observation is technically correct',
+    'a finding with no stated, plausible failure scenario is minor by definition',
+    'do not label hardening opportunities as major',
+    'probable, not merely possible',                          # Major requires probability justification
+    'failure scenario:',                                      # the mandatory per-Issue output line
+    'probable rather than merely possible',                   # ...and its probability wording
+]
+
+
+@pytest.mark.parametrize("phrase", RUBRIC_PHRASES)
+def test_push_template_carries_consequence_rubric(phrase: str):
+    """verification.md must carry the operator's consequence-graded severity
+    rubric (Set 096 / L-095-1) — severity = probability the stated failure
+    scenario materializes for a real user x material impact on the
+    deliverable's objectives."""
+    assert phrase.lower() in _norm(_push_text()), (
+        f"push verification template lost the consequence-rubric phrase "
+        f"{phrase!r}; without the rubric the verification loop reverts to "
+        "ungraded severity and stops converging (Set 095: 17 rounds / 39 "
+        "fresh Majors vs first-graded-round VERIFIED)."
+    )
+
+
+def test_rubric_keeps_anti_laundering_scoped_to_stated_scenarios():
+    """The anti-laundering escalation survives the rubric, but scoped: it
+    resolves doubt about a STATED scenario; it is never a license to skip
+    the scenario (a scenario you cannot state = Minor by definition)."""
+    text = _norm(_push_text())
+    assert 'no plausible path' in text
+    assert 'when in doubt, escalate' in text
+    assert 'never a license to skip the scenario' in text
+
+
+# --- Set 096: the failureScenario field's tolerant parse ---------------------
+
+
+def test_issue_block_failure_scenario_parsed():
+    """The 'Failure scenario:' line of an Issue block lands in the parsed
+    issue as failureScenario (tolerant of markdown emphasis)."""
+    verdict, issues = verification.parse_verification_response(
+        "ISSUES FOUND\n\n"
+        "- **Issue 1:** The gate fails open.\n"
+        "  - **Category:** Correctness\n"
+        "  - **Severity:** Major\n"
+        "  - **Failure scenario:** A remote-less consumer repo hits the "
+        "fallback and silently skips the gate; probable because the default "
+        "scaffold ships remote-less.\n"
+        "  - **Details:** violation / impact / evidence.\n"
+    )
+    assert verdict == "ISSUES_FOUND"
+    assert issues[0]["failureScenario"].startswith(
+        "A remote-less consumer repo"
+    )
+    assert "probable because" in issues[0]["failureScenario"]
+
+
+def test_failure_scenario_plain_punctuation_variants_parse():
+    verdict, issues = verification.parse_verification_response(
+        "ISSUES FOUND\n\n"
+        "Issue 1: Fallback bug.\n"
+        "Severity: Major\n"
+        "Failure scenario - the nightly job crashes on the first non-ASCII "
+        "payload.\n"
+    )
+    assert issues[0]["failureScenario"].startswith("the nightly job crashes")
+
+
+def test_failure_scenario_absent_leaves_no_key():
+    verdict, issues = verification.parse_verification_response(
+        "ISSUES FOUND\n\n"
+        "- **Issue 1:** The X path is off by one.\n"
+        "  - **Category:** Correctness\n"
+        "  - **Severity:** Major\n"
+    )
+    assert "failureScenario" not in issues[0]
+
+
+def test_failure_scenario_never_changes_blocking_classification():
+    """classify_blocking semantics are UNCHANGED by design (Set 096): the
+    scenario field is advisory context, never a blocking input."""
+    with_scenario = {
+        "description": "x", "severity": "Minor",
+        "failureScenario": "only under an adversarial self-inflicted state",
+    }
+    without_scenario = {"description": "x", "severity": "Minor"}
+    assert verification.is_blocking_issue(with_scenario) is False
+    assert verification.is_blocking_issue(without_scenario) is False
+    major = {"description": "x", "severity": "Major",
+             "failureScenario": "typical user hits it on the main path"}
+    assert verification.is_blocking_issue(major) is True

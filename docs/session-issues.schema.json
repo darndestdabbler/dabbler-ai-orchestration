@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dabbler.ai/schemas/session-issues.schema.json",
   "title": "SessionIssues",
-  "description": "Root-level structured verifier-findings artifact for one findings-bearing verification round. Written beside sN-verification.md as sN-issues.json (round 1) or sN-issues-round-<M>.json (later findings-bearing retries). This artifact has no runtime reader in the orchestration layer; it is durable, machine-readable persistence of the verifier's structured issue list. The presence of an sN-issues*.json file means that verification round found issues — VERIFIED rounds get no file. schemaVersion 1 (Set 055) keeps category/severity/resolution_status as loose strings. schemaVersion 2 (Set 057) promotes four optional finding fields (issueId, issueType, verificationMethod, suggestedTestOrCheck) and enum-enforces resolution_status + issueType when present; the fields stay advisory in semantics (no runtime gate reads them) — the enum is a spelling-drift guard. v1 files remain valid unchanged. See docs/session-issues-schema.md.",
+  "description": "Root-level structured verifier-findings artifact for one findings-bearing verification round. Written beside sN-verification.md as sN-issues.json (round 1) or sN-issues-round-<M>.json (later findings-bearing retries). This artifact has no runtime reader in the orchestration layer; it is durable, machine-readable persistence of the verifier's structured issue list. The presence of an sN-issues*.json file means that verification round found issues — VERIFIED rounds get no file. schemaVersion 1 (Set 055) keeps category/severity/resolution_status as loose strings. schemaVersion 2 (Set 057) promotes four optional finding fields (issueId, issueType, verificationMethod, suggestedTestOrCheck) and enum-enforces resolution_status + issueType when present; the fields stay advisory in semantics (no runtime gate reads them) — the enum is a spelling-drift guard. v1 files remain valid unchanged. Set 096 adds the optional verifier-emitted failureScenario string to the base issue object (both versions; additive, tolerant parse). See docs/session-issues-schema.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -71,6 +71,11 @@
         },
         "severity": {
           "type": "string"
+        },
+        "failureScenario": {
+          "description": "Optional verifier-emitted field (Set 096): the concrete failure scenario in which the finding's consequence materializes for a real user, with the probability justification the consequence-graded severity rubric requires. Parsed tolerantly from the 'Failure scenario:' line of an Issue block; its absence never changes blocking classification.",
+          "type": "string",
+          "minLength": 1
         },
         "resolution_status": {
           "description": "Advisory annotation: what the orchestrator did with this finding. Loose string under schemaVersion 1; enum-enforced under schemaVersion 2 (see IssueV2).",

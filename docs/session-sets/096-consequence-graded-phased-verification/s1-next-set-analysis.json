@@ -1,0 +1,23 @@
+```json
+{
+  "recommendation": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "effort": "medium",
+    "rationale": "Cheapest-capable model for moderate, well-defined coding, testing, and documentation tasks."
+  },
+  "runnerUp": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-8",
+    "effort": "medium",
+    "rationale": "A higher-capability option if the advisory critique or CLI logic exceeds Sonnet's reasoning."
+  },
+  "notes": [
+    "The cross-provider verification pool (openai, google) constrains the orchestrator to the anthropic provider.",
+    "The low-to-moderate design variance makes a high-end model like claude-fable-5 (used in S1) unnecessary and uneconomical for this session.",
+    "Effort is 'medium' due to the combination of new CLI code, tests, documentation restructure, and an end-to-end replay experiment."
+  ]
+}
+```

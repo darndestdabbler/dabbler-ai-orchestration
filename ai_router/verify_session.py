@@ -28,9 +28,16 @@ What it does, in order:
    -- L-064-9), and the complete unfiltered diff of the working tree vs
    ``--diff-base`` (default ``HEAD``), with generated-bundle exclusions
    (``dist/`` etc.) on by default and overridable.
-3. Fills ``ai_router/prompt-templates/verification.md`` (which carries
-   the structured verdict schema) and routes
-   ``task_type="session-verification"``. Set 084 (F2): the CLI resolves
+3. Auto-assembles the cross-round issue ledger (Set 096) from prior
+   rounds' ``sN-issues*.json`` and the orchestrator's
+   ``sN-remediation-round-<R>.md`` sidecars — settled vs unresolved
+   split by SETTLEMENT EVIDENCE, fail-closed — then fills
+   ``ai_router/prompt-templates/verification.md`` (which carries the
+   consequence-graded severity rubric and the structured verdict schema)
+   and routes ``task_type="session-verification"``. The hand-carried
+   ledger file is retired for the no-resurrection function;
+   ``--conventions-file`` remains for the suite baseline / release
+   contract / by-design scope. Set 084 (F2): the CLI resolves
    the session orchestrator's EFFECTIVE provider (registry lookup on
    the orchestrator block's model, via ``orchestrator_identity``) and
    passes it as a hard ``exclude_providers`` constraint -- the verifier
@@ -718,12 +725,243 @@ def load_verification_template() -> str:
     return path.read_text(encoding="utf-8")
 
 
+# ---------------------------------------------------------------------------
+# Cross-round issue ledger as machinery (Set 096)
+#
+# Set 095 carried the settled-points ledger by hand (a conventions-file
+# section the orchestrator re-edited every round) — 17 rounds of copy-carry.
+# The no-resurrection function is deterministic: prior rounds' findings live
+# in the immutable ``sN-issues*.json`` artifacts, and the orchestrator's
+# remediation story lives in a per-round sidecar. So ``verify_session`` now
+# ASSEMBLES the ledger itself from those records and prepends it to the
+# prompt. ``--conventions-file`` stays for what genuinely needs hand
+# authorship: the suite baseline, release contract, and by-design scope.
+# ---------------------------------------------------------------------------
+
+# Per-field render caps: the ledger is a settled-points INDEX, not a replay
+# of every round's prose. Oversized fields truncate with an explicit marker
+# (never silently), and the immutable artifacts remain the full record.
+_LEDGER_DESCRIPTION_CAP = 700
+_LEDGER_SCENARIO_CAP = 300
+_LEDGER_NOTE_CAP = 2000
+
+# The resolution_status values that COUNT as settlement evidence (see the
+# docs/session-issues-schema.md v2 enum). ``needs-more-context`` and
+# ``escalate-human`` are explicitly OPEN states, and an unrecognized value
+# proves nothing — both render as unresolved (fail closed: no-resurrection
+# framing is never applied to a finding whose settlement is unproven).
+_SETTLED_RESOLUTION_STATUSES = frozenset({
+    "fixed",
+    "not-reproducible",
+    "accepted-risk",
+    "accepted-consequence",
+    "advisory-disagreement",
+})
+
+
+def remediation_note_path(
+    session_set_dir: Path, session_number: int, round_number: int
+) -> Path:
+    """The orchestrator's remediation-note sidecar for *round_number*.
+
+    Written (free-form markdown) AFTER remediating that round's findings and
+    BEFORE the next round routes. A NON-EMPTY sidecar is the orchestrator's
+    settlement assertion for the round's status-less findings — without it
+    (or a settling per-issue ``resolution_status``) the next round's ledger
+    renders them UNRESOLVED and instructs the verifier to re-evaluate them.
+    Loop bookkeeping, not reviewed work — excluded from the work-diff
+    freshness binding like the ``sN-issues*.json`` files it annotates.
+    """
+    return session_set_dir / (
+        f"s{session_number}-remediation-round-{round_number}.md"
+    )
+
+
+def _squash(text: str, cap: int) -> str:
+    """Whitespace-collapse *text* and truncate at *cap* with an explicit
+    marker (a ledger entry is an index line, never a silent elision)."""
+    flat = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(flat) <= cap:
+        return flat
+    return flat[:cap].rstrip() + " ...[truncated -- see the round artifact]"
+
+
+def _render_ledger_issue(issue: dict) -> List[str]:
+    """The index lines for one prior-round finding."""
+    severity = str(issue.get("severity") or "unrated").strip()
+    issue_id = str(issue.get("issueId") or "").strip()
+    id_note = f" (id: {issue_id})" if issue_id else ""
+    status = str(issue.get("resolution_status") or "").strip()
+    status_note = f" [resolution: {status}]" if status else ""
+    lines = [
+        f"- [{severity}]{id_note}{status_note} "
+        + _squash(issue.get("description"), _LEDGER_DESCRIPTION_CAP)
+    ]
+    scenario = issue.get("failureScenario")
+    if scenario:
+        lines.append(
+            "  - Failure scenario: " + _squash(scenario, _LEDGER_SCENARIO_CAP)
+        )
+    return lines
+
+
+def assemble_cross_round_ledger(
+    session_set_dir: Path, session_number: int, current_round: int
+) -> str:
+    """Auto-assemble the cross-round issue ledger from prior rounds' artifacts.
+
+    For every round before *current_round*, reads the round's
+    ``sN-issues*.json`` findings envelope (when the round bore findings) and
+    the orchestrator's ``sN-remediation-round-<R>.md`` sidecar (when
+    written), and renders the ledger block the prompt builder prepends to
+    the Original Task. Returns ``""`` when there is nothing to carry
+    (round 1, or no prior findings/notes).
+
+    **No-resurrection framing must be EARNED** (S1 verification round 1's
+    own Major, fixed fail-closed): an issues artifact proves a finding was
+    *reported*, never that it was settled. A prior finding renders as
+    SETTLED only with settlement evidence — an explicit per-issue
+    ``resolution_status`` in :data:`_SETTLED_RESOLUTION_STATUSES` (which
+    takes precedence when present), or, for status-less issues, a NON-EMPTY
+    remediation-note sidecar for that round (the sidecar is the
+    orchestrator's settlement assertion for the round's findings). Every
+    other prior finding renders under an UNRESOLVED block that instructs
+    the verifier to re-evaluate it — re-raising an unsettled point is not
+    resurrection, and the ledger must never suppress an unremediated
+    defect.
+
+    An unreadable artifact is reported EXPLICITLY under the UNRESOLVED
+    framing (a parse failure is not settlement evidence); the immutable
+    artifacts on disk stay the full record.
+    """
+    settled_sections: List[str] = []
+    unresolved_sections: List[str] = []
+    for prior_round in range(1, current_round):
+        settled_lines: List[str] = []
+        unresolved_lines: List[str] = []
+
+        note_path = remediation_note_path(
+            session_set_dir, session_number, prior_round
+        )
+        note_text = ""
+        note_present = note_path.exists()
+        if note_present:
+            try:
+                note_text = note_path.read_text(encoding="utf-8").strip()
+            except OSError:
+                note_text = ""
+        round_has_settlement_note = bool(note_text)
+
+        issues_path = issues_artifact_path(
+            session_set_dir, session_number, prior_round
+        )
+        if issues_path.exists():
+            try:
+                envelope = json.loads(issues_path.read_text(encoding="utf-8"))
+                issues = [
+                    i for i in (envelope.get("issues") or [])
+                    if isinstance(i, dict)
+                ]
+                verdict = str(
+                    envelope.get("verificationVerdict") or "(unrecorded)"
+                )
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                unresolved_lines.append(
+                    f"- issues artifact `{issues_path.name}` is unreadable "
+                    "-- consult it directly and RE-EVALUATE its findings "
+                    "against the current evidence (a parse failure is not "
+                    "settlement evidence)."
+                )
+            else:
+                for issue in issues:
+                    status = (
+                        str(issue.get("resolution_status") or "")
+                        .strip()
+                        .lower()
+                    )
+                    if status:
+                        settled = status in _SETTLED_RESOLUTION_STATUSES
+                    else:
+                        settled = round_has_settlement_note
+                    (settled_lines if settled else unresolved_lines).extend(
+                        _render_ledger_issue(issue)
+                    )
+                header_line = (
+                    f"Verdict: {verdict} -- {len(issues)} finding(s) "
+                    "this round."
+                )
+                if settled_lines:
+                    settled_lines.insert(0, header_line)
+                if unresolved_lines:
+                    unresolved_lines.insert(0, header_line)
+
+        if note_text:
+            (settled_lines if (settled_lines or not unresolved_lines)
+             else unresolved_lines).append(
+                f"Remediation notes (round {prior_round}): "
+                + _squash(note_text, _LEDGER_NOTE_CAP)
+            )
+        elif note_present:
+            unresolved_lines.append(
+                f"Remediation-note sidecar `{note_path.name}` is EMPTY or "
+                "unreadable -- it is not settlement evidence; consult it "
+                "directly."
+            )
+
+        if settled_lines:
+            settled_sections.append(
+                f"**Round {prior_round}**\n" + "\n".join(settled_lines)
+            )
+        if unresolved_lines:
+            unresolved_sections.append(
+                f"**Round {prior_round}**\n" + "\n".join(unresolved_lines)
+            )
+
+    if not settled_sections and not unresolved_sections:
+        return ""
+
+    parts: List[str] = [
+        "#### Cross-round issue ledger (auto-assembled from prior rounds' "
+        "artifacts)\n\n"
+        "Findings from this session's PRIOR verification rounds. New "
+        "findings must be NEW defects, material under the severity rubric, "
+        "in the artifacts as they now stand."
+    ]
+    if settled_sections:
+        parts.append(
+            "##### Settled points -- do not resurrect\n\n"
+            "Every entry below carries SETTLEMENT EVIDENCE (an "
+            "orchestrator remediation note for the round, or an explicit "
+            "per-finding resolution status). A settled point never reopens "
+            "under fresh wording -- re-raising one (in any wording) is a "
+            "review error. The one exception: if the REMEDIATION itself is "
+            "defective in the evidence as it now stands, say so "
+            "explicitly, name the round and finding you are challenging, "
+            "and present the new evidence.\n\n"
+            + "\n\n".join(settled_sections)
+        )
+    if unresolved_sections:
+        parts.append(
+            "##### Prior findings WITHOUT settlement evidence -- NOT "
+            "settled\n\n"
+            "The entries below were reported in a prior round but carry NO "
+            "settlement evidence (no remediation note for the round, no "
+            "settling resolution status). Do NOT treat them as settled: "
+            "re-evaluate each against the evidence as it now stands. If "
+            "one is fixed, say so; if it persists, RE-RAISE it -- "
+            "re-raising an unsettled point is not resurrection.\n\n"
+            + "\n\n".join(unresolved_sections)
+        )
+    return "\n\n".join(parts)
+
+
 def build_prompt(
     evidence: EvidenceBundle,
     session_number: int,
     round_number: int,
     conventions: str = "",
     template: Optional[str] = None,
+    ledger: str = "",
 ) -> str:
     """Fill the verification template with the session's evidence.
 
@@ -731,6 +969,11 @@ def build_prompt(
     up-front conventions block the guidance requires session-verification
     prompts to open with (suite baseline, release contract, by-design
     exclusions) -- it rides at the top of the Original Task slot.
+
+    ``ledger`` (Set 096, auto-assembled by
+    :func:`assemble_cross_round_ledger`) is the settled-points cross-round
+    issue ledger; it rides directly after the conventions block so the
+    no-resurrection rule is in front of the verifier before the work.
     """
     if template is None:
         template = load_verification_template()
@@ -740,6 +983,8 @@ def build_prompt(
             "#### Conventions and baseline (read first)\n\n"
             + conventions.strip()
         )
+    if ledger.strip():
+        task_parts.append(ledger.strip())
     task_parts.append(
         f"Session {session_number} of the active session set "
         f"(verification round {round_number}). This is a **pre-close** review "
@@ -1154,8 +1399,17 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             )
             return EXIT_USAGE
 
+    # -- Set 096: the settled-points cross-round ledger is machinery, not a
+    #    hand-carried conventions section. Assembled from prior rounds'
+    #    immutable sN-issues*.json + the orchestrator's remediation-note
+    #    sidecars; empty on round 1 / no prior findings.
+    ledger = assemble_cross_round_ledger(
+        session_set_dir, session_number, round_number
+    )
+
     prompt = build_prompt(
-        evidence, session_number, round_number, conventions=conventions
+        evidence, session_number, round_number, conventions=conventions,
+        ledger=ledger,
     )
 
     review_path = verification_artifact_path(
@@ -1244,6 +1498,8 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         print(f"  diff exclusions:    {', '.join(excludes) or '(none)'}")
         print(f"  evidence diff:      {len(evidence.diff)} chars")
         print(f"  git status lines:   {len(evidence.git_status.splitlines())}")
+        print(f"  cross-round ledger: "
+              f"{f'{len(ledger)} chars (auto-assembled)' if ledger else '(empty -- no prior findings)'}")
         print(f"  prompt size:        {len(prompt)} chars")
         print(f"  would write:        {review_path.name}"
               f" (+ {issues_path.name} if findings)")
@@ -1359,6 +1615,8 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
     print(f"verify_session: session {session_number}, round {round_number}")
     print(f"  excluded providers: {', '.join(exclude_providers)} "
           f"(orchestrator effective provider via {identity.source})")
+    print(f"  cross-round ledger: "
+          f"{f'{len(ledger)} chars (auto-assembled)' if ledger else '(empty -- no prior findings)'}")
     print(f"  verifier model:     {result.model_name}")
     print(f"  verdict:            {verdict}")
     print(f"  blocking:           {'YES' if classification.blocking else 'no'}"

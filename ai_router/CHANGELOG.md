@@ -3,6 +3,52 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] — consequence-graded severity + cross-round ledger machinery (Set 096 S1)
+
+> Makes the Set 095 verification-churn fix durable and framework-level.
+> Evidence: Set 095's loop (17 non-converging rounds / 39 fresh Majors under
+> the ungraded prompt; VERIFIED on the first round graded by the operator's
+> consequence rubric, replicated). Publish stays operator-gated.
+
+### Changed
+
+- **(Set 096) The verification template grades severity by EXPECTED
+  CONSEQUENCE.** `ai_router/prompt-templates/verification.md`'s "Severity
+  anchoring" section now carries the operator's consequence rubric (L-095-1,
+  2026-07-12): severity = probability the stated failure scenario materializes
+  for a real user × material impact on the deliverable's objectives;
+  low-probability OR low-impact = Minor even when technically correct; **a
+  finding with no stated, plausible failure scenario is Minor by definition**.
+  Every blocking Issue must now carry a mandatory **`Failure scenario:`** line
+  with a probability justification. The merge-decision anchor and the
+  anti-laundering escalation are preserved, subordinated to (and scoped by)
+  the rubric; the adversarial framing, materiality triad, and NITS grammar are
+  untouched. Template version bumped: `TEMPLATE_ID = session-verification-v3`,
+  new pinned hash in `TEMPLATE_HASHES` (v1/v2 retained for historical rows).
+- **(Set 096) The parser recognizes the optional `failureScenario` field.**
+  `parse_verification_response` tolerantly extracts the `Failure scenario:`
+  line of an Issue block into `issue["failureScenario"]`; the field flows
+  verbatim into `sN-issues*.json` (schema + doc updated, both schema versions,
+  additive). `classify_blocking` semantics are unchanged by design.
+- **(Set 096) The cross-round settled-points ledger is now machinery.**
+  `verify_session` auto-assembles the ledger from prior rounds' immutable
+  `sN-issues*.json` plus a new per-round orchestrator remediation-note sidecar
+  (`sN-remediation-round-<R>.md`) and prepends it to the verification prompt —
+  retiring the hand-carried ledger file for the no-resurrection function
+  (`--conventions-file` remains for the suite baseline / release contract /
+  by-design scope). **No-resurrection framing is earned, never assumed**
+  (this session's own round-1 verification Major, fixed fail-closed): a
+  prior finding renders as SETTLED only with settlement evidence — a
+  settling per-issue `resolution_status`, or a non-empty remediation
+  sidecar for the round — and every other prior finding renders under an
+  UNRESOLVED block instructing the verifier to re-evaluate it (re-raising
+  an unsettled point is not resurrection). Unreadable artifacts are
+  reported explicitly under the UNRESOLVED framing; oversized entries
+  truncate with an explicit marker. The sidecar
+  joins `WORK_DIFF_SET_BOOKKEEPING` (loop bookkeeping, like the issues
+  envelopes it annotates), so a note recorded after a clean final round cannot
+  stale the close evidence.
+
 ## [Unreleased] — verifier pre-close review scope (Set 090)
 
 > Stacks on Sets 089/0.32.0. Retires a recurring verifier **category error**

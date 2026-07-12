@@ -247,6 +247,114 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
   }
 });
 
+// Set 093 Session 2 (verdict amendments 1 + 2): the module-row action
+// strip. Asserts what the operator sees: declared + pseudo modules carry a
+// hover/focus-revealed toolbar; a fallback module carries none; the pseudo
+// `Unassigned` module adds the `Assign legacy sets…` affordance; the strip
+// buttons are NOT treeitems (excluded from the tree's arrow nav and name);
+// and focusing a module makes its strip the one Tab-reachable secondary
+// tabstop (routed ruling D3, s2-targeting-seam-architecture.json).
+test("module rows carry a hover/focus-revealed action strip; fallback has none; Unassigned adds Assign", async () => {
+  const per: PerTest = {};
+  try {
+    per.tmpPath = makeTmpDir("dabbler-pw-modstrip");
+    const a = makeSet(per.tmpPath, "093-clock-widget", 2);
+    const b = makeAdditionalSet(a, "093-greeter-core", 2);
+    const d = makeAdditionalSet(a, "093-loose-end", 2);
+    const e = makeAdditionalSet(a, "093-undeclared", 2);
+    stampModule(a, "clock");
+    stampModule(b, "greeter");
+    stampModule(e, "not-in-manifest");
+    void d; // deliberately unlabeled → the pseudo Unassigned module
+    fs.writeFileSync(
+      path.join(a.repo_root, "docs", "modules.yaml"),
+      MODULES_YAML,
+      "utf8",
+    );
+
+    per.launch = await launchVSCode(a.repo_root);
+    const inner = await openSessionSetsView(per.launch.page);
+    await triggerRefresh(per.launch.page);
+
+    const tree = inner.getByTestId("work-explorer-tree");
+    await expect(tree).toBeVisible({ timeout: 30_000 });
+
+    // Declared module: a role=toolbar strip of four actions, HIDDEN until
+    // the header/strip is hovered or the module holds focus.
+    const greeterModule = inner.getByTestId("module-declared-greeter");
+    const strip = greeterModule.locator("> .module-action-strip");
+    await expect(strip).toHaveCount(1);
+    await expect(strip).toHaveAttribute("role", "toolbar");
+    await expect(strip.locator(".module-action")).toHaveCount(4);
+    // The buttons are NOT treeitems — excluded from the tree name + arrow nav.
+    await expect(strip.locator('[role="treeitem"]')).toHaveCount(0);
+    // The module treeitem's accessible name still points only at the header.
+    await expect(greeterModule).toHaveAttribute(
+      "aria-labelledby",
+      /^module-declared-greeter$/,
+    );
+    await expect(strip).toBeHidden();
+    await greeterModule.locator(".module-header").hover();
+    await expect(strip).toBeVisible();
+
+    // Fallback module: NO strip (the undeclared-slug warning owns remediation).
+    const fallback = inner.getByTestId("module-fallback-not-in-manifest");
+    await expect(fallback.locator("> .module-action-strip")).toHaveCount(0);
+
+    // Pseudo `Unassigned` module: the four actions PLUS `Assign legacy sets`.
+    const pseudo = inner.getByTestId("module-pseudo-default");
+    await expect(pseudo.locator(".module-title")).toHaveText("Unassigned");
+    const pseudoStrip = pseudo.locator("> .module-action-strip");
+    await expect(pseudoStrip.locator(".module-action")).toHaveCount(5);
+    await expect(
+      pseudoStrip.locator('[data-module-action="assign-legacy"]'),
+    ).toHaveCount(1);
+
+    // Keyboard: focusing the module makes its strip's first button the one
+    // Tab-reachable secondary tabstop (roving anchor); other strips stay off
+    // the tab order.
+    const page = per.launch.page;
+    await greeterModule.focus();
+    await expect(strip.locator(".module-action").first()).toHaveAttribute(
+      "tabindex",
+      "0",
+    );
+    await expect(
+      pseudoStrip.locator(".module-action").first(),
+    ).toHaveAttribute("tabindex", "-1");
+    // Tab from the focused module lands on its strip; ArrowRight roves
+    // within. Keys go to whatever holds focus (page.keyboard) — pressing on
+    // the module locator would re-focus the module and defeat the check.
+    await page.keyboard.press("Tab");
+    await expect(strip.locator(".module-action").first()).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    await expect(strip.locator(".module-action").nth(1)).toBeFocused();
+    // Escape returns focus to the module treeitem.
+    await page.keyboard.press("Escape");
+    await expect(greeterModule).toBeFocused();
+
+    // Set 093 S2 (verification R7 fix): a POINTER click on ANOTHER module's
+    // strip button makes THAT button the sole roving anchor and its module the
+    // active tree row — no stale anchor left in the previously-focused strip,
+    // and Shift+Tab returns to the clicked module.
+    const clockModule = inner.getByTestId("module-declared-clock");
+    const clockStrip = clockModule.locator("> .module-action-strip");
+    await clockModule.locator(".module-header").hover();
+    const clockAiPlan = clockStrip.locator('[data-module-action="ai-plan"]');
+    await clockAiPlan.click();
+    await expect(clockAiPlan).toBeFocused();
+    await expect(clockAiPlan).toHaveAttribute("tabindex", "0");
+    // The previously-focused greeter strip has NO stale anchor.
+    await expect(strip.locator('.module-action[tabindex="0"]')).toHaveCount(0);
+    // clock is now the tree tabstop; Shift+Tab off the button returns to it.
+    await expect(clockModule).toHaveAttribute("tabindex", "0");
+    await page.keyboard.press("Shift+Tab");
+    await expect(clockModule).toBeFocused();
+  } finally {
+    await teardown(per);
+  }
+});
+
 test("invalid manifest pins System Status and retains the last-known-good tree until repair", async () => {
   const per: PerTest = {};
   try {

@@ -81,24 +81,52 @@ function defaultUi(): PlanImportUi {
 }
 
 /**
+ * Set 093 S2 (routed ruling D1): an explicit module target from a
+ * row/context invocation. When present, the picker is bypassed — see
+ * {@link PickModuleForAuthoringOptions}. Absent → today's interactive
+ * behavior (palette QuickPick / auto-select notice).
+ */
+export interface PlanAuthoringOptions {
+  preselectedSlug?: string;
+}
+
+/**
  * Resolve which plan this flow targets (Set 087 S3, ruling Q4): the
  * picked module's plan when ``docs/modules.yaml`` names modules (one
  * module auto-selects with a notice; Esc on the picker cancels the whole
  * flow), the repo-level plan otherwise. ``null`` = cancelled.
+ *
+ * Set 093 S2: with ``opts.preselectedSlug`` the module is implied by the
+ * clicked row — no QuickPick, no auto-select notice (`""` → repo-level;
+ * a declared slug → that module; an unresolvable slug → abort).
  */
 async function resolvePlanTarget(
   root: string | undefined,
   ui: PlanImportUi,
+  opts?: PlanAuthoringOptions,
 ): Promise<{ entry: ModuleManifestEntry | null; destPosix: string } | null> {
   if (!root) return { entry: null, destPosix: PLAN_DEST_POSIX };
-  const pick = await pickModuleForAuthoring(root, {
-    showQuickPick: ui.showQuickPick,
-    showInformationMessage: ui.showInformationMessage,
-    showErrorMessage: ui.showErrorMessage,
-  });
-  // S3 verification R1: invalid-manifest aborts like a cancel (the picker
-  // already showed the error) — never the silent repo-level fallback.
-  if (pick.kind === "cancelled" || pick.kind === "invalid-manifest") return null;
+  const pick = await pickModuleForAuthoring(
+    root,
+    {
+      showQuickPick: ui.showQuickPick,
+      showInformationMessage: ui.showInformationMessage,
+      showErrorMessage: ui.showErrorMessage,
+    },
+    opts && opts.preselectedSlug !== undefined
+      ? { preselectedSlug: opts.preselectedSlug }
+      : undefined,
+  );
+  // S3 verification R1 + Set 093 S2 D1: invalid-manifest / unknown-module
+  // abort like a cancel (the picker already showed the error) — never the
+  // silent repo-level fallback.
+  if (
+    pick.kind === "cancelled" ||
+    pick.kind === "invalid-manifest" ||
+    pick.kind === "unknown-module"
+  ) {
+    return null;
+  }
   return {
     entry: pick.entry,
     destPosix: pick.entry ? modulePlanRelPath(pick.entry) : PLAN_DEST_POSIX,
@@ -106,8 +134,11 @@ async function resolvePlanTarget(
 }
 
 /** Copy the plan-authoring prompt to the clipboard (step-2 "OR" path). */
-export async function copyPlanningPrompt(ui: PlanImportUi = defaultUi()): Promise<void> {
-  const target = await resolvePlanTarget(ui.workspaceRoot(), ui);
+export async function copyPlanningPrompt(
+  ui: PlanImportUi = defaultUi(),
+  opts?: PlanAuthoringOptions,
+): Promise<void> {
+  const target = await resolvePlanTarget(ui.workspaceRoot(), ui, opts);
   if (!target) return; // module picker cancelled
   await ui.writeClipboard(buildPlanningPrompt(target.entry, target.destPosix));
   void ui.showInformationMessage(
@@ -123,12 +154,15 @@ export async function copyPlanningPrompt(ui: PlanImportUi = defaultUi()): Promis
  * 087 S3, ruling Q4). Returns true when a plan was written (so callers
  * can refresh live state), false on cancel / error.
  */
-export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promise<boolean> {
+export async function importPlanFromFile(
+  ui: PlanImportUi = defaultUi(),
+  opts?: PlanAuthoringOptions,
+): Promise<boolean> {
   // The module pick needs a root; the no-root ERROR stays after the file
   // dialog (pre-087 order) so a cancelled dialog is a quiet false, never
   // an error toast.
   const root = ui.workspaceRoot();
-  const target = await resolvePlanTarget(root, ui);
+  const target = await resolvePlanTarget(root, ui, opts);
   if (!target) return false; // module picker cancelled
 
   const picked = await ui.showOpenDialog({
@@ -197,6 +231,59 @@ export async function importPlanFromFile(ui: PlanImportUi = defaultUi()): Promis
   return true;
 }
 
+/**
+ * Set 093 S2 (`Open Plan` row action): open the module's plan in an
+ * editor. Resolves the target the same way as the plan flows — the
+ * declared module's `planPath`, or the repo-level plan for a pseudo row
+ * (`opts.preselectedSlug === ""`). When the plan does not exist yet, offer
+ * to import one (its state already shows "missing" on the Plan child node).
+ */
+export async function openModulePlan(
+  ui: PlanImportUi = defaultUi(),
+  opts?: PlanAuthoringOptions,
+): Promise<void> {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    void ui.showErrorMessage("No workspace folder is open.");
+    return;
+  }
+  const target = await resolvePlanTarget(root, ui, opts);
+  if (!target) return; // cancelled / invalid-manifest / unknown-module
+
+  const destPath = path.join(root, ...target.destPosix.split("/"));
+  // Containment guard mirroring importPlanFromFile (the plan path can
+  // derive from repository-controlled manifest config).
+  const containment = path.relative(path.resolve(root), path.resolve(destPath));
+  if (
+    containment === "" ||
+    containment.startsWith("..") ||
+    path.isAbsolute(containment)
+  ) {
+    void ui.showErrorMessage(
+      `Refusing to open outside the workspace: ${target.destPosix}`,
+    );
+    return;
+  }
+  if (!fs.existsSync(destPath)) {
+    const action = await ui.showWarningMessage(
+      `No plan found at ${target.destPosix}. Import one first?`,
+      "Import Plan",
+    );
+    if (action === "Import Plan") {
+      // R9 fix (Major): carry the ALREADY-resolved module into the import so
+      // the palette path performs ONE module selection — otherwise a
+      // palette invocation (opts undefined) would re-pick via QuickPick and
+      // could import into a DIFFERENT module than the one Open Plan named
+      // (a wrong-destination write). A row/context path already carries opts.
+      const importOpts: PlanAuthoringOptions =
+        opts ?? { preselectedSlug: target.entry ? target.entry.slug : "" };
+      await importPlanFromFile(ui, importOpts);
+    }
+    return;
+  }
+  await ui.executeCommand("vscode.open", vscode.Uri.file(destPath));
+}
+
 export function registerPlanImportCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("dabbler.importPlan", async () => {
@@ -215,5 +302,14 @@ export function registerPlanImportCommand(context: vscode.ExtensionContext): voi
       }
       await importPlanFromFile();
     })
+  );
+  // Set 093 S2 (verification R2 Major): the `Open Plan` action's Command
+  // Palette mirror. Like the other palette commands it keeps the module
+  // QuickPick (no preselect) so keyboard-driven use picks the module; the
+  // row/context strip supplies the module directly.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("dabbler.openModulePlan", async () => {
+      await openModulePlan();
+    }),
   );
 }

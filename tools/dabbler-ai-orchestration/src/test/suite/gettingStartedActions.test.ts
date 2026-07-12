@@ -37,7 +37,12 @@ import {
   findUnsubstitutedTokens,
 } from "../../utils/consumerBootstrap";
 import { buildSessionGenPrompt } from "../../wizard/sessionGenPrompt";
-import { PlanImportUi, copyPlanningPrompt, importPlanFromFile } from "../../wizard/planImport";
+import {
+  PlanImportUi,
+  copyPlanningPrompt,
+  importPlanFromFile,
+  openModulePlan,
+} from "../../wizard/planImport";
 import { GettingStartedActionMsg } from "../../types/sessionSetsWebviewProtocol";
 
 function canonicalBundleDir(): string {
@@ -785,6 +790,67 @@ suite("planImport — module-aware targeting (Set 087 S3)", () => {
     }
   });
 
+  // Set 093 S2 (routed ruling D1): a row/context invocation carries its
+  // module — copyPlanningPrompt must target that module WITHOUT ever opening
+  // the QuickPick, even when the manifest holds >= 2 modules.
+  test("copyPlanningPrompt: a preselected module targets its plan with NO QuickPick (row path)", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-preselect-", TWO_MODULES);
+    let quickPickCalls = 0;
+    try {
+      await copyPlanningPrompt(
+        makeUi(
+          {
+            workspaceRoot: () => root,
+            showQuickPick: async () => {
+              quickPickCalls++;
+              return undefined;
+            },
+          },
+          log,
+        ),
+        { preselectedSlug: "clock" },
+      );
+      assert.strictEqual(quickPickCalls, 0, "no module QuickPick on a row path");
+      assert.strictEqual(log.clipboard.length, 1);
+      assert.ok(log.clipboard[0].includes("docs/plans/clock.md"));
+      assert.ok(log.clipboard[0].includes('the "Clock" module'));
+      // No auto-select notice either — only the copied-confirmation toast.
+      assert.strictEqual(log.infos.length, 1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2 (routed ruling D2): a pseudo row's `preselectedSlug: ""` is
+  // repo-level — the module-less plan, no QuickPick even with >= 2 modules.
+  test("copyPlanningPrompt: empty preselect ('') is repo-level with NO QuickPick (pseudo row)", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-preselect-empty-", TWO_MODULES);
+    let quickPickCalls = 0;
+    try {
+      await copyPlanningPrompt(
+        makeUi(
+          {
+            workspaceRoot: () => root,
+            showQuickPick: async () => {
+              quickPickCalls++;
+              return undefined;
+            },
+          },
+          log,
+        ),
+        { preselectedSlug: "" },
+      );
+      assert.strictEqual(quickPickCalls, 0);
+      assert.strictEqual(log.clipboard.length, 1);
+      assert.ok(log.clipboard[0].includes("docs/planning/project-plan.md"));
+      assert.ok(!log.clipboard[0].includes("module"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("importPlanFromFile: the picked module's planPath is the destination", async () => {
     const log = freshLog();
     const root = moduleRoot("gs-mod-import-", TWO_MODULES);
@@ -815,6 +881,71 @@ suite("planImport — module-aware targeting (Set 087 S3)", () => {
       assert.ok(log.infos.some((m) => m.includes("docs/plans/clock.md")));
     } finally {
       fs.rmSync(src, { force: true });
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2 verification R2 (Major): `Open Plan` must have a Command
+  // Palette mirror — the palette path resolves the selected module via the
+  // QuickPick and opens ITS plan file.
+  test("openModulePlan (palette path): the QuickPicked module's plan opens", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-openplan-", TWO_MODULES);
+    // Materialize the clock module's plan so open (not the import fallback)
+    // fires.
+    const clockPlan = path.join(root, "docs", "plans", "clock.md");
+    fs.mkdirSync(path.dirname(clockPlan), { recursive: true });
+    fs.writeFileSync(clockPlan, "# clock plan\n");
+    try {
+      await openModulePlan(
+        makeUi(
+          {
+            workspaceRoot: () => root,
+            showQuickPick: async (items) => items[1], // clock
+          },
+          log,
+        ),
+      );
+      const opened = log.opened.find((o) => o.command === "vscode.open");
+      assert.ok(opened, "vscode.open must fire");
+      const uri = opened!.args[0] as { fsPath: string };
+      assert.ok(uri.fsPath.endsWith(path.join("docs", "plans", "clock.md")));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2: the row-path Open Plan carries its module (no QuickPick).
+  test("openModulePlan (row path): a preselected module opens its plan with NO QuickPick", async () => {
+    const log = freshLog();
+    const root = moduleRoot("gs-mod-openplan-row-", TWO_MODULES);
+    const clockPlan = path.join(root, "docs", "plans", "clock.md");
+    fs.mkdirSync(path.dirname(clockPlan), { recursive: true });
+    fs.writeFileSync(clockPlan, "# clock plan\n");
+    let quickPickCalls = 0;
+    try {
+      await openModulePlan(
+        makeUi(
+          {
+            workspaceRoot: () => root,
+            showQuickPick: async () => {
+              quickPickCalls++;
+              return undefined;
+            },
+          },
+          log,
+        ),
+        { preselectedSlug: "clock" },
+      );
+      assert.strictEqual(quickPickCalls, 0);
+      const opened = log.opened.find((o) => o.command === "vscode.open");
+      assert.ok(opened, "vscode.open must fire");
+      assert.ok(
+        (opened!.args[0] as { fsPath: string }).fsPath.endsWith(
+          path.join("docs", "plans", "clock.md"),
+        ),
+      );
+    } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });

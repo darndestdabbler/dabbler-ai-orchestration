@@ -299,6 +299,7 @@ sets per the rules above.`;
 export async function copySessionSetGenPrompt(
   context: vscode.ExtensionContext,
   options: SessionGenPromptOptions = {},
+  pickOpts?: { preselectedSlug?: string },
 ): Promise<boolean> {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
@@ -312,14 +313,30 @@ export async function copySessionSetGenPrompt(
   // No-manifest repos resolve to "none" and keep today's flow unchanged;
   // an Esc on the picker cancels the whole copy (never a silent fallback
   // to the repo-level plan).
-  const modulePick = await pickModuleForAuthoring(root, {
-    showQuickPick: (items, opts) => vscode.window.showQuickPick(items, opts),
-    showInformationMessage: (m) => vscode.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode.window.showErrorMessage(m),
-  });
-  // S3 verification R1: a PRESENT-but-invalid manifest aborts (the picker
-  // already showed the error) — never the silent repo-level fallback.
-  if (modulePick.kind === "cancelled" || modulePick.kind === "invalid-manifest") {
+  //
+  // Set 093 S2 (routed ruling D1): the `AI Sets` row/context action passes
+  // `pickOpts.preselectedSlug` — the module is implied by the clicked row,
+  // so NO QuickPick and NO auto-select notice fires (`""` → repo-level for a
+  // pseudo row). The palette command passes nothing and keeps today's flow.
+  const modulePick = await pickModuleForAuthoring(
+    root,
+    {
+      showQuickPick: (items, opts) => vscode.window.showQuickPick(items, opts),
+      showInformationMessage: (m) => vscode.window.showInformationMessage(m),
+      showErrorMessage: (m) => vscode.window.showErrorMessage(m),
+    },
+    pickOpts && pickOpts.preselectedSlug !== undefined
+      ? { preselectedSlug: pickOpts.preselectedSlug }
+      : undefined,
+  );
+  // S3 verification R1 + Set 093 S2 D1: a PRESENT-but-invalid manifest OR an
+  // unresolvable preselected module aborts (the picker already showed the
+  // error) — never the silent repo-level fallback.
+  if (
+    modulePick.kind === "cancelled" ||
+    modulePick.kind === "invalid-manifest" ||
+    modulePick.kind === "unknown-module"
+  ) {
     return false;
   }
   const moduleOpt = modulePick.entry

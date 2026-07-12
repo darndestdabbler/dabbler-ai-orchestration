@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Module-action protocol validation fails open and can silently target the repository-level plan**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Location:** `src/providers/CustomSessionSetsView.ts` → `handleModuleAction()` and `showModuleContextMenu()`\n  - **Violation:** The authoritative D3 ruling requires: “Host narrows all three fields … unknown ⇒ drop + log,” with `moduleKind` treated as an untrusted cross-check. It also requires stale or malformed module targeting to fail loudly rather than fall back to the repository plan.\n  - **Impact:** A malformed message such as `{action:\"import-plan\", moduleKind:\"declared\", moduleSlug:null}` is accepted. The host coerces the slug to `\"\"`, which `pickModuleForAuthoring` deliberately interprets as the pseudo repository-level target. The import can therefore write `docs/planning/project-plan.md` instead of a module plan—the exact wrong-destination failure this seam was designed to prevent. The host also accepts arbitrary kinds as declared in `showModuleContextMenu`, and permits `assign-legacy` regardless of module kind.\n  - **Evidence:** `handleModuleAction()` only rejects `moduleKind === \"fallback\"` and then executes:\n    ```ts\n    const slug = typeof moduleSlug === \"string\" ? moduleSlug : \"\";\n    ```\n    `showModuleContextMenu()` similarly maps every non-`\"pseudo\"` value to `\"declared\"`:\n    ```ts\n    const kind = moduleKind === \"pseudo\" ? \"pseudo\" : \"declared\";\n    ```\n    Neither method validates the declared/pseudo slug-kind invariant or restricts `assign-legacy` to pseudo `Unassigned`.\n  - **Fix:** Reject and log unless:\n    - `moduleKind` is exactly `\"declared\"` or `\"pseudo\"`; `\"fallback\"` and unknown kinds are rejected.\n    - `moduleSlug` is a string.\n    - `\"pseudo\"` has exactly `moduleSlug === \"\"`.\n    - `\"declared\"` has a non-empty slug, subsequently resolved through `pickModuleForAuthoring`.\n    - `\"assign-legacy\"` is accepted only for the pseudo empty-slug path.\n    \n    Apply the same validation before constructing the context menu; never coerce malformed identity fields to repository-level defaults.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

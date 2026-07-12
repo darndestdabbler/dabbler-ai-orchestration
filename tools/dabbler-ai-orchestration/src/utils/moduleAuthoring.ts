@@ -13,6 +13,7 @@
 // may legitimately be [] (an integration module); Phase 1 ships no
 // enforcement machinery.
 
+import * as crypto from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import * as YAML from "yaml";
@@ -562,7 +563,48 @@ export type ModulePickOutcome =
    * the flow with an error — callers treat it like a cancel, never like
    * the repo-level fallback (which is reserved for a truly absent
    * manifest). */
-  | { kind: "invalid-manifest"; entry: null };
+  | { kind: "invalid-manifest"; entry: null }
+  /** Set 093 S2 (routed ruling D1): a row/context invocation carried an
+   * explicit module slug that no longer resolves in the manifest (a stale
+   * snapshot — the module was removed between render and click). Fails
+   * LOUD (the picker shows {@link unknownModuleMessage}) and aborts;
+   * callers treat it like a cancel and NEVER fall back to the repo-level
+   * plan — silently misdirecting a module-targeted action to the repo
+   * plan is exactly the wrong-destination hazard. */
+  | { kind: "unknown-module"; entry: null };
+
+/** The operator-facing refusal when a preselected module no longer
+ * resolves (Set 093 S2 routed ruling D1): distinct from the
+ * invalid-manifest message (corrupt file) — this is a deleted / renamed
+ * module the stale webview row still referenced. */
+export function unknownModuleMessage(slug: string): string {
+  return (
+    `Module "${slug}" is no longer declared in ${MODULES_MANIFEST_DISPLAY} ` +
+    `(it may have been removed or renamed). Refresh the Work Explorer and ` +
+    `try again.`
+  );
+}
+
+/** Set 093 S2 (routed ruling D1): options for a row/context invocation
+ * that already knows its module target. */
+export interface PickModuleForAuthoringOptions {
+  /**
+   * An EXPLICIT module target from a row/context action — the module is
+   * implied by the clicked row, so NO module QuickPick and NO auto-select
+   * notice fires (amendment 1's QuickPick retirement). Resolution:
+   *   - `""` (empty)     → repo-level flow, exactly `{kind:"none"}` (a
+   *                        pseudo row: `Default`/`Unassigned` targets the
+   *                        legacy root plan / module-less decomposition).
+   *                        A ≥2-module manifest NEVER QuickPicks here.
+   *   - `"<declared>"`   → `{kind:"picked", entry}` for that manifest module.
+   *   - `"<unresolvable>"`→ `{kind:"unknown-module"}` (stale row — the
+   *                        module was removed) with a loud refusal.
+   * A PRESENT-but-invalid manifest still aborts FIRST (a config error is
+   * fixed before either path). Absent options → today's interactive
+   * behavior (the palette paths keep their QuickPick / auto-select notice).
+   */
+  preselectedSlug?: string;
+}
 
 /**
  * Resolve the module an authoring flow should target. Reads the manifest
@@ -575,15 +617,36 @@ export type ModulePickOutcome =
  * auto-selected with a notice (ruling Q2 — the operator must see which
  * module the flow silently targeted); many → QuickPick (Esc cancels the
  * whole flow, never falls back silently).
+ *
+ * Set 093 S2 (routed ruling D1): when `opts.preselectedSlug` is provided
+ * — a row/context invocation whose module is implied by the clicked row —
+ * the manifest QuickPick and the auto-select notice are BOTH skipped; the
+ * slug resolves directly (see {@link PickModuleForAuthoringOptions}). The
+ * invalid-manifest abort still fires first: a stale slug against a broken
+ * manifest is "invalid", never "unknown".
  */
 export async function pickModuleForAuthoring(
   root: string,
   ui: ModulePickUi,
+  opts?: PickModuleForAuthoringOptions,
 ): Promise<ModulePickOutcome> {
   const classified = classifyModulesManifest(root);
   if (classified.kind === "invalid") {
     ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
     return { kind: "invalid-manifest", entry: null };
+  }
+  // Set 093 S2 (routed ruling D1): explicit module target from a
+  // row/context path — resolve without a QuickPick or a notice.
+  if (opts && opts.preselectedSlug !== undefined) {
+    const slug = opts.preselectedSlug;
+    if (slug === "") return { kind: "none", entry: null }; // pseudo → repo-level
+    const entries = classified.kind === "present" ? classified.entries : [];
+    const entry = entries.find((e) => e.slug === slug);
+    if (!entry) {
+      ui.showErrorMessage(unknownModuleMessage(slug));
+      return { kind: "unknown-module", entry: null };
+    }
+    return { kind: "picked", entry };
   }
   const target = resolveModuleTarget(
     classified.kind === "present" ? classified.entries : null,
@@ -607,4 +670,458 @@ export async function pickModuleForAuthoring(
   );
   if (!picked) return { kind: "cancelled", entry: null };
   return { kind: "picked", entry: picked.entry };
+}
+
+// ---------- Set 093 S2: the spec.md `module:` stamp writer ----------
+//
+// The `Assign legacy sets to module…` flow (verdict amendment 2) stamps
+// `module: <slug>` into each chosen legacy (unstamped) set's spec.md via a
+// FORMAT-PRESERVING splice (routed ruling D4): a regex insert as the first
+// line after the "Session Set Configuration" block's opening ```yaml fence,
+// guarded by a parse-after check — never a YAML round-trip, which would
+// destroy the operator's comments and formatting (the S3 modules.yaml
+// appender posture, extended here to N files). `module` is a GROUPING
+// attribute, never identity: the set's globally-unique NAME is untouched.
+
+/** Where in the spec.md the config block heading + yaml fence live. */
+const CONFIG_HEADING_RE = /^##[ \t]+Session Set Configuration[ \t]*$/im;
+/** The block's opening yaml fence line (```yaml / ```yml), consumed whole. */
+const CONFIG_YAML_FENCE_OPEN_RE = /^```ya?ml[ \t]*\r?\n/im;
+/** A closing fence line (```), the block's terminator. */
+const CONFIG_FENCE_CLOSE_RE = /^```[ \t]*$/m;
+/** A TOP-LEVEL (column-0) `module:` key in a plain fenced block — used only
+ * as the duplicate-key defense-in-depth count. Indented `module:` lines (a
+ * block scalar / nested mapping) are NOT top-level keys and are excluded. */
+const CONFIG_TOP_LEVEL_MODULE_RE = /^module[ \t]*:/gm;
+
+export type StampModuleRefusal =
+  | { code: "no-config-block" }
+  | { code: "no-yaml-fence" }
+  | { code: "already-assigned"; existing: string };
+
+export type StampModuleResult =
+  | { kind: "written"; text: string; inserted: string; insertAt: number }
+  | { kind: "noop" }
+  | { kind: "refused"; reason: StampModuleRefusal };
+
+/**
+ * PURE format-preserving splice of `module: <slug>` into a spec.md's
+ * "Session Set Configuration" YAML block (routed ruling D4-i). Inserts as
+ * the FIRST line after the opening ```yaml fence (col 0 — a plain fenced
+ * block's key column), touching no existing key, comment, or byte. Refuses
+ * loudly when there is no safe anchor. Idempotent: a set already stamped to
+ * `slug` is a `noop`; a set stamped to a DIFFERENT module refuses
+ * (`already-assigned`) — a differing stamp on a supposedly-legacy set is a
+ * stale snapshot, never silently overwritten.
+ */
+export function stampModuleIntoSpecText(
+  text: string,
+  slug: string,
+): StampModuleResult {
+  const heading = CONFIG_HEADING_RE.exec(text);
+  if (!heading) return { kind: "refused", reason: { code: "no-config-block" } };
+  const afterHeading = heading.index + heading[0].length;
+  // Bound to before the next `## ` heading — the config block's yaml fence
+  // must live inside the Session Set Configuration section, not a later one.
+  const rest = text.slice(afterHeading);
+  const nextHeadingRel = rest.search(/^##[ \t]/m);
+  const sectionEnd =
+    nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
+  const section = text.slice(afterHeading, sectionEnd);
+
+  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
+  if (!fenceOpen) return { kind: "refused", reason: { code: "no-yaml-fence" } };
+  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
+
+  // R2 fix (Major): bound the closing-fence search to WITHIN this section
+  // (before the next `## ` heading) — an UNTERMINATED config fence must
+  // refuse loud, never borrow a closing fence from a later section (which
+  // would let a malformed block be mutated instead of rejected).
+  const boundedTail = text.slice(blockContentStart, sectionEnd);
+  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
+  if (closeRel === -1) return { kind: "refused", reason: { code: "no-yaml-fence" } };
+  const blockContent = boundedTail.slice(0, closeRel);
+
+  // R9 fix (Major): decide "already stamped" from the PARSED top-level
+  // `module` property — NOT a raw-text regex, which mistook an indented
+  // `module:` inside a block scalar or a nested mapping (e.g. `notes: |` /
+  // `parent:\n  module: greeter`) for a real stamp and wrongly returned noop
+  // / already-assigned. A truly top-level `module` key that already equals
+  // the slug is a no-op; a different one refuses; anything else (no key /
+  // nested only) splices our top-level key at the fence top.
+  let parsedBlock: unknown;
+  try {
+    parsedBlock = YAML.parse(blockContent);
+  } catch {
+    parsedBlock = undefined; // unparseable → splice; the parse-after guard refuses
+  }
+  if (
+    parsedBlock !== null &&
+    typeof parsedBlock === "object" &&
+    !Array.isArray(parsedBlock) &&
+    "module" in (parsedBlock as Record<string, unknown>)
+  ) {
+    const existingModule = (parsedBlock as Record<string, unknown>).module;
+    if (existingModule === slug) return { kind: "noop" };
+    return {
+      kind: "refused",
+      reason: {
+        code: "already-assigned",
+        existing:
+          typeof existingModule === "string" ? existingModule : String(existingModule),
+      },
+    };
+  }
+
+  const inserted = `module: ${slug}\n`;
+  const newText =
+    text.slice(0, blockContentStart) + inserted + text.slice(blockContentStart);
+  return { kind: "written", text: newText, inserted, insertAt: blockContentStart };
+}
+
+/** Extract the "Session Set Configuration" YAML block content (for the
+ * parse-after guard). Null when no block/fence — the guard treats that as
+ * a failure. */
+function extractConfigBlock(text: string): string | null {
+  const heading = CONFIG_HEADING_RE.exec(text);
+  if (!heading) return null;
+  const afterHeading = heading.index + heading[0].length;
+  const rest = text.slice(afterHeading);
+  const nextHeadingRel = rest.search(/^##[ \t]/m);
+  const sectionEnd =
+    nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
+  const section = text.slice(afterHeading, sectionEnd);
+  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
+  if (!fenceOpen) return null;
+  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
+  // R2 fix (Major): the closing fence must live within THIS section — an
+  // unterminated block never borrows a later section's fence (parity with
+  // stampModuleIntoSpecText, so the parse-after guard re-extracts the same
+  // block the splice targeted).
+  const boundedTail = text.slice(blockContentStart, sectionEnd);
+  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
+  if (closeRel === -1) return null;
+  return boundedTail.slice(0, closeRel);
+}
+
+/**
+ * The parse-after-write guard (routed ruling D4-iii). Throws an
+ * operator-readable Error unless ALL hold: (4) the new text is EXACTLY the
+ * canonical single-line splice of the original — nothing else changed; plus
+ * defense in depth on the resulting block — (1) it re-parses as valid YAML,
+ * (2) parsed `module` === the target slug, (3) exactly ONE `module:` line.
+ * Any failure is a loud refusal — a splice that mutated anything else is a
+ * bug, and the caller rolls the file back from its in-memory original.
+ *
+ * R6 fix (Major): the exact-content check RECOMPUTES the canonical splice
+ * via {@link stampModuleIntoSpecText} and requires byte-for-byte equality —
+ * the previous longest-common-prefix/suffix heuristic mis-identified the
+ * inserted line when the first block key ALSO started with `m` (e.g.
+ * `model:` / `mode:`), wrongly refusing a correct splice and — because phase
+ * one gates the whole batch — blocking every selected set.
+ */
+export function assertStampedTextValid(
+  originalText: string,
+  newText: string,
+  slug: string,
+): void {
+  const refuse = (why: string): never => {
+    throw new Error(`Refusing the module stamp (${why}).`);
+  };
+  // (4) the ONLY acceptable result is the deterministic canonical splice of
+  // the original — recompute it and require exact equality (insertion-safe,
+  // unlike a common-prefix/suffix diff).
+  const expected = stampModuleIntoSpecText(originalText, slug);
+  if (expected.kind !== "written") {
+    return refuse(
+      expected.kind === "noop"
+        ? "the original is already stamped to this module"
+        : "the original has no spliceable config block",
+    );
+  }
+  if (newText !== expected.text) {
+    return refuse("the result is not the exact canonical single-line splice");
+  }
+  // (1)+(2)+(3): defense in depth on the resulting block.
+  const block = extractConfigBlock(newText);
+  if (block === null) return refuse("the config block no longer parses");
+  let doc: unknown;
+  try {
+    doc = YAML.parse(block);
+  } catch {
+    return refuse("the config block is not valid YAML after the stamp");
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return refuse("the config block is not a YAML mapping");
+  }
+  const parsedModule = (doc as Record<string, unknown>).module;
+  if (parsedModule !== slug) {
+    return refuse(`module resolved to ${JSON.stringify(parsedModule)}, not ${JSON.stringify(slug)}`);
+  }
+  const moduleLineCount = (block.match(CONFIG_TOP_LEVEL_MODULE_RE) || []).length;
+  if (moduleLineCount !== 1) {
+    return refuse(`${moduleLineCount} top-level module: lines in the block`);
+  }
+}
+
+/** One set the assign flow was asked to stamp (absolute spec.md path). */
+export interface AssignSetTarget {
+  name: string;
+  specAbs: string;
+}
+
+/**
+ * The spec.md read/write surface the batch writer uses — injectable so the
+ * atomic-write path (write temp → verify → rename) is unit-testable. Defaults
+ * to node fs. `renameSync` MUST be atomic on the target (a same-directory
+ * rename — node's uv_fs_rename replaces the destination atomically on both
+ * POSIX and Windows), so the operator's spec.md is never left partially
+ * written: on any failure the temp is discarded and the original is intact.
+ */
+export interface SpecFileIo {
+  readFileSync(specAbs: string): string;
+  writeFileSync(specAbs: string, data: string): void;
+  renameSync(fromAbs: string, toAbs: string): void;
+  rmSync(specAbs: string): void;
+}
+
+const NODE_SPEC_IO: SpecFileIo = {
+  readFileSync: (p) => fs.readFileSync(p, "utf8"),
+  writeFileSync: (p, d) => fs.writeFileSync(p, d, { encoding: "utf8" }),
+  renameSync: (from, to) => fs.renameSync(from, to),
+  rmSync: (p) => fs.rmSync(p, { force: true }),
+};
+
+/** The report the assign flow surfaces (routed ruling D4-ii). */
+export interface LegacyAssignmentReport {
+  /** Sets whose spec.md gained the `module:` stamp. */
+  stamped: string[];
+  /** Sets already stamped to the target — skipped, not refused. */
+  alreadyAssigned: string[];
+  /** Present iff the WHOLE batch was refused before any write (phase 1). */
+  refused?: { reason: string; setName?: string };
+  /**
+   * Present iff phase 2 aborted (a disk I/O failure, or a concurrent
+   * modification detected pre-write). `written` names the sets stamped
+   * before the abort. Because each write is ATOMIC (temp → verify → rename),
+   * `setName`'s own file is ALWAYS left intact on failure — there is no
+   * partial-write / rollback-failure state — so the only files that changed
+   * are those in `written` (refresh iff `written.length > 0`).
+   */
+  writeFailed?: { setName: string; reason: string; written: string[] };
+}
+
+/**
+ * Stamp `module: <targetSlug>` into every chosen legacy set's spec.md —
+ * two-phase, format-preserving, fail-loud (routed ruling D4-ii). Phase 1
+ * validates the ENTIRE batch (target manifest-declared and non-pseudo; every
+ * set has a spliceable config block, is not stamped to a different module);
+ * any predictable refusal aborts the whole batch with NOTHING written. Phase
+ * 2 writes each queued splice, re-reads, and runs the parse-after guard; a
+ * post-write anomaly rolls THAT file back from its in-memory original and
+ * aborts. A disk I/O throw stops and reports which files were written.
+ *
+ * Guards (routed ruling D4-iv): never writes `""` / `default` / any
+ * pseudo/fallback slug; the target is validated against the CURRENT manifest
+ * at call time (not a stale picker snapshot); a set already stamped to the
+ * SAME target is a no-op (counted `alreadyAssigned`, never a refusal).
+ */
+export function assignLegacySetsToModule(
+  root: string,
+  targetSlug: string,
+  sets: readonly AssignSetTarget[],
+  io: SpecFileIo = NODE_SPEC_IO,
+): LegacyAssignmentReport {
+  const slug = (targetSlug ?? "").trim();
+  // D4-iv: never stamp the pseudo sentinel.
+  if (slug === "" || slug.toLowerCase() === "default") {
+    return {
+      stamped: [],
+      alreadyAssigned: [],
+      refused: { reason: `"${targetSlug}" is not a valid module target.` },
+    };
+  }
+  // D4-iv: target MUST be declared in the CURRENT manifest.
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    return { stamped: [], alreadyAssigned: [], refused: { reason: INVALID_MANIFEST_MESSAGE } };
+  }
+  const declaredSlugs =
+    classified.kind === "present" ? classified.entries.map((e) => e.slug) : [];
+  if (!declaredSlugs.includes(slug)) {
+    return {
+      stamped: [],
+      alreadyAssigned: [],
+      refused: { reason: unknownModuleMessage(slug) },
+    };
+  }
+
+  // ----- Phase 1: validate ALL. Read each spec, compute the splice, hold
+  // originals + new texts in memory. Any predictable refusal aborts.
+  const queued: { name: string; specAbs: string; original: string; next: string }[] = [];
+  const alreadyAssigned: string[] = [];
+  for (const set of sets) {
+    let original: string;
+    try {
+      original = io.readFileSync(set.specAbs);
+    } catch (err) {
+      return {
+        stamped: [],
+        alreadyAssigned: [],
+        refused: {
+          reason: `could not read ${set.name}'s spec.md: ${err instanceof Error ? err.message : String(err)}`,
+          setName: set.name,
+        },
+      };
+    }
+    const result = stampModuleIntoSpecText(original, slug);
+    if (result.kind === "noop") {
+      alreadyAssigned.push(set.name);
+      continue;
+    }
+    if (result.kind === "refused") {
+      const why =
+        result.reason.code === "already-assigned"
+          ? `${set.name} is already stamped module: ${result.reason.existing} — reassigning is not a legacy stamp`
+          : result.reason.code === "no-config-block"
+            ? `${set.name}'s spec.md has no "Session Set Configuration" block to stamp`
+            : `${set.name}'s Session Set Configuration block has no ` + "```yaml" + ` fence to stamp`;
+      return {
+        stamped: [],
+        alreadyAssigned: [],
+        refused: { reason: why, setName: set.name },
+      };
+    }
+    // Guard the computed text BEFORE queueing — a bad splice fails the whole
+    // batch in phase 1 (nothing written), not mid-write.
+    try {
+      assertStampedTextValid(original, result.text, slug);
+    } catch (err) {
+      return {
+        stamped: [],
+        alreadyAssigned: [],
+        refused: {
+          reason: `${set.name}: ${err instanceof Error ? err.message : String(err)}`,
+          setName: set.name,
+        },
+      };
+    }
+    queued.push({ name: set.name, specAbs: set.specAbs, original, next: result.text });
+  }
+
+  // ----- Phase 2: ATOMIC write each queued splice. R9 resolution: write the
+  // spliced text to a temp file, verify the temp bytes, then atomically
+  // rename it over the target. A rename replaces the destination in one step,
+  // so the operator's spec.md is NEVER left partially written — on ANY
+  // failure the temp is discarded and the original is intact. This collapses
+  // the whole write-safety class (partial writes, mis-placed splices,
+  // rollback-vs-preserve) that the non-atomic write model kept re-surfacing:
+  // there is no post-write mismatch to reconcile, so no rollback that could
+  // clobber a concurrent edit.
+  const stamped: string[] = [];
+  const fail = (setName: string, reason: string): LegacyAssignmentReport => ({
+    stamped,
+    alreadyAssigned,
+    writeFailed: { setName, reason, written: [...stamped] },
+  });
+  // R8 fix (Major): the manifest can change during the (potentially lengthy)
+  // phase-1 reads. Re-validate the TARGET against the CURRENT manifest
+  // immediately before each write (D4-iv: validated at WRITE time, not the
+  // phase-1 snapshot). A removed/renamed target or a now-invalid manifest
+  // must refuse before any spec.md is written — and, if earlier sets were
+  // already stamped, report a partial state rather than stamp an obsolete slug.
+  const revalidateTarget = (): string | null => {
+    const c = classifyModulesManifest(root);
+    if (c.kind === "invalid") return INVALID_MANIFEST_MESSAGE;
+    const slugs = c.kind === "present" ? c.entries.map((e) => e.slug) : [];
+    return slugs.includes(slug) ? null : unknownModuleMessage(slug);
+  };
+  for (const item of queued) {
+    const manifestErr = revalidateTarget();
+    if (manifestErr) {
+      return stamped.length > 0
+        ? fail(
+            item.name,
+            `the target module "${slug}" is no longer declared in the manifest after ${stamped.length} set(s) were already stamped — ${manifestErr}`,
+          )
+        : {
+            stamped: [],
+            alreadyAssigned,
+            refused: { reason: manifestErr, setName: item.name },
+          };
+    }
+    // R4 fix (Major, TOCTOU): re-read immediately BEFORE writing and require
+    // byte-for-byte equality with the phase-1 original. A file that changed
+    // after validation (a concurrent editor / tool) must NOT be overwritten
+    // with `item.next` — spliced from the now-stale original — which would
+    // silently delete the intervening edits. Refuse and leave it untouched.
+    let current: string;
+    try {
+      current = io.readFileSync(item.specAbs);
+    } catch (err) {
+      return fail(
+        item.name,
+        `could not re-read ${item.name}'s spec.md before writing: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    if (current !== item.original) {
+      return fail(
+        item.name,
+        `${item.name}'s spec.md changed after it was validated (a concurrent edit) — refused to overwrite it`,
+      );
+    }
+
+    // R11 fix: a UNIQUE staging path per operation (pid + random) — a fixed
+    // temp path let a second process's stage overwrite this one's between the
+    // temp-verify and the rename. Cross-instance serialization of the same
+    // target (file-locking) is an adjudicated residual: portable Node fs has
+    // no atomic conditional-replace, and OS-level locking is disproportionate
+    // for a user-initiated single-line stamp — the pre-rename target re-check
+    // (R10) plus a unique stage covers realistic use.
+    const tmp = `${item.specAbs}.${process.pid}.${crypto
+      .randomBytes(6)
+      .toString("hex")}.dabbler-assign-tmp`;
+    let staged = false;
+    try {
+      io.writeFileSync(tmp, item.next);
+      staged = true;
+      // Verify the TEMP (a partial temp write throws here, never touching the
+      // target) before the atomic swap.
+      if (io.readFileSync(tmp) !== item.next) {
+        throw new Error("the staged temp file did not verify");
+      }
+      // R10 fix (Major): re-read the TARGET immediately before the rename and
+      // abort if it changed since the pre-write check — the rename replaces
+      // the destination unconditionally, so a concurrent editor saving during
+      // the staging window would otherwise be silently clobbered. This
+      // narrows the concurrent-edit window to the atomic rename itself (Node
+      // fs has no portable conditional/versioned replace; this is the
+      // tightest practical guard).
+      if (io.readFileSync(item.specAbs) !== item.original) {
+        io.rmSync(tmp);
+        return fail(
+          item.name,
+          `${item.name}'s spec.md changed during the staged write (a concurrent edit) — refused to overwrite it`,
+        );
+      }
+      io.renameSync(tmp, item.specAbs);
+    } catch (err) {
+      // The atomic rename never ran (or threw) — the target is untouched.
+      // Best-effort cleanup of the temp; the original spec.md is intact.
+      if (staged) {
+        try {
+          io.rmSync(tmp);
+        } catch {
+          /* leftover temp is harmless; the target is what matters */
+        }
+      }
+      return fail(
+        item.name,
+        `writing ${item.name}'s spec.md failed; the original was left intact (${err instanceof Error ? err.message : String(err)})`,
+      );
+    }
+    stamped.push(item.name);
+  }
+
+  return { stamped, alreadyAssigned };
 }

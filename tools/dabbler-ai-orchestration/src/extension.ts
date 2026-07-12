@@ -21,6 +21,7 @@ import { registerInstallAiRouterCommands } from "./commands/installAiRouterComma
 // registrations.
 import { registerGetStartedCommand } from "./commands/gettingStartedDoc";
 import { registerNewModuleCommand } from "./commands/newModule";
+import { registerAssignLegacySetsCommand } from "./commands/assignLegacySets";
 import { registerPlanImportCommand } from "./wizard/planImport";
 import { registerSessionGenPromptCommand } from "./wizard/sessionGenPrompt";
 import { registerCostDashboardCommand } from "./dashboard/CostDashboard";
@@ -308,6 +309,9 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerGetStartedCommand", () => registerGetStartedCommand(context));
   safeRegister("registerPlanImportCommand", () => registerPlanImportCommand(context));
   safeRegister("registerNewModuleCommand", () => registerNewModuleCommand(context));
+  safeRegister("registerAssignLegacySetsCommand", () =>
+    registerAssignLegacySetsCommand(context),
+  );
   safeRegister("registerSessionGenPromptCommand", () =>
     registerSessionGenPromptCommand(context),
   );

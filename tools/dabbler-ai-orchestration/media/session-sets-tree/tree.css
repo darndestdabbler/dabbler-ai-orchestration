@@ -103,8 +103,19 @@ html, body {
  * foreground; the same chevron + click-to-collapse affordance. */
 .module {
   margin-bottom: 6px;
+  /* Set 093 S2: a two-column grid so the action strip occupies its OWN
+   * right-hand column (never overlapping the header's collapse-click
+   * target) with the body spanning both columns below. The strip column is
+   * `auto`, and the strip is display:none until revealed, so it collapses to
+   * zero width and the header takes the full row when the strip is hidden. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "header strip"
+    "body   body";
 }
 .module-header {
+  grid-area: header;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -134,6 +145,9 @@ html, body {
   opacity: 0.7;
   flex-shrink: 0;
 }
+.module-body {
+  grid-area: body;
+}
 .module[aria-expanded="false"] .module-body {
   display: none;
 }
@@ -155,6 +169,50 @@ html, body {
   outline: 1px solid var(--vscode-focusBorder, #007fd4);
   outline-offset: -1px;
 }
+/* Set 093 S2 (verdict amendments 1 + 2): the module-row inline action
+ * strip. Overlays the header's right edge (absolute, no layout shift) and
+ * is revealed only on hover of the header/strip or when the module row or a
+ * strip button holds focus — a quiet affordance that never competes with
+ * the semantic child nodes. The buttons are NOT treeitems (excluded from
+ * the tree name + arrow nav); the strip is a Tab-reached toolbar. */
+.module-action-strip {
+  grid-area: strip;
+  align-self: center;
+  align-items: center;
+  gap: 2px;
+  padding-right: 6px;
+  /* Hidden (and zero-width) until the header/strip is hovered or the module
+   * row / a strip button holds focus — revealed via display, so the header
+   * reclaims the full row width when the strip is not shown. */
+  display: none;
+}
+.module-header:hover + .module-action-strip,
+.module-action-strip:hover,
+.module-action-strip:focus-within,
+.module:focus > .module-action-strip {
+  display: inline-flex;
+}
+.module-action {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 1px 6px;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground, #ccc));
+  background: var(--vscode-button-secondaryBackground, rgba(127, 127, 127, 0.18));
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.module-action:hover {
+  background: var(--vscode-button-secondaryHoverBackground, rgba(127, 127, 127, 0.30));
+}
+.module-action:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 1px;
+}
+
 /* Set 093 S1: the persistent Plan / Session sets child nodes sit at
  * level 2 (indented under the module header); buckets nest under the
  * Session sets node at level 3, rows at level 4. The staircase of

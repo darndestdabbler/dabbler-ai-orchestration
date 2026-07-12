@@ -1,7 +1,7 @@
 {
   "sessionSetName": "093-work-explorer-module-row-interactions",
   "createdDate": "2026-07-12T00:19:46.261194+00:00",
-  "totalSessions": 0,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -67,6 +67,118 @@
       "stepKey": "session-001/uat-armed",
       "dateTime": "2026-07-11T21:07:37.956146-04:00",
       "description": "E2E covered by updated Playwright Layer 3 pins (23 tests). Session 1 human walk (suggested, per-session) armed to the 078/087-S3 bar: built local 0.41.0 VSIX; authored 3-walk checklist (this-repo render + keyboard, scratch-repo state variety) \u2014 human walk pending operator (does not gate close).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/register-and-read",
+      "dateTime": "2026-07-12T01:05:47.679032-04:00",
+      "description": "Registered S2 (claude/opus-4-8/medium); read spec S2 plan, S1 outcome + s1-child-nodes-architecture ruling, 087 S3 authoring-scaffold record, and the touched surfaces (moduleAuthoring/pickModuleForAuthoring seam, sessionGenPrompt/planImport/newModule handlers, CustomSessionSetsView host, client.js module rendering, protocol, package.json commands/menus, fileSystem config-block parser).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/architecture-ruling",
+      "dateTime": "2026-07-12T01:24:56.497253-04:00",
+      "description": "Routed architecture ruling (opus tier 3, $0.54). D1: extend pickModuleForAuthoring with preselectedSlug; new {kind:unknown-module} for stale/removed slug (abort+error), not repo-level fallback. D2: pseudo strip=repo-level flow (no stamp); fallback=NO strip (undeclared-slug warning owns remediation). D3: new moduleAction + showModuleContextMenu webview messages (not executeCommand/allowlist); strip=role=toolbar secondary tabstop sibling of module-header, treeitem aria-labelledby=header only. D4: regex-splice module: as first line after yaml fence + parse-after guard (block reparses, module===target, exactly one module: line, byte-diff==single inserted line); two-phase all-or-nothing validate then per-file write w/ rollback; never write default/pseudo; already-same-target=no-op. Saved s2-targeting-seam-architecture.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/ai-assignment-and-implement",
+      "dateTime": "2026-07-12T01:43:00.028190-04:00",
+      "description": "Authored ai-assignment.md S2 block + next-set recommendation (Set 094, gemini-2.5-pro, s2-next-set-analysis.json). Implemented: protocol moduleAction/showModuleContextMenu messages; pickModuleForAuthoring preselectedSlug + unknown-module outcome; stampModuleIntoSpecText + assertStampedTextValid + assignLegacySetsToModule two-phase batch writer; copyPlanningPrompt/importPlanFromFile/openModulePlan/copySessionSetGenPrompt preselect threading; assignLegacySets flow command + dabbler.assignLegacySetsToModule palette command; host handleModuleAction/showModuleContextMenu dispatch; client.js action strip (role=toolbar secondary tabstop, focusin-driven), module context menu, keyboard roving; tree.css strip styling. Layer 2 tests (preselect parity/no-QuickPick, stamp matrix, batch atomicity, assign flow) + Layer 3 strip smoke added; affected unit files 119 passing; tsc clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/build-and-suite",
+      "dateTime": "2026-07-12T02:08:11.361798-04:00",
+      "description": "Built dist (esbuild). Full suite GREEN: pytest 2922 passed/6 skipped; extension unit 1442 passing (+22 S2 tests); Playwright Layer 3 24 passed; tsc clean. Fixed watcherInventory allowlist line drift (extension.ts 201->202, 240->241) from the assign-legacy command registration. Fixed action-strip overlay: switched from absolute overlay (intercepted header collapse clicks when revealed) to a 2-column CSS grid so the strip occupies its own right column.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/dogfood",
+      "dateTime": "2026-07-12T02:08:11.624142-04:00",
+      "description": "Live dogfood against a scratch multi-module repo (compiled out/ modules + vscode stub): 12/12 checks PASS \u2014 preselect declared->picked (no QuickPick/notice), empty->repo-level none, stale->unknown-module+error; assign-stamp both real spec.md files (comment preserved, module: first block line), YAML round-trip yields module=greeter (reader-key parity), re-assign byte-identical no-op, default target refused.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/verification-remediation",
+      "dateTime": "2026-07-12T02:32:28.950829-04:00",
+      "description": "Verification R1 Major (module-action protocol fails open: null slug coerced to '' -> repo-level; unknown kinds mapped to declared) FIXED via pure narrowModuleAction/narrowModuleIdentity (strict drop, no coercion) + 8 tests. R2 two Majors FIXED: (a) stamp writer close-fence search bounded to sectionEnd (no borrowing a later section's fence) + regression test; (b) added dabbler.openModulePlan palette command (Open Plan mirror) + 2 tests. R3 three Majors FIXED: (a) post-write guard now requires on-disk readBack===item.next byte-for-byte (injectable SpecFileIo) + mis-placed-stamp rollback test; (b) added never-hide-work regrouping round-trip test (Unassigned persists until emptied, total rows preserved, writer->parser->model); (c) extracted testable dispatchModuleAction + 4 mapping tests, and drove all four strip actions end-to-end in the dogfood (17/17 PASS, no QuickPick). Full suite: unit 1459 passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/verification-remediation-r4",
+      "dateTime": "2026-07-12T02:37:44.422295-04:00",
+      "description": "Verification R4 two Majors FIXED (data-integrity on operator spec.md): (a) rollback-failure now tracked \u2014 writeFailed carries fileModified; when the post-write rollback ALSO fails the report says the file may be left modified/needs manual recovery (never 'rolled back'/'no files changed'), and the flow refreshes; (b) TOCTOU \u2014 phase 2 re-reads immediately before writing and refuses (no overwrite) if the file changed since phase-1 validation, preserving concurrent edits. +2 regression tests (rollback-also-fails, concurrent-edit-preserved). Unit 1461 passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/verification-remediation-r5",
+      "dateTime": "2026-07-12T02:42:07.413559-04:00",
+      "description": "Verification R5 Major FIXED (non-transactional write): a throwing writeFileSync can partially modify the file before throwing, so the write-throw path no longer assumes 'nothing landed'. Added a verified restoreOriginal helper (write original + confirm bytes) used by BOTH the throwing-write and post-write-anomaly paths; unconfirmed restore -> fileModified=true (manual recovery, refresh, never 'no files changed'). +2 regression tests (partial-write-then-throw with failed restore, and clean-restore). Unit 1463 passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-002/verification-remediation-r6",
+      "dateTime": "2026-07-12T02:47:21.838678-04:00",
+      "description": "Verification R6 Major FIXED (real bug): assertStampedTextValid's longest-common-prefix/suffix byte-diff mis-identified the inserted line when the first block key also started with 'm' (model:/mode:), wrongly refusing a correct splice and \u2014 since phase 1 gates the whole batch \u2014 blocking every set. Replaced the fragile heuristic with a deterministic recompute-and-compare (stampModuleIntoSpecText(original,slug).text === newText), keeping the YAML/single-line checks as defense in depth. +2 regression tests (model: first key, single+multi assign). Unit 1465 passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "session-002/verification-remediation-r7",
+      "dateTime": "2026-07-12T02:55:42.976850-04:00",
+      "description": "Verification R7 two Majors FIXED: (a) post-write read-back mismatch no longer restores item.original (which could clobber a concurrent operator edit) \u2014 the writer never overwrites unknown on-disk bytes, reports fileModified=true + manual-review; restoreOriginal now used ONLY on the write-throw path; updated mis-placed test + added concurrent-edit-at-readback-preserved test. (b) client.js focusin now handles pointer focus on a strip button: clears anchors across ALL strips, makes the clicked button the sole tabindex=0 anchor and its module the active tree row (setTreeTabstop w/o stealing focus) + Playwright regression (focus A, click B's action -> B sole anchor, Shift+Tab returns to B). Unit 1465, Playwright module-tier 4 passed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "session-002/verification-remediation-r8",
+      "dateTime": "2026-07-12T03:00:16.935303-04:00",
+      "description": "Verification R8 Major FIXED (D4-iv manifest TOCTOU): the target is now re-validated against the CURRENT manifest immediately before each phase-2 write (not just at call-start before the lengthy phase-1 reads). A target removed/renamed or a now-invalid manifest refuses before any spec.md is written; a change after earlier sets were stamped reports a partial state. +regression test (target removed between phase 1 and phase 2 -> no spec written). Unit 1466 passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "session-002/verification-remediation-r9",
+      "dateTime": "2026-07-12T03:11:07.237288-04:00",
+      "description": "Verification R9 three Majors FIXED: (a) R9-1 the write is now ATOMIC (temp -> verify staged bytes -> atomic rename over target) \u2014 on ANY failure the temp is discarded and the operator's spec.md is intact, which collapses the whole write-safety class (partial writes, mis-placement, rollback-vs-concurrent-edit) into one provably-correct primitive; removed the restoreOriginal/fileModified machinery (report simplified to written-based). (b) R9-2 already-stamped detection now uses the PARSED top-level module property (not a raw regex that mistook an indented module: in a block scalar / nested mapping for a stamp); guard's duplicate-key count is now col-0 top-level only. (c) R9-3 openModulePlan's missing-plan Import fallback carries the resolved module (preselectedSlug) so the palette path performs ONE module selection (no wrong-destination re-pick). Tests reworked for the atomic model (temp-corrupt, staged-throw, pre-write TOCTOU, manifest TOCTOU) + R9-2 nested/block-scalar regressions. Unit 1466, dogfood 17/17.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 13,
+      "stepKey": "session-002/verification-remediation-r10",
+      "dateTime": "2026-07-12T04:12:40.424599-04:00",
+      "description": "Verification R10 Major FIXED (residual staging TOCTOU): added a final target re-read immediately before the atomic rename \u2014 if the target changed since the pre-write check (a concurrent save during staging), discard the temp and refuse rather than clobber. Narrows the concurrent-edit window to the atomic rename itself (portable Node fs has no conditional/versioned replace). +regression test (concurrent save during staging preserved, temp cleaned up). Unit 1467.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 14,
+      "stepKey": "session-002/verification-loop-stop",
+      "dateTime": "2026-07-12T04:18:25.443650-04:00",
+      "description": "R11: fixed the concrete part (unique per-operation staging path: specAbs.<pid>.<rand>.dabbler-assign-tmp) removing the shared-temp cross-process collision + updated the staging-race regression. STOPPING the verification loop at round 11 and escalating to the operator: rounds 4-11 have been a converging TOCTOU/atomicity regress on the spec.md writer (spec-TOCTOU, partial-write, mis-placement, rollback-vs-concurrent-edit, atomic temp-rename, staging-window, now cross-VS-Code-instance serialization). Each fix was made + tested (writer is now atomic temp->verify->rename with pre-rename target re-check + unique stage). Round 11's RESIDUAL (cross-instance file-locking serialization) is edge-case exhaustion per Set 086: unwinnable in portable Node fs (no atomic conditional-replace), disproportionate for a single-line stamp, practical risk ~nil. Full suite green (pytest 2922/6skip, unit 1467, Playwright 24, tsc, dogfood 17/17). Awaiting operator adjudication: accept (close, residual documented) / third-provider opinion / continue.",
       "status": "complete"
     }
   ]

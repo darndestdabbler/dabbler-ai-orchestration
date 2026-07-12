@@ -190,6 +190,16 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.assignLegacySetsToModule",
+        "title": "Assign Legacy Sets to Module",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.openModulePlan",
+        "title": "Open Module Plan",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.generateSessionSetPrompt",
         "title": "Generate Session-Set Prompt",
         "category": "Dabbler"

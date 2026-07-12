@@ -1,31 +1,39 @@
 {
   "status": "completed",
-  "summary": "Set 093 Session 1: every Work Explorer module row now renders two PERSISTENT semantic child nodes — Plan (present/missing) and Session sets (blocked-until-plan / empty / bucketed, with the status buckets nested UNDER Session sets, never replacing the checklist). ARIA levels shifted to module 1 / Plan & Session sets 2 / bucket 3 / row 4 (aria-setsize=2 on the fixed pair; aria-expanded on Session sets only when bucketed); keyboard nav and collapse reach the new nodes via the existing shared toggler. States derive from the pure deriveModuleChildren(planPresent, setCount); planExists is resolved host-side per root (guarded against a null planPath) and ORed across worktree roots in mergeVisibleModules, with the null guard also enforced in the pure buildVisibleModulePayloads so a fallback (planPath null) can never read present. A routed architecture ruling (opus, tier 3) settled that all three module kinds render both children with no exemption. Layer 2 (deriveModuleChildren matrix, per-kind payload, merge-OR) and Layer 3 (session-sets-tree + module-tier) pins moved with the new level (amendment 6). Full suite re-run GREEN against the final remediated tree (postdates R3–R5): pytest 2922 passed/6 skipped, extension unit 1420 passing, Playwright Layer 3 23 passed, tsc clean. No Marketplace publish (single release boundary after Set 094). Verification: R1 Major (host-only null guard) fixed; R2 VERIFIED; the close backstop (R3) then surfaced a distinct never-hide-work Major — the optional sessionSets field degraded to a leaf that dropped buckets for a fields-less legacy payload — fixed by rendering bucketed whenever any bucket carries rows; R4 refined it (guard must consult rows.length as well as count) and its root, so the class was closed STRUCTURALLY: plan/sessionSets are now REQUIRED on ModulePayload (both producers emit them — the test-only legacy buildModulePayloads updated), eliminating the field-less-payload vector at the type level, with the webview count||rows guard kept as defense in depth. R5 closed the class at the TERMINAL gate: renderBucket now decides emptiness from bucket.rows (not the display count), so no row-rendering path can drop populated rows on a stale-count payload — count===rows.length is invariant in the sole producer buildBucketPayloads, so this is defense in depth. client.js is covered by the documented source-scan house pattern (IIFE, not unit-importable) plus Layer 3.",
+  "summary": "Set 093 Session 2 (set-terminal): the Work Explorer module-row interaction surface, built on S1's persistent Plan/Session-sets child nodes. Shipped: (1) a module-ROW action strip — a hover/focus-revealed role=toolbar (secondary Tab-stop with internal Arrow/Home/End roving, Escape back to the row) carrying AI Plan / Import Plan / Open Plan / AI Sets, rendered for declared+pseudo kinds only (fallback shows none; its undeclared-slug warning owns remediation), plus Assign… on the pseudo Unassigned module; the toolbar buttons sit OUTSIDE the treeitem's aria-labelledby (=header) so they never pollute the tree name (amendment 1). (2) The same actions mirrored in a module-row context menu (new showModuleContextMenu message) and the Command Palette (added dabbler.openModulePlan for the Open Plan mirror; AI Plan/Import/AI Sets already had dabbler.importPlan/generateSessionSetPrompt). (3) QuickPick retirement on click paths: row/context invocations carry the module via pickModuleForAuthoring(root, ui, {preselectedSlug}); a new {kind:'unknown-module'} outcome fails loud on a stale slug (never a silent repo-level fallback); the palette commands keep their QuickPick. (4) Assign legacy sets to module…: a two-phase, ATOMIC, format-preserving module: stamp into each chosen unstamped set's spec.md config block — a col-0 splice at the yaml-fence top, target validated against the CURRENT manifest at write time, never writes default/pseudo, already-same-target is a no-op. A routed architecture ruling (opus tier 3, s2-targeting-seam-architecture.json) settled the D1-D4 seam design. Protocol: new moduleAction/showModuleContextMenu webview messages (closed enum + module identity, NOT via executeCommand/COMMAND_ALLOWLIST); a pure narrowModuleAction/narrowModuleIdentity strictly drops malformed identity (no coercion); a pure dispatchModuleAction maps each action to its handler (Layer-2 tested). Full suite GREEN: pytest 2922 passed/6 skipped, extension unit 1467 passing, Playwright Layer 3 24 passed, tsc clean; live dogfood 17/17 (all four strip actions end-to-end, no QuickPick). No Marketplace publish (single release boundary after Set 094).",
   "verification_method": "api",
-  "verification_verdict": "VERIFIED",
+  "verification_verdict": "ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+  "verification_notes": "Cross-provider verification (gpt-5-6, anthropic excluded) ran 11 rounds — an exceptionally deep adversarial drill of the operator-file-mutation writer. R1 (protocol fail-open: null slug coerced to repo-level, unknown kinds mapped to declared) → fixed via strict pure narrowing. R2 (unterminated-fence borrowing a later fence; Open Plan lacked a palette mirror) → bounded fence search + dabbler.openModulePlan. R3 (exact byte-for-byte post-write guard; missing never-hide-work regrouping test; dogfood didn't drive the strip actions) → all added. R4/R5 (rollback honesty; non-transactional partial write) and R6 (byte-diff guard broke on model:-first keys → deterministic recompute-compare) and R7 (rollback could clobber a concurrent edit; pointer-focus broke the toolbar anchor) → all fixed with regressions. R8 (manifest TOCTOU at write time), R9 (nested/block-scalar module: false noop → parsed top-level check; Open Plan palette re-pick → carry resolved module; and the write-safety class resolved structurally by making the writer ATOMIC: temp → verify → rename, which removes the rollback-vs-preserve dilemma entirely), R10 (residual pre-rename target re-check), R11 (unique per-operation staging path removing the shared-temp collision) → all fixed with regressions. Every material Critical/Major was fixed in-flight and re-verified. R11's RESIDUAL — serializing assignments across SEPARATE VS Code instances via OS-level file-locking — was OPERATOR-ADJUDICATED as adjudicated-minor: unwinnable in portable Node fs (no atomic conditional-replace), disproportionate for a single-line stamp, practical probability ~nil (two instances stamping the same unassigned set to different modules in the same microsecond). Per the Set 086 severity-gated-stop rule and the operator's explicit 'Accept & close' adjudication, the loop stopped at round 11 with the material class fully closed. Closed via --manual-verify (operator attestation); raw round artifacts s2-verification*.md / s2-issues*.json are immutable records.",
   "files_changed": [
     "tools/dabbler-ai-orchestration/src/types/sessionSetsWebviewProtocol.ts",
-    "tools/dabbler-ai-orchestration/src/providers/SessionSetsModel.ts",
+    "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts",
+    "tools/dabbler-ai-orchestration/src/utils/moduleActionNarrowing.ts",
+    "tools/dabbler-ai-orchestration/src/wizard/planImport.ts",
+    "tools/dabbler-ai-orchestration/src/wizard/sessionGenPrompt.ts",
+    "tools/dabbler-ai-orchestration/src/commands/assignLegacySets.ts",
     "tools/dabbler-ai-orchestration/src/providers/CustomSessionSetsView.ts",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
     "tools/dabbler-ai-orchestration/media/session-sets-tree/client.js",
     "tools/dabbler-ai-orchestration/media/session-sets-tree/tree.css",
-    "tools/dabbler-ai-orchestration/src/test/suite/visibleModules.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/moduleTier.test.ts",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleAuthoring.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleActionNarrowing.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/assignLegacySets.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
     "tools/dabbler-ai-orchestration/src/test/playwright/module-tier.spec.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/session-sets-tree.spec.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/multi-in-progress.spec.ts",
     "tools/dabbler-ai-orchestration/dist/extension.js",
     "tools/dabbler-ai-orchestration/dist/extension.js.map",
     "docs/session-sets/093-work-explorer-module-row-interactions/ai-assignment.md",
-    "docs/session-sets/093-work-explorer-module-row-interactions/s1-child-nodes-architecture.json",
-    "docs/session-sets/093-work-explorer-module-row-interactions/s1-assignment-analysis.json",
-    "docs/session-sets/093-work-explorer-module-row-interactions/s1-verification.md",
-    "docs/session-sets/093-work-explorer-module-row-interactions/s1-issues.json",
-    "docs/session-sets/093-work-explorer-module-row-interactions/s1-verification-round-2.md",
-    "docs/session-sets/093-work-explorer-module-row-interactions/093-work-explorer-module-row-interactions-uat-checklist.json",
+    "docs/session-sets/093-work-explorer-module-row-interactions/s2-targeting-seam-architecture.json",
+    "docs/session-sets/093-work-explorer-module-row-interactions/s2-next-set-analysis.json",
+    "docs/session-sets/093-work-explorer-module-row-interactions/change-log.md",
+    "docs/session-sets/093-work-explorer-module-row-interactions/s2-step9-review.md",
+    "docs/session-sets/093-work-explorer-module-row-interactions/path-aware-critique.json",
     "docs/session-sets/093-work-explorer-module-row-interactions/activity-log.json",
     "docs/session-sets/093-work-explorer-module-row-interactions/disposition.json"
   ],
+  "path_aware_critique": "advisory — pull_critique (google gemini-2.5-pro + openai gpt-5.4, 2 distinct providers) both returned VERIFIED with 0 findings, independently corroborating the final atomic-writer tree.",
   "verification_message_ids": [],
   "next_orchestrator": {
     "engine": "claude-code",
@@ -34,12 +42,13 @@
     "effort": "medium",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 (row action strip, QuickPick retirement, assign-legacy flow) builds directly on Session 1's child-node model and touches the same host/webview/protocol surfaces; the routed analysis (gemini-2.5-pro, s1-assignment-analysis.json) recommends the same Opus seat at medium effort because the warm architectural context sharply lowers the cost of the cross-cutting pickModuleForAuthoring targeting-seam refactor and the set-terminal path-aware critique."
+      "specifics": "Set 093 is the last session of this set. Routed next-set analysis (gemini-2.5-pro, s2-next-set-analysis.json) recommends Set 094 — the release-boundary set for the 091-094 Work Explorer redesign — under claude-code/anthropic/Opus/medium: it reuses the same host/webview/protocol surfaces (warm context) and is the single Marketplace publish for the group."
     }
   },
   "blockers": [],
   "lessons_cited": [
     "L-064-9",
-    "L-064-12"
+    "L-064-12",
+    "L-069-1"
   ]
 }

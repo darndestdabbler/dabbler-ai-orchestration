@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 8,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The assignment writer does not validate the target against the manifest at write time**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The authoritative D4 ruling requires: **“Target slug MUST be manifest-declared, validated against the current manifest at write time (not the stale picker snapshot).”**\n    - **Impact:** `docs/modules.yaml` can change while phase-one validation reads multiple selected sets. If the target module is removed, renamed, or the manifest becomes invalid before phase two, the writer still stamps every queued `spec.md` with the obsolete slug. Those sets are then incorrectly regrouped under a fallback module, contrary to the manifest-validation and stale-target fail-loud guarantees.\n    - **Evidence:** `assignLegacySetsToModule()` calls `classifyModulesManifest(root)` only once, before phase-one set validation. Phase two re-reads each `spec.md`, but never re-reads or revalidates `docs/modules.yaml` before writing:\n      ```ts\n      const classified = classifyModulesManifest(root);\n      // ...\n      for (const set of sets) {\n        // potentially lengthy phase-one reads and validation\n      }\n      // ...\n      for (const item of queued) {\n        current = io.readFileSync(item.specAbs);\n        // only spec.md is revalidated\n        io.writeFileSync(item.specAbs, item.next);\n      }\n      ```\n      Thus the manifest used to authorize the writes can be stale by the time any write occurs.\n  - **Location:** `tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts` → `assignLegacySetsToModule()`\n  - **Fix:** Reclassify the manifest after phase-one validation and immediately before phase-two writes, refusing before any write if it is invalid or no longer declares `targetSlug`. For stronger protection during a multi-file phase two, capture the validated manifest state and verify it remains unchanged before each write; report a partial-state failure if it changes after earlier files were written. Add a regression test that removes the target module between phase one and phase two and proves no `spec.md` is written.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

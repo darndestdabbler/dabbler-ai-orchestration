@@ -13,6 +13,8 @@ import {
   MODULES_YAML_TEMPLATE,
   ModulePickItem,
   ModulePickUi,
+  assertStampedTextValid,
+  assignLegacySetsToModule,
   classifyModulesManifest,
   defaultModulePlanPath,
   isSafeRepoRelativePath,
@@ -23,11 +25,17 @@ import {
   replaceEmptyModulesList,
   resolveModuleTarget,
   scaffoldNewModule,
+  stampModuleIntoSpecText,
+  unknownModuleMessage,
   validateNewModuleSlug,
 } from "../../utils/moduleAuthoring";
 import { runNewModuleFlow, NewModuleUi } from "../../commands/newModule";
-import { readModulesManifest } from "../../utils/fileSystem";
-import { ModuleManifestEntry } from "../../types";
+import { readModulesManifest, parseSessionSetConfig } from "../../utils/fileSystem";
+import {
+  buildVisibleModulePayloads,
+  computeVisibleModules,
+} from "../../providers/SessionSetsModel";
+import { ModuleManifestEntry, SessionSet } from "../../types";
 
 function tmpRoot(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -911,6 +919,663 @@ suite("runNewModuleFlow (Set 087 S3)", () => {
       assert.strictEqual(ok, true);
       assert.strictEqual(log.errors.length, 0);
       assert.strictEqual(readModulesManifest(root)![0].slug, "greeter");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+// Set 093 Session 2 (routed ruling D1): the explicit-module-target seam.
+// A row/context invocation carries its module, so pickModuleForAuthoring
+// must skip BOTH the QuickPick and the auto-select notice — and fail loud on
+// a slug that no longer resolves (a stale snapshot), never fall to the repo
+// plan. This is the "targeting parity" contract (row vs palette).
+suite("moduleAuthoring — preselected module target (Set 093 S2)", () => {
+  function pickUi(log: {
+    infos: string[];
+    picks: ModulePickItem[][];
+    errors: string[];
+  }): ModulePickUi {
+    return {
+      showQuickPick: async (items) => {
+        log.picks.push(items);
+        return undefined;
+      },
+      showInformationMessage: (m) => void log.infos.push(m),
+      showErrorMessage: (m) => void log.errors.push(m),
+    };
+  }
+  function fresh() {
+    return { infos: [] as string[], picks: [] as ModulePickItem[][], errors: [] as string[] };
+  }
+  const twoModules =
+    "modules:\n" +
+    "  - slug: greeter\n    title: Greeter\n" +
+    "  - slug: payments\n    title: Payments\n";
+
+  test("declared preselect resolves WITHOUT a QuickPick or a notice — even with >=2 modules", async () => {
+    const root = tmpRoot("mod-preselect-");
+    const log = fresh();
+    try {
+      writeManifest(root, twoModules);
+      const out = await pickModuleForAuthoring(root, pickUi(log), {
+        preselectedSlug: "payments",
+      });
+      assert.strictEqual(out.kind, "picked");
+      assert.strictEqual(out.entry?.slug, "payments");
+      assert.strictEqual(log.picks.length, 0, "no QuickPick on a row path");
+      assert.strictEqual(log.infos.length, 0, "no auto-select notice on a row path");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("empty preselect ('') is repo-level (none) — no QuickPick even with >=2 modules (pseudo row)", async () => {
+    const root = tmpRoot("mod-preselect-empty-");
+    const log = fresh();
+    try {
+      writeManifest(root, twoModules);
+      const out = await pickModuleForAuthoring(root, pickUi(log), {
+        preselectedSlug: "",
+      });
+      assert.strictEqual(out.kind, "none");
+      assert.strictEqual(log.picks.length, 0);
+      assert.strictEqual(log.infos.length, 0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("unresolvable preselect → unknown-module + a loud error, NEVER repo-level fallback", async () => {
+    const root = tmpRoot("mod-preselect-stale-");
+    const log = fresh();
+    try {
+      writeManifest(root, twoModules);
+      const out = await pickModuleForAuthoring(root, pickUi(log), {
+        preselectedSlug: "ghost",
+      });
+      assert.strictEqual(out.kind, "unknown-module");
+      assert.strictEqual(log.errors.length, 1);
+      assert.ok(log.errors[0] === unknownModuleMessage("ghost"));
+      assert.strictEqual(log.picks.length, 0);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("invalid manifest aborts BEFORE the preselect branch (a stale slug on a broken file is 'invalid', not 'unknown')", async () => {
+    const root = tmpRoot("mod-preselect-invalid-");
+    const log = fresh();
+    try {
+      writeManifest(root, "just a string\n");
+      const out = await pickModuleForAuthoring(root, pickUi(log), {
+        preselectedSlug: "greeter",
+      });
+      assert.strictEqual(out.kind, "invalid-manifest");
+      assert.strictEqual(log.errors.length, 1);
+      assert.ok(log.errors[0].includes("not a valid module manifest"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("targeting parity: a declared preselect and the palette QuickPick resolve the SAME entry", async () => {
+    const root = tmpRoot("mod-parity-");
+    try {
+      writeManifest(root, twoModules);
+      const rowLog = fresh();
+      const row = await pickModuleForAuthoring(root, pickUi(rowLog), {
+        preselectedSlug: "greeter",
+      });
+      // Palette path: the operator picks "greeter" from the QuickPick.
+      const paletteUi: ModulePickUi = {
+        showQuickPick: async (items) => items.find((i) => i.entry.slug === "greeter"),
+        showInformationMessage: () => undefined,
+        showErrorMessage: () => undefined,
+      };
+      const palette = await pickModuleForAuthoring(root, paletteUi);
+      assert.strictEqual(row.kind, "picked");
+      assert.strictEqual(palette.kind, "picked");
+      assert.deepStrictEqual(row.entry, palette.entry);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+// Set 093 Session 2 (routed ruling D4): the format-preserving spec.md
+// `module:` stamp writer + the two-phase batch assign flow.
+suite("moduleAuthoring — module stamp writer (Set 093 S2)", () => {
+  const SPEC = [
+    "# My Set",
+    "",
+    "## Session Set Configuration",
+    "",
+    "```yaml",
+    "tier: full          # keep this comment",
+    "requiresUAT: false",
+    "```",
+    "",
+    "## Sessions",
+    "body text",
+    "",
+  ].join("\n");
+
+  test("stampModuleIntoSpecText inserts module: as the first block line, preserving every other byte", () => {
+    const out = stampModuleIntoSpecText(SPEC, "greeter");
+    assert.strictEqual(out.kind, "written");
+    if (out.kind !== "written") return;
+    assert.ok(out.text.includes("```yaml\nmodule: greeter\ntier: full"));
+    // Comment + all other content survive verbatim.
+    assert.ok(out.text.includes("# keep this comment"));
+    assert.ok(out.text.includes("## Sessions\nbody text"));
+    // Byte-diff guard passes for the real splice.
+    assert.doesNotThrow(() => assertStampedTextValid(SPEC, out.text, "greeter"));
+  });
+
+  // Set 093 S2 verification R6 (Major): a valid splice must NOT be refused
+  // when the first existing block key ALSO starts with `m` (model:/mode:) —
+  // the byte-diff guard used to mis-identify the inserted line here and gate
+  // the whole batch.
+  test("stamp + guard succeed when the first config key starts with 'm' (model:)", () => {
+    const spec = [
+      "## Session Set Configuration",
+      "```yaml",
+      "model: opus",
+      "mode: fast",
+      "tier: full",
+      "```",
+      "",
+    ].join("\n");
+    const out = stampModuleIntoSpecText(spec, "greeter");
+    assert.strictEqual(out.kind, "written");
+    if (out.kind !== "written") return;
+    assert.ok(out.text.includes("```yaml\nmodule: greeter\nmodel: opus\nmode: fast"));
+    assert.doesNotThrow(() => assertStampedTextValid(spec, out.text, "greeter"));
+  });
+
+  test("assignLegacySetsToModule stamps sets whose first config key starts with 'm' (single + multi)", () => {
+    const root = tmpRoot("assign-mkey-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const mSpec = [
+        "# Set",
+        "## Session Set Configuration",
+        "```yaml",
+        "model: opus",
+        "tier: full",
+        "```",
+        "",
+      ].join("\n");
+      const a = specWith(root, "001-a", mSpec);
+      const b = specWith(root, "002-b", mSpec);
+      const report = assignLegacySetsToModule(root, "greeter", [
+        { name: "001-a", specAbs: a },
+        { name: "002-b", specAbs: b },
+      ]);
+      assert.deepStrictEqual(report.stamped.sort(), ["001-a", "002-b"]);
+      assert.strictEqual(report.refused, undefined);
+      assert.strictEqual(report.writeFailed, undefined);
+      assert.ok(fs.readFileSync(a, "utf8").includes("```yaml\nmodule: greeter\nmodel: opus"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("stampModuleIntoSpecText is a no-op when already stamped to the same slug", () => {
+    const already = SPEC.replace("```yaml\n", "```yaml\nmodule: greeter\n");
+    assert.strictEqual(stampModuleIntoSpecText(already, "greeter").kind, "noop");
+  });
+
+  test("stampModuleIntoSpecText refuses when stamped to a DIFFERENT module", () => {
+    const other = SPEC.replace("```yaml\n", "```yaml\nmodule: payments\n");
+    const out = stampModuleIntoSpecText(other, "greeter");
+    assert.strictEqual(out.kind, "refused");
+    if (out.kind === "refused") {
+      assert.strictEqual(out.reason.code, "already-assigned");
+    }
+  });
+
+  test("stampModuleIntoSpecText refuses with no config block / no yaml fence", () => {
+    assert.strictEqual(
+      stampModuleIntoSpecText("# Just a title\n\nbody\n", "greeter").kind === "refused" &&
+        (stampModuleIntoSpecText("# Just a title\n\nbody\n", "greeter") as any).reason.code,
+      "no-config-block",
+    );
+    const noFence = "## Session Set Configuration\n\ntier: full\n\n## Sessions\n";
+    const out = stampModuleIntoSpecText(noFence, "greeter");
+    assert.strictEqual(out.kind, "refused");
+    if (out.kind === "refused") assert.strictEqual(out.reason.code, "no-yaml-fence");
+  });
+
+  // Set 093 S2 verification R2 (Major): an UNTERMINATED config fence must
+  // refuse — never borrow a closing fence from a LATER section (which would
+  // let a malformed block be mutated instead of rejected).
+  test("stampModuleIntoSpecText refuses an unterminated fence even when a later section has a fence", () => {
+    const malformed = [
+      "## Session Set Configuration",
+      "```yaml",
+      "tier: full",
+      "",
+      "## Sessions",
+      "```yaml",
+      "not-really: config",
+      "```",
+      "",
+    ].join("\n");
+    const out = stampModuleIntoSpecText(malformed, "greeter");
+    assert.strictEqual(out.kind, "refused");
+    if (out.kind === "refused") assert.strictEqual(out.reason.code, "no-yaml-fence");
+    // And nothing was produced — the input is unchanged (caller writes nothing).
+    assert.ok(!("text" in out));
+  });
+
+  test("assertStampedTextValid throws when anything besides the single line changed", () => {
+    const written = stampModuleIntoSpecText(SPEC, "greeter");
+    if (written.kind !== "written") return assert.fail("expected written");
+    // Tamper with an unrelated line — the byte-diff guard must catch it.
+    const tampered = written.text.replace("requiresUAT: false", "requiresUAT: true");
+    assert.throws(() => assertStampedTextValid(SPEC, tampered, "greeter"));
+    // Wrong target slug caught too.
+    assert.throws(() => assertStampedTextValid(SPEC, written.text, "payments"));
+  });
+
+  function specWith(root: string, name: string, body: string): string {
+    const dir = path.join(root, "docs", "session-sets", name);
+    fs.mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, "spec.md");
+    fs.writeFileSync(p, body, "utf8");
+    return p;
+  }
+
+  test("assignLegacySetsToModule stamps multiple sets and reports them", () => {
+    const root = tmpRoot("assign-multi-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const a = specWith(root, "001-a", SPEC);
+      const b = specWith(root, "002-b", SPEC);
+      const report = assignLegacySetsToModule(root, "greeter", [
+        { name: "001-a", specAbs: a },
+        { name: "002-b", specAbs: b },
+      ]);
+      assert.deepStrictEqual(report.stamped.sort(), ["001-a", "002-b"]);
+      assert.strictEqual(report.refused, undefined);
+      assert.ok(fs.readFileSync(a, "utf8").includes("module: greeter"));
+      assert.ok(fs.readFileSync(b, "utf8").includes("module: greeter"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("assignLegacySetsToModule is all-or-nothing: one bad set leaves EVERY file untouched", () => {
+    const root = tmpRoot("assign-atomic-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const good = specWith(root, "001-good", SPEC);
+      // Second set has no yaml fence → phase-1 refusal for the whole batch.
+      const bad = specWith(root, "002-bad", "## Session Set Configuration\n\ntier: full\n");
+      const report = assignLegacySetsToModule(root, "greeter", [
+        { name: "001-good", specAbs: good },
+        { name: "002-bad", specAbs: bad },
+      ]);
+      assert.ok(report.refused, "batch refused");
+      assert.strictEqual(report.stamped.length, 0);
+      assert.ok(!fs.readFileSync(good, "utf8").includes("module:"), "good set untouched");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("assignLegacySetsToModule: already-same-target is a no-op skip, not a refusal", () => {
+    const root = tmpRoot("assign-noop-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const already = SPEC.replace("```yaml\n", "```yaml\nmodule: greeter\n");
+      const p = specWith(root, "001-a", already);
+      const report = assignLegacySetsToModule(root, "greeter", [{ name: "001-a", specAbs: p }]);
+      assert.deepStrictEqual(report.alreadyAssigned, ["001-a"]);
+      assert.strictEqual(report.stamped.length, 0);
+      assert.strictEqual(report.refused, undefined);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2 verification R9 resolution: the writer is ATOMIC (temp →
+  // verify → rename), so ANY write failure leaves the operator's spec.md
+  // intact — there is no partial-write / rollback / post-write-mismatch state.
+  // A tiny in-memory fs models the four io ops; `<path>.dabbler-assign-tmp`
+  // is the staging file.
+  function memIo(
+    store: Record<string, string>,
+    over: Partial<{
+      readFileSync: (p: string) => string;
+      writeFileSync: (p: string, d: string) => void;
+      renameSync: (from: string, to: string) => void;
+      rmSync: (p: string) => void;
+    }> = {},
+  ) {
+    return {
+      readFileSync: (p: string) => {
+        if (!(p in store)) throw new Error(`ENOENT: ${p}`);
+        return store[p];
+      },
+      writeFileSync: (p: string, d: string) => {
+        store[p] = d;
+      },
+      renameSync: (from: string, to: string) => {
+        store[to] = store[from];
+        delete store[from];
+      },
+      rmSync: (p: string) => {
+        delete store[p];
+      },
+      ...over,
+    };
+  }
+
+  // A corrupt STAGED write is caught by the temp verification BEFORE the
+  // atomic rename — the target is never touched.
+  test("assignLegacySetsToModule leaves the target intact when the staged temp does not verify", () => {
+    const root = tmpRoot("assign-tmp-corrupt-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const fakePath = path.join(root, "docs", "session-sets", "001-a", "spec.md");
+      const store: Record<string, string> = { [fakePath]: SPEC };
+      const io = memIo(store, {
+        writeFileSync: (p, d) => {
+          // The temp write corrupts the staged bytes.
+          store[p] = d.includes("module: greeter") ? "CORRUPT-STAGE" : d;
+        },
+      });
+      const report = assignLegacySetsToModule(
+        root,
+        "greeter",
+        [{ name: "001-a", specAbs: fakePath }],
+        io,
+      );
+      assert.ok(report.writeFailed);
+      assert.strictEqual(report.stamped.length, 0);
+      assert.strictEqual(store[fakePath], SPEC, "the target spec.md is untouched");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // A throwing (temp) write leaves the target intact — the atomic rename
+  // never runs.
+  test("assignLegacySetsToModule leaves the target intact when the staged write throws", () => {
+    const root = tmpRoot("assign-tmp-throw-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const fakePath = path.join(root, "docs", "session-sets", "001-a", "spec.md");
+      const store: Record<string, string> = { [fakePath]: SPEC };
+      const io = memIo(store, {
+        writeFileSync: () => {
+          throw new Error("disk full");
+        },
+      });
+      const report = assignLegacySetsToModule(
+        root,
+        "greeter",
+        [{ name: "001-a", specAbs: fakePath }],
+        io,
+      );
+      assert.ok(report.writeFailed);
+      assert.ok(/left intact/i.test(report.writeFailed!.reason));
+      assert.strictEqual(store[fakePath], SPEC);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2 verification R4 (Major, TOCTOU): a file changed AFTER phase-1
+  // validation (a concurrent editor) must NOT be overwritten with the stale
+  // splice — the writer re-reads immediately before writing and refuses,
+  // preserving the external edit.
+  test("assignLegacySetsToModule refuses to overwrite a file edited after validation", () => {
+    const root = tmpRoot("assign-toctou-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const fakePath = path.join(root, "docs", "session-sets", "001-a", "spec.md");
+      const edited = SPEC.replace("# My Set", "# My Set (edited by hand)");
+      const store: Record<string, string> = { [fakePath]: SPEC };
+      let reads = 0;
+      const io = memIo(store, {
+        readFileSync: (p) => {
+          reads++;
+          // phase-1 read sees the original; the pre-write re-read (2nd) sees
+          // the external edit.
+          if (reads >= 2 && p === fakePath) {
+            store[p] = edited;
+            return edited;
+          }
+          return store[p];
+        },
+      });
+      const report = assignLegacySetsToModule(
+        root,
+        "greeter",
+        [{ name: "001-a", specAbs: fakePath }],
+        io,
+      );
+      assert.ok(report.writeFailed);
+      assert.ok(/concurrent edit|changed after/i.test(report.writeFailed!.reason));
+      assert.strictEqual(report.stamped.length, 0);
+      // The external edit is preserved (never overwritten).
+      assert.strictEqual(store[fakePath], edited);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2 verification R10 (Major): a concurrent edit landing during the
+  // staged write (between the pre-write check and the rename) must survive —
+  // the final target re-check before the rename aborts rather than clobber it.
+  test("assignLegacySetsToModule preserves a concurrent edit that lands during staging", () => {
+    const root = tmpRoot("assign-stage-race-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const fakePath = path.join(root, "docs", "session-sets", "001-a", "spec.md");
+      const userEdit = SPEC.replace("# My Set", "# CONCURRENT SAVE DURING STAGING");
+      const store: Record<string, string> = { [fakePath]: SPEC };
+      const isTmp = (p: string) => p.endsWith(".dabbler-assign-tmp");
+      const io = memIo(store, {
+        writeFileSync: (p, d) => {
+          store[p] = d;
+          // A concurrent editor saves the TARGET while we stage the temp.
+          if (isTmp(p)) store[fakePath] = userEdit;
+        },
+      });
+      const report = assignLegacySetsToModule(
+        root,
+        "greeter",
+        [{ name: "001-a", specAbs: fakePath }],
+        io,
+      );
+      assert.ok(report.writeFailed);
+      assert.ok(/changed during the staged write|concurrent edit/i.test(report.writeFailed!.reason));
+      assert.strictEqual(report.stamped.length, 0);
+      // The concurrent edit survives; the (unique) staged temp was cleaned up.
+      assert.strictEqual(store[fakePath], userEdit);
+      assert.ok(!Object.keys(store).some(isTmp), "the staged temp was discarded");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2 verification R9 (Major): an indented `module:` inside a block
+  // scalar / nested mapping is NOT a top-level stamp — it must not be mistaken
+  // for "already assigned"; the writer stamps a real top-level key.
+  test("stampModuleIntoSpecText: a nested / block-scalar `module:` is not a stamp (parsed top-level)", () => {
+    const nested = [
+      "## Session Set Configuration",
+      "```yaml",
+      "notes: |",
+      "  module: greeter",
+      "tier: full",
+      "```",
+      "",
+    ].join("\n");
+    const out = stampModuleIntoSpecText(nested, "greeter");
+    assert.strictEqual(out.kind, "written", "must splice a real top-level module key");
+    if (out.kind !== "written") return;
+    assert.ok(out.text.includes("```yaml\nmodule: greeter\nnotes: |"));
+    assert.doesNotThrow(() => assertStampedTextValid(nested, out.text, "greeter"));
+  });
+
+  test("assignLegacySetsToModule stamps a set whose block scalar contains a `module:` line", () => {
+    const root = tmpRoot("assign-nested-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const nested = [
+        "# Set",
+        "## Session Set Configuration",
+        "```yaml",
+        "notes: |",
+        "  module: greeter (a mention, not a stamp)",
+        "tier: full",
+        "```",
+        "",
+      ].join("\n");
+      const p = specWith(root, "001-a", nested);
+      const report = assignLegacySetsToModule(root, "greeter", [{ name: "001-a", specAbs: p }]);
+      assert.deepStrictEqual(report.stamped, ["001-a"]);
+      assert.ok(fs.readFileSync(p, "utf8").includes("```yaml\nmodule: greeter\nnotes: |"));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2 verification R8 (Major): the target must be re-validated
+  // against the manifest at WRITE time. If the module is removed from
+  // docs/modules.yaml during phase-1 reads, phase 2 must refuse before
+  // stamping any spec.md with the now-obsolete slug.
+  test("assignLegacySetsToModule refuses (no writes) when the target module is removed between phase 1 and phase 2", () => {
+    const root = tmpRoot("assign-manifest-toctou-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const a = specWith(root, "001-a", SPEC);
+      const b = specWith(root, "002-b", SPEC);
+      let rewrote = false;
+      const io = {
+        readFileSync: (p: string) => {
+          const content = fs.readFileSync(p, "utf8");
+          // On the first spec read (phase 1), remove the target from the real
+          // manifest so the write-time re-validation sees it gone.
+          if (!rewrote) {
+            writeManifest(root, "modules: []\n");
+            rewrote = true;
+          }
+          return content;
+        },
+        writeFileSync: (p: string, d: string) => fs.writeFileSync(p, d, "utf8"),
+        renameSync: (from: string, to: string) => fs.renameSync(from, to),
+        rmSync: (p: string) => fs.rmSync(p, { force: true }),
+      };
+      const report = assignLegacySetsToModule(
+        root,
+        "greeter",
+        [
+          { name: "001-a", specAbs: a },
+          { name: "002-b", specAbs: b },
+        ],
+        io,
+      );
+      assert.ok(report.refused, "must refuse when the target vanished at write time");
+      assert.strictEqual(report.stamped.length, 0);
+      assert.ok(!fs.readFileSync(a, "utf8").includes("module:"), "001-a untouched");
+      assert.ok(!fs.readFileSync(b, "utf8").includes("module:"), "002-b untouched");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("assignLegacySetsToModule never writes the pseudo/default target and refuses an undeclared one", () => {
+    const root = tmpRoot("assign-guard-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const p = specWith(root, "001-a", SPEC);
+      for (const bad of ["", "default", "Default", "ghost"]) {
+        const report = assignLegacySetsToModule(root, bad, [{ name: "001-a", specAbs: p }]);
+        assert.ok(report.refused, `refuses target ${JSON.stringify(bad)}`);
+        assert.ok(!fs.readFileSync(p, "utf8").includes("module:"), "file untouched");
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Set 093 S2 verification R3 (Major): the never-hide-work regrouping
+  // invariant, driven WRITER → parser → model (the spec's Step-5 promise
+  // "Unassigned disappears from a module only when emptied — work never
+  // vanishes"). Parses the stamped config back off disk so the assertion
+  // exercises the real writer output, not a hand-set attribution.
+  test("never-hide-work: Unassigned persists until emptied; total rows preserved", () => {
+    const root = tmpRoot("assign-regroup-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const names = ["001-a", "002-b", "003-c"];
+      const specs = names.map((n) => specWith(root, n, SPEC));
+      // Re-read each set's raw `module:` stamp from disk and build the
+      // minimal SessionSet computeVisibleModules re-derives attribution from.
+      const setsFromDisk = (): SessionSet[] =>
+        names.map(
+          (name, i) =>
+            ({
+              name,
+              specPath: specs[i],
+              root,
+              state: "not-started",
+              lastTouched: null,
+              config: parseSessionSetConfig(specs[i]),
+            }) as unknown as SessionSet,
+        );
+      const visible = (sets: SessionSet[]) =>
+        buildVisibleModulePayloads(
+          computeVisibleModules(classifyModulesManifest(root), sets, {
+            legacyRootPlanExists: false,
+          }),
+          (s) => ({ slug: s.name }) as never,
+        );
+      const totalRows = (mods: ReturnType<typeof visible>) =>
+        mods.reduce(
+          (n, m) => n + m.buckets.reduce((b, bk) => b + bk.rows.length, 0),
+          0,
+        );
+
+      // Baseline: all three unassigned under the pseudo module.
+      let mods = visible(setsFromDisk());
+      let pseudo = mods.find((m) => m.kind === "pseudo");
+      let greeter = mods.find((m) => m.slug === "greeter");
+      assert.ok(pseudo && pseudo.title === "Unassigned");
+      assert.strictEqual(totalRows([pseudo!]), 3);
+      assert.strictEqual(totalRows([greeter!]), 0);
+      assert.strictEqual(totalRows(mods), 3);
+
+      // Assign a SUBSET → Unassigned PERSISTS with the remaining set; the
+      // total is preserved (work never vanishes).
+      assignLegacySetsToModule(root, "greeter", [
+        { name: "001-a", specAbs: specs[0] },
+        { name: "002-b", specAbs: specs[1] },
+      ]);
+      mods = visible(setsFromDisk());
+      pseudo = mods.find((m) => m.kind === "pseudo");
+      greeter = mods.find((m) => m.slug === "greeter");
+      assert.ok(pseudo, "Unassigned must persist while a set is still unassigned");
+      assert.strictEqual(totalRows([pseudo!]), 1);
+      assert.strictEqual(totalRows([greeter!]), 2);
+      assert.strictEqual(totalRows(mods), 3);
+
+      // Assign the LAST set → Unassigned disappears ONLY now (emptied); every
+      // set remains visible under greeter.
+      assignLegacySetsToModule(root, "greeter", [{ name: "003-c", specAbs: specs[2] }]);
+      mods = visible(setsFromDisk());
+      pseudo = mods.find((m) => m.kind === "pseudo");
+      greeter = mods.find((m) => m.slug === "greeter");
+      assert.strictEqual(pseudo, undefined, "Unassigned disappears only when emptied");
+      assert.strictEqual(totalRows([greeter!]), 3);
+      assert.strictEqual(totalRows(mods), 3);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

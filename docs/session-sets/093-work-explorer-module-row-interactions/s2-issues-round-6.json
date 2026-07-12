@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 6,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The byte-diff guard rejects valid stamps when the first existing YAML key starts with `m`**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The D4 contract requires a format-preserving `module:` splice into valid configuration blocks. `assertStampedTextValid()` claims to verify that the result is “the original with EXACTLY the single inserted line,” but its longest-common-prefix/suffix calculation is not insertion-safe when the inserted text and following original text share a prefix.\n    - **Impact:** A valid unstamped set can be refused, and because phase one gates the entire batch, one such set prevents every selected set from being assigned. For example, any configuration whose first key is `model:`, `mode:`, or another key beginning with `m` triggers this failure despite the produced splice being correct.\n    - **Evidence:** In `assertStampedTextValid()`, the common prefix continues past the insertion point when the original block’s first character is `m`, because the inserted line also starts with `m`:\n      ```ts\n      while (p < minLen && originalText[p] === newText[p]) p++;\n      ```\n      Given:\n      ```yaml\n      model: opus\n      ```\n      and the correct result:\n      ```yaml\n      module: greeter\n      model: opus\n      ```\n      the calculated `newMiddle` becomes effectively `odule: greeter\\nm`, not `module: greeter\\n`, so the expected-line regex rejects it. All current tests use `tier:` as the first key and therefore miss this case.\n  - **Location:** `tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts` → `assertStampedTextValid()`\n  - **Fix:** Validate against the deterministic insertion anchor rather than inferring an insertion through longest-common-prefix/suffix. Pass the known `insertAt`/`inserted` values into the guard, reconstruct the expected text from `originalText`, and require exact equality with `newText`; alternatively, recompute the expected result using `stampModuleIntoSpecText(originalText, slug)`. Add a regression test with `model:` as the first configuration key and verify both single- and multi-set assignment succeed.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

@@ -60,6 +60,23 @@ import {
   LEGACY_ROOT_PLAN_REL,
   classifyModulesManifest,
 } from "../utils/moduleAuthoring";
+// Set 093 Session 2: the module-row action handlers (verdict amendments
+// 1 + 2). The four authoring actions reuse the existing plan / decomposition
+// flows with an explicit module target (routed ruling D1); the assign-legacy
+// flow is its own command.
+import {
+  copyPlanningPrompt,
+  importPlanFromFile,
+  openModulePlan,
+} from "../wizard/planImport";
+import { copySessionSetGenPrompt } from "../wizard/sessionGenPrompt";
+import { runAssignLegacySetsFlow } from "../commands/assignLegacySets";
+import {
+  ModuleActionExec,
+  dispatchModuleAction,
+  narrowModuleAction,
+  narrowModuleIdentity,
+} from "../utils/moduleActionNarrowing";
 import {
   ActionSupports,
   RowAction,
@@ -294,6 +311,15 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       case "showRowContextMenu":
         void this.showContextMenu(msg.slug);
         return;
+      case "moduleAction":
+        // Set 093 S2 (routed ruling D3): the module-row action strip /
+        // context menu. A closed action enum + explicit module identity —
+        // NOT routed through executeCommand/COMMAND_ALLOWLIST.
+        void this.handleModuleAction(msg.action, msg.moduleSlug, msg.moduleKind);
+        return;
+      case "showModuleContextMenu":
+        void this.showModuleContextMenu(msg.moduleSlug, msg.moduleKind);
+        return;
       case "toggleRow":
         this.handleToggle(msg.slug, msg.expanded, msg.accordionUpdatedAt);
         return;
@@ -337,6 +363,99 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     } catch (err) {
       console.warn(`[CustomSessionSetsView] left-click clipboard write failed for "${slug}"`, err);
     }
+  }
+
+  // Set 093 S2 (routed ruling D1/D2/D3): dispatch a module-row action. The
+  // module is IMPLIED by the row, so the authoring flows run with an
+  // explicit `preselectedSlug` — NO module QuickPick and NO auto-select
+  // notice fires (amendment 1's QuickPick retirement). Dispatch is driven by
+  // the AUTHORITATIVE slug (`""` → repo-level for a pseudo row; a declared
+  // slug → that module; the picker fails loud on an unresolvable one);
+  // `moduleKind` is only an untrusted cross-check that drops a fallback
+  // message (a fallback row renders no strip, so it must never send one).
+  private async handleModuleAction(
+    action: unknown,
+    moduleSlug: unknown,
+    moduleKind: unknown,
+  ): Promise<void> {
+    // Set 093 S2 (routed ruling D3): STRICTLY narrow the untrusted message —
+    // a malformed identity (e.g. `moduleSlug: null` claiming `declared`, or a
+    // `fallback`/unknown kind, or `assign-legacy` off the pseudo module) is
+    // DROPPED, never coerced to a repo-level default. `narrowModuleAction`
+    // enforces the kind⟺slug-shape invariant so a null slug can no longer
+    // masquerade as the pseudo (repo-level) target.
+    const narrowed = narrowModuleAction(action, moduleSlug, moduleKind);
+    if (!narrowed) {
+      console.warn(
+        `[CustomSessionSetsView] dropped malformed module action ` +
+          `${JSON.stringify({ action, moduleSlug, moduleKind })}`,
+      );
+      return;
+    }
+    // The narrowed slug drives resolution: "" → repo-level (pseudo); a
+    // non-empty declared slug → that module (or unknown-module, fail-loud).
+    // The dispatch MAPPING is the pure `dispatchModuleAction`, tested at
+    // Layer 2; this binds it to the real flows.
+    await dispatchModuleAction(narrowed, this.moduleActionExec());
+  }
+
+  /** Set 093 S2: bind the module-action dispatch to the real flows. */
+  private moduleActionExec(): ModuleActionExec {
+    return {
+      aiPlan: (slug) => copyPlanningPrompt(undefined, { preselectedSlug: slug }),
+      importPlan: (slug) =>
+        importPlanFromFile(undefined, { preselectedSlug: slug }),
+      openPlan: (slug) => openModulePlan(undefined, { preselectedSlug: slug }),
+      aiSets: async (slug) => {
+        // copySessionSetGenPrompt returns whether it copied; the exec
+        // contract is void (the info toast is its own feedback).
+        await copySessionSetGenPrompt(this.context, {}, { preselectedSlug: slug });
+      },
+      assignLegacy: () => runAssignLegacySetsFlow(),
+      refresh: () => this.refresh(),
+    };
+  }
+
+  // Set 093 S2 (routed ruling D3): the module-row context menu — an
+  // action-SELECTION QuickPick (which of the actions). The module is already
+  // carried, so no module-selection QuickPick and no auto-select notice fire
+  // (amendment 1 bans re-picking the MODULE, not the menu mechanism). Each
+  // pick dispatches through the same `handleModuleAction` seam.
+  private async showModuleContextMenu(
+    moduleSlug: unknown,
+    moduleKind: unknown,
+  ): Promise<void> {
+    // Set 093 S2 (routed ruling D3): the same strict narrowing as the strip —
+    // a fallback / unknown kind or a malformed kind⟺slug pairing drops the
+    // menu entirely (no coercion to a repo-level default).
+    const identity = narrowModuleIdentity(moduleSlug, moduleKind);
+    if (!identity) return;
+    const { slug, kind } = identity;
+    const items: { label: string; action: string }[] = [
+      { label: "$(sparkle) AI Plan — copy a plan-authoring prompt", action: "ai-plan" },
+      { label: "$(file-add) Import Plan…", action: "import-plan" },
+      { label: "$(go-to-file) Open Plan", action: "open-plan" },
+      { label: "$(sparkle) AI Sets — copy a decomposition prompt", action: "ai-sets" },
+    ];
+    // The `Assign legacy sets…` affordance rides the pseudo `Unassigned`
+    // module only — i.e. a pseudo module beside >= 1 declared module. The
+    // manifest having a declared entry is the same condition that labels the
+    // pseudo module `Unassigned` (routed ruling D2).
+    if (kind === "pseudo") {
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const classified = root ? classifyModulesManifest(root) : { kind: "absent" as const };
+      if (classified.kind === "present" && classified.entries.length > 0) {
+        items.push({
+          label: "$(arrow-right) Assign legacy sets to module…",
+          action: "assign-legacy",
+        });
+      }
+    }
+    const picked = await vscode.window.showQuickPick(items, {
+      placeHolder: "Module actions",
+    });
+    if (!picked) return;
+    await this.handleModuleAction(picked.action, slug, kind);
   }
 
   private dispatchCommand(commandId: string, args?: unknown[]): void {

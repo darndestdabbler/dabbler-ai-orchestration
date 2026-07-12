@@ -505,19 +505,75 @@
     // embedded controls (WAI-ARIA tree keyboard semantics, amendment 1).
     const children =
       renderPlanNode(mod, moduleKey) + renderSessionSetsNode(mod, moduleKey);
+    // Set 093 S2 (verdict amendments 1 + 2): the module-ROW inline action
+    // strip. Rendered for `declared` and `pseudo` kinds; NOT `fallback` (a
+    // fallback has no plan slot and no manifest entry to target — the
+    // undeclared-slug warning owns its remediation, routed ruling D2). The
+    // strip is a SIBLING of the header inside the treeitem, and the
+    // treeitem's aria-labelledby continues to point ONLY at the header, so
+    // the buttons never pollute the accessible name (amendment 1 —
+    // interactive descendants excluded from the tree name).
+    const actionStrip =
+      kind === "fallback" ? "" : renderModuleActionStrip(kind, label, slug);
     return (
       '<div role="treeitem" tabindex="-1" aria-level="1"' +
         ' aria-selected="false" aria-expanded="' + (expanded ? "true" : "false") + '"' +
         ' aria-labelledby="' + escAttr(headerId) + '" class="' + moduleClasses + '"' +
         ' data-module-key="' + escAttr(moduleKey) + '"' +
         ' data-module-kind="' + escAttr(kind) + '"' +
+        ' data-module-slug="' + escAttr(slug) + '"' +
         ' data-testid="module-' + escAttr(moduleKey) + '">' +
         '<div id="' + escAttr(headerId) + '" class="module-header" data-collapsible="true">' +
           '<span class="module-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
           '<span class="module-title">' + escHtml(label) + '</span>' +
           warning +
         '</div>' +
+        actionStrip +
         '<div class="module-body" role="group">' + children + '</div>' +
+      '</div>'
+    );
+  }
+
+  // Set 093 S2 (routed ruling D3): the module-row action strip — a
+  // `role="toolbar"` reached by Tab as a SECONDARY TABSTOP (never on the
+  // tree's arrow-key roving, which touches treeitems only). Its buttons are
+  // NOT treeitems, so they are excluded from the tree name and from arrow
+  // nav; internal roving (Arrow/Home/End) + activate (Enter/Space) + Escape
+  // (back to the module) are handled by the root keydown handler. Buttons
+  // carry the module identity so a click/activation posts a self-validating
+  // `moduleAction` message (no executeCommand allowlist involvement). The
+  // `assign-legacy` affordance rides the pseudo `Unassigned` module only.
+  function renderModuleActionStrip(kind, label, slug) {
+    var buttons = [
+      { action: "ai-plan", label: "AI Plan", title: "Copy a module-targeted plan-authoring prompt" },
+      { action: "import-plan", label: "Import Plan", title: "Import a plan file for this module" },
+      { action: "open-plan", label: "Open Plan", title: "Open this module's plan" },
+      { action: "ai-sets", label: "AI Sets", title: "Copy a module-targeted decomposition prompt" },
+    ];
+    if (kind === "pseudo" && label === "Unassigned") {
+      buttons.push({
+        action: "assign-legacy",
+        label: "Assign…",
+        title: "Assign legacy (unassigned) sets to a module",
+      });
+    }
+    var btnHtml = buttons
+      .map(function (b) {
+        return (
+          '<button type="button" class="module-action"' +
+            ' tabindex="-1" data-module-action="' + escAttr(b.action) + '"' +
+            ' title="' + escAttr(b.title) + '"' +
+            ' aria-label="' + escAttr(b.title) + '">' +
+            escHtml(b.label) +
+          '</button>'
+        );
+      })
+      .join("");
+    return (
+      '<div class="module-action-strip" role="toolbar" aria-label="Module actions"' +
+        ' data-module-slug="' + escAttr(slug) + '"' +
+        ' data-module-kind="' + escAttr(kind) + '">' +
+        btnHtml +
       '</div>'
     );
   }
@@ -816,16 +872,103 @@
     });
   }
 
-  function focusItem(item) {
-    if (!item) return;
-    const all = Array.from(root.querySelectorAll('[role="treeitem"]'));
-    all.forEach(function (el) {
+  // Set 093 S2: make `item` the tree's single roving tabstop (tabindex 0,
+  // aria-selected) WITHOUT moving DOM focus — used both by focusItem (which
+  // then focuses) and by the focusin handler when a pointer click lands on a
+  // strip button (the button keeps focus; its module becomes the active row).
+  function setTreeTabstop(item) {
+    Array.from(root.querySelectorAll('[role="treeitem"]')).forEach(function (el) {
       el.setAttribute("tabindex", "-1");
       el.setAttribute("aria-selected", "false");
     });
     item.setAttribute("tabindex", "0");
     item.setAttribute("aria-selected", "true");
+  }
+
+  function focusItem(item) {
+    if (!item) return;
+    setTreeTabstop(item);
     item.focus();
+    // The `focusin` listener (wireInteraction) drives the action-strip
+    // secondary-tabstop off the resulting focus change — see below.
+  }
+
+  // Set 093 S2 (routed ruling D3): exactly one module's strip carries a
+  // Tab-reachable button (the roving anchor), and only when that module row
+  // is focused, so Tab off the module lands on its strip and every other
+  // strip stays off the tab order. All buttons stay tabindex=-1 (roved into
+  // via Arrow keys once inside).
+  function syncActionStripTabstop(focusedModule) {
+    Array.from(root.querySelectorAll(".module-action")).forEach(function (btn) {
+      btn.setAttribute("tabindex", "-1");
+    });
+    if (!focusedModule) return;
+    const first = focusedModule.querySelector(".module-action-strip .module-action");
+    if (first) first.setAttribute("tabindex", "0");
+  }
+
+  // Set 093 S2: toolbar internal roving + activation, invoked from the root
+  // keydown handler when focus sits on a `.module-action` button. Arrow /
+  // Home / End move within the strip; Enter / Space activate; Escape returns
+  // to the module treeitem. Tab / Shift+Tab fall through (exit the toolbar).
+  function handleToolbarKey(ev, btn) {
+    const strip = btn.closest(".module-action-strip");
+    if (!strip) return;
+    const btns = Array.from(strip.querySelectorAll(".module-action"));
+    const i = btns.indexOf(btn);
+    function moveTo(next) {
+      const target = btns[Math.min(btns.length - 1, Math.max(0, next))];
+      if (!target) return;
+      btns.forEach(function (b) { b.setAttribute("tabindex", "-1"); });
+      target.setAttribute("tabindex", "0");
+      target.focus();
+    }
+    switch (ev.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        ev.preventDefault();
+        moveTo(i + 1);
+        return;
+      case "ArrowLeft":
+      case "ArrowUp":
+        ev.preventDefault();
+        moveTo(i - 1);
+        return;
+      case "Home":
+        ev.preventDefault();
+        moveTo(0);
+        return;
+      case "End":
+        ev.preventDefault();
+        moveTo(btns.length - 1);
+        return;
+      case "Enter":
+      case " ":
+        ev.preventDefault();
+        invokeModuleAction(btn);
+        return;
+      case "Escape": {
+        ev.preventDefault();
+        const mod = btn.closest('[role="treeitem"]');
+        if (mod) focusItem(mod);
+        return;
+      }
+      default:
+        // Tab / Shift+Tab and everything else: let the browser handle it.
+        return;
+    }
+  }
+
+  // Set 093 S2: post the module action carried by a strip button.
+  function invokeModuleAction(btn) {
+    const strip = btn.closest(".module-action-strip");
+    if (!strip) return;
+    vscode.postMessage({
+      type: "moduleAction",
+      action: btn.getAttribute("data-module-action"),
+      moduleSlug: strip.getAttribute("data-module-slug") || "",
+      moduleKind: strip.getAttribute("data-module-kind") || "",
+    });
   }
 
   function moveFocus(current, delta) {
@@ -929,6 +1072,45 @@
       });
     });
 
+    // Set 093 S2 (routed ruling D3): the module-row action strip buttons.
+    // A click posts the self-validating `moduleAction` message; focus moves
+    // to the button (and its module) so keyboard roving continues from
+    // there. stopPropagation keeps the module-header collapse from firing.
+    Array.from(root.querySelectorAll(".module-action")).forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        invokeModuleAction(btn);
+      });
+    });
+
+    // Set 093 S2 (routed ruling D3): drive the strip secondary-tabstop off
+    // ANY focus change (keyboard Tab, mouse, arrow nav) — not only our
+    // focusItem — so Tab into the tree then onward always reaches the
+    // focused module's strip. Focus on a module treeitem arms its strip;
+    // focus on any other treeitem retracts all strips; focus moving INTO a
+    // strip button keeps the current anchor.
+    root.addEventListener("focusin", function (ev) {
+      const btn = ev.target.closest && ev.target.closest(".module-action");
+      if (btn) {
+        // Set 093 S2 (verification R7 fix): focus entered a strip button —
+        // including a POINTER CLICK on a DIFFERENT module's strip (a button is
+        // clickable even at tabindex=-1). Make the focused button the SOLE
+        // roving anchor across ALL strips (clear any stale anchor left in the
+        // previously-focused module's strip), and make its module the active
+        // tree row — without stealing focus from the button. Otherwise
+        // Shift+Tab / arrow nav would jump to the wrong module.
+        Array.from(root.querySelectorAll(".module-action")).forEach(function (b) {
+          b.setAttribute("tabindex", b === btn ? "0" : "-1");
+        });
+        const mod = btn.closest('[role="treeitem"]');
+        if (mod) setTreeTabstop(mod);
+        return;
+      }
+      const ti = ev.target.closest && ev.target.closest('[role="treeitem"]');
+      syncActionStripTabstop(ti && ti.classList.contains("module") ? ti : null);
+    });
+
     // Set 062 S1 (D1): the verification-posture marker is an action
     // surface — click (or Enter/Space, via the keydown handler below)
     // opens the SAME row QuickPick the right-click opens. It posts the
@@ -966,10 +1148,7 @@
         if (ev.target.closest('[role="treeitem"]') !== item) return;
         ev.preventDefault();
         focusItem(item);
-        const slug = item.getAttribute("data-slug");
-        if (slug) {
-          vscode.postMessage({ type: "showRowContextMenu", slug: slug });
-        }
+        postContextMenuFor(item);
       });
     });
 
@@ -1001,6 +1180,27 @@
     });
   }
 
+  // Set 093 S2 (routed ruling D3): open the right context menu for a
+  // treeitem — the set-name-keyed row menu (`showRowContextMenu`) for a
+  // session-set row, or the module action menu (`showModuleContextMenu`)
+  // for a module row. Buckets / child nodes carry neither and open nothing.
+  // A fallback module renders no strip, so its menu is suppressed here too.
+  function postContextMenuFor(item) {
+    const slug = item.getAttribute("data-slug");
+    if (slug) {
+      vscode.postMessage({ type: "showRowContextMenu", slug: slug });
+      return;
+    }
+    const kind = item.getAttribute("data-module-kind");
+    if (kind && kind !== "fallback") {
+      vscode.postMessage({
+        type: "showModuleContextMenu",
+        moduleSlug: item.getAttribute("data-module-slug") || "",
+        moduleKind: kind,
+      });
+    }
+  }
+
   // Root-level keydown — captures keys regardless of which node has
   // focus. Implements the WAI-ARIA single-select tree pattern. Set 087
   // S2 (R2 fix): module/bucket nodes are expandable treeitems in the
@@ -1010,6 +1210,15 @@
   // activates, ArrowRight/Left stay consumed no-ops in the
   // single-implicit dialect (no parent treeitem exists there).
   document.addEventListener("keydown", function (ev) {
+    // Set 093 S2 (routed ruling D3): when focus sits on a module-action
+    // toolbar button, the toolbar owns the keys (internal roving / activate /
+    // Escape) — the tree's arrow nav must NOT also fire off the button's
+    // ancestor module treeitem.
+    const actionBtn = ev.target.closest && ev.target.closest(".module-action");
+    if (actionBtn) {
+      handleToolbarKey(ev, actionBtn);
+      return;
+    }
     const item = ev.target.closest && ev.target.closest('[role="treeitem"]');
     if (!item) return;
     const expandable = item.hasAttribute("aria-expanded");
@@ -1071,14 +1280,12 @@
       case "F10":
         if (ev.shiftKey) {
           ev.preventDefault();
-          const s = item.getAttribute("data-slug");
-          if (s) vscode.postMessage({ type: "showRowContextMenu", slug: s });
+          postContextMenuFor(item);
         }
         return;
       case "ContextMenu":
         ev.preventDefault();
-        const slugCm = item.getAttribute("data-slug");
-        if (slugCm) vscode.postMessage({ type: "showRowContextMenu", slug: slugCm });
+        postContextMenuFor(item);
         return;
     }
   });

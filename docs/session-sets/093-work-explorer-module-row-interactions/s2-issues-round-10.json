@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 10,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Atomic staging reintroduces a concurrent-edit overwrite window**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Details:**\n    - **Violation:** The writer must preserve operator edits and ensure that only the intended `module:` insertion changes. The implementation itself states that a file changed after validation “must NOT be overwritten,” while D4 requires the on-disk mutation to equal the intended splice with nothing else changed.\n    - **Impact:** An editor or external tool saving `spec.md` while the extension stages the replacement can have its changes silently erased. The operation then reports success, making this an operator-data-loss path that should block merge.\n    - **Evidence:** Phase two checks the target before staging, but the actual target replacement happens only after two additional filesystem operations:\n      ```ts\n      current = io.readFileSync(item.specAbs);\n      if (current !== item.original) return fail(...);\n\n      io.writeFileSync(tmp, item.next);\n      if (io.readFileSync(tmp) !== item.next) throw ...;\n      io.renameSync(tmp, item.specAbs);\n      ```\n      If `spec.md` changes after the first read but before `renameSync`, the rename unconditionally replaces those new bytes with `item.next`. Verifying the temporary file proves only the staged source contents; it does not prove the destination still equals `item.original`. This can be reproduced deterministically with the injectable `SpecFileIo` by changing the target as a side effect of the temporary-file write.\n    - **Location:** `tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts` → phase two of `assignLegacySetsToModule()`\n    - **Fix:** Re-read and compare the target after temporary-file verification and immediately before the rename, aborting and deleting the temp if it changed. Also serialize assignments targeting the same file or use a versioned/conditional replacement mechanism where available. Add a regression that modifies the target during the staged write and verifies the concurrent edit survives and the assignment fails.",
+      "category": "Correctness",
+      "severity": "Major"
+    }
+  ]
+}

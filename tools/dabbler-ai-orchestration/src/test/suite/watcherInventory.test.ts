@@ -49,15 +49,17 @@ const WATCHER_ALLOWLIST: WatcherEntry[] = [
   {
     file: "extension.ts",
     // Set 077 S2: +9 — the retainContextWhenHidden evaluation comment
-    // at the view registration shifted both callsites down.
-    line: 201,
+    // at the view registration shifted both callsites down. Set 093 S2:
+    // +1 — the assign-legacy command import + registration shifted both
+    // callsites down one more line.
+    line: 202,
     target: "docs/session-sets/** (spec.md, session-state.json, session-events.jsonl, activity-log.json, change-log.md, CANCELLED.md, *-uat-checklist.json)",
     purpose:
       "Tree-view refresh on canonical session-set state files. Watched files are themselves the writers' source of truth (no inference from indirect signals) — D1 permits.",
   },
   {
     file: "extension.ts",
-    line: 240,
+    line: 241,
     target: "Getting Started D3 inputs + module manifest: {CLAUDE.md, AGENTS.md, GEMINI.md, docs/modules.yaml, docs/planning/project-plan.md, .venv/**/site-packages/ai_router/**, docs/session-sets/*}",
     purpose:
       "Set 060 Getting Started live-progress plus Set 092 manifest diagnostics: these scaffold artifacts and docs/modules.yaml are the direct sources of truth for form completion, module grouping, and invalid-manifest status (no indirect orchestrator-state inference) — D1 permits.",

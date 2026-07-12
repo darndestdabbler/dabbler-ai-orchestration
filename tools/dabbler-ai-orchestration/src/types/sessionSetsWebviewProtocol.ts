@@ -331,6 +331,49 @@ export interface ShowRowContextMenuMsg {
   slug: string;
 }
 
+// Set 093 Session 2 (verdict amendments 1 + 2): the module-row action
+// strip / context menu / palette all resolve to ONE host dispatch. The
+// action is a closed enum and the module identity travels with it
+// (`moduleSlug` is the docs/modules.yaml slug — "" for the pseudo
+// module; `moduleKind` is an UNTRUSTED cross-check the host re-resolves,
+// never trusts). Like `gettingStartedAction`, this channel is separate
+// from `executeCommand` on purpose — a self-validating action enum plus
+// explicit module identity keeps the COMMAND_ALLOWLIST contract
+// untouched (routed ruling D3, s2-targeting-seam-architecture.json).
+//
+// The four authoring actions imply their module, so NO module QuickPick
+// and NO auto-select notice fires (amendment 1's QuickPick retirement
+// bans re-picking the MODULE, not the mechanism). `assign-legacy` is the
+// separate `Assign legacy sets to module…` affordance the pseudo module
+// carries only when it is labeled `Unassigned` (declared groups coexist);
+// it opens its own target-module + sets pickers (amendment 2).
+export type ModuleActionId =
+  | "ai-plan"       // copy a module-targeted plan-authoring prompt
+  | "import-plan"   // file picker → the module's plan path
+  | "open-plan"     // open the module's plan in an editor
+  | "ai-sets"       // copy a module-targeted decomposition prompt
+  | "assign-legacy"; // Unassigned only: stamp module: into chosen sets
+
+export interface ModuleActionMsg {
+  type: "moduleAction";
+  action: ModuleActionId;
+  moduleSlug: string;               // "" for the pseudo module
+  moduleKind: "declared" | "fallback" | "pseudo";
+}
+
+// Right-click / Shift+F10 / Context Menu key on a MODULE row → open the
+// action-selection QuickPick. Distinct from `showRowContextMenu` (which
+// is keyed by a set NAME): module identity and the four-action menu are
+// disjoint from the set-name-keyed row menu, so a separate message keeps
+// each menu's contract single-purpose (routed ruling D3). The module is
+// already carried, so the QuickPick chooses only WHICH action — never
+// re-picks the module.
+export interface ShowModuleContextMenuMsg {
+  type: "showModuleContextMenu";
+  moduleSlug: string;
+  moduleKind: "declared" | "fallback" | "pseudo";
+}
+
 // Operator manually collapsed / expanded a row. Host updates
 // workspaceState (suppress / clear) and may re-fire a SuppressionEcho.
 // `accordionUpdatedAt` carries the suppression-key value from the
@@ -409,6 +452,8 @@ export interface GettingStartedActionMsg {
 export type WebviewToHost =
   | ExecuteCommandMsg
   | ShowRowContextMenuMsg
+  | ModuleActionMsg
+  | ShowModuleContextMenuMsg
   | ToggleRowMsg
   | ActivateRowMsg
   | ReadyMsg

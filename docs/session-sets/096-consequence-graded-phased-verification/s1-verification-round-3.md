@@ -1,0 +1,10 @@
+VERIFIED
+
+The core rubric, parser/schema extension, ledger assembly, prompt wiring, experiment deliverables, and settlement-evidence remediation are implemented and targeted by tests. No likely, materially impairing defect is substantiated; the remaining concerns are non-blocking.
+
+#### NITS
+
+- **Nit — Issue:** The claimed full-suite result is stale relative to the remediated tree: the diff adds 29 collected tests, while the recorded increase is only 26 (`2922 → 2948`), and only targeted suites were rerun after remediation. **Location:** `s1-conventions.md`, `activity-log.json`, `disposition.json`. **Fix:** Run the full suite on the final tree and record the resulting count.
+- **Nit — Issue:** The failure-scenario regex is unanchored and permits zero label punctuation, so ordinary prose containing “failure scenario” can be misparsed as `failureScenario`. Classification is unaffected, limiting this to data quality. **Location:** `ai_router/verification.py`, `_parse_issue_blocks()`. **Fix:** Anchor the match to a line prefix and require label punctuation while retaining Markdown-emphasis tolerance.
+- **Nit — Issue:** The schema description still claims the issues artifact “has no runtime reader in the orchestration layer,” although `assemble_cross_round_ledger()` now consumes it at runtime. **Location:** `docs/session-issues.schema.json`. **Fix:** Document `verify_session` as a compatibility-sensitive runtime consumer.
+- **Nit — Issue:** The K=3 rejection uses the chronological `+1` marginal from one ordering, although exchangeable K=2 pairs leave 1, 5, or 3 findings for the third run—three on average. The memo correctly reports 81% mean K=2 coverage, but this specific rationale remains overstated. **Location:** `s1-fanout-experiment.md`, “Sizing recommendation.” **Fix:** Base the K=2/K=3 tradeoff on expected pair coverage and average third-run marginal, while retaining the stated small-sample caveat.

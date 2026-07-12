@@ -37,7 +37,11 @@
     }
   },
   "blockers": [],
-  "lessons_cited": ["L-095-1", "L-065-1", "L-069-1"],
+  "lessons_cited": [
+    "L-095-1",
+    "L-065-1",
+    "L-069-1"
+  ],
   "deferred_issues": [
     "Five latent rubric-graded Majors against the SHIPPED Set 095 tutorial deliverables surfaced by the fan-out experiment (F1-F5 in s1-fanout-experiment.md: unittest test-framework contract not pinned by the walkthrough; reviewDecision treated as enforcement proof; ADVISORY caps able to suppress proven failures; owner-roster gap; hotfix drill's module-only pre-tag validation). Recorded with raw artifacts for operator disposition; out of this set's machinery scope."
   ]

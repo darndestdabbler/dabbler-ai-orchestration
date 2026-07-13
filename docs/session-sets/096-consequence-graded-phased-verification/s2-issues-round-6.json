@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 6,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The convergence replay does not substantiate the required materially lower-cost falsifier\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** The phased loop is accepted as empirically demonstrating substantially cheaper convergence for normal, initially defective sessions. Those sessions begin before remediation, but the replay begins after all 39 Set 095 Majors were already fixed and processes only five latent findings plus one fix-induced defect. Because this workload mismatch affects the normal use case, the claimed 17-round/$4.88 to 4-round/$0.85 improvement may reflect the easier starting state rather than the phased loop.\n  - **Details:**\n    - **Violation:** The task requires “the Set 095 corpus replay demonstrating convergence … at materially lower cost” and calls it “the set’s falsifier.” The delivered artifacts continue to describe the replay as that falsifier and compare its cost directly with the Set 095 baseline.\n    - **Impact:** The set’s central empirical acceptance criterion remains unproven. A reasonable reviewer cannot attribute the reported cost reduction to the phased design, which changes the merge decision for a release justified by that experiment.\n    - **Evidence:** `s2-convergence-replay.md` states that it starts at `b16dd58`, where “all 39 remediated Majors are fixed,” and explicitly concedes that it is not a defect-for-defect A/B. Nevertheless, `change-log.md` and `ai_router/CHANGELOG.md` still present 4 rounds/$0.85 versus 17 rounds/$4.88 as the set’s lower-cost falsifier. Qualifications accurately describe the limitation but do not supply the missing comparative evidence.\n    - **Location:** `docs/session-sets/096-consequence-graded-phased-verification/s2-convergence-replay.md`, `change-log.md`, and `ai_router/CHANGELOG.md`.\n    - **Fix:** Replay from an equivalent pre-remediation Set 095 state and preserve the rounds/cost evidence, or characterize the existing run only as an end-to-end machinery demonstration and acknowledge that the required comparative-cost falsifier remains incomplete.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "The phased loop is accepted as empirically demonstrating substantially cheaper convergence for normal, initially defective sessions. Those sessions begin before remediation, but the replay begins after all 39 Set 095 Majors were already fixed and processes only five latent findings plus one fix-induced defect. Because this workload mismatch affects the normal use case, the claimed 17-round/$4.88 to 4-round/$0.85 improvement may reflect the easier starting state rather than the phased loop."
+    }
+  ]
+}

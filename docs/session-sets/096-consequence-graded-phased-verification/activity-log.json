@@ -148,6 +148,14 @@
       "dateTime": "2026-07-12T20:26:49.187545-04:00",
       "description": "Advisory path-aware critique produced (pull surface, google gemini-2.5-pro VERIFIED + openai gpt-5.4 ISSUES_FOUND with one Major: fixVerdicts has no machine record on a CLEAN remediation-review round because the Set 055 invariant forbids a clean-round envelope). Adjudication: the invariant is locked and correct; the CONTRACT DOCS overclaimed -- schema doc + writer docstring now state the raw stamp-bound artifact is the durable record on clean rounds, and the JSON schema gained the ledgerId item property (parity). Converged per L-070-1 (doc-wording change only, no code change). Next-set analysis routed (gemini-pro, $0.004: 095-patch first, then 077-redo); ai-assignment actuals filled; disposition.json authored (final session, next_orchestrator null); change-log.md written.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "awaiting-human-adjudication",
+      "dateTime": "2026-07-12T20:43:56.476844-04:00",
+      "description": "Close attempted twice; the Set 084 backstop ran rounds 5 and 6 in-process. Round 5: 2 Majors -- the ledger-id occurrence/re-coverage churn defect (REAL, fixed: previously-accepted ids now render EXEMPT and drop from the required coverage set, +1 test, suite 3011 passed) and the resurrected replay-comparison point (refused per the no-resurrection rule with the settlement evidence named in s2-remediation-round-5.md). Round 6: the B2 fix accepted; ONLY the resurrected point remains, re-raised in fresh wording after two explicit fix-accepted verdicts (rounds 3+4). Constitution stopping condition reached (never re-round a disputed finding): loop stopped, disposition -> requires_review, all work committed+pushed, adjudication package prepared for the operator. Second-provider datapoint on record: gemini-2.5-pro path-aware critic returned VERIFIED with no such finding.",
+      "status": "complete"
     }
   ]
 }

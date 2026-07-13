@@ -17897,21 +17897,29 @@ var NODE_RENAME_IO = {
     }
   }
 };
+function inferLegacyStatus(dir) {
+  if (fs6.existsSync(path7.join(dir, "change-log.md")))
+    return "complete";
+  if (fs6.existsSync(path7.join(dir, "activity-log.json")))
+    return "in-progress";
+  return "not-started";
+}
 function hasRunningSessionAt(setDir, io) {
   let raw;
   try {
     raw = io.readFileSync(path7.join(setDir, "session-state.json"));
   } catch {
-    return false;
+    return inferLegacyStatus(setDir) === "in-progress";
   }
   let doc;
   try {
     doc = JSON.parse(raw);
   } catch {
-    return false;
+    return inferLegacyStatus(setDir) === "in-progress";
   }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc))
-    return false;
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return inferLegacyStatus(setDir) === "in-progress";
+  }
   const d = doc;
   if (d.status === "in-progress")
     return true;
@@ -18099,19 +18107,19 @@ function rawSessionSetStatus(dir) {
   try {
     raw = fs6.readFileSync(path7.join(dir, "session-state.json"), "utf8");
   } catch {
-    return "not-started";
+    return inferLegacyStatus(dir);
   }
   let doc;
   try {
     doc = JSON.parse(raw);
   } catch {
-    return "not-started";
+    return inferLegacyStatus(dir);
   }
   if (doc === null || typeof doc !== "object" || Array.isArray(doc))
-    return "not-started";
+    return inferLegacyStatus(dir);
   const status = doc.status;
   if (typeof status !== "string")
-    return "not-started";
+    return inferLegacyStatus(dir);
   const canon = status === "completed" || status === "done" ? "complete" : status;
   return canon === "complete" || canon === "in-progress" ? canon : "not-started";
 }
@@ -18158,7 +18166,7 @@ function removeManifestEntryText(text, slug) {
   const entryIndent = target[1].length;
   const slugLineEnd = target.index + target[0].length;
   let spanEnd = text.length;
-  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|[^ \t\r\n#])/g;
+  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|#|[^ \t\r\n#])/g;
   boundaryRe.lastIndex = slugLineEnd;
   let bm;
   while ((bm = boundaryRe.exec(text)) !== null) {

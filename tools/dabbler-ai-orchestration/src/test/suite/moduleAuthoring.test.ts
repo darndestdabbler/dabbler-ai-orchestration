@@ -2366,6 +2366,27 @@ suite("moduleAuthoring — renameModule preflight matrix (Set 099 S1)", () => {
     }
   });
 
+  // Path-aware critique (GPT-5.4, Major): a LEGACY in-progress set — no
+  // session-state.json at all, only activity-log.json (the pre-backfill
+  // shape readStatus itself infers "in-progress" from) — must ALSO refuse,
+  // not silently read as not-running because the state file is absent.
+  test("refuses while an affected set is LEGACY in-progress (activity-log.json, no session-state.json)", () => {
+    const root = setup("modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      const setDir = path.dirname(a);
+      fs.writeFileSync(path.join(setDir, "activity-log.json"), "{}", "utf8");
+      assert.ok(!fs.existsSync(path.join(setDir, "session-state.json")));
+      const before = fs.readFileSync(a, "utf8");
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" });
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /running session/i);
+      assert.strictEqual(fs.readFileSync(a, "utf8"), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("refuses renaming a module that is not declared", () => {
     const root = setup("modules:\n  - slug: greeter\n    title: Greeter\n");
     try {
@@ -2783,6 +2804,41 @@ suite("moduleAuthoring — classifyModuleSetsForDeletion (Set 099 S2)", () => {
     }
   });
 
+  // Path-aware critique (both providers, Critical/Major): a legacy set that
+  // predates the session-state.json lifecycle (or was never backfilled) has
+  // NO state file at all -- readStatus's own synthesizer would infer its
+  // status from change-log.md / activity-log.json presence, and the
+  // non-mutating classifier must replicate that same inference rather than
+  // reading "no state file" as "untouched".
+  test("a legacy COMPLETE set with change-log.md but no session-state.json classifies terminal", () => {
+    const root = tmpRoot("delclassify-legacycomplete-");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      fs.writeFileSync(path.join(path.dirname(a), "change-log.md"), "# Change Log\n", "utf8");
+      assert.ok(!fs.existsSync(path.join(path.dirname(a), "session-state.json")));
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "terminal");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a legacy IN-PROGRESS set with activity-log.json but no session-state.json still classifies cancel (not remove)", () => {
+    const root = tmpRoot("delclassify-legacyinprogress-");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter", "kind: plan"));
+      fs.writeFileSync(path.join(path.dirname(a), "activity-log.json"), "{}", "utf8");
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      // hasExecutionArtifacts already caught this (activity-log.json is a
+      // listed artifact), so this alone would not have failed pre-fix --
+      // the point of this test is rawSessionSetStatus's inference, checked
+      // directly below.
+      assert.strictEqual(c.disposition, "cancel");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("an unrelated module's sets are excluded from the scan", () => {
     const root = tmpRoot("delclassify-unrelated-");
     try {
@@ -2918,6 +2974,24 @@ suite("moduleAuthoring — deleteModule apply matrix (Set 099 S2)", () => {
     }
   });
 
+  test("refuses while an affected set is LEGACY in-progress (activity-log.json, no session-state.json)", async () => {
+    const root = tmpRoot("del-legacyrunning-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      fs.writeFileSync(path.join(path.dirname(a), "activity-log.json"), "{}", "utf8");
+      assert.ok(!fs.existsSync(path.join(path.dirname(a), "session-state.json")));
+      const manifestBefore = readManifestText(root);
+      const r = await deleteModule(root, "greeter");
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /running session/i);
+      assert.strictEqual(readManifestText(root), manifestBefore);
+      assert.ok(fs.existsSync(path.dirname(a)));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("re-declaring a deleted module's slug later regroups its untouched (terminal) history", async () => {
     const root = tmpRoot("del-restore-");
     writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
@@ -3017,6 +3091,72 @@ suite("moduleAuthoring — deleteModule apply matrix (Set 099 S2)", () => {
       // Sibling entries byte-for-byte identical.
       assert.ok(after.includes('  - slug: alpha\n    title: "Alpha"'));
       assert.ok(after.includes('  - slug: zeta\n    title: "Zeta"'));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Path-aware critique (GPT-5.4, Major): a standalone same-indent comment
+  // line sitting between the deleted entry and the NEXT entry must survive
+  // deletion -- it conventionally describes what follows, not the entry
+  // being removed, and the old boundary walk swept it into the deleted span.
+  test("preserves a standalone comment between the deleted entry and the next entry", async () => {
+    const root = tmpRoot("del-comment-");
+    const manifest = [
+      "modules:",
+      "  - slug: alpha",
+      "    title: Alpha",
+      "  - slug: greeter",
+      "    title: Greeter",
+      "  # this comment describes zeta below",
+      "  - slug: zeta",
+      "    title: Zeta",
+      "",
+    ].join("\n");
+    writeManifest(root, manifest);
+    try {
+      const r = await deleteModule(root, "greeter");
+      assert.strictEqual(r.refused, undefined, r.refused?.reason);
+      const after = readManifestText(root);
+      assert.ok(
+        after.includes("  # this comment describes zeta below"),
+        `expected the standalone comment to survive; got:\n${after}`,
+      );
+      assert.ok(!after.includes("slug: greeter"));
+      const entries = classifyModulesManifest(root) as any;
+      assert.deepStrictEqual(
+        entries.entries.map((e: any) => e.slug),
+        ["alpha", "zeta"],
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Trailing comment after the LAST entry (no following entry at all) must
+  // also survive -- the same boundary fix applies at EOF, not just
+  // mid-file.
+  test("preserves a trailing standalone comment when deleting the last entry", async () => {
+    const root = tmpRoot("del-trailingcomment-");
+    const manifest = [
+      "modules:",
+      "  - slug: alpha",
+      "    title: Alpha",
+      "  - slug: greeter",
+      "    title: Greeter",
+      "  # trailing footer comment",
+      "",
+    ].join("\n");
+    writeManifest(root, manifest);
+    try {
+      const r = await deleteModule(root, "greeter");
+      assert.strictEqual(r.refused, undefined, r.refused?.reason);
+      const after = readManifestText(root);
+      assert.ok(
+        after.includes("  # trailing footer comment"),
+        `expected the trailing comment to survive; got:\n${after}`,
+      );
+      assert.ok(!after.includes("slug: greeter"));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

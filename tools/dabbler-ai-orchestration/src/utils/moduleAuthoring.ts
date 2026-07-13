@@ -1640,24 +1640,48 @@ const NODE_RENAME_IO: RenameFileIo = {
   },
 };
 
+/**
+ * Non-mutating legacy-status fallback, used ONLY when `session-state.json`
+ * is absent or unparseable. Mirrors `sessionState.ts`'s own
+ * `backfillPayload`/`readStatus` inference (change-log.md present ->
+ * "complete"; else activity-log.json present -> "in-progress"; else
+ * "not-started") WITHOUT that function's side effect of synthesizing the
+ * state file onto disk. A pre-Set-7 (or otherwise never-backfilled) legacy
+ * set has no `session-state.json` at all, so a reader that treats "file
+ * absent" as unconditionally "not-started" — rather than replicating this
+ * same file-presence inference — misreads a genuinely COMPLETE or
+ * IN-PROGRESS legacy set as untouched (path-aware critique, both providers:
+ * a legacy complete set would be wrongly cancelled by `deleteModule`, and a
+ * legacy in-progress set would wrongly pass the running-session refusal).
+ */
+function inferLegacyStatus(dir: string): "not-started" | "in-progress" | "complete" {
+  if (fs.existsSync(path.join(dir, "change-log.md"))) return "complete";
+  if (fs.existsSync(path.join(dir, "activity-log.json"))) return "in-progress";
+  return "not-started";
+}
+
 /** Non-mutating "is a session actively in flight?" probe: reads the set's
  * session-state.json (never writes — unlike `readStatus`, which seeds a state
  * file) and reports true iff a top-level or per-session `status` is
- * "in-progress". Absent / unparseable state reads as not-running. */
+ * "in-progress". Absent / unparseable state falls back to
+ * {@link inferLegacyStatus} (a legacy in-progress set with no state file must
+ * still refuse a rename/delete, not silently read as not-running). */
 function hasRunningSessionAt(setDir: string, io: RenameFileIo): boolean {
   let raw: string;
   try {
     raw = io.readFileSync(path.join(setDir, "session-state.json"));
   } catch {
-    return false;
+    return inferLegacyStatus(setDir) === "in-progress";
   }
   let doc: unknown;
   try {
     doc = JSON.parse(raw);
   } catch {
-    return false;
+    return inferLegacyStatus(setDir) === "in-progress";
   }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return false;
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return inferLegacyStatus(setDir) === "in-progress";
+  }
   const d = doc as Record<string, unknown>;
   if (d.status === "in-progress") return true;
   if (Array.isArray(d.sessions)) {
@@ -1933,25 +1957,28 @@ function hasExecutionArtifacts(dir: string): boolean {
 
 /** Non-mutating raw-status read (mirrors {@link hasRunningSessionAt}): never
  * calls the Explorer's `readStatus` (which would synthesize a state file as
- * a side effect). Absent/unparseable/no-string-status all read as
- * "not-started" — the same fallback the synthesizer itself would produce,
- * just without writing it. */
+ * a side effect). Absent/unparseable/no-string-status all fall back to
+ * {@link inferLegacyStatus} — the SAME file-presence inference
+ * `readStatus`'s own synthesizer would apply, just without writing it,
+ * so a legacy set with no `session-state.json` at all (but a real
+ * `change-log.md` or `activity-log.json`) still classifies correctly
+ * instead of reading as an untouched not-started set. */
 function rawSessionSetStatus(dir: string): "not-started" | "in-progress" | "complete" {
   let raw: string;
   try {
     raw = fs.readFileSync(path.join(dir, "session-state.json"), "utf8");
   } catch {
-    return "not-started";
+    return inferLegacyStatus(dir);
   }
   let doc: unknown;
   try {
     doc = JSON.parse(raw);
   } catch {
-    return "not-started";
+    return inferLegacyStatus(dir);
   }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return "not-started";
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return inferLegacyStatus(dir);
   const status = (doc as Record<string, unknown>).status;
-  if (typeof status !== "string") return "not-started";
+  if (typeof status !== "string") return inferLegacyStatus(dir);
   const canon = status === "completed" || status === "done" ? "complete" : status;
   return canon === "complete" || canon === "in-progress" ? canon : "not-started";
 }
@@ -2045,11 +2072,24 @@ function removeManifestEntryText(text: string, slug: string): string | null {
   const entryIndent = target[1].length;
   const slugLineEnd = target.index! + target[0].length;
 
-  // Same entry-span boundary walk as rewriteManifestEntryText: the next
-  // list marker at the same (or shallower) indent, or a column-appropriate
-  // dedent, or EOF.
+  // Entry-span boundary walk: the next list marker at the same (or
+  // shallower) indent, a column-appropriate dedent, a STANDALONE comment
+  // line at the same (or shallower) indent, or EOF.
+  //
+  // Path-aware critique (GPT-5.4, Major): unlike rewriteManifestEntryText's
+  // identical-looking walk (which only ever searches for an EDIT point
+  // *inside* the surviving entry — a following comment landing "inside"
+  // its window is harmless there), THIS walk decides what gets DELETED.
+  // A same-or-shallower-indent `#` line conventionally attaches FORWARD to
+  // whatever follows it (the next entry, or the file's trailing content) —
+  // it is never part of the entry being removed — so it must stop the span
+  // here, not be swept into the deletion. The two walks therefore
+  // deliberately diverge: this one adds `#` as its own boundary
+  // alternative; rewriteManifestEntryText's is unchanged (no defect there
+  // to fix, and changing shared behavior risks its own already-verified
+  // contract for no gain).
   let spanEnd = text.length;
-  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|[^ \t\r\n#])/g;
+  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|#|[^ \t\r\n#])/g;
   boundaryRe.lastIndex = slugLineEnd;
   let bm: RegExpExecArray | null;
   while ((bm = boundaryRe.exec(text)) !== null) {

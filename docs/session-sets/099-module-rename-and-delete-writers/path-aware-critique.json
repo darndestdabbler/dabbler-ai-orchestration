@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "099-module-rename-and-delete-writers",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-07-13T00:00:00-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Read moduleAuthoring.ts, cancelLifecycle.ts, sessionState.ts, and the test suites over the repo. Found three real defects: two independent legacy-set misclassifications caused by the non-mutating classifier not replicating readStatus's file-presence backfill inference, and a comment-preservation gap in removeManifestEntryText. All three were verified against on-disk source, not paraphrase.",
+      "findings": [
+        {
+          "description": "Claim 3 (the non-mutating replacement reproduces readStatus semantics) is false: a legacy COMPLETE set with change-log.md but no session-state.json is classified 'cancel' instead of 'terminal', so deleteModule would cancel a completed set the contract says must never be touched. rawSessionSetStatus returns 'not-started' as soon as session-state.json is absent, without replicating backfillPayload's change-log.md -> complete inference.",
+          "severity": "Major",
+          "category": "correctness / contract-drift"
+        },
+        {
+          "description": "Claim 6 (running-session refusal is checked before either writer touches anything) is incomplete: a legacy IN-PROGRESS set with activity-log.json but no session-state.json is read as not-running by hasRunningSessionAt, so both renameModule and deleteModule could proceed against a live legacy set.",
+          "severity": "Major",
+          "category": "correctness / completeness"
+        },
+        {
+          "description": "Claim 2 (manifest edits preserve comments byte-for-byte) has a gap: removeManifestEntryText's boundary regex excludes '#'-prefixed lines from counting as a boundary, so a standalone comment between the deleted entry and the next entry is swept into the deleted span and lost, even though the feature is sold as format-preserving.",
+          "severity": "Major",
+          "category": "contract-drift / false-confidence"
+        },
+        {
+          "description": "The summary's claim that renameModule always rolls back every already-written file is stronger than the code's actual contract, which explicitly models a rollback-also-failed path (writeFailed.rolledBack === false) and surfaces it to the operator.",
+          "severity": "Minor",
+          "category": "false-confidence"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Independently read moduleAuthoring.ts and the delete/rename classification paths with repo access. Found the same legacy-set-without-state-file misclassification as the OpenAI pass (converging independently), plus a rollback-claim overstatement and a cosmetic manifest-formatting nit.",
+      "findings": [
+        {
+          "description": "A completed legacy session set (change-log.md present, session-state.json missing) is incorrectly cancelled by deleteModule: rawSessionSetStatus returns 'not-started' immediately when session-state.json is absent, with no fallback to infer 'complete' from change-log.md the way readStatus/ensureSessionStateFile does. The same gap affects hasRunningSessionAt for legacy in-progress sets with only activity-log.json.",
+          "severity": "Critical",
+          "category": "correctness / contract-drift"
+        },
+        {
+          "description": "The claim that renameModule always rolls back every already-written file to its exact original bytes is not absolute: the apply-phase catch block sets rolledBack = false when a rollback write itself throws, and reports writeFailed accordingly rather than guaranteeing a full rollback.",
+          "severity": "Minor",
+          "category": "false-confidence"
+        }
+      ]
+    }
+  ]
+}

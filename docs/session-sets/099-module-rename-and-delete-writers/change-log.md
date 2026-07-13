@@ -96,5 +96,52 @@
   confirmed both disputes (`2 accepted, 0 rejected`) and returned
   `VERIFIED`.
 
+## Post-close: the advisory path-aware critique (manual, operator-run)
+
+After the set-terminal `close_session`, the operator ran the manual
+multi-provider path-aware critique (`pathAwareCritique: advisory`) — GPT-5.4
+and Gemini-Pro, each with real repo access via GitHub Copilot, using
+`ai_router/prompt-templates/path-aware-critique.md`. Both independently
+converged on the same real Major/Critical defect, and GPT-5.4 found a second:
+
+- **Legacy-set misclassification (both providers, Critical/Major).** The
+  non-mutating classifier (`rawSessionSetStatus`, `hasRunningSessionAt`)
+  returned `"not-started"` / "not running" the instant `session-state.json`
+  was absent, without replicating `sessionState.ts`'s own
+  `backfillPayload`/`readStatus` file-presence inference
+  (`change-log.md` present → complete; `activity-log.json` present →
+  in-progress). A pre-Set-7 (or otherwise never-backfilled) legacy set with
+  no state file at all — of which this repo has several — would therefore
+  have a **completed** history wrongly **cancelled** by `deleteModule`, and a
+  **live** legacy set wrongly pass the running-session refusal for both
+  writers. **Fixed:** a shared, non-mutating `inferLegacyStatus()` helper
+  now backs both functions' state-file-absent fallback.
+- **Comment-sweep on delete (GPT-5.4, Major).** `removeManifestEntryText`'s
+  entry-span boundary walk treated a standalone `#`-prefixed line as "not a
+  boundary," so a comment describing the *next* manifest entry — sitting
+  between the deleted entry and that next entry — was swept into the
+  deleted span and lost, contradicting the format-preservation contract.
+  **Fixed:** the deletion-specific boundary walk now also stops at a
+  same-or-shallower-indent standalone comment line, which therefore survives
+  attached to whatever follows (mirrors how a human reader would attribute
+  it) — `rewriteManifestEntryText`'s own (non-destructive) span walk is left
+  unchanged, since it never deletes anything and has no equivalent defect.
+
+Both providers' two remaining findings (rollback-wording overstatements) were
+adjudicated as accurate already — the code already reports
+`writeFailed.rolledBack === false` on a failed rollback; only the *prose*
+summary overstated it, not the shipped code or its tests — so no behavior
+change was needed there.
+
+6 new regression tests added (legacy-complete classification, legacy
+in-progress classification, legacy in-progress running-session refusal for
+*both* writers, mid-file and trailing standalone-comment preservation), plus
+a real-compiled-writer dogfood exercising all three scenarios end-to-end.
+Suite green (1587 → 1593 passing). Raw critiques saved at
+`path-aware-critique.json` (validated via
+`ai_router.path_aware_critique.validate_path_aware_critique_artifact`);
+`close_session` re-run afterward is a no-op (the set was already closed) —
+the artifact retroactively satisfies the advisory gate for any future audit.
+
 **Set 099 is now complete.** No version bump, no publish — the release
 boundary is after Set 101.

@@ -180,6 +180,14 @@
       "dateTime": "2026-07-13T03:01:57.247942-04:00",
       "description": "Round 9 (reshaped context) ACCEPTED both adjudicated points (replay falsifier, output budget) and raised one new refinement of the round-5 coverage fix: occurrence-level ids let redundant fan-out siblings manufacture coverage failures. Fixed with the duplicate-of declaration (Fix verdict: L<m> -- duplicate-of L<n>): duplicate covered in-round, disposition follows target, next-cycle exemption carries by fixpoint; grammar/schema/doc parity + 3 tests. Suite 3017 passed / 6 skipped.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 13,
+      "stepKey": "round-10-remediation",
+      "dateTime": "2026-07-13T03:15:02.747722-04:00",
+      "description": "Round 10 challenged the round-9 duplicate-of mechanism (sanctioned exception) and was right: aliased ids with no terminal disposition (cycles, self-references, dangling targets) counted as covered. Fixed with chain-terminating coverage: every required id must resolve to a real verdict or an exempt previously-accepted id; the ledger returns the full id universe so exempt vs dangling is decidable. +3 tests; suite 3020 passed / 6 skipped.",
+      "status": "complete"
     }
   ]
 }

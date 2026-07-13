@@ -1062,7 +1062,7 @@ def assemble_cross_round_ledger(
 ) -> str:
     """The rendered cross-round ledger (see
     :func:`assemble_cross_round_ledger_with_ids` for the full contract)."""
-    text, _ids = assemble_cross_round_ledger_with_ids(
+    text, _required, _all = assemble_cross_round_ledger_with_ids(
         session_set_dir, session_number, current_round
     )
     return text
@@ -1070,7 +1070,7 @@ def assemble_cross_round_ledger(
 
 def assemble_cross_round_ledger_with_ids(
     session_set_dir: Path, session_number: int, current_round: int
-) -> "tuple[str, List[str]]":
+) -> "tuple[str, List[str], List[str]]":
     """Auto-assemble the cross-round issue ledger from prior rounds' artifacts.
 
     For every round before *current_round*, reads the round's
@@ -1097,10 +1097,13 @@ def assemble_cross_round_ledger_with_ids(
     framing (a parse failure is not settlement evidence); the immutable
     artifacts on disk stay the full record.
 
-    Returns ``(ledger_text, required_ledger_ids)``. Every BLOCKING finding
-    is numbered ``L1..Ln`` in encounter order (rounds ascending, envelope
-    order within a round) — deterministic and stable across re-renders
-    because the envelopes are immutable. The remediation-review phase
+    Returns ``(ledger_text, required_ledger_ids, all_ledger_ids)``. Every
+    BLOCKING finding is numbered ``L1..Ln`` in encounter order (rounds
+    ascending, envelope order within a round) — deterministic and stable
+    across re-renders because the envelopes are immutable. ``all_ledger_ids``
+    is the full assigned universe (required + exempt) — the coverage
+    check's duplicate-chain resolution needs it to tell an exempt target
+    from a dangling one (round 10). The remediation-review phase
     requires one ``Fix verdict:`` line per REQUIRED id, and the coverage
     check compares the parsed id set against the required set exactly
     (S2 verification rounds 3–4: identity-free counting double-counts
@@ -1241,7 +1244,7 @@ def assemble_cross_round_ledger_with_ids(
             )
 
     if not settled_sections and not unresolved_sections:
-        return "", []
+        return "", [], []
 
     parts: List[str] = [
         "#### Cross-round issue ledger (auto-assembled from prior rounds' "
@@ -1275,7 +1278,7 @@ def assemble_cross_round_ledger_with_ids(
             "re-raising an unsettled point is not resurrection.\n\n"
             + "\n\n".join(unresolved_sections)
         )
-    return "\n\n".join(parts), required_ids
+    return "\n\n".join(parts), required_ids, blocking_ids
 
 
 # ---------------------------------------------------------------------------
@@ -1620,7 +1623,11 @@ def build_phase_framing(phase: Optional[str]) -> str:
             "mark the other on its own line:\n"
             "  - Fix verdict: L<m> -- duplicate-of L<n>\n"
             "  A duplicate's disposition follows its target's -- never "
-            "re-argue the same point under two ids.\n"
+            "re-argue the same point under two ids. A duplicate-of chain "
+            "must END in a real verdict (fix-accepted / fix-rejected / "
+            "accepted-with-modification): cycles, self-references, and "
+            "targets with no verdict are machine-rejected as missing "
+            "coverage.\n"
             "  fix-accepted = the fix resolves the finding. fix-rejected "
             "= it does not -- you must then restate the finding as an "
             "Issue block (severity + mandatory failure scenario). "
@@ -2227,9 +2234,12 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             return EXIT_USAGE
         framing = build_phase_framing(phase) + "\n\n" + prior_findings
         ledger_ids: List[str] = []
+        all_ledger_ids: List[str] = []
     else:
-        ledger, ledger_ids = assemble_cross_round_ledger_with_ids(
-            session_set_dir, session_number, round_number
+        ledger, ledger_ids, all_ledger_ids = (
+            assemble_cross_round_ledger_with_ids(
+                session_set_dir, session_number, round_number
+            )
         )
         framing = build_phase_framing(phase)
 
@@ -2685,13 +2695,55 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                     "findings."
                 )
             elif parsed_ids:
-                missing = [i for i in ledger_ids if i not in parsed_ids]
-                if missing:
+                # Round 10: coverage means every required id's verdict
+                # chain TERMINATES in a real disposition — a direct
+                # fix-accepted / fix-rejected / accepted-with-modification
+                # verdict, or a duplicate-of chain ending at one (or at an
+                # EXEMPT, previously-accepted id). Cycles (L1<->L2),
+                # self-references, and dangling targets are NOT coverage:
+                # an aliased id with no terminal disposition escalates
+                # exactly like a missing one.
+                real_ids = {
+                    fv["ledgerId"] for fv in fix_verdicts
+                    if fv.get("ledgerId") and fv.get("verdict") in (
+                        "fix-accepted", "fix-rejected",
+                        "accepted-with-modification",
+                    )
+                }
+                dup_map_round = {
+                    fv["ledgerId"]: str(fv.get("duplicateOf") or "").upper()
+                    for fv in fix_verdicts
+                    if fv.get("ledgerId")
+                    and fv.get("verdict") == "duplicate-of"
+                }
+                exempt_ids = set(all_ledger_ids) - set(ledger_ids)
+                id_universe = set(all_ledger_ids)
+
+                def _terminates(lid: str) -> bool:
+                    seen: set = set()
+                    cur = lid
+                    while True:
+                        if cur in seen:
+                            return False  # duplicate-of cycle
+                        seen.add(cur)
+                        if cur in real_ids or cur in exempt_ids:
+                            return True
+                        nxt = dup_map_round.get(cur)
+                        if not nxt or nxt not in id_universe:
+                            return False  # no verdict / dangling target
+                        cur = nxt
+
+                unterminated = [
+                    i for i in ledger_ids if not _terminates(i)
+                ]
+                if unterminated:
                     gap_note = (
-                        "the review gave no fix verdict for ledger id(s) "
-                        + ", ".join(missing)
-                        + " -- every numbered blocking finding requires "
-                        "one."
+                        "ledger id(s) "
+                        + ", ".join(unterminated)
+                        + " received no terminal fix verdict -- each "
+                        "required id needs a real disposition, directly "
+                        "or via a duplicate-of chain that ends in one "
+                        "(cycles and dangling targets are not coverage)."
                     )
             elif len(fix_verdicts) < len(ledger_ids):
                 gap_note = (

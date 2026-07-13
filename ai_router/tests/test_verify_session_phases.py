@@ -1137,7 +1137,7 @@ class TestVerificationRoundHardening:
     def test_ledger_numbers_blocking_findings(self, repo: Path):
         set_dir = _set_dir(repo)
         self._seed_two_finding_round(repo, set_dir)
-        text, ids = vs.assemble_cross_round_ledger_with_ids(set_dir, 1, 2)
+        text, ids, all_ids = vs.assemble_cross_round_ledger_with_ids(set_dir, 1, 2)
         assert ids == ["L1", "L2"]
         assert "(ledger id: L1)" in text
         assert "(ledger id: L2)" in text
@@ -1174,7 +1174,7 @@ class TestVerificationRoundHardening:
             route_fn=fake,
         )
         assert code == vs.EXIT_BLOCKING
-        assert "no fix verdict for ledger id(s) L2" in (
+        assert "ledger id(s) L2 received no terminal fix verdict" in (
             capsys.readouterr().err
         )
         disposition = json.loads(
@@ -1285,13 +1285,79 @@ class TestVerificationRoundHardening:
         (set_dir / "s1-remediation-round-2.md").write_text(
             "Fixed the new defect.", encoding="utf-8"
         )
-        text, required = vs.assemble_cross_round_ledger_with_ids(
+        text, required, all_ids = vs.assemble_cross_round_ledger_with_ids(
             set_dir, 1, 3
         )
         # L1 accepted; L2 follows it via duplicate-of; only the round-2
         # restatement (L3) still needs a verdict.
         assert required == ["L3"]
+        assert all_ids == ["L1", "L2", "L3"]
         assert "ledger id: L2; fix-accepted in a prior review cycle" in text
+
+
+
+    def test_duplicate_cycle_is_not_coverage(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # Round 10 finding: reciprocal aliases (L1<->L2) under VERIFIED
+        # must escalate -- neither id has a terminal disposition.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        self._seed_two_finding_round(repo, set_dir)
+        response = (
+            "VERIFIED\n\n"
+            "- Fix verdict: L1 finding one -- duplicate-of L2\n"
+            "- Fix verdict: L2 finding two -- duplicate-of L1\n"
+        )
+        fake = FakeMultiRoute([response])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_BLOCKING
+        err = capsys.readouterr().err
+        assert "no terminal fix verdict" in err
+        disposition = json.loads(
+            (set_dir / "disposition.json").read_text(encoding="utf-8")
+        )
+        assert disposition["verification_verdict"] == "ISSUES_FOUND"
+
+    def test_dangling_duplicate_target_is_not_coverage(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        self._seed_two_finding_round(repo, set_dir)
+        response = (
+            "VERIFIED\n\n"
+            "- Fix verdict: L1 finding one -- fix-accepted\n"
+            "- Fix verdict: L2 finding two -- duplicate-of L9\n"
+        )
+        fake = FakeMultiRoute([response])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_BLOCKING
+        assert "L2" in capsys.readouterr().err
+
+    def test_self_referencing_duplicate_is_not_coverage(
+        self, repo: Path, monkeypatch
+    ):
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        self._seed_two_finding_round(repo, set_dir)
+        response = (
+            "VERIFIED\n\n"
+            "- Fix verdict: L1 finding one -- fix-accepted\n"
+            "- Fix verdict: L2 finding two -- duplicate-of L2\n"
+        )
+        fake = FakeMultiRoute([response])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_BLOCKING
 
     def test_previously_accepted_ids_are_exempt_from_re_coverage(
         self, repo: Path, monkeypatch
@@ -1337,11 +1403,12 @@ class TestVerificationRoundHardening:
         )
         # The next render marks L1 exempt and requires L2 + the round-2
         # restatement's id (L3) only.
-        text, required = vs.assemble_cross_round_ledger_with_ids(
+        text, required, all_ids = vs.assemble_cross_round_ledger_with_ids(
             set_dir, 1, 3
         )
         assert "ledger id: L1; fix-accepted in a prior review cycle" in text
         assert required == ["L2", "L3"]
+        assert all_ids == ["L1", "L2", "L3"]
         # Cycle 2 verdicts only the non-exempt ids -> clean pass.
         response = (
             "VERIFIED\n\n"

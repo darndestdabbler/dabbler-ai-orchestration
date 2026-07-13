@@ -5,7 +5,7 @@ with mandatory cross-provider verification, automatic cost tracking, git-
 worktree-aware session-set state, and a Work Explorer in the
 activity bar.
 
-![The Work Explorer beside a session-set spec: the muted Default module contains in-progress, not-started, and complete sets](tools/dabbler-ai-orchestration/media/session-set-explorer-and-spec.png)
+![The Work Explorer groups work by module: the Auth Service module is expanded, showing an in-progress session set, a not-started set, and two complete sets; the Billing, Notifications, and Platform Core modules are collapsed below](tools/dabbler-ai-orchestration/media/work-explorer-modules.png)
 
 ---
 

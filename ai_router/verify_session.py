@@ -970,16 +970,29 @@ def _squash(text: str, cap: int) -> str:
     return flat[:cap].rstrip() + " ...[truncated -- see the round artifact]"
 
 
-def _render_ledger_issue(issue: dict, ledger_id: str = "") -> List[str]:
+def _render_ledger_issue(
+    issue: dict, ledger_id: str = "", accepted: bool = False
+) -> List[str]:
     """The index lines for one prior-round finding.
 
     *ledger_id* (Set 096 S2, remediation-review coverage) is the
     machinery-assigned per-render id (``L1``, ``L2``, ...) the fix-verdict
     coverage check keys on; deterministic because prior rounds' envelopes
-    are immutable and rounds render in ascending order.
+    are immutable and rounds render in ascending order. *accepted* marks
+    an id a PRIOR review cycle already fix-accepted — rendered exempt
+    from re-coverage, so a growing ledger never demands redundant
+    re-verdicts of already-validated points (backstop round 5 finding).
     """
     severity = str(issue.get("severity") or "unrated").strip()
-    lid_note = f" (ledger id: {ledger_id})" if ledger_id else ""
+    if ledger_id and accepted:
+        lid_note = (
+            f" (ledger id: {ledger_id}; fix-accepted in a prior review "
+            "cycle -- EXEMPT from re-coverage)"
+        )
+    elif ledger_id:
+        lid_note = f" (ledger id: {ledger_id})"
+    else:
+        lid_note = ""
     issue_id = str(issue.get("issueId") or "").strip()
     id_note = f" (id: {issue_id})" if issue_id else ""
     status = str(issue.get("resolution_status") or "").strip()
@@ -1036,19 +1049,42 @@ def assemble_cross_round_ledger_with_ids(
     framing (a parse failure is not settlement evidence); the immutable
     artifacts on disk stay the full record.
 
-    Returns ``(ledger_text, blocking_ledger_ids)``. Every BLOCKING finding
+    Returns ``(ledger_text, required_ledger_ids)``. Every BLOCKING finding
     is numbered ``L1..Ln`` in encounter order (rounds ascending, envelope
     order within a round) — deterministic and stable across re-renders
     because the envelopes are immutable. The remediation-review phase
-    requires one ``Fix verdict:`` line per id, and the coverage check
-    compares the parsed id set against ``blocking_ledger_ids`` exactly
+    requires one ``Fix verdict:`` line per REQUIRED id, and the coverage
+    check compares the parsed id set against the required set exactly
     (S2 verification rounds 3–4: identity-free counting double-counts
     restatements; the ids make coverage machine-checkable without fuzzy
-    text matching).
+    text matching). An id a prior review cycle already ``fix-accepted``
+    (or accepted-with-modification, read from the prior envelopes'
+    ``fixVerdicts``) renders EXEMPT and is dropped from the required set
+    — a later cycle re-verdicts only the rejected/new/unvalidated points,
+    so a growing ledger never manufactures redundant re-coverage churn
+    (backstop round 5 finding).
     """
+    # Pre-scan: ids already accepted by a PRIOR remediation-review cycle.
+    accepted_ids: set = set()
+    for prior_round in range(1, current_round):
+        envelope = _read_round_envelope(
+            session_set_dir, session_number, prior_round
+        )
+        if envelope is None:
+            continue
+        for fv in envelope.get("fixVerdicts") or []:
+            if not isinstance(fv, dict):
+                continue
+            lid = str(fv.get("ledgerId") or "").strip()
+            if lid and str(fv.get("verdict") or "").strip().lower() in (
+                "fix-accepted", "accepted-with-modification",
+            ):
+                accepted_ids.add(lid)
+
     settled_sections: List[str] = []
     unresolved_sections: List[str] = []
     blocking_ids: List[str] = []
+    required_ids: List[str] = []
     for prior_round in range(1, current_round):
         settled_lines: List[str] = []
         unresolved_lines: List[str] = []
@@ -1097,11 +1133,17 @@ def assemble_cross_round_ledger_with_ids(
                     else:
                         settled = round_has_settlement_note
                     ledger_id = ""
+                    id_accepted = False
                     if is_blocking_issue(issue):
                         ledger_id = f"L{len(blocking_ids) + 1}"
                         blocking_ids.append(ledger_id)
+                        id_accepted = ledger_id in accepted_ids
+                        if not id_accepted:
+                            required_ids.append(ledger_id)
                     (settled_lines if settled else unresolved_lines).extend(
-                        _render_ledger_issue(issue, ledger_id=ledger_id)
+                        _render_ledger_issue(
+                            issue, ledger_id=ledger_id, accepted=id_accepted
+                        )
                     )
                 header_line = (
                     f"Verdict: {verdict} -- {len(issues)} finding(s) "
@@ -1169,7 +1211,7 @@ def assemble_cross_round_ledger_with_ids(
             "re-raising an unsettled point is not resurrection.\n\n"
             + "\n\n".join(unresolved_sections)
         )
-    return "\n\n".join(parts), blocking_ids
+    return "\n\n".join(parts), required_ids
 
 
 # ---------------------------------------------------------------------------
@@ -1502,11 +1544,13 @@ def build_phase_framing(phase: Optional[str]) -> str:
             "discovery baseline -- not the full session diff.\n\n"
             "- The ledger numbers every prior blocking finding with a "
             "ledger id (L1, L2, ...). Give ONE per-finding verdict line "
-            "for EVERY ledger id, in exactly this form:\n"
+            "for EVERY ledger id NOT marked 'EXEMPT from re-coverage' "
+            "(ids a prior review cycle already fix-accepted are exempt "
+            "-- do not re-verdict them), in exactly this form:\n"
             "  - Fix verdict: L<n> <short summary> -- "
             "fix-accepted | fix-rejected | accepted-with-modification\n"
-            "  Coverage is machine-checked against the ledger ids: a "
-            "missing id fails the round.\n"
+            "  Coverage is machine-checked against the non-exempt ledger "
+            "ids: a missing id fails the round.\n"
             "  fix-accepted = the fix resolves the finding. fix-rejected "
             "= it does not -- you must then restate the finding as an "
             "Issue block (severity + mandatory failure scenario). "

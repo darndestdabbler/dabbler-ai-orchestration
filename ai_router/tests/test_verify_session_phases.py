@@ -1199,6 +1199,68 @@ class TestVerificationRoundHardening:
             for i in envelope["issues"]
         )
 
+    def test_previously_accepted_ids_are_exempt_from_re_coverage(
+        self, repo: Path, monkeypatch
+    ):
+        # Backstop round 5 finding: a growing ledger must not demand
+        # redundant re-verdicts of already-validated points. An id
+        # fix-accepted by a prior review cycle renders EXEMPT, and the
+        # next cycle passes by verdicting only the remaining ids.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        self._seed_two_finding_round(repo, set_dir)
+        # Cycle 1 (round 2): L1 accepted, L2 rejected (blocking envelope
+        # carries the fixVerdicts with ledger ids).
+        (set_dir / "s1-verification-round-2.md").write_text(
+            "ISSUES FOUND\n"
+            "- Fix verdict: L1 finding one -- fix-accepted\n"
+            "- Fix verdict: L2 finding two -- fix-rejected\n"
+            "Issue 1: finding two persists.\n- **Severity:** Major\n",
+            encoding="utf-8",
+        )
+        (set_dir / "s1-issues-round-2.json").write_text(
+            json.dumps({
+                "schemaVersion": 1,
+                "sessionNumber": 1,
+                "verificationRound": 2,
+                "verificationVerdict": "ISSUES_FOUND",
+                "phase": "remediation-review",
+                "issues": [
+                    {"description": "finding two persists.",
+                     "severity": "Major"},
+                ],
+                "fixVerdicts": [
+                    {"finding": "L1 finding one", "verdict": "fix-accepted",
+                     "ledgerId": "L1"},
+                    {"finding": "L2 finding two", "verdict": "fix-rejected",
+                     "ledgerId": "L2"},
+                ],
+            }),
+            encoding="utf-8",
+        )
+        (set_dir / "s1-remediation-round-2.md").write_text(
+            "Re-fixed finding two.", encoding="utf-8"
+        )
+        # The next render marks L1 exempt and requires L2 + the round-2
+        # restatement's id (L3) only.
+        text, required = vs.assemble_cross_round_ledger_with_ids(
+            set_dir, 1, 3
+        )
+        assert "ledger id: L1; fix-accepted in a prior review cycle" in text
+        assert required == ["L2", "L3"]
+        # Cycle 2 verdicts only the non-exempt ids -> clean pass.
+        response = (
+            "VERIFIED\n\n"
+            "- Fix verdict: L2 finding two -- fix-accepted\n"
+            "- Fix verdict: L3 finding two restatement -- fix-accepted\n"
+        )
+        fake = FakeMultiRoute([response])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_OK
+
     def test_second_blocking_review_cycle_suspends_to_operator(
         self, repo: Path, monkeypatch, capsys
     ):

@@ -3,3 +3,5 @@
 {"timestamp": "2026-07-12T21:46:19.139273Z", "session_number": 1, "event_type": "verification_completed", "method": "api", "source": "close_session_backstop", "verdict": "VERIFIED"}
 {"timestamp": "2026-07-12T21:46:20.436748Z", "session_number": 1, "event_type": "closeout_succeeded", "method": "api", "engine": "claude", "provider": "anthropic", "model": "claude-fable-5", "verdict": "VERIFIED", "lessons_cited": ["L-095-1", "L-065-1", "L-069-1"]}
 {"timestamp": "2026-07-12T22:15:11.016044Z", "session_number": 2, "event_type": "work_started"}
+{"timestamp": "2026-07-13T00:27:37.742439Z", "session_number": 2, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-13T00:29:40.764677Z", "session_number": 2, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "blocking_findings"}

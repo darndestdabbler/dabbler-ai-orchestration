@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "101-default-module-scaffold-and-docs",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Session 1",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "Session 2",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

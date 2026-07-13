@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "099-module-rename-and-delete-writers",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Session 1",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "Session 2",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

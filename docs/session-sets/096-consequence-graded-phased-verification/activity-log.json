@@ -196,6 +196,14 @@
       "dateTime": "2026-07-13T03:34:18.083471-04:00",
       "description": "Round 11 (exemption regression hole) resolved by OPERATOR DECISION (option 1, removal-over-addition): the prior-acceptance exemption (round 5, patched rounds 9-10) deleted outright; every ledger id re-verdicted every cycle (the restatement IS the regression check); duplicate-of stays in-round with chain-terminating coverage. Whole vulnerability class removed structurally. Suite 3019 passed / 6 skipped.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 15,
+      "stepKey": "round-12-verified",
+      "dateTime": "2026-07-13T03:36:49.974013-04:00",
+      "description": "Round 12 (post-removal, adjudication conventions): VERIFIED, zero findings, $0.38. Disposition finalized completed/VERIFIED. Proceeding to close (no metrics writes after the settling round).",
+      "status": "complete"
     }
   ]
 }

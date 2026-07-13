@@ -156,6 +156,14 @@
       "dateTime": "2026-07-12T20:43:56.476844-04:00",
       "description": "Close attempted twice; the Set 084 backstop ran rounds 5 and 6 in-process. Round 5: 2 Majors -- the ledger-id occurrence/re-coverage churn defect (REAL, fixed: previously-accepted ids now render EXEMPT and drop from the required coverage set, +1 test, suite 3011 passed) and the resurrected replay-comparison point (refused per the no-resurrection rule with the settlement evidence named in s2-remediation-round-5.md). Round 6: the B2 fix accepted; ONLY the resurrected point remains, re-raised in fresh wording after two explicit fix-accepted verdicts (rounds 3+4). Constitution stopping condition reached (never re-round a disputed finding): loop stopped, disposition -> requires_review, all work committed+pushed, adjudication package prepared for the operator. Second-provider datapoint on record: gemini-2.5-pro path-aware critic returned VERIFIED with no such finding.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "adjudication-resolved",
+      "dateTime": "2026-07-13T02:34:42.666235-04:00",
+      "description": "Operator adjudication (2026-07-13, option c: reshaped-context re-verify). The operator supplied the objective context earlier rounds lacked: definitive comparative experiments are confounded beyond resolution and rejected as disproportionate for a personally-funded ~1-year-horizon tool whose staff users run weaker Copilot CLI models; the consequence rubric is operator policy, not a hypothesis under test; the replay is an indicative loop-shape demonstration by design. Round 7 (same verifier, gpt-5-6, full bundle + 27k-char auto-ledger, $0.37): VERIFIED, zero findings, explicitly grading the open point non-material for the deliverable's real users. record_adjudication logged (context-gap / reverify-reshaped); disposition restored to completed/VERIFIED. Operator follow-on candidates recorded: (a) background liberal-definition probe loop + triage queue (large), (b) per-project configurable severity definition (small).",
+      "status": "complete"
     }
   ]
 }

@@ -4,6 +4,7 @@
 
 import * as assert from "assert";
 import {
+  nextSessionSetNumberFrom,
   numericPrefix,
   parseSetHandle,
   resolveSetNumber,
@@ -60,5 +61,30 @@ suite("resolveSetNumber (Set 050 S4)", () => {
     assert.strictEqual(parseSetHandle("050-schema-drift"), null);
     assert.strictEqual(parseSetHandle("abc"), null);
     assert.strictEqual(parseSetHandle(""), null);
+  });
+
+  // Set 098 S2: pure mirror of ai_router.resolve_set.next_session_set_number,
+  // feeding scaffoldModuleLifecycleSets's number resolution.
+  test("nextSessionSetNumberFrom: empty repo starts at 001", () => {
+    assert.deepStrictEqual(nextSessionSetNumberFrom([]), { n: 1, padded: "001" });
+  });
+
+  test("nextSessionSetNumberFrom: max(existing) + 1, unnumbered dirs ignored", () => {
+    assert.deepStrictEqual(
+      nextSessionSetNumberFrom(["047-foo", "050-schema-drift", "bare-name"]),
+      { n: 51, padded: "051" },
+    );
+  });
+
+  test("nextSessionSetNumberFrom: width tracks the widest existing prefix", () => {
+    assert.deepStrictEqual(nextSessionSetNumberFrom(["0998-foo", "0999-bar"]), {
+      n: 1000,
+      padded: "1000",
+    });
+    // A 3-digit repo stays at width 3 even near the boundary.
+    assert.deepStrictEqual(nextSessionSetNumberFrom(["097-foo", "098-bar"]), {
+      n: 99,
+      padded: "099",
+    });
   });
 });

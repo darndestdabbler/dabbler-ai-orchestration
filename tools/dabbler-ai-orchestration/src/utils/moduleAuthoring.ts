@@ -19,9 +19,14 @@ import * as path from "path";
 import * as YAML from "yaml";
 import {
   MODULES_MANIFEST_REL,
+  SESSION_SETS_REL,
+  listSessionSetDirNames,
+  parsePrerequisites,
+  parseSessionSetConfig,
   readModulesManifest,
   writeFileExclusiveSync,
 } from "./fileSystem";
+import { nextSessionSetNumberFrom, numericPrefix } from "./resolveSetNumber";
 import { ModuleManifestEntry } from "../types";
 
 /** The manifest path as shown to operators (forward-slashed on every OS). */
@@ -1200,4 +1205,310 @@ export function assignLegacySetsToModule(
   }
 
   return { stamped, alreadyAssigned };
+}
+
+// ---------- Set 098 S2: module-lifecycle set templates + scaffold writer ----------
+//
+// The two module-lifecycle set KINDS (verdict decision 5, Set 098 S1): a
+// `kind: plan` set creates or imports a module's `project-plan.md`; a
+// `kind: decomposition` set reads that plan plus the module's existing sets
+// and authors the next batch of session sets, `prerequisites:`-linked back
+// to its sibling plan set (verdict decision 6 — reuses the existing
+// machinery, no new gating code). Not wired to any UI yet — Sets 100/101 are
+// the callers.
+
+/** The inputs a lifecycle spec's render needs (both kinds share these). */
+interface ModuleLifecycleSetContext {
+  /** This set's own full slug, e.g. `102-greeter-plan`. */
+  slug: string;
+  moduleSlug: string;
+  moduleTitle: string;
+  /** ISO `YYYY-MM-DD`. */
+  created: string;
+  /** Repo-relative, forward-slashed (from {@link modulePlanRelPath}). */
+  planRelPath: string;
+}
+
+/** The `kind: decomposition` set's render context — its sibling plan slug too. */
+interface ModuleDecompositionSetContext extends ModuleLifecycleSetContext {
+  /** The sibling `kind: plan` set's full slug (the `prerequisites:` target). */
+  planSlug: string;
+}
+
+const MODULE_PLAN_SET_TEMPLATE_FILENAME = "module-plan-set.spec.md.template";
+const MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME =
+  "module-decomposition-set.spec.md.template";
+
+/**
+ * Resolve the directory the two module-lifecycle spec templates live in —
+ * the SAME durable files at `docs/templates/consumer-bootstrap/` that
+ * `docs/planning/session-set-authoring-guide.md` documents, so there is
+ * exactly one source of truth (verification round 1, finding 2: two
+ * hand-synced copies with no parity test is a real drift risk). Mirrors
+ * `consumerBootstrap.ts`'s bundle-directory precedent (Set 058): esbuild
+ * copies `docs/templates/consumer-bootstrap` next to the packaged
+ * `dist/extension.js` at compile time; running against the TS source
+ * directly (unit tests, ts-node) resolves the checked-in repo-root copy
+ * instead — both candidates sit the same number of directory levels below
+ * the extension root, so one resolver covers `src/utils`, `out/utils`
+ * (plain-tsc test host), and `dist` alike. Whichever candidate actually
+ * holds the plan template wins; a genuinely missing bundle throws a plain
+ * ENOENT from the caller's `fs.readFileSync`, not a guess here.
+ */
+function resolveModuleLifecycleTemplatesDir(): string {
+  const candidates = [
+    path.join(__dirname, "templates", "consumer-bootstrap"),
+    path.join(__dirname, "..", "..", "..", "..", "docs", "templates", "consumer-bootstrap"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(path.join(c, MODULE_PLAN_SET_TEMPLATE_FILENAME))) return c;
+  }
+  return candidates[candidates.length - 1];
+}
+
+function loadModuleLifecycleTemplate(filename: string): string {
+  const dir = resolveModuleLifecycleTemplatesDir();
+  return fs.readFileSync(path.join(dir, filename), "utf8").replace(/\r\n/g, "\n");
+}
+
+/** Substitute every `{{TOKEN}}` the table knows about (unknown ones are left as-is). */
+function substituteLifecycleTokens(text: string, table: Record<string, string>): string {
+  return text.replace(/{{([A-Z_]+)}}/g, (whole, key: string) =>
+    Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole,
+  );
+}
+
+/** Fail loud on a template/token-table mismatch rather than shipping a literal `{{TOKEN}}`. */
+function assertNoUnsubstitutedTokens(rendered: string, filename: string): void {
+  const leftover = rendered.match(/{{[A-Z_]+}}/g);
+  if (leftover) {
+    throw new Error(
+      `${filename}: unsubstituted token(s) ${leftover.join(", ")} — a template/writer token-table mismatch.`,
+    );
+  }
+}
+
+/**
+ * Render the `kind: plan` set's spec.md from the canonical on-disk template
+ * ({@link MODULE_PLAN_SET_TEMPLATE_FILENAME}). Single session:
+ * create-or-import the module's project plan — both paths are in-session
+ * work (this set replaces the retired AI-Plan / Import-Plan clipboard
+ * flows, Set 100). A later plan revision is just another `kind: plan` set
+ * targeting the same module and file — nothing here is one-shot or frozen.
+ */
+export function renderModulePlanSetSpec(ctx: ModuleLifecycleSetContext): string {
+  const rendered = substituteLifecycleTokens(
+    loadModuleLifecycleTemplate(MODULE_PLAN_SET_TEMPLATE_FILENAME),
+    {
+      MODULE_TITLE: ctx.moduleTitle,
+      MODULE_SLUG: ctx.moduleSlug,
+      SLUG: ctx.slug,
+      CREATED: ctx.created,
+      PLAN_REL_PATH: ctx.planRelPath,
+    },
+  );
+  assertNoUnsubstitutedTokens(rendered, MODULE_PLAN_SET_TEMPLATE_FILENAME);
+  return rendered;
+}
+
+/**
+ * Render the `kind: decomposition` set's spec.md from the canonical on-disk
+ * template ({@link MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME}). Single
+ * session: read the current plan plus the module's existing sets (avoid
+ * duplication), author the next batch — `prerequisites:` pre-linked to the
+ * sibling plan set (`condition: complete`, verdict decision 6: the existing
+ * gating machinery, no new mechanism). A later continuation is just
+ * another `kind: decomposition` set.
+ */
+export function renderModuleDecompositionSetSpec(
+  ctx: ModuleDecompositionSetContext,
+): string {
+  const rendered = substituteLifecycleTokens(
+    loadModuleLifecycleTemplate(MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME),
+    {
+      MODULE_TITLE: ctx.moduleTitle,
+      MODULE_SLUG: ctx.moduleSlug,
+      SLUG: ctx.slug,
+      CREATED: ctx.created,
+      PLAN_REL_PATH: ctx.planRelPath,
+      PLAN_SLUG: ctx.planSlug,
+    },
+  );
+  assertNoUnsubstitutedTokens(rendered, MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME);
+  return rendered;
+}
+
+/**
+ * Find an already-scaffolded lifecycle set of the given kind for this
+ * module (a slug ending \`-<moduleSlug>-plan\` / \`-<moduleSlug>-decomposition\`
+ * with a numeric prefix) — the skip-existing identity check: re-running the
+ * scaffold for a module that already has one must reuse it, never mint a
+ * duplicate. Deterministic pick (sorted ascending) on the pathological case
+ * of more than one match.
+ */
+function findExistingLifecycleSetSlug(
+  dirNames: string[],
+  moduleSlug: string,
+  kind: "plan" | "decomposition",
+): string | null {
+  const suffix = `-${moduleSlug}-${kind}`;
+  const matches = dirNames
+    .filter((n) => n.endsWith(suffix) && numericPrefix(n) !== null)
+    .sort();
+  return matches.length > 0 ? matches[0] : null;
+}
+
+/** Write `text` to `abs` unless it already exists (skip-existing); returns
+ * whether a write happened. Re-reads the written bytes back before
+ * returning (defense against a concurrent writer racing in). */
+function writeSpecSkipExisting(abs: string, text: string): boolean {
+  if (fs.existsSync(abs)) return false;
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, text, { encoding: "utf8" });
+  if (fs.readFileSync(abs, "utf8") !== text) {
+    throw new Error(`${abs} did not verify after writing (concurrent modification?).`);
+  }
+  return true;
+}
+
+/**
+ * Parse-after-write guard (the Set 091 appender posture): re-parse the
+ * written spec.md with the REAL parsers and confirm the declared `kind` and
+ * (for `decomposition`) the `prerequisites:` cross-link actually landed.
+ * Throws — never silently — on a mismatch; the caller has already written
+ * by this point, so a throw here signals a template/parser drift bug to fix,
+ * not a recoverable runtime condition.
+ */
+function assertLifecycleSpecWritten(
+  abs: string,
+  expectedKind: "plan" | "decomposition",
+  expectedPrereqSlug: string | null,
+): void {
+  const config = parseSessionSetConfig(abs);
+  if (config.kind !== expectedKind) {
+    throw new Error(
+      `${abs}: expected kind "${expectedKind}", parsed "${config.kind}" — refusing (template/parser drift).`,
+    );
+  }
+  if (expectedPrereqSlug !== null) {
+    const prereqs = parsePrerequisites(abs);
+    const ok =
+      prereqs !== null &&
+      prereqs.some(
+        (p) => p.slug === expectedPrereqSlug && p.condition === "complete",
+      );
+    if (!ok) {
+      throw new Error(
+        `${abs}: expected a prerequisites: entry for "${expectedPrereqSlug}" — refusing (template/parser drift).`,
+      );
+    }
+  }
+}
+
+export interface ModuleLifecycleScaffoldResult {
+  planSlug: string;
+  planSpecRel: string;
+  /** False when a lifecycle plan set for this module already existed (skip-existing) — `planSlug` names the existing one. */
+  planCreated: boolean;
+  decompositionSlug: string;
+  decompositionSpecRel: string;
+  /** False when a lifecycle decomposition set for this module already existed (skip-existing) — `decompositionSlug` names the existing one. */
+  decompositionCreated: boolean;
+}
+
+/**
+ * Scaffold a module's two lifecycle sets (Set 098 S2 — the Session 1
+ * `kind` contract's first real writer): resolves the next two free set
+ * numbers (mirrors `ai_router.resolve_set.next_session_set_number`), renders
+ * both templates into `docs/session-sets/NNN-<module>-plan/` and
+ * `docs/session-sets/NNN-<module>-decomposition/` (spec.md only — state
+ * files are the blessed runtime writers' job, per `start_session`), and
+ * cross-links the decomposition set's `prerequisites:` to its sibling plan.
+ *
+ * Skip-existing (identity, not merely path): a module that already has a
+ * scaffolded lifecycle set of a given kind keeps it — the writer never
+ * mints a duplicate on a re-run, and reuses the existing slug for the
+ * `prerequisites:` cross-link. Fail-loud: an invalid module slug throws
+ * before any write (the tree is left untouched); the parse-after-write
+ * guard throws if a freshly-written file does not parse back as expected.
+ * Not wired to any UI yet — Sets 100/101 are the callers.
+ */
+export function scaffoldModuleLifecycleSets(
+  root: string,
+  module: ModuleManifestEntry,
+): ModuleLifecycleScaffoldResult {
+  const moduleSlug = (module.slug ?? "").trim();
+  if (!MODULE_SLUG_RE.test(moduleSlug)) {
+    throw new Error(
+      `Cannot scaffold lifecycle sets: "${module.slug}" is not a valid module slug.`,
+    );
+  }
+
+  const dirNames = listSessionSetDirNames(root);
+  const existingPlanSlug = findExistingLifecycleSetSlug(dirNames, moduleSlug, "plan");
+  const existingDecompositionSlug = findExistingLifecycleSetSlug(
+    dirNames,
+    moduleSlug,
+    "decomposition",
+  );
+
+  const planSlug =
+    existingPlanSlug ?? `${nextSessionSetNumberFrom(dirNames).padded}-${moduleSlug}-plan`;
+  // Reserve the freshly-minted plan slug (when it's new) so the
+  // decomposition number advances past it too.
+  const reservedDirNames =
+    existingPlanSlug || dirNames.includes(planSlug) ? dirNames : [...dirNames, planSlug];
+  const decompositionSlug =
+    existingDecompositionSlug ??
+    `${nextSessionSetNumberFrom(reservedDirNames).padded}-${moduleSlug}-decomposition`;
+
+  const created = new Date().toISOString().slice(0, 10);
+  const planRelPath = modulePlanRelPath(module);
+  const moduleTitle = (module.title ?? "").trim() || moduleSlug;
+
+  const planAbs = path.join(root, SESSION_SETS_REL, planSlug, "spec.md");
+  const decompositionAbs = path.join(
+    root,
+    SESSION_SETS_REL,
+    decompositionSlug,
+    "spec.md",
+  );
+
+  let planCreated = false;
+  if (!existingPlanSlug) {
+    const planText = renderModulePlanSetSpec({
+      slug: planSlug,
+      moduleSlug,
+      moduleTitle,
+      created,
+      planRelPath,
+    });
+    planCreated = writeSpecSkipExisting(planAbs, planText);
+    if (planCreated) assertLifecycleSpecWritten(planAbs, "plan", null);
+  }
+
+  let decompositionCreated = false;
+  if (!existingDecompositionSlug) {
+    const decompositionText = renderModuleDecompositionSetSpec({
+      slug: decompositionSlug,
+      moduleSlug,
+      moduleTitle,
+      created,
+      planRelPath,
+      planSlug,
+    });
+    decompositionCreated = writeSpecSkipExisting(decompositionAbs, decompositionText);
+    if (decompositionCreated) {
+      assertLifecycleSpecWritten(decompositionAbs, "decomposition", planSlug);
+    }
+  }
+
+  return {
+    planSlug,
+    planSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${planSlug}/spec.md`,
+    planCreated,
+    decompositionSlug,
+    decompositionSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${decompositionSlug}/spec.md`,
+    decompositionCreated,
+  };
 }

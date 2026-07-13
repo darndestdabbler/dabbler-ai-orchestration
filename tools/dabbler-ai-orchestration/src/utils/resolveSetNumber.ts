@@ -50,3 +50,33 @@ export function parseSetHandle(raw: string): number | null {
   if (!/^\d+$/.test(trimmed)) return null;
   return parseInt(trimmed, 10);
 }
+
+// Digit-count of a slug's numeric prefix (0 when it has none).
+function prefixWidth(slug: string): number {
+  const m = PREFIX_RE.exec(slug);
+  return m ? m[1].length : 0;
+}
+
+export interface NextSetNumber {
+  n: number;
+  padded: string;
+}
+
+/**
+ * Set 098 S2: pure TS mirror of ``ai_router.resolve_set.next_session_set_number``
+ * — ``max(existing numeric prefix) + 1`` (``1`` when none exist), zero-padded to
+ * ``width = max(3, widest existing numeric prefix)`` so a repo that has grown
+ * past 3-digit prefixes keeps its width. ``dirNames`` is every directory
+ * basename under ``docs/session-sets`` (the caller excludes ``_``-prefixed
+ * dirs, same as the Python lister); slugs without a numeric prefix are
+ * ignored for max-finding, matching the Python contract exactly.
+ */
+export function nextSessionSetNumberFrom(dirNames: string[]): NextSetNumber {
+  const numbered = dirNames
+    .map(numericPrefix)
+    .filter((p): p is number => p !== null);
+  const n = numbered.length ? Math.max(...numbered) + 1 : 1;
+  const widest = dirNames.reduce((w, name) => Math.max(w, prefixWidth(name)), 0);
+  const width = Math.max(3, widest);
+  return { n, padded: String(n).padStart(width, "0") };
+}

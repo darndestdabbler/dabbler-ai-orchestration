@@ -1,0 +1,77 @@
+# {{MODULE_TITLE}} — session-set decomposition
+
+> **Purpose:** Read the `{{MODULE_SLUG}}` module's current plan and its
+> existing session sets, then author the next batch of session sets per the
+> authoring guide. A later continuation is just another `kind:
+> decomposition` set.
+> **Session Set:** `docs/session-sets/{{SLUG}}/`
+> **Created:** {{CREATED}}
+> **Workflow:** Full
+> **Prerequisite:** `{{PLAN_SLUG}}` must be complete.
+
+---
+
+## Session Set Configuration
+
+```yaml
+tier: full
+requiresUAT: false        # An authoring pass; no interaction surface ships here.
+requiresE2E: false
+uatScope: none
+pathAwareCritique: none
+kind: decomposition         # module-lifecycle set identity (Set 098) — scaffolder output, do not remove.
+module: {{MODULE_SLUG}}
+totalSessions: 1
+prerequisites:
+  - slug: {{PLAN_SLUG}}
+    condition: complete
+```
+
+> Rationale: decomposition gating reuses `prerequisites:` (the Explorer's
+> existing `[BLOCKED BY PREREQS]` badge) — no new mechanism.
+
+---
+
+## Project Overview
+
+Read `{{PLAN_REL_PATH}}` AND this module's existing session sets (avoid
+duplicating work already scoped), then author the next batch of session
+sets per `docs/planning/session-set-authoring-guide.md` — each a focused,
+independently deployable unit of work one AI coding session can complete,
+numbered sequentially, stamped `module: {{MODULE_SLUG}}`.
+
+---
+
+## Sessions
+
+### Session 1 of 1: Author the next batch of session sets
+
+**Goal:** The plan's next unscoped phase(s) are decomposed into new,
+numbered session sets for the `{{MODULE_SLUG}}` module.
+**Steps:**
+1. Register; read `{{PLAN_REL_PATH}}` and every existing session set
+   stamped `module: {{MODULE_SLUG}}` (avoid duplication).
+2. Author the next batch of session sets — each a new
+   `docs/session-sets/<NNN-slug>/spec.md`, stamped
+   `module: {{MODULE_SLUG}}`, per the authoring guide. Do **not**
+   hand-author `session-state.json` for these new sets: each one's own
+   first `start_session` run bootstraps it from the spec's
+   `totalSessions`, per the blessed-writer contract — state files are
+   the runtime writers' job, never authored by hand.
+3. Verify (mandatory cross-provider session verification).
+4. Author `disposition.json`; commit + push; `close_session`.
+**Creates:** the newly authored session-set directories.
+**Touches:** none
+**Ends with:** the new sets exist, are correctly numbered and stamped, and
+validate against the spec parser; cross-provider VERIFIED (or Minor-only);
+pushed; `close_session` succeeded.
+**Progress keys:** `session-001/sets-authored`, `session-001/suite-green`
+
+---
+
+## End-of-set deliverables
+
+- The next batch of session sets for the `{{MODULE_SLUG}}` module, ready
+  to run.
+- Continuing later is a new `kind: decomposition` set (with a fresh
+  `prerequisites:` link back to this module's current plan set).

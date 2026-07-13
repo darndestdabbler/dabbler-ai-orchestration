@@ -21,10 +21,13 @@ import {
   isSafeRepoRelativePath,
   modulePlanRelPath,
   pickModuleForAuthoring,
+  renderModuleDecompositionSetSpec,
   renderModuleManifestEntry,
+  renderModulePlanSetSpec,
   renderModulePlanStub,
   replaceEmptyModulesList,
   resolveModuleTarget,
+  scaffoldModuleLifecycleSets,
   scaffoldNewModule,
   stampModuleIntoSpecText,
   unknownModuleMessage,
@@ -34,6 +37,7 @@ import { runNewModuleFlow, NewModuleUi } from "../../commands/newModule";
 import {
   ExclusiveWriteOps,
   readModulesManifest,
+  parsePrerequisites,
   parseSessionSetConfig,
   writeFileExclusiveSync,
 } from "../../utils/fileSystem";
@@ -66,6 +70,15 @@ function entry(over: Partial<ModuleManifestEntry> = {}): ModuleManifestEntry {
     touches: [],
     ...over,
   };
+}
+
+/** Write `body` as `<root>/docs/session-sets/<name>/spec.md`, returning its absolute path. */
+function specWith(root: string, name: string, body: string): string {
+  const dir = path.join(root, "docs", "session-sets", name);
+  fs.mkdirSync(dir, { recursive: true });
+  const p = path.join(dir, "spec.md");
+  fs.writeFileSync(p, body, "utf8");
+  return p;
 }
 
 // ---------------------------------------------------------------------
@@ -1898,6 +1911,267 @@ suite("moduleAuthoring — module stamp writer (Set 093 S2)", () => {
       assert.strictEqual(pseudo, undefined, "Unassigned disappears only when emptied");
       assert.strictEqual(totalRows([greeter!]), 3);
       assert.strictEqual(totalRows(mods), 3);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------- Set 098 S2: module-lifecycle set templates + scaffold writer ----------
+
+// Mirrors consumerBootstrap.test.ts's own bundle-location convention: from
+// this test file, three "../" reaches the extension root, two more reaches
+// the repo root and into docs/templates/consumer-bootstrap.
+const LIFECYCLE_TEMPLATES_DIR = path.resolve(
+  __dirname,
+  "../../..",
+  "../../docs/templates/consumer-bootstrap",
+);
+
+suite("moduleAuthoring — renderModule*SetSpec (Set 098 S2)", () => {
+  // Verification round 1, finding 2 (Major, Completeness): the render
+  // functions must be a substitution of the CHECKED-IN template files, not a
+  // hand-synced inline copy that can silently drift from what's on disk.
+  test("renders are a token-substitution of the checked-in template files (single source of truth)", () => {
+    const planTemplate = fs
+      .readFileSync(path.join(LIFECYCLE_TEMPLATES_DIR, "module-plan-set.spec.md.template"), "utf8")
+      .replace(/\r\n/g, "\n");
+    const decompTemplate = fs
+      .readFileSync(
+        path.join(LIFECYCLE_TEMPLATES_DIR, "module-decomposition-set.spec.md.template"),
+        "utf8",
+      )
+      .replace(/\r\n/g, "\n");
+
+    const substitute = (text: string, table: Record<string, string>): string =>
+      text.replace(/{{([A-Z_]+)}}/g, (whole, key: string) =>
+        Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole,
+      );
+
+    const ctx = {
+      slug: "102-greeter-plan",
+      moduleSlug: "greeter",
+      moduleTitle: "Greeter",
+      created: "2026-07-13",
+      planRelPath: "docs/modules/greeter/project-plan.md",
+    };
+    assert.strictEqual(
+      renderModulePlanSetSpec(ctx),
+      substitute(planTemplate, {
+        MODULE_TITLE: ctx.moduleTitle,
+        MODULE_SLUG: ctx.moduleSlug,
+        SLUG: ctx.slug,
+        CREATED: ctx.created,
+        PLAN_REL_PATH: ctx.planRelPath,
+      }),
+    );
+
+    const decompCtx = { ...ctx, slug: "103-greeter-decomposition", planSlug: "102-greeter-plan" };
+    assert.strictEqual(
+      renderModuleDecompositionSetSpec(decompCtx),
+      substitute(decompTemplate, {
+        MODULE_TITLE: decompCtx.moduleTitle,
+        MODULE_SLUG: decompCtx.moduleSlug,
+        SLUG: decompCtx.slug,
+        CREATED: decompCtx.created,
+        PLAN_REL_PATH: decompCtx.planRelPath,
+        PLAN_SLUG: decompCtx.planSlug,
+      }),
+    );
+  });
+
+  test("plan-set spec parses with kind: plan and the declared module", () => {
+    const root = tmpRoot("lifecycle-render-plan-");
+    try {
+      const text = renderModulePlanSetSpec({
+        slug: "102-greeter-plan",
+        moduleSlug: "greeter",
+        moduleTitle: "Greeter",
+        created: "2026-07-13",
+        planRelPath: "docs/modules/greeter/project-plan.md",
+      });
+      const specPath = specWith(root, "102-greeter-plan", text);
+      const config = parseSessionSetConfig(specPath);
+      assert.strictEqual(config.kind, "plan");
+      assert.strictEqual(config.module, "greeter");
+      assert.strictEqual(config.tier, "full");
+      assert.strictEqual(config.requiresUAT, false);
+      assert.strictEqual(parsePrerequisites(specPath), null);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("decomposition-set spec parses with kind: decomposition and a prerequisites cross-link", () => {
+    const root = tmpRoot("lifecycle-render-decomp-");
+    try {
+      const text = renderModuleDecompositionSetSpec({
+        slug: "103-greeter-decomposition",
+        moduleSlug: "greeter",
+        moduleTitle: "Greeter",
+        created: "2026-07-13",
+        planRelPath: "docs/modules/greeter/project-plan.md",
+        planSlug: "102-greeter-plan",
+      });
+      const specPath = specWith(root, "103-greeter-decomposition", text);
+      const config = parseSessionSetConfig(specPath);
+      assert.strictEqual(config.kind, "decomposition");
+      assert.strictEqual(config.module, "greeter");
+      const prereqs = parsePrerequisites(specPath);
+      assert.ok(prereqs);
+      assert.deepStrictEqual(prereqs, [{ slug: "102-greeter-plan", condition: "complete" }]);
+      // Verification round 1, finding 1 (Major, Correctness): the guidance for
+      // newly authored child sets must NOT instruct hand-authoring
+      // session-state.json — that contradicts "state files are the blessed
+      // runtime writers' job" and can produce invalid/duplicated lifecycle
+      // state. Pin the corrected guidance so it cannot silently regress.
+      assert.ok(
+        text.includes("Do **not**") && text.includes("hand-author `session-state.json`"),
+        "decomposition guidance must explicitly forbid hand-authoring session-state.json",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+suite("moduleAuthoring — scaffoldModuleLifecycleSets (Set 098 S2)", () => {
+  function listSetDirs(root: string): string[] {
+    const dir = path.join(root, "docs", "session-sets");
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir).sort();
+  }
+
+  test("fresh module: both sets scaffolded at 001/002, cross-linked, parse cleanly", () => {
+    const root = tmpRoot("lifecycle-fresh-");
+    try {
+      const result = scaffoldModuleLifecycleSets(root, entry({ slug: "greeter", title: "Greeter" }));
+      assert.strictEqual(result.planSlug, "001-greeter-plan");
+      assert.strictEqual(result.decompositionSlug, "002-greeter-decomposition");
+      assert.strictEqual(result.planCreated, true);
+      assert.strictEqual(result.decompositionCreated, true);
+      assert.strictEqual(result.planSpecRel, "docs/session-sets/001-greeter-plan/spec.md");
+      assert.strictEqual(
+        result.decompositionSpecRel,
+        "docs/session-sets/002-greeter-decomposition/spec.md",
+      );
+      assert.deepStrictEqual(listSetDirs(root), [
+        "001-greeter-plan",
+        "002-greeter-decomposition",
+      ]);
+
+      const planSpec = path.join(root, "docs", "session-sets", "001-greeter-plan", "spec.md");
+      const decompSpec = path.join(
+        root,
+        "docs",
+        "session-sets",
+        "002-greeter-decomposition",
+        "spec.md",
+      );
+      assert.strictEqual(parseSessionSetConfig(planSpec).kind, "plan");
+      assert.strictEqual(parseSessionSetConfig(decompSpec).kind, "decomposition");
+      assert.deepStrictEqual(parsePrerequisites(decompSpec), [
+        { slug: "001-greeter-plan", condition: "complete" },
+      ]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("numbers advance past existing numbered sets (unnumbered dirs ignored)", () => {
+    const root = tmpRoot("lifecycle-advance-");
+    try {
+      specWith(root, "047-existing-work", "# placeholder\n");
+      specWith(root, "harvester-cli-distribution", "# placeholder\n");
+      const result = scaffoldModuleLifecycleSets(root, entry({ slug: "billing", title: "Billing" }));
+      assert.strictEqual(result.planSlug, "048-billing-plan");
+      assert.strictEqual(result.decompositionSlug, "049-billing-decomposition");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("skip-existing: a re-run reuses the module's already-scaffolded lifecycle sets, no duplicates", () => {
+    const root = tmpRoot("lifecycle-rerun-");
+    try {
+      const first = scaffoldModuleLifecycleSets(root, entry({ slug: "greeter", title: "Greeter" }));
+      const planSpec = path.join(root, "docs", "session-sets", first.planSlug, "spec.md");
+      const before = fs.readFileSync(planSpec, "utf8");
+
+      const second = scaffoldModuleLifecycleSets(root, entry({ slug: "greeter", title: "Greeter" }));
+      assert.strictEqual(second.planSlug, first.planSlug);
+      assert.strictEqual(second.decompositionSlug, first.decompositionSlug);
+      assert.strictEqual(second.planCreated, false);
+      assert.strictEqual(second.decompositionCreated, false);
+      // Nothing new was minted, and the existing file was left byte-identical.
+      assert.deepStrictEqual(listSetDirs(root), [first.planSlug, first.decompositionSlug].sort());
+      assert.strictEqual(fs.readFileSync(planSpec, "utf8"), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("skip-existing: a hand-created lifecycle dir for the module is detected and reused", () => {
+    const root = tmpRoot("lifecycle-preexisting-");
+    try {
+      // A plan set for "greeter" already exists under a number the writer
+      // would not have picked on its own — the scaffold must find and reuse
+      // it (identity, not merely "does the computed path exist").
+      specWith(root, "005-greeter-plan", "# hand-authored plan set\n");
+      const result = scaffoldModuleLifecycleSets(root, entry({ slug: "greeter", title: "Greeter" }));
+      assert.strictEqual(result.planSlug, "005-greeter-plan");
+      assert.strictEqual(result.planCreated, false);
+      // The decomposition set is new and cross-links to the EXISTING plan slug.
+      assert.strictEqual(result.decompositionCreated, true);
+      const decompSpec = path.join(
+        root,
+        "docs",
+        "session-sets",
+        result.decompositionSlug,
+        "spec.md",
+      );
+      assert.deepStrictEqual(parsePrerequisites(decompSpec), [
+        { slug: "005-greeter-plan", condition: "complete" },
+      ]);
+      // The hand-authored plan file was never touched.
+      assert.strictEqual(
+        fs.readFileSync(path.join(root, "docs", "session-sets", "005-greeter-plan", "spec.md"), "utf8"),
+        "# hand-authored plan set\n",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refusal on an invalid module slug leaves the tree untouched", () => {
+    const root = tmpRoot("lifecycle-refusal-");
+    try {
+      assert.throws(() =>
+        scaffoldModuleLifecycleSets(root, entry({ slug: "Not Valid!", title: "Bad" })),
+      );
+      assert.ok(!fs.existsSync(path.join(root, "docs", "session-sets")));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("uses the module's declared planPath in both rendered specs", () => {
+    const root = tmpRoot("lifecycle-planpath-");
+    try {
+      const result = scaffoldModuleLifecycleSets(
+        root,
+        entry({ slug: "greeter", title: "Greeter", planPath: "docs/plans/greeter.md" }),
+      );
+      const planSpec = fs.readFileSync(
+        path.join(root, "docs", "session-sets", result.planSlug, "spec.md"),
+        "utf8",
+      );
+      const decompSpec = fs.readFileSync(
+        path.join(root, "docs", "session-sets", result.decompositionSlug, "spec.md"),
+        "utf8",
+      );
+      assert.ok(planSpec.includes("docs/plans/greeter.md"));
+      assert.ok(decompSpec.includes("docs/plans/greeter.md"));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

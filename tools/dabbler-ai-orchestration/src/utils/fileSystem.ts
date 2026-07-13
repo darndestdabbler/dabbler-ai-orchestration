@@ -36,6 +36,23 @@ export const MODULES_MANIFEST_REL = path.join("docs", "modules.yaml");
 export const PLAYWRIGHT_REL_DEFAULT = "tests";
 
 /**
+ * Set 098 S2: directory basenames directly under ``docs/session-sets``,
+ * ``_``-prefixed dirs skipped — mirrors ``ai_router.resolve_set._list_set_dirs``
+ * (no ``spec.md`` / ``session-state.json`` requirement, so a freshly-scaffolded
+ * dir still counts toward next-number resolution). Feeds
+ * {@link nextSessionSetNumberFrom} for `scaffoldModuleLifecycleSets`.
+ */
+export function listSessionSetDirNames(root: string): string[] {
+  const dir = path.join(root, SESSION_SETS_REL);
+  if (!fs.existsSync(dir)) return [];
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && !e.name.startsWith("_"))
+    .map((e) => e.name)
+    .sort();
+}
+
+/**
  * Set 094: a genuinely ATOMIC, symlink-safe, no-replace create — the trust
  * boundary for the create-on-demand docs/modules.yaml ensure-write
  * (adjudication A). Writes `content` to `absPath`, or throws an

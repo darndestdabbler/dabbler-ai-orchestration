@@ -58,3 +58,38 @@ implementation of a settled design (templates + a guarded file-writing
 utility + tests); the cheapest-capable model suffices, and anthropic
 orchestration keeps the openai/google verification pool free. Runner-up:
 claude / anthropic / claude-sonnet-5.
+
+### Actuals (filled at close)
+
+- Orchestrator used: claude / anthropic / claude-sonnet-5 (operator-invoked
+  via `/model sonnet`, overriding the routed haiku-4-5 recommendation — no
+  deviation rationale requested; recorded per the operator-invocation
+  precedent).
+- Routed calls: phased verification discovery fan-out K=2 ($0.3539, both
+  gpt-5-6, anthropic excluded as the orchestrator provider) +
+  remediation-review round 2 ($0.0423, gpt-5-6). Session routed total ≈
+  **$0.40**.
+- Verification loop story: discovery round 1 returned **ISSUES_FOUND**
+  with 2 blocking findings (both fan-out calls independently surfaced the
+  same two defects — see `s2-remediation-round-1.md`). Remediated once;
+  remediation-review round 2 returned **VERIFIED**, both fix verdicts
+  accepted, 0 blocking.
+- Deviations from recommendation: model (haiku-4-5 → sonnet-5,
+  operator-invoked); no deviation in approach — implementation matched the
+  spec's settled design, and both verification findings were genuine
+  defects in that implementation (a template guidance bug + a
+  hand-synced-template drift risk), not a design disagreement.
+- No Layer 3 / Playwright run this session: no `readSessionSets` or
+  rendering-surface file was touched (the new writer is not wired to any
+  UI yet), so the L-064-12 trigger condition does not apply.
+
+## Set 098 — routed next-set recommendation
+
+Not requested this close: Sets 099–101 of the module-lifecycle-
+simplification bundle are already authored and sequenced
+(`docs/session-sets/099-module-rename-and-delete-writers/`,
+`docs/session-sets/100-work-explorer-module-lifecycle-ui/`,
+`docs/session-sets/101-default-module-scaffold-and-docs/`);
+`next_orchestrator: null` in the final disposition per the set-terminal
+convention (Set 097 precedent — the field records the next SESSION
+within a set, not the next SET).

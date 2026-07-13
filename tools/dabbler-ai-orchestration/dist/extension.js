@@ -17054,6 +17054,36 @@ var crypto2 = __toESM(require("crypto"));
 var fs6 = __toESM(require("fs"));
 var path7 = __toESM(require("path"));
 var YAML2 = __toESM(require_dist());
+
+// src/utils/resolveSetNumber.ts
+var PREFIX_RE = /^(\d+)-/;
+function numericPrefix(slug) {
+  const m = PREFIX_RE.exec(slug);
+  return m ? parseInt(m[1], 10) : null;
+}
+function resolveSetNumber(slugs, n) {
+  const matches = slugs.filter((s) => numericPrefix(s) === n);
+  if (matches.length === 0) {
+    const available = Array.from(
+      new Set(
+        slugs.map(numericPrefix).filter((p2) => p2 !== null)
+      )
+    ).sort((a, b2) => a - b2);
+    return { kind: "no-match", available };
+  }
+  if (matches.length > 1) {
+    return { kind: "collision", matches: matches.slice().sort() };
+  }
+  return { kind: "match", slug: matches[0] };
+}
+function parseSetHandle(raw) {
+  const trimmed2 = raw.trim().replace(/^set\s+/i, "");
+  if (!/^\d+$/.test(trimmed2))
+    return null;
+  return parseInt(trimmed2, 10);
+}
+
+// src/utils/moduleAuthoring.ts
 var MODULES_MANIFEST_DISPLAY = MODULES_MANIFEST_REL.replace(/\\/g, "/");
 var MODULE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function validateNewModuleSlug(raw, existingSlugs) {
@@ -31028,36 +31058,6 @@ function registerExternalVerificationCommand(context) {
 
 // src/commands/resolveSetNumber.ts
 var vscode32 = __toESM(require("vscode"));
-
-// src/utils/resolveSetNumber.ts
-var PREFIX_RE = /^(\d+)-/;
-function numericPrefix(slug) {
-  const m = PREFIX_RE.exec(slug);
-  return m ? parseInt(m[1], 10) : null;
-}
-function resolveSetNumber(slugs, n) {
-  const matches = slugs.filter((s) => numericPrefix(s) === n);
-  if (matches.length === 0) {
-    const available = Array.from(
-      new Set(
-        slugs.map(numericPrefix).filter((p2) => p2 !== null)
-      )
-    ).sort((a, b2) => a - b2);
-    return { kind: "no-match", available };
-  }
-  if (matches.length > 1) {
-    return { kind: "collision", matches: matches.slice().sort() };
-  }
-  return { kind: "match", slug: matches[0] };
-}
-function parseSetHandle(raw) {
-  const trimmed2 = raw.trim().replace(/^set\s+/i, "");
-  if (!/^\d+$/.test(trimmed2))
-    return null;
-  return parseInt(trimmed2, 10);
-}
-
-// src/commands/resolveSetNumber.ts
 function registerResolveSetNumberCommand(context, deps = {}) {
   const readSets = deps.readSets ?? readAllSessionSets;
   context.subscriptions.push(

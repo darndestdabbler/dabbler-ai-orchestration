@@ -26,6 +26,8 @@
 | [`cross-provider-verification.md.template`](cross-provider-verification.md.template) | `docs/dabbler/cross-provider-verification.md` — the engine-facing out-of-band verification instructions (Set 077 S4); also ensure-written idempotently before any Evaluate pointer prompt | yes |
 | [`CODEOWNERS.template`](CODEOWNERS.template) | `.github/CODEOWNERS` — the module-ownership teaching template: worked three-person example + the integration `touches` review rule (Set 087 S3). **Token-free and comment-only** — inert until adapted to `docs/modules.yaml` | yes |
 | [`monorepo-ci.yml.template`](monorepo-ci.yml.template) | `.github/workflows/monorepo-ci.yml` — monorepo CI teaching template: commented path-scoped per-module jobs + the ACTIVE all-module guardrail job on every merge to `main` (its placeholder step succeeds, so the unadapted file never breaks a build) (Set 087 S3). **Token-free** | yes |
+| [`module-plan-set.spec.md.template`](module-plan-set.spec.md.template) | a `kind: plan` module-lifecycle set's `spec.md` (Set 098 S2) — the single source of truth, rendered directly (via `resolveModuleLifecycleTemplatesDir` + `{{TOKEN}}` substitution, no `BootstrapContext`/`TemplateBundle` coupling) by `renderModulePlanSetSpec` in `scaffoldModuleLifecycleSets` (`src/utils/moduleAuthoring.ts`) | full only |
+| [`module-decomposition-set.spec.md.template`](module-decomposition-set.spec.md.template) | a `kind: decomposition` module-lifecycle set's `spec.md` (Set 098 S2), `prerequisites:`-linked to its sibling plan set — same resolver, rendered by `renderModuleDecompositionSetSpec` | full only |
 
 The three `docs/planning/` guidance starters are repo-level structure (not
 per-set), so they are written by **both** the full session-set scaffold and the

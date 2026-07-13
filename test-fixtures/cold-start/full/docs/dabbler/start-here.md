@@ -57,6 +57,17 @@ If two sets are `in-progress` at once, that is a drift error, not a choice to
 make — stop and surface it to the operator (and the CI "exactly one active
 set" check will already be red).
 
+> **A fresh `Build project structure` also scaffolds a `default` module**
+> (`docs/modules.yaml`) with two starter session sets already in place —
+> a `kind: plan` set and a `kind: decomposition` set (the Visual Studio
+> `Class1` pattern: a working starting point, not a template to study).
+> The rule above already resolves to whichever of the two is lower-numbered
+> and not-started, exactly like any other set — no special handling. Run
+> the plan set first (create or import the real project plan), then the
+> decomposition set (turns that plan into the project's real session
+> sets); rename or delete "Default" any time from the Work Explorer once
+> the project's real module names are known.
+
 ## Step 2 — Read the tier and verification mode
 
 Open the active set's `spec.md` and read its *Session Set Configuration*

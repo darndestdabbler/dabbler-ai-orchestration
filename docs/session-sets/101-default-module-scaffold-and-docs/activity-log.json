@@ -1,0 +1,105 @@
+{
+  "sessionSetName": "101-default-module-scaffold-and-docs",
+  "createdDate": "2026-07-13T22:38:00.087430+00:00",
+  "totalSessions": 2,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-13T22:38:00.087430+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/register",
+      "dateTime": "2026-07-13T18:59:02.673065-04:00",
+      "description": "Registered session 1 via start_session (engine=claude, provider=anthropic); read spec.md, the module-lifecycle-simplification verdict, Set 098/100 change-logs, and gitScaffold.ts/moduleAuthoring.ts to plan the reuse.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/default-module-scaffolded",
+      "dateTime": "2026-07-13T18:59:02.673065-04:00",
+      "description": "Extended buildProjectStructureNoPrompt: a Build call that just created docs/modules.yaml now also scaffolds the real 'default' module + its two lifecycle sets via scaffoldNewModule + scaffoldModuleLifecycleSets (Set 087/098 writers, reused verbatim, never modified). New scaffoldDefaultModuleAndLifecycleSets() + BuildStructureSeams.scaffoldDefaultModule test seam in gitScaffold.ts.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/idempotent-rerun",
+      "dateTime": "2026-07-13T18:59:02.673065-04:00",
+      "description": "Gated the new scaffold strictly on result.written.includes(MODULES_MANIFEST_DISPLAY) (the manifest having been CREATED this exact call) rather than mere emptiness, so a Build re-run (manifest already present, reported in `skipped`) makes no module/set writes.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/legacy-untouched",
+      "dateTime": "2026-07-13T18:59:02.674072-04:00",
+      "description": "The same gate means a legacy repo whose docs/modules.yaml already exists (however empty) is left exactly as found by a later Build call -- no forced migration, matching the verdict's decision 4.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/scaffold-copy",
+      "dateTime": "2026-07-13T18:59:02.674072-04:00",
+      "description": "Added the Default-is-Class1 short paragraph to both docs/templates/consumer-bootstrap/getting-started.md.template and start-here.md.template (human-facing and orchestrator-facing cold-start docs); regenerated the cold-start golden fixtures (UPDATE_GOLDEN=1) and the Python cold-start acceptance test both pass.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/tests-written",
+      "dateTime": "2026-07-13T18:59:02.674072-04:00",
+      "description": "New tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldDefaultModule.test.ts: real-fs tests for scaffoldDefaultModuleAndLifecycleSets (fresh-scaffold end-state, no-manifest edge case, refused re-call safety) plus fake-seam wiring tests for buildProjectStructureNoPrompt's gating (fresh vs pre-existing manifest, both Full and Lightweight tiers, plus one real-writer end-to-end wiring test). 8 new tests, all passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/dogfood-pass",
+      "dateTime": "2026-07-13T18:59:02.674072-04:00",
+      "description": "Live dogfood (s1-dogfood.md): drove the REAL compiled buildProjectStructureNoPrompt against a cold-start empty scratch folder (only the network pip install faked), then the real moduleAuthoring.js writers through the full Class1 loop -- Build (default + Sets 001/002) -> re-run Build (idempotent, no new writes) -> rename (default->greeter, zero orphans) -> delete (both lifecycle sets removed, manifest entry gone) -> re-add (payments, fresh pair). All 6 named checks PASS.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/suite-green",
+      "dateTime": "2026-07-13T18:59:02.675059-04:00",
+      "description": "Full suite: extension unit 1613/1613 (up from 1605 baseline, +8 new), tsc --noEmit clean, eslint unchanged pre-existing baseline (7 errors in untouched test files, matching Set 100's recorded baseline), esbuild clean, Python cold-start acceptance test (both tiers) passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-001/ai-router-baseline",
+      "dateTime": "2026-07-13T19:01:29.599180-04:00",
+      "description": "Full ai_router pytest suite: 3030 passed, 6 skipped in 498.17s -- unchanged baseline (no Python files touched this session), matching Set 100's recorded baseline.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-001/verification-round-1",
+      "dateTime": "2026-07-13T19:25:59.619502-04:00",
+      "description": "Phased verification discovery round 1 (fan-out K=2, gpt-5-6): ISSUES_FOUND, 4 blocking Major findings (both discovery calls independently found the same legacy-repo-mutation bug in different framings; plus VSIX-dogfood-completeness and Work-Explorer-tree-test-completeness findings). Supplementary discovery pass: VERIFIED, 0 new findings.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "session-001/remediation-round-1",
+      "dateTime": "2026-07-13T19:25:59.620515-04:00",
+      "description": "Remediated all 4 merged findings (s1-remediation-round-1.md): (1&2) scaffoldDefaultModuleAndLifecycleSets now refuses whenever docs/session-sets/ already has any set dirs, regardless of manifest-creation signal -- fixes a real bug where a legacy repo upgrading and re-running Build would get an unsolicited Default module; (3) packaged the real VSIX (vsce package, 43 files, clean) and added a genuine Playwright Layer-3 spec driving a real VS Code Electron instance against the scaffold's exact fixture shape; (4) added Work-Explorer tree-model tests (computeVisibleModules/buildVisibleModulePayloads) for both tiers plus the legacy-pseudo-module non-interference case. Suite after remediation: extension unit 1617/1617 (+4), Playwright Layer 3 27/27 (+1, 0 regressions), tsc/eslint/esbuild clean.",
+      "status": "complete"
+    }
+  ]
+}

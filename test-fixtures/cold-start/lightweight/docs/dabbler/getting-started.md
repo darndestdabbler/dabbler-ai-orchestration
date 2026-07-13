@@ -56,6 +56,16 @@ work. It is better suited to users who can't (or don't want to)
 spend extra money on projects and who are OK with some workarounds
 for verifying AI output.
 
+**What Build gives you.** Building the project structure also
+declares a `default` module in `docs/modules.yaml` with two starter
+session sets already scaffolded — a plan set and a decomposition set.
+Think of it as the Visual Studio `Class1` pattern: a working starting
+point, not a template to study. Run the plan set first (it creates or
+imports your project's real plan), then the decomposition set (it
+turns that plan into your project's real session sets); rename or
+delete "Default" any time from the module's row in the Work Explorer
+once you know your project's real module names.
+
 ## 2. Define Modules (Optional)
 
 If your project is split across areas or teams — say two developers

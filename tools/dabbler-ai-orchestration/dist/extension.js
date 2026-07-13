@@ -26000,6 +26000,36 @@ async function scaffoldConsumerRepo(deps) {
     budgetOutcome
   };
 }
+function scaffoldDefaultModuleAndLifecycleSets(projectDir) {
+  if (listSessionSetDirNames(projectDir).length > 0) {
+    return {
+      ran: false,
+      note: " The default module was NOT scaffolded \u2014 this repo already has session sets under docs/session-sets/, so it is treated as an existing (legacy) repo, not a fresh scaffold."
+    };
+  }
+  try {
+    const newModule = scaffoldNewModule(projectDir, "default", "Default");
+    const declared = {
+      slug: "default",
+      title: "Default",
+      codeRoots: [],
+      planPath: newModule.planRel,
+      touches: []
+    };
+    const lifecycle = scaffoldModuleLifecycleSets(projectDir, declared);
+    return {
+      ran: true,
+      planSlug: lifecycle.planSlug,
+      decompositionSlug: lifecycle.decompositionSlug,
+      note: ` Default module scaffolded: ${lifecycle.planSlug} (plan) and ${lifecycle.decompositionSlug} (decomposition) \u2014 rename or delete "Default" any time from the Work Explorer.`
+    };
+  } catch (err) {
+    return {
+      ran: false,
+      note: ` The default module's starter sets were NOT scaffolded (${err instanceof Error ? err.message : String(err)}).`
+    };
+  }
+}
 async function pickDirectory() {
   const picked = await vscode11.window.showOpenDialog({
     canSelectFiles: false,
@@ -26159,7 +26189,10 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
     effectiveBudget
   );
   const budgetNote = result.budgetOutcome === "written" ? " Budget saved to ai_router/budget.yaml." : result.budgetOutcome === "skipped-exists" ? " Existing ai_router/budget.yaml kept (budget input not applied)." : "";
-  const summary = `Project structure built (${tier} tier): ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote;
+  const defaultModuleNote = result.written.includes(MODULES_MANIFEST_DISPLAY) ? (seams.scaffoldDefaultModule ?? scaffoldDefaultModuleAndLifecycleSets)(
+    projectDir
+  ).note : "";
+  const summary = `Project structure built (${tier} tier): ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote + defaultModuleNote;
   const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
   const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
   if (result.installOk) {

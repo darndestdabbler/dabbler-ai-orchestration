@@ -164,6 +164,14 @@
       "dateTime": "2026-07-13T02:34:42.666235-04:00",
       "description": "Operator adjudication (2026-07-13, option c: reshaped-context re-verify). The operator supplied the objective context earlier rounds lacked: definitive comparative experiments are confounded beyond resolution and rejected as disproportionate for a personally-funded ~1-year-horizon tool whose staff users run weaker Copilot CLI models; the consequence rubric is operator policy, not a hypothesis under test; the replay is an indicative loop-shape demonstration by design. Round 7 (same verifier, gpt-5-6, full bundle + 27k-char auto-ledger, $0.37): VERIFIED, zero findings, explicitly grading the open point non-material for the deliverable's real users. record_adjudication logged (context-gap / reverify-reshaped); disposition restored to completed/VERIFIED. Operator follow-on candidates recorded: (a) background liberal-definition probe loop + triage queue (large), (b) per-project configurable severity definition (small).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "round-8-remediation",
+      "dateTime": "2026-07-13T02:49:17.252668-04:00",
+      "description": "Round 8 (backstop, ran because record_adjudication had appended an unstamped session-verification row after round 7 and the anti-rollback rule correctly refused to settle on an older row -- orchestrator row-hygiene error, machinery behaved as designed; follow-up noted: exclude adjudication records from the latest-attempt comparison). Its one Major (spec \"raised output budget\" for discovery) remediated to the extent that is real: calls already run at each model's configured max_output_tokens (provider-limit-bound, operator-owned); shipped verification.discovery.min_output_tokens floor (32000) + loud under-budget verifier warning + 3 tests; probability evidence recorded (sub-8k observed responses vs 65,536 ceiling, zero truncations in 13 live rounds; truncation already fail-closed). Residual spec-prose reading surfaced for Step 9. Suite 3014 passed / 6 skipped.",
+      "status": "complete"
     }
   ]
 }

@@ -204,6 +204,14 @@ DISCOVERY_FAN_OUT_DEFAULT = 2
 PROVIDER_DIVERSITY_SAME_MODEL = "same-model"
 PROVIDER_DIVERSITY_CROSS_PROVIDER = "cross-provider"
 PROVIDER_DIVERSITY_DEFAULT = PROVIDER_DIVERSITY_SAME_MODEL
+# The discovery output-budget FLOOR (spec: "raised output budget"). Every
+# routed call already runs at its model's CONFIGURED max_output_tokens —
+# the per-model ceiling is provider-limit-bound and only the operator can
+# raise it — so the implementable half is visibility: warn LOUDLY when a
+# discovery call is answered by a model whose configured ceiling sits
+# below this floor (exhaustive enumeration needs headroom; a truncated
+# response is already a fail-closed invalid round, never silent loss).
+DISCOVERY_MIN_OUTPUT_TOKENS_DEFAULT = 32000
 # Backstop against a runaway config value: each call is a metered routed
 # review, and the measured yield curve flattened hard by K=3 (7 -> +8 -> +1).
 _DISCOVERY_FAN_OUT_CAP = 4
@@ -250,6 +258,46 @@ def load_discovery_phase_config(
     except Exception:
         pass
     return fan_out, diversity
+
+
+def load_discovery_min_output_tokens(config: Optional[dict] = None) -> int:
+    """The discovery output-budget floor from
+    ``verification.discovery.min_output_tokens`` (fail-open to the
+    default, like :func:`load_discovery_phase_config`)."""
+    floor = DISCOVERY_MIN_OUTPUT_TOKENS_DEFAULT
+    try:
+        if config is None:
+            try:
+                from config import load_config  # type: ignore[import-not-found]
+            except ImportError:
+                from .config import load_config  # type: ignore[no-redef]
+            config = load_config()
+        raw = (
+            (config.get("verification") or {}).get("discovery") or {}
+        ).get("min_output_tokens")
+        if isinstance(raw, int) and not isinstance(raw, bool) and raw > 0:
+            floor = raw
+    except Exception:
+        pass
+    return floor
+
+
+def _model_output_cap(model_name: str) -> Optional[int]:
+    """The CONFIGURED ``max_output_tokens`` for *model_name*, or ``None``
+    when unresolvable (fail open — the floor check cannot warn on
+    evidence it does not have)."""
+    try:
+        try:
+            from config import load_config  # type: ignore[import-not-found]
+        except ImportError:
+            from .config import load_config  # type: ignore[no-redef]
+        cfg = (load_config().get("models") or {}).get(str(model_name)) or {}
+        cap = cfg.get("max_output_tokens")
+        if isinstance(cap, int) and not isinstance(cap, bool) and cap > 0:
+            return cap
+    except Exception:
+        pass
+    return None
 
 # Generated-bundle exclusions applied to the evidence diff by default.
 # These are build outputs / vendored trees whose churn drowns the real
@@ -2505,6 +2553,28 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         #    CRLF write would break the artifact binding on Windows.
         artifact_path_k.write_text(result.content, encoding="utf-8", newline="")
         results.append((call_index, result))
+
+        # -- Discovery output-budget floor (S2 verification round 8): the
+        #    call already ran at its model's configured max_output_tokens;
+        #    raising THAT is a provider-limit-bound operator setting. The
+        #    implementable half is loud visibility when exhaustive
+        #    enumeration landed on an under-budget verifier.
+        if phase == PHASE_DISCOVERY:
+            cap = _model_output_cap(getattr(result, "model_name", ""))
+            floor = load_discovery_min_output_tokens()
+            if cap is not None and cap < floor:
+                print(
+                    f"verify_session: WARNING -- discovery call {call_index} "
+                    f"was answered by {result.model_name}, whose configured "
+                    f"max_output_tokens ({cap}) is below the discovery "
+                    f"output-budget floor ({floor}, "
+                    "verification.discovery.min_output_tokens). Exhaustive "
+                    "enumeration needs headroom; consider raising that "
+                    "model's configured ceiling (provider limits permitting) "
+                    "or verifying with a higher-capacity model. A truncated "
+                    "response is already treated as invalid evidence.",
+                    file=sys.stderr,
+                )
 
     # -- Parse each completed call and merge across the fan-out (a
     #    single-call round merges trivially). Blocking classification runs

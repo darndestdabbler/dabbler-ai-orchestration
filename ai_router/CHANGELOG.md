@@ -95,7 +95,13 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `router-config.yaml` — `fan_out: 2`, `provider_diversity: same-model`,
   seeded verbatim from the S1 experiment memo and documented inline;
   `load_discovery_phase_config` fails open to those defaults on any
-  malformed value.
+  malformed value. Plus `min_output_tokens: 32000` — the discovery
+  output-budget FLOOR: every routed call already runs at its model's
+  configured `max_output_tokens` (a provider-limit-bound, operator-owned
+  ceiling), so the implementable half of the spec's "raised output
+  budget" is loud visibility — `verify_session` warns when a discovery
+  call is answered by a model whose configured ceiling sits below the
+  floor (a truncated response was already fail-closed invalid evidence).
 - **(Set 096 S2) Envelope machinery fields** (omit-null, tolerant readers;
   `schemaVersion` unchanged): envelope-level `phase`,
   `discoveryBaselineTree`, `fixVerdicts`; per-issue `discoveryCall`.

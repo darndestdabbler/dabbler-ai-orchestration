@@ -705,6 +705,18 @@ verification:
   # and falls back to these defaults on a malformed value.
   discovery:
     fan_out: 2                       # K same-model discovery calls, identical bundles
+    min_output_tokens: 32000         # discovery output-budget FLOOR (spec: "raised
+                                     #   output budget"). Every routed call already runs
+                                     #   at its model's configured max_output_tokens --
+                                     #   the per-model ceiling above, which is bound by
+                                     #   provider limits and is the operator's to raise.
+                                     #   This floor makes an under-budget verifier LOUD:
+                                     #   verify_session warns when a discovery call is
+                                     #   answered by a model whose configured ceiling is
+                                     #   below it (exhaustive enumeration needs headroom;
+                                     #   observed discovery responses run well under 8k
+                                     #   tokens, and a truncated response is already a
+                                     #   fail-closed invalid round, never silent loss).
     provider_diversity: same-model   # same-model | cross-provider
                                      # same-model: the supplementary pass decorrelates by
                                      #   prompt (completeness-critic framing) on the same

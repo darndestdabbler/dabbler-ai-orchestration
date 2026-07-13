@@ -256,6 +256,18 @@ class TestPhaseConfig:
         )
         config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         assert vs.load_discovery_phase_config(config) == (2, "same-model")
+        assert vs.load_discovery_min_output_tokens(config) == 32000
+
+    def test_min_output_tokens_defaults_and_fails_open(self):
+        assert vs.load_discovery_min_output_tokens({}) == (
+            vs.DISCOVERY_MIN_OUTPUT_TOKENS_DEFAULT
+        )
+        malformed = {
+            "verification": {"discovery": {"min_output_tokens": "lots"}}
+        }
+        assert vs.load_discovery_min_output_tokens(malformed) == (
+            vs.DISCOVERY_MIN_OUTPUT_TOKENS_DEFAULT
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1317,6 +1329,44 @@ class TestVerificationRoundHardening:
         # The prior FINDINGS still reach the verifier -- via the critic
         # block, not via the raw artifact bytes.
         assert "missing its safety catch" in prompt
+
+    def test_under_budget_discovery_verifier_warns(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # S2 verification round 8: discovery landing on a model whose
+        # configured output ceiling is below the floor warns LOUDLY (the
+        # ceiling itself is a provider-limit-bound operator setting).
+        _phase_config(monkeypatch, fan_out=1)
+        monkeypatch.setattr(vs, "_model_output_cap", lambda name: 16000)
+        monkeypatch.setattr(
+            vs, "load_discovery_min_output_tokens", lambda config=None: 32000
+        )
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        code = vs.run(
+            _args(_set_dir(repo), phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_OK
+        err = capsys.readouterr().err
+        assert "below the discovery output-budget floor" in err
+
+    def test_adequate_or_unresolvable_budget_stays_quiet(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        monkeypatch.setattr(vs, "_model_output_cap", lambda name: 65536)
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        assert vs.run(
+            _args(_set_dir(repo), phase=vs.PHASE_DISCOVERY), route_fn=fake
+        ) == vs.EXIT_OK
+        assert "output-budget floor" not in capsys.readouterr().err
+        # Unresolvable cap fails open (no warning on missing evidence).
+        monkeypatch.setattr(vs, "_model_output_cap", lambda name: None)
+        fake2 = FakeMultiRoute([VERIFIED_RESPONSE])
+        assert vs.run(
+            _args(_set_dir(repo), phase=vs.PHASE_DISCOVERY,
+                  round_number=2), route_fn=fake2
+        ) == vs.EXIT_OK
+        assert "output-budget floor" not in capsys.readouterr().err
 
     def test_fix_delta_excludes_loop_bookkeeping(
         self, repo: Path, monkeypatch

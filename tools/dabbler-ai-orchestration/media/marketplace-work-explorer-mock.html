@@ -1,8 +1,8 @@
 <!doctype html>
 <!--
   Marketplace screenshot mock — Work Explorer, module-first tree
-  (Sets 091–094 four-level dialect: module → Plan / Session sets →
-  status bucket → row).
+  (module → status bucket → row; the operator-confirmed shipped shape —
+  no intermediate Plan / Session sets level is drawn).
 
   Every visual value is transcribed from the REAL webview stylesheet
   media/session-sets-tree/tree.css and the REAL renderer
@@ -10,12 +10,10 @@
   substituted for the CSS variables:
 
     module-header    padding 7px 8px, 13px/600, chevron 12px, gap 4px
-    child-header     padding 5px 8px 5px 24px, 12px; label 500;
-                     state 11px italic opacity .7 margin-left 6px
-    bucket-header    padding 6px 12px 8px 12px (+padding-left 40px under
+    bucket-header    padding 6px 12px 8px 12px (+padding-left 24px under
                      a module), 11px/600 uppercase ls .05em opacity .72
     bucket label     "Label  (N)" — double space (client.js renderBucket)
-    row-header       padding 2px 12px (+padding-left 40px), 13px, lh 1.2
+    row-header       padding 2px 12px (+padding-left 24px), 13px, lh 1.2
     row-fraction     700, tabular-nums, width 3em, margin-right 12px,
                      format "N/M" (CustomSessionSetsView.fractionFor —
                      no spaces around the slash)
@@ -124,33 +122,11 @@
     font-size: 11px;
   }
 
-  /* ----- Level-2 children: Plan / Session sets (tree.css .child-*) ----- */
-  .module-child { margin-bottom: 1px; }
-  .child-header {
-    display: flex; align-items: center; gap: 4px;
-    padding: 5px 8px 5px 24px;
-    font-size: 12px;
-    user-select: none;
-  }
-  .child-chevron {
-    display: inline-block; width: 12px; text-align: center;
-    opacity: 0.7; flex-shrink: 0;
-    font-size: 10px;
-  }
-  .child-label { font-weight: 500; }
-  .child-state {
-    margin-left: 6px;
-    font-size: 11px;
-    opacity: 0.7;
-    font-style: italic;
-    color: #8a8a8a;
-  }
-
-  /* ----- Buckets (tree.css .bucket*) ----- */
+  /* ----- Buckets (tree.css .bucket*), directly under the module ----- */
   .bucket { margin-bottom: 4px; }
   .bucket-header {
     display: flex; align-items: center; gap: 4px;
-    padding: 6px 12px 8px 40px;
+    padding: 6px 12px 8px 24px;
     font-size: 11px; font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -174,11 +150,11 @@
   }
   .row-header {
     display: flex; align-items: baseline;
-    padding: 2px 12px 2px 40px;
+    padding: 2px 12px 2px 24px;
     font-size: 13px; line-height: 1.2;
     user-select: none;
   }
-  .row.selected .row-header { padding-left: 38px; }
+  .row.selected .row-header { padding-left: 22px; }
   .row-fraction {
     flex: 0 0 auto;
     font-weight: 700;
@@ -259,68 +235,51 @@
           </div>
           <div class="module-body">
 
-            <div class="module-child">
-              <div class="child-header">
-                <span class="child-chevron"></span>
-                <span class="child-label">Plan</span>
-                <span class="child-state">present</span>
+            <div class="bucket">
+              <div class="bucket-header">
+                <span class="bucket-chevron">▾</span>
+                <span>In Progress&nbsp;&nbsp;(1)</span>
+              </div>
+              <div class="row selected">
+                <div class="row-header">
+                  <span class="row-fraction row-fraction-in-progress">2/4</span>
+                  <span class="row-text"><span class="row-name">012-passkey-enrollment</span></span>
+                </div>
               </div>
             </div>
 
-            <div class="module-child">
-              <div class="child-header">
-                <span class="child-chevron">▾</span>
-                <span class="child-label">Session sets</span>
+            <div class="bucket">
+              <div class="bucket-header">
+                <span class="bucket-chevron">▾</span>
+                <span>Not Started&nbsp;&nbsp;(1)</span>
               </div>
-              <div class="child-body">
-
-                <div class="bucket">
-                  <div class="bucket-header">
-                    <span class="bucket-chevron">▾</span>
-                    <span>In Progress&nbsp;&nbsp;(1)</span>
-                  </div>
-                  <div class="row selected">
-                    <div class="row-header">
-                      <span class="row-fraction row-fraction-in-progress">2/4</span>
-                      <span class="row-text"><span class="row-name">012-passkey-enrollment</span></span>
-                    </div>
-                  </div>
+              <div class="row">
+                <div class="row-header">
+                  <span class="row-fraction row-fraction-not-started">0/3</span>
+                  <span class="row-text"><span class="row-name">013-session-token-rotation</span></span>
                 </div>
-
-                <div class="bucket">
-                  <div class="bucket-header">
-                    <span class="bucket-chevron">▾</span>
-                    <span>Not Started&nbsp;&nbsp;(1)</span>
-                  </div>
-                  <div class="row">
-                    <div class="row-header">
-                      <span class="row-fraction row-fraction-not-started">0/3</span>
-                      <span class="row-text"><span class="row-name">013-session-token-rotation</span></span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="bucket">
-                  <div class="bucket-header">
-                    <span class="bucket-chevron">▾</span>
-                    <span>Complete&nbsp;&nbsp;(2)</span>
-                  </div>
-                  <div class="row">
-                    <div class="row-header">
-                      <span class="row-fraction row-fraction-complete">5/5</span>
-                      <span class="row-text"><span class="row-name">010-oauth-provider-integration</span></span>
-                    </div>
-                  </div>
-                  <div class="row">
-                    <div class="row-header">
-                      <span class="row-fraction row-fraction-complete">3/3</span>
-                      <span class="row-text"><span class="row-name">011-password-reset-flow</span></span>
-                    </div>
-                  </div>
-                </div>
-
               </div>
             </div>
+
+            <div class="bucket">
+              <div class="bucket-header">
+                <span class="bucket-chevron">▾</span>
+                <span>Complete&nbsp;&nbsp;(2)</span>
+              </div>
+              <div class="row">
+                <div class="row-header">
+                  <span class="row-fraction row-fraction-complete">5/5</span>
+                  <span class="row-text"><span class="row-name">010-oauth-provider-integration</span></span>
+                </div>
+              </div>
+              <div class="row">
+                <div class="row-header">
+                  <span class="row-fraction row-fraction-complete">3/3</span>
+                  <span class="row-text"><span class="row-name">011-password-reset-flow</span></span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 

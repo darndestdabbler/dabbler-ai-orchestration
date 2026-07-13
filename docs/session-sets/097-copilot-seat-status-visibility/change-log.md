@@ -39,7 +39,7 @@
   L-079-3, reload durability, the new re-confirm command, a never-a-nag
   regression check, and the D3 copy) and offered.
 
-### Verification (phased loop, 3 rounds, $0.53 total)
+### Verification (phased loop + close backstop, 4 rounds, $0.94 total; +$0.02 for the disputed-finding second opinion, untagged/attributable, see below)
 
 - **Round 1 (discovery, K=2 fan-out):** ISSUES_FOUND, 2 blocking findings
   (both fan-out calls independently found the same real bug): the

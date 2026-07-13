@@ -81,6 +81,23 @@
   3 fix verdicts accepted (the marker-clear fix, the recovery-command fix,
   and the reload-persistence explanation). One non-blocking Nit on the
   UAT checklist's folder-numbering wording, fixed in the same pass.
+- **Round 4 (Set 084 close backstop, in-process, triggered by the round-3
+  Nit fix touching non-bookkeeping content after round 3 stamped):**
+  **VERIFIED**, 0 blocking, 4 Nits recorded as residuals (none required to
+  close): (a) the note's copy names the `api` profile even in the
+  `(marker="unconfirmed", durableProfile=null)` case, where the profile
+  might not literally be `api` (router-config.yaml missing/unreadable) —
+  cosmetic wording precision; (b) Layer 3 ran before the `rerunRefreshHint`
+  wording fix (a pure string-content change to an existing field, not new
+  rendering logic) — `s1-conventions.md`'s claim should say so precisely;
+  (c) `copilotSeatSetupCommand.ts` has no dedicated Layer-2 suite (a
+  deliberate call matching the `installAiRouterCommands.ts` precedent,
+  noted explicitly in the UAT checklist itself, per the Nit); (d) the UAT
+  checklist's `Passes: true` defaults are the established repo convention
+  (an AI-authored prediction pending the operator's real walk, as in Sets
+  078/079/092) rather than a literal completed-walk claim, which the
+  round's Nit reasonably flagged as easy to misread out of context. See
+  `s1-verification-round-4.md`.
 
 ## End state
 

@@ -1,21 +1,21 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "097-copilot-seat-status-visibility",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-13T05:33:00.528486-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-13T07:34:20.139857-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
         "model": "claude-sonnet-5",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

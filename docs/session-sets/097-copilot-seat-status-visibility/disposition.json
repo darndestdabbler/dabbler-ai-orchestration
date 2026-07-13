@@ -45,5 +45,9 @@
   "verification_message_ids": [],
   "next_orchestrator": null,
   "blockers": [],
-  "lessons_cited": ["L-065-1", "L-069-1", "L-079-3"]
+  "lessons_cited": [
+    "L-065-1",
+    "L-069-1",
+    "L-079-3"
+  ]
 }

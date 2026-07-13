@@ -1,4 +1,51 @@
 {
+  "status": "completed",
+  "summary": "Set 101 Session 1 of 2: a fresh Build now declares the real `default` module (docs/modules.yaml) and scaffolds its two lifecycle sets via the Set 087/098 writers (scaffoldNewModule + scaffoldModuleLifecycleSets, reused verbatim, never modified) -- the Class1 starter, rename-or-delete one action away via the Set 099/100 Work Explorer actions. New scaffoldDefaultModuleAndLifecycleSets() + BuildStructureSeams.scaffoldDefaultModule test seam in gitScaffold.ts, called from buildProjectStructureNoPrompt right after the scaffold step. Gated on docs/modules.yaml having been freshly created by THIS Build call AND no pre-existing docs/session-sets/ content (listSessionSetDirNames), so a Build re-run and a legacy repo (with or without a manifest) are left byte-for-byte untouched -- the invariant lives on the scaffold function itself, not just the caller's gate. Added the Default-is-Class1 short paragraph to both docs/templates/consumer-bootstrap/getting-started.md.template and start-here.md.template (the human-facing and orchestrator-facing cold-start docs), regenerated the cold-start golden fixtures (UPDATE_GOLDEN=1) and confirmed the Python cold-start acceptance test still passes both tiers. Also corrected a stale reference in getting-started.md.template (retired AI Plan/Import Plan/AI Sets strip actions) discovered while touching the same file -- a small, adjacent fix, not the Session 2 doc sweep. New tests in gitScaffoldDefaultModule.test.ts: real-fs scaffold tests, wiring-gate tests (fresh vs pre-existing manifest, both tiers), and Work-Explorer tree-model tests (computeVisibleModules/buildVisibleModulePayloads) proving the fresh-scaffold tree shows one declared module with two pending sets and no pseudo-module, and that a legacy pre-existing empty manifest keeps rendering pseudo-Default unaffected. Live dogfood (s1-dogfood.md): drove the REAL compiled buildProjectStructureNoPrompt against a cold-start empty scratch folder (only the network pip install faked) through the full Class1 loop -- Build (default + Sets 001/002) -> re-run Build (idempotent) -> rename (default->greeter) -> delete (both lifecycle sets removed) -> re-add (payments, fresh pair). Cross-provider phased verification: discovery round 1 (fan-out K=2, gpt-5-6) returned ISSUES_FOUND with 4 blocking Majors, all real: (1&2) both fan-out calls independently caught the same bug -- the original gate treated 'manifest just created' as proof of a fresh repo, so a legacy repo with real pre-existing session sets but no prior docs/modules.yaml would have been wrongly seeded with a Default module on its first post-upgrade Build; fixed by adding a listSessionSetDirNames(projectDir).length > 0 refusal directly on scaffoldDefaultModuleAndLifecycleSets, independent of the caller's gate. (3) the original dogfood ran the compiled writers directly, not a literally-packaged VSIX or the interactive VS Code layer; fixed by packaging the real VSIX (vsce package, 43 files, clean, dist/extension.js + the updated templates present) and adding a genuine Playwright Layer-3 spec (default-module-scaffold-tree.spec.ts) that launches a REAL VS Code Electron instance against the scaffold's exact fixture shape and asserts the real webview renders it correctly; the residual (native rename/delete/add dialog automation) is explicitly out of scope per this repo's own pre-existing, documented Playwright boundary (context-menu-quickpick.spec.ts's header; CONTRIBUTING.md's known-broken @vscode/test-electron note), not a decision invented this session -- covered instead by the existing preselectedSlug unit suites and the writer-level dogfood, mirroring the Set 100 S2 precedent for the identical gap. (4) the original test suite never drove the real tree-rendering model; fixed by adding the Work-Explorer tree-model tests described above plus the new Playwright spec. Supplementary discovery pass found nothing new. All 4 findings remediated in one pass (s1-remediation-round-1.md); remediation-review returned VERIFIED (3 fix verdicts accepted, 0 rejected, 0 blocking). Suites green throughout and after remediation: extension unit 1617/1617 (up from the 1605 baseline entering this session); tsc --noEmit clean; eslint unchanged pre-existing baseline (7 errors in untouched test files, matching the Set 100-recorded baseline); esbuild clean; Playwright Layer 3 27/27 (26 pre-existing + 1 new, 0 regressions -- run because this session's remediation touches Explorer-rendering test coverage, L-064-12); ai_router pytest 3030 passed/6 skipped (unchanged baseline, no Python touched). The remediation-review verification call itself hit a persistent OpenAI 429 (9 attempts across roughly 10 minutes, the pinned session-verification verifier gpt-5-6 being rate-limited/out-of-credit) before the operator topped up OpenAI credits and a subsequent retry succeeded cleanly -- work was committed (not yet pushed) before that retry per the session-constitution's provider-failure recovery guidance, so it was never at risk. No version bump, no publish -- the single release boundary for the module-lifecycle-simplification bundle (Sets 098-101) lands after Session 2 closes Set 101.",
   "verification_method": "api",
-  "verification_verdict": "ISSUES_FOUND"
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "docs/session-sets/101-default-module-scaffold-and-docs/activity-log.json",
+    "docs/session-sets/101-default-module-scaffold-and-docs/ai-assignment.md",
+    "docs/session-sets/101-default-module-scaffold-and-docs/disposition.json",
+    "docs/session-sets/101-default-module-scaffold-and-docs/s1-dogfood.md",
+    "docs/session-sets/101-default-module-scaffold-and-docs/s1-issues.json",
+    "docs/session-sets/101-default-module-scaffold-and-docs/s1-next-set-analysis.json",
+    "docs/session-sets/101-default-module-scaffold-and-docs/s1-remediation-round-1.md",
+    "docs/session-sets/101-default-module-scaffold-and-docs/s1-verification-fanout-2.md",
+    "docs/session-sets/101-default-module-scaffold-and-docs/s1-verification-round-2.md",
+    "docs/session-sets/101-default-module-scaffold-and-docs/s1-verification-round-3.md",
+    "docs/session-sets/101-default-module-scaffold-and-docs/s1-verification.md",
+    "docs/session-sets/101-default-module-scaffold-and-docs/session-events.jsonl",
+    "docs/session-sets/101-default-module-scaffold-and-docs/session-state.json",
+    "docs/templates/consumer-bootstrap/getting-started.md.template",
+    "docs/templates/consumer-bootstrap/start-here.md.template",
+    "test-fixtures/cold-start/full/docs/dabbler/getting-started.md",
+    "test-fixtures/cold-start/full/docs/dabbler/start-here.md",
+    "test-fixtures/cold-start/lightweight/docs/dabbler/getting-started.md",
+    "test-fixtures/cold-start/lightweight/docs/dabbler/start-here.md",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/getting-started.md.template",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/start-here.md.template",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/default-module-scaffold-tree.spec.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldDefaultModule.test.ts"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "effort": "medium",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 is primarily technical-prose authorship (the hello-world tutorial + quick-start rewrite, the new module-reorganization.md guidance doc) plus a repo-wide doc-consistency sweep and the standard close-out mechanics; the same orchestrator identity keeps continuity and strong prose quality, per the routed recommendation in s1-next-set-analysis.json."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-064-9",
+    "L-064-12",
+    "L-079-3"
+  ]
 }

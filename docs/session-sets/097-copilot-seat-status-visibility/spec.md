@@ -89,6 +89,26 @@ prerequisites: []
   (tier, verificationMode) per L-069-1 and document in-code why they do
   not need the carve-out (their seeds are rider-derived, per the
   asymmetry above); do not change their behavior.
+- **D3 — module-ownership copy reframing (operator directive,
+  2026-07-13).** The shipped guidance says *"Modules group your session
+  sets by area of the project — one team per module."* With AI-led
+  work the right framing is **ownership exclusivity, not team
+  grouping**: a module is a unit of work for an **individual
+  developer**; the same developer may work several modules at once, but
+  **no two developers should work the same module at the same time** —
+  AI is fast and pervasive enough that concurrent same-module work
+  invites constant merge conflicts. Rewrite the copy at both shipped
+  sites — `gettingStartedHtml.js` `DEFINE_MODULES_INTRO_TEXT` and the
+  decomposition prompt in `copyModuleDecompositionPrompt.ts`
+  ("typically one team per module") — and echo-sweep the conceptual
+  docs per L-065-1: `docs/planning/module-organized-projects-primer.md`
+  (the canonical home for the rationale — state the merge-storm
+  argument there), the hello-world walkthrough's module framing, the
+  extension README's "Define modules" step, and the `modules.yaml`
+  template header comments if they carry the team phrasing. Keep the
+  copy short in the form; the primer carries the why. The refreshed
+  `getting-started.png` shows the OLD sentence — retake it as part of
+  this session's asset pass (the same capture the UAT walk exercises).
 
 ### Non-goals
 
@@ -101,7 +121,7 @@ prerequisites: []
 
 ## Sessions
 
-### Session 1 of 1: Persistent seat status + first-seed carve-out
+### Session 1 of 1: Persistent seat status, first-seed carve-out, module-ownership copy
 
 **Steps:**
 1. Register; read this spec, the diagnosis anchors above
@@ -120,6 +140,10 @@ prerequisites: []
    api→copilot and copilot→api changed-seed precedence unchanged; tier
    and mode seed behavior pinned unchanged). Sibling-sweep note in
    code (L-069-1).
+3.5. **D3:** module-ownership copy reframing at both shipped sites +
+   the L-065-1 echo sweep across the primer, walkthrough, README, and
+   template comments; retake `getting-started.png` after the copy
+   lands.
 4. Layer 3 Playwright locally (Explorer-rendering surfaces changed —
    L-064-12) plus the full extension suite (`tsc`, Layer 2).
 5. UAT checklist (ad-hoc, per-set, the 078 quality bar: literal
@@ -137,23 +161,34 @@ prerequisites: []
    `close_session`; notify; Step 9 review.
 
 **Creates:** the persistent seat-status strip note, the
-`restoreGsState` carve-out, Layer 2/3 tests, `uat/uat-checklist.md`,
-`change-log.md`.
+`restoreGsState` carve-out, the module-ownership copy at both shipped
+sites, Layer 2/3 tests, `uat/uat-checklist.md`, retaken
+`getting-started.png`, `change-log.md`.
 **Touches:** `media/session-sets-tree/systemStatusHtml.js`,
 `media/session-sets-tree/gettingStartedHtml.js`,
 `media/session-sets-tree/client.js`,
+`src/commands/copyModuleDecompositionPrompt.ts`,
 `src/providers/CustomSessionSetsView.ts` (snapshot payload),
 `src/utils/copilotSeatSetup.ts` (outcome persistence/read, if the
-session lands there), extension `package.json`/`CHANGELOG.md`, tests.
+session lands there),
+`docs/planning/module-organized-projects-primer.md`,
+`docs/tutorials/module-team-hello-world.md` (framing echoes only),
+extension `README.md`, `media/getting-started.png`, extension
+`package.json`/`CHANGELOG.md`, tests.
 **Ends with:** a cancelled/unauthenticated Copilot build leaves a
 persistent, honest strip note with the re-run command instead of a
 silently reverted form; the user's Copilot radio survives the
 first-seed repaint; changed-seed precedence and the Set 086
-confirmation gate are pinned unchanged by tests; suite green (Layer 2 +
-Layer 3 local); UAT checklist authored and offered (cold-start walk
-included); vsix built; cross-provider VERIFIED via the phased loop.
+confirmation gate are pinned unchanged by tests; the Define-modules
+guidance (form, decomposition prompt, primer, walkthrough, README)
+states the one-developer-per-module-at-a-time ownership rule with the
+merge-storm rationale, with zero "one team per module" echoes left
+(grep-proven); `getting-started.png` retaken on the new copy; suite
+green (Layer 2 + Layer 3 local); UAT checklist authored and offered
+(cold-start walk included); vsix built; cross-provider VERIFIED via
+the phased loop.
 **Progress keys:** seat-status-note-live, first-seed-carveout-live,
-uat-offered, session-closed
+module-copy-reframed, uat-offered, session-closed
 
 ---
 

@@ -174,6 +174,20 @@ export interface SystemStatusPayload {
   copilotCliPresent: boolean;
   tier: "full" | "lightweight";
   transportProfile: "api" | "copilot-cli";
+  // Set 097 (spec D1): true when the workspace's DURABLE evidence says the
+  // operator chose the Copilot seat but it is not confirmed yet (derived
+  // host-side by copilotSeatSetup.deriveCopilotSeatChosenUnconfirmed from
+  // the `.dabbler/copilot-seat-status` marker + the current
+  // transport.profile). Deliberately independent of the volatile
+  // `transportProfile` control above — a repainted-back-to-api form must
+  // not suppress this note, since the note exists exactly to survive that
+  // repaint. Ignored when `tier !== "full"`.
+  copilotSeatChosenUnconfirmed: boolean;
+  // The exact copy-pasteable re-run command (copilotSeatSetup.rerunRefreshHint),
+  // computed host-side since the webview has no filesystem/process access.
+  // Always populated (even when copilotSeatChosenUnconfirmed is false) so
+  // the webview never branches on a possibly-absent field.
+  copilotSeatRerunHint: string;
   manifestFaults: ManifestFaultPayload[];
 }
 

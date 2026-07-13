@@ -1,0 +1,81 @@
+{
+  "sessionSetName": "097-copilot-seat-status-visibility",
+  "createdDate": "2026-07-13T09:33:00.555499+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-13T09:33:00.556499+00:00",
+      "description": "Operator set pathAwareCritique: none.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "none"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/register-and-read-spec",
+      "dateTime": "2026-07-13T06:16:06.935812-04:00",
+      "description": "Registered session 1 via start_session; read spec.md, diagnosis anchors (gettingStartedHtml.js restoreGsState, client.js seed block, gitScaffold.ts seat-setup sequencing, copilotSeatSetup.ts, systemStatusHtml.js).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/seat-status-note-live",
+      "dateTime": "2026-07-13T06:16:06.935812-04:00",
+      "description": "D1: added .dabbler/copilot-seat-status marker (read/write/derive) in copilotSeatSetup.ts, wired into gitScaffold.ts buildProjectStructureNoPrompt (markSeatChosen seam) and CustomSessionSetsView.ts buildSystemStatus, rendered as a persistent System Status fault in systemStatusHtml.js. 21 new Layer 2 tests (copilotSeatSetup.test.ts + systemStatusHtml.test.ts), all passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/first-seed-carveout-live",
+      "dateTime": "2026-07-13T06:16:06.935812-04:00",
+      "description": "D2: restoreGsState profile-only first-seed precedence carve-out in gettingStartedHtml.js (a null->value seed no longer overrides a profileDirty flip); sibling-sweep in-code note for tier/verificationMode. 5 new Layer 2 tests in gettingStartedHtml.test.ts, all passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/module-copy-reframed",
+      "dateTime": "2026-07-13T06:16:06.935812-04:00",
+      "description": "D3: module-ownership copy reframed from team-grouping to ownership-exclusivity at both shipped sites (gettingStartedHtml.js DEFINE_MODULES_INTRO_TEXT, copyModuleDecompositionPrompt.ts), echoed across module-organized-projects-primer.md (new merge-storm rationale, section 1.2), the Hello World walkthrough, and both READMEs; media/getting-started.png retaken via a one-off Playwright capture (deleted after use).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/suite-green",
+      "dateTime": "2026-07-13T06:16:06.936813-04:00",
+      "description": "Layer 3 Playwright (26/26) run locally per L-064-12 (Explorer-rendering surfaces changed); full extension unit suite (1508/1508) and tsc --noEmit clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/version-bump-and-vsix",
+      "dateTime": "2026-07-13T06:16:06.936813-04:00",
+      "description": "Extension bumped 0.42.0 -> 0.43.0; CHANGELOG.md entry authored; dabbler-ai-orchestration-0.43.0.vsix built via npx vsce package.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/uat-offered",
+      "dateTime": "2026-07-13T06:16:06.936813-04:00",
+      "description": "Authored 097-copilot-seat-status-visibility-uat-checklist.json (ad-hoc, 078 bar): 5 walks (cold-start cancel replay, durability-across-reload, re-confirm clears the note, never-a-nag regression, D3 copy) with ProgrammaticVerification citing fresh Layer 2 pass counts.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-001/verify-discovery-and-remediation",
+      "dateTime": "2026-07-13T07:26:33.899547-04:00",
+      "description": "verify_session --phase discovery found 2 Major findings (marker never cleared on explicit API rebuild); fixed with clearCopilotSeatStatusMarker + gitScaffold.ts recordSeatChoice(dir, chosen). --phase supplementary found 2 more Majors: (1) rerunRefreshHint never actually promoted transport.profile -- fixed by adding the Dabbler: Set Up Copilot Seat command and pointing rerunRefreshHint at it; (2) claimed post-reload radio-revert -- disputed by orchestrator, confirmed FALSE_POSITIVE by a second-opinion routed call (gemini-2.5-pro), logged via record_adjudication. Suite re-verified green (1511 unit, tsc clean) after each fix; vsix rebuilt.",
+      "status": "complete"
+    }
+  ]
+}

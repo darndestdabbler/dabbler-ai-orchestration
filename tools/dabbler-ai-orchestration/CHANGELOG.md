@@ -3,6 +3,80 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.43.0] — Unreleased (Set 097 — Copilot seat-status visibility + module-ownership copy)
+
+Extension-only release: `dabbler-ai-router` stays at 0.33.0 (zero
+`ai_router/` changes in this set). Publish remains **operator-gated**
+(tag-driven, same runbook as 0.42.0); the registry-live extension is
+still `0.40.0` until the operator publishes the queued 0.42.0/0.43.0
+work.
+
+### Added
+
+- **`Dabbler: Set Up Copilot Seat` command.** Re-runs the Copilot seat
+  probe and confirmation-gated `transport.profile` promotion
+  (`performCopilotSeatSetup`, unchanged from Set 079) against an
+  already-scaffolded workspace's existing `.venv` — reachable from the
+  Command Palette regardless of whether the Getting Started form is
+  still showing. Added after cross-provider verification caught that
+  the persistent seat-status note's advertised recovery command (a bare
+  `python -m ai_router.copilot_catalog --refresh …` invocation) never
+  actually promoted the profile, and that the ONLY other path to that
+  promotion — the form's Build action — is unreachable once a workspace
+  has any session sets at all.
+
+### Fixed
+
+- **A cancelled or unconfirmed Copilot seat setup no longer silently
+  reverts the Getting Started form, and the recovery path actually
+  works.** Three bugs in the same defect chain, all caught before
+  shipping (one operator-reported, two by this session's own
+  cross-provider verification):
+  - The System Status strip now shows a **persistent** note — "You
+    selected the GitHub Copilot CLI seat during setup, but it is not
+    confirmed yet… Re-run seat setup (no need to re-scaffold): run
+    \"Dabbler: Set Up Copilot Seat\" from the Command Palette" —
+    whenever the workspace's durable evidence says the operator chose
+    the Copilot seat but the seat is not confirmed (cancelled,
+    missing/unauthenticated CLI, fewer than 2 confirmed provider
+    families, or the scaffold's install never completed). The note is
+    derived from a new one-word `.dabbler/copilot-seat-status` marker
+    plus the existing `transport.profile` read — never a nag on a
+    workspace that never chose Copilot, and never suppressed by a form
+    that has (silently or otherwise) repainted back to Full/Direct API,
+    since surviving that exact repaint is the point. The marker clears
+    on an explicit Direct-API rebuild, so abandoning Copilot in favor of
+    the default does not revive the note forever.
+  - The Getting Started form's Copilot radio no longer snaps back to
+    "Direct provider API keys" the first time `router-config.yaml` is
+    seeded. A profile seed's first-ever transition from *nothing on
+    disk yet* to a value is now recognized as the template default
+    materializing, not a newer sanctioned choice — it no longer
+    overrides an explicit Copilot pick made in the interim. A
+    genuinely **changed** seed (e.g. a later confirmed seat) still
+    updates the radio exactly as before.
+- Independent of the volatile in-form control state by design;
+  `.venv`/`ai_router` transport-profile confirmation itself (Set 086) is
+  unchanged — this only fixes what the operator is told, shown, and can
+  actually DO while the seat isn't yet confirmed.
+
+### Changed
+
+- **Module-ownership copy reframed from team grouping to ownership
+  exclusivity** (operator directive): a module is a unit of work for
+  **one developer at a time**, not "one team per module" — the same
+  developer may own several modules, but two developers should never
+  work the same module concurrently, since AI-led changes land fast
+  enough to make that a constant merge-conflict source. Updated at
+  both shipped copy sites (the Getting Started form's Define-modules
+  section, the `Copy AI decomposition prompt` command's prompt text)
+  and echoed across the module-organized-projects primer (new
+  merge-storm rationale in §1.2), the Hello World walkthrough, and
+  both READMEs.
+- **README screenshot refreshed.** `getting-started.png` shows the new
+  module-ownership copy (captured against a locally built
+  0.43.0-candidate build).
+
 ## [0.42.0] — Unreleased (Sets 087 + 091–094 — Work Explorer module-first redesign)
 
 > **The single 091–094 release-boundary VSIX** (verdict: no Marketplace

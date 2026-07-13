@@ -118,8 +118,12 @@ companion step-by-step instructions in the editor:
    guided flow itself ran — the form says so honestly rather than
    leaving a silently broken router.
 2. **Define modules (optional)** — for a project split across areas
-   or teams, declare **modules** in `docs/modules.yaml` so the Work
-   Explorer groups your session sets by module. **Open modules.yaml**
+   of work, declare **modules** in `docs/modules.yaml` so the Work
+   Explorer groups your session sets by module. A module is a unit of
+   work for one developer at a time — a developer may own several
+   modules, but two developers should never work the same module
+   concurrently (AI-speed changes make concurrent same-module work a
+   constant merge-conflict source). **Open modules.yaml**
    creates the file from a commented template (on this explicit
    action only — the extension never writes it just because you
    opened the repo) and opens it to edit; **Copy AI decomposition

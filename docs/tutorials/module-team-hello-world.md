@@ -107,6 +107,16 @@ Before you begin, every team member needs:
     integration module that composes the other two.
     ```
 
+    Notice the shape: **one developer per module**, not one team per
+    module. Priya, Sam, and Alex each own a *different* module and can all
+    work in parallel with near-zero conflicts; the rule this tutorial
+    never breaks is that two of them never touch the *same* module at the
+    same time — AI-led changes land fast enough that concurrent
+    same-module work would be a constant merge-conflict source (the
+    primer's [§1.2](../planning/module-organized-projects-primer.md#12-what-a-merge-conflict-actually-is)
+    has the full rationale). A developer can still own more than one
+    module; they just don't share one with a teammate concurrently.
+
 3. Review the agent's edit, then **save `docs/modules.yaml`**. Below the preserved header comments, the `modules:` list should read:
 
     ```yaml

@@ -302,7 +302,7 @@ suite("gitScaffold — runCopilotSeatSetupWithProgress (VS Code layer)", () => {
     await runCopilotSeatSetupWithProgress(fakeContext(), projectDir, venvPath, seams);
     assert.strictEqual(captured.warnings.length, 1);
     assert.ok(captured.warnings[0].includes("exited with code 2"));
-    assert.ok(captured.warnings[0].includes("--seat-id"));
+    assert.ok(captured.warnings[0].includes("Dabbler: Set Up Copilot Seat"));
   });
 });
 
@@ -341,6 +341,10 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     // Set 081 S1: the EFFECTIVE budget the scaffold step receives
     // (undefined under copilot-cli — the caller condition under test).
     scaffoldBudgets: Array<BudgetChoice | undefined>;
+    // Set 097 (spec D1, extended after S1 discovery Majors 1-2): every
+    // recordSeatChoice call this build made, in order — never touches real
+    // disk in this suite.
+    recordSeatChoiceCalls: Array<{ dir: string; chosen: boolean }>;
   }
 
   function makeBuildSeams(
@@ -353,6 +357,7 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
       warnings: [],
       infos: [],
       scaffoldBudgets: [],
+      recordSeatChoiceCalls: [],
     };
     return {
       captured,
@@ -382,6 +387,10 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
         }) as typeof runCopilotSeatSetupWithProgress,
         showInfo: (m) => captured.infos.push(m),
         showWarning: (m) => captured.warnings.push(m),
+        recordSeatChoice: (dir, chosen) => {
+          captured.events.push(chosen ? "record-seat-choice:chosen" : "record-seat-choice:cleared");
+          captured.recordSeatChoiceCalls.push({ dir, chosen });
+        },
       },
     };
   }
@@ -400,10 +409,12 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     assert.ok(result);
     assert.deepStrictEqual(
       captured.events,
-      ["git-init", "scaffold", "seat-setup"],
-      "the refresh must never precede the completed scaffold sequence",
+      ["git-init", "scaffold", "record-seat-choice:chosen", "seat-setup"],
+      "the refresh must never precede the completed scaffold sequence, and " +
+        "the durable marker must land before the attempt starts",
     );
     assert.deepStrictEqual(captured.seatSetupArgs, { projectDir, venvPath });
+    assert.deepStrictEqual(captured.recordSeatChoiceCalls, [{ dir: projectDir, chosen: true }]);
   });
 
   test("copilot-cli but the install failed: seat setup NEVER runs; honest skip warning", async () => {
@@ -422,7 +433,11 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
       w.includes("Copilot seat setup was skipped"),
     );
     assert.ok(skip, "the skip must be operator-visible, never silent");
-    assert.ok(skip!.includes("--seat-id"), "carries the re-run hint");
+    assert.ok(skip!.includes("Dabbler: Set Up Copilot Seat"), "carries the re-run hint");
+    // Set 097 (spec D1): the operator DID choose Copilot — the durable
+    // marker must still land even though the attempt never even reaches
+    // the refresh (no venv to run it in).
+    assert.deepStrictEqual(captured.recordSeatChoiceCalls, [{ dir: projectDir, chosen: true }]);
   });
 
   test("copilot-cli but no venv materialized: seat setup NEVER runs; honest skip warning", async () => {
@@ -440,6 +455,7 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     assert.ok(
       captured.warnings.some((w) => w.includes("Copilot seat setup was skipped")),
     );
+    assert.deepStrictEqual(captured.recordSeatChoiceCalls, [{ dir: projectDir, chosen: true }]);
   });
 
   // Set 081 S1: the Build write matrix — the scaffold step receives the
@@ -493,9 +509,28 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     assert.deepStrictEqual(captured.scaffoldBudgets, [undefined]);
   });
 
-  test("api profile / no profile / lightweight: seat setup never runs and no seat warning fires", async () => {
+  test("full+api: an explicit non-Copilot rebuild CLEARS a stale marker (S1 discovery Majors 1-2 fix)", async () => {
+    // The verifier's finding: an operator who attempted Copilot, failed to
+    // confirm, then explicitly rebuilds choosing Direct API has abandoned
+    // that attempt -- the marker must be retired, not left to revive the
+    // unconfirmed-seat note forever with no dismissal path.
+    const { captured, seams } = makeBuildSeams(true, venvPath);
+    await buildProjectStructureNoPrompt(
+      fakeContext(),
+      projectDir,
+      "full",
+      undefined,
+      undefined,
+      "api",
+      seams,
+    );
+    assert.ok(!captured.events.includes("seat-setup"));
+    assert.ok(!captured.warnings.some((w) => w.includes("Copilot seat setup")));
+    assert.deepStrictEqual(captured.recordSeatChoiceCalls, [{ dir: projectDir, chosen: false }]);
+  });
+
+  test("full with no profile pick, or lightweight: seat setup never runs, marker never touched (indifferent callers)", async () => {
     for (const [tier, profile] of [
-      ["full", "api"],
       ["full", undefined],
       ["lightweight", undefined],
     ] as const) {
@@ -516,6 +551,16 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
       assert.ok(
         !captured.warnings.some((w) => w.includes("Copilot seat setup")),
         "no seat-setup warning on the not-selected path",
+      );
+      // Set 097 (spec D1): neither of these callers answered the Copilot
+      // question at all -- the durable marker must be neither written nor
+      // cleared (a Lightweight rebuild, or a legacy Command-Palette build
+      // with no profile info, must not destroy evidence of an earlier
+      // unconfirmed Full+Copilot attempt it wasn't even asked about).
+      assert.deepStrictEqual(
+        captured.recordSeatChoiceCalls,
+        [],
+        `tier=${tier} profile=${String(profile)} must not touch the seat marker`,
       );
     }
   });

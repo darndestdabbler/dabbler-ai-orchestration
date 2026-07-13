@@ -18,6 +18,17 @@
   var WORKSPACE_TEXT =
     "Workspace initialization is incomplete: the virtual environment, ai_router " +
     "package, and engine instruction files are required.";
+  // Set 097 (spec D1): the durable replacement for the one-shot seat-setup
+  // toast. Shown whenever the workspace's durable evidence says the
+  // operator chose the Copilot seat but it is not confirmed yet — never a
+  // nag on a workspace that never chose Copilot, and never suppressed by a
+  // form that has (silently or otherwise) repainted back to Full/Direct
+  // API, since that repaint is exactly the defect this note exists to
+  // survive.
+  var COPILOT_SEAT_UNCONFIRMED_TEXT =
+    "You selected the GitHub Copilot CLI seat during setup, but it is not " +
+    "confirmed yet — ai_router/router-config.yaml still runs on the api " +
+    "profile. Re-run seat setup (no need to re-scaffold): ";
 
   function escHtml(value) {
     return String(value == null ? "" : value)
@@ -43,6 +54,15 @@
     }
     if (tier === "full" && profile === "copilot-cli" && status.copilotCliPresent === false) {
       faults.push({ code: "copilot-cli", text: COPILOT_TEXT });
+    }
+    // Set 097 (spec D1): gated on the HOST-COMPUTED durable signal only —
+    // deliberately NOT on `profile` (the live/possibly-reverted control
+    // state) — so the note survives the exact repaint the defect causes.
+    if (tier === "full" && status.copilotSeatChosenUnconfirmed === true) {
+      faults.push({
+        code: "copilot-seat-unconfirmed",
+        text: COPILOT_SEAT_UNCONFIRMED_TEXT + (status.copilotSeatRerunHint || ""),
+      });
     }
     (status.manifestFaults || []).forEach(function (fault) {
       var suffix = fault.retainedLastKnownGood
@@ -74,5 +94,6 @@
     PYTHON_TEXT: PYTHON_TEXT,
     COPILOT_TEXT: COPILOT_TEXT,
     WORKSPACE_TEXT: WORKSPACE_TEXT,
+    COPILOT_SEAT_UNCONFIRMED_TEXT: COPILOT_SEAT_UNCONFIRMED_TEXT,
   };
 });

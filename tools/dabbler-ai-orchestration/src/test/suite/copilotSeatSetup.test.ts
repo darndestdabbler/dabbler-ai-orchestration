@@ -12,6 +12,7 @@ import * as path from "path";
 import {
   CATALOG_LOCKFILE_REL,
   CONFIG_WRITE_TMP_SUFFIX,
+  SEAT_STATUS_MARKER_REL,
   CancellationLike,
   KillEffects,
   RefreshChildCallbacks,
@@ -21,6 +22,9 @@ import {
   SeatSetupOutcome,
   SeedReadOps,
   buildRefreshArgs,
+  clearCopilotSeatStatusMarker,
+  currentUsername,
+  deriveCopilotSeatChosenUnconfirmed,
   deriveSeatId,
   deriveSeatLabel,
   describeSeatSetupOutcome,
@@ -28,11 +32,14 @@ import {
   dispatchKill,
   parseRefreshStdout,
   performCopilotSeatSetup,
+  readCopilotSeatStatusMarker,
   readTransportProfile,
   renderTransportProfile,
+  rerunRefreshHint,
   resolveKillStrategy,
   runCatalogRefresh,
   spawnDetached,
+  writeCopilotSeatStatusMarker,
   writeConfigAtomically,
 } from "../../utils/copilotSeatSetup";
 import {
@@ -387,6 +394,131 @@ suite("copilotSeatSetup", () => {
       const ops = new FakeFileOps();
       ops.files.set(configPath, "transports:\n  profile: api\n");
       assert.strictEqual(readTransportProfile(projectRoot, ops), null);
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Set 097 (spec D1) — the durable "chose Copilot but not confirmed"
+  // marker: SEAT_STATUS_MARKER_REL read/write, and the pure derivation the
+  // System Status strip note gates on. The 5-state matrix (never-chose /
+  // chose+confirmed / chose+cancelled / chose+CLI-missing /
+  // chose+install-incomplete) collapses to marker x durableProfile,
+  // because the three "attempted, unconfirmed" reasons are indistinguishable
+  // on disk by design (same marker word, same api-profile router-config).
+  // ---------------------------------------------------------------------
+
+  suite("copilot seat status marker (Set 097 D1)", () => {
+    const projectRoot = "/proj";
+    const markerPath = path.join(projectRoot, ".dabbler", "copilot-seat-status");
+
+    test("SEAT_STATUS_MARKER_REL is .dabbler/copilot-seat-status", () => {
+      assert.strictEqual(
+        SEAT_STATUS_MARKER_REL,
+        path.posix.join(".dabbler", "copilot-seat-status"),
+      );
+    });
+
+    test("readCopilotSeatStatusMarker: null when the file does not exist", () => {
+      assert.strictEqual(
+        readCopilotSeatStatusMarker(projectRoot, new FakeFileOps()),
+        null,
+      );
+    });
+
+    test("readCopilotSeatStatusMarker: reads 'unconfirmed' (trimmed, case-insensitive)", () => {
+      for (const raw of ["unconfirmed", "unconfirmed\n", "  Unconfirmed  \n", "UNCONFIRMED"]) {
+        const ops = new FakeFileOps();
+        ops.files.set(markerPath, raw);
+        assert.strictEqual(
+          readCopilotSeatStatusMarker(projectRoot, ops),
+          "unconfirmed",
+          JSON.stringify(raw),
+        );
+      }
+    });
+
+    test("readCopilotSeatStatusMarker: null for an unrecognized word or unreadable file", () => {
+      const junk = new FakeFileOps();
+      junk.files.set(markerPath, "confirmed\n");
+      assert.strictEqual(readCopilotSeatStatusMarker(projectRoot, junk), null);
+
+      const unreadable = new FakeFileOps();
+      unreadable.files.set(markerPath, "unconfirmed\n");
+      unreadable.errors.readFile = true;
+      assert.strictEqual(readCopilotSeatStatusMarker(projectRoot, unreadable), null);
+    });
+
+    test("writeCopilotSeatStatusMarker: writes the single word, round-trips through the reader", () => {
+      const ops = new FakeFileOps();
+      writeCopilotSeatStatusMarker(projectRoot, ops);
+      assert.strictEqual(ops.files.get(markerPath), "unconfirmed\n");
+      assert.strictEqual(readCopilotSeatStatusMarker(projectRoot, ops), "unconfirmed");
+    });
+
+    // S1 discovery Majors 1-2: the marker must not revive the note forever
+    // once the operator explicitly rebuilds away from Copilot.
+    test("clearCopilotSeatStatusMarker: removes an existing marker; reader then sees null", () => {
+      const ops = new FakeFileOps();
+      writeCopilotSeatStatusMarker(projectRoot, ops);
+      assert.strictEqual(readCopilotSeatStatusMarker(projectRoot, ops), "unconfirmed");
+      clearCopilotSeatStatusMarker(projectRoot, ops);
+      assert.strictEqual(ops.files.has(markerPath), false);
+      assert.strictEqual(readCopilotSeatStatusMarker(projectRoot, ops), null);
+    });
+
+    test("clearCopilotSeatStatusMarker: a no-op, not an error, when no marker exists", () => {
+      const ops = new FakeFileOps();
+      assert.doesNotThrow(() => clearCopilotSeatStatusMarker(projectRoot, ops));
+      assert.strictEqual(readCopilotSeatStatusMarker(projectRoot, ops), null);
+    });
+  });
+
+  // Set 097: rerunRefreshHint relocated here from gitScaffold.ts so the
+  // persistent System Status note and the one-shot toast share ONE
+  // implementation instead of two that could drift.
+  //
+  // S1 discovery supplementary Major: the ORIGINAL relocated body (a
+  // copy-pasteable `python -m ai_router.copilot_catalog --refresh …`
+  // command) never actually promoted transport.profile — that CLI has no
+  // knowledge of router-config.yaml at all, so the note it was supposed
+  // to help dismiss could never actually clear. Replaced with the
+  // Command-Palette instruction that runs the ACTUAL confirmation-gated
+  // flow (copilotSeatSetupCommand.ts).
+  suite("rerunRefreshHint (Set 097 relocation, corrected after S1 supplementary)", () => {
+    test("points at the Set Up Copilot Seat command, deterministically", () => {
+      const hint = rerunRefreshHint();
+      assert.ok(hint.includes("Dabbler: Set Up Copilot Seat"));
+      assert.ok(hint.includes("Command Palette"));
+      assert.strictEqual(hint, rerunRefreshHint());
+    });
+
+    test("currentUsername never throws", () => {
+      assert.strictEqual(typeof currentUsername(), "string");
+      assert.ok(currentUsername().length > 0);
+    });
+  });
+
+  suite("deriveCopilotSeatChosenUnconfirmed (Set 097 D1)", () => {
+    test("never chose: marker null -> false, whatever the durable profile", () => {
+      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed(null, null), false);
+      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed(null, "api"), false);
+      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed(null, "copilot-cli"), false);
+    });
+
+    test("chose + confirmed: durable profile is copilot-cli -> false, even with a stale marker", () => {
+      assert.strictEqual(
+        deriveCopilotSeatChosenUnconfirmed("unconfirmed", "copilot-cli"),
+        false,
+      );
+    });
+
+    test("chose + unconfirmed (cancelled | CLI-missing | insufficient-providers | install-incomplete): true", () => {
+      // All four reasons share the identical on-disk shape (marker=
+      // "unconfirmed", profile stays "api" or the file never existed) —
+      // that IS the point: the derivation cannot and need not tell them
+      // apart, only whether the seat is durably confirmed.
+      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed("unconfirmed", "api"), true);
+      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed("unconfirmed", null), true);
     });
   });
 
@@ -793,14 +925,16 @@ suite("copilotSeatSetup", () => {
   // (gemini-pro) and adapted (composer copy re-grounded against the real
   // strings; tmp-write assertion fixed for the move-semantics fake). ---
   suite("Session 3 failure-matrix", () => {
-    // Realistic fixture: production (gitScaffold.rerunRefreshHint) passes a
-    // directly runnable copilot_catalog --refresh command line, never a VS
-    // Code command name — no such command is contributed in package.json
-    // (S5 path-aware critique: a fictional command string here misled a
-    // repo-reading reviewer into a contract-drift finding).
-    const rerunHint =
-      '.venv\\Scripts\\python.exe -m ai_router.copilot_catalog --refresh ' +
-      '--seat-id seat-abc123def456 --seat-label "project"';
+    // Realistic fixture: production (copilotSeatSetup.rerunRefreshHint)
+    // now points at the REAL "Dabbler: Set Up Copilot Seat" command,
+    // contributed in package.json and registered in
+    // copilotSeatSetupCommand.ts (S1 discovery supplementary Major, Set
+    // 097: the prior copy-pasteable `copilot_catalog --refresh` command
+    // never actually promoted transport.profile). Earlier revisions of
+    // this fixture used a FICTIONAL command name before any such command
+    // existed (S5 path-aware critique caught that as misleading) — this
+    // string is the actual shipped one now.
+    const rerunHint = 'run "Dabbler: Set Up Copilot Seat" from the Command Palette';
     const projectDir =
       process.platform === "win32" ? "C:\\Users\\test\\project" : "/home/test/project";
     const configRel = path.join("ai_router", "router-config.yaml");

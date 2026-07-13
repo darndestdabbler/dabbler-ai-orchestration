@@ -48,6 +48,7 @@
 
 import * as crypto from "crypto";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { ROUTER_CONFIG_REL } from "./aiRouterInstall";
 
@@ -90,6 +91,18 @@ export function deriveSeatId(hostname: string, username: string): string {
 export function deriveSeatLabel(projectDir: string): string {
   const base = path.basename(projectDir);
   return base === "" ? "workspace" : base;
+}
+
+/** The OS username for seat-id derivation; tolerant of the exotic hosts
+ * where `os.userInfo()` throws (no passwd entry). Set 097: relocated here
+ * (from gitScaffold.ts) alongside {@link rerunRefreshHint}, its only
+ * caller besides the seat-setup progress wrapper. */
+export function currentUsername(): string {
+  try {
+    return os.userInfo().username;
+  } catch {
+    return process.env.USERNAME ?? process.env.USER ?? "user";
+  }
 }
 
 /**
@@ -315,6 +328,122 @@ export function readTransportProfile(
   const loc = locateTransportProfile(text);
   if (!loc) return null;
   return loc.value === "api" || loc.value === "copilot-cli" ? loc.value : null;
+}
+
+// ---------------------------------------------------------------------------
+// The durable "chose the Copilot seat but it isn't confirmed" marker
+// (Set 097, spec D1)
+// ---------------------------------------------------------------------------
+//
+// The defect: a cancelled, unauthenticated-CLI, install-incomplete, or
+// <2-providers seat-setup attempt honestly leaves transport.profile: api
+// (Set 086's confirmation gate) — but the ONLY explanation the operator
+// ever saw was a one-shot toast (describeSeatSetupOutcome, above). Once the
+// toast dismisses, nothing on disk remembers the attempt: the catalog
+// lockfile is restored to its PRE-run state on every non-completed path
+// (runCatalogRefresh's restoreLockfile), and a completed-but-insufficient
+// run's lockfile carries no "the operator wanted copilot-cli" signal either
+// (removal-over-addition was tried first — see the spec — and found
+// insufficient for exactly this reason).
+//
+// This marker is the minimal addition: one word, written the instant the
+// operator's Full+copilot-cli pick is known at Build time (gitScaffold.ts's
+// decideCopilotSeatSetup call site — BOTH the "run" and
+// "skip-install-incomplete" branches, since both mean "the operator chose
+// Copilot"), before the outcome of the attempt is known.
+//
+// It is a write-through cache of the LATEST explicit Build-time pick, same
+// contract as the tier/verification-mode markers in tierMarkerStore.ts
+// (S1 discovery Majors 1-2, both fan-out calls independently): a confirmed
+// retry does not need the marker cleared (the render-gate already pairs it
+// with the CURRENT transport.profile, so profile flipping to copilot-cli
+// suppresses the note regardless of the stale word on disk) — but an
+// operator who explicitly rebuilds choosing Direct API (or Lightweight)
+// instead has abandoned Copilot, and a marker that only ever grows would
+// revive the note forever with no supported dismissal path. So every Build
+// records the CURRENT pick: writes "unconfirmed" when this build chose
+// copilot-cli, clears the file on any other explicit pick.
+export const SEAT_STATUS_MARKER_REL = path.posix.join(
+  ".dabbler",
+  "copilot-seat-status",
+);
+
+export type SeatStatusMarker = "unconfirmed";
+
+/** Read `.dabbler/copilot-seat-status`. Tolerant like every marker reader
+ * in this codebase: missing file, unreadable file, or an unrecognized word
+ * all read as null (never attempted, as far as this marker can tell). */
+export function readCopilotSeatStatusMarker(
+  root: string,
+  ops: SeedReadOps = nodeSeedReadOps,
+): SeatStatusMarker | null {
+  const abs = path.join(root, SEAT_STATUS_MARKER_REL);
+  if (!ops.exists(abs)) return null;
+  let text: string;
+  try {
+    text = ops.readFile(abs);
+  } catch {
+    return null;
+  }
+  return text.trim().toLowerCase() === "unconfirmed" ? "unconfirmed" : null;
+}
+
+/** Write `.dabbler/copilot-seat-status` — always the single word
+ * "unconfirmed". Callers write this the moment the operator's Copilot pick
+ * is known, regardless of what the attempt goes on to do; the directory is
+ * guaranteed to exist by the time this runs (the tier marker's
+ * unconditional scaffold-time write creates `.dabbler/` first). */
+export function writeCopilotSeatStatusMarker(
+  root: string,
+  ops: SeatSetupFileOps,
+): void {
+  ops.writeFile(path.join(root, SEAT_STATUS_MARKER_REL), "unconfirmed\n");
+}
+
+/**
+ * Clear `.dabbler/copilot-seat-status` (S1 discovery Majors 1-2): the
+ * operator explicitly rebuilt WITHOUT choosing the Copilot seat this time
+ * (Direct API, or Lightweight) — that pick supersedes any earlier
+ * unconfirmed Copilot attempt, so the marker is retired rather than left to
+ * revive the note forever. Best-effort and idempotent: a missing file is
+ * not an error (nothing to clear).
+ */
+export function clearCopilotSeatStatusMarker(
+  root: string,
+  ops: SeatSetupFileOps,
+): void {
+  const abs = path.join(root, SEAT_STATUS_MARKER_REL);
+  if (!ops.exists(abs)) return;
+  ops.removeRecursive(abs);
+}
+
+/**
+ * The pure derivation the persistent strip note gates on (spec D1's
+ * 5-state matrix: never-chose / chose+confirmed / chose+cancelled /
+ * chose+CLI-missing / chose+install-incomplete). The three "attempted but
+ * not confirmed" reasons are indistinguishable on disk by design (same
+ * marker, same api-profile router-config) and share one honest note — the
+ * derivation only needs to tell "confirmed" and "never chose" apart from
+ * everything else:
+ *   - never chose (or explicitly rebuilt away from Copilot — the marker is
+ *     cleared then): marker is null -> false, regardless of profile.
+ *   - chose + confirmed (a later retry succeeded): durableProfile is
+ *     "copilot-cli" -> false, even with a stale "unconfirmed" marker still
+ *     on disk from the earlier failed attempt (the marker is cleared only
+ *     on an explicit non-Copilot rebuild, not on a confirmed retry — but
+ *     the profile check alone already suppresses the note either way).
+ *   - chose + (cancelled | CLI-missing | insufficient-providers |
+ *     install-incomplete), no rebuild away from Copilot since: marker is
+ *     "unconfirmed" AND durableProfile is NOT "copilot-cli" -> true.
+ * Independent of any VOLATILE webview control state (gsState) by design —
+ * the whole point is a note that survives the exact repaint that reverts
+ * the radio (S097 defect chain step 3).
+ */
+export function deriveCopilotSeatChosenUnconfirmed(
+  marker: SeatStatusMarker | null,
+  durableProfile: TransportProfile | null,
+): boolean {
+  return marker === "unconfirmed" && durableProfile !== "copilot-cli";
 }
 
 // ---------------------------------------------------------------------------
@@ -727,6 +856,29 @@ export function dispatchKill(
 export interface SeatSetupMessage {
   level: "info" | "warning";
   message: string;
+}
+
+/**
+ * The recovery instruction for failure messages — the corrected failure
+ * story's core promise: fixing the seat never requires re-scaffolding.
+ *
+ * S1 discovery supplementary Major (Set 097): this used to be a
+ * copy-pasteable `python -m ai_router.copilot_catalog --refresh …`
+ * command — but that CLI invocation only refreshes the seat-scoped
+ * lockfile (copilot_catalog.py has no knowledge of router-config.yaml at
+ * all); it never invokes performCopilotSeatSetup, so transport.profile
+ * was NEVER promoted and the persistent "unconfirmed" note NEVER cleared,
+ * no matter how many providers the refresh confirmed. The instruction now
+ * points at `Dabbler: Set Up Copilot Seat` (copilotSeatSetupCommand.ts), a
+ * standalone command that runs the SAME confirmation-gated
+ * runCopilotSeatSetupWithProgress flow the Build action uses — the only
+ * mechanism that actually completes the promise. Set 097: relocated here
+ * (from gitScaffold.ts) so the persistent System Status strip note (D1)
+ * can reuse the SAME instruction the one-shot toast composes, instead of a
+ * second, drifting implementation.
+ */
+export function rerunRefreshHint(): string {
+  return 'run "Dabbler: Set Up Copilot Seat" from the Command Palette';
 }
 
 /**

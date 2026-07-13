@@ -880,6 +880,104 @@ suite("gettingStartedHtml — restoreGsState seat-profile seed (Set 079 S1)", ()
 });
 
 // ---------------------------------------------------------------------
+// Set 097 (spec D2) — the profile-only first-seed precedence carve-out.
+// Defect chain: pre-build there is no router-config.yaml (profileSeed
+// null), the operator picks Copilot (profileDirty=true), the build
+// completes without a CONFIRMED seat (cancelled / CLI-missing /
+// insufficient-providers / install-incomplete) so router-config.yaml
+// seeds `transport.profile: api` — the FIRST-EVER non-null seed. Before
+// this fix that first seed unconditionally overrode the dirty flip
+// (treated as "a newer sanctioned choice"), silently reverting the radio
+// to Full/Direct API with no visible explanation.
+// ---------------------------------------------------------------------
+
+suite("gettingStartedHtml — restoreGsState profile first-seed carve-out (Set 097 D2)", () => {
+  test("a FIRST-EVER seed (null -> value) never overrides a profileDirty flip", () => {
+    const state = gsHtml.restoreGsState(
+      { transportProfile: "copilot-cli", profileDirty: true, lastProfileSeed: null },
+      null,
+      null,
+      null,
+      "api",
+    );
+    assert.strictEqual(state.transportProfile, "copilot-cli", "the operator's pick survives");
+    assert.strictEqual(state.profileDirty, true, "the flip stays protected");
+    assert.strictEqual(state.lastProfileSeed, "api", "the seed still records for future comparisons");
+  });
+
+  test("a FIRST-EVER seed that happens to MATCH the dirty pick clears dirty (truth caught up)", () => {
+    // The confirmed-seat case: the seed becomes copilot-cli and the form
+    // already agrees with the operator — dirty must still clear, this is
+    // not an override, just staleness catching up.
+    const state = gsHtml.restoreGsState(
+      { transportProfile: "copilot-cli", profileDirty: true, lastProfileSeed: null },
+      null,
+      null,
+      null,
+      "copilot-cli",
+    );
+    assert.strictEqual(state.transportProfile, "copilot-cli");
+    assert.strictEqual(state.profileDirty, false);
+    assert.strictEqual(state.lastProfileSeed, "copilot-cli");
+  });
+
+  test("a SECOND (non-first) seed change still overrides a dirty flip, unchanged behavior", () => {
+    // lastProfileSeed is already a KNOWN value ("api") — this is a genuine
+    // changed seed, not a first-ever materialization, so today's
+    // override-and-clear-dirty rule still applies.
+    const state = gsHtml.restoreGsState(
+      { transportProfile: "api", profileDirty: true, lastProfileSeed: "api" },
+      null,
+      null,
+      null,
+      "copilot-cli",
+    );
+    assert.strictEqual(state.transportProfile, "copilot-cli");
+    assert.strictEqual(state.profileDirty, false);
+    assert.strictEqual(state.lastProfileSeed, "copilot-cli");
+  });
+
+  test("a first-ever seed with NO dirty flip still applies normally (the common case)", () => {
+    const state = gsHtml.restoreGsState(
+      { transportProfile: "api", profileDirty: false, lastProfileSeed: null },
+      null,
+      null,
+      null,
+      "api",
+    );
+    assert.strictEqual(state.transportProfile, "api");
+    assert.strictEqual(state.profileDirty, false);
+    assert.strictEqual(state.lastProfileSeed, "api");
+  });
+
+  test("full defect-chain replay: null seed, dirty Copilot pick, unconfirmed build seeds api", () => {
+    // Step 1: fresh form, no router-config.yaml yet.
+    let state = gsHtml.restoreGsState(undefined, null, "/repo", null, null);
+    assert.strictEqual(state.transportProfile, "api");
+    assert.strictEqual(state.lastProfileSeed, null);
+    // Step 2: operator selects the Copilot radio (client.js's change
+    // listener sets these two fields directly on gsState).
+    state.transportProfile = "copilot-cli";
+    state.profileDirty = true;
+    // Step 3: Build runs; seat setup does not confirm (any of cancelled /
+    // CLI-missing / insufficient-providers / install-incomplete), so the
+    // scaffold's seeded default lands: transport.profile: api. The next
+    // snapshot's seed transitions null -> "api" for the first time.
+    state = gsHtml.restoreGsState(state, null, "/repo", null, "api");
+    assert.strictEqual(
+      state.transportProfile,
+      "copilot-cli",
+      "the operator's Copilot pick must survive the unconfirmed build's re-render",
+    );
+    assert.strictEqual(state.profileDirty, true);
+    // And the re-rendered form actually keeps the Copilot radio checked.
+    const html = gsHtml.renderGettingStarted(gs(), state);
+    assert.ok(/value="copilot-cli" checked/.test(html));
+    assert.ok(!/value="api" checked/.test(html));
+  });
+});
+
+// ---------------------------------------------------------------------
 // Set 080 Session 1 — the row-structured option layout both sub-choice
 // groups share: each option is a gs-option-row label carrying the radio,
 // the bold short name (copy before the em-dash), and the description

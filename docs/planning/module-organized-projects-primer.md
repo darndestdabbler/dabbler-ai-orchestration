@@ -39,6 +39,21 @@ This has a huge practical consequence:
 > If we arrange the work so that each person's changes live in their own
 > directory, conflicts mostly disappear — no clever tooling required.
 
+Directory separation alone isn't quite enough for an AI-led workflow,
+though — it prevents overlap **across** modules, not overlap **within**
+one. That's why a module isn't just "a directory" here; it's **a unit of
+work for one developer at a time.** A developer can own several modules
+at once, but two developers should never work the *same* module
+concurrently. The reason is speed: an AI agent can rewrite a substantial
+slice of a module in minutes, not days, and can do it several times in
+one sitting. Two people (or their AI sessions) editing the same module in
+parallel isn't a rare unlucky overlap anymore — it's a near-certain,
+constantly-refreshing merge conflict, because the "surface area" either
+side can touch in a short window is so much larger than with manual
+coding. One-developer-per-module-at-a-time is the same overlap-avoidance
+idea from the callout above, just tightened to match how fast the
+overlap can now happen.
+
 Where conflicts *do* still happen, even with perfect directory separation:
 
 - **Shared files**: API contracts, database schemas/migrations, the root

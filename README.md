@@ -185,7 +185,7 @@ actions** in the tree (and the Command Palette), one click from the
 module they belong to. The four-tier budget mapping is documented in
 [docs/ai-led-session-workflow.md → Cost-budgeted verification modes](docs/ai-led-session-workflow.md#cost-budgeted-verification-modes).
 
-New to the team/module workflow? The hands-on tutorial
+New to the module-organized workflow? The hands-on tutorial
 [docs/tutorials/module-team-hello-world.md](docs/tutorials/module-team-hello-world.md)
 walks a three-person team through the whole flow end to end — scaffold,
 modules, per-module plans and session sets, worktrees, CODEOWNERS +

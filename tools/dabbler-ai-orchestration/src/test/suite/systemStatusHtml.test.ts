@@ -14,6 +14,7 @@ const statusHtml = requireFromPackageRoot(
   PYTHON_TEXT: string;
   COPILOT_TEXT: string;
   WORKSPACE_TEXT: string;
+  COPILOT_SEAT_UNCONFIRMED_TEXT: string;
 };
 
 const HEALTHY = {
@@ -24,6 +25,8 @@ const HEALTHY = {
   copilotCliPresent: true,
   tier: "full",
   transportProfile: "api",
+  copilotSeatChosenUnconfirmed: false,
+  copilotSeatRerunHint: "",
   manifestFaults: [],
 };
 
@@ -101,6 +104,73 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
       { tier: "full", transportProfile: "api" },
     );
     assert.strictEqual(html, "");
+  });
+
+  // Set 097 (spec D1): the persistent seat-status note. Gated on the
+  // HOST-COMPUTED durable field, NOT on the live/possibly-reverted
+  // `transportProfile` control — that independence is the whole point
+  // (the note must survive the exact repaint the defect causes).
+  suite("Copilot seat chosen-but-unconfirmed note (Set 097 D1)", () => {
+    test("never chose: no note even if somehow flagged (defense in depth via HEALTHY)", () => {
+      assert.strictEqual(
+        statusHtml.renderSystemStatus(HEALTHY, { tier: "full", transportProfile: "api" }),
+        "",
+      );
+    });
+
+    test("chose but unconfirmed: renders the persistent note with the exact re-run instruction", () => {
+      const html = statusHtml.renderSystemStatus(
+        {
+          ...HEALTHY,
+          copilotSeatChosenUnconfirmed: true,
+          copilotSeatRerunHint: 'run "Dabbler: Set Up Copilot Seat" from the Command Palette',
+        },
+        { tier: "full", transportProfile: "api" },
+      );
+      assert.ok(html.includes('data-status-code="copilot-seat-unconfirmed"'));
+      assert.ok(html.includes(statusHtml.COPILOT_SEAT_UNCONFIRMED_TEXT));
+      assert.ok(html.includes("Dabbler: Set Up Copilot Seat"));
+    });
+
+    test("the note survives even when the LIVE control state has reverted to api (the defect it fixes)", () => {
+      // This is the crux: controls.transportProfile === "api" (the exact
+      // silently-reverted form the S097 defect chain produces), yet the
+      // durable host-computed flag still fires the note.
+      const html = statusHtml.renderSystemStatus(
+        { ...HEALTHY, copilotSeatChosenUnconfirmed: true, copilotSeatRerunHint: "cmd" },
+        { tier: "full", transportProfile: "api" },
+      );
+      assert.ok(html.includes('data-status-code="copilot-seat-unconfirmed"'));
+    });
+
+    test("chose and confirmed: host reports false, no note (even with a stale marker on disk)", () => {
+      const html = statusHtml.renderSystemStatus(
+        { ...HEALTHY, copilotSeatChosenUnconfirmed: false, transportProfile: "copilot-cli" },
+        { tier: "full", transportProfile: "copilot-cli" },
+      );
+      assert.ok(!html.includes('data-status-code="copilot-seat-unconfirmed"'));
+    });
+
+    test("Lightweight tier: never shown, whatever the durable flag says", () => {
+      const html = statusHtml.renderSystemStatus(
+        { ...HEALTHY, copilotSeatChosenUnconfirmed: true, copilotSeatRerunHint: "cmd" },
+        { tier: "lightweight", transportProfile: "api" },
+      );
+      assert.strictEqual(html, "");
+    });
+
+    test("no-folder state stays quiet even with the durable flag set", () => {
+      const html = statusHtml.renderSystemStatus(
+        {
+          ...HEALTHY,
+          workspaceOpen: false,
+          copilotSeatChosenUnconfirmed: true,
+          copilotSeatRerunHint: "cmd",
+        },
+        { tier: "full", transportProfile: "api" },
+      );
+      assert.strictEqual(html, "");
+    });
   });
 
   // Set 092 S2 verification R1 (Major): the client must compute the

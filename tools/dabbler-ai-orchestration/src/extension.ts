@@ -13,6 +13,7 @@ import { registerGitScaffoldCommand } from "./commands/gitScaffold";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerInstallAiRouterCommands } from "./commands/installAiRouterCommands";
+import { registerCopilotSeatSetupCommand } from "./commands/copilotSeatSetupCommand";
 // Set 060 S3: the Set 021 WizardPanel (webview/wizard.html) is retired.
 // `dabbler.getStarted` now focuses the Session Set Explorer (whose
 // Getting Started form is the interactive surface, D1) and opens the
@@ -326,6 +327,9 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   safeRegister("registerInstallAiRouterCommands", () =>
     registerInstallAiRouterCommands(context),
+  );
+  safeRegister("registerCopilotSeatSetupCommand", () =>
+    registerCopilotSeatSetupCommand(context),
   );
   safeRegister("registerConfigEditorCommand", () =>
     registerConfigEditorCommand(context),

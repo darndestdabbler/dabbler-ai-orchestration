@@ -18,13 +18,17 @@ import {
   RefreshChildSpawner,
   SeatSetupOutcome,
   TransportProfile,
+  clearCopilotSeatStatusMarker,
+  currentUsername,
   deriveSeatId,
   deriveSeatLabel,
   describeSeatSetupOutcome,
   describeSkipInstallIncompleteHonesty,
   dispatchKill,
   performCopilotSeatSetup,
+  rerunRefreshHint,
   spawnDetached,
+  writeCopilotSeatStatusMarker,
 } from "../utils/copilotSeatSetup";
 import { providerKeyPresent } from "../utils/gettingStartedDetection";
 import {
@@ -419,6 +423,21 @@ export interface BuildStructureSeams {
   seatSetup?: typeof runCopilotSeatSetupWithProgress;
   showWarning?: (msg: string) => void;
   showInfo?: (msg: string) => void;
+  /**
+   * Set 097 (spec D1, extended after S1 discovery Majors 1-2): keep the
+   * durable "chose Copilot" marker in sync with THIS build's explicit
+   * Full-tier pick. `chosen: true` writes "unconfirmed" (the pick is
+   * copilot-cli, before the attempt's outcome is known); `chosen: false`
+   * clears a stale marker (the pick is explicitly "api" — an operator who
+   * rebuilds choosing Direct API has abandoned an earlier unconfirmed
+   * Copilot attempt, and the note must not revive forever with no
+   * dismissal path). Never invoked for Lightweight builds or callers that
+   * pass no `transportProfile` at all (the legacy Command Palette flow) —
+   * neither is an explicit answer to the Copilot question, so neither
+   * writes nor clears. Production default is the real writer/clearer;
+   * Layer-2 tests inject a capture instead of touching disk.
+   */
+  recordSeatChoice?: (projectDir: string, chosen: boolean) => void;
 }
 
 export async function buildProjectStructureNoPrompt(
@@ -577,7 +596,35 @@ export async function buildProjectStructureNoPrompt(
   // possible `vscode.openFolder` (which reloads the extension host and
   // would kill a still-running refresh mid-probe).
   const venvPath = installOutcome?.venvPath ?? null;
-  switch (decideCopilotSeatSetup(tier, transportProfile, result.installOk, venvPath)) {
+  const seatDecision = decideCopilotSeatSetup(
+    tier,
+    transportProfile,
+    result.installOk,
+    venvPath,
+  );
+  // Set 097 (spec D1, extended after S1 discovery Majors 1-2): record THIS
+  // build's explicit Full-tier pick durably BEFORE dispatching. "run" and
+  // "skip-install-incomplete" both mean "the operator chose Copilot" — the
+  // persistent System Status note must survive an attempt that never even
+  // reaches the refresh (no venv to run it in). An explicit "api" pick
+  // means the operator abandoned (or never made) that choice this time —
+  // clear a stale marker so a note from an earlier unconfirmed attempt
+  // cannot revive forever. Lightweight builds and callers with no
+  // transportProfile at all (the legacy Command Palette flow) answer
+  // neither question, so neither writes nor clears.
+  const recordSeatChoice =
+    seams.recordSeatChoice ??
+    ((dir: string, chosen: boolean) => {
+      const ops = makeFileOps();
+      if (chosen) writeCopilotSeatStatusMarker(dir, ops);
+      else clearCopilotSeatStatusMarker(dir, ops);
+    });
+  if (tier === "full" && transportProfile === "copilot-cli") {
+    recordSeatChoice(projectDir, true);
+  } else if (tier === "full" && transportProfile === "api") {
+    recordSeatChoice(projectDir, false);
+  }
+  switch (seatDecision) {
     case "run":
       await (seams.seatSetup ?? runCopilotSeatSetupWithProgress)(
         context,
@@ -594,11 +641,10 @@ export async function buildProjectStructureNoPrompt(
       // told the router is not functional, never implied-working `api`.
       showWarning(
         "Copilot seat setup was skipped because the ai-router install did " +
-          "not complete — the catalog refresh runs inside the scaffolded " +
-          ".venv. Finish the install (\"Dabbler: Install ai-router\"), then " +
-          "run seat setup from the venv: " +
-          rerunRefreshHint(projectDir) +
-          " " +
+          "not complete — the seat setup runs inside the scaffolded .venv. " +
+          "Finish the install (\"Dabbler: Install ai-router\"), then " +
+          rerunRefreshHint() +
+          ". " +
           describeSkipInstallIncompleteHonesty(providerKeyPresent(process.env)),
       );
       break;
@@ -631,39 +677,6 @@ export function decideCopilotSeatSetup(
   }
   if (!installOk || !venvPath) return "skip-install-incomplete";
   return "run";
-}
-
-/**
- * The copy-pasteable "re-run just the seat setup" command for failure
- * messages — the corrected failure story's core promise: fixing the seat
- * never requires re-scaffolding. Uses the venv-relative interpreter path
- * so the hint works from a fresh terminal at the project root.
- */
-function rerunRefreshHint(projectDir: string): string {
-  const venvPy =
-    process.platform === "win32"
-      ? ".venv\\Scripts\\python.exe"
-      : ".venv/bin/python";
-  const seatId = deriveSeatId(os.hostname(), currentUsername());
-  // Escape embedded double quotes — the label is a folder basename and
-  // this string is presented as directly runnable (S2 review Minor 8).
-  const seatLabel = deriveSeatLabel(projectDir).replace(/"/g, '\\"');
-  // Keep the recovery command faithful for custom-path operators (S2
-  // verification nit): when an explicit copilotCliPath drove the run,
-  // the hand re-run needs the same --binary.
-  const binary = resolveCopilotCliBinary(projectDir);
-  const binaryArg = binary ? ` --binary "${binary.replace(/"/g, '\\"')}"` : "";
-  return `${venvPy} -m ai_router.copilot_catalog --refresh --seat-id ${seatId} --seat-label "${seatLabel}"${binaryArg}`;
-}
-
-/** The OS username for seat-id derivation; tolerant of the exotic hosts
- * where `os.userInfo()` throws (no passwd entry). */
-function currentUsername(): string {
-  try {
-    return os.userInfo().username;
-  } catch {
-    return process.env.USERNAME ?? process.env.USER ?? "user";
-  }
 }
 
 /** The child subset the real kill effects need. */
@@ -847,7 +860,7 @@ export async function runCopilotSeatSetupWithProgress(
   const msg = describeSeatSetupOutcome(
     outcome,
     providerKeyPresent(process.env),
-    rerunRefreshHint(projectDir),
+    rerunRefreshHint(),
   );
   (msg.level === "info" ? showInfo : showWarning)(msg.message);
   return outcome;

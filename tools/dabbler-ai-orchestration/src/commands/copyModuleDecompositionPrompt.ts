@@ -54,8 +54,11 @@ export function buildModuleDecompositionPrompt(planPresent: boolean): string {
     `Module-decomposition request (Dabbler module-organized project).\n` +
     `\n` +
     `Decompose THIS project into modules for the Dabbler AI-led workflow. A ` +
-    `"module" groups related session sets by area of the project — typically ` +
-    `one team per module. ${planLine}\n` +
+    `"module" groups related session sets by area of the project — a unit of ` +
+    `work owned by ONE developer at a time (a developer may own several ` +
+    `modules, but two developers should never work the same module ` +
+    `concurrently; AI-speed changes make concurrent same-module work a ` +
+    `constant merge-conflict source — size modules accordingly). ${planLine}\n` +
     `\n` +
     `Write your result into \`${MODULES_MANIFEST_DISPLAY}\` (already created ` +
     `from the canonical template): fill it in, preserving the header comments ` +

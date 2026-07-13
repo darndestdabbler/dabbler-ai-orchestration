@@ -1,0 +1,112 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "Extension pre-0.43.0 (Set 097 'Copilot Seat-Status Visibility', Session 1 of 1)",
+  "DocumentDate": "7/13/2026, 6:00:00 PM",
+  "Notes": "Ad-hoc per-set UAT for Set 097's operator-reported defect chain: selecting the GitHub Copilot CLI seat and clicking Build project structure silently repainted the form back to Full/Direct API whenever the guided seat setup did not confirm, with no durable explanation. This session ships two independent fixes on the SAME defect chain -- a persistent System Status strip note (D1) derived from a new one-word `.dabbler/copilot-seat-status` marker plus the existing transport.profile read, and a `restoreGsState` first-ever-seed carve-out (D2) so a profile seed transitioning null -> <value> no longer overrides an explicit Copilot pick -- plus an unrelated copy reframing (D3, operator directive) with no functional surface. Cross-provider verification's own discovery + supplementary fan-out (gpt-5-6) caught two real gaps in the FIRST draft of this feature and its UAT: (1) the durable marker was never cleared, so an explicit rebuild choosing Direct API after an abandoned Copilot attempt would have shown the note forever -- fixed, marker now clears on that path; (2) the note's advertised 're-run' command only refreshed the catalog lockfile and never actually promoted transport.profile (and was unreachable once any session sets existed, since the Getting Started form disappears) -- fixed with a new standalone command, `Dabbler: Set Up Copilot Seat`, which Walk 3 below now exercises instead of a terminal command. A third finding (that the radio does not survive a real window reload) was independently traced and DISPUTED by the orchestrator, then confirmed as a false positive by a second-opinion routed call to a different model/provider (gemini-2.5-pro) -- see s1-remediation-round-2.md; Walk 2 below still asks you to confirm this for real, since it is exactly the kind of claim that deserves a live check regardless of the paper trail. Authored to the Set 078 bar: every HumanAction is a literal UI element label or command; every Expectation is a literal string to diff against, re-grounded against CURRENT shipped source (including this remediation) during authoring; every cited Layer-2/3 suite was re-run fresh with the exact pass count quoted per walk. UAT runs against a LOCALLY BUILT VSIX ONLY (dabbler-ai-orchestration-0.43.0.vsix from `npx vsce package`, then 'Extensions: Install from VSIX...') -- never a published build. HONEST SCOPE LIMIT, carried forward from Set 079's M3 note: Walks 1 and 3 involve the guided Copilot seat probe against your REAL personal seat (the same one Sets 078/079 validated on) -- the underlying probe/confirm/promote mechanics are UNCHANGED from Set 079 (this session only adds a new entry point to the same function), so the real-seat timing/provider-count evidence you are relying on for THAT mechanic is Set 079's already-recorded dogfood (Session 2: SUCCESS in 102 s, 15/18 models, providers anthropic/google/openai; Session 3: a real mid-run cancel with confirmed process-tree kill and no partial lockfile) -- what is genuinely NEW and needs your live confirmation is the persistent note, the surviving radio, and the new command actually completing the promotion, none of which any prior session walked. Walks 1-2 each need a FRESH EMPTY FOLDER (L-079-3 cold-start rule -- this ships provisioning-adjacent behavior, the marker is written at Build time); Walk 3 reuses Walk 1's folder; Walk 4 needs a SECOND fresh folder; Walk 5 can reuse any folder with the form open.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 1 -- cold-start: a cancelled Copilot seat probe leaves a persistent, honest note and the radio survives",
+      "ItemLabel": "Cancelling the guided seat setup keeps the Copilot radio checked and shows a persistent System Status note naming the exact re-run command, instead of silently reverting to Direct provider API keys",
+      "HumanAction": "Open a FRESH EMPTY FOLDER in VS Code (locally built 0.43.0 VSIX installed). Click the Dabbler AI Orchestration icon in the Activity Bar. In the Getting Started form: leave \"Full\" checked; click the radio labeled exactly \"GitHub Copilot CLI seat\"; type 5 into \"Verification budget (USD, not-to-exceed)\". Click \"Build project structure\". A non-cancellable \"Building project structure…\" notification runs first; when it completes, a SECOND notification titled exactly \"Setting up the Copilot seat — probing the seat's models (about 1–2 minutes)…\" appears with a Cancel affordance -- click Cancel after roughly 15-30 seconds (mid-probe).",
+      "Expectation": "Two things, both visible without reloading anything: (1) the existing warning toast reads \"Copilot seat setup was cancelled — the lockfile was restored to its pre-run state and router-config.yaml keeps transport.profile: api…\" (unchanged from Set 079); (2) a NEW System Status strip section appears above the Getting Started form reading exactly:\n\"You selected the GitHub Copilot CLI seat during setup, but it is not confirmed yet — ai_router/router-config.yaml still runs on the api profile. Re-run seat setup (no need to re-scaffold): run \\\"Dabbler: Set Up Copilot Seat\\\" from the Command Palette\"\nCritically, the \"GitHub Copilot CLI seat\" radio in the form below is STILL CHECKED -- it must NOT have snapped back to \"Direct provider API keys\". This is the defect this session exists to fix: before this fix, the radio silently reverted to Full/Direct API with no explanation at all.",
+      "ProgrammaticVerification": "Fresh `npm run test:unit -- --grep \"Set 097\"` during authoring: 21/21 passing, spanning three files. The note's exact text is quoted verbatim from systemStatusHtml.js's COPILOT_SEAT_UNCONFIRMED_TEXT constant plus rerunRefreshHint's return value, pinned by 'chose but unconfirmed: renders the persistent note with the exact re-run command' and 'the note survives even when the LIVE control state has reverted to api (the defect it fixes)' (systemStatusHtml.test.ts, 'Copilot seat chosen-but-unconfirmed note (Set 097 D1)', 6/6) and 'points at the Set Up Copilot Seat command, deterministically' (copilotSeatSetup.test.ts, corrected after the S1 supplementary round's finding that the ORIGINAL terminal-command wording never actually promoted transport.profile). The marker write itself ('record-seat-choice:chosen' landing BEFORE the seat-setup attempt, for both the run and skip-install-incomplete decisions) is pinned end-to-end in gitScaffoldSeatSetup.test.ts's 'buildProjectStructureNoPrompt (the REAL build path)' suite (28/28 in the wider gitScaffold grep). The radio-survival half is the D2 fix, pinned by 'full defect-chain replay: null seed, dirty Copilot pick, unconfirmed build seeds api' in gettingStartedHtml.test.ts's 'restoreGsState profile first-seed carve-out (Set 097 D2)' suite (5/5), which replays this EXACT scenario against the real renderer. The real cancel timing and the real toast/strip painting in an actual VS Code window are the operator portion -- this exact mid-probe cancel mechanics were already real-seat dogfooded in Set 079 Session 3 (confirmed process-tree kill, no partial lockfile; s3-close-reason.md), unchanged by this session.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 2 -- the note is durable, not just in-memory (survives a window reload)",
+      "ItemLabel": "The persistent note from Walk 1 still shows after a full window reload -- it is read from disk on every snapshot, not held only in the webview's volatile state",
+      "HumanAction": "In the SAME folder as Walk 1 (right after Walk 1's cancel), run \"Developer: Reload Window\" from the Command Palette. Re-open the Session Set Explorer (click the Dabbler AI Orchestration icon again if needed) and look at the System Status strip and the Getting Started form.",
+      "Expectation": "After the reload, the exact same System Status note from Walk 1 is still showing (identical text), and the \"GitHub Copilot CLI seat\" radio is still checked. Nothing resets to a clean/no-note state just because the webview was torn down and recreated.",
+      "ProgrammaticVerification": "The note's durability is a direct consequence of the derivation reading two ON-DISK sources every snapshot -- `.dabbler/copilot-seat-status` (readCopilotSeatStatusMarker) and `ai_router/router-config.yaml`'s transport.profile (readTransportProfile) -- computed fresh in CustomSessionSetsView.ts's buildSystemStatus on every render, never cached in memory across a reload. `writeCopilotSeatStatusMarker: writes the single word, round-trips through the reader` (copilotSeatSetup.test.ts) pins that the marker file itself persists byte-for-byte. The radio's durability is a SEPARATE, pre-existing (Set 077) mechanism -- the webview's vscode.getState()/setState() API, which persists across a real window reload by design; `persistGsState()` runs immediately after every seed-application, so the operator's Copilot pick is already saved before Walk 2's reload even happens, and the existing 'full defect-chain replay' Layer-2 test (gettingStartedHtml.test.ts) already replays the exact object handoff this produces. This exact claim was independently traced and confirmed by a second-opinion routed call (gemini-2.5-pro) during authoring after the orchestrator disputed a verifier finding that argued the opposite -- see s1-remediation-round-2.md. The real webview teardown/recreate across an actual window reload is inherently untestable on the vscode-stub and is exactly what this walk exists to confirm live, regardless of the paper trail.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 3 -- running the new Set Up Copilot Seat command confirms the seat and clears the note",
+      "ItemLabel": "The Dabbler: Set Up Copilot Seat command re-probes the seat, and on >=2 confirmed providers actually promotes transport.profile and clears the note -- unlike the old terminal-command instruction, which never did",
+      "HumanAction": "In the SAME folder as Walks 1-2, open the Command Palette and run \"Dabbler: Set Up Copilot Seat\" (do not run any terminal command). A cancellable progress notification titled \"Setting up the Copilot seat — probing the seat's models (about 1–2 minutes)…\" appears -- let it finish (Set 079's Session 2 real run on this same seat took about 102 seconds and confirmed 15/18 models across anthropic/google/openai; this command runs the identical underlying flow). Once it completes, run \"Dabbler: Refresh Work Explorer\" from the Command Palette (or reload the window). ADDITIONALLY, as a quick negative check: open ANOTHER fresh empty folder (no .venv at all) and run \"Dabbler: Set Up Copilot Seat\" there.",
+      "Expectation": "An info notification appears reading \"Copilot seat set up: <N>/<M> models confirmed (providers: ...). transport.profile: copilot-cli written to ai_router/router-config.yaml.\" naming at least 2 distinct provider families (exact counts may drift slightly if GitHub changes the CLI's model list). After the refresh: the System Status note from Walks 1-2 is GONE (no seat-status fault renders at all); `ai_router/router-config.yaml`'s `transport:` block now reads `profile: copilot-cli`; the \"GitHub Copilot CLI seat\" radio is still checked (it was never wrong, it just needed the confirmation to catch up). The negative check's empty folder shows an error message naming \"No .venv found\" and must NOT crash or hang.",
+      "ProgrammaticVerification": "Fresh 'deriveCopilotSeatChosenUnconfirmed (Set 097 D1)' run (3/3 passing): 'chose + confirmed: durable profile is copilot-cli -> false, even with a stale marker' pins that a confirmed transport.profile suppresses the note regardless of the (never-cleared-by-design) marker word still on disk -- exactly the state this walk produces. The command itself (copilotSeatSetupCommand.ts) is a thin wrapper with no dedicated Layer-2 suite (matching the existing installAiRouterCommands.ts precedent for this class of command-registration file) -- it reuses runCopilotSeatSetupWithProgress UNCHANGED, which IS fully pinned (28/28 in the gitScaffold grep) and was real-seat dogfooded on THIS SAME personal seat in Set 079 Session 2 (s2-close-reason.md: SUCCESS in 102 s, 15/18 models, providers anthropic/google/openai). This session's fix (added during the S1 supplementary verification round, after the FIRST draft's terminal-command instruction was caught never actually promoting the profile) is exactly this command's existence and wiring -- the real Command Palette run, the real progress notification, and the real note-clearing repaint are the operator portion.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 4 -- a workspace that never chose Copilot never shows the note (never a nag)",
+      "ItemLabel": "Building with the default Direct provider API keys option produces no seat-status note at all, ever",
+      "HumanAction": "Open a SECOND FRESH EMPTY FOLDER. In the Getting Started form, leave everything at its defaults (\"Full\" tier, \"Direct provider API keys\" -- do NOT click the Copilot radio), type 5 into the budget input, click \"Build project structure\", and wait for it to complete.",
+      "Expectation": "No System Status note about the Copilot seat ever appears, at any point, before or after the build completes -- the strip stays exactly as it was before this session's changes (workspace-initialization / provider-key / Python faults only, none of which apply here since keys are present).",
+      "ProgrammaticVerification": "Fresh 'deriveCopilotSeatChosenUnconfirmed (Set 097 D1)' run: 'never chose: marker null -> false, whatever the durable profile' (3 assertions covering null/api/copilot-cli). The marker write itself is gated in gitScaffoldSeatSetup.test.ts's 'api profile / no profile / lightweight: seat setup never runs and no seat warning fires' test, extended this session to also assert `markSeatChosenCalls` stays EMPTY on every not-selected combination (28/28 in the gitScaffold grep) -- the marker file is never even created on this path, so there is nothing for the derivation to read. The real absence of any strip content in an actual window is the operator portion.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "Define modules section",
+      "Subarea": "Walk 5 -- module-ownership copy reframed from team grouping to ownership exclusivity (D3)",
+      "ItemLabel": "The Define-modules intro note states one-developer-per-module-at-a-time, not the old team-per-module framing",
+      "HumanAction": "In any folder with the Getting Started form open, look at Section 2, \"Define modules (optional)\", and read its first note (the dark highlighted box right under the section heading).",
+      "Expectation": "The note reads exactly:\n\"Modules group your session sets by area of the project — one developer per module at a time, to avoid merge conflicts. Solo or single-area projects can skip this: your work stays under a single default group.\"\nIt must NOT say \"one team per module\" (the old wording) anywhere.",
+      "ProgrammaticVerification": "The string is quoted verbatim from gettingStartedHtml.js's DEFINE_MODULES_INTRO_TEXT constant, re-read moments before this checklist was written. Fresh `npm run test:unit -- --grep \"gettingStartedHtml\"` during authoring: 69/69 passing, including the existing 'the Define-modules section carries the open-modules + copy-decomposition buttons + SAVE copy' test (which asserts the constant renders verbatim -- it does not pin the OLD wording, so it could not have caught the drift itself, but confirms the new constant renders unchanged from source to DOM). This is a pure copy change with no logic behind it -- the operator portion is simply confirming the real rendered text matches, which the screenshot in this release's README (media/getting-started.png, retaken this session) also shows.",
+      "Passes": true
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 1 -- cold-start: a cancelled Copilot seat probe leaves a persistent, honest note and the radio survives",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 2 -- the note is durable, not just in-memory (survives a window reload)",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 3 -- re-running the copied command confirms the seat and clears the note",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "System Status strip",
+      "Subarea": "Walk 4 -- a workspace that never chose Copilot never shows the note (never a nag)",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    },
+    {
+      "FunctionalArea": "Define modules section",
+      "Subarea": "Walk 5 -- module-ownership copy reframed from team grouping to ownership exclusivity (D3)",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": ""
+    }
+  ]
+}

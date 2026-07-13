@@ -35,10 +35,16 @@
   // (the ensure-write only creates it — the operator's declarations are the
   // point). Solo / single-area projects skip this and stay in the single
   // default group (the pseudo-module).
+  // Set 097 (spec D3, operator directive): reframed from team GROUPING to
+  // ownership EXCLUSIVITY — a module is a unit of work for one developer at
+  // a time (AI-speed work makes concurrent same-module work a constant
+  // merge-conflict source). Kept short here per the spec; the full
+  // merge-storm rationale lives in the primer this section's copy does not
+  // repeat (module-organized-projects-primer.md).
   var DEFINE_MODULES_INTRO_TEXT =
-    "Modules group your session sets by area of the project — one team per " +
-    "module. Solo or single-area projects can skip this: your work stays " +
-    "under a single default group.";
+    "Modules group your session sets by area of the project — one developer " +
+    "per module at a time, to avoid merge conflicts. Solo or single-area " +
+    "projects can skip this: your work stays under a single default group.";
   // Set 094 S2 (spec D6): the SAVE copy references the decomposition-prompt
   // button (the copy command is the fourth ensure-write site). The button
   // hands an AI a ready-made prompt that fills docs/modules.yaml in; the human
@@ -173,7 +179,12 @@
    * seat-profile sub-choice ("api" default | "copilot-cli") — joins the
    * family the same way (`profileSeed` is the durable seat-profile
    * resolution the host will wire in Session 2; `profileDirty` /
-   * `lastProfileSeed` mirror the mode fields exactly).
+   * `lastProfileSeed` mirror the mode fields exactly) — WITH one
+   * exception, added Set 097 (spec D2): `transportProfile`'s FIRST-EVER
+   * seed (`lastProfileSeed` still null) never overrides a `profileDirty`
+   * flip, because unlike tier/mode the profile's durable source is
+   * confirmation-gated (Set 086) — its first post-build value is just the
+   * unconfirmed template default, not a newer sanctioned choice.
    *
    * Pure so the Layer-2 suite replays teardown/re-init without a
    * webview.
@@ -223,6 +234,16 @@
           : null,
       rootId: typeof rootId === "string" ? rootId : persistedRootId,
     };
+    // Set 097 (spec D2, L-069-1 sibling sweep): the tier and verification-
+    // mode seeds below do NOT need a first-seed carve-out. Their durable
+    // markers (`.dabbler/tier`, `.dabbler/verification-mode`) are written
+    // FROM the build rider itself — literally the value the operator just
+    // picked — so the post-build seed always EQUALS what they chose; there
+    // is no confirmation-gated intermediate value the way transport.profile
+    // has (Set 086's seat-confirmation gate). A first tier/mode seed can
+    // therefore never disagree with a same-build dirty flip, so the
+    // asymmetry this fix corrects for the profile family does not exist
+    // here. Left unchanged deliberately.
     if (tierSeed === "full" || tierSeed === "lightweight") {
       var seedChanged = state.lastSeed !== tierSeed;
       if (!state.tierDirty || seedChanged) {
@@ -246,10 +267,24 @@
     }
     if (profileSeed === "api" || profileSeed === "copilot-cli") {
       var profileSeedChanged = state.lastProfileSeed !== profileSeed;
-      if (!state.profileDirty || profileSeedChanged) {
+      // Set 097 (spec D2): a seed's FIRST-EVER application — lastProfileSeed
+      // still null, meaning no router-config.yaml existed before this
+      // build — merely MATERIALIZES the template default. It is not a
+      // "newer sanctioned choice" the way a later CHANGED seed is (e.g. the
+      // confirmed-seat transition from api -> copilot-cli), so it must
+      // never override a profileDirty explicit flip made in the interim —
+      // there was nothing durable yet for that flip to have been "against".
+      // A seed that changes between two ALREADY-KNOWN values keeps today's
+      // override-and-clear-dirty behavior unchanged below.
+      var isFirstEverProfileSeed = state.lastProfileSeed === null;
+      var protectDirtyFlip = isFirstEverProfileSeed && state.profileDirty;
+      if (!protectDirtyFlip && (!state.profileDirty || profileSeedChanged)) {
         state.transportProfile = profileSeed;
         state.profileDirty = false;
       }
+      // Runs regardless of protectDirtyFlip: once the truth catches up to
+      // the operator's pick (dirty flip already equals the new seed), the
+      // flag must still clear — this is a staleness check, not an override.
       if (state.transportProfile === profileSeed) state.profileDirty = false;
       state.lastProfileSeed = profileSeed;
     }

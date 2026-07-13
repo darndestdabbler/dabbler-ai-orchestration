@@ -119,7 +119,14 @@ import { probePythonPresence } from "../utils/pythonInterpreter";
 // Set 079 Session 1 (Feature 1): the Copilot-CLI presence probe.
 import { probeCopilotCliPresence } from "../utils/copilotCli";
 // Set 079 Session 2 (Feature 1): the durable seat-profile seed reader.
-import { readTransportProfile } from "../utils/copilotSeatSetup";
+// Set 097 (spec D1): the chosen-but-unconfirmed marker + derivation + the
+// shared re-run hint (also used by gitScaffold.ts's one-shot toast).
+import {
+  deriveCopilotSeatChosenUnconfirmed,
+  readCopilotSeatStatusMarker,
+  readTransportProfile,
+  rerunRefreshHint,
+} from "../utils/copilotSeatSetup";
 // Set 060 Session 2: the form's action handlers (D4/D5/D7).
 import {
   GettingStartedHandlers,
@@ -752,9 +759,15 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
         copilotCliPresent: true,
         tier: "full",
         transportProfile: "api",
+        copilotSeatChosenUnconfirmed: false,
+        copilotSeatRerunHint: "",
         manifestFaults,
       };
     }
+    // Set 097 (spec D1): read the durable transport profile ONCE and reuse
+    // it for both the existing `transportProfile` field and the new
+    // unconfirmed-seat derivation, instead of a second redundant read.
+    const durableTransportProfile = readTransportProfile(root);
     return {
       workspaceOpen: true,
       // Set 092 S2 (UAT Walk 4): a workspace that already has session
@@ -772,7 +785,12 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
       pythonPresent: probePythonPresence(root),
       copilotCliPresent: probeCopilotCliPresence(root),
       tier: resolveDurableTier(root)?.tier ?? "full",
-      transportProfile: readTransportProfile(root) ?? "api",
+      transportProfile: durableTransportProfile ?? "api",
+      copilotSeatChosenUnconfirmed: deriveCopilotSeatChosenUnconfirmed(
+        readCopilotSeatStatusMarker(root),
+        durableTransportProfile,
+      ),
+      copilotSeatRerunHint: rerunRefreshHint(),
       manifestFaults,
     };
   }

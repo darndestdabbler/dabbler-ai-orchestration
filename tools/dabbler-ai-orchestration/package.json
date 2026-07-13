@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Getting Started form (the onboarding entry point), Work Explorer, and cost dashboard for the Dabbler AI-led workflow.",
-  "version": "0.42.0",
+  "version": "0.43.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -253,6 +253,12 @@
         "title": "Update ai-router",
         "category": "Dabbler",
         "icon": "$(sync)"
+      },
+      {
+        "command": "dabblerSessionSets.setUpCopilotSeat",
+        "title": "Set Up Copilot Seat",
+        "category": "Dabbler",
+        "icon": "$(github)"
       },
       {
         "command": "dabbler.openConfigEditor",

@@ -1,0 +1,6 @@
+VERIFIED — The raw and validated type propagation, tolerant unknown-value handling, Explorer-model round trip, required documentation, and parse matrix are implemented consistently. No Critical or Major defect is substantiated.
+
+#### NITS
+
+- **Nit:** Issue → Present-but-malformed declarations (`kind:`, `kind: ""`, or a non-scalar value) are silently treated as absent, weakening the required fail-loud-not-hidden posture. **Location** → `parseSessionSetConfig()` in `src/utils/fileSystem.ts`, where `stringValue(...)` plus `if (kd)` loses the distinction between an absent key and an invalid declaration; `sessionSetKind.test.ts` codifies no warning. **Fix** → Detect key presence separately and warn while still degrading to an ordinary work set.
+- **Nit:** Issue → The evidence calls the full suite “all green” and records `suite-green`, but the reported full Layer 3 run was 25/26; isolated retries support the flake explanation but do not make that full-suite invocation green. **Location** → `s1-conventions.md`, `activity-log.json`, and `disposition.json`. **Fix** → Rerun the complete Layer 3 suite successfully or describe the result accurately as an accepted flaky failure with successful targeted retries.

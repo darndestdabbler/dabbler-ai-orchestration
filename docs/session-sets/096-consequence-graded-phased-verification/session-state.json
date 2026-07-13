@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "096-consequence-graded-phased-verification",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -20,16 +20,16 @@
     {
       "number": 2,
       "title": "Session 2",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-12T18:15:11.038328-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-13T03:37:09.519533-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
         "model": "claude-fable-5",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

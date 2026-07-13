@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "096-consequence-graded-phased-verification",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-07-12T20:25:07.547584-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "I reviewed the phased verification changes across ai_router/verify_session.py, ai_router/verification.py, the session-issues schema/docs/tests, workflow/constitution docs, router-config.yaml, and version metadata. I found one material contract/completeness defect in the remediation-review phase: clean remediation-review rounds do not persist their parsed fixVerdicts, even though the code/docs/tests claim remediation-review rounds record fix verdicts in the issues envelope and the loop relies on that artifact as its durable record.",
+      "findings": [
+        {
+          "description": "Violation: the shipped contract says remediation-review rounds record parsed per-finding fix verdicts in the issues envelope (for example `ai_router/verify_session.py` documents optional envelope field `fixVerdicts` as 'a remediation-review round\\'s parsed per-finding fix verdicts', and `docs/session-issues-schema.md` says `fixVerdicts` is an optional machinery field for remediation-review rounds). Impact: on a clean remediation-review pass there is no `sN-issues*.json` artifact at all, because `write_issues_artifact()` is only called when `merged_issues` is non-empty (`ai_router/verify_session.py:2582-2591`), so the promised durable record of fix verdict coverage disappears exactly on the successful path. That breaks the stated artifact contract, deprives later tooling/operators of the only machine-readable record of which ledger items were accepted, and makes the docs/tests materially overclaim the shipped deliverable. Evidence: `write_issues_artifact(..., fix_verdicts=...)` is gated under `if merged_issues:` in `ai_router/verify_session.py:2582-2591`; the clean-path test `test_full_id_coverage_passes` in `ai_router/tests/test_verify_session_phases.py` asserts only `EXIT_OK` and never checks for an envelope, while the docs/schema still describe `fixVerdicts` as a remediation-review envelope field (`docs/session-issues-schema.md:121-123`, `docs/session-issues.schema.json:52-71`). Concrete fix: either persist a remediation-review envelope whenever `fix_verdicts` exist (even on VERIFIED/no-issue rounds), or narrow the docs/schema/tests to say `fixVerdicts` are only recorded on findings-bearing remediation-review rounds and stop claiming a durable remediation-review verdict artifact.",
+          "severity": "major",
+          "category": "completeness"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the implementation of the phased verification loop, including the core logic in `ai_router/verify_session.py`, the comprehensive new test suite in `ai_router/tests/test_verify_session_phases.py`, the configuration changes in `ai_router/router-config.yaml`, and the schema extension in `docs/session-issues.schema.json` with its corresponding tests. I also verified the consistency of the updated policy and workflow documentation in `docs/`.\n\nThe claims made in the session summary are substantiated by the code. The phased loop (`discovery`, `supplementary`, `remediation-review`) is implemented with careful attention to detail, including correct evidence assembly for each phase (e.g., tree-to-tree fix deltas), deterministic cross-round ledger generation with machine-checkable coverage, and robust failure handling (e.g., loud degradation on fan-out errors). The system was hardened based on insights from its own verification (\"dogfooding\"), resulting in fail-closed logic for verdict merging, escalation for incomplete or rejected fix verdicts, and bounded remediation cycles. The changes are internally consistent, well-documented, and thoroughly tested. I could not find any significant defects.",
+      "findings": []
+    }
+  ]
+}

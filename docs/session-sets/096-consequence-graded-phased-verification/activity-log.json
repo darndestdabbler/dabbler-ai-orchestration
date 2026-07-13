@@ -1,7 +1,7 @@
 {
   "sessionSetName": "096-consequence-graded-phased-verification",
   "createdDate": "2026-07-12T20:57:25.370122+00:00",
-  "totalSessions": 0,
+  "totalSessions": 2,
   "entries": [
     {
       "sessionNumber": 1,
@@ -84,6 +84,70 @@
       "dateTime": "2026-07-12T17:46:49.487638-04:00",
       "description": "close_session succeeded (all gates PASS; Set 084 backstop re-verified post-disposition tree: round 3 VERIFIED, \\.17). Close-out artifacts committed + pushed; notification firing.",
       "status": "completed"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register-and-read",
+      "dateTime": "2026-07-12T18:17:18.233941-04:00",
+      "description": "Registered S2 (claude/anthropic/claude-fable-5); read spec S2 plan, S1 fan-out experiment memo (K=2 same-model sizing, provider-diversity as preference knob), and shipped state: verify_session.py (ledger machinery), verification.py (parser + classify_blocking), template v3 (consequence rubric), router-config.yaml verification block, workflow doc Step 6/7.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "phase-modes-live",
+      "dateTime": "2026-07-12T18:44:35.254275-04:00",
+      "description": "Phase modes shipped in verify_session: --phase discovery (fan-out K from config, identical bundles, per-call stamps/artifacts, merged envelope with discoveryCall + discoveryBaselineTree snapshot), --phase supplementary (completeness-critic block replaces ledger; cross-provider preference knob degrades loudly), --phase remediation-review (tree-to-tree fix delta from recorded baseline + auto-ledger; parse_fix_verdicts into envelope fixVerdicts). Framings ride the Original Task slot so the v3 template pin holds. Compat: no --phase = classic single call. parse_fix_verdicts added to verification.py.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "config-seeded",
+      "dateTime": "2026-07-12T18:44:35.254817-04:00",
+      "description": "router-config.yaml verification.discovery seeded verbatim from the S1 memo: fan_out: 2, provider_diversity: same-model, documented inline; loader clamps to [1,4] and fails open to defaults. Tests: 48 new (test_verify_session_phases.py) + 74 existing pass; full suite 2988 passed / 6 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "policy-docs-rewritten",
+      "dateTime": "2026-07-12T18:52:08.990747-04:00",
+      "description": "Loop policy rewritten: workflow doc Step 6 gained \"The phased loop (Set 096)\" (discovery -> supplementary -> remediate-once -> remediation-review; bounded totals <=2 discovery passes / <=2 review cycles; severity gate + operator round-cap authority preserved verbatim); Materiality items 3-4 updated (auto-assembled ledger, phased bounds); Step 7 blocking list restructured (supplementary-before-remediation, sidecar, phase-aware re-verify). Echo sweep (L-065-1): overview diagram, constitution Step 6/7 + Recovery bounded-round language, verification-surface-strategy Set-071 recap note. session-issues-schema.md + session-issues.schema.json extended (phase/discoveryBaselineTree/fixVerdicts envelope fields, per-issue discoveryCall) with 9 new schema tests; Lightweight Mode-B 1-2/3+ bound intentionally unchanged. Preload ceilings all OK (constitution 75%).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "convergence-replay-recorded",
+      "dateTime": "2026-07-12T19:11:00.161657-04:00",
+      "description": "Convergence replay run end-to-end through the shipped --phase machinery on the frozen 095 corpus (scratch worktree @ b16dd58, diff-base 34d4149, scratch set 096-s2-replay so stamps can never corroborate this session). Result: 4 rounds / $0.85 / one remediation batch + one micro-fix -> VERIFIED with 6/6 fix verdicts accepted, exactly at the bounded totals (2 discovery passes + 2 remediation-review cycles) vs 095 baseline 17 non-converging rounds / $4.88. Discovery K=2 harvested 4 disjoint Majors; supplementary added 1 new (0 re-reports); remediation-review caught 1 fix-induced in-hunk defect. Memo: s2-convergence-replay.md; raw artifacts s2-replay-*; remediation preserved as s2-replay-fix.patch for the operator (095 deliverable fixes stay operator-scheduled). Worktree removed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "release-prep-and-suite",
+      "dateTime": "2026-07-12T19:20:03.305153-04:00",
+      "description": "Release prep: CHANGELOG 0.33.0 Unreleased block (S1 entries + S2 phased-loop Added/Changed, replay falsifier in the header); pyproject 0.32.0 -> 0.33.0; stale __init__ __version__ fallback 0.27.0 -> 0.33.0 aligned (stamp fallback correctness); editable install refreshed (0.33.0; note: bare pip shim silently no-ops, python -m pip works). Entry point proven: verify_session --phase discovery parses + dry-runs on this set. Full suite: 2996 passed / 6 skipped. Publish stays operator-gated.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "verification-loop",
+      "dateTime": "2026-07-12T20:14:22.539026-04:00",
+      "description": "Mandatory verification, dogfooding the phased loop: R1 discovery K=2 ($0.64, 9 blocking findings, disjoint call sets) -> R2 supplementary ($0.34, 1 new: unparseable-findings deadlock) -> remediated all 8 distinct (fail-closed merge; bookkeeping excludes via WORK_DIFF_SET_BOOKKEEPING; fix-rejected escalation; cycle-cap suspend; replay-claim qualifiers; supplementary session-verdict fail-close; zero-parse envelope synthesis) -> R3 review ($0.09, 10/11... wait 2 rejected) -> R4 cycle 2 ($0.08, 10/11 accepted, 1 held: partial fix-verdict coverage) -> loop SUSPENDED at the bound per the shipped policy. The held point had a deterministic fix the round-3 sidecar had wrongly deferred: ledger-id coverage now machine-checked (L1..Ln numbering, per-id verdict requirement, exact set comparison; id-less full-count fallback). No third cycle opened; the deciding round is the sanctioned close backstop. Suite: 3010 passed / 6 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "critique-and-close-prep",
+      "dateTime": "2026-07-12T20:26:49.187545-04:00",
+      "description": "Advisory path-aware critique produced (pull surface, google gemini-2.5-pro VERIFIED + openai gpt-5.4 ISSUES_FOUND with one Major: fixVerdicts has no machine record on a CLEAN remediation-review round because the Set 055 invariant forbids a clean-round envelope). Adjudication: the invariant is locked and correct; the CONTRACT DOCS overclaimed -- schema doc + writer docstring now state the raw stamp-bound artifact is the durable record on clean rounds, and the JSON schema gained the ledgerId item property (parity). Converged per L-070-1 (doc-wording change only, no code change). Next-set analysis routed (gemini-pro, $0.004: 095-patch first, then 077-redo); ai-assignment actuals filled; disposition.json authored (final session, next_orchestrator null); change-log.md written.",
+      "status": "complete"
     }
   ]
 }

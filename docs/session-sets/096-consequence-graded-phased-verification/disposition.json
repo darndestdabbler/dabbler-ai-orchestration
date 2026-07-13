@@ -1,48 +1,41 @@
 {
   "status": "completed",
-  "summary": "Session 1 of Set 096: the operator's consequence-graded severity rubric (L-095-1) plus a mandatory per-Issue failure-scenario line shipped in the verification template (session-verification-v3, hash-pinned; merge-decision anchor and anti-laundering escalation preserved subordinated to the rubric); the tolerant failureScenario field landed end-to-end (parser -> sN-issues envelope -> JSON schema -> schema doc, both schema versions, classify_blocking unchanged); the cross-round issue ledger became machinery in verify_session (auto-assembled from prior rounds' sN-issues*.json + the new sN-remediation-round-<R>.md sidecar, settled vs unresolved split by fail-closed settlement evidence); and the fan-out experiment ran on the frozen Set 095 corpus (K=3 same-model + 1 cross-provider, identical bundles, $0.80): same-model pairwise overlap is low (Jaccard 0.13-0.31; one run ~50% of the observed pool, two ~81% mean), the cross-provider call harvested nothing, and s1-fanout-experiment.md recommends discovery fan-out K=2 same-model with cross-provider kept as a verdict-calibration signal (sizes Session 2's --phase discovery). Verification dogfooded the machinery: round 1 returned one real Major against the new ledger (settled framing without settlement evidence, delivered WITH a parsed failureScenario), fixed fail-closed; round 2 VERIFIED clean under the auto-assembled ledger (2 rounds / $0.37 vs 095's 17 rounds / $4.88). Suite: pytest 2948 passed / 6 skipped (+26 new tests), extension Layer 2 1487 passing, tsc clean.",
+  "summary": "Session 2 of 2 (set-terminal): the phased verification loop shipped in verify_session (--phase discovery: exhaustive-enumeration framing fanned out K=2 per the S1-measured config with per-call stamps/artifacts and one merged envelope; --phase supplementary: pre-remediation completeness critic fed the prior findings with a do-not-re-report instruction, provider diversity as a config preference that degrades loudly; --phase remediation-review: tree-to-tree fix delta from the recorded discoveryBaselineTree plus the auto-ledger, per-finding fix verdicts with machine-checked ledger-id coverage; omitted --phase = classic behavior, compat). Step 6/7 policy docs rewritten around the phases with bounded totals (<=2 discovery passes, <=2 remediation-review cycles; severity gate and operator round-cap authority preserved verbatim; echo sweep across constitution/diagram/strategy doc). Config seeded verbatim from the S1 memo (verification.discovery: fan_out 2, provider_diversity same-model). Convergence replay ran the frozen Set 095 corpus end-to-end through the shipped machinery: 4 rounds / $0.85 / VERIFIED with 6/6 fix verdicts accepted, exactly at the bounded totals, vs the 095 baseline's 17 non-converging rounds / $4.88 (a loop-shape demonstration, not a defect-for-defect A/B -- qualifications in s2-convergence-replay.md); the replay's remediation of five real Majors in the shipped 095 tutorial is preserved as s2-replay-fix.patch for operator scheduling. Release prep: ai_router 0.33.0 staged (CHANGELOG block, pyproject bump, stale __init__ fallback aligned; publish operator-gated). The session's own verification dogfooded the loop it shipped: discovery K=2 harvested 9 blocking findings (disjoint call sets), supplementary added 1 with zero re-reports, all were real defects in the new machinery, and remediation produced the hardening set (fail-closed verdict merge; phased-evidence bookkeeping excludes; fix-rejected anti-laundering escalation; ledger-id fix-verdict coverage enforcement; supplementary session-verdict fail-close; cycle-cap suspension; zero-parse envelope synthesis) with 23 new tests. Cycle 2 held one point (partial fix-verdict coverage); the loop SUSPENDED at its own bound and the point was then fixed deterministically (ledger ids) rather than adjudicated -- no third cycle was opened; the deciding round is the sanctioned Set 084 close backstop on the final tree. Suite: 3010 passed / 6 skipped.",
   "verification_method": "api",
-  "verification_verdict": "VERIFIED",
+  "verification_verdict": "ISSUES_FOUND",
   "files_changed": [
     "ai_router/CHANGELOG.md",
-    "ai_router/prompt-templates/verification.md",
+    "ai_router/__init__.py",
+    "ai_router/router-config.yaml",
     "ai_router/verification.py",
-    "ai_router/verification_stamp.py",
     "ai_router/verify_session.py",
-    "ai_router/tests/test_verification_framing.py",
+    "ai_router/tests/test_session_issues_schema.py",
     "ai_router/tests/test_verify_session.py",
+    "ai_router/tests/test_verify_session_phases.py",
+    "docs/ai-led-session-workflow.md",
+    "docs/session-constitution.md",
     "docs/session-issues-schema.md",
     "docs/session-issues.schema.json",
+    "docs/verification-surface-strategy.md",
+    "pyproject.toml",
     "docs/session-sets/096-consequence-graded-phased-verification/ai-assignment.md",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-conventions.md",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-fanout-experiment.md",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-fanout-findings.json",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-fanout-analysis.md",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-fanout-run-a.md",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-fanout-run-b.md",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-fanout-run-c.md",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-fanout-run-d.md",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-next-set-analysis.json",
-    "docs/session-sets/096-consequence-graded-phased-verification/s1-remediation-round-1.md"
+    "docs/session-sets/096-consequence-graded-phased-verification/change-log.md",
+    "docs/session-sets/096-consequence-graded-phased-verification/s2-convergence-replay.md",
+    "docs/session-sets/096-consequence-graded-phased-verification/s2-next-set-analysis.json",
+    "docs/session-sets/096-consequence-graded-phased-verification/s2-replay-fix.patch"
   ],
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "claude-code",
-    "provider": "anthropic",
-    "model": "claude-sonnet-5",
-    "effort": "medium",
-    "reason": {
-      "code": "switch-due-to-cost",
-      "specifics": "Routed recommendation (s1-next-set-analysis.json): Session 2 is moderate, well-defined CLI code + tests + policy-doc restructure + the 095-corpus convergence replay, all downstream of the operator-directed phase design and the measured K=2 fan-out sizing; Sonnet-5 at medium effort is cheapest-capable, and an anthropic orchestrator keeps the openai/google cross-provider verification pool free."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": [],
   "lessons_cited": [
     "L-095-1",
     "L-065-1",
-    "L-069-1"
+    "L-069-1",
+    "L-066-1"
   ],
   "deferred_issues": [
-    "Five latent rubric-graded Majors against the SHIPPED Set 095 tutorial deliverables surfaced by the fan-out experiment (F1-F5 in s1-fanout-experiment.md: unittest test-framework contract not pinned by the walkthrough; reviewDecision treated as enforcement proof; ADVISORY caps able to suppress proven failures; owner-roster gap; hotfix drill's module-only pre-tag validation). Recorded with raw artifacts for operator disposition; out of this set's machinery scope."
+    "The five verified Major fixes to the shipped Set 095 tutorial deliverables (s2-replay-fix.patch, loop-VERIFIED on the replay worktree) are NOT applied to main -- application is a separate small docs set, operator-scheduled (the routed next-set analysis ranks it first).",
+    "PyPI publish of ai_router 0.31.0-0.33.0 and Marketplace publish of ext 0.42.0 remain operator-gated (release prep complete).",
+    "The fix-verdict ledger-id coverage check treats an id-less enumeration with a verdict per numbered finding as covered (count fallback) -- a deliberately tolerant edge for legacy-format reviews; the strict per-id path is what the framing prescribes and what reviewers followed in every live round this session."
   ]
 }

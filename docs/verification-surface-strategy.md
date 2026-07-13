@@ -505,8 +505,11 @@ Shipped in `ai_router` **0.25.0**.
    issue ledger** (`reconcile_issue_ledger`) marks prior blockers RESOLVED/UNRESOLVED
    and **refuses to resurrect a settled point under fresh wording** (the exact churn
    pattern above) — keyed on a stable `issueId`, not free text. The existing **1–2
-   automatic / 3+ human** bound is unchanged; this only narrows *what counts as a
-   round-justifying finding*. Scope, stated precisely: the **blocking predicate** is
+   automatic / 3+ human** bound was unchanged by Set 071; it only narrowed *what
+   counts as a round-justifying finding*. (Set 096 later restructured the routed
+   Step 6/7 loop into phases with bounded totals — ≤2 discovery passes, ≤2
+   remediation-review cycles — see the workflow doc's *The phased loop (Set 096)*;
+   the Lightweight Mode-B loop keeps the 1–2/3+ bound.) Scope, stated precisely: the **blocking predicate** is
    surface-agnostic (§7.1.2 — one decision over push *or* pull findings), while the
    **Step-6 re-verify loop discipline** is wired into the routed `api` re-verify loop
    and the Lightweight Mode-B verify→remediate loop (the two loops the workflow doc

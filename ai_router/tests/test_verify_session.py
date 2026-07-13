@@ -976,10 +976,13 @@ class TestCrossRoundLedger:
         ])
         ledger = vs.assemble_cross_round_ledger(tmp_path, 1, 2)
         assert "**Round 1**" in ledger
-        assert "[Major] (id: I-096-1)" in ledger
+        # S2: blocking findings additionally carry the machinery-assigned
+        # ledger id the fix-verdict coverage check keys on.
+        assert "[Major] (ledger id: L1) (id: I-096-1)" in ledger
         assert "fails open on a missing remote" in ledger
         assert "Failure scenario: A remote-less consumer repo" in ledger
-        assert "[unrated]" in ledger
+        # An unrated finding is blocking (anti-laundering) -> numbered too.
+        assert "[unrated] (ledger id: L2)" in ledger
         assert "ISSUES_FOUND -- 2 finding(s)" in ledger
 
     def test_no_resurrection_framing_requires_settlement_evidence(

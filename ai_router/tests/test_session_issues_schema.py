@@ -251,3 +251,65 @@ class TestIssueObjectContract:
         env = _minimal_envelope()
         env["issues"][0].update({"category": "unknown", "severity": "unknown"})
         validator.validate(env)
+
+
+class TestPhasedLoopFields:
+    """Set 096 S2: the phased-loop machinery fields — optional
+    envelope-level phase / discoveryBaselineTree / fixVerdicts and the
+    per-issue discoveryCall — are additive (omit-null) and enum/shape
+    guarded, mirroring what verify_session's write_issues_artifact
+    actually emits."""
+
+    def test_phased_envelope_passes(self, validator):
+        env = _minimal_envelope()
+        env["phase"] = "discovery"
+        env["discoveryBaselineTree"] = "a" * 40
+        env["issues"][0]["discoveryCall"] = 2
+        validator.validate(env)
+
+    def test_all_fields_stay_optional(self, validator):
+        # An envelope with none of the Set 096 S2 fields is unchanged.
+        validator.validate(_minimal_envelope())
+        validator.validate(_minimal_v2_envelope())
+
+    def test_phase_enum_enforced(self, validator):
+        env = _minimal_envelope()
+        env["phase"] = "vibes"
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)
+
+    def test_baseline_tree_must_be_a_git_sha(self, validator):
+        env = _minimal_envelope()
+        env["discoveryBaselineTree"] = "not-a-sha"
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)
+        env["discoveryBaselineTree"] = "f" * 64  # SHA-256 repos
+        validator.validate(env)
+
+    def test_fix_verdicts_shape(self, validator):
+        env = _minimal_envelope()
+        env["phase"] = "remediation-review"
+        env["fixVerdicts"] = [
+            {"finding": "missing catch", "verdict": "fix-rejected"}
+        ]
+        validator.validate(env)
+
+    def test_fix_verdict_token_enum_enforced(self, validator):
+        env = _minimal_envelope()
+        env["fixVerdicts"] = [
+            {"finding": "missing catch", "verdict": "looks-fine"}
+        ]
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)
+
+    def test_fix_verdict_requires_both_keys(self, validator):
+        env = _minimal_envelope()
+        env["fixVerdicts"] = [{"verdict": "fix-accepted"}]
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)
+
+    def test_discovery_call_must_be_positive_int(self, validator):
+        env = _minimal_envelope()
+        env["issues"][0]["discoveryCall"] = 0
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)

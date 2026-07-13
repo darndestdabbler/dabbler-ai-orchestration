@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dabbler.ai/schemas/session-issues.schema.json",
   "title": "SessionIssues",
-  "description": "Root-level structured verifier-findings artifact for one findings-bearing verification round. Written beside sN-verification.md as sN-issues.json (round 1) or sN-issues-round-<M>.json (later findings-bearing retries). This artifact has no runtime reader in the orchestration layer; it is durable, machine-readable persistence of the verifier's structured issue list. The presence of an sN-issues*.json file means that verification round found issues — VERIFIED rounds get no file. schemaVersion 1 (Set 055) keeps category/severity/resolution_status as loose strings. schemaVersion 2 (Set 057) promotes four optional finding fields (issueId, issueType, verificationMethod, suggestedTestOrCheck) and enum-enforces resolution_status + issueType when present; the fields stay advisory in semantics (no runtime gate reads them) — the enum is a spelling-drift guard. v1 files remain valid unchanged. Set 096 adds the optional verifier-emitted failureScenario string to the base issue object (both versions; additive, tolerant parse). See docs/session-issues-schema.md.",
+  "description": "Root-level structured verifier-findings artifact for one findings-bearing verification round. Written beside sN-verification.md as sN-issues.json (round 1) or sN-issues-round-<M>.json (later findings-bearing retries). It is durable, machine-readable persistence of the verifier's structured issue list. The presence of an sN-issues*.json file means that verification round found issues — VERIFIED rounds get no file. schemaVersion 1 (Set 055) keeps category/severity/resolution_status as loose strings. schemaVersion 2 (Set 057) promotes four optional finding fields (issueId, issueType, verificationMethod, suggestedTestOrCheck) and enum-enforces resolution_status + issueType when present; the fields stay advisory in semantics (no runtime gate reads them) — the enum is a spelling-drift guard. v1 files remain valid unchanged. Set 096 adds the optional verifier-emitted failureScenario string to the base issue object (both versions; additive, tolerant parse), and Set 096 S2 adds the phased-loop machinery fields: optional envelope-level phase / discoveryBaselineTree / fixVerdicts (omit-null; the ledger assembler and the remediation-review fix-delta lookup read discoveryBaselineTree tolerantly) and the optional per-issue discoveryCall on fanned-out discovery rounds. See docs/session-issues-schema.md.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -34,10 +34,48 @@
       "minLength": 1
     },
     "issues": {
-      "description": "The verifier's structured issue list for this round. At least one issue is present (the file would not exist otherwise). Under schemaVersion 2 each item additionally validates against IssueV2 (enum-enforced resolution_status / issueType, plus the optional promoted finding fields).",
+      "description": "The verifier's structured issue list for this round. At least one issue is present (the file would not exist otherwise). On a fanned-out discovery round (Set 096 S2) this is the merged union of every completed call's findings. Under schemaVersion 2 each item additionally validates against IssueV2 (enum-enforced resolution_status / issueType, plus the optional promoted finding fields).",
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/Issue" }
+    },
+    "phase": {
+      "description": "Optional machinery field (Set 096 S2, omit-null): which verify_session --phase produced the round. Absent on classic (no --phase) rounds.",
+      "type": "string",
+      "enum": ["discovery", "supplementary", "remediation-review"]
+    },
+    "discoveryBaselineTree": {
+      "description": "Optional machinery field (Set 096 S2, omit-null): the git tree sha (40-hex SHA-1 or 64-hex SHA-256) of the working-tree snapshot a discovery-family round recorded; --phase remediation-review diffs its fix delta from the most recent prior envelope carrying this field. Never written by remediation-review rounds.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"
+    },
+    "fixVerdicts": {
+      "description": "Optional machinery field (Set 096 S2, omit-null): a remediation-review round's parsed per-finding fix verdicts. Observability only — blocking classification reads the re-stated Issue blocks, never this field.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["finding", "verdict"],
+        "properties": {
+          "finding": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "fix-accepted",
+              "fix-rejected",
+              "accepted-with-modification"
+            ]
+          },
+          "ledgerId": {
+            "description": "Optional (Set 096 S2 coverage): the ledger id (L1..Ln) the verdict line named; the CLI compares the parsed id set against the auto-ledger's numbered blocking findings exactly.",
+            "type": "string",
+            "pattern": "^L[0-9]+$"
+          }
+        }
+      }
     }
   },
   "allOf": [
@@ -76,6 +114,11 @@
           "description": "Optional verifier-emitted field (Set 096): the concrete failure scenario in which the finding's consequence materializes for a real user, with the probability justification the consequence-graded severity rubric requires. Parsed tolerantly from the 'Failure scenario:' line of an Issue block; its absence never changes blocking classification.",
           "type": "string",
           "minLength": 1
+        },
+        "discoveryCall": {
+          "description": "Optional machinery field (Set 096 S2): on a fanned-out discovery round, which fan-out call reported the finding (1 = the canonical round artifact; k>=2 = the -fanout-<k> sibling). Absent on single-call rounds.",
+          "type": "integer",
+          "minimum": 1
         },
         "resolution_status": {
           "description": "Advisory annotation: what the orchestrator did with this finding. Loose string under schemaVersion 1; enum-enforced under schemaVersion 2 (see IssueV2).",

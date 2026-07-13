@@ -116,8 +116,11 @@ top-level contract:
 | `schemaVersion` | integer | yes | `1` (Set 055 v1 contract) or `2` (Set 057 v2 contract). v1 keeps loose advisory strings; v2 enum-enforces `resolution_status` / `issueType` and recognizes the promoted finding fields. |
 | `sessionNumber` | integer ≥ 1 | yes | The session this round belongs to. |
 | `verificationRound` | integer ≥ 1 | yes | Round 1 → `sN-issues.json`; round M → `sN-issues-round-<M>.json`. |
-| `verificationVerdict` | string | yes | The verifier verdict, preserved verbatim (e.g. `"ISSUES_FOUND"`). Makes the artifact self-describing. |
-| `issues` | array (≥ 1) | yes | The structured findings. At least one — the file would not exist otherwise. |
+| `verificationVerdict` | string | yes | The verifier verdict, preserved verbatim (e.g. `"ISSUES_FOUND"`). Makes the artifact self-describing. On a fanned-out discovery round this is the MERGED token (`ISSUES_FOUND` when any call said so). |
+| `issues` | array (≥ 1) | yes | The structured findings. At least one — the file would not exist otherwise. On a fanned-out discovery round, the merged union of every completed call's findings. |
+| `phase` | string | no | machinery (Set 096, omit-null). Which `verify_session --phase` produced the round: `discovery`, `supplementary`, or `remediation-review`. Absent on classic (no `--phase`) rounds. Valid under both schema versions (tolerant readers). |
+| `discoveryBaselineTree` | string | no | machinery (Set 096, omit-null). The git tree sha of the working-tree snapshot taken by a discovery-family round; `--phase remediation-review` diffs its fix delta from the most recent prior envelope carrying this field. Never written by remediation-review rounds (so a second review cycle diffs from the original discovery baseline). |
+| `fixVerdicts` | array | no | machinery (Set 096, omit-null). A remediation-review round's parsed per-finding verdicts: `{"finding": string, "verdict": "fix-accepted" \| "fix-rejected" \| "accepted-with-modification", "ledgerId"?: "L<n>"}`. Observability only — blocking classification reads the re-stated Issue blocks, never this field. Present only on FINDINGS-BEARING rounds (the locked Set 055 invariant: envelope presence means issues found); on a clean remediation-review round the immutable, stamp-bound `sN-verification*.md` artifact is the durable record of the fix-verdict enumeration. |
 
 ### Issue objects
 
@@ -132,6 +135,7 @@ are tolerated (`additionalProperties` is open on the issue object).
 | `category` | string | no | verifier (loose) |
 | `severity` | string | no | verifier (loose) |
 | `failureScenario` | string | no | verifier (Set 096). The concrete failure scenario + probability justification the consequence-graded severity rubric requires per blocking Issue. Parsed tolerantly from the `Failure scenario:` line; valid under both schema versions; its absence never changes blocking classification (`classify_blocking` semantics unchanged). |
+| `discoveryCall` | integer ≥ 1 | no | machinery (Set 096). On a fanned-out discovery round, which fan-out call reported the finding (call 1 = the canonical round artifact; call k = the `-fanout-<k>` sibling). Absent on single-call rounds. |
 | `resolution_status` | string | no | orchestrator annotation (advisory). v1: loose. v2: enum-enforced **when present** (see below). |
 | `resolution_notes` | string | no | orchestrator annotation (advisory) |
 | `resolved_in_round` | integer ≥ 1 | no | orchestrator annotation (advisory) |

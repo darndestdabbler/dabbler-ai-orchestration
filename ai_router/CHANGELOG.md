@@ -3,14 +3,117 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased] — consequence-graded severity + cross-round ledger machinery (Set 096 S1)
+## [0.33.0] — Unreleased (Set 096 — consequence-graded severity + the phased verification loop)
 
 > Makes the Set 095 verification-churn fix durable and framework-level.
 > Evidence: Set 095's loop (17 non-converging rounds / 39 fresh Majors under
 > the ungraded prompt; VERIFIED on the first round graded by the operator's
-> consequence rubric, replicated). Publish stays operator-gated.
+> consequence rubric, replicated), the Set 096 S1 fan-out experiment
+> (same-model pairwise finding overlap Jaccard 0.13–0.31 → K=2 harvests
+> ~81% of the observable pool vs ~50% for one call), and the S2 convergence
+> replay (the frozen 095 corpus through the phased loop end-to-end: 4
+> rounds / $0.85 / VERIFIED with 6/6 fix verdicts accepted, vs the 095
+> baseline's 17 non-converging rounds / $4.88 — the set's falsifier).
+> The replay demonstrates the loop's SHAPE — bounded convergence, up-front
+> harvest, fix-delta scoping — on the remediated 095 corpus and its latent
+> findings; it is NOT a defect-for-defect A/B against the original
+> 39-Major workload (the memo's qualifications section states the
+> comparison's limits:
+> `docs/session-sets/096-consequence-graded-phased-verification/s2-convergence-replay.md`).
+> Publish stays operator-gated.
+
+### Added
+
+- **(Set 096 S2) The phased verification loop: `verify_session --phase
+  discovery | supplementary | remediation-review`.** Omitting `--phase`
+  keeps the classic single-call behavior byte-for-byte (compat); every
+  phase framing rides in the Original Task slot, so the canonical template
+  file — and the Set 084 F3 template pin — stay untouched.
+  - `--phase discovery` (INITIAL_DISCOVERY): exhaustive-enumeration
+    framing at ALL severities, fanned out `verification.discovery.fan_out`
+    ways (default 2, clamped to [1, 4]; the S1-measured sizing) with
+    byte-identical bundles and per-call stamps/artifacts (call 1 owns the
+    canonical round artifact; call k writes the `-fanout-<k>` sibling,
+    invisible to the round counter). Finding sets merge into ONE round
+    envelope (per-issue `discoveryCall`); the merged verdict token is
+    ISSUES_FOUND when any call said so; blocking classification runs on
+    the merged set. Sibling-call failures and truncations degrade LOUDLY
+    to a reduced fan-out (call 1 keeps the existing hard exits). The
+    round records a `discoveryBaselineTree` working-tree snapshot (tracked
+    + untracked, via a throwaway index) for the later fix-delta review.
+  - `--phase supplementary` (SUPPLEMENTARY_DISCOVERY, run BEFORE any
+    remediation when discovery found Critical/Major): a completeness-critic
+    pass over the SAME evidence, fed the prior rounds' findings with a
+    do-not-re-report instruction (prompt decorrelation — the S1-measured
+    default; it replaces the auto-ledger for this round, whose re-raise
+    framing would contradict it). With
+    `verification.discovery.provider_diversity: cross-provider`, the
+    round-1 verifier's provider (resolved from the metrics log via the
+    registry) is ALSO excluded as a *preference* — degrading loudly to the
+    base orchestrator-only exclusion when nothing survives, and failing
+    open on unresolvable round-1 identity.
+  - `--phase remediation-review`: the evidence is the FIX DELTA ONLY — a
+    tree-to-tree diff from the recorded discovery baseline to a fresh
+    working-tree snapshot (tree-to-tree so files added during remediation
+    appear with content instead of reading as deleted) — plus the
+    auto-assembled ledger. Per-finding verdicts `fix-accepted /
+    fix-rejected / accepted-with-modification` are requested by the
+    framing and parsed tolerantly (`verification.parse_fix_verdicts`,
+    observability-only — blocking still reads the re-stated Issue blocks)
+    into the envelope's `fixVerdicts`. New defects are admissible only
+    within the fix hunks; refusal (fail-closed) when no prior round
+    recorded a baseline.
+  - Phased rounds default to `complexity_hint=85` (an explicit
+    `--complexity-hint` always wins); phase-aware next-action text walks
+    the loop (supplementary before remediation; ≤2 remediation-review
+    cycles before operator adjudication).
+  - **Hardening from this session's own phased verification round**
+    (the loop dogfooding itself): the merged verdict fails CLOSED
+    (VERIFIED only when every call's token is exactly VERIFIED); a
+    blocking call whose findings do not parse synthesizes an
+    unknown-severity finding so the envelope (and the fix-delta
+    baseline) always exist; an explicit `fix-rejected` verdict is
+    blocking evidence even without a restated Issue block
+    (anti-laundering); **fix-verdict coverage is machine-checked** —
+    the auto-ledger numbers every blocking finding (`ledger id: L1..Ln`,
+    deterministic over the immutable envelopes), the framing requires
+    one `Fix verdict: L<n> ...` line per id, and a missing id (or an
+    id-less under-count) escalates an otherwise-clean round to blocking
+    instead of warning; phased evidence excludes the set's own loop
+    bookkeeping (`WORK_DIFF_SET_BOOKKEEPING`, disclosed — the fix delta
+    stays fixes-only and the classic path is untouched); a CLEAN
+    supplementary round patches the SESSION disposition ISSUES_FOUND
+    (exit 4) while prior discovery blockers stand — a fresh stamped
+    VERIFIED row from the critic pass can never settle a close over
+    unremediated Majors; and the remediation-review next-action
+    SUSPENDS to the operator at the 2-cycle bound instead of printing
+    another re-run command.
+- **(Set 096 S2) Config: `verification.discovery` block** in
+  `router-config.yaml` — `fan_out: 2`, `provider_diversity: same-model`,
+  seeded verbatim from the S1 experiment memo and documented inline;
+  `load_discovery_phase_config` fails open to those defaults on any
+  malformed value.
+- **(Set 096 S2) Envelope machinery fields** (omit-null, tolerant readers;
+  `schemaVersion` unchanged): envelope-level `phase`,
+  `discoveryBaselineTree`, `fixVerdicts`; per-issue `discoveryCall`.
+  `docs/session-issues.schema.json` + `docs/session-issues-schema.md`
+  extended in parity (L-066-1).
 
 ### Changed
+
+- **(Set 096 S2) Step 6/7 loop policy restructured around the phases.**
+  `docs/ai-led-session-workflow.md` Step 6 gained *The phased loop (Set
+  096)* — the default Full-tier procedure with bounded totals (≤2
+  discovery passes; ≤2 remediation-review cycles, then operator
+  adjudication); the Materiality discipline's ledger item now describes
+  the auto-assembled settlement-evidence ledger; Step 7's blocking flow
+  runs supplementary-before-remediation and reviews the fix delta. The
+  severity gate and the operator's round-cap authority are preserved
+  verbatim; the classic path keeps the max-2-automatic-rounds rule and
+  the Lightweight Mode-B loop keeps its 1–2 automatic / 3+ human bound.
+  Echo sweep (L-065-1): overview diagram, `docs/session-constitution.md`
+  Step 6/7 + Recovery bounded-round language,
+  `docs/verification-surface-strategy.md` Set-071 recap note.
 
 - **(Set 096) The verification template grades severity by EXPECTED
   CONSEQUENCE.** `ai_router/prompt-templates/verification.md`'s "Severity

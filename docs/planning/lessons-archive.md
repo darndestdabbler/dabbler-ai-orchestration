@@ -82,7 +82,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   the same rule.
 
 ## A Pure-Python Validator Mirroring A JSON Schema Drifts Looser — Type-Check Optional Fields And Guard Numeric Equivalence
-<!-- lesson: id="L-066-1" added-set="066" last-used-set="085" status="archived" scope="portable" -->
+<!-- lesson: id="L-066-1" added-set="066" last-used-set="096" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-16**
   after instrumental application across Sets 066, 069, and 070. The detailed

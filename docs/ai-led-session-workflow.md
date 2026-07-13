@@ -88,7 +88,9 @@ Orchestrator (Claude / Codex / Gemini)
   |     |   Set 068 routed-gate SKIP path is retired)
   |     |-- sends all work to a DIFFERENT AI provider
   |     |-- saves raw verifier output (never edited)
-  |     +-- fixes issues if found (max 2 retries)
+  |     +-- phased loop (Set 096): discovery (fan-out) -> supplementary
+  |         -> remediate once -> remediation-review on the fix delta
+  |         (bounded: <=2 discovery passes, <=2 review cycles)
   |
   |-- on last session: generates change-log.md (part of the same commit)
   |-- prints cost report
@@ -1529,13 +1531,72 @@ The canonical path is the first-class CLI:
 
 `verify_session` resolves the in-progress session number, assembles the
 evidence bundle (spec excerpt, `git status --short`, the complete diff, and
-the configured generated-bundle exclusions), fills
-`ai_router/prompt-templates/verification.md`, routes
+the configured generated-bundle exclusions), auto-assembles the cross-round
+issue ledger from prior rounds' `sN-issues*.json` + the orchestrator's
+`sN-remediation-round-<R>.md` settlement sidecars (Set 096 — settled vs
+unresolved split by settlement evidence, fail-closed), fills
+`ai_router/prompt-templates/verification.md` (which carries the
+consequence-graded severity rubric), routes
 `task_type="session-verification"` to a different provider, writes the raw
 `sN-verification*.md` artifact before printing, writes
 `sN-issues*.json` when the round bears findings, classifies blockingness with
 `is_blocking_verdict`, and patches `disposition.json` with
 `verification_method: "api"` plus the verifier's exact verdict token.
+
+#### The phased loop (Set 096) — the default Step 6/7 procedure
+
+Set 095 measured why the classic find→fix→re-verify loop churns: reviewers
+are **salience-limited, not context-limited** — each pass returns the most
+salient handful of technically-real findings, each fix reshuffles salience
+(17 non-converging rounds / 39 fresh Majors under the ungraded prompt), and
+~1/3 of later findings were defects in remediation-added content. The Set
+096 S1 fan-out experiment measured the fix at the finding level: K
+same-state discovery calls return largely **disjoint** finding sets
+(same-model pairwise Jaccard 0.13–0.31), so the harvest is fanned out up
+front and remediation is reviewed against the fix delta, where churn cannot
+compound. Run Step 6 as phases (`--phase`), not undifferentiated rounds:
+
+1. **`--phase discovery`** (INITIAL_DISCOVERY) — the exhaustive harvest:
+   all severities, coverage-over-salience framing, fanned out
+   `verification.discovery.fan_out` ways (default 2 — the S1-measured
+   sizing: ~81% of the observable finding pool vs ~50% for one call) with
+   byte-identical bundles, merged into ONE round envelope (per-issue
+   `discoveryCall`). The round records a `discoveryBaselineTree`
+   working-tree snapshot the later fix-delta review diffs from. The
+   severity rubric is unchanged — discovery raises coverage, never
+   severity.
+2. **`--phase supplementary`** (SUPPLEMENTARY_DISCOVERY) — **only when
+   discovery found Critical/Major, and BEFORE any remediation**: a
+   completeness-critic pass over the SAME evidence, fed the prior
+   findings with a do-not-re-report instruction (prompt decorrelation —
+   the S1-measured default). `verification.discovery.provider_diversity:
+   cross-provider` additionally *prefers* a third provider family for
+   this pass (a preference: it degrades loudly to the base
+   orchestrator-only exclusion when nothing survives). A clean discovery
+   round skips this phase entirely.
+3. **Remediate once, against the merged finding set** — every
+   Critical/Major from both passes, graded by the consequence rubric;
+   write the `sN-remediation-round-<R>.md` settlement sidecar(s). Minors
+   are recorded, never re-rounded.
+4. **`--phase remediation-review`** — the reviewer's evidence is the
+   **fix delta only** (a tree-to-tree diff from the discovery baseline to
+   the current working tree) plus the auto-assembled ledger; per-finding
+   verdicts `fix-accepted / fix-rejected / accepted-with-modification`;
+   **new defects are admissible only within the fix hunks** (out-of-delta
+   observations are NITS at most).
+
+**Bounded totals (routed `api` path):** at most **2 discovery passes**
+(the initial + one supplementary) and at most **2 remediation-review
+cycles**; past either bound the loop **suspends to the operator for
+adjudication** — it does not keep opening rounds. The severity gate is
+unchanged: only a Critical/Major (or unknown-severity) finding opens or
+continues any phase, a Minor-only result is effectively VERIFIED, and the
+operator's round-cap authority stands — persisting past an operator cap
+requires a material Critical/Major, nothing less. Invoking
+`verify_session` **without `--phase` keeps the classic single-call
+behavior** (compat), subject to the same severity gate and the classic
+max-2-automatic-rounds rule; the Lightweight Mode-B typed loop keeps its
+own 1–2 automatic / 3+ human bound.
 
 #### Identity, dynamic exclusion, the stamp, and the close backstop (Set 084)
 
@@ -1653,22 +1714,31 @@ item points here).
    merge-impact anchor in the templates (Major = *would change a reasonable
    reviewer's merge decision*) plus the plausible-path-to-harm escalation are what
    keep the demotion honest.
-3. **A round continues only on new or unresolved Critical/Major** — tracked by a
-   **cross-round issue ledger**. Each blocking finding is given a stable
-   `issueId`; each round, `reconcile_issue_ledger(prior_status, current_blocker_ids)`
-   marks prior blockers `RESOLVED` (absent now) or `UNRESOLVED` (still present) and
-   flags any **resurrection** — an id that was `RESOLVED` and reappears. **A
-   settled point is never re-opened under fresh wording:** the orchestrator gives a
-   rephrased-but-same point the **same** ledger id (so it is recognised as settled
-   and the resurrection is refused), while a genuinely new finding gets a new id
-   and faces the materiality gate on its own merits. The keying is on the stable
-   id, not free text, so the no-reopen rule is deterministic; recognising that two
-   differently-worded findings are the *same* point is the orchestrator's judgment.
-4. **The bounded-round bound is unchanged; this only narrows what counts as a
-   round-justifying finding.** The existing **1–2 automatic / 3+ human** rule still
-   holds (and a human-stop disposition or an unfixed Critical/Major still stops to
-   a human). Set 071 does not add rounds — it removes the *Minor-only* and
-   *resurrected-nit* rounds that should never have opened.
+3. **A round continues only on new or unresolved Critical/Major** — tracked by
+   the **cross-round issue ledger**, which is machinery since Set 096:
+   `verify_session` auto-assembles it from prior rounds' immutable
+   `sN-issues*.json` envelopes plus the orchestrator's
+   `sN-remediation-round-<R>.md` settlement sidecars and prepends it to the
+   prompt. **No-resurrection framing must be earned:** a prior finding renders
+   as SETTLED only with settlement evidence (a settling per-issue
+   `resolution_status`, or a non-empty remediation-note sidecar for the
+   round); everything else renders UNRESOLVED with an instruction to
+   re-evaluate it — re-raising an unsettled point is not resurrection, and
+   the ledger never suppresses an unremediated defect. **A settled point is
+   never re-opened under fresh wording.** (`reconcile_issue_ledger` remains
+   the id-keyed reconciliation helper for callers that track stable
+   `issueId`s across rounds; recognising that two differently-worded
+   findings are the *same* point is the orchestrator's judgment.)
+4. **Bounded totals (Set 096 restructure).** On the phased path the bound is
+   **≤2 discovery passes and ≤2 remediation-review cycles**, then the loop
+   **suspends to the operator for adjudication**; on the classic
+   (no `--phase`) path and the Lightweight Mode-B loop, the
+   **1–2 automatic / 3+ human** rule holds unchanged. A human-stop
+   disposition or an unfixed Critical/Major still stops to a human, and the
+   operator's round-cap authority stands. Set 071 removed the *Minor-only*
+   and *resurrected-nit* rounds that should never have opened; Set 096 moves
+   the harvest up front so remediation is reviewed once, against the fix
+   delta, where churn cannot compound.
 
 #### Lightweight tier — verification (per-set; two modes)
 
@@ -2142,9 +2212,18 @@ remediation round. Only a **Critical/Major** (or unknown-severity) finding makes
 the branch below apply.
 
 **ISSUES_FOUND (blocking):**
-1. Parse issues from the verifier's response.
-2. Fix each issue. Update status to "fixed" or "deferred".
-3. Record the findings and what happened to them in the current
+1. **Complete the harvest before touching anything** (phased path): when
+   the blocking round was `--phase discovery`, run `--phase supplementary`
+   FIRST — before any remediation — so the fix set is planned once,
+   against the merged findings, and later review scopes to one fix delta.
+2. Parse issues from the verifier's response (`verify_session` already
+   merged and persisted them to `sN-issues*.json`).
+3. Fix each Critical/Major. Update status to "fixed" or "deferred", and
+   write the `sN-remediation-round-<R>.md` settlement sidecar — the
+   auto-assembled ledger treats a status-less finding as settled only
+   when the round has a non-empty sidecar. Minors are recorded, never
+   re-rounded.
+4. Record the findings and what happened to them in the current
   session's root artifacts. At minimum, keep the raw verifier output in
   `sN-verification*.md` and summarize fixed vs deferred items in
   `sN-close-reason.md` and `disposition.json`. Persist the structured
@@ -2156,11 +2235,16 @@ the branch below apply.
   prose in `sN-verification*.md` and `sN-close-reason.md` remains the
   canonical record. There is no required `issue-logs/` directory in the
   current workflow.
-4. Re-run verification (max 2 retries) — **only when the round is blocking**
-   (≥1 Critical/Major; a Minor-only round is not re-run). Track each blocking
-   finding in the cross-round issue ledger so a settled point is not resurrected
-   under fresh wording (see *Materiality and the re-verify loop discipline* under
-   Step 6). Use `complexity_hint=85` if any issue is Major or Critical.
+5. Re-verify — **only when the round is blocking** (≥1 Critical/Major; a
+   Minor-only round is not re-run). On the phased path this is
+   `--phase remediation-review` (the fix delta + the auto-assembled
+   ledger; **at most 2 cycles**, then operator adjudication). On the
+   classic path, a plain re-run (max 2 automatic rounds). The
+   auto-assembled ledger keeps a settled point from being resurrected
+   under fresh wording (see *Materiality and the re-verify loop
+   discipline* under Step 6). Phased rounds default to
+   `complexity_hint=85`; pass it explicitly on a classic re-verify after
+   Critical/Major fixes.
 
 #### Disagreement With A Verifier Finding
 

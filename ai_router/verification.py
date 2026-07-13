@@ -342,6 +342,60 @@ def parse_verification_response(response: str) -> tuple[str, list]:
     return verdict, issues
 
 
+FIX_VERDICT_TOKENS = (
+    "fix-accepted",
+    "fix-rejected",
+    "accepted-with-modification",
+)
+
+# A per-finding fix verdict line, as the remediation-review phase framing
+# prescribes it: ``- Fix verdict: <finding> -- fix-accepted``. Tolerant of
+# bullet/emphasis markers and separator drift, like the Issue grammar above.
+_FIX_VERDICT_RE = re.compile(
+    r'^[ \t]*[-*>#]*[ \t]*\*{0,2}Fix[\s_-]*verdict\*{0,2}[ \t]*[:.\-]*[ \t]*'
+    r'(?P<finding>.*?)[ \t]*[-:–—]*[ \t]*'
+    r'\**(?P<verdict>fix-accepted|fix-rejected|accepted-with-modification)\**'
+    r'[ \t]*\.?[ \t]*$',
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def parse_fix_verdicts(response: str) -> list:
+    """Extract per-finding fix verdicts from a REMEDIATION-REVIEW response.
+
+    **Additive and observability-only** (Set 096, the same contract as
+    :func:`parse_nits`): the phased loop's remediation-review framing asks the
+    verifier for one ``Fix verdict: <finding> -- fix-accepted | fix-rejected |
+    accepted-with-modification`` line per prior blocking finding. This helper
+    reads those lines for logging and the findings envelope; it never touches
+    the ``(verdict, issues)`` contract or the blocking decision — a
+    ``fix-rejected`` finding blocks because the framing requires it to be
+    re-stated as a severity-bearing Issue block, which the normal parser and
+    :func:`classify_blocking` already handle.
+
+    Returns a list of ``{"finding": str, "verdict": str}`` dicts (verdict
+    lower-cased, one of :data:`FIX_VERDICT_TOKENS`), empty when no line
+    matches.
+    """
+    if not response:
+        return []
+    verdicts: list = []
+    for match in _FIX_VERDICT_RE.finditer(response):
+        finding = match.group("finding").strip().strip("*`").strip()
+        entry = {
+            "finding": finding or "(unnamed finding)",
+            "verdict": match.group("verdict").lower(),
+        }
+        # Set 096 S2 coverage: the remediation-review framing prescribes a
+        # leading ledger id (``Fix verdict: L3 ...``); captured when present
+        # so the CLI can compare coverage against the ledger's id set.
+        lid = re.match(r"^\(?\s*(?P<lid>L\d+)\)?\b", finding)
+        if lid:
+            entry["ledgerId"] = lid.group("lid")
+        verdicts.append(entry)
+    return verdicts
+
+
 def parse_nits(response: str) -> list:
     """Extract the non-blocking NITS observations from a verifier response.
 

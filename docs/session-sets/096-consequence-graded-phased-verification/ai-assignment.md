@@ -67,3 +67,68 @@ well-defined CLI code + tests + policy-doc restructure + replay; anthropic
 orchestration keeps the openai/google verification pool free; Fable-5-class
 capability unnecessary for the settled design). Runner-up:
 claude-opus-4-8 / medium.
+
+## Session 2 of 2 — Phased loop in verify_session, policy docs, release prep
+
+Orchestrator: **claude / anthropic / claude-fable-5 / operator-invoked**
+(deviation from the routed sonnet-5/medium recommendation above — operator
+invocation stands, recorded per the 094/095 precedent).
+
+Design variance stays LOW: the phase semantics are operator-directed in
+the spec, the fan-out sizing and provider-diversity defaults are fixed by
+S1's measured experiment memo, and compat (`--phase` omitted = today's
+behavior) is spec-mandated. Implementation is deterministic downstream of
+settled rulings; the reasoned-output steps route.
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read S1's experiment memo + shipped state (verify_session, verification parser, template v3, config, workflow doc Step 6/7). | Orchestrator direct — read-only reconnaissance over named anchors. |
+| 2 | `--phase discovery` / `supplementary` / `remediation-review` modes in `verify_session`; default invocation unchanged (compat). | Orchestrator direct — CLI code prescribed by the spec + S1 memo; covered by unit tests + the routed session verification. |
+| 3 | Loop policy rewrite: workflow doc Step 6/7 restructured around the phases with bounded totals; constitution Step 6/7 pointers + bounded-round language echo-swept (L-065-1). | Orchestrator direct for the mechanical restructure — the policy CONTENT is operator-set (spec step 3 preserves the severity gate and round-cap authority verbatim); routed session verification reviews the result. |
+| 4 | Config: `verification.discovery.fan_out: 2`, `provider_diversity: same-model` under `verification:` (values verbatim from S1's memo), documented inline. | Orchestrator direct — mechanical seeding of measured values. |
+| 5 | Convergence replay: the frozen 095 corpus (worktree @ `b16dd58`, `--diff-base 34d4149`) through the phased loop end-to-end once; rounds/cost vs the 095 baseline recorded in the change-log. | Mechanics orchestrator direct; the replay's discovery/supplementary/remediation-review calls **routed — session-verification** (the subject IS the routed verifier behavior, no stamp/session_set — 096 S1 precedent). |
+| 6 | Tests (phase framings, fan-out merge/dedupe, config plumb-through, compat). | Orchestrator direct — contract-driven test updates (093/094 precedent). |
+| 7 | CHANGELOG + `dabbler-ai-router` version bump (publish operator-gated); build + full suite. | Orchestrator direct — executable validation. |
+| 8 | Mandatory cross-provider session verification (dogfoods the phased loop). | Routed — session verification, excluding the Anthropic orchestrator provider. |
+| 9 | End-of-set: change-log.md, Step 9 review, advisory path-aware critique, next-set recommendation. | Critique **routed — path-aware pull surface** (>=2 providers); next-set recommendation **routed — analysis**, saved raw at `s2-next-set-analysis.json`. |
+
+### Actuals (filled at close)
+
+- Orchestrator used: claude / anthropic / claude-fable-5 (operator-invoked;
+  deviation from the routed sonnet-5/medium recommendation, recorded above).
+- Routed calls: convergence replay 6 calls ($0.846: discovery K=2 + 
+  supplementary + 2 remediation-review cycles on the scratch 096-s2-replay
+  set — isolated stamps, can never corroborate this close); session
+  verification 5 calls ($1.15: discovery K=2 $0.64, supplementary $0.34,
+  remediation-review cycles $0.09 + $0.08); next-set analysis $0.004
+  (gemini-pro); plus the close backstop's deciding round and the advisory
+  path-aware critique at close. Session routed total before close ≈ **$2.00**.
+- Verification loop story (the phased loop dogfooding itself): discovery
+  K=2 harvested 9 blocking findings (largely disjoint call sets — the S1
+  overlap result reproduced on a code corpus); supplementary added 1 new
+  (the unparseable-findings deadlock) with zero re-reports; ALL findings
+  were real defects in this session's own new machinery, remediated with
+  17 new tests + 5 more for the ledger-id coverage enforcement; cycle 2
+  accepted 10/11 and held the partial-coverage point, the CLI SUSPENDED
+  the loop at the bound per its own shipped policy, and the held point was
+  then fixed deterministically (ledger-id coverage) rather than
+  adjudicated. No third cycle was opened; the deciding round is the
+  sanctioned Set 084 close backstop (S1 precedent).
+- Deviations from recommendation: orchestrator model (operator invocation
+  stands). The routed next-set analysis (below) emitted stale Anthropic
+  model ids (claude-3-haiku/sonnet-2024xx) — recommendation recorded with
+  the orchestrator's correction to current-generation equivalents (the
+  two-layer pass, S1 precedent).
+
+## Next set — routed recommendation
+
+Routed analysis (raw: `s2-next-set-analysis.json`, gemini-pro, $0.004):
+ranking **1) 095-patch** (apply the loop-VERIFIED `s2-replay-fix.patch`
+to the shipped walkthrough — quickest win, evidence already exists),
+**2) 077-redo** (unblocks the 077 release gates), 3) the operator-gated
+publish pass (router 0.31.0–0.33.0 + ext 0.42.0), 4) the authored
+Explorer follow-on sets. Recommended orchestrator for 095-patch:
+anthropic-family, **lowest tier, low effort** (the routed answer named
+stale model ids; current equivalents: claude-haiku-4-5 low, runner-up
+claude-sonnet-5 low — a pre-verified procedural patch application needs
+no more).

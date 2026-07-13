@@ -57,18 +57,20 @@ Run every router CLI through the workspace venv
   documentation, test generation); own the mechanics (file edits,
   shell, git, and mechanical single-file edits under ~50 lines).
 - **5. Build + test.** Run the repo's suite; log the result.
-- **6. Verify (mandatory, every Full-tier session).** Run
-  `python -m ai_router.verify_session` for the set. It routes the
-  session evidence to a **different-provider** verifier and writes the
-  raw round artifacts. There is no skip — verification is
-  machine-enforced at close, and running `verify_session` yourself is
-  the sanctioned way to iterate before that enforcement fires.
+- **6. Verify (mandatory, every Full-tier session).** Run the phased
+  loop: `python -m ai_router.verify_session --phase discovery` for the
+  set (fan-out sized by config; all severities). It routes the evidence
+  to a **different-provider** verifier and writes the raw round
+  artifacts. There is no skip — verification is machine-enforced at
+  close, and running `verify_session` yourself is the sanctioned way to
+  iterate before that enforcement fires.
 - **7. Handle the verdict by blocking-ness, not the bare token.** Only
-  a Critical/Major (or unknown-severity) finding opens a remediation
-  round; a Minor-only round is effectively VERIFIED — record the nits
-  and proceed. Fix blockers, re-verify narrowly, and follow the
-  bounded-round and no-resurrection rules under *Recovery and
-  escalation* below.
+  a Critical/Major (or unknown-severity) finding continues the loop; a
+  Minor-only round is effectively VERIFIED — record the nits and
+  proceed. On a blocking discovery round: run `--phase supplementary`
+  BEFORE remediating, fix the merged blockers once (write the per-round
+  remediation sidecar), then `--phase remediation-review` on the fix
+  delta. Bounds and no-resurrection: *Recovery and escalation* below.
 - **8. Close.** Author `disposition.json`
   (`verification_verdict` always; `next_orchestrator` on a mid-set
   completion), commit **and push**, run
@@ -154,9 +156,11 @@ Human-only, every time; never consensus-eligible, never self-authorized:
   failures, drift repair, the local-only path for deliberately
   remote-less repos). Missing `disposition.json` fields are the usual
   first-attempt cause.
-- **Blocking findings** → fix and re-verify narrowly. **Automatic rounds
-  are hard-capped at two.** Past the cap the loop **suspends** — it does
-  not keep opening rounds:
+- **Blocking findings** → complete the harvest, fix once, review the fix
+  delta. **Bounded totals: at most 2 discovery passes and 2
+  remediation-review cycles** (classic no-`--phase` path: 2 automatic
+  rounds). Past a bound the loop **suspends** — it does not keep opening
+  rounds:
   - **No Critical/Major after the cap** (only Minor, or *unrated*/
     unknown-severity nits remain) → treat as **Minor-only / effectively
     VERIFIED**, record the residual as adjudicated-minor, and stop.
@@ -169,8 +173,9 @@ Human-only, every time; never consensus-eligible, never self-authorized:
     disputes** → stop to the human: either get a **third-provider
     opinion** or have the **operator adjudicate**. Never re-round a
     disputed finding.
-  A settled point never reopens under fresh wording — track findings in
-  the cross-round issue ledger.
+  A settled point never reopens under fresh wording — the auto-assembled
+  cross-round ledger carries settled vs unresolved; a remediated round
+  earns settlement via its remediation-note sidecar.
 - **Disagreement with a finding** → verifiers flag, humans adjudicate.
   Present the exact finding, the dismissal reason, the context the
   verifier saw, and a self-assessment; the human picks accept / dismiss

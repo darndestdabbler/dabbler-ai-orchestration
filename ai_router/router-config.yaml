@@ -691,6 +691,29 @@ escalation:
 verification:
   enabled: true
 
+  # --- Phased verification loop (Set 096) ---
+  # Sizes verify_session's --phase machinery. Values are the Set 096 S1
+  # fan-out experiment's measured recommendation
+  # (docs/session-sets/096-consequence-graded-phased-verification/
+  # s1-fanout-experiment.md): same-model pairwise finding overlap on a
+  # frozen artifact state measured Jaccard 0.13-0.31, so K=2 identical-
+  # bundle discovery calls harvest ~81% (mean) of the observable finding
+  # pool vs ~50% for one call; the third call added one finding (+$0.25)
+  # and the cross-provider call added zero, so provider diversity is a
+  # PREFERENCE knob for the supplementary pass, not a hard rule. Both
+  # values are operator-tunable; verify_session clamps fan_out to [1, 4]
+  # and falls back to these defaults on a malformed value.
+  discovery:
+    fan_out: 2                       # K same-model discovery calls, identical bundles
+    provider_diversity: same-model   # same-model | cross-provider
+                                     # same-model: the supplementary pass decorrelates by
+                                     #   prompt (completeness-critic framing) on the same
+                                     #   verifier pool -- the measured-better harvest.
+                                     # cross-provider: the supplementary pass ALSO excludes
+                                     #   the round-1 verifier's provider, preferring a third
+                                     #   family when one exists (degrades loudly to the base
+                                     #   orchestrator-only exclusion when none survives).
+
   # --- Per-session routed-verification gate (Set 068 S6) — RETIRED (Set 083)
   # The routed_gate CLI is kept only so pre-083 scaffolds keep working; it now
   # always answers REQUIRED (exit 0) and its predicate is informational. The

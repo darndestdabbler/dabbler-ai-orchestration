@@ -1,0 +1,6 @@
+{
+  "model": "gemini-pro",
+  "cost_usd": 0.00426125,
+  "truncated": false,
+  "content": "```json\n{\n  \"next_set_ranking\": [\n    {\n      \"set\": \"095-patch\",\n      \"rationale\": \"Quickest win; delivers verified fixes to shipped docs with near-zero effort, clearing the way for larger tasks.\"\n    },\n    {\n      \"set\": \"077-redo\",\n      \"rationale\": \"High priority; unblocks the 077 release gate. Well-defined docs/UAT work with low design risk.\"\n    },\n    {\n      \"set\": \"PyPI/Marketplace publish pass\",\n      \"rationale\": \"Ships significant accumulated value (router, ext). Logical step after clearing immediate blockers.\"\n    },\n    {\n      \"set\": \"Locator/scope-check and physical-moves\",\n      \"rationale\": \"New feature work; can proceed once blockers and pending releases are cleared.\"\n    }\n  ],\n  \"recommended_orchestrator\": {\n    \"engine\": \"session\",\n    \"provider\": \"anthropic\",\n    \"model\": \"claude-3-haiku-20240307\",\n    \"effort\": \"low\",\n    \"rationale\": \"Set 095-patch is a pre-verified, procedural task. Haiku provides the lowest cost and latency for this low-complexity operation.\"\n  },\n  \"runner_up\": {\n    \"model\": \"claude-3-sonnet-20240229\",\n    \"effort\": \"low\"\n  }\n}\n```"
+}

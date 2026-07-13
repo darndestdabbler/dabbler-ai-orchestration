@@ -204,6 +204,14 @@
       "dateTime": "2026-07-13T03:36:49.974013-04:00",
       "description": "Round 12 (post-removal, adjudication conventions): VERIFIED, zero findings, $0.38. Disposition finalized completed/VERIFIED. Proceeding to close (no metrics writes after the settling round).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 16,
+      "stepKey": "step9-reorganization-review",
+      "dateTime": "2026-07-13T03:38:11.905520-04:00",
+      "description": "Step 9 review of project-guidance.md / lessons-learned.md (post-notify). Proposals for the operator (no unilateral guidance edits): (1) L-095-1 archival at next triage per the spec end-of-set deliverable -- the consequence rubric is now encoded in template v3 and the phased loop, so the active-tier copy is redundancy (pointer: encoded-in-template). (2) New lesson candidate: a verifier grading spec-level claims needs the deliverable objective/consumer context in the conventions block (this session: two Majors withdrawn the moment the operator context arrived -- a context gap, not a rubric failure); pairs with the pending Set-085 spec-prose-fidelity follow-up (this session round 8: spec phrase raised output budget was unimplementable-as-stated). (3) Code follow-up candidate: close_backstop evidence collector should exclude adjudication records from the latest-attempt anti-rollback comparison; and record_adjudication for session-verification disputes should use a distinct task_type. (4) Process observation for the authoring guide: hardening brand-new machinery mid-session invites a salience treadmill -- prefer landing the mechanism and letting the NEXT set harden it (this session: rounds 9-11 each found the next-order gap in hours-old code; resolved by operator-directed removal). No changes to preload files made; ceilings unchanged.",
+      "status": "complete"
     }
   ]
 }

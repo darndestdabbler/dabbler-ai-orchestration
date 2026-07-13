@@ -89,6 +89,16 @@ export interface RowPayload {
   // unique-name path visually unchanged.
   duplicateNameBadge: string;
   duplicateNameTooltip: string;
+  // Set 100 Session 1: the kind-aware row badge (verdict: "a
+  // `kind: plan|decomposition` set row gets a small distinguishing
+  // icon/badge and keeps normal row behavior — no new node types, no
+  // new states, presentation only"). `kindBadge` is the validated
+  // `SessionSet.kind` value verbatim ("plan" / "decomposition") or ""
+  // on every ordinary work set — the same empty-means-absent contract
+  // as the markers above; `kindTooltip` explains what the lifecycle
+  // set is for. The webview renders a quiet chip after the row name.
+  kindBadge: string;
+  kindTooltip: string;
   // Set 034: the per-row orchestrator-tracking accordion is retired.
   // These fields remain on the protocol so older host/webview pairings
   // stay structurally compatible, but the host always emits null and
@@ -127,36 +137,18 @@ export interface ModulePayload {
     | { code: "unstamped-sets" }
     | { code: "undeclared-slug"; rawSlug: string }
     | null;
-  // Set 093 Session 1 (verdict amendment 4): the two PERSISTENT semantic
-  // child nodes every module row always renders — the tree is the
-  // checklist. Both are pure derivations of (plan presence, set count)
-  // via `deriveModuleChildren`; the routed architecture ruling
-  // (s1-child-nodes-architecture.json) settled that ALL three kinds emit
-  // both children with no exemption.
-  //   - `plan`: the Plan node's state. "present"/"missing" from
-  //     `module.planPath` existence (a host filesystem check). A
-  //     `fallback` group has no `planPath` (null) and is therefore
-  //     ALWAYS "missing" — a fallback's plan is absent-pending-declaration,
-  //     stated loudly while the undeclared-slug warning owns remediation.
-  //   - `sessionSets`: the Session sets node's state. "bucketed" whenever
-  //     the module holds >= 1 set (the status buckets nest UNDER this
-  //     node — buckets never REPLACE the checklist); "empty" when it holds
-  //     none but a plan is present; "blocked-until-plan" when it holds
-  //     none AND no plan exists. Set count wins over plan presence: real
-  //     work is never hidden behind a blocked state (the missing plan
-  //     surfaces on the Plan node, orthogonally).
-  // REQUIRED (Round 4 structural fix): both producers — the shipping
-  // `buildVisibleModulePayloads` and the test-only legacy
-  // `buildModulePayloads` — always emit these, so a type-valid payload
-  // can NEVER omit them. Making them required eliminates at the type
-  // level the never-hide-work vector a prior optional shape carried (a
-  // fields-less legacy payload degrading to a leaf that dropped its
-  // buckets). The webview additionally renders "bucketed" whenever any
-  // bucket actually carries rows (count OR rows.length), so even an
-  // inconsistent `sessionSets` can never hide existing session sets —
-  // defense in depth on top of the type-level guarantee.
-  plan: "present" | "missing";
-  sessionSets: "blocked-until-plan" | "empty" | "bucketed";
+  // Set 100 Session 1: the 093-era `plan` / `sessionSets` child-state
+  // fields are RETIRED with the persistent `Plan` / `Session sets`
+  // semantic child nodes they drove — with plan and decomposition living
+  // as kind-typed session sets (Set 098), the checklist IS the bucket
+  // content, so the status buckets nest directly under the module row
+  // (module aria-level 1, bucket 2, row 3). The `blocked-until-plan`
+  // state retired with them: the scaffolded decomposition set's
+  // prerequisite blocked-marker (existing Set 061 machinery, pre-linked
+  // by Set 098's template) carries that signal on the row itself. The
+  // never-hide-work guarantee now rests entirely on the webview's
+  // TERMINAL row-rendering gate (renderBucket decides emptiness from the
+  // actual rows array, never the display count).
   buckets: BucketPayload[];
 }
 

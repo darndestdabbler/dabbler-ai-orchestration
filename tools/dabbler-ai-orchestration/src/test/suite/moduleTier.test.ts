@@ -14,10 +14,11 @@
 // groupByModule's single-implicit-group contract is pinned here; the
 // SHIPPING renderer no longer uses it (Set 092 switched to
 // computeVisibleModules / buildVisibleModulePayloads and deleted the
-// pre-087 implicit-only bucket dialect). Set 093 S1 then inserted the
-// persistent Plan / Session sets child level, so the shipping tree is
-// module 1 / Plan & Session sets 2 / bucket 3 / row 4 (asserted by the
-// 4-level source scan below and the Layer 3 smokes).
+// pre-087 implicit-only bucket dialect). Set 093 S1 inserted the
+// persistent Plan / Session sets child level; Set 100 S1 removed it
+// again (plan/decomposition live as kind-typed sets now), so the
+// shipping tree is module 1 / bucket 2 / row 3 (asserted by the
+// 3-level source scan below and the Layer 3 smokes).
 
 import * as assert from "assert";
 import * as fs from "fs";
@@ -295,6 +296,8 @@ suite("Set 087 S2 — buildModulePayloads payload shape (Layer 2 fixture)", () =
       verificationTooltip: "",
       duplicateNameBadge: "",
       duplicateNameTooltip: "",
+      kindBadge: "",
+      kindTooltip: "",
       accordionHtml: null,
       accordionUpdatedAt: null,
     };
@@ -528,7 +531,7 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     );
   });
 
-  test("webview renders one conformant 4-level ARIA dialect (Set 093 S1)", () => {
+  test("webview renders one conformant 3-level ARIA dialect (Set 100 S1)", () => {
     const client = fs.readFileSync(
       path.join(extRoot, "media", "session-sets-tree", "client.js"),
       "utf8",
@@ -546,74 +549,44 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
       client.includes('\'<div role="treeitem" tabindex="-1" aria-level="1"\''),
       "the module node itself is a treeitem at level 1",
     );
-    // Set 093 S1: the two PERSISTENT semantic child nodes (Plan / Session
-    // sets) render at aria-level 2 as a fixed pair (aria-setsize=2);
-    // buckets nest UNDER Session sets at level 3, rows at level 4.
-    assert.ok(client.includes("function renderPlanNode(mod, moduleKey)"));
-    assert.ok(client.includes("function renderSessionSetsNode(mod, moduleKey)"));
-    assert.ok(client.includes('data-module-child="plan"'));
-    assert.ok(client.includes('data-module-child="session-sets"'));
-    assert.ok(client.includes('data-plan-state="'));
-    assert.ok(client.includes('data-session-sets-state="'));
+    // Set 100 S1: the 093-era persistent Plan / Session sets child nodes
+    // are GONE — buckets are the module's direct children at level 2,
+    // rows at level 3. The retired render functions, data hooks, and the
+    // "<module>/sessionsets" collapse key must not survive.
+    assert.ok(!client.includes("renderPlanNode"));
+    assert.ok(!client.includes("renderSessionSetsNode"));
+    assert.ok(!client.includes("data-module-child"));
+    assert.ok(!client.includes("data-plan-state"));
+    assert.ok(!client.includes("data-session-sets-state"));
+    assert.ok(!client.includes('moduleKey + "/sessionsets"'));
+    assert.ok(!client.includes("child-body"));
     assert.ok(
       client.includes('\'<div role="treeitem" tabindex="-1" aria-level="2"\''),
-      "the Plan / Session sets child nodes are treeitems at level 2",
+      "the bucket node itself is a treeitem at level 2 under the module",
     );
-    assert.ok(
-      client.includes('aria-setsize="2" aria-posinset="1"'),
-      "the Plan node declares its fixed-pair position (posinset 1 of 2)",
-    );
-    assert.ok(
-      client.includes('aria-setsize="2" aria-posinset="2"'),
-      "the Session sets node declares its fixed-pair position (posinset 2 of 2)",
-    );
-    assert.ok(
-      client.includes('\'<div role="treeitem" tabindex="-1" aria-level="3"\''),
-      "the bucket node itself is a treeitem at level 3 under Session sets",
-    );
-    // The Session sets node collapse rides the shared bucketCollapsed map
-    // under a "<module>/sessionsets" key so toggleCollapsible needs no new
-    // wiring, and its buckets live in a nested child-body group.
-    assert.ok(client.includes('moduleKey + "/sessionsets"'));
     assert.ok(client.includes('class="module-body" role="group"'));
-    assert.ok(client.includes('class="child-body" role="group"'));
     assert.ok(client.includes('class="bucket-body" role="group"'));
-    assert.ok(client.includes("renderRow(row, 4)"));
+    assert.ok(client.includes("renderRow(row, 3)"));
+    assert.ok(
+      !client.includes("renderRow(row, 4)"),
+      "no row renders at the retired level 4",
+    );
     assert.ok(client.includes('data-testid="work-explorer-tree"'));
+    // Set 100 S1: the kind-aware row badge renders as a quiet chip after
+    // the row name, carrying the kind verbatim + its tooltip.
+    assert.ok(client.includes('class="row-kind-badge row-kind-badge-'));
+    assert.ok(client.includes("row.kindBadge"));
+    assert.ok(client.includes("row.kindTooltip"));
     // Keyboard operability: shared toggler wired to Enter/Space and
-    // ArrowRight/ArrowLeft; arrow navigation walks visible nodes only. The
-    // Session sets collapsible header joins the module/bucket toggler set.
+    // ArrowRight/ArrowLeft; arrow navigation walks visible nodes only.
     assert.ok(client.includes("function toggleCollapsible(nodeEl"));
     assert.ok(client.includes("toggleCollapsible(item, true)"));
     assert.ok(client.includes("toggleCollapsible(item, false)"));
     assert.ok(client.includes("function visibleTreeItems()"));
-    assert.ok(
-      client.includes('.child-header[data-collapsible="true"]'),
-      "the Session sets header is wired into the collapse toggler set",
-    );
-    // Set 093 S1 (Round 3 Major fix): the Session sets node NEVER hides
-    // work — it renders "bucketed" whenever any bucket carries rows,
-    // regardless of the optional `sessionSets` field. A type-valid legacy
-    // payload that omits the field but carries rows must not degrade to a
-    // leaf that drops those rows from the tree.
-    assert.ok(
-      client.includes("const hasRows = (mod.buckets || []).some("),
-      "renderSessionSetsNode must compute hasRows from the buckets",
-    );
-    // The guard consults BOTH bucket representations — count OR rows.length
-    // — so a payload with a stale/zero count but populated rows still
-    // renders its work (Round 4 fix).
-    assert.ok(
-      client.includes("b.count > 0 || (Array.isArray(b.rows) && b.rows.length > 0)"),
-      "hasRows must consult both count and rows.length",
-    );
-    assert.ok(
-      client.includes('mod.sessionSets === "bucketed" || hasRows'),
-      "the Session sets node renders bucketed whenever rows exist (never hide work)",
-    );
-    // The TERMINAL row-rendering gate (renderBucket) decides emptiness from
-    // the rows array, not the display count, so a stale/zero count can
-    // never drop populated rows (Round 5 fix).
+    // NEVER HIDE WORK: with the Session sets node gone, the guarantee
+    // rests entirely on the TERMINAL row-rendering gate (renderBucket) —
+    // emptiness is decided from the actual rows array, never the display
+    // count, so a stale/zero count can never drop populated rows.
     assert.ok(
       client.includes("const rowCount = Array.isArray(bucket.rows) ? bucket.rows.length : 0"),
       "renderBucket must measure emptiness from bucket.rows, not count",
@@ -631,9 +604,10 @@ suite("Set 087 S2 — module tier payload + rendering source scans", () => {
     );
     assert.ok(css.includes(".module-header"));
     assert.ok(css.includes('.module[aria-expanded="false"] .module-body'));
-    // Set 093 S1: the persistent child nodes ship their own style +
-    // collapse affordance (Session sets body hidden when collapsed).
-    assert.ok(css.includes(".child-header"));
-    assert.ok(css.includes('.module-session-sets[aria-expanded="false"] .child-body'));
+    // Set 100 S1: the persistent child-node styles retired with the
+    // nodes; the kind badge chip ships instead.
+    assert.ok(!css.includes(".child-header"));
+    assert.ok(!css.includes(".module-session-sets"));
+    assert.ok(css.includes(".row-kind-badge"));
   });
 });

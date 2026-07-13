@@ -5,10 +5,11 @@
 //   - one collapsible module group per manifest module (manifest file
 //     order), the unlabeled implicit module last with the quiet
 //     "(ungrouped)" fallback label (routed ruling Q1);
-//   - the 4-level ARIA contract (Set 093 S1): module aria-level=1, the
-//     persistent Plan / Session sets child nodes aria-level=2, bucket
-//     aria-level=3, row aria-level=4 — the persistent children inserted a
-//     level above the Set 092 three-level tree;
+//   - the 3-level ARIA contract (Set 100 S1): module aria-level=1,
+//     bucket aria-level=2, row aria-level=3 — the 093-era persistent
+//     Plan / Session sets child level is retired (plan/decomposition
+//     live as kind-typed session sets now);
+//   - kind-aware rows: a `kind: plan` set renders the quiet kind chip;
 //   - per-(module, bucket) composite collapse keys (ruling Q4);
 //   - rows grouped under their own module;
 //   - module-header click collapses the whole group.
@@ -87,6 +88,20 @@ function stampModule(h: FixtureHandle, moduleSlug: string): void {
   fs.writeFileSync(specPath, patched, "utf8");
 }
 
+// Set 100 S1: stamp `kind: <kind>` the same way, for the kind-chip pin.
+function stampKind(h: FixtureHandle, kind: string): void {
+  const specPath = path.join(h.set_dir, "spec.md");
+  const spec = fs.readFileSync(specPath, "utf8");
+  const patched = spec.replace(
+    /requiresE2E: false(\r?\n)/,
+    (_m, eol: string) => `requiresE2E: false${eol}kind: ${kind}${eol}`,
+  );
+  if (patched === spec) {
+    throw new Error(`could not stamp kind: into ${specPath}`);
+  }
+  fs.writeFileSync(specPath, patched, "utf8");
+}
+
 test("multi-module workspace renders one dialect with fallback warning and Unassigned last", async () => {
   const per: PerTest = {};
   try {
@@ -102,6 +117,8 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
     const e = makeAdditionalSet(a, "087-undeclared", 2);
     stampModule(a, "clock");
     stampModule(b, "greeter");
+    // Set 100 S1: the greeter set doubles as the kind-chip fixture.
+    stampKind(b, "plan");
     stampModule(c, "integration");
     stampModule(e, "not-in-manifest");
     void d; // deliberately unlabeled
@@ -135,9 +152,9 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
       /not declared in docs\/modules\.yaml/,
     );
 
-    // Set 093 S1: 4-level ARIA tree contract — module 1 / Plan &
-    // Session sets 2 / bucket 3 / row 4. Every level is a treeitem;
-    // children nest in role="group" containers.
+    // Set 100 S1: 3-level ARIA tree contract — module 1 / bucket 2 /
+    // row 3. Every level is a treeitem; children nest in role="group"
+    // containers; the 093-era Plan / Session sets child nodes are gone.
     const greeterModule = inner.getByTestId("module-declared-greeter");
     await expect(greeterModule).toHaveAttribute("role", "treeitem");
     await expect(greeterModule).toHaveAttribute("aria-level", "1");
@@ -145,41 +162,19 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
       "role",
       "group",
     );
-
-    // The two persistent semantic child nodes at level 2 (fixed pair).
-    // The fixture ships no plan file, so every module's Plan reads
-    // "missing"; greeter holds one (not-started) set, so its Session sets
-    // node is "bucketed" and expandable with the buckets nested under it.
-    const greeterPlan = greeterModule.getByTestId(
-      "module-declared-greeter-plan",
-    );
-    await expect(greeterPlan).toHaveAttribute("role", "treeitem");
-    await expect(greeterPlan).toHaveAttribute("aria-level", "2");
-    await expect(greeterPlan).toHaveAttribute("aria-setsize", "2");
-    await expect(greeterPlan).toHaveAttribute("aria-posinset", "1");
-    await expect(greeterPlan).toHaveAttribute("data-plan-state", "missing");
-
-    const greeterSessionSets = greeterModule.getByTestId(
-      "module-declared-greeter-session-sets",
-    );
-    await expect(greeterSessionSets).toHaveAttribute("role", "treeitem");
-    await expect(greeterSessionSets).toHaveAttribute("aria-level", "2");
-    await expect(greeterSessionSets).toHaveAttribute("aria-posinset", "2");
-    await expect(greeterSessionSets).toHaveAttribute(
-      "data-session-sets-state",
-      "bucketed",
-    );
-    await expect(greeterSessionSets).toHaveAttribute("aria-expanded", "true");
     await expect(
-      greeterSessionSets.locator("> .child-body"),
-    ).toHaveAttribute("role", "group");
+      greeterModule.getByTestId("module-declared-greeter-plan"),
+    ).toHaveCount(0);
+    await expect(
+      greeterModule.getByTestId("module-declared-greeter-session-sets"),
+    ).toHaveCount(0);
 
-    const greeterNotStarted = greeterSessionSets.locator(
+    const greeterNotStarted = greeterModule.locator(
       '[data-bucket-key="declared-greeter/not-started"]',
     );
     await expect(greeterNotStarted).toHaveCount(1);
     await expect(greeterNotStarted).toHaveAttribute("role", "treeitem");
-    await expect(greeterNotStarted).toHaveAttribute("aria-level", "3");
+    await expect(greeterNotStarted).toHaveAttribute("aria-level", "2");
     await expect(greeterNotStarted.locator("> .bucket-body")).toHaveAttribute(
       "role",
       "group",
@@ -188,7 +183,18 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
       '[role="treeitem"][data-slug="087-greeter-core"]',
     );
     await expect(greeterRow).toBeVisible();
-    await expect(greeterRow).toHaveAttribute("aria-level", "4");
+    await expect(greeterRow).toHaveAttribute("aria-level", "3");
+
+    // Set 100 S1: the kind-typed set renders the quiet kind chip after
+    // its name; ordinary work rows render none.
+    const kindChip = greeterRow.locator(".row-kind-badge");
+    await expect(kindChip).toHaveText("plan");
+    await expect(kindChip).toHaveAttribute("title", /project plan/);
+    await expect(
+      inner
+        .locator('[role="treeitem"][data-slug="087-clock-widget"]')
+        .locator(".row-kind-badge"),
+    ).toHaveCount(0);
 
     // Rows land under their OWN module group.
     await expect(
@@ -212,15 +218,14 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
     await greeterModule.locator(".module-header").click();
     await expect(greeterRow).toBeVisible();
 
-    // Set 093 S1: the Session sets child node collapses independently —
-    // its buckets + rows fold away while the module and the Plan sibling
-    // stay visible (the checklist never vanishes).
-    await greeterSessionSets.locator(".child-header").click();
-    await expect(greeterSessionSets).toHaveAttribute("aria-expanded", "false");
+    // Set 100 S1: a bucket collapses independently — its rows fold away
+    // while the module header and sibling buckets stay visible.
+    await greeterNotStarted.locator(".bucket-header").click();
+    await expect(greeterNotStarted).toHaveAttribute("aria-expanded", "false");
     await expect(greeterRow).toBeHidden();
-    await expect(greeterPlan).toBeVisible();
-    await greeterSessionSets.locator(".child-header").click();
-    await expect(greeterSessionSets).toHaveAttribute("aria-expanded", "true");
+    await expect(greeterModule).toHaveAttribute("aria-expanded", "true");
+    await greeterNotStarted.locator(".bucket-header").click();
+    await expect(greeterNotStarted).toHaveAttribute("aria-expanded", "true");
     await expect(greeterRow).toBeVisible();
 
     // Keyboard operability (R2 fix): the module node is focusable and

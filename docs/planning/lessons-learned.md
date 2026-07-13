@@ -116,7 +116,7 @@ full text in `lessons-archive.md`:
   alongside the diff so additions are visible.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="097" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="100" status="active" scope="portable" -->
 
 - A consistency finding is rarely local: the same claim echoes in the
   summary table, body prose, per-row cells, and the bottom line, and each
@@ -138,7 +138,7 @@ full text in `lessons-archive.md`:
   the resolved installed version at close, not just the declared floor.
 
 ## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
-<!-- lesson: id="L-095-1" added-set="095" last-used-set="099" status="active" scope="portable" -->
+<!-- lesson: id="L-095-1" added-set="095" last-used-set="100" status="active" scope="portable" -->
 
 - Reviewers are salience-limited, not context-limited: each pass returns
   the most salient handful of technically-real findings, and fixing them
@@ -156,7 +156,7 @@ full text in `lessons-archive.md`:
 ## Repo-Specific Lessons
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="098" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="100" status="active" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families

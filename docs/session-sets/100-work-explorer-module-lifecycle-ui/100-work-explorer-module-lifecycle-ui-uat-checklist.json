@@ -1,0 +1,44 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "dabbler-ai-orchestration 0.43.0 local VSIX (Set 100 Session 1 — flattened module tree + kind-aware rows; no Marketplace publish, single release boundary after Set 101)",
+  "DocumentDate": "7/13/2026",
+  "Notes": "Session 1 of 2 arms these three walks; UAT is SUGGESTED and per-session, so the human walk is optional and does not gate close. The flattened three-level ARIA contract, the kind-badge state matrix, and the blocked-marker plan gate are already verified by automation (Layer 2 moduleLifecycleUi/moduleTier/visibleModules suites; Layer 3 Playwright module-tier.spec.ts + session-sets-tree.spec.ts, run locally). These human walks judge only what automation cannot: that the flatter tree reads clearly, the kind chips are legible, and keyboard travel feels right. Install ONLY the local VSIX built from this working tree (tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.43.0.vsix); do not publish it. Walk order: Walk 1 then Walk 2 in THIS repository (dabbler-ai-orchestration), then Walk 3 in a fresh scratch folder. No steps are skipped or out of order. NOTE: this session REVERSES Set 093 Session 1's tree — the Set 093 checklist's Walks 1-3 (Plan / Session sets child rows) are superseded and will no longer pass; module row ACTIONS are unchanged until Session 2.",
+  "Configuration": {
+    "reviewWidths": ["6%", "14%", "34%", "10%", "36%"]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Flattened module tree — rendering",
+      "Subarea": "Walk 1 — status buckets sit directly under the module row (this repo)",
+      "ItemLabel": "The Plan / Session sets child rows are gone; buckets are the module's direct children",
+      "HumanAction": "WHERE YOU ARE: a fresh install, about to look at the Work Explorer tree in THIS repository (dabbler-ai-orchestration), which has many session sets and no docs/modules.yaml, so it renders a single muted 'Default' module.\n1. In this repository's VS Code window, install the local file tools/dabbler-ai-orchestration/dabbler-ai-orchestration-0.43.0.vsix (Extensions view -> '...' menu -> 'Install from VSIX...'), then run 'Developer: Reload Window'.\n2. Click the Dabbler AI Orchestration icon in the Activity Bar to open the Work Explorer.\n3. Find the single, visually muted 'Default' row at the top of the tree.\n4. Read the rows immediately indented beneath 'Default', top to bottom.\n5. Look for any row labeled 'Plan' or 'Session sets' anywhere in the tree.",
+      "Expectation": "Immediately beneath the 'Default' module row are the uppercase status-bucket headers themselves — 'IN PROGRESS (N)', 'NOT STARTED (N)', 'COMPLETE (N)' (and 'CANCELLED (N)' if any cancelled sets exist) — each with its session-set rows one indent level deeper. There is NO row labeled 'Plan' and NO row labeled 'Session sets' anywhere in the tree: the two child rows that sat between the module and its buckets in 0.41.x/0.42.x are gone, so the tree is exactly three levels deep (module, bucket, set row).",
+      "ProgrammaticVerification": "Layer 3 session-sets-tree.spec.ts asserts module-pseudo-default-plan and module-pseudo-default-session-sets have count 0, the three buckets sit directly inside the module body (aria-level 2), and rows sit at aria-level 3; Layer 2 moduleTier source scans pin the retired render functions out of client.js.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    },
+    {
+      "FunctionalArea": "Flattened module tree — keyboard & collapse",
+      "Subarea": "Walk 2 — arrow keys reach buckets directly; a bucket collapses independently (this repo)",
+      "ItemLabel": "Down-arrow from the module lands on the first bucket; Enter folds one bucket while the module and sibling buckets stay visible",
+      "HumanAction": "WHERE YOU ARE: still in THIS repository's Work Explorer, immediately after Walk 1, with the 'Default' module expanded.\n1. Click once on the 'Default' module row. NOTE: this click also COLLAPSES the module (its chevron flips to a right-triangle) — that is expected; the click gives the tree keyboard focus.\n2. Press the Right arrow key once to re-expand the 'Default' module (its chevron flips back to a down-triangle).\n3. Press the Down arrow key once and note which row is highlighted.\n4. With that bucket header highlighted (e.g. 'IN PROGRESS'), press Enter once.\n5. Look at the session-set rows that were nested under that bucket.\n6. Look at whether the 'Default' row and the OTHER bucket headers are still visible.\n7. Press Enter again on the same bucket header.",
+      "Expectation": "The initial click collapses 'Default' and the Right arrow re-expands it — the whole exchange happens on the module row with no mouse travel. Pressing Down from 'Default' then highlights the first status-bucket header directly (e.g. 'IN PROGRESS (N)') — there is no intermediate 'Plan' or 'Session sets' stop. Pressing Enter on the bucket collapses it: its chevron flips from a down-triangle to a right-triangle and ONLY that bucket's session-set rows disappear. The 'Default' module row and the other bucket headers REMAIN visible. Pressing Enter again re-expands the bucket and its rows reappear.",
+      "ProgrammaticVerification": "Layer 3 module-tier.spec.ts drives the bucket-header click and Enter/ArrowLeft/ArrowRight toggles, asserting aria-expanded flips, the row hides, and the module stays expanded; the shared roving-tabindex handler covers arrow navigation.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    },
+    {
+      "FunctionalArea": "Kind-aware rows — chips and the plan gate",
+      "Subarea": "Walk 3 — plan/decomposition chips render; the decomposition row carries the blocked marker until its plan set completes (scratch repo)",
+      "ItemLabel": "A 'kind: plan' set shows a small 'plan' chip; a 'kind: decomposition' set shows a 'decomposition' chip plus the chain blocked-marker whose tooltip names the incomplete plan set",
+      "HumanAction": "WHERE YOU ARE: about to create a tiny throwaway workspace so you can see the kind chips and the prerequisite gate that replaced the old 'blocked - add a plan first' row.\n1. Create a new empty folder, e.g. C:\\temp\\dabbler-100-uat.\n2. Inside it create the file docs\\modules.yaml with EXACTLY this content:\nmodules:\n  - slug: alpha\n    title: Alpha\n3. Create the file docs\\session-sets\\001-alpha-plan\\spec.md with EXACTLY this content:\n# 001-alpha-plan\n\n## Session Set Configuration\n```yaml\ntier: full\nrequiresUAT: false\nrequiresE2E: false\nmodule: alpha\nkind: plan\n```\n4. Create the file docs\\session-sets\\002-alpha-decomposition\\spec.md with EXACTLY this content:\n# 002-alpha-decomposition\n\n## Session Set Configuration\n```yaml\ntier: full\nrequiresUAT: false\nrequiresE2E: false\nmodule: alpha\nkind: decomposition\nprerequisites:\n  - slug: 001-alpha-plan\n    condition: complete\n```\n5. Open that folder in a new VS Code window that has the 0.43.0 VSIX installed, and open the Work Explorer.\n6. Expand the 'Alpha' module and its 'NOT STARTED (2)' bucket.\n7. Read the '001-alpha-plan' row, including any small chip after its name.\n8. Read the '002-alpha-decomposition' row, including any small chip and any extra glyph after its name.\n9. Hover the mouse over the small chain glyph on the '002-alpha-decomposition' row and read the tooltip.",
+      "Expectation": "Both sets appear under the 'Alpha' module's 'NOT STARTED (2)' bucket. The '001-alpha-plan' row shows a small rounded chip reading exactly 'plan' right after its name, and NO chain glyph. The '002-alpha-decomposition' row shows a chip reading exactly 'decomposition' AND a small chain glyph after its name. Hovering the chain glyph shows a tooltip reading 'Blocked by prerequisites: 001-alpha-plan (not started) — all must complete first.' — the gate that used to render as a 'blocked - add a plan first' child row now rides the decomposition set itself. Hovering a chip explains the lifecycle set (e.g. 'Module lifecycle set: creates or imports this module's project plan.').",
+      "ProgrammaticVerification": "Layer 2 moduleLifecycleUi.test.ts pins the scan->badge round-trip, the state matrix, and the scaffolded-decomposition blocked marker + tooltip text (including the unblock when the plan set completes); Layer 3 module-tier.spec.ts pins the rendered chip text and title attribute.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    }
+  ]
+}

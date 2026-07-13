@@ -47,7 +47,9 @@
   `modulePlanRelPath` (explicit value when safe, canonical default
   otherwise); a fallback group has none; the pseudo-module always
   carries `LEGACY_ROOT_PLAN_REL` (`docs/planning/project-plan.md`) —
-  present/missing state is the consumer's separate check (Set 093).
+  consumers (wizard flows, the module-row `Open Plan` action) resolve
+  existence at action time (the 093-era rendered present/missing state
+  retired in Set 100 with the persistent child nodes).
 - **No auto-writes:** nothing in this matrix ever writes a file
   (adjudication A: manifest creation happens on explicit user action
   only — Set 094).
@@ -78,7 +80,7 @@ unless another file is named. Warning codes are the structured
 | Case | Behavior | Pinning test |
 |---|---|---|
 | Legacy root plan exists, every set stamped | Pseudo-module stays visible (empty, `Unassigned`) so the repo-level plan never vanishes (gpt-5-4 Critical #1). Its warning follows the standard precedence, independent of the legacy plan: **no warning under a usable manifest** (populated or valid-empty), but `manifest-missing` when the manifest is absent (and sets exist) and `manifest-invalid` when it is invalid — a legacy plan must never mask a manifest fault | `legacy root plan keeps the pseudo-module visible even when every set is stamped (gpt-5-4 Critical #1)` plus `legacy plan does not mask manifest faults: absent -> manifest-missing, invalid -> manifest-invalid on the legacy-kept pseudo row` |
-| Declared module with zero sets | Visible with empty sets (Set 093 persistent `Plan`/`Session sets` children) | `declared-but-empty modules are visible with zero sets (Set 093 persistent-children contract)` |
+| Declared module with zero sets | Visible with empty status buckets — the landing zone for the scaffolded lifecycle sets (Set 100 flattened tree; the 093 persistent children retired) | `declared-but-empty modules are visible with zero sets (Set 100 flattened-tree contract)` |
 | Only fallback groups coexist with the pseudo-module | Pseudo-module labels `Unassigned` (fallback groups count as coexisting) | `fallback groups count as coexisting modules for naming: pseudo labels Unassigned beside fallback-only groups` |
 | Operator declares a literal `default` slug | Normal declared module; pseudo-module always `Unassigned` beside it | `a user-declared literal default slug is a normal declared module and forces the pseudo-module to Unassigned` |
 | Hand-written `module: default`, no declared `default` slug | Undeclared-slug fallback group named `default` — never merged into the pseudo-module | `a hand-written module: default with NO declared default slug is an undeclared-slug fallback group, never merged into the pseudo-module` and the end-to-end reader test in the same suite |

@@ -173,7 +173,7 @@ html, body {
  * strip. Overlays the header's right edge (absolute, no layout shift) and
  * is revealed only on hover of the header/strip or when the module row or a
  * strip button holds focus — a quiet affordance that never competes with
- * the semantic child nodes. The buttons are NOT treeitems (excluded from
+ * the tree content. The buttons are NOT treeitems (excluded from
  * the tree name + arrow nav); the strip is a Tab-reached toolbar. */
 .module-action-strip {
   grid-area: strip;
@@ -213,72 +213,14 @@ html, body {
   outline-offset: 1px;
 }
 
-/* Set 093 S1: the persistent Plan / Session sets child nodes sit at
- * level 2 (indented under the module header); buckets nest under the
- * Session sets node at level 3, rows at level 4. The staircase of
- * padding makes the four levels read at a glance. */
-.module-child {
-  margin-bottom: 1px;
-}
-.child-header {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 8px 5px 24px;
-  font-size: 12px;
-  user-select: none;
-  cursor: default;
-}
-.child-header[data-collapsible="true"] {
-  cursor: pointer;
-}
-.child-header[data-collapsible="true"]:hover {
-  background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.10));
-}
-.child-chevron {
-  display: inline-block;
-  width: 12px;
-  text-align: center;
-  opacity: 0.7;
-  flex-shrink: 0;
-}
-.child-label {
-  font-weight: 500;
-}
-.child-state {
-  margin-left: 6px;
-  font-size: 11px;
-  opacity: 0.7;
-  font-style: italic;
-}
-/* A missing plan / blocked session-sets node is the checklist's calm
- * next-step cue, not an error: a quiet warning tint, never hidden. */
-.module-plan-missing .child-state,
-.module-session-sets-blocked-until-plan .child-state {
-  color: var(--vscode-list-warningForeground, #cca700);
-  opacity: 0.9;
-}
-.module-child:focus {
-  outline: none;
-}
-.module-child[aria-selected="true"] > .child-header {
-  background: var(--vscode-list-focusBackground, rgba(127, 127, 127, 0.10));
-}
-.module-child:focus-visible > .child-header {
-  outline: 1px solid var(--vscode-focusBorder, #007fd4);
-  outline-offset: -1px;
-}
-.module-session-sets[aria-expanded="false"] .child-body {
-  display: none;
-}
-/* Buckets + rows nest under the Session sets child node — indent past
- * the level-2 child header (was 24px when buckets sat directly under the
- * module in the Set 092 three-level tree). */
+/* Set 100 S1: the 093-era persistent Plan / Session sets child-node
+ * styles retired with the nodes themselves. Buckets sit directly under
+ * the module header again (the Set 092 three-level indent). */
 .module-body .bucket-header {
-  padding-left: 40px;
+  padding-left: 24px;
 }
 .module-body .row-header {
-  padding-left: 40px;
+  padding-left: 24px;
 }
 
 .bucket {
@@ -512,6 +454,26 @@ body.vscode-light, body.vscode-high-contrast-light {
   margin-left: 4px;
   font-weight: 700;
   color: var(--vscode-list-errorForeground, #f14c4c);
+  cursor: help;
+}
+
+/*
+ * Set 100 S1: the kind-aware row badge — a quiet lowercase chip
+ * ("plan" / "decomposition") after the row name on Set 098 lifecycle
+ * sets. Presentation only: theme-derived muted colors, help cursor,
+ * tooltip carries the explanation. Ordinary work sets render no chip.
+ */
+.row-kind-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 5px;
+  font-size: 0.8em;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--vscode-badge-foreground, #ccc);
+  background: var(--vscode-badge-background, rgba(127, 127, 127, 0.25));
+  border-radius: 7px;
+  vertical-align: 0.08em;
   cursor: help;
 }
 

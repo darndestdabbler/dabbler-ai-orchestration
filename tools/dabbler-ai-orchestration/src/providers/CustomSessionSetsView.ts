@@ -43,6 +43,8 @@ import {
   fractionTooltip,
   ICON_FILES,
   isCurrentSessionInFlight,
+  kindBadge,
+  kindTooltip,
   migrationMarker,
   migrationTooltip,
   mergeVisibleModules,
@@ -810,25 +812,18 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     const manifestFaults: SystemStatusPayload["manifestFaults"] = [];
     const byRoot = Array.from(roots).map((root) => {
       const classification = classifyModulesManifest(root);
-      // Set 093 S1: resolve each visible module's plan-presence against
-      // THIS root, gated on a non-null planPath (a fallback group has no
-      // plan slot, so it never touches the filesystem and stays
-      // "missing"). computeVisibleModules is pure and cannot do the I/O;
-      // the host owns it here, and mergeVisibleModules ORs planExists
-      // across roots. The pseudo-module's LEGACY_ROOT_PLAN_REL check is
-      // the same fact as `legacyRootPlanExists` below, resolved uniformly.
+      // Set 100 S1: the 093-era per-module plan-existence resolution
+      // retired with the persistent `Plan` child node it fed.
+      // `legacyRootPlanExists` stays — it drives pseudo-module VISIBILITY
+      // (the legacy root plan keeps the pseudo-module rendered even when
+      // every set is stamped).
       const current = computeVisibleModules(
         classification,
         all.filter((set) => set.root === root),
         {
           legacyRootPlanExists: fs.existsSync(path.join(root, LEGACY_ROOT_PLAN_REL)),
         },
-      ).map((module) => ({
-        ...module,
-        planExists:
-          module.planPath != null &&
-          fs.existsSync(path.join(root, module.planPath)),
-      }));
+      );
       const selected = chooseRenderableModuleSnapshot(
         classification,
         current,
@@ -919,6 +914,10 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
         ? `Duplicate session-set name in ${set.duplicateNameError.conflictingDirs.length} ` +
           `locations. Showing ${set.duplicateNameError.chosenDir}; rename one copy.`
         : "",
+      // Set 100 S1: the kind-aware row badge — "plan" / "decomposition"
+      // on Set 098 lifecycle sets, "" on every ordinary work set.
+      kindBadge: kindBadge(set),
+      kindTooltip: kindTooltip(set),
       accordionHtml: null,
       accordionUpdatedAt: null,
     };

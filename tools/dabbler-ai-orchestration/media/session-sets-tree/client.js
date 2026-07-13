@@ -472,15 +472,15 @@
       : "";
     const moduleClasses = "module module-" + kind +
       (kind === "pseudo" && label === "Default" ? " module-default" : "");
-    // Set 093 S1 (verdict amendment 4): every module ALWAYS renders two
-    // persistent semantic child nodes — `Plan` and `Session sets` — at
-    // aria-level 2. The status buckets nest UNDER the `Session sets` node
-    // (level 3, rows level 4) and never replace the checklist; a module
-    // with no sets still shows both children with their empty/blocked
-    // states. Children are semantic treeitems only — state text, no
-    // embedded controls (WAI-ARIA tree keyboard semantics, amendment 1).
-    const children =
-      renderPlanNode(mod, moduleKey) + renderSessionSetsNode(mod, moduleKey);
+    // Set 100 S1: the 093-era persistent `Plan` / `Session sets` child
+    // nodes retired — with plan and decomposition living as kind-typed
+    // session sets, the checklist IS the bucket content. The status
+    // buckets are the module's DIRECT children (module aria-level 1,
+    // bucket 2, row 3); a module with no sets still shows its empty
+    // default buckets, which is where the scaffolded lifecycle sets land.
+    const children = (mod.buckets || [])
+      .map(function (bucket) { return renderBucket(bucket, moduleKey); })
+      .join("");
     // Set 093 S2 (verdict amendments 1 + 2): the module-ROW inline action
     // strip. Rendered for `declared` and `pseudo` kinds; NOT `fallback` (a
     // fallback has no plan slot and no manifest entry to target — the
@@ -554,112 +554,12 @@
     );
   }
 
-  // Set 093 S1: the persistent `Plan` child node — a semantic LEAF
-  // treeitem at aria-level 2 (one of two fixed siblings, aria-setsize=2).
-  // State ("present" / "missing") is derived host-side from the module's
-  // planPath existence; a fallback group has no planPath and is always
-  // "missing". No embedded controls — the accessible name is
-  // "Plan <state>" via aria-labelledby (amendment 1: children are
-  // purely semantic; the Set 093 S2 action strip owns Open/Import Plan).
-  function renderPlanNode(mod, moduleKey) {
-    const state = mod.plan === "present" ? "present" : "missing";
-    const headerId = "plan-" + moduleKey;
-    return (
-      '<div role="treeitem" tabindex="-1" aria-level="2"' +
-        ' aria-setsize="2" aria-posinset="1" aria-selected="false"' +
-        ' aria-labelledby="' + escAttr(headerId) + '"' +
-        ' class="module-child module-plan module-plan-' + escAttr(state) + '"' +
-        ' data-module-child="plan" data-plan-state="' + escAttr(state) + '"' +
-        ' data-testid="module-' + escAttr(moduleKey) + '-plan">' +
-        '<div id="' + escAttr(headerId) + '" class="child-header">' +
-          '<span class="child-chevron" aria-hidden="true"></span>' +
-          '<span class="child-label">Plan</span>' +
-          '<span class="child-state">' + escHtml(state) + '</span>' +
-        '</div>' +
-      '</div>'
-    );
-  }
-
-  // Set 093 S1: the persistent `Session sets` child node at aria-level 2.
-  // When "bucketed" it is an EXPANDABLE treeitem whose nested group holds
-  // the status buckets (level 3, rows level 4) — buckets nest here, never
-  // replacing the checklist. When "empty" or "blocked-until-plan" it is a
-  // semantic LEAF stating that (still visible forever). Collapse state
-  // rides the shared bucketCollapsed map under a "<module>/sessionsets"
-  // key so toggleCollapsible handles it with no new wiring.
-  function sessionSetsStateText(state) {
-    if (state === "empty") return "empty";
-    if (state === "blocked-until-plan") return "blocked — add a plan first";
-    return "";
-  }
-  function renderSessionSetsNode(mod, moduleKey) {
-    // NEVER HIDE WORK (verdict posture; Round 3 Major fix): if any bucket
-    // actually carries rows, render "bucketed" REGARDLESS of the state
-    // field — a type-valid legacy/pre-093 payload (or the test-only
-    // buildModulePayloads) can omit `sessionSets` while still carrying
-    // rows, and degrading that to a leaf would silently drop existing
-    // session sets from the tree. The field only decides the empty vs
-    // blocked-until-plan distinction, and only when there is nothing to
-    // show. In the shipping path (buildVisibleModulePayloads) the field
-    // and the row count always agree, so this is a pure robustness guard.
-    const hasRows = (mod.buckets || []).some(function (b) {
-      return (
-        b &&
-        (b.count > 0 || (Array.isArray(b.rows) && b.rows.length > 0))
-      );
-    });
-    const state = mod.sessionSets === "bucketed" || hasRows
-      ? "bucketed"
-      : mod.sessionSets === "empty"
-        ? "empty"
-        : "blocked-until-plan";
-    const headerId = "sessionsets-" + moduleKey;
-    const common =
-      ' aria-setsize="2" aria-posinset="2" aria-selected="false"' +
-      ' aria-labelledby="' + escAttr(headerId) + '"' +
-      ' data-module-child="session-sets"' +
-      ' data-session-sets-state="' + escAttr(state) + '"' +
-      ' data-testid="module-' + escAttr(moduleKey) + '-session-sets"';
-    if (state !== "bucketed") {
-      // Leaf node — no aria-expanded (APG end node), state said out loud.
-      return (
-        '<div role="treeitem" tabindex="-1" aria-level="2"' + common +
-          ' class="module-child module-session-sets module-session-sets-' + escAttr(state) + '">' +
-          '<div id="' + escAttr(headerId) + '" class="child-header">' +
-            '<span class="child-chevron" aria-hidden="true"></span>' +
-            '<span class="child-label">Session sets</span>' +
-            '<span class="child-state">' + escHtml(sessionSetsStateText(state)) + '</span>' +
-          '</div>' +
-        '</div>'
-      );
-    }
-    const collapseKey = moduleKey + "/sessionsets";
-    const expanded = bucketCollapsed[collapseKey] !== false;
-    const chevronGlyph = expanded ? "▾" : "▸";
-    const buckets = (mod.buckets || [])
-      .map(function (bucket) { return renderBucket(bucket, moduleKey); })
-      .join("");
-    return (
-      '<div role="treeitem" tabindex="-1" aria-level="2"' + common +
-        ' aria-expanded="' + (expanded ? "true" : "false") + '"' +
-        ' class="module-child module-session-sets module-session-sets-bucketed"' +
-        ' data-bucket-key="' + escAttr(collapseKey) + '">' +
-        '<div id="' + escAttr(headerId) + '" class="child-header" data-collapsible="true">' +
-          '<span class="child-chevron" aria-hidden="true">' + chevronGlyph + '</span>' +
-          '<span class="child-label">Session sets</span>' +
-        '</div>' +
-        '<div class="child-body" role="group">' + buckets + '</div>' +
-      '</div>'
-    );
-  }
-
-  // Set 093 S1: the bucket is a `role="treeitem"` at aria-level="3" now
-  // (module 1 / Plan & Session sets 2 / bucket 3 / row 4 — the persistent
-  // child nodes inserted a level). aria-expanded on the treeitem when it
-  // has rows; an empty bucket is a leaf node with no aria-expanded, per
-  // the APG. Children in a nested `role="group"`, composite
-  // "<module>/<key>" collapse key, rows at aria-level 4. Buckets nest
-  // UNDER the module's `Session sets` child node (never replacing it).
+  // Set 100 S1: the bucket is a `role="treeitem"` at aria-level="2" —
+  // the 093-era persistent child nodes retired, so buckets sit directly
+  // under the module (module 1 / bucket 2 / row 3). aria-expanded on the
+  // treeitem when it has rows; an empty bucket is a leaf node with no
+  // aria-expanded, per the APG. Children in a nested `role="group"`,
+  // composite "<module>/<key>" collapse key, rows at aria-level 3.
   function renderBucket(bucket, moduleKey) {
     const labelText = bucket.label + "  (" + bucket.count + ")";
     const idSuffix = moduleKey + "-" + bucket.key;
@@ -676,7 +576,7 @@
     if (rowCount === 0) {
       // Leaf tree node: no children, no aria-expanded (APG end node).
       return (
-        '<div role="treeitem" tabindex="-1" aria-level="3"' +
+        '<div role="treeitem" tabindex="-1" aria-level="2"' +
           ' aria-selected="false" aria-labelledby="' + escAttr(groupId) + '"' +
           ' class="bucket bucket-empty" data-testid="bucket-' + escAttr(idSuffix) + '">' +
           '<div id="' + escAttr(groupId) + '" class="bucket-header">' +
@@ -691,10 +591,10 @@
     const expanded = bucketCollapsed[collapseKey] !== false;
     const chevronGlyph = expanded ? "▾" : "▸";
     const rows = bucket.rows
-      .map(function (row) { return renderRow(row, 4); })
+      .map(function (row) { return renderRow(row, 3); })
       .join("");
     return (
-      '<div role="treeitem" tabindex="-1" aria-level="3"' +
+      '<div role="treeitem" tabindex="-1" aria-level="2"' +
         ' aria-selected="false" aria-expanded="' + (expanded ? "true" : "false") + '"' +
         ' aria-labelledby="' + escAttr(groupId) + '" class="bucket"' +
         ' data-bucket-key="' + escAttr(collapseKey) + '"' +
@@ -708,10 +608,10 @@
     );
   }
 
-  // Set 093 Session 1: rows render at aria-level 4 — the persistent
-  // `Plan` / `Session sets` child nodes inserted a level (module 1 /
-  // Plan & Session sets 2 / bucket 3 / row 4). `ariaLevel` is threaded
-  // from renderBucket so the contract stays single-sourced.
+  // Set 100 Session 1: rows render at aria-level 3 — the 093-era
+  // persistent child nodes retired, so the tree is module 1 / bucket 2 /
+  // row 3. `ariaLevel` is threaded from renderBucket so the contract
+  // stays single-sourced.
   function renderRow(row, ariaLevel) {
     // Set 034: row layout simplified. Per-row chevron + state-badge
     // icon retired; the bold color-coded `row.fraction` is the
@@ -727,6 +627,16 @@
     const fractionCls = "row-fraction row-fraction-" + escAttr(row.state);
     const descSpan = row.description
       ? '<span class="row-description">' + escHtml(row.description) + '</span>'
+      : "";
+    // Set 100 S1: the kind-aware row badge — a quiet chip naming the
+    // lifecycle kind ("plan" / "decomposition") right after the row
+    // name. Presentation only: the row keeps normal behavior. Empty
+    // badge → no span (every ordinary work set stays unchanged).
+    const kindSpan = row.kindBadge
+      ? '<span class="row-kind-badge row-kind-badge-' + escAttr(row.kindBadge) +
+          '" title="' + escAttr(row.kindTooltip || "") + '" aria-label="' +
+          escAttr(row.kindTooltip || "") + '" data-kind="' + escAttr(row.kindBadge) + '">' +
+          escHtml(row.kindBadge) + '</span>'
       : "";
     // Set 050 S4: unobtrusive schema-drift marker. A single asterisk
     // after the row name, carrying the "Ran under schema v<N>" tooltip
@@ -795,6 +705,7 @@
           '<span class="' + fractionCls + '" aria-hidden="true"' + fractionTitle + '>' + escHtml(row.fraction || "") + '</span>' +
           '<span class="row-text">' +
             '<span class="row-name">' + escHtml(row.name) + '</span>' +
+            kindSpan +
             tierSpan +
             migrationSpan +
             blockedSpan +
@@ -978,9 +889,9 @@
     nodeEl.setAttribute("aria-expanded", next ? "true" : "false");
     // The first chevron in document order is the node's OWN header chevron
     // (its header precedes its nested body): module → .module-chevron,
-    // Session sets → .child-chevron, bucket → .bucket-chevron.
+    // bucket → .bucket-chevron.
     const chev = nodeEl.querySelector(
-      ".module-chevron, .child-chevron, .bucket-chevron",
+      ".module-chevron, .bucket-chevron",
     );
     if (chev) chev.textContent = next ? "▾" : "▸";
     const moduleKey = nodeEl.getAttribute("data-module-key");
@@ -1021,7 +932,7 @@
     // whichever of data-module-key / data-bucket-key the node carries.
     Array.from(
       root.querySelectorAll(
-        '.module-header[data-collapsible="true"], .child-header[data-collapsible="true"], .bucket-header[data-collapsible="true"]',
+        '.module-header[data-collapsible="true"], .bucket-header[data-collapsible="true"]',
       ),
     ).forEach(function (header) {
       header.addEventListener("click", function (ev) {

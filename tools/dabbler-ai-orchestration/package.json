@@ -200,6 +200,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.deleteModule",
+        "title": "Delete Module",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.openModulePlan",
         "title": "Open Module Plan",
         "category": "Dabbler"

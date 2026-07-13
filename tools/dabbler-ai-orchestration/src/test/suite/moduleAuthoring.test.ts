@@ -18,7 +18,9 @@ import {
   assertRestampedTextValid,
   assertStampedTextValid,
   assignLegacySetsToModule,
+  classifyModuleSetsForDeletion,
   classifyModulesManifest,
+  deleteModule,
   renameModule,
   restampModuleInSpecText,
   defaultModulePlanPath,
@@ -2649,5 +2651,374 @@ suite("moduleAuthoring — renameModule rollback + format preservation (Set 099 
         newTitle: "Greeter",
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 099 Session 2 — the module DELETE writer + classification.
+// ---------------------------------------------------------------------
+
+suite("moduleAuthoring — classifyModuleSetsForDeletion (Set 099 S2)", () => {
+  const moduleSpec = (slug: string, kindLine?: string): string =>
+    [
+      "# A Set",
+      "## Session Set Configuration",
+      "```yaml",
+      `module: ${slug}`,
+      ...(kindLine ? [kindLine] : []),
+      "tier: full",
+      "```",
+      "",
+    ].join("\n");
+
+  const writeState = (dir: string, status: string, sessions: unknown[] = []): void => {
+    fs.writeFileSync(
+      path.join(dir, "session-state.json"),
+      JSON.stringify({ schemaVersion: 4, status, sessions }),
+      "utf8",
+    );
+  };
+
+  test("complete set classifies terminal", () => {
+    const root = tmpRoot("delclassify-complete-");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      writeState(path.dirname(a), "complete", [{ number: 1, status: "complete" }]);
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "terminal");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("already-cancelled set classifies terminal", () => {
+    const root = tmpRoot("delclassify-cancelled-");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      writeState(path.dirname(a), "cancelled");
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "terminal");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Dogfood-caught regression: cancelSessionSet only touches
+  // session-state.json when one ALREADY exists (a set cancelled before its
+  // first start_session leaves ONLY CANCELLED.md on disk). readCancellationState
+  // alone reports "unknown" for that shape — the classifier must fall back
+  // to the legacy CANCELLED.md presence check (mirroring readSessionSets'
+  // own fallback) or it would wrongly re-cancel an already-cancelled set.
+  test("a set cancelled before ever having a session-state.json (CANCELLED.md only) classifies terminal", () => {
+    const root = tmpRoot("delclassify-legacycancelled-");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      fs.writeFileSync(
+        path.join(path.dirname(a), "CANCELLED.md"),
+        "# Cancellation history\n\nCancelled on 2026-01-01T00:00:00-04:00\nunrelated prior cancel\n\n",
+        "utf8",
+      );
+      assert.ok(!fs.existsSync(path.join(path.dirname(a), "session-state.json")));
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "terminal");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("kindless unstarted set (no state file at all) classifies cancel, not remove", () => {
+    const root = tmpRoot("delclassify-kindless-");
+    try {
+      specWith(root, "001-a", moduleSpec("greeter"));
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "cancel");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("unstarted kind: plan scaffold with no execution artifacts classifies remove", () => {
+    const root = tmpRoot("delclassify-planscaffold-");
+    try {
+      specWith(root, "001-a", moduleSpec("greeter", "kind: plan"));
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "remove");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("unstarted kind: decomposition scaffold with no execution artifacts classifies remove", () => {
+    const root = tmpRoot("delclassify-decompscaffold-");
+    try {
+      specWith(root, "001-a", moduleSpec("greeter", "kind: decomposition"));
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "remove");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a kind: plan set that was actually started (has an execution artifact) classifies cancel, not remove", () => {
+    const root = tmpRoot("delclassify-startedplan-");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter", "kind: plan"));
+      fs.writeFileSync(path.join(path.dirname(a), "ai-assignment.md"), "# Assignment\n", "utf8");
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "cancel");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("in-progress set classifies cancel (running-session refusal is the writer's separate gate)", () => {
+    const root = tmpRoot("delclassify-inprogress-");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      writeState(path.dirname(a), "in-progress", [{ number: 1, status: "in-progress" }]);
+      const [c] = classifyModuleSetsForDeletion(root, "greeter");
+      assert.strictEqual(c.disposition, "cancel");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("an unrelated module's sets are excluded from the scan", () => {
+    const root = tmpRoot("delclassify-unrelated-");
+    try {
+      specWith(root, "001-a", moduleSpec("greeter"));
+      specWith(root, "002-b", moduleSpec("payments"));
+      const result = classifyModuleSetsForDeletion(root, "greeter");
+      assert.deepStrictEqual(
+        result.map((c) => c.name),
+        ["001-a"],
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+suite("moduleAuthoring — deleteModule apply matrix (Set 099 S2)", () => {
+  const moduleSpec = (slug: string, kindLine?: string): string =>
+    [
+      "# A Set",
+      "## Session Set Configuration",
+      "```yaml",
+      `module: ${slug}`,
+      ...(kindLine ? [kindLine] : []),
+      "tier: full",
+      "```",
+      "",
+    ].join("\n");
+
+  const writeState = (dir: string, status: string, sessions: unknown[] = []): void => {
+    fs.writeFileSync(
+      path.join(dir, "session-state.json"),
+      JSON.stringify({ schemaVersion: 4, status, sessions }),
+      "utf8",
+    );
+  };
+
+  test("0 affected sets: only the manifest entry is removed", async () => {
+    const root = tmpRoot("del-0-");
+    writeManifest(
+      root,
+      "modules:\n  - slug: greeter\n    title: Greeter\n  - slug: payments\n    title: Payments\n",
+    );
+    try {
+      const r = await deleteModule(root, "greeter");
+      assert.strictEqual(r.refused, undefined, r.refused?.reason);
+      assert.strictEqual(r.partialFailure, undefined);
+      assert.deepStrictEqual(r.cancelled, []);
+      assert.deepStrictEqual(r.removed, []);
+      const entries = classifyModulesManifest(root) as any;
+      assert.deepStrictEqual(
+        entries.entries.map((e: any) => e.slug),
+        ["payments"],
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("mixed disposition: terminal untouched, non-terminal cancelled, scaffold removed", async () => {
+    const root = tmpRoot("del-mixed-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const complete = specWith(root, "001-complete", moduleSpec("greeter"));
+      writeState(path.dirname(complete), "complete", [{ number: 1, status: "complete" }]);
+      const completeBefore = fs.readFileSync(complete, "utf8");
+
+      const notStarted = specWith(root, "002-notstarted", moduleSpec("greeter"));
+
+      const scaffold = specWith(root, "003-scaffold", moduleSpec("greeter", "kind: plan"));
+      const scaffoldDir = path.dirname(scaffold);
+
+      const r = await deleteModule(root, "greeter");
+      assert.strictEqual(r.refused, undefined, r.refused?.reason);
+      assert.strictEqual(r.partialFailure, undefined);
+      assert.deepStrictEqual(r.terminal, ["001-complete"]);
+      assert.deepStrictEqual(r.cancelled, ["002-notstarted"]);
+      assert.deepStrictEqual(r.removed, ["003-scaffold"]);
+
+      // Completed set: byte-identical, never touched.
+      assert.strictEqual(fs.readFileSync(complete, "utf8"), completeBefore);
+      // Not-started set: cancelled (CANCELLED.md written, state flipped).
+      assert.ok(fs.existsSync(path.join(path.dirname(notStarted), "CANCELLED.md")));
+      // Scaffold: directory gone entirely.
+      assert.ok(!fs.existsSync(scaffoldDir));
+      // Manifest entry gone.
+      const entries = classifyModulesManifest(root) as any;
+      assert.deepStrictEqual(entries.entries, []);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses on an invalid manifest", async () => {
+    const root = tmpRoot("del-invalidmanifest-");
+    writeManifest(root, "this: is not a modules list\n");
+    try {
+      const r = await deleteModule(root, "greeter");
+      assert.ok(r.refused);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses deleting a module that is not declared", async () => {
+    const root = tmpRoot("del-notdeclared-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const r = await deleteModule(root, "ghost");
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /not declared/i);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses while an affected set has a running (in-progress) session — nothing touched", async () => {
+    const root = tmpRoot("del-running-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      writeState(path.dirname(a), "in-progress", []);
+      const manifestBefore = readManifestText(root);
+      const specBefore = fs.readFileSync(a, "utf8");
+      const r = await deleteModule(root, "greeter");
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /running session/i);
+      assert.strictEqual(readManifestText(root), manifestBefore);
+      assert.strictEqual(fs.readFileSync(a, "utf8"), specBefore);
+      assert.ok(fs.existsSync(path.dirname(a)), "the set directory must survive a refusal");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("re-declaring a deleted module's slug later regroups its untouched (terminal) history", async () => {
+    const root = tmpRoot("del-restore-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const complete = specWith(root, "001-complete", moduleSpec("greeter"));
+      writeState(path.dirname(complete), "complete", [{ number: 1, status: "complete" }]);
+
+      const r = await deleteModule(root, "greeter");
+      assert.strictEqual(r.refused, undefined, r.refused?.reason);
+      assert.deepStrictEqual(r.terminal, ["001-complete"]);
+      // The manifest no longer declares greeter...
+      const afterDelete = classifyModulesManifest(root) as any;
+      assert.deepStrictEqual(afterDelete.entries, []);
+      // ...but the completed set's stamp survives untouched.
+      assert.strictEqual(parseSessionSetConfig(complete).module, "greeter");
+
+      // Re-declaring the slug later regroups it — no restore mechanism
+      // needed, just the emergent property of the untouched stamp.
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter Reborn\n");
+      const reclassified = classifyModuleSetsForDeletion(root, "greeter");
+      assert.deepStrictEqual(
+        reclassified.map((c) => c.name),
+        ["001-complete"],
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("manifest edit lands last: a manifest write failure leaves cancels/removals applied and reports partialFailure", async () => {
+    const root = tmpRoot("del-manifestlast-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const notStarted = specWith(root, "002-notstarted", moduleSpec("greeter"));
+      const scaffold = specWith(root, "003-scaffold", moduleSpec("greeter", "kind: plan"));
+      const scaffoldDir = path.dirname(scaffold);
+      const manifestBefore = readManifestText(root);
+
+      const io: RenameFileIo = {
+        readFileSync: (p) => fs.readFileSync(p, "utf8"),
+        writeFileSync: (p, d) => {
+          if (p.endsWith("modules.yaml")) {
+            throw new Error("injected disk failure");
+          }
+          fs.writeFileSync(p, d, "utf8");
+        },
+      };
+      const r = await deleteModule(root, "greeter", io);
+      assert.ok(r.partialFailure, "expected a partial failure");
+      assert.deepStrictEqual(r.cancelled, ["002-notstarted"]);
+      assert.deepStrictEqual(r.removed, ["003-scaffold"]);
+      // The cancel and the scaffold removal both landed despite the
+      // manifest write failing — they are not rolled back.
+      assert.ok(fs.existsSync(path.join(path.dirname(notStarted), "CANCELLED.md")));
+      assert.ok(!fs.existsSync(scaffoldDir));
+      // The manifest itself is untouched (the failed write never renamed
+      // over it) — re-running deleteModule finishes the job.
+      assert.strictEqual(readManifestText(root), manifestBefore);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("preserves comments and entry order when deleting a middle entry", async () => {
+    const root = tmpRoot("del-format-");
+    const manifest = [
+      "# docs/modules.yaml — hand-authored, keep my comments",
+      "modules:",
+      "  - slug: alpha",
+      '    title: "Alpha"',
+      "    codeRoots: []            # alpha owns nothing yet",
+      "    planPath: docs/modules/alpha/project-plan.md",
+      "  - slug: greeter",
+      '    title: "Greeter Module"',
+      "    codeRoots:",
+      "      - src/greeter",
+      "    planPath: docs/modules/greeter/project-plan.md",
+      "  - slug: zeta",
+      '    title: "Zeta"',
+      "    codeRoots: []",
+      "    planPath: docs/modules/zeta/project-plan.md",
+      "",
+    ].join("\n");
+    writeManifest(root, manifest);
+    try {
+      const r = await deleteModule(root, "greeter");
+      assert.strictEqual(r.refused, undefined, r.refused?.reason);
+      const after = readManifestText(root);
+      assert.ok(after.includes("# docs/modules.yaml — hand-authored, keep my comments"));
+      assert.ok(after.includes("# alpha owns nothing yet"));
+      assert.ok(!after.includes("slug: greeter"));
+      const entries = classifyModulesManifest(root) as any;
+      assert.deepStrictEqual(
+        entries.entries.map((e: any) => e.slug),
+        ["alpha", "zeta"],
+      );
+      // Sibling entries byte-for-byte identical.
+      assert.ok(after.includes('  - slug: alpha\n    title: "Alpha"'));
+      assert.ok(after.includes('  - slug: zeta\n    title: "Zeta"'));
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });

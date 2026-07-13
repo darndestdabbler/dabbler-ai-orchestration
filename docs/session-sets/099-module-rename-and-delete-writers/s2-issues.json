@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Watcher inventory line numbers are deterministically off by one**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** Every full-suite run that validates the exact watcher inventory will find no watcher at the newly declared lines `207` and `243`. This is probable rather than merely possible because the complete `extension.ts` diff adds only one line—the import—before both watcher callsites; the three-line command registration is inserted later, below them.\n  - **Details:** **Violation:** Step 6 requires “Build + full suite” and the progress contract requires “suite-green.” **Impact:** The deterministic inventory-test failure prevents the required green suite and should block merge/close. **Evidence:** The watcher callsites were previously recorded at lines `205` and `241`. The added import shifts both by exactly one, to `206` and `242`. The registration hunk starts around line 323 and therefore cannot shift earlier callsites, despite the comment claiming it does. **Location:** `src/test/suite/watcherInventory.test.ts`, entries changed to `207` and `243`. **Fix:** Change them to `206` and `242`, then run the full suite.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Every full-suite run that validates the exact watcher inventory will find no watcher at the newly declared lines `207` and `243`. This is probable rather than merely possible because the complete `extension.ts` diff adds only one line—the import—before both watcher callsites; the three-line command registration is inserted later, below them.",
+      "discoveryCall": 1
+    },
+    {
+      "description": "Watcher inventory line numbers are off by one and will fail the full suite**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** CI or the required full-suite run executes `watcherInventory.test.ts` and deterministically reports both watcher callsites as unexpected because the allowlist points one line below their actual locations. This is probable because the mismatch occurs on every test run, not only under an unusual runtime condition.\n  - **Details:**\n    - **Violation:** Step 6 requires “Build + full suite” and the session progress requires `suite-green`.\n    - **Impact:** The required suite cannot be green, so this changes a reasonable reviewer’s merge decision.\n    - **Evidence:** The baseline allowlist locations were lines 205 and 241. The only new source line before those callsites is the single `deleteModule` import, so they move to 206 and 242. The three-line registration added around new line 323 occurs after both watcher callsites and cannot move them. The test instead changes the expected lines to 207 and 243 and incorrectly claims the later registration shifted them.\n  - **Location:** `tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts`, entries changed to lines `207` and `243`.\n  - **Fix:** Change the allowlist locations to `206` and `242`, then run the watcher inventory and full suite.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "CI or the required full-suite run executes `watcherInventory.test.ts` and deterministically reports both watcher callsites as unexpected because the allowlist points one line below their actual locations. This is probable because the mismatch occurs on every test run, not only under an unusual runtime condition.",
+      "discoveryCall": 2
+    },
+    {
+      "description": "The destructive command implements only one modal confirmation, not the required two-step confirmation**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** Every user invoking `dabbler.deleteModule` receives only one modal warning after selecting a module. The mandated second safety checkpoint is absent on the main path, allowing permanent scaffold deletion after a single modal acceptance. This is certain for every successful invocation and materially removes an explicit safeguard for a destructive operation.\n  - **Details:**\n    - **Violation:** The specification requires “module QuickPick → **two-step modal confirm**” and the end deliverables require palette commands “with **two-step truthful confirms**.”\n    - **Impact:** The primary destructive workflow does not meet its required safety contract, which should block merging the feature as complete.\n    - **Evidence:** `runDeleteModuleFlow` calls `ui.confirm(...)` exactly once. `defaultUi.confirm` presents exactly one `showWarningMessage`. The tests likewise model and test only a single confirmation.\n  - **Location:** `tools/dabbler-ai-orchestration/src/commands/deleteModule.ts`, `runDeleteModuleFlow` and `defaultUi`; `src/test/suite/deleteModule.test.ts`.\n  - **Fix:** Implement two sequential modal confirmations, aborting if either is declined. Ensure the final confirmation presents the exact disposition, and add tests for accepting both and declining each independently.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "Every user invoking `dabbler.deleteModule` receives only one modal warning after selecting a module. The mandated second safety checkpoint is absent on the main path, allowing permanent scaffold deletion after a single modal acceptance. This is certain for every successful invocation and materially removes an explicit safeguard for a destructive operation.",
+      "discoveryCall": 2
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "9e97687854c932ee334a6268d67bdb5d634d3c69"
+}

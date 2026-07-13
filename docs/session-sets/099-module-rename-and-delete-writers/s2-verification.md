@@ -1,0 +1,25 @@
+ISSUES FOUND
+
+- **Issue 1: Watcher inventory line numbers are deterministically off by one**
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Failure scenario:** Every full-suite run that validates the exact watcher inventory will find no watcher at the newly declared lines `207` and `243`. This is probable rather than merely possible because the complete `extension.ts` diff adds only one line—the import—before both watcher callsites; the three-line command registration is inserted later, below them.
+  - **Details:** **Violation:** Step 6 requires “Build + full suite” and the progress contract requires “suite-green.” **Impact:** The deterministic inventory-test failure prevents the required green suite and should block merge/close. **Evidence:** The watcher callsites were previously recorded at lines `205` and `241`. The added import shifts both by exactly one, to `206` and `242`. The registration hunk starts around line 323 and therefore cannot shift earlier callsites, despite the comment claiming it does. **Location:** `src/test/suite/watcherInventory.test.ts`, entries changed to `207` and `243`. **Fix:** Change them to `206` and `242`, then run the full suite.
+
+#### NITS
+
+- **Nit:** The required “two-step modal confirm” is represented by only one `showWarningMessage` call; the QuickPick is separate and the modal itself has no second confirmation stage. **Location:** `src/commands/deleteModule.ts`, `DeleteModuleUi.confirm`, `defaultUi`, and `runDeleteModuleFlow`. **Fix:** Add the second destructive confirmation if “two-step modal confirm” means two confirmation dialogs, and test declining either stage.
+
+- **Nit:** A module with an already-running set is previewed as though that set will be cancelled, but the writer then refuses without changing anything. This makes the promised exact disposition dialog misleading in a supported refusal case. **Location:** `runDeleteModuleFlow` classifies before confirmation without performing the writer’s running-session preflight. **Fix:** Expose and run the same preflight before showing the confirmation, or present the refusal instead of a cancellation disposition.
+
+- **Nit:** The claim that sharing the classifier “guarantees” a truthful confirmation is false because the command classifies before waiting for user confirmation and the writer independently reclassifies afterward. State can change between those operations. **Location:** Comments and flow in `src/commands/deleteModule.ts`. **Fix:** Revalidate the preview immediately after confirmation and require it to match, or pass a versioned plan to the writer and refuse if the filesystem changed.
+
+- **Nit:** Manifest removal can delete standalone comments between the removed entry and the following entry. The boundary search skips comment-only lines, so those comments become part of the removed span even when they document the next module. **Location:** `removeManifestEntryText` in `src/utils/moduleAuthoring.ts`. **Fix:** Preserve same-level standalone comments preceding the next entry, or define and test explicit comment ownership rules.
+
+- **Nit:** Scaffold removal uses an execution-artifact denylist that omits known session artifacts such as `*-uat-checklist.json` and verification/remediation records. A lifecycle scaffold containing one of those artifacts but no listed artifact can be removed outright despite not being artifact-free. **Location:** `EXECUTION_ARTIFACT_FILENAMES`. **Fix:** Prefer an allowlist of files permitted in a removable scaffold, or include every canonical execution artifact and add tests for omitted artifact classes.
+
+- **Nit:** Unreadable, malformed, or unknown-status `session-state.json` files fail open as `"not-started"`. For `kind: plan|decomposition`, that can cause destructive directory removal when the writer cannot actually establish that the set was unstarted. **Location:** `rawSessionSetStatus`. **Fix:** Distinguish absent/synthetic not-started state from malformed or unknown state and conservatively classify the latter as `cancel` or refuse.
+
+- **Nit:** The final manifest write is not atomic. `fs.writeFileSync` opens the existing manifest for truncation, so an ENOSPC or interrupted write can leave a corrupt manifest after cancels/removals have landed; the next run then refuses the invalid manifest rather than being safely re-runnable. **Location:** `NODE_RENAME_IO` usage in the final `deleteModule` manifest write. **Fix:** Write and validate a sibling temporary file, then atomically rename it over `modules.yaml`.
+
+- **Nit:** The running-session check and scaffold deletion are not protected by a lock or final recheck. A session starting after preflight but before `rmSync` can have its directory removed despite the running-session refusal contract. **Location:** `deleteModule`, between `hasRunningSessionAt` and the apply loops. **Fix:** Hold the lifecycle lock through preflight and apply, or recheck each set immediately before cancellation/removal.

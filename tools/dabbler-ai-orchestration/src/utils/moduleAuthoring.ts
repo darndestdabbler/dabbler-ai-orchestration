@@ -27,6 +27,7 @@ import {
   writeFileExclusiveSync,
 } from "./fileSystem";
 import { nextSessionSetNumberFrom, numericPrefix } from "./resolveSetNumber";
+import { cancelSessionSet, isCancelled, readCancellationState } from "./cancelLifecycle";
 import { ModuleManifestEntry } from "../types";
 
 /** The manifest path as shown to operators (forward-slashed on every OS). */
@@ -1893,6 +1894,361 @@ export function renameModule(
     titleChanged: titleChanging,
     restamped: restampedNames,
   };
+}
+
+// ---------- Set 099 S2: the module DELETE writer ----------
+//
+// Delete a declared module (operator's adjudicated rule, spec "Delete
+// semantics"): remove the docs/modules.yaml entry; cancel every NON-TERMINAL
+// affected set via the existing `cancelSessionSet` writer (audit preserved,
+// restorable); remove OUTRIGHT only an unstarted `kind: plan|decomposition`
+// scaffold with no execution artifacts (the Set 098/100/101 placeholder);
+// completed (and already-cancelled) sets are never touched and reappear in
+// the undeclared-slug fallback group if the slug is later re-declared. The
+// manifest entry is removed LAST: cancels and scaffold removals are each
+// idempotent and safely re-runnable, so a run that stops partway can simply
+// be re-invoked — it never leaves the module half-deleted.
+
+/** Session-set artifact filenames that prove REAL execution happened (as
+ * opposed to a bare `kind: plan|decomposition` scaffold that only has a
+ * spec.md). Deliberately does NOT include `session-state.json`: the
+ * Session Set Explorer's own reader (`readStatus` -> `ensureSessionStateFile`)
+ * lazily SYNTHESIZES a `not-started` session-state.json onto any spec-only
+ * folder the moment it is scanned, so the file's mere presence is not a
+ * "this was touched" signal — only these real artifacts (or a non-
+ * `not-started` status inside the state file, checked separately) are. */
+const EXECUTION_ARTIFACT_FILENAMES = [
+  "activity-log.json",
+  "session-events.jsonl",
+  "change-log.md",
+  "ai-assignment.md",
+  "disposition.json",
+  "CANCELLED.md",
+  "RESTORED.md",
+] as const;
+
+function hasExecutionArtifacts(dir: string): boolean {
+  return EXECUTION_ARTIFACT_FILENAMES.some((f) => fs.existsSync(path.join(dir, f)));
+}
+
+/** Non-mutating raw-status read (mirrors {@link hasRunningSessionAt}): never
+ * calls the Explorer's `readStatus` (which would synthesize a state file as
+ * a side effect). Absent/unparseable/no-string-status all read as
+ * "not-started" — the same fallback the synthesizer itself would produce,
+ * just without writing it. */
+function rawSessionSetStatus(dir: string): "not-started" | "in-progress" | "complete" {
+  let raw: string;
+  try {
+    raw = fs.readFileSync(path.join(dir, "session-state.json"), "utf8");
+  } catch {
+    return "not-started";
+  }
+  let doc: unknown;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return "not-started";
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return "not-started";
+  const status = (doc as Record<string, unknown>).status;
+  if (typeof status !== "string") return "not-started";
+  const canon = status === "completed" || status === "done" ? "complete" : status;
+  return canon === "complete" || canon === "in-progress" ? canon : "not-started";
+}
+
+/** One set's deletion disposition (spec "Delete semantics"):
+ * `"terminal"` — complete, or already cancelled — never touched;
+ * `"cancel"` — non-terminal and NOT a removable scaffold — cancelled via
+ * `cancelSessionSet`;
+ * `"remove"` — an unstarted `kind: plan|decomposition` scaffold with no
+ * execution artifacts — its directory is removed outright. */
+export type ModuleSetDisposition = "terminal" | "cancel" | "remove";
+
+export interface ModuleSetDeletionClassification {
+  name: string;
+  dir: string;
+  disposition: ModuleSetDisposition;
+}
+
+function classifyOneSetForDeletion(
+  dir: string,
+  kind: string | undefined,
+): ModuleSetDisposition {
+  // Mirrors readSessionSets' own state-file-first-with-legacy-fallback
+  // cancellation read (fileSystem.ts): a set cancelled before it ever had a
+  // session-state.json (cancelSessionSet only touches the state file when
+  // one already exists) leaves CANCELLED.md as the ONLY signal —
+  // readCancellationState alone reports "unknown" for it, which would
+  // wrongly re-classify an already-cancelled set as "cancel" and re-cancel
+  // it.
+  const cancellation = readCancellationState(dir);
+  if (cancellation === "cancelled" || (cancellation === "unknown" && isCancelled(dir))) {
+    return "terminal";
+  }
+  const status = rawSessionSetStatus(dir);
+  if (status === "complete") return "terminal";
+  if (status === "not-started") {
+    const k = (kind ?? "").toLowerCase();
+    const isLifecycleScaffold = k === "plan" || k === "decomposition";
+    if (isLifecycleScaffold && !hasExecutionArtifacts(dir)) return "remove";
+  }
+  return "cancel";
+}
+
+/**
+ * Classify every set stamped `module: <slug>` (the same raw-stamp scan
+ * {@link renameModule} uses) by its deletion disposition. Exported so the
+ * palette command's two-step confirm and the writer itself share ONE
+ * classification — the confirm dialog's enumeration is guaranteed to match
+ * what the writer actually does, never a second independently-computed
+ * guess.
+ */
+export function classifyModuleSetsForDeletion(
+  root: string,
+  slug: string,
+): ModuleSetDeletionClassification[] {
+  const setsRoot = path.join(root, SESSION_SETS_REL);
+  const out: ModuleSetDeletionClassification[] = [];
+  for (const name of listSessionSetDirNames(root)) {
+    const dir = path.join(setsRoot, name);
+    const specAbs = path.join(dir, "spec.md");
+    const config = parseSessionSetConfig(specAbs);
+    if (config.module !== slug) continue;
+    out.push({ name, dir, disposition: classifyOneSetForDeletion(dir, config.kind) });
+  }
+  return out;
+}
+
+/**
+ * Format-preserving REMOVAL of one manifest entry (the Set 091 appender /
+ * Set 099 S1 rename posture: never re-serialize the operator's manifest).
+ * Deletes the `- slug: <slug>` entry's entire block — its slug line through
+ * its last nested field — plus exactly the one trailing newline that
+ * separated it from whatever followed, so no blank line is left behind (or
+ * trims cleanly to EOF when it was the last entry). Returns `null` when the
+ * entry cannot be located safely — the same exotic-manifest-shape residual
+ * {@link rewriteManifestEntryText} declares; the caller refuses loud and
+ * asks the operator to edit by hand.
+ */
+function removeManifestEntryText(text: string, slug: string): string | null {
+  const markerRe =
+    /^([ \t]*)-([ \t]+)slug([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n \t][^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/gm;
+  let target: RegExpExecArray | null = null;
+  for (const m of text.matchAll(markerRe)) {
+    if (unquoteScalar(m[4]) === slug) {
+      target = m as unknown as RegExpExecArray;
+      break;
+    }
+  }
+  if (target === null) return null;
+
+  const entryIndent = target[1].length;
+  const slugLineEnd = target.index! + target[0].length;
+
+  // Same entry-span boundary walk as rewriteManifestEntryText: the next
+  // list marker at the same (or shallower) indent, or a column-appropriate
+  // dedent, or EOF.
+  let spanEnd = text.length;
+  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|[^ \t\r\n#])/g;
+  boundaryRe.lastIndex = slugLineEnd;
+  let bm: RegExpExecArray | null;
+  while ((bm = boundaryRe.exec(text)) !== null) {
+    if (bm[1].length <= entryIndent) {
+      spanEnd = bm.index;
+      break;
+    }
+  }
+
+  const nlMatch = /^\r?\n/.exec(text.slice(spanEnd));
+  const deleteEnd = spanEnd + (nlMatch ? nlMatch[0].length : 0);
+  return text.slice(0, target.index!) + text.slice(deleteEnd);
+}
+
+/**
+ * The parse-after-write guard for the manifest removal (mirrors
+ * {@link assertRenamedManifestParses}): the candidate must parse to exactly
+ * the original entry set minus the removed slug, every remaining entry
+ * unchanged and in the same relative order. A semantic comparison, not a
+ * text diff, so it holds regardless of formatting.
+ */
+function assertManifestEntryRemoved(
+  originalEntries: readonly ModuleManifestEntry[],
+  candidateText: string,
+  slug: string,
+): void {
+  const refuse = (why: string): never => {
+    throw new Error(`Could not remove the module entry (${why}).`);
+  };
+  const candidate = parseManifestEntriesFromText(candidateText);
+  if (candidate === null) return refuse("the result is not a valid module manifest");
+  if (candidate.length !== originalEntries.length - 1) {
+    return refuse(
+      `entry count changed (${originalEntries.length} -> ${candidate.length}, expected ${originalEntries.length - 1})`,
+    );
+  }
+  if (candidate.some((e) => e.slug === slug)) {
+    return refuse(`the removed slug "${slug}" still appears`);
+  }
+  const remainingOriginal = originalEntries.filter(
+    (e) => e.slug !== slug,
+  ) as NormalizedManifestEntry[];
+  for (let i = 0; i < remainingOriginal.length; i++) {
+    if (!entriesEqual(remainingOriginal[i], candidate[i])) {
+      return refuse(`entry ${i} (${remainingOriginal[i].slug}) changed unexpectedly`);
+    }
+  }
+}
+
+/** The report the delete writer returns (the command surfaces it). */
+export interface DeleteModuleResult {
+  slug: string;
+  /** Names of sets cancelled via `cancelSessionSet`. */
+  cancelled: string[];
+  /** Names of unstarted lifecycle-scaffold sets whose directory was removed. */
+  removed: string[];
+  /** Names of completed/already-cancelled sets left untouched. */
+  terminal: string[];
+  /** Present iff a preflight refused the whole operation — nothing written. */
+  refused?: { reason: string };
+  /**
+   * Present iff the apply phase stopped partway. `cancelled` / `removed`
+   * above already list what succeeded before the stop; every one of those
+   * steps is idempotent, so re-invoking `deleteModule` with the same slug
+   * picks up exactly where it left off (already-cancelled sets classify
+   * `"terminal"` on the retry; already-removed directories are simply gone).
+   * The manifest entry is NEVER removed until every cancel/removal has
+   * succeeded, so a partial failure always leaves the module still declared.
+   */
+  partialFailure?: { reason: string };
+}
+
+/**
+ * Delete a declared module (operator's adjudicated disposition rule).
+ * Preflight (refusals leave every file byte-identical): the manifest is
+ * present + valid and declares `slug`; refuse while any affected set has a
+ * running session (checked BEFORE anything is touched, mirroring
+ * {@link renameModule}). Every affected set (the raw `module: <slug>`
+ * stamp scan, matching {@link renameModule}'s own scan) is then classified
+ * by {@link classifyModuleSetsForDeletion} and the manifest removal is
+ * computed + guarded up front — a bad splice refuses the whole operation
+ * before any set is touched. Apply order: cancel non-terminal sets, then
+ * remove scaffold directories (both idempotent, safely re-runnable), then
+ * the manifest entry LAST — so an interrupted run never half-deletes the
+ * module.
+ */
+export async function deleteModule(
+  root: string,
+  slugRaw: string,
+  io: RenameFileIo = NODE_RENAME_IO,
+): Promise<DeleteModuleResult> {
+  const slug = (slugRaw ?? "").trim();
+  const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+  const refuse = (reason: string): DeleteModuleResult => ({
+    slug,
+    cancelled: [],
+    removed: [],
+    terminal: [],
+    refused: { reason },
+  });
+
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") return refuse(INVALID_MANIFEST_MESSAGE);
+  const entries = classified.kind === "present" ? classified.entries : [];
+  if (!entries.some((e) => e.slug === slug)) {
+    return refuse(`Module "${slug}" is not declared in ${MODULES_MANIFEST_DISPLAY}.`);
+  }
+
+  const classifications = classifyModuleSetsForDeletion(root, slug);
+
+  const running = classifications.filter((c) => hasRunningSessionAt(c.dir, io));
+  if (running.length > 0) {
+    return refuse(
+      `Refusing to delete "${slug}" while ${running.length} affected set(s) have a ` +
+        `running session (${running.map((r) => r.name).join(", ")}). Finish or close them first.`,
+    );
+  }
+
+  const terminalNames = classifications
+    .filter((c) => c.disposition === "terminal")
+    .map((c) => c.name)
+    .sort();
+  const toCancel = classifications.filter((c) => c.disposition === "cancel");
+  const toRemove = classifications.filter((c) => c.disposition === "remove");
+
+  // Compute + guard the manifest removal BEFORE touching any set — an
+  // unspliceable manifest refuses the whole operation up front.
+  const manifestAbs = path.join(root, MODULES_MANIFEST_REL);
+  let manifestOriginal: string;
+  try {
+    manifestOriginal = io.readFileSync(manifestAbs);
+  } catch (e) {
+    return refuse(`could not read ${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
+  }
+  const manifestNext = removeManifestEntryText(manifestOriginal, slug);
+  if (manifestNext === null) {
+    return refuse(
+      `could not remove the ${MODULES_MANIFEST_DISPLAY} entry for "${slug}" while ` +
+        `preserving formatting — remove it by hand.`,
+    );
+  }
+  try {
+    assertManifestEntryRemoved(entries, manifestNext, slug);
+  } catch (e) {
+    return refuse(`${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
+  }
+
+  // ----- Apply: cancels + scaffold removals first (each idempotent and
+  // safely re-runnable); the manifest edit lands last.
+  const cancelled: string[] = [];
+  const removed: string[] = [];
+  const reason = `module ${slug} deleted`;
+  for (const c of toCancel) {
+    try {
+      await cancelSessionSet(c.dir, reason);
+      cancelled.push(c.name);
+    } catch (e) {
+      return {
+        slug,
+        cancelled,
+        removed,
+        terminal: terminalNames,
+        partialFailure: { reason: `cancelling ${c.name} failed: ${msg(e)}` },
+      };
+    }
+  }
+  for (const c of toRemove) {
+    try {
+      fs.rmSync(c.dir, { recursive: true, force: true });
+      removed.push(c.name);
+    } catch (e) {
+      return {
+        slug,
+        cancelled,
+        removed,
+        terminal: terminalNames,
+        partialFailure: { reason: `removing ${c.name} failed: ${msg(e)}` },
+      };
+    }
+  }
+
+  try {
+    io.writeFileSync(manifestAbs, manifestNext);
+  } catch (e) {
+    return {
+      slug,
+      cancelled,
+      removed,
+      terminal: terminalNames,
+      partialFailure: {
+        reason:
+          `${cancelled.length} set(s) cancelled and ${removed.length} scaffold(s) removed, ` +
+          `but writing ${MODULES_MANIFEST_DISPLAY} failed: ${msg(e)} — re-run to finish ` +
+          `removing the manifest entry.`,
+      },
+    };
+  }
+
+  return { slug, cancelled, removed, terminal: terminalNames };
 }
 
 // ---------- Set 098 S2: module-lifecycle set templates + scaffold writer ----------

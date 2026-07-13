@@ -214,7 +214,7 @@ Before you begin, every team member needs:
     git branch -d authoring/001-greeter-hello
     ```
 
-    > **One rule for every cleanup in this tutorial:** the steps assume GitHub's default **Create a merge commit** strategy. If your repo merges PRs by **squash** or **rebase** instead, the merged commit gets a new identity, so `git branch -d` will refuse with "not fully merged" at *every* cleanup point from here on — that is git protecting you, not an error in the flow. Verify the PR's changes are on your pulled `main`, then delete with `git branch -D`.
+    > **One rule for every cleanup in this tutorial:** the steps assume GitHub's default **Create a merge commit** strategy. If your repo merges PRs by **squash** or **rebase** instead, the merged commit gets a new identity, so `git branch -d` will refuse with "not fully merged" at *every* cleanup point from here on — that is git protecting you, not an error in the flow. Verify the PR's changes are on your pulled `main`, then delete with `git branch -D`. Deleting merged branches never deletes the audit trail: each merged **PR** permanently keeps the branch name, changed files, and reviews, and that PR record is exactly what the companion workflow review reads once the branches themselves are gone.
 
     > **Expect:** `origin/main` now contains the greeter plan and `001-greeter-hello`. (The scaffolded CI's placeholder job runs and passes on the PR — the real per-module jobs arrive in Part 7.)
 
@@ -343,6 +343,8 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
     ```
 
     Note the integration rule: Alex owns the folder, but Priya and Sam are listed too — the integration module composes *their* code (`touches: [greeter, clock]`), so the owners of every touched module review its PRs.
+
+    Also write the module→owner mapping down somewhere **other** than CODEOWNERS itself — the simplest is one `# owners: @priya-gh` comment line per module in `docs/modules.yaml`. CODEOWNERS routes reviews, but nothing in GitHub checks that its handles are the *right people*; a mistyped or stale handle still "covers" every path. The companion workflow review (next section's doc pointer) treats that separate roster as the ground truth to audit CODEOWNERS against, and without one it can verify only path coverage, not owner identity.
 
 2. Open `.github/workflows/monorepo-ci.yml`. The scaffolded template teaches a two-layer contract — **path-scoped module jobs** for fast PR feedback, and the **`all-modules` guardrail** on every push to `main` (the anti-integration-bomb rule: cross-module breakage surfaces on the merge that caused it). Rather than hand-assembling it from the template's two commented examples, replace the whole file with this complete, final workflow for our three modules:
 
@@ -551,12 +553,18 @@ The core habit: **merge a set when it completes.** Small, frequent, boring merge
     git push -u origin hotfix/greeting-typo
     ```
 
-    Open the PR (the path-scoped `greeter` job runs on it — pull requests trigger CI regardless of branch name), get a teammate's approval, and wait for green. One subtlety: the PR check runs against GitHub's *preview merge* of your branch with `main` — good for compatibility, but not literally the snapshot you are about to tag. So validate the exact hotfix commit locally, **then** tag and deploy — and only merge after:
+    Open the PR (the path-scoped `greeter` job runs on it — pull requests trigger CI regardless of branch name), get a teammate's approval, and wait for green. One subtlety: the PR check runs against GitHub's *preview merge* of your branch with `main` — good for compatibility, but not literally the snapshot you are about to tag. And the path-scoped job tested only the changed module, while the tag ships **all** of them — `integration` composes greeter's output, and the `all-modules` guardrail won't run until this merges to `main`, *after* the release is out. So validate the exact hotfix commit locally with the **full integrated suite**, **then** tag and deploy — and only merge after:
 
     ```bash
     git switch hotfix/greeting-typo
-    python -m unittest discover -s services/greeter -v   # the exact snapshot v0.1.1 will point at
-    git tag -a v0.1.1 -m "hello-modules 0.1.1 (hotfix)"
+    # The exact snapshot v0.1.1 will point at — every module's tests plus
+    # the composed smoke run, mirroring the all-modules job locally. The
+    # && chain gates each step on the one before it, so the tag and push
+    # run ONLY if every test and the smoke run passed (the parentheses
+    # keep the loop's failure exit from closing your shell):
+    ( for d in services/*/; do python -m unittest discover -s "${d%/}" -v || exit 1; done ) &&
+    python services/integration/app.py &&
+    git tag -a v0.1.1 -m "hello-modules 0.1.1 (hotfix)" &&
     git push origin v0.1.1
     ```
 

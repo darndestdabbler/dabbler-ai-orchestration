@@ -164,8 +164,13 @@ for branch in branches:
 # A failure here just means "review evidence unavailable" — the prompt
 # scores the owner-review principle ADVISORY in that case, never guesses.
 evidence.append("--- gh pr list (best-effort PR review data) ---\n"
-                + sh("gh", "pr", "list", "--state", "merged", "--limit", "30",
-                     "--json", "number,title,author,files,reviews,reviewDecision"))
+                + sh("gh", "pr", "list", "--state", "merged", "--limit", "50",
+                     "--json", "number,title,author,headRefName,mergedAt,url,"
+                               "files,reviews,reviewDecision"))
+# Branch-protection / ruleset configuration is the ONLY evidence that review
+# is ENFORCED (an approving review can exist with no rule requiring it).
+evidence.append("--- gh api branch protection (best-effort enforcement data) ---\n"
+                + sh("gh", "api", "repos/{owner}/{repo}/branches/main/protection"))
 
 content = (PROMPT
            + "\n\n# EVIDENCE BUNDLE (gathered by the caller)\n\n"
@@ -215,6 +220,8 @@ Read the following files and run these shell commands from the repository root:
 *   **File:** `.github/CODEOWNERS`
     *   **Extract:** The ordered list of all active (uncommented) ownership rules. ORDER MATTERS: GitHub applies the LAST matching pattern for a path, and later rules REPLACE (not add to) earlier owners. When scoring coverage, resolve each path of interest against the rules bottom-up and record the final matching pattern and its effective owner set.
 
+*   **Ownership ground truth (best-effort):** an authoritative module→owner mapping INDEPENDENT of CODEOWNERS — an `owners:` note per module in `docs/modules.yaml`, a roster in the module plan docs or a team policy file, or a caller-supplied ownership map appended to the evidence bundle. CODEOWNERS is the artifact under audit, so its own handles are never their own ground truth; without an independent source, owner-IDENTITY judgments are unverifiable (see Principle 5's owner-identity rule).
+
 *   **File Pattern:** `.github/workflows/*.yml` or `.github/workflows/*.yaml`
     *   **Extract:** The structure of CI jobs. Specifically look for (a) jobs that are scoped to run only on changes to specific module `codeRoots` and (b) an unconditional, all-modules integration job that runs on every push to the `main` branch.
 
@@ -258,15 +265,23 @@ Read the following files and run these shell commands from the repository root:
 *   **PR review data (best-effort):** if the `gh` CLI is available, the repo has
     a GitHub remote, and you are authenticated, run:
     ```shell
-    gh pr list --state merged --limit 30 --json number,title,author,files,reviews,reviewDecision
+    gh pr list --state merged --limit 50 --json number,title,author,headRefName,mergedAt,url,files,reviews,reviewDecision
+    gh api repos/{owner}/{repo}/branches/main/protection
     ```
-    If this fails for any reason, treat completed-review evidence as
-    UNAVAILABLE. Local git artifacts (CODEOWNERS contents, merge-commit
-    messages) are never proof that a review happened.
+    The merged-PR record (with `headRefName` and `mergedAt`) is the DURABLE
+    audit trail: trunk hygiene deletes merged session branches, so completed
+    work is reviewable only through its PRs. State the window these PRs
+    cover (count and merge-date range) — the review audits that period, not
+    all history. The protection/ruleset output is the only enforcement
+    evidence (Principle 4 fact 3). If either command fails, treat that
+    evidence as UNAVAILABLE. Local git artifacts (CODEOWNERS contents,
+    merge-commit messages) are never proof that a review happened.
 
 **2. Principles for Review**
 
 Evaluate the gathered evidence against these seven principles.
+
+**Cap semantics (applies to every evidence rule below):** an evidence cap is a CEILING on PASS for the unevidenced fact only. Missing evidence prevents a `PASS`; it NEVER suppresses a `FAIL` that evidence in hand already establishes. When any sub-check fails on available evidence, the principle scores `FAIL` (cite it), and the report separately names the facts that remain unevidenced. Every "cap at `ADVISORY`" below means: score no better than `ADVISORY` unless an evidenced condition independently requires `FAIL`.
 
 **Principle 1: Trunk Hygiene**
 *   **Check:** The `main` branch should be the only long-lived branch. All other branches should be short-lived feature or session-set branches that are created, merged to `main`, and then deleted. Look for stale, unmerged branches or parallel long-lived branches like `develop`, `staging`, or `release/*`. Judge "stale" from the DATED branch-tip evidence (committer dates and divergence counts), not from names.
@@ -280,7 +295,7 @@ Evaluate the gathered evidence against these seven principles.
 *   **Bad:** Session sets are missing the `module:` stamp (they are "unstamped") or use a slug not declared in the manifest. Unstamped sets are a smell of forgotten intent.
 
 **Principle 3: Directory Discipline vs `codeRoots`**
-*   **Check:** For each session-set branch (LOCAL AND REMOTE — see the evidence section), analyze the changed files (`git diff`). A changed path is IN SCOPE when it falls under any of:
+*   **Check:** For each session-set branch (LOCAL AND REMOTE — see the evidence section), analyze the changed files (`git diff`). **Completed work is audited through merged PRs, not branches:** trunk hygiene deletes merged session branches, so ALSO evaluate each gathered merged PR whose `headRefName` names a session set (`session-set/<slug>`), using the PR's `files` list and resolving the set's `module:` stamp from `docs/session-sets/<slug>/spec.md` on `main`. Name the PR window you audited (from the gathered `mergedAt` range). Without authenticated PR metadata, the merged-history half of this principle is unscoreable — cap IT at `ADVISORY` while still scoring the live branches. A changed path is IN SCOPE when it falls under any of:
     1.  the owning module's `codeRoots` (per the set's `module:` stamp);
     2.  the set's own `docs/session-sets/<set-name>/` directory (and the module's own `docs/modules/<slug>/` folder);
     3.  **the `touches` exception:** the `codeRoots` of modules explicitly named in the owning module's `touches:` list — that is precisely what `touches` sanctions. (Whether the touched owners then actually reviewed the work is Principle 4's question, not this one's.)
@@ -291,17 +306,18 @@ Evaluate the gathered evidence against these seven principles.
 *   **Check:** Work that intentionally spans multiple modules must belong to a module whose declaration in `docs/modules.yaml` includes a `touches:` list naming the other modules — and the touched modules' owners must actually review that work. Keep four different facts separate, and say which ones you have evidence for:
     1.  **Coverage** — judged on the CHANGED PATHS, not on the integration module's own directories: for every changed path admitted through `touches` (i.e. inside a touched module's `codeRoots`), the final matching CODEOWNERS rule (last-match-wins — see Principle 5) must include that touched module's owner, and the aggregated effective owners across the PR must therefore include every touched module's owner. When the integration module also owns composition code of its own (`codeRoots` non-empty) and the PR changes it, that path's effective owners should include the touched owners too. An integration module with the legal `codeRoots: []` shape has no paths of its own — coverage for it is ONLY the changed-path aggregation; never report deficient coverage merely because no integration-owned path lists all owners.
     2.  **Auto-request** — GitHub requests those owners on a PR (never the PR's own author). Follows from coverage, but only for hosted PRs.
-    3.  **Enforcement** — branch protection actually requires approvals (or code-owner reviews) before merge. Proven only by protection/ruleset data or PR `reviewDecision` output.
+    3.  **Enforcement** — branch protection actually requires approvals (or code-owner reviews) before merge. Proven ONLY by protection/ruleset configuration (the `gh api .../branches/main/protection` output in the evidence section, or the repository rulesets endpoint). PR `reviews`/`reviewDecision` output is completed-review evidence (fact 4), NEVER enforcement evidence — an approving review can exist with no rule requiring it. Without protection/ruleset data, report enforcement as unevidenced.
     4.  **Completed approvals** — the touched owners approved specific PRs. Proven only by PR review data (the `gh pr list` output above).
 *   **Good:** A set in the `reporting` module (`codeRoots: []`, `touches: [auth, billing]`) changes `auth/**` and `billing/**`; resolving those changed paths gives effective owners `@auth-team` and `@billing-team` respectively, so the PR's aggregated owners include both (coverage), and the gathered PR data shows both teams' approving reviews (completed approvals).
 *   **Bad:** Cross-module changes without a `touches` declaration; CODEOWNERS not composing the touched owners; or — an evidence failure, not a workflow failure — claiming owner review happened based on CODEOWNERS contents or a merge-commit message alone.
-*   **Evidence rule:** with no PR review data, cap this principle at `ADVISORY`: report coverage (fact 1) from CODEOWNERS, state that request/enforcement/approval evidence is unavailable, and name what would settle it (an authenticated `gh` run, or a screenshot of the PR's review panel). Never infer completed reviews from local git artifacts.
+*   **Evidence rule:** with no PR review data, cap this principle at `ADVISORY` — per the cap semantics above, that is a ceiling on PASS, so an evidenced failure of coverage (fact 1: cross-module changes without `touches`, or CODEOWNERS not composing the touched owners) still scores `FAIL`. Report coverage (fact 1) from CODEOWNERS, state that request/enforcement/approval evidence is unavailable, and name what would settle it (an authenticated `gh` run, or a screenshot of the PR's review panel). Never infer completed reviews from local git artifacts.
 
 **Principle 5: CODEOWNERS Coverage**
 *   **Check:** For every `codeRoot` declared in `docs/modules.yaml`, every module documentation folder (`docs/modules/<slug>/`), and the critical shared files (`docs/modules.yaml`, `.github/` workflow files): resolve the path against the CODEOWNERS rules using **last-match-wins** (GitHub applies the last matching pattern; later rules replace earlier owners entirely) and check that the EFFECTIVE owner set is the intended one. A module rule that a later, broader rule overrides is a covered-looking blind spot.
 *   **Good:** Every path of interest resolves to the intended effective owners; the report cites the final matching pattern for each.
 *   **Bad:** A module's `codeRoot` has no matching rule — or has one that a later rule overrides, so the module owner is not in the effective owner set. For example, with `services/greeter/ @greeter-team` followed by `services/ @platform-team`, greeter's effective owner is only `@platform-team`.
-*   **Scope rule:** this principle scores COVERAGE of the mapping file only. Never claim here that CODEOWNERS "ensures" or "blocks" anything — whether reviews are requested, required, or actually happened is Principle 4's four-fact question, and enforcement claims need protection/ruleset or PR evidence.
+*   **Scope rule:** this principle scores COVERAGE of the mapping file only. Never claim here that CODEOWNERS "ensures" or "blocks" anything — whether reviews are requested, required, or actually happened is Principle 4's four-fact question, and enforcement claims need protection/ruleset evidence.
+*   **Owner-identity rule:** judging that the effective owners are the INTENDED owners requires the independent ownership ground truth from the evidence section (an `owners:` note in the manifest, a roster doc, or a caller-supplied map) — CODEOWNERS' own handles are circular as their own ground truth, and a mistyped, swapped, or stale handle still "covers" every path syntactically. Without an independent source, report path-match coverage as evidenced, state that owner identity is unverifiable, and cap owner-identity judgments at `ADVISORY`.
 
 **Principle 6: Tag Correctness / Production-as-a-Tag**
 *   **Check:** Releases must be marked with ANNOTATED git tags (`objecttype` is `tag`), not lightweight tags (`objecttype` is `commit`). The tags should follow a consistent semver scheme (e.g., `vX.Y.Z` for the whole repo or `<slug>-vX.Y.Z` per-module). Hotfixes should branch from a tag, not from `main`, carry the new tag ON the fixed commit (so the new release is exactly the old release plus the fix), and be merged back to `main` after release.
@@ -309,7 +325,7 @@ Evaluate the gathered evidence against these seven principles.
 *   **Good:** `git for-each-ref` shows annotated tags with a clear scheme, and the range log between consecutive tags shows only the intended commits.
 *   **Bad:** Lightweight tags, inconsistent schemes, long-lived `release/*` branches, or a patch tag placed on post-merge `main` that sweeps in unreleased work.
 *   **Evidence rule:** if the evidence at hand does not show tag targets and ancestry (no decorated log, no range logs), cap this principle at `ADVISORY` and say which command would settle it. Never write "presumably" — an unverifiable claim is unavailable evidence.
-*   **Production-target rule:** tag MECHANICS (annotated, consistent scheme, correct ancestry, hotfix-from-tag) are provable from git alone — score them as above. Whether PRODUCTION actually runs a tag is a separate fact that git history cannot prove: look for a tag-triggered deploy job in the gathered workflows (`on: push: tags:`), or an environment/release record naming the deployed tag. With such evidence, say so and score the whole principle; without it, report the mechanics result, state that the production-target half is unevidenced, cap the principle at `ADVISORY`, and name what would settle it. Never infer "production runs the tag" from the tags merely existing.
+*   **Production-target rule:** tag MECHANICS (annotated, consistent scheme, correct ancestry, hotfix-from-tag) are provable from git alone — score them as above. Whether PRODUCTION actually runs a tag is a separate fact that git history cannot prove: look for a tag-triggered deploy job in the gathered workflows (`on: push: tags:`), or an environment/release record naming the deployed tag. With such evidence, say so and score the whole principle; without it, report the mechanics result, state that the production-target half is unevidenced, cap the principle at `ADVISORY`, and name what would settle it — but per the cap semantics above, an evidenced mechanics failure (lightweight tags, inconsistent scheme, bad ancestry) still scores `FAIL`; the missing production-target evidence never suppresses it. Never infer "production runs the tag" from the tags merely existing.
 
 **Principle 7: Integration-Bomb Symptoms**
 *   **Check:** This is a meta-principle looking for signs of deferred integration pain. Look for multiple completed but unmerged session-set branches piling up. Check for a disabled or missing all-modules integration job in CI for the `main` branch. Scan for branches that have drifted from `main` for more than a week or two — judge drift from the dated branch tips and the per-branch divergence counts (behind/ahead), not from names or an undated graph.
@@ -339,7 +355,7 @@ Produce a single Markdown document. Do not include any text before the first hea
 *   **Coaching:** [Explain the risk of scope creep. Advise on how to fix it, e.g., "The set 'add-user-avatar' in the 'profile' module modified files in the 'notifications' module. This work should be moved to a dedicated integration set owned by a module with a `touches: [notifications]` declaration."]
 
 ### 4. Integration `touches` & Owner Review — <PASS | ADVISORY | FAIL>
-*   **Evidence:** [Cite the `touches` declarations, and coverage as the effective owners of the CHANGED touched paths (final matching rule per path, aggregated across the PR — not the integration module's own directories). Cite completed approvals ONLY from gathered PR review data; if that data is unavailable, say so, score ADVISORY, and name what would settle it. Never cite a merge-commit message as proof of review.]
+*   **Evidence:** [Cite the `touches` declarations, and coverage as the effective owners of the CHANGED touched paths (final matching rule per path, aggregated across the PR — not the integration module's own directories). Cite completed approvals ONLY from gathered PR review data, and enforcement ONLY from protection/ruleset data; if that data is unavailable, say so, score no better than ADVISORY (an evidenced coverage failure still scores FAIL — cap semantics), and name what would settle it. Never cite a merge-commit message as proof of review.]
 *   **Coaching:** [Reinforce the importance of making dependencies explicit and of the touched owners actually approving. If there's a gap, recommend updating `modules.yaml` / `CODEOWNERS`, or tightening branch protection.]
 
 ### 5. CODEOWNERS Coverage — <PASS | ADVISORY | FAIL>
@@ -347,7 +363,7 @@ Produce a single Markdown document. Do not include any text before the first hea
 *   **Coaching:** [Explain that missing or overridden ownership leads to missed reviews. Suggest the specific rule to add — or to move above/below the overriding rule.]
 
 ### 6. Tag Correctness / Production-as-a-Tag — <PASS | ADVISORY | FAIL>
-*   **Evidence:** [Cite `git for-each-ref` for tag types AND the decorated log / per-tag range logs for where tags point and what each release added. A PASS requires ancestry evidence AND production-target evidence (e.g. a tag-triggered deploy workflow); with mechanics-only evidence, report the mechanics result and score ADVISORY, naming the missing deployment evidence. No "presumably".]
+*   **Evidence:** [Cite `git for-each-ref` for tag types AND the decorated log / per-tag range logs for where tags point and what each release added. A PASS requires ancestry evidence AND production-target evidence (e.g. a tag-triggered deploy workflow); with mechanics-only evidence, report the mechanics result and score no better than ADVISORY, naming the missing deployment evidence — an evidenced mechanics failure still scores FAIL (cap semantics). No "presumably".]
 *   **Coaching:** [Explain why annotated tags on the right commits — and a production that provably runs them — are crucial for releases. Recommend a consistent scheme and process for tagging.]
 
 ### 7. Integration-Bomb Symptoms — <PASS | ADVISORY | FAIL>
@@ -364,7 +380,7 @@ Produce a single Markdown document. Do not include any text before the first hea
 
 ```
 
-**Final Rule:** If you cannot find evidence for a principle (e.g., the project is too new to have tags, or you cannot access PR history to confirm reviews), score it as `ADVISORY` and state what evidence would be needed to make a `PASS` or `FAIL` judgment. Do not guess or invent violations. If the repository is small and new, it's acceptable to state that some principles are not yet exercised.
+**Final Rule:** If you cannot find evidence for a principle (e.g., the project is too new to have tags, or you cannot access PR history to confirm reviews), score it as `ADVISORY` and state what evidence would be needed to make a `PASS` or `FAIL` judgment. A cap never converts an evidenced `FAIL` into `ADVISORY` (cap semantics above). Do not guess or invent violations. If the repository is small and new, it's acceptable to state that some principles are not yet exercised.
 ~~~
 
 ## Reading the results

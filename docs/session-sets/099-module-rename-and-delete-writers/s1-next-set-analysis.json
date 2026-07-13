@@ -1,0 +1,12 @@
+{
+  "purpose": "Set 099 Session 2 orchestrator recommendation (routed analysis, Step 3.5/8 contract)",
+  "model_id": "gemini-2.5-pro",
+  "model_name": "gemini-pro",
+  "tier": 2,
+  "complexity_score": 39,
+  "escalated": false,
+  "truncated": false,
+  "total_cost_usd": 0.00166625,
+  "elapsed_seconds": 14.085342645645142,
+  "content": "### Orchestrator Recommendation\n\n**Recommended**\n`claude / anthropic / claude-sonnet-5 / low`\n\n**Rationale**\nSonnet provides the optimal balance of cost and the reasoning capability required to correctly sequence the multi-part logic, handle the stateful checks, and deliver the advisory critique without the expense of a flagship model.\n\n**Runner-up**\n`gemini / google / gemini-pro / low`"
+}

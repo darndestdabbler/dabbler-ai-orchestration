@@ -13,9 +13,14 @@ import {
   MODULES_YAML_TEMPLATE,
   ModulePickItem,
   ModulePickUi,
+  RenameFileIo,
+  assertRenamedManifestParses,
+  assertRestampedTextValid,
   assertStampedTextValid,
   assignLegacySetsToModule,
   classifyModulesManifest,
+  renameModule,
+  restampModuleInSpecText,
   defaultModulePlanPath,
   ensureModulesManifest,
   isSafeRepoRelativePath,
@@ -2175,5 +2180,474 @@ suite("moduleAuthoring — scaffoldModuleLifecycleSets (Set 098 S2)", () => {
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 099 Session 1 — the transactional module RENAME writer.
+// ---------------------------------------------------------------------
+
+suite("moduleAuthoring — restampModuleInSpecText (Set 099 S1)", () => {
+  const specWithModule = (slug: string, extra = ""): string =>
+    [
+      "# A Set",
+      "",
+      "## Session Set Configuration",
+      "",
+      "```yaml",
+      `module: ${slug}${extra}`,
+      "tier: full          # keep me",
+      "```",
+      "",
+      "## Sessions",
+      "body",
+      "",
+    ].join("\n");
+
+  test("rewrites only the module value, preserving every other byte", () => {
+    const original = specWithModule("greeter");
+    const out = restampModuleInSpecText(original, "greeter", "welcomer");
+    assert.strictEqual(out.kind, "written");
+    if (out.kind !== "written") return;
+    assert.ok(out.text.includes("```yaml\nmodule: welcomer\ntier: full"));
+    assert.ok(out.text.includes("# keep me"));
+    assert.ok(out.text.includes("## Sessions\nbody"));
+    // Exactly one byte-span changed: everything but the value token matches.
+    assert.strictEqual(out.text.replace("welcomer", "greeter"), original);
+    assert.doesNotThrow(() =>
+      assertRestampedTextValid(original, out.text, "greeter", "welcomer"),
+    );
+  });
+
+  test("preserves a trailing comment on the module: line", () => {
+    const original = specWithModule("greeter", "   # grouping attr");
+    const out = restampModuleInSpecText(original, "greeter", "welcomer");
+    assert.strictEqual(out.kind, "written");
+    if (out.kind !== "written") return;
+    assert.ok(out.text.includes("module: welcomer   # grouping attr"));
+  });
+
+  test("noop when already stamped to the new slug", () => {
+    const original = specWithModule("welcomer");
+    assert.strictEqual(
+      restampModuleInSpecText(original, "greeter", "welcomer").kind,
+      "noop",
+    );
+  });
+
+  test("refuses when stamped to a slug other than the expected old one", () => {
+    const original = specWithModule("payments");
+    const out = restampModuleInSpecText(original, "greeter", "welcomer");
+    assert.strictEqual(out.kind, "refused");
+  });
+
+  test("refuses when there is no top-level module key (only a nested one)", () => {
+    const nested = [
+      "## Session Set Configuration",
+      "```yaml",
+      "tier: full",
+      "notes: |",
+      "  module: greeter",
+      "```",
+      "",
+    ].join("\n");
+    assert.strictEqual(
+      restampModuleInSpecText(nested, "greeter", "welcomer").kind,
+      "refused",
+    );
+  });
+
+  test("refuses an unterminated config fence", () => {
+    const bad = [
+      "## Session Set Configuration",
+      "```yaml",
+      "module: greeter",
+      "",
+      "## Sessions",
+      "no closing fence",
+    ].join("\n");
+    assert.strictEqual(
+      restampModuleInSpecText(bad, "greeter", "welcomer").kind,
+      "refused",
+    );
+  });
+
+  test("assertRestampedTextValid rejects a tampered result", () => {
+    const original = specWithModule("greeter");
+    const good = restampModuleInSpecText(original, "greeter", "welcomer");
+    if (good.kind !== "written") return assert.fail("expected written");
+    const tampered = good.text + "\nEXTRA\n";
+    assert.throws(() =>
+      assertRestampedTextValid(original, tampered, "greeter", "welcomer"),
+    );
+  });
+});
+
+suite("moduleAuthoring — renameModule preflight matrix (Set 099 S1)", () => {
+  const moduleSpec = (slug: string): string =>
+    [
+      "# A Set",
+      "## Session Set Configuration",
+      "```yaml",
+      `module: ${slug}`,
+      "tier: full",
+      "```",
+      "",
+    ].join("\n");
+
+  const setup = (manifest: string): string => {
+    const root = tmpRoot("rename-pf-");
+    writeManifest(root, manifest);
+    return root;
+  };
+
+  test("refuses an invalid target slug (shape) — nothing written", () => {
+    const root = setup("modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const before = readManifestText(root);
+      const r = renameModule(root, "greeter", { newSlug: "Not A Slug" });
+      assert.ok(r.refused, "expected a refusal");
+      assert.strictEqual(readManifestText(root), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses a target that collides with another DECLARED slug", () => {
+    const root = setup(
+      "modules:\n  - slug: greeter\n    title: Greeter\n  - slug: payments\n    title: Payments\n",
+    );
+    try {
+      const before = readManifestText(root);
+      const r = renameModule(root, "greeter", { newSlug: "payments" });
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /already exists/i);
+      assert.strictEqual(readManifestText(root), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses a target that collides with an UNDECLARED slug carrying stamped sets", () => {
+    const root = setup("modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      // A set stamped to an undeclared 'welcomer' — the silent-merge hazard.
+      specWith(root, "002-legacy", moduleSpec("welcomer"));
+      const before = fs.readFileSync(a, "utf8");
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" });
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /merge histories/i);
+      assert.strictEqual(fs.readFileSync(a, "utf8"), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses while an affected set has a running (in-progress) session", () => {
+    const root = setup("modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      const setDir = path.dirname(a);
+      fs.writeFileSync(
+        path.join(setDir, "session-state.json"),
+        JSON.stringify({ schemaVersion: 4, status: "in-progress", sessions: [] }),
+        "utf8",
+      );
+      const before = fs.readFileSync(a, "utf8");
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" });
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /running session/i);
+      assert.strictEqual(fs.readFileSync(a, "utf8"), before);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses renaming a module that is not declared", () => {
+    const root = setup("modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const r = renameModule(root, "ghost", { newSlug: "welcomer" });
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /not declared/i);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses when nothing would change", () => {
+    const root = setup("modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const r = renameModule(root, "greeter", { newSlug: "greeter", newTitle: "Greeter" });
+      assert.ok(r.refused);
+      assert.match(r.refused!.reason, /no change/i);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("refuses on an invalid manifest", () => {
+    const root = setup("this: is not a modules list\n");
+    try {
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" });
+      assert.ok(r.refused);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+suite("moduleAuthoring — renameModule apply matrix (Set 099 S1)", () => {
+  const moduleSpec = (slug: string): string =>
+    [
+      "# A Set",
+      "## Session Set Configuration",
+      "```yaml",
+      `module: ${slug}`,
+      "tier: full",
+      "```",
+      "",
+    ].join("\n");
+
+  const readModule = (specAbs: string): string | null =>
+    parseSessionSetConfig(specAbs).module;
+
+  test("0 affected sets: slug rename touches only the manifest", () => {
+    const root = tmpRoot("rename-0-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" });
+      assert.strictEqual(r.refused, undefined);
+      assert.strictEqual(r.writeFailed, undefined);
+      assert.strictEqual(r.slugChanged, true);
+      assert.deepStrictEqual(r.restamped, []);
+      const entries = classifyModulesManifest(root) as any;
+      assert.ok(entries.kind === "present");
+      assert.deepStrictEqual(
+        entries.entries.map((e: any) => e.slug),
+        ["welcomer"],
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("1 affected set: slug rename restamps it and the manifest", () => {
+    const root = tmpRoot("rename-1-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" });
+      assert.strictEqual(r.refused, undefined);
+      assert.deepStrictEqual(r.restamped, ["001-a"]);
+      assert.strictEqual(readModule(a), "welcomer");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("N affected sets: slug rename restamps every one", () => {
+    const root = tmpRoot("rename-n-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      const b = specWith(root, "002-b", moduleSpec("greeter"));
+      const c = specWith(root, "003-c", moduleSpec("other")); // untouched
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" });
+      assert.strictEqual(r.refused, undefined);
+      assert.deepStrictEqual(r.restamped.sort(), ["001-a", "002-b"]);
+      assert.strictEqual(readModule(a), "welcomer");
+      assert.strictEqual(readModule(b), "welcomer");
+      assert.strictEqual(readModule(c), "other"); // unrelated set untouched
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("title-only rename: manifest title changes, no spec is touched", () => {
+    const root = tmpRoot("rename-title-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      const before = fs.readFileSync(a, "utf8");
+      const r = renameModule(root, "greeter", { newTitle: "Greeter Deluxe" });
+      assert.strictEqual(r.refused, undefined);
+      assert.strictEqual(r.slugChanged, false);
+      assert.strictEqual(r.titleChanged, true);
+      assert.deepStrictEqual(r.restamped, []);
+      assert.strictEqual(fs.readFileSync(a, "utf8"), before); // spec untouched
+      const entries = classifyModulesManifest(root) as any;
+      assert.strictEqual(entries.entries[0].title, "Greeter Deluxe");
+      assert.strictEqual(entries.entries[0].slug, "greeter");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("slug + title together: both change and the set restamps", () => {
+    const root = tmpRoot("rename-both-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      const r = renameModule(root, "greeter", {
+        newSlug: "welcomer",
+        newTitle: "Welcomer",
+      });
+      assert.strictEqual(r.refused, undefined);
+      assert.strictEqual(r.slugChanged, true);
+      assert.strictEqual(r.titleChanged, true);
+      assert.strictEqual(readModule(a), "welcomer");
+      const entries = classifyModulesManifest(root) as any;
+      assert.strictEqual(entries.entries[0].slug, "welcomer");
+      assert.strictEqual(entries.entries[0].title, "Welcomer");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("adds a title line when the entry declared none (title defaulted to slug)", () => {
+    const root = tmpRoot("rename-addtitle-");
+    // No explicit title — the reader defaults title to the slug.
+    writeManifest(root, "modules:\n  - slug: greeter\n    codeRoots: []\n");
+    try {
+      const r = renameModule(root, "greeter", { newTitle: "Greeter Module" });
+      assert.strictEqual(r.refused, undefined);
+      const entries = classifyModulesManifest(root) as any;
+      assert.strictEqual(entries.entries[0].title, "Greeter Module");
+      assert.strictEqual(entries.entries[0].slug, "greeter");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // Verifier nit (both fan-outs): a slug-only rename of an entry with NO
+  // explicit title must NOT be refused — the title defaults to the slug, so
+  // after the slug change the implicit display name follows the new slug.
+  test("slug-only rename of a title-less entry succeeds (implicit title follows the slug)", () => {
+    const root = tmpRoot("rename-titleless-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    codeRoots: []\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" });
+      assert.strictEqual(r.refused, undefined, r.refused?.reason);
+      assert.strictEqual(r.slugChanged, true);
+      assert.strictEqual(r.titleChanged, false);
+      const entries = classifyModulesManifest(root) as any;
+      assert.strictEqual(entries.entries[0].slug, "welcomer");
+      // Title was never explicit, so it now defaults to the new slug.
+      assert.strictEqual(entries.entries[0].title, "welcomer");
+      assert.strictEqual(readModule(a), "welcomer");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+suite("moduleAuthoring — renameModule rollback + format preservation (Set 099 S1)", () => {
+  const moduleSpec = (slug: string): string =>
+    [
+      "# A Set",
+      "## Session Set Configuration",
+      "```yaml",
+      `module: ${slug}`,
+      "tier: full",
+      "```",
+      "",
+    ].join("\n");
+
+  test("rolls every file back when a mid-transaction write fails", () => {
+    const root = tmpRoot("rename-rollback-");
+    writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+    try {
+      const a = specWith(root, "001-a", moduleSpec("greeter"));
+      const specBefore = fs.readFileSync(a, "utf8");
+      const manifestBefore = readManifestText(root);
+      // Fail the manifest write (the last write), AFTER the spec was written
+      // and verified — the rollback must restore the spec.
+      const io: RenameFileIo = {
+        readFileSync: (p) => fs.readFileSync(p, "utf8"),
+        writeFileSync: (p, d) => {
+          if (p.endsWith("modules.yaml")) {
+            throw new Error("injected disk failure");
+          }
+          fs.writeFileSync(p, d, "utf8");
+        },
+      };
+      const r = renameModule(root, "greeter", { newSlug: "welcomer" }, io);
+      assert.ok(r.writeFailed, "expected a write failure");
+      assert.strictEqual(r.writeFailed!.rolledBack, true);
+      assert.deepStrictEqual(r.restamped, []);
+      // The spec was written then rolled back; the manifest never changed.
+      assert.strictEqual(fs.readFileSync(a, "utf8"), specBefore);
+      assert.strictEqual(readManifestText(root), manifestBefore);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("preserves comments and entry order when renaming a middle entry", () => {
+    const root = tmpRoot("rename-format-");
+    const manifest = [
+      "# docs/modules.yaml — hand-authored, keep my comments",
+      "modules:",
+      "  - slug: alpha",
+      '    title: "Alpha"',
+      "    codeRoots: []            # alpha owns nothing yet",
+      "    planPath: docs/modules/alpha/project-plan.md",
+      "  - slug: greeter",
+      '    title: "Greeter Module"',
+      "    codeRoots:",
+      "      - src/greeter",
+      "    planPath: docs/modules/greeter/project-plan.md",
+      "  - slug: zeta",
+      '    title: "Zeta"',
+      "    codeRoots: []",
+      "    planPath: docs/modules/zeta/project-plan.md",
+      "",
+    ].join("\n");
+    writeManifest(root, manifest);
+    try {
+      const g = specWith(root, "010-g", moduleSpec("greeter"));
+      const r = renameModule(root, "greeter", {
+        newSlug: "welcomer",
+        newTitle: "Welcomer",
+      });
+      assert.strictEqual(r.refused, undefined);
+      assert.strictEqual(r.writeFailed, undefined);
+      const after = readManifestText(root);
+      // Comments survive.
+      assert.ok(after.includes("# docs/modules.yaml — hand-authored, keep my comments"));
+      assert.ok(after.includes("# alpha owns nothing yet"));
+      // The renamed entry's codeRoots block survives verbatim.
+      assert.ok(after.includes("      - src/greeter"));
+      // Order preserved: alpha, welcomer, zeta.
+      const entries = classifyModulesManifest(root) as any;
+      assert.deepStrictEqual(
+        entries.entries.map((e: any) => e.slug),
+        ["alpha", "welcomer", "zeta"],
+      );
+      assert.strictEqual(entries.entries[1].title, "Welcomer");
+      // Sibling entries are byte-for-byte identical in the text.
+      assert.ok(after.includes('  - slug: alpha\n    title: "Alpha"'));
+      assert.ok(after.includes('  - slug: zeta\n    title: "Zeta"'));
+      // The affected set restamped.
+      assert.strictEqual(parseSessionSetConfig(g).module, "welcomer");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("assertRenamedManifestParses rejects a candidate that drops an entry", () => {
+    const originalEntries = [
+      { slug: "greeter", title: "Greeter", codeRoots: [], planPath: null, touches: [] },
+      { slug: "payments", title: "Payments", codeRoots: [], planPath: null, touches: [] },
+    ];
+    const dropped = "modules:\n  - slug: welcomer\n    title: Greeter\n";
+    assert.throws(() =>
+      assertRenamedManifestParses(originalEntries as any, dropped, "greeter", {
+        newSlug: "welcomer",
+        newTitle: "Greeter",
+      }),
+    );
   });
 });

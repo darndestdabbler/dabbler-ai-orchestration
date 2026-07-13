@@ -107,7 +107,7 @@ full text in `lessons-archive.md`:
   verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="098" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="099" status="active" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and
@@ -138,7 +138,7 @@ full text in `lessons-archive.md`:
   the resolved installed version at close, not just the declared floor.
 
 ## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
-<!-- lesson: id="L-095-1" added-set="095" last-used-set="096" status="active" scope="portable" -->
+<!-- lesson: id="L-095-1" added-set="095" last-used-set="099" status="active" scope="portable" -->
 
 - Reviewers are salience-limited, not context-limited: each pass returns
   the most salient handful of technically-real findings, and fixing them

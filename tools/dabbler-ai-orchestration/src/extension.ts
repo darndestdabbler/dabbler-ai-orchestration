@@ -25,6 +25,7 @@ import { registerNewModuleCommand } from "./commands/newModule";
 import { registerOpenModulesManifestCommand } from "./commands/openModulesManifest";
 import { registerCopyModuleDecompositionPromptCommand } from "./commands/copyModuleDecompositionPrompt";
 import { registerAssignLegacySetsCommand } from "./commands/assignLegacySets";
+import { registerRenameModuleCommand } from "./commands/renameModule";
 import { registerPlanImportCommand } from "./wizard/planImport";
 import { registerSessionGenPromptCommand } from "./wizard/sessionGenPrompt";
 import { registerCostDashboardCommand } from "./dashboard/CostDashboard";
@@ -317,6 +318,9 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   safeRegister("registerAssignLegacySetsCommand", () =>
     registerAssignLegacySetsCommand(context),
+  );
+  safeRegister("registerRenameModuleCommand", () =>
+    registerRenameModuleCommand(context),
   );
   safeRegister("registerSessionGenPromptCommand", () =>
     registerSessionGenPromptCommand(context),

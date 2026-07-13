@@ -195,6 +195,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.renameModule",
+        "title": "Rename Module",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.openModulePlan",
         "title": "Open Module Plan",
         "category": "Dabbler"

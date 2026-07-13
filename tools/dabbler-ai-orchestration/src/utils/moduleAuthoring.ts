@@ -1207,6 +1207,694 @@ export function assignLegacySetsToModule(
   return { stamped, alreadyAssigned };
 }
 
+// ---------- Set 099 S1: the transactional module RENAME writer ----------
+//
+// Rename a declared module (verdict decision 1: slug stays identity — no
+// moduleId / tombstones / registry). A rename is a PREFLIGHTED, all-or-
+// nothing rewrite: the docs/modules.yaml entry (format-preserving, the Set
+// 091 appender posture) AND, when the slug changes, a restamp of
+// `module: <old>` -> `module: <new>` in EVERY affected set's spec.md (the
+// same top-level-key splice the Set 093 assign writer uses, extended from
+// insert to value-rewrite). A title-only rename skips the restamp entirely
+// (manifest-only edit — the stamp value is unchanged). Any failure in the
+// apply phase rolls every touched file back to its pre-transaction bytes, so
+// a refusal or a mid-write error leaves the workspace exactly as it was.
+
+/**
+ * PURE format-preserving REWRITE of the top-level `module:` value in a
+ * spec.md's "Session Set Configuration" YAML block: `module: <oldSlug>` ->
+ * `module: <newSlug>`, touching no other byte (the leading `module:` +
+ * spacing and any trailing comment survive). Refuses when the block has no
+ * top-level `module` key, or when it is stamped to a DIFFERENT slug than
+ * expected (a stale snapshot — never silently overwritten). Idempotent: a
+ * block already stamped to `newSlug` is a `noop`. Mirrors the anchoring of
+ * {@link stampModuleIntoSpecText} (bounded to the config section, unterminated
+ * fence refuses loud), and decides "which module" from the PARSED top-level
+ * property, never a raw-text regex (an indented `module:` inside a block
+ * scalar / nested mapping is not a stamp).
+ */
+export type RestampModuleResult =
+  | { kind: "written"; text: string }
+  | { kind: "noop" }
+  | { kind: "refused"; reason: string };
+
+export function restampModuleInSpecText(
+  text: string,
+  expectedOldSlug: string,
+  newSlug: string,
+): RestampModuleResult {
+  const heading = CONFIG_HEADING_RE.exec(text);
+  if (!heading) {
+    return { kind: "refused", reason: 'no "Session Set Configuration" block' };
+  }
+  const afterHeading = heading.index + heading[0].length;
+  const rest = text.slice(afterHeading);
+  const nextHeadingRel = rest.search(/^##[ \t]/m);
+  const sectionEnd =
+    nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
+  const section = text.slice(afterHeading, sectionEnd);
+
+  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
+  if (!fenceOpen) {
+    return { kind: "refused", reason: "the config block has no ```yaml fence" };
+  }
+  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
+  const boundedTail = text.slice(blockContentStart, sectionEnd);
+  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
+  if (closeRel === -1) {
+    return { kind: "refused", reason: "the config block has no closing fence" };
+  }
+  const blockContent = boundedTail.slice(0, closeRel);
+
+  let parsed: unknown;
+  try {
+    parsed = YAML.parse(blockContent);
+  } catch {
+    return { kind: "refused", reason: "the config block is not valid YAML" };
+  }
+  const parsedModule =
+    parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>).module
+      : undefined;
+  if (parsedModule === undefined) {
+    return { kind: "refused", reason: "no top-level module: key to rewrite" };
+  }
+  if (parsedModule === newSlug) return { kind: "noop" };
+  if (parsedModule !== expectedOldSlug) {
+    return {
+      kind: "refused",
+      reason: `stamped module: ${JSON.stringify(parsedModule)}, not ${JSON.stringify(expectedOldSlug)}`,
+    };
+  }
+
+  // Rewrite ONLY the value token of the top-level (column-0) module: line.
+  const lineRe = /^(module[ \t]*:[ \t]*)([^\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/m;
+  const lm = lineRe.exec(blockContent);
+  if (!lm) {
+    return { kind: "refused", reason: "could not locate the module: line to rewrite" };
+  }
+  const valueAbs = blockContentStart + lm.index + lm[1].length;
+  const valueLen = lm[2].length;
+  const newText = text.slice(0, valueAbs) + newSlug + text.slice(valueAbs + valueLen);
+  return { kind: "written", text: newText };
+}
+
+/**
+ * The parse-after-write guard for a restamp (mirrors
+ * {@link assertStampedTextValid}): the ONLY acceptable result is the
+ * deterministic canonical value-rewrite of the original — recompute it and
+ * require byte-for-byte equality — plus defense in depth on the resulting
+ * block (re-parses, parsed `module` === newSlug, exactly one top-level
+ * `module:` line). Any failure is a loud refusal; the caller rolls the file
+ * back from its in-memory original.
+ */
+export function assertRestampedTextValid(
+  originalText: string,
+  newText: string,
+  oldSlug: string,
+  newSlug: string,
+): void {
+  const refuse = (why: string): never => {
+    throw new Error(`Refusing the module restamp (${why}).`);
+  };
+  const expected = restampModuleInSpecText(originalText, oldSlug, newSlug);
+  if (expected.kind !== "written") {
+    return refuse(
+      expected.kind === "noop"
+        ? "the original is already stamped to the new module"
+        : `the original cannot be restamped (${expected.reason})`,
+    );
+  }
+  if (newText !== expected.text) {
+    return refuse("the result is not the exact canonical single-value rewrite");
+  }
+  // Defense in depth on the resulting config block.
+  const heading = CONFIG_HEADING_RE.exec(newText);
+  const afterHeading = heading ? heading.index + heading[0].length : -1;
+  if (afterHeading < 0) return refuse("the config block no longer parses");
+  const restText = newText.slice(afterHeading);
+  const nextHeadingRel = restText.search(/^##[ \t]/m);
+  const sectionEnd =
+    nextHeadingRel === -1 ? newText.length : afterHeading + nextHeadingRel;
+  const section = newText.slice(afterHeading, sectionEnd);
+  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
+  if (!fenceOpen) return refuse("the config block no longer parses");
+  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
+  const boundedTail = newText.slice(blockContentStart, sectionEnd);
+  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
+  if (closeRel === -1) return refuse("the config block no longer parses");
+  const block = boundedTail.slice(0, closeRel);
+  let doc: unknown;
+  try {
+    doc = YAML.parse(block);
+  } catch {
+    return refuse("the config block is not valid YAML after the restamp");
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return refuse("the config block is not a YAML mapping");
+  }
+  if ((doc as Record<string, unknown>).module !== newSlug) {
+    return refuse(
+      `module resolved to ${JSON.stringify((doc as Record<string, unknown>).module)}, not ${JSON.stringify(newSlug)}`,
+    );
+  }
+  const moduleLineCount = (block.match(CONFIG_TOP_LEVEL_MODULE_RE) || []).length;
+  if (moduleLineCount !== 1) {
+    return refuse(`${moduleLineCount} top-level module: lines in the block`);
+  }
+}
+
+/** A normalized manifest entry parsed straight from text (mirrors
+ * {@link readModulesManifest}'s per-entry normalization: no-slug dropped,
+ * first duplicate kept, title defaults to slug, planPath null when absent,
+ * codeRoots/touches keep only trimmed string members). Used by the rename
+ * guard so the semantic comparison matches what the Explorer reader sees. */
+interface NormalizedManifestEntry {
+  slug: string;
+  title: string;
+  codeRoots: string[];
+  planPath: string | null;
+  touches: string[];
+}
+
+function parseManifestEntriesFromText(
+  text: string,
+): NormalizedManifestEntry[] | null {
+  let doc: unknown;
+  try {
+    doc = YAML.parse(text);
+  } catch {
+    return null;
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return null;
+  const rawModules = (doc as Record<string, unknown>).modules;
+  if (rawModules === null) return [];
+  if (!Array.isArray(rawModules)) return null;
+  const stringList = (v: unknown): string[] =>
+    Array.isArray(v)
+      ? v
+          .filter((x): x is string => typeof x === "string" && x.trim() !== "")
+          .map((s) => s.trim())
+      : [];
+  const out: NormalizedManifestEntry[] = [];
+  const seen = new Set<string>();
+  for (const raw of rawModules) {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const obj = raw as Record<string, unknown>;
+    const slug = typeof obj.slug === "string" ? obj.slug.trim() : "";
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    const title =
+      typeof obj.title === "string" && obj.title.trim() !== ""
+        ? obj.title.trim()
+        : slug;
+    const planPath =
+      typeof obj.planPath === "string" && obj.planPath.trim() !== ""
+        ? obj.planPath.trim()
+        : null;
+    out.push({
+      slug,
+      title,
+      codeRoots: stringList(obj.codeRoots),
+      planPath,
+      touches: stringList(obj.touches),
+    });
+  }
+  return out;
+}
+
+function entriesEqual(
+  a: NormalizedManifestEntry,
+  b: NormalizedManifestEntry,
+): boolean {
+  return (
+    a.slug === b.slug &&
+    a.title === b.title &&
+    a.planPath === b.planPath &&
+    a.codeRoots.length === b.codeRoots.length &&
+    a.codeRoots.every((v, i) => v === b.codeRoots[i]) &&
+    a.touches.length === b.touches.length &&
+    a.touches.every((v, i) => v === b.touches[i])
+  );
+}
+
+/** Unquote a YAML scalar value token (double / single quoted), else trim. */
+function unquoteScalar(raw: string): string {
+  const t = raw.trim();
+  if (t.length >= 2 && (t[0] === '"' || t[0] === "'") && t[t.length - 1] === t[0]) {
+    return t.slice(1, -1);
+  }
+  return t;
+}
+
+/**
+ * Format-preserving rewrite of ONE manifest entry's `slug:` and/or `title:`
+ * value (the Set 091 appender posture: never re-serialize the operator's
+ * manifest, which would destroy comments and entry order). Returns the new
+ * text, or `null` when the entry cannot be edited safely in place (the caller
+ * refuses loudly and asks the operator to edit by hand — the same
+ * exotic-shape residual the appender declares). Assumes the entry's `slug:`
+ * lives on its list-item (`- slug:`) line, the shape the scaffold writes;
+ * an entry whose slug is a bare indented key on its own line is treated as
+ * un-editable here (guard refuses).
+ */
+function rewriteManifestEntryText(
+  text: string,
+  oldSlug: string,
+  opts: { newSlug?: string; newTitle?: string },
+): string | null {
+  const markerRe =
+    /^([ \t]*)-([ \t]+)slug([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n \t][^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/gm;
+  let target: RegExpExecArray | null = null;
+  for (const m of text.matchAll(markerRe)) {
+    if (unquoteScalar(m[4]) === oldSlug) {
+      target = m as unknown as RegExpExecArray;
+      break;
+    }
+  }
+  if (target === null) return null;
+
+  const entryIndent = target[1].length;
+  const keyIndent = target[1].length + 1 + target[2].length;
+  const slugValueStart =
+    target.index! + target[1].length + 1 + target[2].length + 4 + target[3].length;
+  const slugValueEnd = slugValueStart + target[4].length;
+  const slugLineEnd = target.index! + target[0].length;
+
+  // The entry span ends at the next list marker AT THE SAME indent, or a
+  // dedent to a column-0 key, or EOF — so the title edit stays inside THIS
+  // entry (a nested codeRoots/touches `- ` member is deeper-indented and
+  // never mistaken for the next entry).
+  let spanEnd = text.length;
+  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|[^ \t\r\n#])/g;
+  boundaryRe.lastIndex = slugLineEnd;
+  let bm: RegExpExecArray | null;
+  while ((bm = boundaryRe.exec(text)) !== null) {
+    if (bm[1].length <= entryIndent) {
+      spanEnd = bm.index; // before the newline that starts the boundary line
+      break;
+    }
+  }
+
+  const edits: { start: number; end: number; replacement: string }[] = [];
+  if (opts.newSlug !== undefined && opts.newSlug !== oldSlug) {
+    edits.push({ start: slugValueStart, end: slugValueEnd, replacement: opts.newSlug });
+  }
+  if (opts.newTitle !== undefined) {
+    const titleRe =
+      /^([ \t]+)title([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/m;
+    const span = text.slice(slugLineEnd, spanEnd);
+    const tm = titleRe.exec(span);
+    if (tm) {
+      const titleValueStart =
+        slugLineEnd + tm.index + tm[1].length + 5 + tm[2].length; // 5 = "title".length
+      const titleValueEnd = titleValueStart + tm[3].length;
+      edits.push({
+        start: titleValueStart,
+        end: titleValueEnd,
+        replacement: JSON.stringify(opts.newTitle),
+      });
+    } else {
+      // No explicit title line — insert one right after the slug line, at the
+      // entry's key indent (title defaults to slug when absent, so adding it
+      // is the only way to make a title-only rename take effect here). Reuse
+      // the manifest's own newline convention so a CRLF file stays CRLF.
+      const nl = text.includes("\r\n") ? "\r\n" : "\n";
+      const insertion = `${nl}${" ".repeat(keyIndent)}title: ${JSON.stringify(opts.newTitle)}`;
+      edits.push({ start: slugLineEnd, end: slugLineEnd, replacement: insertion });
+    }
+  }
+  if (edits.length === 0) return text;
+  // Apply from the latest offset to the earliest so earlier offsets stay valid.
+  edits.sort((a, b) => b.start - a.start);
+  let out = text;
+  for (const e of edits) {
+    out = out.slice(0, e.start) + e.replacement + out.slice(e.end);
+  }
+  return out;
+}
+
+/**
+ * The parse-after-write guard for the manifest rewrite: the candidate must
+ * parse to the SAME entry set as the original in the SAME order, with only
+ * the target entry's slug/title changed to the expected values, no entry
+ * count change, no duplicate of the new slug, and (on a slug change) no
+ * lingering old slug. A semantic comparison (not a text diff) so it holds
+ * regardless of formatting — comments and order are the writer's separate
+ * concern, verified by the format-preservation test.
+ */
+export function assertRenamedManifestParses(
+  originalEntries: readonly ModuleManifestEntry[],
+  candidateText: string,
+  oldSlug: string,
+  expected: { newSlug: string; newTitle: string | null },
+): void {
+  const refuse = (why: string): never => {
+    throw new Error(`Could not rename the module entry (${why}).`);
+  };
+  const arrEq = (a: string[], b: string[]): boolean =>
+    a.length === b.length && a.every((v, i) => v === b[i]);
+  const candidate = parseManifestEntriesFromText(candidateText);
+  if (candidate === null) return refuse("the result is not a valid module manifest");
+  if (candidate.length !== originalEntries.length) {
+    return refuse(
+      `entry count changed (${originalEntries.length} -> ${candidate.length})`,
+    );
+  }
+  const targetIndex = originalEntries.findIndex((e) => e.slug === oldSlug);
+  if (targetIndex < 0) return refuse(`the original had no "${oldSlug}" entry`);
+  for (let i = 0; i < originalEntries.length; i++) {
+    const before = originalEntries[i] as NormalizedManifestEntry;
+    const after = candidate[i];
+    if (i === targetIndex) {
+      // slug + non-slug/title fields must be exactly the target rename.
+      if (after.slug !== expected.newSlug) {
+        return refuse(
+          `entry ${i} slug is ${JSON.stringify(after.slug)}, expected ${JSON.stringify(expected.newSlug)}`,
+        );
+      }
+      if (
+        after.planPath !== before.planPath ||
+        !arrEq(after.codeRoots, before.codeRoots) ||
+        !arrEq(after.touches, before.touches)
+      ) {
+        return refuse(`entry ${i} changed a field other than slug/title`);
+      }
+      if (expected.newTitle !== null) {
+        // Title explicitly changed — must land exactly.
+        if (after.title !== expected.newTitle) {
+          return refuse(
+            `entry ${i} title is ${JSON.stringify(after.title)}, expected ${JSON.stringify(expected.newTitle)}`,
+          );
+        }
+      } else if (after.title !== before.title && after.title !== expected.newSlug) {
+        // Slug-only rename: the title line is untouched, so the parsed title is
+        // EITHER the preserved explicit title OR — when the entry had no
+        // explicit title — the slug-derived default, which now follows the new
+        // slug. Any OTHER value means the splice corrupted the title.
+        return refuse(
+          `entry ${i} title changed unexpectedly to ${JSON.stringify(after.title)}`,
+        );
+      }
+    } else if (!entriesEqual(after, before)) {
+      return refuse(`entry ${i} (${before.slug}) changed unexpectedly`);
+    }
+  }
+  const newSlugCount = candidate.filter((e) => e.slug === expected.newSlug).length;
+  if (newSlugCount !== 1) {
+    return refuse(`the new slug appears ${newSlugCount} times`);
+  }
+  if (expected.newSlug !== oldSlug && candidate.some((e) => e.slug === oldSlug)) {
+    return refuse(`the old slug "${oldSlug}" still appears`);
+  }
+}
+
+/** The injectable read/write surface the rename transaction uses (node fs by
+ * default). `writeFileSync` MUST make `data` the complete on-disk content of
+ * `abs` (the node impl publishes atomically via a unique temp + rename, so a
+ * crash never leaves a half-written file); the transaction layers all-or-
+ * nothing rollback on top by re-writing in-memory originals. */
+export interface RenameFileIo {
+  readFileSync(abs: string): string;
+  writeFileSync(abs: string, data: string): void;
+}
+
+const NODE_RENAME_IO: RenameFileIo = {
+  readFileSync: (p) => fs.readFileSync(p, "utf8"),
+  writeFileSync: (p, data) => {
+    const tmp = `${p}.${process.pid}.${crypto
+      .randomBytes(6)
+      .toString("hex")}.dabbler-rename-tmp`;
+    try {
+      fs.writeFileSync(tmp, data, { encoding: "utf8" });
+      fs.renameSync(tmp, p);
+    } catch (err) {
+      try {
+        fs.rmSync(tmp, { force: true });
+      } catch {
+        /* leftover temp is harmless */
+      }
+      throw err;
+    }
+  },
+};
+
+/** Non-mutating "is a session actively in flight?" probe: reads the set's
+ * session-state.json (never writes — unlike `readStatus`, which seeds a state
+ * file) and reports true iff a top-level or per-session `status` is
+ * "in-progress". Absent / unparseable state reads as not-running. */
+function hasRunningSessionAt(setDir: string, io: RenameFileIo): boolean {
+  let raw: string;
+  try {
+    raw = io.readFileSync(path.join(setDir, "session-state.json"));
+  } catch {
+    return false;
+  }
+  let doc: unknown;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) return false;
+  const d = doc as Record<string, unknown>;
+  if (d.status === "in-progress") return true;
+  if (Array.isArray(d.sessions)) {
+    return d.sessions.some(
+      (s) =>
+        s !== null &&
+        typeof s === "object" &&
+        (s as Record<string, unknown>).status === "in-progress",
+    );
+  }
+  return false;
+}
+
+/** The report the rename writer returns (the command surfaces it). */
+export interface RenameModuleResult {
+  oldSlug: string;
+  /** Resolved target slug (=== oldSlug for a title-only rename). */
+  newSlug: string;
+  /** Resolved new title when the title changed, else null. */
+  newTitle: string | null;
+  slugChanged: boolean;
+  titleChanged: boolean;
+  /** Names of the sets whose spec.md was restamped (empty for title-only). */
+  restamped: string[];
+  /** Present iff a preflight refused the whole transaction — nothing written. */
+  refused?: { reason: string };
+  /** Present iff the apply phase failed — every touched file was rolled back
+   * (`rolledBack: false` iff a rollback write itself failed — operator must
+   * reconcile from git). */
+  writeFailed?: { reason: string; rolledBack: boolean };
+}
+
+/**
+ * Transactionally rename a declared module (verdict decision 1). Preflight
+ * (all refusals leave every file byte-identical):
+ *   - the manifest is present + valid and declares `oldSlug`;
+ *   - on a slug change: `newSlug` validates (shape) and is unique among
+ *     declared slugs; refuse a target that collides with an UNDECLARED slug
+ *     already carrying stamped sets (silent history merge is the failure
+ *     mode); refuse while any affected set has a running session.
+ * Then the all-or-nothing apply: restamp every affected set's spec.md (slug
+ * change only) + rewrite the manifest entry (slug and/or title), each guarded
+ * by a parse-after-write check computed BEFORE any byte is written; the writes
+ * publish atomically and, on any failure, every already-written file is rolled
+ * back to its pre-transaction bytes. A title-only rename skips the restamp
+ * entirely (manifest-only edit).
+ */
+export function renameModule(
+  root: string,
+  oldSlugRaw: string,
+  changes: { newSlug?: string; newTitle?: string },
+  io: RenameFileIo = NODE_RENAME_IO,
+): RenameModuleResult {
+  const oldSlug = (oldSlugRaw ?? "").trim();
+  const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+  const refuse = (reason: string): RenameModuleResult => ({
+    oldSlug,
+    newSlug: oldSlug,
+    newTitle: null,
+    slugChanged: false,
+    titleChanged: false,
+    restamped: [],
+    refused: { reason },
+  });
+
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") return refuse(INVALID_MANIFEST_MESSAGE);
+  const entries = classified.kind === "present" ? classified.entries : [];
+  const targetEntry = entries.find((e) => e.slug === oldSlug);
+  if (!targetEntry) {
+    return refuse(
+      `Module "${oldSlug}" is not declared in ${MODULES_MANIFEST_DISPLAY}.`,
+    );
+  }
+
+  const requestedSlug =
+    changes.newSlug === undefined ? undefined : changes.newSlug.trim();
+  const requestedTitle =
+    changes.newTitle === undefined ? undefined : changes.newTitle.trim();
+
+  const slugChanging =
+    requestedSlug !== undefined && requestedSlug !== "" && requestedSlug !== oldSlug;
+  const newSlug = slugChanging ? (requestedSlug as string) : oldSlug;
+  const currentTitle = targetEntry.title;
+  const titleChanging =
+    requestedTitle !== undefined &&
+    requestedTitle !== "" &&
+    requestedTitle !== currentTitle;
+  const newTitle = titleChanging ? (requestedTitle as string) : null;
+
+  if (!slugChanging && !titleChanging) {
+    return refuse(
+      "no change requested — the new slug and title match the current module.",
+    );
+  }
+
+  if (slugChanging) {
+    const declaredSlugs = entries.map((e) => e.slug);
+    const slugErr = validateNewModuleSlug(newSlug, declaredSlugs);
+    if (slugErr) return refuse(slugErr);
+  }
+
+  // One scan of every set: collect the affected (old-slug) sets and detect an
+  // undeclared new-slug history collision.
+  const setsRoot = path.join(root, SESSION_SETS_REL);
+  const affected: { name: string; dir: string; specAbs: string }[] = [];
+  const newSlugCollisions: string[] = [];
+  for (const name of listSessionSetDirNames(root)) {
+    const dir = path.join(setsRoot, name);
+    const specAbs = path.join(dir, "spec.md");
+    const mod = parseSessionSetConfig(specAbs).module;
+    if (mod === oldSlug) affected.push({ name, dir, specAbs });
+    else if (slugChanging && mod === newSlug) newSlugCollisions.push(name);
+  }
+
+  if (slugChanging && newSlugCollisions.length > 0) {
+    return refuse(
+      `Renaming to "${newSlug}" would merge histories: ${newSlugCollisions.length} ` +
+        `set(s) already declare module: ${newSlug}, which is not a declared module ` +
+        `(${newSlugCollisions.join(", ")}). Pick a different name.`,
+    );
+  }
+
+  if (slugChanging) {
+    const running = affected.filter((a) => hasRunningSessionAt(a.dir, io));
+    if (running.length > 0) {
+      return refuse(
+        `Refusing to rename "${oldSlug}" while ${running.length} affected set(s) ` +
+          `have a running session (${running.map((r) => r.name).join(", ")}). ` +
+          `Finish or close them first.`,
+      );
+    }
+  }
+
+  // ----- Compute + guard EVERY write before touching disk (a bad splice
+  // fails the whole transaction here, nothing written).
+  const writes: { abs: string; original: string; next: string; label: string }[] = [];
+  const restampedNames: string[] = [];
+
+  if (slugChanging) {
+    for (const a of affected) {
+      let original: string;
+      try {
+        original = io.readFileSync(a.specAbs);
+      } catch (e) {
+        return refuse(`could not read ${a.name}'s spec.md: ${msg(e)}`);
+      }
+      const res = restampModuleInSpecText(original, oldSlug, newSlug);
+      if (res.kind === "noop") continue; // already newSlug — nothing to write
+      if (res.kind === "refused") return refuse(`${a.name}: ${res.reason}`);
+      try {
+        assertRestampedTextValid(original, res.text, oldSlug, newSlug);
+      } catch (e) {
+        return refuse(`${a.name}: ${msg(e)}`);
+      }
+      writes.push({ abs: a.specAbs, original, next: res.text, label: a.name });
+      restampedNames.push(a.name);
+    }
+  }
+
+  // Manifest LAST (a failed run never half-renames: specs restamp first, the
+  // manifest flips the declaration only once every spec is safely staged).
+  const manifestAbs = path.join(root, MODULES_MANIFEST_REL);
+  let manifestOriginal: string;
+  try {
+    manifestOriginal = io.readFileSync(manifestAbs);
+  } catch (e) {
+    return refuse(`could not read ${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
+  }
+  const manifestNext = rewriteManifestEntryText(manifestOriginal, oldSlug, {
+    newSlug: slugChanging ? newSlug : undefined,
+    newTitle: titleChanging ? (newTitle as string) : undefined,
+  });
+  if (manifestNext === null) {
+    return refuse(
+      `could not rewrite the ${MODULES_MANIFEST_DISPLAY} entry for "${oldSlug}" ` +
+        `while preserving formatting — edit the slug/title by hand.`,
+    );
+  }
+  try {
+    assertRenamedManifestParses(entries, manifestNext, oldSlug, {
+      newSlug,
+      // null = title not explicitly changed — the guard then tolerates a
+      // slug-derived implicit default (a title-less entry's display name
+      // follows its slug), so a slug-only rename of a title-less entry is not
+      // spuriously refused.
+      newTitle: titleChanging ? (newTitle as string) : null,
+    });
+  } catch (e) {
+    return refuse(`${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
+  }
+  writes.push({
+    abs: manifestAbs,
+    original: manifestOriginal,
+    next: manifestNext,
+    label: MODULES_MANIFEST_DISPLAY,
+  });
+
+  // ----- Apply: write each file; on ANY failure roll every written file back.
+  const written: { abs: string; original: string }[] = [];
+  for (const w of writes) {
+    try {
+      io.writeFileSync(w.abs, w.next);
+      written.push({ abs: w.abs, original: w.original });
+      if (io.readFileSync(w.abs) !== w.next) {
+        throw new Error("did not verify after write");
+      }
+    } catch (e) {
+      let rolledBack = true;
+      for (const done of written) {
+        try {
+          io.writeFileSync(done.abs, done.original);
+        } catch {
+          rolledBack = false;
+        }
+      }
+      return {
+        oldSlug,
+        newSlug,
+        newTitle,
+        slugChanged: false,
+        titleChanged: false,
+        restamped: [],
+        writeFailed: { reason: `writing ${w.label} failed: ${msg(e)}`, rolledBack },
+      };
+    }
+  }
+
+  return {
+    oldSlug,
+    newSlug,
+    newTitle,
+    slugChanged: slugChanging,
+    titleChanged: titleChanging,
+    restamped: restampedNames,
+  };
+}
+
 // ---------- Set 098 S2: module-lifecycle set templates + scaffold writer ----------
 //
 // The two module-lifecycle set KINDS (verdict decision 5, Set 098 S1): a

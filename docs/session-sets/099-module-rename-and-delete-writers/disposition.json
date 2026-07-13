@@ -1,0 +1,42 @@
+{
+  "status": "completed",
+  "summary": "Set 099 Session 1 of 2: shipped the TRANSACTIONAL module RENAME writer (verdict decision 1 - slug stays identity; no moduleId/tombstones/registry). renameModule(root, oldSlug, {newSlug?, newTitle?}, io?) in src/utils/moduleAuthoring.ts is a preflighted, all-or-nothing rewrite: preflight (target slug validates shape + is unique among declared slugs; REJECT a target that collides with an UNDECLARED slug already carrying stamped sets - the silent history-merge hazard; REFUSE while any affected set has a running/in-progress session) then the apply - a format-preserving docs/modules.yaml entry edit (slug and/or title) plus a restamp of module: <old> -> module: <new> in every affected set's spec.md; a title-only rename skips the restamp (manifest-only). Every candidate is computed and guarded (parse-after-write) BEFORE any byte is written; writes publish atomically (unique temp + rename) and ANY failure rolls every already-written file back to its pre-transaction bytes. New pure helpers: restampModuleInSpecText (top-level module: value rewrite, mirrors the Set 093 stamp anchoring - bounded to the config section, unterminated fence refuses loud, decides target from the PARSED top-level property not raw regex), assertRestampedTextValid (recompute-and-byte-equal guard + defense-in-depth), rewriteManifestEntryText + assertRenamedManifestParses (semantic parse-after: same entry set, same order, only the target's slug/title changed, no dup/no lingering old slug), parseManifestEntriesFromText, hasRunningSessionAt (NON-mutating state read - never writes session-state.json). New palette command dabbler.renameModule (src/commands/renameModule.ts; injectable UI, live slug validation, two-step modal confirm enumerating the N restamped sets) wired into extension.ts + a package.json contribution. Tests: 30 new (24 writer/helper + 6 command-flow) covering the preflight matrix (invalid slug, declared-collision, undeclared-history collision, running-session refusal, not-declared, no-change, invalid manifest), the apply matrix (0/1/N affected sets, title-only, slug+title, add-title-when-absent, slug-only rename of a title-less entry), rollback on an injected mid-transaction write failure, and format preservation (comments + entry order + sibling entries byte-identical). Dogfood (s1-dogfood.md): the real compiled writer renamed greeter->welcomer on a scratch multi-module repo - 2 stamped sets restamped, the unrelated payments module + an unstamped set untouched, ZERO orphans, comments/codeRoots block/sibling entry byte-preserved. Suites: full extension unit suite via the sanctioned vscode-stub path = 1695 passing / 27 failing, where all 27 failures are electron-runtime-dependent tests the stub cannot satisfy (tree getChildren rendering, cancelled-bucket mapping, force-close badges, worktree discovery, fs.watch allowlist, aiAssignment before-all workspace hook) and NONE touch a surface this session changed; the Layer 2 electron harness (@vscode/test-electron) is environment-broken here (VS Code 1.128.0 rejects the runner's CLI flags: 'bad option: --no-sandbox'). tsc --noEmit, eslint, and the esbuild compile are clean. Cross-provider phased verification: discovery round 1 fanned out K=2 (both gpt-5-6, openai - anthropic orchestrator provider correctly excluded) returned VERIFIED / VERIFIED, 0 Critical/Major, $0.41. Both fan-outs converged on the same nits; I folded in the two both flagged as genuine (all test-covered): (1) a slug-only rename of a title-less manifest entry was spuriously refused because the guard expected the old defaulted title - fixed so the guard tolerates the slug-derived implicit default on a slug-only rename (+ a reproducing test); (2) the title-INSERT path hardcoded \\n - fixed to reuse the manifest's own newline (CRLF-safe). Corrected the s1-conventions test count (~40 -> the accurate 30). Remaining nits adjudicated by-design/precedent-consistent (this disposition is the record; end-of-set change-log lands in Session 2): the exotic-manifest-shape residual (only '- slug:'-first entries editable) is the documented appender-posture residual that refuses loud; 'two-step confirm' == the affirmative-click modal, matching the cancel command's own 'two-step prompt' idiom; the fail-open tolerant reads (hasRunningSessionAt / parseSessionSetConfig on an unreadable file) match the codebase's tolerant-reader convention (readSessionSets skips an unreadable spec too) and a benign restamp is the only downside; crash-atomicity across N files and file-mode/quote-style preservation match the assignLegacySetsToModule precedent. NO version bump / NO publish - single release boundary after Set 101. Next: Session 2 = the delete writer.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "docs/session-sets/099-module-rename-and-delete-writers/activity-log.json",
+    "docs/session-sets/099-module-rename-and-delete-writers/ai-assignment.md",
+    "docs/session-sets/099-module-rename-and-delete-writers/disposition.json",
+    "docs/session-sets/099-module-rename-and-delete-writers/s1-conventions.md",
+    "docs/session-sets/099-module-rename-and-delete-writers/s1-dogfood.md",
+    "docs/session-sets/099-module-rename-and-delete-writers/s1-next-set-analysis.json",
+    "docs/session-sets/099-module-rename-and-delete-writers/s1-verification.md",
+    "docs/session-sets/099-module-rename-and-delete-writers/s1-verification-fanout-2.md",
+    "docs/session-sets/099-module-rename-and-delete-writers/session-events.jsonl",
+    "docs/session-sets/099-module-rename-and-delete-writers/session-state.json",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/src/commands/renameModule.ts",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleAuthoring.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/renameModule.test.ts",
+    "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "effort": "low",
+    "reason": {
+      "code": "switch-due-to-cost",
+      "specifics": "Routed analysis (gemini-pro) picks Sonnet-5/low for Session 2's delete writer: a deterministic, settled-design implementation that reuses Session 1's manifest-edit machinery and the existing cancel writer, plus the terminal-session Step 9 + advisory path-aware critique - Sonnet's reasoning is sufficient without a flagship model's cost, and anthropic orchestration keeps the openai/google verification pool free."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-064-9",
+    "L-095-1"
+  ]
+}

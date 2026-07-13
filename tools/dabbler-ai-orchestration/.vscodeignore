@@ -21,4 +21,5 @@ tsconfig.json
 # .vscodeignore edit cannot silently drop it. Verified with `vsce ls`.
 !dist/templates/**
 media/screenshot-mockup.html
+media/marketplace-work-explorer-mock.html
 media/render-mockup.mjs

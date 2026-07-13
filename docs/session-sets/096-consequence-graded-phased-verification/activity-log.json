@@ -172,6 +172,14 @@
       "dateTime": "2026-07-13T02:49:17.252668-04:00",
       "description": "Round 8 (backstop, ran because record_adjudication had appended an unstamped session-verification row after round 7 and the anti-rollback rule correctly refused to settle on an older row -- orchestrator row-hygiene error, machinery behaved as designed; follow-up noted: exclude adjudication records from the latest-attempt comparison). Its one Major (spec \"raised output budget\" for discovery) remediated to the extent that is real: calls already run at each model's configured max_output_tokens (provider-limit-bound, operator-owned); shipped verification.discovery.min_output_tokens floor (32000) + loud under-budget verifier warning + 3 tests; probability evidence recorded (sub-8k observed responses vs 65,536 ceiling, zero truncations in 13 live rounds; truncation already fail-closed). Residual spec-prose reading surfaced for Step 9. Suite 3014 passed / 6 skipped.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "round-9-remediation",
+      "dateTime": "2026-07-13T03:01:57.247942-04:00",
+      "description": "Round 9 (reshaped context) ACCEPTED both adjudicated points (replay falsifier, output budget) and raised one new refinement of the round-5 coverage fix: occurrence-level ids let redundant fan-out siblings manufacture coverage failures. Fixed with the duplicate-of declaration (Fix verdict: L<m> -- duplicate-of L<n>): duplicate covered in-round, disposition follows target, next-cycle exemption carries by fixpoint; grammar/schema/doc parity + 3 tests. Suite 3017 passed / 6 skipped.",
+      "status": "complete"
     }
   ]
 }

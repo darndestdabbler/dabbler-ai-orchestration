@@ -82,7 +82,11 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     blocking instead of warning — while an id a prior review cycle
     already fix-accepted renders EXEMPT and drops out of the required
     set, so a growing ledger never demands redundant re-verdicts of
-    already-validated points; phased evidence excludes the set's own loop
+    already-validated points, and a reviewer marks same-point occurrences
+    (fan-out siblings, reworded restatements) with
+    `Fix verdict: L<m> -- duplicate-of L<n>` — the duplicate's
+    disposition follows its target's, so redundant occurrences never
+    manufacture coverage failures; phased evidence excludes the set's own loop
     bookkeeping (`WORK_DIFF_SET_BOOKKEEPING`, disclosed — the fix delta
     stays fixes-only and the classic path is untouched); a CLEAN
     supplementary round patches the SESSION disposition ISSUES_FOUND

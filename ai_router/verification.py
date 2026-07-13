@@ -346,15 +346,23 @@ FIX_VERDICT_TOKENS = (
     "fix-accepted",
     "fix-rejected",
     "accepted-with-modification",
+    # Set 096 S2 round 9: the reviewer's sanctioned way to declare that a
+    # ledger occurrence is the SAME point as another id (fan-out siblings,
+    # reworded restatements) — its disposition follows the target's, so a
+    # redundant occurrence never manufactures a coverage failure. The
+    # identity judgment is the reviewer's, recorded; never fuzzy-matched.
+    "duplicate-of",
 )
 
 # A per-finding fix verdict line, as the remediation-review phase framing
-# prescribes it: ``- Fix verdict: <finding> -- fix-accepted``. Tolerant of
-# bullet/emphasis markers and separator drift, like the Issue grammar above.
+# prescribes it: ``- Fix verdict: <finding> -- fix-accepted`` (or
+# ``-- duplicate-of L2``). Tolerant of bullet/emphasis markers and
+# separator drift, like the Issue grammar above.
 _FIX_VERDICT_RE = re.compile(
     r'^[ \t]*[-*>#]*[ \t]*\*{0,2}Fix[\s_-]*verdict\*{0,2}[ \t]*[:.\-]*[ \t]*'
     r'(?P<finding>.*?)[ \t]*[-:–—]*[ \t]*'
-    r'\**(?P<verdict>fix-accepted|fix-rejected|accepted-with-modification)\**'
+    r'\**(?P<verdict>fix-accepted|fix-rejected|accepted-with-modification'
+    r'|duplicate-of[ \t]+L\d+)\**'
     r'[ \t]*\.?[ \t]*$',
     re.IGNORECASE | re.MULTILINE,
 )
@@ -382,10 +390,16 @@ def parse_fix_verdicts(response: str) -> list:
     verdicts: list = []
     for match in _FIX_VERDICT_RE.finditer(response):
         finding = match.group("finding").strip().strip("*`").strip()
+        raw_verdict = match.group("verdict").lower()
         entry = {
             "finding": finding or "(unnamed finding)",
-            "verdict": match.group("verdict").lower(),
         }
+        dup = re.match(r"^duplicate-of\s+(?P<target>l\d+)$", raw_verdict)
+        if dup:
+            entry["verdict"] = "duplicate-of"
+            entry["duplicateOf"] = dup.group("target").upper()
+        else:
+            entry["verdict"] = raw_verdict
         # Set 096 S2 coverage: the remediation-review framing prescribes a
         # leading ledger id (``Fix verdict: L3 ...``); captured when present
         # so the CLI can compare coverage against the ledger's id set.

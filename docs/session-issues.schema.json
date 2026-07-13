@@ -66,11 +66,17 @@
             "enum": [
               "fix-accepted",
               "fix-rejected",
-              "accepted-with-modification"
+              "accepted-with-modification",
+              "duplicate-of"
             ]
           },
           "ledgerId": {
             "description": "Optional (Set 096 S2 coverage): the ledger id (L1..Ln) the verdict line named; the CLI compares the parsed id set against the auto-ledger's numbered blocking findings exactly.",
+            "type": "string",
+            "pattern": "^L[0-9]+$"
+          },
+          "duplicateOf": {
+            "description": "Present when verdict is duplicate-of: the ledger id whose disposition this occurrence follows (the reviewer's declared identity judgment for fan-out siblings / reworded restatements).",
             "type": "string",
             "pattern": "^L[0-9]+$"
           }

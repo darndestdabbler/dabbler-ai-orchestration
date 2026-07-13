@@ -376,6 +376,18 @@ class TestParseFixVerdicts:
             {"finding": "(unnamed finding)", "verdict": "fix-accepted"}
         ]
 
+    def test_duplicate_of_parses_with_target(self):
+        verdicts = parse_fix_verdicts(
+            "- Fix verdict: L5 same defect, other wording -- "
+            "duplicate-of L2\n"
+        )
+        assert verdicts == [{
+            "finding": "L5 same defect, other wording",
+            "verdict": "duplicate-of",
+            "duplicateOf": "L2",
+            "ledgerId": "L5",
+        }]
+
 
 # ---------------------------------------------------------------------------
 # Worktree snapshot + tree-to-tree fix delta
@@ -1210,6 +1222,76 @@ class TestVerificationRoundHardening:
             i.get("category") == "incomplete-fix-verdict-coverage"
             for i in envelope["issues"]
         )
+
+    def test_duplicate_sibling_covered_by_declaration(
+        self, repo: Path, monkeypatch
+    ):
+        # Round 9 finding: fan-out siblings reporting the same defect must
+        # not manufacture coverage failures — the reviewer declares the
+        # identity with duplicate-of, and the sibling id counts as covered.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        self._seed_two_finding_round(repo, set_dir)
+        response = (
+            "VERIFIED\n\n"
+            "- Fix verdict: L1 finding one -- fix-accepted\n"
+            "- Fix verdict: L2 finding two, same point other wording -- "
+            "duplicate-of L1\n"
+        )
+        fake = FakeMultiRoute([response])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_OK
+
+    def test_duplicate_of_follows_target_acceptance_next_cycle(
+        self, repo: Path, monkeypatch
+    ):
+        # A duplicate id inherits its target's acceptance for the NEXT
+        # cycle's exemption set (fixpoint, so chains carry).
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        self._seed_two_finding_round(repo, set_dir)
+        (set_dir / "s1-verification-round-2.md").write_text(
+            "ISSUES FOUND\n"
+            "- Fix verdict: L1 finding one -- fix-accepted\n"
+            "- Fix verdict: L2 finding two -- duplicate-of L1\n"
+            "Issue 1: an unrelated new in-hunk defect.\n"
+            "- **Severity:** Major\n",
+            encoding="utf-8",
+        )
+        (set_dir / "s1-issues-round-2.json").write_text(
+            json.dumps({
+                "schemaVersion": 1,
+                "sessionNumber": 1,
+                "verificationRound": 2,
+                "verificationVerdict": "ISSUES_FOUND",
+                "phase": "remediation-review",
+                "issues": [
+                    {"description": "an unrelated new in-hunk defect.",
+                     "severity": "Major"},
+                ],
+                "fixVerdicts": [
+                    {"finding": "L1 finding one",
+                     "verdict": "fix-accepted", "ledgerId": "L1"},
+                    {"finding": "L2 finding two",
+                     "verdict": "duplicate-of", "ledgerId": "L2",
+                     "duplicateOf": "L1"},
+                ],
+            }),
+            encoding="utf-8",
+        )
+        (set_dir / "s1-remediation-round-2.md").write_text(
+            "Fixed the new defect.", encoding="utf-8"
+        )
+        text, required = vs.assemble_cross_round_ledger_with_ids(
+            set_dir, 1, 3
+        )
+        # L1 accepted; L2 follows it via duplicate-of; only the round-2
+        # restatement (L3) still needs a verdict.
+        assert required == ["L3"]
+        assert "ledger id: L2; fix-accepted in a prior review cycle" in text
 
     def test_previously_accepted_ids_are_exempt_from_re_coverage(
         self, repo: Path, monkeypatch

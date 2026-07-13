@@ -1113,7 +1113,11 @@ def assemble_cross_round_ledger_with_ids(
     (backstop round 5 finding).
     """
     # Pre-scan: ids already accepted by a PRIOR remediation-review cycle.
+    # A ``duplicate-of`` id follows its TARGET's disposition (round 9: the
+    # reviewer's sanctioned identity declaration for fan-out siblings and
+    # reworded restatements) — resolved by fixpoint so chains carry too.
     accepted_ids: set = set()
+    duplicate_map: dict = {}
     for prior_round in range(1, current_round):
         envelope = _read_round_envelope(
             session_set_dir, session_number, prior_round
@@ -1124,10 +1128,22 @@ def assemble_cross_round_ledger_with_ids(
             if not isinstance(fv, dict):
                 continue
             lid = str(fv.get("ledgerId") or "").strip()
-            if lid and str(fv.get("verdict") or "").strip().lower() in (
-                "fix-accepted", "accepted-with-modification",
-            ):
+            if not lid:
+                continue
+            fv_verdict = str(fv.get("verdict") or "").strip().lower()
+            if fv_verdict in ("fix-accepted", "accepted-with-modification"):
                 accepted_ids.add(lid)
+            elif fv_verdict == "duplicate-of":
+                target = str(fv.get("duplicateOf") or "").strip().upper()
+                if target:
+                    duplicate_map[lid] = target
+    changed = True
+    while changed:
+        changed = False
+        for lid, target in duplicate_map.items():
+            if lid not in accepted_ids and target in accepted_ids:
+                accepted_ids.add(lid)
+                changed = True
 
     settled_sections: List[str] = []
     unresolved_sections: List[str] = []
@@ -1599,6 +1615,12 @@ def build_phase_framing(phase: Optional[str]) -> str:
             "fix-accepted | fix-rejected | accepted-with-modification\n"
             "  Coverage is machine-checked against the non-exempt ledger "
             "ids: a missing id fails the round.\n"
+            "- If two ledger ids report the SAME underlying point (fan-out "
+            "siblings, reworded restatements), verdict the primary one and "
+            "mark the other on its own line:\n"
+            "  - Fix verdict: L<m> -- duplicate-of L<n>\n"
+            "  A duplicate's disposition follows its target's -- never "
+            "re-argue the same point under two ids.\n"
             "  fix-accepted = the fix resolves the finding. fix-rejected "
             "= it does not -- you must then restate the finding as an "
             "Issue block (severity + mandatory failure scenario). "

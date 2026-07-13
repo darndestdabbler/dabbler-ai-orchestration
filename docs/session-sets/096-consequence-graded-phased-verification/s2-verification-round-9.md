@@ -1,0 +1,14 @@
+ISSUES FOUND
+
+- **Issue 1: Round 5’s L14 remediation still assigns coverage IDs to report occurrences, so duplicate findings can manufacture blocking review failures**
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Failure scenario:** K=2 discovery produces differently worded reports of the same defect, as the measured 0.13–0.31 overlap and this session’s 9 reports for 7 distinct points demonstrate. A remediation reviewer accepts one occurrence but omits its redundant sibling ID—probable on the finding-dense, free-form reviews this machinery explicitly treats as salience-limited. The CLI then synthesizes an incomplete-coverage blocker and consumes a remediation cycle even though the logical defect was reviewed and fixed. Repetition on cycle two, or combination with one genuine rejected fix, suspends the loop at its cap over redundant bookkeeping rather than unresolved work.
+  - **Details:**
+    - **Violation:** The policy and Round 5 remediation claim that “A settled point never reopens under fresh wording” and that “a growing ledger never demands redundant re-verdicts of already-validated points.” The implementation still identifies occurrences rather than logical findings.
+    - **Impact:** Normal fan-out overlap can recreate the verification churn this deliverable exists to prevent, consume its two-cycle budget, and force unnecessary operator adjudication. That materially impairs bounded convergence and changes a reasonable merge decision.
+    - **Evidence:** Discovery concatenates reports with `merged_issues.extend(issues_k)` without deduplication. `assemble_cross_round_ledger_with_ids()` assigns a new `L<n>` to every blocking issue occurrence. `accepted_ids` exempts only the exact ID previously enumerated; an omitted duplicate remains required even when another occurrence of the same point was accepted. The shipped test `test_previously_accepted_ids_are_exempt_from_re_coverage` further demonstrates occurrence semantics by requiring both `L2` and the same finding’s restatement `L3`.
+    - **Location:** `ai_router/verify_session.py` — discovery merge loop and `assemble_cross_round_ledger_with_ids()`; this specifically challenges the Round 5 remediation of L14.
+    - **Fix:** Give each logical finding a persistent identity before coverage enforcement. Deduplicate or alias equivalent fan-out/cross-round occurrences through explicit orchestrator reconciliation, and treat acceptance of the canonical ID as settlement for all aliases. Keep distinct IDs only where reports represent materially distinct failure scenarios.
+
+**Round 6 L15:** Not re-raised. Under the supplied operator context, the replay is explicitly an indicative loop-shape demonstration, its workload limitation is prominently disclosed, and the proposed failure scenario no longer has a probable material consequence for this deliverable’s real users or objectives.

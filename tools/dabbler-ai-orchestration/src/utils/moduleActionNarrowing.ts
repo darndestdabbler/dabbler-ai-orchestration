@@ -12,13 +12,26 @@
 // the (kind ⟺ slug-shape) invariant is enforced so a malformed pairing can
 // never slip a repo-level default in behind a "declared" claim. No vscode
 // import, so the contract is Layer-2 unit-testable.
+//
+// Set 100 Session 2: the three lifecycle-management actions
+// (`add-module` / `rename-module` / `delete-module`) are DECLARED-only —
+// the pseudo module keeps `assign-legacy` and gets no management
+// actions (mirroring `assign-legacy`'s pseudo-only gate below). `open-plan`
+// stays actionable on both kinds, unchanged.
 
 export type ModuleActionId =
-  | "ai-plan"
-  | "import-plan"
   | "open-plan"
-  | "ai-sets"
+  | "add-module"
+  | "rename-module"
+  | "delete-module"
   | "assign-legacy";
+
+/** The three lifecycle-management actions — declared modules only. */
+const DECLARED_ONLY_ACTIONS: ReadonlySet<string> = new Set([
+  "add-module",
+  "rename-module",
+  "delete-module",
+]);
 
 /** The actionable module kinds (a `fallback` row exposes no actions). */
 export type ActionableModuleKind = "declared" | "pseudo";
@@ -33,10 +46,10 @@ export interface NarrowedModuleAction extends NarrowedModuleIdentity {
 }
 
 const MODULE_ACTIONS: ReadonlySet<string> = new Set([
-  "ai-plan",
-  "import-plan",
   "open-plan",
-  "ai-sets",
+  "add-module",
+  "rename-module",
+  "delete-module",
   "assign-legacy",
 ]);
 
@@ -62,9 +75,11 @@ export function narrowModuleIdentity(
 /**
  * Validate a full `moduleAction` message (action + identity). Returns the
  * narrowed action, or null when it must be dropped: an action outside the
- * closed enum, an identity that fails {@link narrowModuleIdentity}, or
+ * closed enum, an identity that fails {@link narrowModuleIdentity},
  * `assign-legacy` on anything but the pseudo (empty-slug) module — the
- * `Assign legacy sets…` affordance rides `Unassigned` alone.
+ * `Assign legacy sets…` affordance rides `Unassigned` alone — or one of the
+ * three lifecycle-management actions on anything but a declared module (the
+ * pseudo module gets no management actions, Set 100 S2).
  */
 export function narrowModuleAction(
   action: unknown,
@@ -75,34 +90,41 @@ export function narrowModuleAction(
   const identity = narrowModuleIdentity(moduleSlug, moduleKind);
   if (!identity) return null;
   if (action === "assign-legacy" && identity.kind !== "pseudo") return null;
+  if (DECLARED_ONLY_ACTIONS.has(action) && identity.kind !== "declared") return null;
   return { action: action as ModuleActionId, slug: identity.slug, kind: identity.kind };
 }
 
 /**
- * The side-effectful surface a narrowed module action dispatches into — the
- * four authoring flows (each carrying the module's `preselectedSlug` so no
- * QuickPick / notice fires) plus the assign-legacy flow and a view refresh.
- * Injectable so the strip→handler WIRING is Layer-2 testable (Set 093 S2
- * verification R3): the host binds these to the real handlers.
- * `importPlan` / `assignLegacy` return whether they mutated the workspace so
- * the dispatcher can refresh only on a real change.
+ * The side-effectful surface a narrowed module action dispatches into: open
+ * the module's plan, run the New Module / rename / delete flows (rename and
+ * delete carry the module's `preselectedSlug` so neither re-picks the
+ * target — the explicit-target seam, Set 100 S2), the assign-legacy flow,
+ * and a view refresh. Injectable so the strip→handler WIRING is Layer-2
+ * testable (Set 093 S2 verification R3, extended Set 100 S2): the host
+ * binds these to the real handlers. `addModule` / `renameModule` /
+ * `deleteModule` / `assignLegacy` return whether they mutated the
+ * workspace so the dispatcher can refresh only on a real change.
  */
 export interface ModuleActionExec {
-  aiPlan(preselectedSlug: string): Promise<void>;
-  importPlan(preselectedSlug: string): Promise<boolean>;
   openPlan(preselectedSlug: string): Promise<void>;
-  aiSets(preselectedSlug: string): Promise<void>;
+  addModule(): Promise<boolean>;
+  renameModule(preselectedSlug: string): Promise<boolean>;
+  deleteModule(preselectedSlug: string): Promise<boolean>;
   assignLegacy(): Promise<boolean>;
   refresh(): void;
 }
 
 /**
  * Execute a NARROWED module action against the injected handlers — the one
- * dispatch mapping shared by the row strip and the context menu. Each of the
- * four authoring actions threads the narrowed slug as its `preselectedSlug`
- * (`""` → repo-level for a pseudo row); `assign-legacy` and a successful
- * `import-plan` refresh the view. Kept pure of vscode so the mapping is
- * unit-tested without a webview (routed ruling D3; verification R3).
+ * dispatch mapping shared by the row strip and the context menu. `open-plan`
+ * threads the narrowed slug (`""` → repo-level for a pseudo row);
+ * `rename-module` / `delete-module` thread it as the writer's explicit
+ * target (declared-only, enforced upstream by {@link narrowModuleAction});
+ * `add-module` ignores the carried slug entirely (it targets a brand-new
+ * module, not the row it was clicked from). `add-module` / `rename-module` /
+ * `delete-module` / `assign-legacy` refresh the view only on a real mutation.
+ * Kept pure of vscode so the mapping is unit-tested without a webview
+ * (routed ruling D3; verification R3).
  */
 export async function dispatchModuleAction(
   narrowed: NarrowedModuleAction,
@@ -113,18 +135,20 @@ export async function dispatchModuleAction(
       if (await exec.assignLegacy()) exec.refresh();
       return;
     }
-    case "ai-plan":
-      await exec.aiPlan(narrowed.slug);
-      return;
-    case "import-plan": {
-      if (await exec.importPlan(narrowed.slug)) exec.refresh();
-      return;
-    }
     case "open-plan":
       await exec.openPlan(narrowed.slug);
       return;
-    case "ai-sets":
-      await exec.aiSets(narrowed.slug);
+    case "add-module": {
+      if (await exec.addModule()) exec.refresh();
       return;
+    }
+    case "rename-module": {
+      if (await exec.renameModule(narrowed.slug)) exec.refresh();
+      return;
+    }
+    case "delete-module": {
+      if (await exec.deleteModule(narrowed.slug)) exec.refresh();
+      return;
+    }
   }
 }

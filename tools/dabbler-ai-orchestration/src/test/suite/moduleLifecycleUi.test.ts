@@ -313,3 +313,58 @@ suite("Set 100 S1 — host ships the kind badge on the row payload", () => {
     assert.ok(!view.includes("planExists"));
   });
 });
+
+// Set 100 Session 2 — the reworked module action strip / context menu:
+// `Open Plan` stays; the retired `ai-plan` / `import-plan` / `ai-sets`
+// actions are gone from BOTH surfaces; `add-module` / `rename-module` /
+// `delete-module` are declared-only. House pattern: the host class
+// (webview lifecycle) and the webview client (DOM-only) are not importable
+// from the unit harness, so this pins the wiring by source scan.
+suite("Set 100 S2 — module action strip retired/added actions", () => {
+  const extRoot = path.resolve(__dirname, "..", "..", "..");
+  const viewSrc = fs.readFileSync(
+    path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
+    "utf8",
+  );
+  const clientSrc = fs.readFileSync(
+    path.join(extRoot, "media", "session-sets-tree", "client.js"),
+    "utf8",
+  );
+
+  test("the retired ai-plan / import-plan / ai-sets actions are gone from the context menu and the strip", () => {
+    for (const retired of ['"ai-plan"', '"import-plan"', '"ai-sets"']) {
+      assert.ok(!viewSrc.includes(retired), `context menu still references ${retired}`);
+      assert.ok(!clientSrc.includes(retired), `client.js strip still references ${retired}`);
+    }
+  });
+
+  test("open-plan survives; add-module / rename-module / delete-module join both surfaces", () => {
+    for (const action of ['"open-plan"', '"add-module"', '"rename-module"', '"delete-module"']) {
+      assert.ok(viewSrc.includes(action), `context menu missing ${action}`);
+      assert.ok(clientSrc.includes(action), `client.js strip missing ${action}`);
+    }
+  });
+
+  test("the three lifecycle-management actions are gated declared-only on both surfaces", () => {
+    // Context menu: pushed only inside the `kind === "declared"` branch.
+    assert.match(
+      viewSrc,
+      /kind === "declared"[\s\S]{0,200}add-module[\s\S]{0,120}rename-module[\s\S]{0,120}delete-module/,
+    );
+    // Strip: buttons pushed only inside the `kind === "declared"` branch.
+    assert.match(
+      clientSrc,
+      /kind === "declared"[\s\S]{0,200}add-module[\s\S]{0,120}rename-module[\s\S]{0,120}delete-module/,
+    );
+  });
+
+  test("moduleActionExec binds the lifecycle flows with the explicit-target seam", () => {
+    assert.ok(viewSrc.includes("runNewModuleFlow()"));
+    assert.ok(
+      viewSrc.includes("runRenameModuleFlow(undefined, { preselectedSlug: slug })"),
+    );
+    assert.ok(
+      viewSrc.includes("runDeleteModuleFlow(undefined, { preselectedSlug: slug })"),
+    );
+  });
+});

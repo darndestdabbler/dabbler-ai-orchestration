@@ -15,6 +15,7 @@ import {
   INVALID_MANIFEST_MESSAGE,
   classifyModulesManifest,
   renameModule,
+  unknownModuleMessage,
   validateNewModuleSlug,
 } from "../utils/moduleAuthoring";
 import { readAllSessionSets } from "../utils/fileSystem";
@@ -81,6 +82,17 @@ function defaultUi(): RenameModuleUi {
 }
 
 /**
+ * Set 100 Session 2 (explicit-target seam): a row/context invocation
+ * already carries its module, so the QuickPick is skipped entirely — a
+ * slug that no longer resolves (a stale row) fails LOUD rather than
+ * falling back to the picker. Absent → today's interactive behavior (the
+ * palette command keeps its QuickPick for keyboard-driven use).
+ */
+export interface RenameModuleOptions {
+  preselectedSlug?: string;
+}
+
+/**
  * Run the rename-module flow. Returns true when the writer changed at least
  * one file (so callers refresh the Explorer). Gathers a declared module, the
  * new slug and/or title, and an affirmative confirm that names the sets that
@@ -88,6 +100,7 @@ function defaultUi(): RenameModuleUi {
  */
 export async function runRenameModuleFlow(
   ui: RenameModuleUi = defaultUi(),
+  opts?: RenameModuleOptions,
 ): Promise<boolean> {
   const root = ui.workspaceRoot();
   if (!root) {
@@ -109,8 +122,17 @@ export async function runRenameModuleFlow(
     return false;
   }
 
-  const target = await ui.pickModule(entries);
-  if (!target) return false; // cancelled
+  let target: ModuleManifestEntry | undefined;
+  if (opts && opts.preselectedSlug !== undefined) {
+    target = entries.find((e) => e.slug === opts.preselectedSlug);
+    if (!target) {
+      ui.showErrorMessage(unknownModuleMessage(opts.preselectedSlug));
+      return false;
+    }
+  } else {
+    target = await ui.pickModule(entries);
+    if (!target) return false; // cancelled
+  }
 
   // Live slug validation: shape + uniqueness among the OTHER declared slugs
   // (keeping the current slug is allowed and means "no slug change").

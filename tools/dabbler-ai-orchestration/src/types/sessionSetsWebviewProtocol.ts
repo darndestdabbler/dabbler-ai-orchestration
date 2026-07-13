@@ -327,18 +327,28 @@ export interface ShowRowContextMenuMsg {
 // explicit module identity keeps the COMMAND_ALLOWLIST contract
 // untouched (routed ruling D3, s2-targeting-seam-architecture.json).
 //
-// The four authoring actions imply their module, so NO module QuickPick
-// and NO auto-select notice fires (amendment 1's QuickPick retirement
-// bans re-picking the MODULE, not the mechanism). `assign-legacy` is the
-// separate `Assign legacy sets to module…` affordance the pseudo module
-// carries only when it is labeled `Unassigned` (declared groups coexist);
-// it opens its own target-module + sets pickers (amendment 2).
+// Set 100 Session 2 (module lifecycle simplification, verdict + spec):
+// the four Set 093 authoring actions (`ai-plan` / `import-plan` /
+// `ai-sets`) retire from this strip/menu — superseded by the scaffolded
+// `kind: plan|decomposition` lifecycle sets (Set 098). `open-plan`
+// SURVIVES on every actionable kind. Three lifecycle-management actions
+// join, DECLARED modules only (the pseudo module keeps `assign-legacy`
+// and gets no management actions): `add-module` ignores its carried
+// slug (it launches the New Module flow for a brand-new module — the
+// row is just where the affordance sits); `rename-module` /
+// `delete-module` target the carried slug directly via the SAME
+// explicit-target seam the authoring actions used — no module QuickPick
+// on the row/context path (the palette commands `dabbler.renameModule`
+// / `dabbler.deleteModule` keep their own QuickPick for keyboard-driven
+// use). The retired actions' underlying capability (plan
+// prompt/import/open, decomposition prompt) survives unchanged as
+// palette-only commands — only the strip/menu affordance retires.
 export type ModuleActionId =
-  | "ai-plan"       // copy a module-targeted plan-authoring prompt
-  | "import-plan"   // file picker → the module's plan path
-  | "open-plan"     // open the module's plan in an editor
-  | "ai-sets"       // copy a module-targeted decomposition prompt
-  | "assign-legacy"; // Unassigned only: stamp module: into chosen sets
+  | "open-plan"       // open the module's plan in an editor
+  | "add-module"      // launch the New Module flow (carried slug unused)
+  | "rename-module"   // rename this declared module (Set 099 renameModule)
+  | "delete-module"   // delete this declared module (Set 099 deleteModule)
+  | "assign-legacy";  // Unassigned only: stamp module: into chosen sets
 
 export interface ModuleActionMsg {
   type: "moduleAction";

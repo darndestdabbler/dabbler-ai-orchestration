@@ -1265,6 +1265,119 @@ suite("runNewModuleFlow (Set 087 S3)", () => {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
+
+  // Set 100 Session 2 (spec: "Add module now scaffolds the module's two
+  // lifecycle sets"): the end-to-end Add-module state — manifest entry +
+  // plan stub + the two scaffolded sets, correctly numbered and linked.
+  // A fresh empty root always starts numbering at 001 (pinned precedent:
+  // moduleAuthoring — scaffoldModuleLifecycleSets, "Session 2" suite
+  // above), so this asserts the exact slugs, not just a digit pattern.
+  test("scaffolds the module's plan + decomposition lifecycle sets after the manifest append", async () => {
+    const root = tmpRoot("mod-flow-lifecycle-");
+    const log = freshFlowLog();
+    try {
+      const ok = await runNewModuleFlow(flowUi(root, ["greeter", "Greeter"], log));
+      assert.strictEqual(ok, true);
+      assert.strictEqual(log.errors.length, 0);
+      // One combined toast (not a second notification) names both sets.
+      assert.strictEqual(log.infos.length, 1);
+      assert.match(
+        log.infos[0],
+        /Next steps scaffolded: 001-greeter-plan and 002-greeter-decomposition\.$/,
+      );
+
+      const planName = "001-greeter-plan";
+      const decompName = "002-greeter-decomposition";
+      assert.ok(
+        fs.existsSync(path.join(root, "docs", "session-sets", planName, "spec.md")),
+        "plan set directory must exist",
+      );
+      assert.ok(
+        fs.existsSync(path.join(root, "docs", "session-sets", decompName, "spec.md")),
+        "decomposition set directory must exist",
+      );
+
+      const planConfig = parseSessionSetConfig(
+        path.join(root, "docs", "session-sets", planName, "spec.md"),
+      );
+      assert.strictEqual(planConfig.kind, "plan");
+      const decompConfig = parseSessionSetConfig(
+        path.join(root, "docs", "session-sets", decompName, "spec.md"),
+      );
+      assert.strictEqual(decompConfig.kind, "decomposition");
+      const prereqs = parsePrerequisites(
+        path.join(root, "docs", "session-sets", decompName, "spec.md"),
+      );
+      assert.ok(
+        prereqs?.some((p) => p.slug === planName && p.condition === "complete"),
+        "the decomposition set must prerequisite its sibling plan set",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // NOT a "re-run the flow for the same slug" test — `runNewModuleFlow`
+  // cannot be invoked twice for one slug (the input box's live validator
+  // refuses a slug already in the manifest), so that path is unreachable
+  // through the UI. What this DOES pin: a module that already carries
+  // scaffolded lifecycle sets (e.g. from a prior Add, or hand-authored)
+  // stays untouched when a LATER Add-module declares a different module —
+  // the new module's scaffold must not disturb or duplicate anything.
+  test("an already-lifecycle-scaffolded module's sets survive a later Add-module for a different module", async () => {
+    const root = tmpRoot("mod-flow-lifecycle-coexist-");
+    const log = freshFlowLog();
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      scaffoldModuleLifecycleSets(root, {
+        slug: "greeter",
+        title: "Greeter",
+        codeRoots: [],
+        planPath: null,
+        touches: [],
+      });
+      const before = fs
+        .readdirSync(path.join(root, "docs", "session-sets"))
+        .sort();
+
+      const ok = await runNewModuleFlow(flowUi(root, ["clock", "Clock"], log));
+      assert.strictEqual(ok, true);
+      // greeter's lifecycle sets are untouched; only clock's new ones land.
+      const after = fs.readdirSync(path.join(root, "docs", "session-sets")).sort();
+      for (const name of before) {
+        assert.ok(after.includes(name), `${name} must survive the later Add-module`);
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  // The manifest append is the load-bearing half — a lifecycle-scaffold
+  // refusal must report but never undo the module's declaration (spec:
+  // "a writer refusal reports and leaves the manifest append intact —
+  // module without sets beats half-written sets"). Block the plan set's
+  // directory with a same-named FILE so the writer's mkdirSync throws
+  // mid-scaffold, AFTER the manifest append has already landed.
+  test("a lifecycle-scaffold refusal reports but keeps the module declared", async () => {
+    const root = tmpRoot("mod-flow-lifecycle-refuse-");
+    const log = freshFlowLog();
+    try {
+      fs.mkdirSync(path.join(root, "docs", "session-sets"), { recursive: true });
+      fs.writeFileSync(
+        path.join(root, "docs", "session-sets", "001-greeter-plan"),
+        "not a directory",
+        "utf8",
+      );
+      const ok = await runNewModuleFlow(flowUi(root, ["greeter", "Greeter"], log));
+      assert.strictEqual(ok, true);
+      assert.strictEqual(log.errors.length, 0);
+      assert.strictEqual(readModulesManifest(root)![0].slug, "greeter");
+      assert.strictEqual(log.infos.length, 1);
+      assert.match(log.infos[0], /lifecycle sets were NOT scaffolded/i);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 // Set 093 Session 2 (routed ruling D1): the explicit-module-target seam.

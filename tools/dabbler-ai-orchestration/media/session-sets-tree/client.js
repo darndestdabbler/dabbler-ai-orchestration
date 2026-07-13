@@ -510,22 +510,33 @@
     );
   }
 
-  // Set 093 S2 (routed ruling D3): the module-row action strip — a
-  // `role="toolbar"` reached by Tab as a SECONDARY TABSTOP (never on the
-  // tree's arrow-key roving, which touches treeitems only). Its buttons are
-  // NOT treeitems, so they are excluded from the tree name and from arrow
-  // nav; internal roving (Arrow/Home/End) + activate (Enter/Space) + Escape
-  // (back to the module) are handled by the root keydown handler. Buttons
-  // carry the module identity so a click/activation posts a self-validating
-  // `moduleAction` message (no executeCommand allowlist involvement). The
-  // `assign-legacy` affordance rides the pseudo `Unassigned` module only.
+  // Set 093 S2 (routed ruling D3), reworked Set 100 S2 (module lifecycle
+  // simplification): the module-row action strip — a `role="toolbar"`
+  // reached by Tab as a SECONDARY TABSTOP (never on the tree's arrow-key
+  // roving, which touches treeitems only). Its buttons are NOT treeitems,
+  // so they are excluded from the tree name and from arrow nav; internal
+  // roving (Arrow/Home/End) + activate (Enter/Space) + Escape (back to the
+  // module) are handled by the root keydown handler. Buttons carry the
+  // module identity so a click/activation posts a self-validating
+  // `moduleAction` message (no executeCommand allowlist involvement).
+  //
+  // `Open Plan` stays on every actionable kind. The retired `AI Plan` /
+  // `Import Plan` / `AI Sets` buttons are GONE — superseded by the
+  // scaffolded `kind: plan|decomposition` lifecycle sets (their underlying
+  // flows survive palette-only). `Add` / `Rename…` / `Delete…` join,
+  // DECLARED modules only; the pseudo module gets no management actions and
+  // keeps only `Assign…` on `Unassigned`.
   function renderModuleActionStrip(kind, label, slug) {
     var buttons = [
-      { action: "ai-plan", label: "AI Plan", title: "Copy a module-targeted plan-authoring prompt" },
-      { action: "import-plan", label: "Import Plan", title: "Import a plan file for this module" },
       { action: "open-plan", label: "Open Plan", title: "Open this module's plan" },
-      { action: "ai-sets", label: "AI Sets", title: "Copy a module-targeted decomposition prompt" },
     ];
+    if (kind === "declared") {
+      buttons.push(
+        { action: "add-module", label: "Add", title: "Add a new module" },
+        { action: "rename-module", label: "Rename…", title: "Rename this module" },
+        { action: "delete-module", label: "Delete…", title: "Delete this module" },
+      );
+    }
     if (kind === "pseudo" && label === "Unassigned") {
       buttons.push({
         action: "assign-legacy",

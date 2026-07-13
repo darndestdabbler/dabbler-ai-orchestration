@@ -14687,9 +14687,9 @@ var path41 = __toESM(require("path"));
 
 // src/providers/CustomSessionSetsView.ts
 var crypto4 = __toESM(require("crypto"));
-var fs17 = __toESM(require("fs"));
+var fs16 = __toESM(require("fs"));
 var path21 = __toESM(require("path"));
-var vscode14 = __toESM(require("vscode"));
+var vscode16 = __toESM(require("vscode"));
 
 // src/utils/fileSystem.ts
 var vscode = __toESM(require("vscode"));
@@ -17088,6 +17088,17 @@ function parseSetHandle(raw) {
     return null;
   return parseInt(trimmed2, 10);
 }
+function prefixWidth(slug) {
+  const m = PREFIX_RE.exec(slug);
+  return m ? m[1].length : 0;
+}
+function nextSessionSetNumberFrom(dirNames) {
+  const numbered = dirNames.map(numericPrefix).filter((p2) => p2 !== null);
+  const n = numbered.length ? Math.max(...numbered) + 1 : 1;
+  const widest = dirNames.reduce((w, name) => Math.max(w, prefixWidth(name)), 0);
+  const width = Math.max(3, widest);
+  return { n, padded: String(n).padStart(width, "0") };
+}
 
 // src/utils/moduleAuthoring.ts
 var MODULES_MANIFEST_DISPLAY = MODULES_MANIFEST_REL.replace(/\\/g, "/");
@@ -18294,6 +18305,164 @@ async function deleteModule(root, slugRaw, io = NODE_RENAME_IO) {
   }
   return { slug, cancelled, removed, terminal: terminalNames };
 }
+var MODULE_PLAN_SET_TEMPLATE_FILENAME = "module-plan-set.spec.md.template";
+var MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME = "module-decomposition-set.spec.md.template";
+function resolveModuleLifecycleTemplatesDir() {
+  const candidates = [
+    path7.join(__dirname, "templates", "consumer-bootstrap"),
+    path7.join(__dirname, "..", "..", "..", "..", "docs", "templates", "consumer-bootstrap")
+  ];
+  for (const c3 of candidates) {
+    if (fs6.existsSync(path7.join(c3, MODULE_PLAN_SET_TEMPLATE_FILENAME)))
+      return c3;
+  }
+  return candidates[candidates.length - 1];
+}
+function loadModuleLifecycleTemplate(filename) {
+  const dir = resolveModuleLifecycleTemplatesDir();
+  return fs6.readFileSync(path7.join(dir, filename), "utf8").replace(/\r\n/g, "\n");
+}
+function substituteLifecycleTokens(text, table) {
+  return text.replace(
+    /{{([A-Z_]+)}}/g,
+    (whole, key) => Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole
+  );
+}
+function assertNoUnsubstitutedTokens(rendered, filename) {
+  const leftover = rendered.match(/{{[A-Z_]+}}/g);
+  if (leftover) {
+    throw new Error(
+      `${filename}: unsubstituted token(s) ${leftover.join(", ")} \u2014 a template/writer token-table mismatch.`
+    );
+  }
+}
+function renderModulePlanSetSpec(ctx) {
+  const rendered = substituteLifecycleTokens(
+    loadModuleLifecycleTemplate(MODULE_PLAN_SET_TEMPLATE_FILENAME),
+    {
+      MODULE_TITLE: ctx.moduleTitle,
+      MODULE_SLUG: ctx.moduleSlug,
+      SLUG: ctx.slug,
+      CREATED: ctx.created,
+      PLAN_REL_PATH: ctx.planRelPath
+    }
+  );
+  assertNoUnsubstitutedTokens(rendered, MODULE_PLAN_SET_TEMPLATE_FILENAME);
+  return rendered;
+}
+function renderModuleDecompositionSetSpec(ctx) {
+  const rendered = substituteLifecycleTokens(
+    loadModuleLifecycleTemplate(MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME),
+    {
+      MODULE_TITLE: ctx.moduleTitle,
+      MODULE_SLUG: ctx.moduleSlug,
+      SLUG: ctx.slug,
+      CREATED: ctx.created,
+      PLAN_REL_PATH: ctx.planRelPath,
+      PLAN_SLUG: ctx.planSlug
+    }
+  );
+  assertNoUnsubstitutedTokens(rendered, MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME);
+  return rendered;
+}
+function findExistingLifecycleSetSlug(dirNames, moduleSlug, kind) {
+  const suffix = `-${moduleSlug}-${kind}`;
+  const matches = dirNames.filter((n) => n.endsWith(suffix) && numericPrefix(n) !== null).sort();
+  return matches.length > 0 ? matches[0] : null;
+}
+function writeSpecSkipExisting(abs, text) {
+  if (fs6.existsSync(abs))
+    return false;
+  fs6.mkdirSync(path7.dirname(abs), { recursive: true });
+  fs6.writeFileSync(abs, text, { encoding: "utf8" });
+  if (fs6.readFileSync(abs, "utf8") !== text) {
+    throw new Error(`${abs} did not verify after writing (concurrent modification?).`);
+  }
+  return true;
+}
+function assertLifecycleSpecWritten(abs, expectedKind, expectedPrereqSlug) {
+  const config = parseSessionSetConfig(abs);
+  if (config.kind !== expectedKind) {
+    throw new Error(
+      `${abs}: expected kind "${expectedKind}", parsed "${config.kind}" \u2014 refusing (template/parser drift).`
+    );
+  }
+  if (expectedPrereqSlug !== null) {
+    const prereqs = parsePrerequisites(abs);
+    const ok = prereqs !== null && prereqs.some(
+      (p2) => p2.slug === expectedPrereqSlug && p2.condition === "complete"
+    );
+    if (!ok) {
+      throw new Error(
+        `${abs}: expected a prerequisites: entry for "${expectedPrereqSlug}" \u2014 refusing (template/parser drift).`
+      );
+    }
+  }
+}
+function scaffoldModuleLifecycleSets(root, module2) {
+  const moduleSlug = (module2.slug ?? "").trim();
+  if (!MODULE_SLUG_RE.test(moduleSlug)) {
+    throw new Error(
+      `Cannot scaffold lifecycle sets: "${module2.slug}" is not a valid module slug.`
+    );
+  }
+  const dirNames = listSessionSetDirNames(root);
+  const existingPlanSlug = findExistingLifecycleSetSlug(dirNames, moduleSlug, "plan");
+  const existingDecompositionSlug = findExistingLifecycleSetSlug(
+    dirNames,
+    moduleSlug,
+    "decomposition"
+  );
+  const planSlug = existingPlanSlug ?? `${nextSessionSetNumberFrom(dirNames).padded}-${moduleSlug}-plan`;
+  const reservedDirNames = existingPlanSlug || dirNames.includes(planSlug) ? dirNames : [...dirNames, planSlug];
+  const decompositionSlug = existingDecompositionSlug ?? `${nextSessionSetNumberFrom(reservedDirNames).padded}-${moduleSlug}-decomposition`;
+  const created = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const planRelPath = modulePlanRelPath(module2);
+  const moduleTitle = (module2.title ?? "").trim() || moduleSlug;
+  const planAbs = path7.join(root, SESSION_SETS_REL, planSlug, "spec.md");
+  const decompositionAbs = path7.join(
+    root,
+    SESSION_SETS_REL,
+    decompositionSlug,
+    "spec.md"
+  );
+  let planCreated = false;
+  if (!existingPlanSlug) {
+    const planText = renderModulePlanSetSpec({
+      slug: planSlug,
+      moduleSlug,
+      moduleTitle,
+      created,
+      planRelPath
+    });
+    planCreated = writeSpecSkipExisting(planAbs, planText);
+    if (planCreated)
+      assertLifecycleSpecWritten(planAbs, "plan", null);
+  }
+  let decompositionCreated = false;
+  if (!existingDecompositionSlug) {
+    const decompositionText = renderModuleDecompositionSetSpec({
+      slug: decompositionSlug,
+      moduleSlug,
+      moduleTitle,
+      created,
+      planRelPath,
+      planSlug
+    });
+    decompositionCreated = writeSpecSkipExisting(decompositionAbs, decompositionText);
+    if (decompositionCreated) {
+      assertLifecycleSpecWritten(decompositionAbs, "decomposition", planSlug);
+    }
+  }
+  return {
+    planSlug,
+    planSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${planSlug}/spec.md`,
+    planCreated,
+    decompositionSlug,
+    decompositionSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${decompositionSlug}/spec.md`,
+    decompositionCreated
+  };
+}
 
 // src/providers/inProgressSetsService.ts
 function listInProgressSets(all) {
@@ -18803,511 +18972,12 @@ function registerPlanImportCommand(context) {
   );
 }
 
-// src/wizard/sessionGenPrompt.ts
-var vscode4 = __toESM(require("vscode"));
-var fs9 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
-
-// src/utils/consumerBootstrap.ts
-var fs8 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
-var DEFAULT_VERIFICATION_MODE = "out-of-band-or-none";
-var BUNDLE_FILES = {
-  specTemplate: "spec.md.template",
-  sessionStateTemplate: "session-state.json.template",
-  startHereTemplate: "start-here.md.template",
-  gettingStartedTemplate: "getting-started.md.template",
-  sharedBody: "engine-file.shared-body.md",
-  claudeTail: "engine-file.claude-tail.md",
-  agentsTail: "engine-file.agents-tail.md",
-  geminiTail: "engine-file.gemini-tail.md",
-  lessonsLearnedTemplate: "lessons-learned.md.template",
-  projectGuidanceTemplate: "project-guidance.md.template",
-  lessonsArchiveTemplate: "lessons-archive.md.template",
-  crossProviderVerificationTemplate: "cross-provider-verification.md.template",
-  codeownersTemplate: "CODEOWNERS.template",
-  monorepoCiTemplate: "monorepo-ci.yml.template"
-};
-var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
-function resolveBundledTemplateDir(extensionPath) {
-  return path9.join(extensionPath, "dist", "templates", "consumer-bootstrap");
-}
-function loadTemplateBundle(bundleDir) {
-  const read = (name) => fs8.readFileSync(path9.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
-  return {
-    specTemplate: read(BUNDLE_FILES.specTemplate),
-    sessionStateTemplate: read(BUNDLE_FILES.sessionStateTemplate),
-    startHereTemplate: read(BUNDLE_FILES.startHereTemplate),
-    gettingStartedTemplate: read(BUNDLE_FILES.gettingStartedTemplate),
-    sharedBody: read(BUNDLE_FILES.sharedBody),
-    claudeTail: read(BUNDLE_FILES.claudeTail),
-    agentsTail: read(BUNDLE_FILES.agentsTail),
-    geminiTail: read(BUNDLE_FILES.geminiTail),
-    lessonsLearnedTemplate: read(BUNDLE_FILES.lessonsLearnedTemplate),
-    projectGuidanceTemplate: read(BUNDLE_FILES.projectGuidanceTemplate),
-    lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate),
-    crossProviderVerificationTemplate: read(
-      BUNDLE_FILES.crossProviderVerificationTemplate
-    ),
-    codeownersTemplate: read(BUNDLE_FILES.codeownersTemplate),
-    monorepoCiTemplate: read(BUNDLE_FILES.monorepoCiTemplate)
-  };
-}
-function padSessionNumber(n) {
-  return String(n).padStart(3, "0");
-}
-function assertPositiveSessionCount(totalSessions) {
-  if (!Number.isInteger(totalSessions) || totalSessions < 1) {
-    throw new Error(
-      `consumer-bootstrap: totalSessions must be a positive integer, got ${totalSessions}`
-    );
-  }
-}
-function verificationModeLine(ctx) {
-  if (ctx.tier !== "lightweight")
-    return "";
-  const mode = ctx.verificationMode || DEFAULT_VERIFICATION_MODE;
-  return `verificationMode: ${mode}  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full
-`;
-}
-function moduleLine(ctx) {
-  if (!ctx.module)
-    return "";
-  return `module: ${ctx.module}                      # grouping only \u2014 set names stay globally unique
-`;
-}
-function tokenTable(ctx) {
-  return {
-    REPO_NAME: ctx.repoName,
-    SET_TITLE: ctx.setTitle,
-    PURPOSE: ctx.purpose,
-    SLUG: ctx.slug,
-    CREATED: ctx.created,
-    TIER: ctx.tier,
-    MODULE_LINE: moduleLine(ctx),
-    VERIFICATION_MODE_LINE: verificationModeLine(ctx),
-    TOTAL_SESSIONS: String(ctx.totalSessions)
-  };
-}
-function substituteTokens(text, ctx) {
-  const table = tokenTable(ctx);
-  return text.replace(
-    /{{([A-Z_]+)}}/g,
-    (whole, key) => Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole
-  );
-}
-function findUnsubstitutedTokens(rendered) {
-  const out = /* @__PURE__ */ new Set();
-  for (const m of rendered.matchAll(/{{[A-Z_]+}}/g))
-    out.add(m[0]);
-  return [...out];
-}
-function expandSpecSessions(specText, totalSessions) {
-  assertPositiveSessionCount(totalSessions);
-  specText = specText.replace(/\r\n/g, "\n");
-  const SESSIONS_HEADER = "## Sessions\n";
-  const DELIVERABLES_HEADER = "## End-of-set deliverables";
-  const SEP = "\n\n---\n\n";
-  const headerIdx = specText.indexOf(SESSIONS_HEADER);
-  const deliverablesIdx = specText.indexOf(DELIVERABLES_HEADER);
-  if (headerIdx === -1 || deliverablesIdx === -1 || deliverablesIdx < headerIdx) {
-    return specText;
-  }
-  const preamble = specText.slice(0, headerIdx + SESSIONS_HEADER.length);
-  const postamble = specText.slice(deliverablesIdx);
-  const region = specText.slice(headerIdx + SESSIONS_HEADER.length, deliverablesIdx);
-  const blockStart = region.indexOf("### Session 1 of");
-  if (blockStart === -1)
-    return specText;
-  const afterStart = region.slice(blockStart);
-  const sepIdx = afterStart.indexOf(SEP);
-  const unit = (sepIdx === -1 ? afterStart : afterStart.slice(0, sepIdx)).trimEnd();
-  const blocks = [];
-  for (let k2 = 1; k2 <= totalSessions; k2++) {
-    let block = unit.replace("### Session 1 of", `### Session ${k2} of`);
-    block = block.replace(/session-001\//g, `session-${padSessionNumber(k2)}/`);
-    blocks.push(block);
-  }
-  return `${preamble}
-${blocks.join(SEP)}${SEP}${postamble}`;
-}
-function expandSessionState(stateText, totalSessions) {
-  assertPositiveSessionCount(totalSessions);
-  const parsed = JSON.parse(stateText);
-  const unit = parsed.sessions[0];
-  parsed.sessions = [];
-  for (let k2 = 1; k2 <= totalSessions; k2++) {
-    parsed.sessions.push({
-      ...unit,
-      number: k2,
-      title: `Session ${k2}`,
-      status: "not-started",
-      startedAt: null,
-      completedAt: null,
-      orchestrator: null,
-      verificationVerdict: null
-    });
-  }
-  return JSON.stringify(parsed, null, 2) + "\n";
-}
-function renderEngineFile(sharedBody, tail, ctx) {
-  return substituteTokens(sharedBody, ctx) + "\n" + substituteTokens(tail, ctx);
-}
-function renderSpec(bundle, ctx) {
-  return expandSpecSessions(
-    substituteTokens(bundle.specTemplate, ctx),
-    ctx.totalSessions
-  );
-}
-function renderSessionState(bundle, ctx) {
-  return expandSessionState(
-    substituteTokens(bundle.sessionStateTemplate, ctx),
-    ctx.totalSessions
-  );
-}
-function renderStartHere(bundle, ctx) {
-  return substituteTokens(bundle.startHereTemplate, ctx);
-}
-function specRelPath(ctx) {
-  return path9.posix.join("docs", "session-sets", ctx.slug, "spec.md");
-}
-function sessionStateRelPath(ctx) {
-  return path9.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
-}
-var START_HERE_REL_PATH = path9.posix.join("docs", "dabbler", "start-here.md");
-var GETTING_STARTED_REL_PATH = path9.posix.join(
-  "docs",
-  "dabbler",
-  "getting-started.md"
-);
-var CROSS_PROVIDER_VERIFICATION_REL_PATH = path9.posix.join(
-  "docs",
-  "dabbler",
-  "cross-provider-verification.md"
-);
-function renderCrossProviderVerification(bundle, ctx) {
-  return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
-}
-var LESSONS_LEARNED_REL_PATH = path9.posix.join("docs", "planning", "lessons-learned.md");
-var PROJECT_GUIDANCE_REL_PATH = path9.posix.join("docs", "planning", "project-guidance.md");
-var LESSONS_ARCHIVE_REL_PATH = path9.posix.join("docs", "planning", "lessons-archive.md");
-var CODEOWNERS_REL_PATH = path9.posix.join(".github", "CODEOWNERS");
-var MONOREPO_CI_REL_PATH = path9.posix.join(
-  ".github",
-  "workflows",
-  "monorepo-ci.yml"
-);
-function guidanceFiles(bundle, ctx) {
-  return {
-    [LESSONS_LEARNED_REL_PATH]: substituteTokens(bundle.lessonsLearnedTemplate, ctx),
-    [PROJECT_GUIDANCE_REL_PATH]: substituteTokens(bundle.projectGuidanceTemplate, ctx),
-    [LESSONS_ARCHIVE_REL_PATH]: substituteTokens(bundle.lessonsArchiveTemplate, ctx)
-  };
-}
-function renderConsumerBootstrap(bundle, ctx) {
-  const files = {
-    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
-    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
-    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
-    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
-    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
-    // Set 077 S4 (Feature 3): the engine-facing verification doc the
-    // Evaluate pointer prompts reference.
-    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
-      bundle,
-      ctx
-    ),
-    [specRelPath(ctx)]: renderSpec(bundle, ctx),
-    [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
-    // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
-    ...guidanceFiles(bundle, ctx),
-    // Set 087 S3 (ruling Q3): the module-ownership + monorepo-CI teaching
-    // templates (token-free; inert until adapted).
-    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
-    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate
-  };
-  const leftovers = /* @__PURE__ */ new Set();
-  for (const content of Object.values(files)) {
-    for (const t2 of findUnsubstitutedTokens(content))
-      leftovers.add(t2);
-  }
-  if (leftovers.size > 0) {
-    throw new Error(
-      `consumer-bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`
-    );
-  }
-  return { files };
-}
-function renderStructureBootstrap(bundle, ctx) {
-  const files = {
-    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
-    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
-    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
-    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
-    // D8 (Set 060 S3): the static Getting Started teaching doc ships
-    // with the structure scaffold too, so the editor-open path can
-    // prefer the workspace copy once the structure is built.
-    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
-    // Set 077 S4 (Feature 3): the verification instruction doc is repo
-    // structure — the Lightweight review flow depends on it.
-    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
-      bundle,
-      ctx
-    ),
-    // Set 064 (D7): the guidance-lifecycle starters are repo structure too,
-    // so a fresh repo built via "Build project structure" starts the
-    // lifecycle with docs/planning/ in place.
-    ...guidanceFiles(bundle, ctx),
-    // Set 087 S3 (ruling Q3): the ownership + CI teaching templates are
-    // repo structure too — a new project starts with them in place.
-    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
-    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate
-  };
-  const leftovers = /* @__PURE__ */ new Set();
-  for (const content of Object.values(files)) {
-    for (const t2 of findUnsubstitutedTokens(content))
-      leftovers.add(t2);
-  }
-  if (leftovers.size > 0) {
-    throw new Error(
-      `structure-only bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`
-    );
-  }
-  return { files };
-}
-function structureOnlyContext(repoName, tier, created, verificationMode = DEFAULT_VERIFICATION_MODE) {
-  return {
-    repoName,
-    setTitle: "(no starter set \u2014 created via the Getting Started decomposition prompt)",
-    purpose: "(no starter set)",
-    slug: "000-placeholder-unused",
-    created,
-    tier,
-    verificationMode,
-    totalSessions: 1
-  };
-}
-
-// src/wizard/sessionGenPrompt.ts
-var PLAN_PATH = path10.join("docs", "planning", "project-plan.md");
-var PLAN_REL_POSIX = "docs/planning/project-plan.md";
-function sampleContext(tier, verificationMode = "out-of-band-or-none", moduleSlug) {
-  return {
-    repoName: "example-app",
-    setTitle: "Example feature",
-    purpose: "A worked example \u2014 replace with the real set's purpose.",
-    slug: "001-example-feature",
-    created: "2026-01-01",
-    tier,
-    verificationMode,
-    totalSessions: 3,
-    // Set 087 S3 (ruling Q2): a module-targeted decomposition renders the
-    // module: line IN the exemplar (writer-rendered, so the prompt cannot
-    // drift from what the shared writer emits); absent → no line at all.
-    module: moduleSlug
-  };
-}
-var PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** You asked for parallel session sets
-  where possible: the orchestration runs independent session sets concurrently in
-  separate git worktrees, merged back to the main branch when the sets complete.
-  Minimize cross-set dependencies; when one set genuinely must follow another,
-  declare that explicitly with a \`prerequisites:\` entry in the dependent set's
-  Session Set Configuration block (slug + \`condition: complete\`). Any set with no
-  \`prerequisites:\` is treated as safe to start in parallel.
-`;
-function buildSessionGenPrompt(bundle, options = {}) {
-  const exemplarTier = options.tier ?? "full";
-  const exemplarMode = exemplarTier === "lightweight" && options.verificationMode ? options.verificationMode : "out-of-band-or-none";
-  const ctx = sampleContext(exemplarTier, exemplarMode, options.module?.slug);
-  const exampleSpec = renderSpec(bundle, ctx);
-  const exampleState = renderSessionState(bundle, ctx);
-  const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
-  const moduleRequirement = options.module ? `- **Module:** declare \`module: ${options.module.slug}\` in EVERY generated set's
-  Session Set Configuration block, exactly as the worked example shows (the value is
-  validated against \`docs/modules.yaml\`). \`module\` is a grouping attribute only \u2014
-  session-set names stay globally unique across ALL modules.
-` : "";
-  const moduleGuidance = options.module ? `- **Module.** This decomposition targets the **${options.module.slug}** module
-  (declared in \`docs/modules.yaml\`). Stamp \`module: ${options.module.slug}\` in each
-  generated set's configuration block. Recommended (not enforced): include the module
-  slug in each set's name (e.g. \`00N-${options.module.slug}-<feature>\`) so names stay
-  self-describing and collision-free across modules.
-` : "";
-  const planRefPosix = options.module?.planPath ?? PLAN_REL_POSIX;
-  const modeGuidance = exemplarTier === "lightweight" && exemplarMode === "dedicated-sessions" ? `- **Verification mode.** The operator selected **dedicated verification sessions**
-  for this project \u2014 author each Lightweight set with \`verificationMode:
-  dedicated-sessions\` unless the project plan explicitly calls for a different mode
-  on a specific set.
-` : "";
-  let tierGuidance;
-  if (options.tier && options.tierSource !== "inference") {
-    tierGuidance = `- **Tier.** The operator selected the **${options.tier}** tier for this
-  project \u2014 author each new set with \`tier: ${options.tier}\` unless the project plan
-  explicitly calls for a different tier on a specific set.
-`;
-  } else if (options.tier) {
-    tierGuidance = `- **Tier.** This workspace is set up for the **${options.tier}** tier
-  (inferred from the workspace's router configuration) \u2014 author each new set with
-  \`tier: ${options.tier}\` unless the project plan explicitly calls for a different
-  tier on a specific set.
-`;
-  } else {
-    tierGuidance = `- **Tier.** No tier choice is recorded in this workspace. The worked
-  example above uses \`tier: full\` for illustration only \u2014 do NOT treat it as the
-  operator's selection. Choose each set's tier (\`full\` | \`lightweight\`) from the
-  project plan, per the tier-model SSoT linked above.
-`;
-  }
-  return `You are a session-set architect for an AI-led software development workflow (the Dabbler session-set workflow).
-
-Given a project plan, decompose it into a sequence of session sets. Each session set is a
-focused, independently deployable unit of work that one AI coding session can complete.
-
-For EACH session set, scaffold a folder \`docs/session-sets/<NNN-slug>/\` containing a
-\`spec.md\` AND a \`session-state.json\`, matching the worked examples below EXACTLY in shape.
-
-## Hard requirements (do not deviate)
-
-- **Slug:** \`NNN-kebab-title\` \u2014 a three-digit, zero-padded, monotonically increasing
-  prefix then a kebab-case title (e.g. \`001-user-authentication\`, \`002-product-catalog\`).
-  Never emit a bare (un-prefixed) slug.
-- **\`spec.md\` Session Set Configuration block** MUST declare \`tier\` (\`full\` |
-  \`lightweight\`). \`lightweight\` sets ALSO declare \`verificationMode\`
-  (\`out-of-band-or-none\` default, or \`dedicated-sessions\`); \`full\` sets OMIT
-  \`verificationMode\` entirely \u2014 the field is Lightweight-only, and omitting it means
-  the default. The tier model is defined once, in the SSoT \u2014
-  do NOT restate it in the spec:
-  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
-- **One \`### Session K of N\` block per planned session** (progress keys keyed
-  \`session-00K/\`), and **one object in the \`session-state.json\` \`sessions\` array per
-  planned session** (\`"number": K\`, \`"title": "Session K"\`, all other fields at their
-  not-started defaults).
-- **\`session-state.json\`** MUST use \`"schemaVersion": 4\` and \`"status": "not-started"\`.
-  Never emit the retired schemaVersion-2 state shape.
-${moduleRequirement}
-
-## Worked example \u2014 \`spec.md\` for a 3-session ${exemplarTier === "lightweight" ? "Lightweight" : "Full"} set (\`001-example-feature\`)
-
-Match this shape; substitute your own title/purpose/slug/tier and emit exactly one session
-block per planned session:
-
-~~~~markdown
-${exampleSpec}
-~~~~
-
-## Worked example \u2014 its \`session-state.json\` (schemaVersion 4, three not-started sessions)
-
-~~~~json
-${exampleState}
-~~~~
-
-## Authoring guidance
-
-- Order sets so earlier ones unblock later ones.
-- Keep scope tight: prefer 2\u20134 sessions per set.
-- Set \`requiresUAT: true\` only for user-visible features that need manual verification;
-  when true, set \`uatStyle: dsl\` for web/browser UI (Playwright via dabbler-uat-dsl) or
-  \`uatStyle: ad-hoc\` for non-web surfaces (CLI, native, Access, COM apps). Default ad-hoc.
-- Set \`requiresE2E: true\` only if automated browser tests are relevant.
-- Both tiers run the same Python lifecycle (\`start_session\` / \`close_session\`), state
-  handling, and close-out. Lightweight is router-off, not Python-off \u2014 pick \`tier:
-  lightweight\` when the project opts out of metered API calls.
-${tierGuidance}${modeGuidance}${moduleGuidance}${parallelGuidance}
----
-
-## The project plan (read it from the workspace)
-
-The authoritative input for this decomposition is the project plan at
-\`${planRefPosix}\` in this workspace. Read that file directly \u2014 it is
-intentionally NOT inlined here. Decompose the plan it describes into session
-sets per the rules above.`;
-}
-async function copySessionSetGenPrompt(context, options = {}, pickOpts) {
-  const root = vscode4.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!root) {
-    void vscode4.window.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const modulePick = await pickModuleForAuthoring(
-    root,
-    {
-      showQuickPick: (items, opts) => vscode4.window.showQuickPick(items, opts),
-      showInformationMessage: (m) => vscode4.window.showInformationMessage(m),
-      showErrorMessage: (m) => vscode4.window.showErrorMessage(m)
-    },
-    pickOpts && pickOpts.preselectedSlug !== void 0 ? { preselectedSlug: pickOpts.preselectedSlug } : void 0
-  );
-  if (modulePick.kind === "cancelled" || modulePick.kind === "invalid-manifest" || modulePick.kind === "unknown-module") {
-    return false;
-  }
-  const moduleOpt = modulePick.entry ? {
-    slug: modulePick.entry.slug,
-    planPath: modulePlanRelPath(modulePick.entry)
-  } : void 0;
-  const planRelPosix = moduleOpt?.planPath ?? PLAN_REL_POSIX;
-  const planPath = path10.join(root, ...planRelPosix.split("/"));
-  if (!fs9.existsSync(planPath)) {
-    const action = await vscode4.window.showWarningMessage(
-      moduleOpt ? `No project plan found at ${planRelPosix} for module "${moduleOpt.slug}". Create it (the New Module command writes a stub) or import one first?` : `No project plan found at ${PLAN_PATH}. Import one first?`,
-      "Import Plan"
-    );
-    if (action === "Import Plan")
-      void vscode4.commands.executeCommand("dabbler.importPlan");
-    return false;
-  }
-  let bundle;
-  try {
-    bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
-  } catch (err) {
-    void vscode4.window.showErrorMessage(
-      `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  const durable = options.tier === void 0 ? resolveDurableTier(root) : null;
-  const resolvedTier = options.tier ?? durable?.tier;
-  const durableMode = options.verificationMode === void 0 && resolvedTier === "lightweight" ? readVerificationModeMarker(root) : null;
-  const resolved = {
-    parallel: options.parallel,
-    tier: resolvedTier,
-    tierSource: options.tier ? "form" : durable?.source,
-    verificationMode: options.verificationMode ?? durableMode ?? void 0,
-    module: moduleOpt
-  };
-  const prompt = buildSessionGenPrompt(bundle, resolved);
-  await vscode4.env.clipboard.writeText(prompt);
-  void vscode4.window.showInformationMessage(
-    "Session-set generation prompt copied to clipboard. Paste it into your AI assistant. When you receive the specs, save each one to docs/session-sets/<NNN-slug>/spec.md (alongside its session-state.json).\n\nCost reminder: each session set typically costs $0.10\u2013$2.00 depending on model and effort. Review the generated specs before running all sessions.",
-    { modal: false }
-  );
-  return true;
-}
-function registerSessionGenPromptCommand(context) {
-  context.subscriptions.push(
-    vscode4.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
-      await copySessionSetGenPrompt(context);
-    }),
-    // Set 094 S2 (verdict amendment 7): the shelved parallel-sets UI's escape
-    // hatch — the ONLY live feeder of `parallel: true`. A deliberate,
-    // per-invocation Command-Palette variant for the narrow
-    // multiple-branches-in-one-module case (routed ruling 1a, chosen over a
-    // sticky `parallelHint` setting). The `prerequisites:` machinery + worktree
-    // tooling it references are untouched — this is UI shelving, reversible.
-    vscode4.commands.registerCommand(
-      "dabbler.generateParallelSessionSetPrompt",
-      async () => {
-        await copySessionSetGenPrompt(context, { parallel: true });
-      }
-    )
-  );
-}
-
 // src/commands/assignLegacySets.ts
-var vscode5 = __toESM(require("vscode"));
+var vscode4 = __toESM(require("vscode"));
 function defaultUi2() {
   return {
     pickTargetModule: async (entries) => {
-      const picked = await vscode5.window.showQuickPick(
+      const picked = await vscode4.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -19321,7 +18991,7 @@ function defaultUi2() {
       return picked?.entry;
     },
     pickSets: async (candidates) => {
-      const picked = await vscode5.window.showQuickPick(
+      const picked = await vscode4.window.showQuickPick(
         candidates.map((s) => ({ label: s.name, set: s })),
         {
           placeHolder: "Select the legacy (unassigned) sets to assign",
@@ -19331,9 +19001,9 @@ function defaultUi2() {
       );
       return picked?.map((p2) => p2.set);
     },
-    showInformationMessage: (m) => vscode5.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode5.window.showErrorMessage(m),
-    workspaceRoot: () => vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    showInformationMessage: (m) => vscode4.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode4.window.showErrorMessage(m),
+    workspaceRoot: () => vscode4.workspace.workspaceFolders?.[0]?.uri.fsPath,
     readSets: () => readAllSessionSets()
   };
 }
@@ -19405,7 +19075,7 @@ async function runAssignLegacySetsFlow(ui = defaultUi2()) {
 }
 function registerAssignLegacySetsCommand(context) {
   context.subscriptions.push(
-    vscode5.commands.registerCommand(
+    vscode4.commands.registerCommand(
       "dabbler.assignLegacySetsToModule",
       async () => {
         await runAssignLegacySetsFlow();
@@ -19414,12 +19084,341 @@ function registerAssignLegacySetsCommand(context) {
   );
 }
 
+// src/commands/newModule.ts
+var vscode5 = __toESM(require("vscode"));
+var path9 = __toESM(require("path"));
+function defaultUi3() {
+  return {
+    showInputBox: vscode5.window.showInputBox,
+    showInformationMessage: (m) => vscode5.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode5.window.showErrorMessage(m),
+    openFile: (absPath) => vscode5.commands.executeCommand("vscode.open", vscode5.Uri.file(absPath)),
+    workspaceRoot: () => vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath
+  };
+}
+async function runNewModuleFlow(ui = defaultUi3()) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const existingSlugs = (readModulesManifest(root) ?? []).map((e) => e.slug);
+  const slug = await ui.showInputBox({
+    title: "New module (1/2): slug",
+    prompt: "Machine identity for the module (kebab-case). Session sets declare module: <slug> and the Explorer groups them under it.",
+    placeHolder: "greeter",
+    ignoreFocusOut: true,
+    validateInput: (v) => validateNewModuleSlug(v, existingSlugs)
+  });
+  if (slug === void 0 || slug.trim() === "")
+    return false;
+  const title = await ui.showInputBox({
+    title: "New module (2/2): display title",
+    prompt: `Shown as the module's group header in the Session Set Explorer. Press Enter to use "${slug.trim()}".`,
+    placeHolder: slug.trim(),
+    ignoreFocusOut: true
+  });
+  if (title === void 0)
+    return false;
+  let result;
+  try {
+    result = scaffoldNewModule(root, slug, title);
+  } catch (err) {
+    ui.showErrorMessage(
+      `New module was not created: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  const declared = {
+    slug: slug.trim(),
+    title: title.trim() || slug.trim(),
+    codeRoots: [],
+    planPath: result.planRel,
+    touches: []
+  };
+  let lifecycleNote;
+  try {
+    const lifecycle = scaffoldModuleLifecycleSets(root, declared);
+    lifecycleNote = ` Next steps scaffolded: ${lifecycle.planSlug} and ${lifecycle.decompositionSlug}.`;
+  } catch (err) {
+    lifecycleNote = ` The module's lifecycle sets were NOT scaffolded (${err instanceof Error ? err.message : String(err)}) \u2014 the module is still declared; scaffold them later.`;
+  }
+  await ui.openFile(path9.join(root, ...result.planRel.split("/")));
+  ui.showInformationMessage(
+    `Module "${slug.trim()}" ${result.manifestCreated ? `declared in a new ${MODULES_MANIFEST_DISPLAY}` : `appended to ${MODULES_MANIFEST_DISPLAY}`}. ` + (result.planCreated ? `Plan stub created at ${result.planRel} \u2014 fill it in, then decompose it into session sets.` : `Existing plan at ${result.planRel} kept.`) + lifecycleNote
+  );
+  return true;
+}
+function registerNewModuleCommand(context) {
+  context.subscriptions.push(
+    vscode5.commands.registerCommand("dabbler.newModule", async () => {
+      await runNewModuleFlow();
+    })
+  );
+}
+
+// src/commands/renameModule.ts
+var vscode6 = __toESM(require("vscode"));
+function defaultUi4() {
+  return {
+    pickModule: async (entries) => {
+      const picked = await vscode6.window.showQuickPick(
+        entries.map((e) => ({
+          label: e.title,
+          description: e.slug,
+          entry: e
+        })),
+        { placeHolder: "Which module do you want to rename?", ignoreFocusOut: true }
+      );
+      return picked?.entry;
+    },
+    promptNewSlug: (currentSlug, validate) => vscode6.window.showInputBox({
+      prompt: "New module slug (kebab-case) \u2014 leave unchanged to keep it",
+      value: currentSlug,
+      ignoreFocusOut: true,
+      validateInput: (v) => validate(v) ?? null
+    }),
+    promptNewTitle: (currentTitle) => vscode6.window.showInputBox({
+      prompt: "New module title (display name) \u2014 leave unchanged to keep it",
+      value: currentTitle,
+      ignoreFocusOut: true
+    }),
+    confirm: async (summary, detail) => {
+      const choice = await vscode6.window.showWarningMessage(
+        summary,
+        { modal: true, detail },
+        "Rename Module"
+      );
+      return choice === "Rename Module";
+    },
+    showInformationMessage: (m) => vscode6.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode6.window.showErrorMessage(m),
+    workspaceRoot: () => vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    readSets: () => readAllSessionSets()
+  };
+}
+async function runRenameModuleFlow(ui = defaultUi4(), opts) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return false;
+  }
+  const entries = classified.kind === "present" ? classified.entries : [];
+  if (entries.length === 0) {
+    ui.showInformationMessage(
+      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet. Run "Dabbler: New Module" to declare one.`
+    );
+    return false;
+  }
+  let target;
+  if (opts && opts.preselectedSlug !== void 0) {
+    target = entries.find((e) => e.slug === opts.preselectedSlug);
+    if (!target) {
+      ui.showErrorMessage(unknownModuleMessage(opts.preselectedSlug));
+      return false;
+    }
+  } else {
+    target = await ui.pickModule(entries);
+    if (!target)
+      return false;
+  }
+  const otherSlugs = entries.map((e) => e.slug).filter((s) => s !== target.slug);
+  const rawSlug = await ui.promptNewSlug(target.slug, (value) => {
+    const v = (value ?? "").trim();
+    if (v === target.slug)
+      return void 0;
+    return validateNewModuleSlug(v, otherSlugs) ?? void 0;
+  });
+  if (rawSlug === void 0)
+    return false;
+  const rawTitle = await ui.promptNewTitle(target.title);
+  if (rawTitle === void 0)
+    return false;
+  const newSlug = rawSlug.trim();
+  const newTitle = rawTitle.trim();
+  const slugChanging = newSlug !== "" && newSlug !== target.slug;
+  const titleChanging = newTitle !== "" && newTitle !== target.title;
+  if (!slugChanging && !titleChanging) {
+    ui.showInformationMessage(
+      `Nothing to change \u2014 the slug and title are unchanged for "${target.slug}".`
+    );
+    return false;
+  }
+  const affected = slugChanging ? ui.readSets().filter((s) => s.root === root && s.config?.module === target.slug).map((s) => s.name).sort() : [];
+  const changeLines = [];
+  if (slugChanging)
+    changeLines.push(`slug: ${target.slug} \u2192 ${newSlug}`);
+  if (titleChanging)
+    changeLines.push(`title: "${target.title}" \u2192 "${newTitle}"`);
+  const restampNote = slugChanging ? affected.length > 0 ? `Restamps module: in ${affected.length} set(s): ${affected.join(", ")}.` : `No session sets are stamped module: ${target.slug} \u2014 only the manifest changes.` : "Title-only change \u2014 no session sets are touched.";
+  const confirmed = await ui.confirm(
+    `Rename module "${target.slug}"?`,
+    `${changeLines.join("\n")}
+
+${restampNote}
+
+Every file is rewritten transactionally; any failure rolls the whole change back.`
+  );
+  if (!confirmed)
+    return false;
+  const report = renameModule(root, target.slug, {
+    newSlug: slugChanging ? newSlug : void 0,
+    newTitle: titleChanging ? newTitle : void 0
+  });
+  if (report.refused) {
+    ui.showErrorMessage(
+      `Rename refused \u2014 ${report.refused.reason} Every file was left untouched.`
+    );
+    return false;
+  }
+  if (report.writeFailed) {
+    const wf = report.writeFailed;
+    ui.showErrorMessage(
+      wf.rolledBack ? `Rename failed: ${wf.reason}. All changes were rolled back \u2014 the workspace is unchanged.` : `Rename failed: ${wf.reason}. Rollback ALSO failed \u2014 reconcile docs/modules.yaml and the affected spec.md files from git.`
+    );
+    return false;
+  }
+  const parts = [];
+  if (report.slugChanged)
+    parts.push(`slug \u2192 ${report.newSlug}`);
+  if (report.titleChanged)
+    parts.push(`title \u2192 "${report.newTitle}"`);
+  const restampSummary = report.restamped.length ? ` Restamped ${report.restamped.length} set(s): ${report.restamped.join(", ")}.` : "";
+  ui.showInformationMessage(
+    `Renamed module (${parts.join(", ")}).${restampSummary}`
+  );
+  return true;
+}
+function registerRenameModuleCommand(context) {
+  context.subscriptions.push(
+    vscode6.commands.registerCommand("dabbler.renameModule", async () => {
+      await runRenameModuleFlow();
+    })
+  );
+}
+
+// src/commands/deleteModule.ts
+var vscode7 = __toESM(require("vscode"));
+function defaultUi5() {
+  return {
+    pickModule: async (entries) => {
+      const picked = await vscode7.window.showQuickPick(
+        entries.map((e) => ({
+          label: e.title,
+          description: e.slug,
+          entry: e
+        })),
+        { placeHolder: "Which module do you want to delete?", ignoreFocusOut: true }
+      );
+      return picked?.entry;
+    },
+    confirm: async (summary, detail) => {
+      const choice = await vscode7.window.showWarningMessage(
+        summary,
+        { modal: true, detail },
+        "Delete Module"
+      );
+      return choice === "Delete Module";
+    },
+    showInformationMessage: (m) => vscode7.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode7.window.showErrorMessage(m),
+    workspaceRoot: () => vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath
+  };
+}
+function summarizeGroup(label, names) {
+  return names.length > 0 ? `${label} (${names.length}): ${names.join(", ")}` : `${label}: none`;
+}
+async function runDeleteModuleFlow(ui = defaultUi5(), opts) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return false;
+  }
+  const entries = classified.kind === "present" ? classified.entries : [];
+  if (entries.length === 0) {
+    ui.showInformationMessage(
+      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet.`
+    );
+    return false;
+  }
+  let target;
+  if (opts && opts.preselectedSlug !== void 0) {
+    target = entries.find((e) => e.slug === opts.preselectedSlug);
+    if (!target) {
+      ui.showErrorMessage(unknownModuleMessage(opts.preselectedSlug));
+      return false;
+    }
+  } else {
+    target = await ui.pickModule(entries);
+    if (!target)
+      return false;
+  }
+  const classification = classifyModuleSetsForDeletion(root, target.slug);
+  const toCancel = classification.filter((c3) => c3.disposition === "cancel").map((c3) => c3.name).sort();
+  const toRemove = classification.filter((c3) => c3.disposition === "remove").map((c3) => c3.name).sort();
+  const terminal = classification.filter((c3) => c3.disposition === "terminal").map((c3) => c3.name).sort();
+  const detailLines = [
+    summarizeGroup("Cancelled", toCancel),
+    summarizeGroup("Removed outright", toRemove),
+    summarizeGroup("Left untouched (completed / already cancelled)", terminal)
+  ];
+  const confirmed = await ui.confirm(
+    `Delete module "${target.slug}"?`,
+    `Removes the ${MODULES_MANIFEST_DISPLAY} entry.
+
+${detailLines.join("\n")}
+
+Re-declaring "${target.slug}" later restores this grouping for any untouched history.`
+  );
+  if (!confirmed)
+    return false;
+  const report = await deleteModule(root, target.slug);
+  if (report.refused) {
+    ui.showErrorMessage(
+      `Delete refused \u2014 ${report.refused.reason} Every file was left untouched.`
+    );
+    return false;
+  }
+  if (report.partialFailure) {
+    ui.showErrorMessage(
+      `Delete stopped partway: ${report.partialFailure.reason} ${report.cancelled.length} set(s) cancelled and ${report.removed.length} scaffold(s) removed so far \u2014 re-run "Dabbler: Delete Module" to finish (already-applied steps are skipped on retry).`
+    );
+    return report.cancelled.length > 0 || report.removed.length > 0;
+  }
+  ui.showInformationMessage(
+    `Deleted module "${target.slug}" \u2014 ${report.cancelled.length} set(s) cancelled, ${report.removed.length} scaffold(s) removed, ${report.terminal.length} left untouched.`
+  );
+  return true;
+}
+function registerDeleteModuleCommand(context) {
+  context.subscriptions.push(
+    vscode7.commands.registerCommand("dabbler.deleteModule", async () => {
+      await runDeleteModuleFlow();
+    })
+  );
+}
+
 // src/utils/moduleActionNarrowing.ts
+var DECLARED_ONLY_ACTIONS = /* @__PURE__ */ new Set([
+  "add-module",
+  "rename-module",
+  "delete-module"
+]);
 var MODULE_ACTIONS = /* @__PURE__ */ new Set([
-  "ai-plan",
-  "import-plan",
   "open-plan",
-  "ai-sets",
+  "add-module",
+  "rename-module",
+  "delete-module",
   "assign-legacy"
 ]);
 function narrowModuleIdentity(moduleSlug, moduleKind) {
@@ -19441,6 +19440,8 @@ function narrowModuleAction(action, moduleSlug, moduleKind) {
     return null;
   if (action === "assign-legacy" && identity.kind !== "pseudo")
     return null;
+  if (DECLARED_ONLY_ACTIONS.has(action) && identity.kind !== "declared")
+    return null;
   return { action, slug: identity.slug, kind: identity.kind };
 }
 async function dispatchModuleAction(narrowed, exec) {
@@ -19450,20 +19451,24 @@ async function dispatchModuleAction(narrowed, exec) {
         exec.refresh();
       return;
     }
-    case "ai-plan":
-      await exec.aiPlan(narrowed.slug);
-      return;
-    case "import-plan": {
-      if (await exec.importPlan(narrowed.slug))
-        exec.refresh();
-      return;
-    }
     case "open-plan":
       await exec.openPlan(narrowed.slug);
       return;
-    case "ai-sets":
-      await exec.aiSets(narrowed.slug);
+    case "add-module": {
+      if (await exec.addModule())
+        exec.refresh();
       return;
+    }
+    case "rename-module": {
+      if (await exec.renameModule(narrowed.slug))
+        exec.refresh();
+      return;
+    }
+    case "delete-module": {
+      if (await exec.deleteModule(narrowed.slug))
+        exec.refresh();
+      return;
+    }
   }
 }
 
@@ -19662,30 +19667,30 @@ function prune(state, visibleSlugs) {
 }
 
 // src/utils/gettingStartedDetection.ts
-var fs10 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
+var fs8 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
 var ENGINE_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"];
 function routerInstalled(root, fsi) {
-  const venvDir = path11.join(root, ".venv");
+  const venvDir = path10.join(root, ".venv");
   if (!fsi.isDirectory(venvDir))
     return false;
   const siteCandidates = [
     // Windows venv
-    path11.join(venvDir, "Lib", "site-packages")
+    path10.join(venvDir, "Lib", "site-packages")
   ];
-  const libDir = path11.join(venvDir, "lib");
+  const libDir = path10.join(venvDir, "lib");
   if (fsi.isDirectory(libDir)) {
     for (const entry of fsi.readdir(libDir)) {
-      siteCandidates.push(path11.join(libDir, entry, "site-packages"));
+      siteCandidates.push(path10.join(libDir, entry, "site-packages"));
     }
   }
-  return siteCandidates.some((sp) => fsi.isDirectory(path11.join(sp, "ai_router")));
+  return siteCandidates.some((sp) => fsi.isDirectory(path10.join(sp, "ai_router")));
 }
 function fileExists(p2, fsi) {
   return fsi.exists(p2) && !fsi.isDirectory(p2);
 }
 function engineFilesPresent(root, fsi) {
-  return ENGINE_FILES.every((f) => fileExists(path11.join(root, f), fsi));
+  return ENGINE_FILES.every((f) => fileExists(path10.join(root, f), fsi));
 }
 function detectCompletion(root, fsi) {
   return {
@@ -19727,21 +19732,21 @@ function computeGettingStarted(hasFolder, root, hasAnySets, fsi, resolveTierSeed
 var nodeDetectionFs = {
   exists(p2) {
     try {
-      return fs10.existsSync(p2);
+      return fs8.existsSync(p2);
     } catch {
       return false;
     }
   },
   isDirectory(p2) {
     try {
-      return fs10.statSync(p2).isDirectory();
+      return fs8.statSync(p2).isDirectory();
     } catch {
       return false;
     }
   },
   readdir(p2) {
     try {
-      return fs10.readdirSync(p2);
+      return fs8.readdirSync(p2);
     } catch {
       return [];
     }
@@ -19749,30 +19754,30 @@ var nodeDetectionFs = {
 };
 
 // src/utils/pythonInterpreter.ts
-var fs11 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
-var vscode6 = __toESM(require("vscode"));
+var fs9 = __toESM(require("fs"));
+var path11 = __toESM(require("path"));
+var vscode8 = __toESM(require("vscode"));
 var realExists = (p2) => {
   try {
-    return fs11.statSync(p2).isFile();
+    return fs9.statSync(p2).isFile();
   } catch {
     return false;
   }
 };
 function venvInterpreterCandidate(workspaceRoot2) {
-  return process.platform === "win32" ? path12.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path12.join(workspaceRoot2, ".venv", "bin", "python");
+  return process.platform === "win32" ? path11.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path11.join(workspaceRoot2, ".venv", "bin", "python");
 }
 function detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2 = realExists) {
   if (!workspaceRoot2)
     return null;
-  const venvRoot = path12.join(workspaceRoot2, ".venv");
-  if (!fileExists2(path12.join(venvRoot, "pyvenv.cfg")))
+  const venvRoot = path11.join(workspaceRoot2, ".venv");
+  if (!fileExists2(path11.join(venvRoot, "pyvenv.cfg")))
     return null;
   const interp = venvInterpreterCandidate(workspaceRoot2);
   return fileExists2(interp) ? interp : null;
 }
 function explicitPythonPathSetting() {
-  const inspected = vscode6.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath");
+  const inspected = vscode8.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath");
   if (!inspected)
     return void 0;
   const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
@@ -19780,10 +19785,10 @@ function explicitPythonPathSetting() {
   return trimmed2 === "" ? void 0 : trimmed2;
 }
 function normalizeExplicit(value, workspaceRoot2) {
-  if (path12.isAbsolute(value))
+  if (path11.isAbsolute(value))
     return value;
-  if (value.includes(path12.sep) || value.includes("/")) {
-    return path12.resolve(workspaceRoot2, value);
+  if (value.includes(path11.sep) || value.includes("/")) {
+    return path11.resolve(workspaceRoot2, value);
   }
   return value;
 }
@@ -19802,7 +19807,7 @@ function findCommandOnPath(cmd, env9 = process.env, fileExists2 = realExists, pl
   if (!rawPath)
     return null;
   const isWin = platform === "win32";
-  const p2 = isWin ? path12.win32 : path12.posix;
+  const p2 = isWin ? path11.win32 : path11.posix;
   const delimiter = isWin ? ";" : ":";
   for (const dir of rawPath.split(delimiter)) {
     const entry = dir.trim();
@@ -19819,7 +19824,7 @@ function findCommandOnPath(cmd, env9 = process.env, fileExists2 = realExists, pl
   return null;
 }
 function resolveBootstrapPythonCore(explicitSetting, workspaceRoot2, env9 = process.env, fileExists2 = realExists, platform = process.platform) {
-  const p2 = platform === "win32" ? path12.win32 : path12.posix;
+  const p2 = platform === "win32" ? path11.win32 : path11.posix;
   if (explicitSetting) {
     const normalized = normalizeExplicit(explicitSetting, workspaceRoot2);
     if (p2.isAbsolute(normalized)) {
@@ -19866,11 +19871,11 @@ function probePythonPresenceCore(explicitSetting, workspaceRoot2, env9 = process
 function interpreterResolves(pythonPath, env9 = process.env, fileExists2 = realExists, platform = process.platform) {
   if (!pythonPath)
     return false;
-  const p2 = platform === "win32" ? path12.win32 : path12.posix;
+  const p2 = platform === "win32" ? path11.win32 : path11.posix;
   if (p2.isAbsolute(pythonPath))
     return fileExists2(pythonPath);
   if (pythonPath.includes("\\") || pythonPath.includes("/")) {
-    return fileExists2(path12.resolve(pythonPath));
+    return fileExists2(path11.resolve(pythonPath));
   }
   return findCommandOnPath(pythonPath, env9, fileExists2, platform) !== null;
 }
@@ -19887,19 +19892,19 @@ function describeMissingPython(actionLabel) {
 }
 
 // src/utils/copilotCli.ts
-var fs12 = __toESM(require("fs"));
-var path13 = __toESM(require("path"));
-var vscode7 = __toESM(require("vscode"));
+var fs10 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
+var vscode9 = __toESM(require("vscode"));
 var COPILOT_CLI_COMMAND = "copilot";
 var realExists2 = (p2) => {
   try {
-    return fs12.statSync(p2).isFile();
+    return fs10.statSync(p2).isFile();
   } catch {
     return false;
   }
 };
 function explicitCopilotCliPathSetting() {
-  const inspected = vscode7.workspace.getConfiguration("dabblerSessionSets").inspect("copilotCliPath");
+  const inspected = vscode9.workspace.getConfiguration("dabblerSessionSets").inspect("copilotCliPath");
   if (!inspected)
     return void 0;
   const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
@@ -19907,7 +19912,7 @@ function explicitCopilotCliPathSetting() {
   return trimmed2 === "" ? void 0 : trimmed2;
 }
 function probeCopilotCliPresenceCore(explicitSetting, workspaceRoot2, env9 = process.env, fileExists2, platform = process.platform) {
-  const p2 = platform === "win32" ? path13.win32 : path13.posix;
+  const p2 = platform === "win32" ? path12.win32 : path12.posix;
   if (explicitSetting) {
     if (p2.isAbsolute(explicitSetting))
       return fileExists2(explicitSetting);
@@ -19930,7 +19935,7 @@ function probeCopilotCliPresence(workspaceRoot2, fileExists2 = realExists2) {
 function resolveCopilotCliBinaryCore(explicitSetting, workspaceRoot2, platform = process.platform) {
   if (!explicitSetting)
     return void 0;
-  const p2 = platform === "win32" ? path13.win32 : path13.posix;
+  const p2 = platform === "win32" ? path12.win32 : path12.posix;
   if (p2.isAbsolute(explicitSetting))
     return explicitSetting;
   if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
@@ -19948,10 +19953,10 @@ function resolveCopilotCliBinary(workspaceRoot2) {
 
 // src/utils/copilotSeatSetup.ts
 var crypto3 = __toESM(require("crypto"));
-var fs13 = __toESM(require("fs"));
+var fs11 = __toESM(require("fs"));
 var os = __toESM(require("os"));
-var path14 = __toESM(require("path"));
-var CATALOG_LOCKFILE_REL = path14.posix.join(
+var path13 = __toESM(require("path"));
+var CATALOG_LOCKFILE_REL = path13.posix.join(
   "ai_router",
   "copilot-catalog.lock"
 );
@@ -19961,7 +19966,7 @@ function deriveSeatId(hostname2, username) {
   return `seat-${digest.slice(0, 12)}`;
 }
 function deriveSeatLabel(projectDir) {
-  const base = path14.basename(projectDir);
+  const base = path13.basename(projectDir);
   return base === "" ? "workspace" : base;
 }
 function currentUsername() {
@@ -20064,17 +20069,17 @@ function renderTransportProfile(configText, profile) {
 var nodeSeedReadOps = {
   exists(p2) {
     try {
-      return fs13.existsSync(p2);
+      return fs11.existsSync(p2);
     } catch {
       return false;
     }
   },
   readFile(p2) {
-    return fs13.readFileSync(p2, "utf8");
+    return fs11.readFileSync(p2, "utf8");
   }
 };
 function readTransportProfile(root, ops = nodeSeedReadOps) {
-  const abs = path14.join(root, ROUTER_CONFIG_REL);
+  const abs = path13.join(root, ROUTER_CONFIG_REL);
   if (!ops.exists(abs))
     return null;
   let text;
@@ -20088,12 +20093,12 @@ function readTransportProfile(root, ops = nodeSeedReadOps) {
     return null;
   return loc.value === "api" || loc.value === "copilot-cli" ? loc.value : null;
 }
-var SEAT_STATUS_MARKER_REL = path14.posix.join(
+var SEAT_STATUS_MARKER_REL = path13.posix.join(
   ".dabbler",
   "copilot-seat-status"
 );
 function readCopilotSeatStatusMarker(root, ops = nodeSeedReadOps) {
-  const abs = path14.join(root, SEAT_STATUS_MARKER_REL);
+  const abs = path13.join(root, SEAT_STATUS_MARKER_REL);
   if (!ops.exists(abs))
     return null;
   let text;
@@ -20105,10 +20110,10 @@ function readCopilotSeatStatusMarker(root, ops = nodeSeedReadOps) {
   return text.trim().toLowerCase() === "unconfirmed" ? "unconfirmed" : null;
 }
 function writeCopilotSeatStatusMarker(root, ops) {
-  ops.writeFile(path14.join(root, SEAT_STATUS_MARKER_REL), "unconfirmed\n");
+  ops.writeFile(path13.join(root, SEAT_STATUS_MARKER_REL), "unconfirmed\n");
 }
 function clearCopilotSeatStatusMarker(root, ops) {
-  const abs = path14.join(root, SEAT_STATUS_MARKER_REL);
+  const abs = path13.join(root, SEAT_STATUS_MARKER_REL);
   if (!ops.exists(abs))
     return;
   ops.removeRecursive(abs);
@@ -20118,7 +20123,7 @@ function deriveCopilotSeatChosenUnconfirmed(marker, durableProfile) {
 }
 var DEFAULT_KILL_SETTLE_TIMEOUT_MS = 1e4;
 function runCatalogRefresh(deps) {
-  const lockfileAbs = path14.join(deps.projectDir, CATALOG_LOCKFILE_REL);
+  const lockfileAbs = path13.join(deps.projectDir, CATALOG_LOCKFILE_REL);
   const existedBefore = deps.fileOps.exists(lockfileAbs);
   let priorContent = null;
   if (existedBefore) {
@@ -20370,7 +20375,7 @@ async function performCopilotSeatSetup(deps) {
       if (distinct.length < 2) {
         return { kind: "insufficient-providers", ...base };
       }
-      const configAbs = path14.join(deps.projectDir, ROUTER_CONFIG_REL);
+      const configAbs = path13.join(deps.projectDir, ROUTER_CONFIG_REL);
       if (!deps.fileOps.exists(configAbs)) {
         return {
           kind: "config-write-failed",
@@ -20406,10 +20411,10 @@ async function performCopilotSeatSetup(deps) {
 }
 
 // src/commands/gettingStartedActions.ts
-var vscode12 = __toESM(require("vscode"));
+var vscode14 = __toESM(require("vscode"));
 
 // src/commands/gitScaffold.ts
-var vscode9 = __toESM(require("vscode"));
+var vscode11 = __toESM(require("vscode"));
 var cp3 = __toESM(require("child_process"));
 var os3 = __toESM(require("os"));
 var path17 = __toESM(require("path"));
@@ -25378,10 +25383,10 @@ var esm_default = gitInstanceFactory;
 
 // src/commands/installAiRouterCommands.ts
 var cp2 = __toESM(require("child_process"));
-var fs14 = __toESM(require("fs"));
+var fs12 = __toESM(require("fs"));
 var os2 = __toESM(require("os"));
-var path15 = __toESM(require("path"));
-var vscode8 = __toESM(require("vscode"));
+var path14 = __toESM(require("path"));
+var vscode10 = __toESM(require("vscode"));
 
 // src/utils/utf8ChunkDecoder.ts
 var import_string_decoder = require("string_decoder");
@@ -25396,27 +25401,27 @@ function makeUtf8ChunkDecoder() {
 // src/commands/installAiRouterCommands.ts
 function registerInstallAiRouterCommands(context) {
   context.subscriptions.push(
-    vscode8.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
+    vscode10.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
       await runInstallFlow("install");
     }),
-    vscode8.commands.registerCommand("dabblerSessionSets.updateAiRouter", async () => {
+    vscode10.commands.registerCommand("dabblerSessionSets.updateAiRouter", async () => {
       await runInstallFlow("update");
     })
   );
 }
 async function runInstallFlow(mode) {
-  const root = vscode8.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode8.window.showErrorMessage(
+    vscode10.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Install ai-router."
     );
     return;
   }
   const pythonPath = resolveExplicitPythonPath(root);
   const repoUrl = resolveAiRouterRepoUrl();
-  const outcome = await vscode8.window.withProgress(
+  const outcome = await vscode10.window.withProgress(
     {
-      location: vscode8.ProgressLocation.Notification,
+      location: vscode10.ProgressLocation.Notification,
       title: mode === "update" ? "Updating ai_router\u2026" : "Installing ai_router\u2026",
       cancellable: false
     },
@@ -25434,16 +25439,16 @@ async function runInstallFlow(mode) {
     }
   );
   if (!outcome.ok) {
-    vscode8.window.showErrorMessage(outcome.message);
+    vscode10.window.showErrorMessage(outcome.message);
     return;
   }
-  vscode8.window.showInformationMessage(outcome.message);
-  const routerConfig = path15.join(root, ROUTER_CONFIG_REL);
-  if (fs14.existsSync(routerConfig)) {
+  vscode10.window.showInformationMessage(outcome.message);
+  const routerConfig = path14.join(root, ROUTER_CONFIG_REL);
+  if (fs12.existsSync(routerConfig)) {
     try {
-      const doc = await vscode8.workspace.openTextDocument(routerConfig);
-      await vscode8.window.showTextDocument(doc, { preview: false });
-      vscode8.window.showInformationMessage(
+      const doc = await vscode10.workspace.openTextDocument(routerConfig);
+      await vscode10.window.showTextDocument(doc, { preview: false });
+      vscode10.window.showInformationMessage(
         "Tune router-config.yaml for your project \u2014 per-task-type effort, the cost guard, and delegation.always_route_task_types live here."
       );
     } catch {
@@ -25451,7 +25456,7 @@ async function runInstallFlow(mode) {
   }
 }
 function resolveAiRouterRepoUrl() {
-  const cfg = vscode8.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode10.workspace.getConfiguration("dabblerSessionSets");
   const raw = (cfg.get("aiRouterRepoUrl") ?? "").trim();
   return raw === "" ? void 0 : raw;
 }
@@ -25509,8 +25514,8 @@ function makeSpawner() {
 }
 function makeFileOps() {
   return {
-    exists: (p2) => fs14.existsSync(p2),
-    readFile: (p2) => fs14.readFileSync(p2, "utf8"),
+    exists: (p2) => fs12.existsSync(p2),
+    readFile: (p2) => fs12.readFileSync(p2, "utf8"),
     // Always ensure the parent directory exists before writing. The
     // GitHub-fallback flow can momentarily leave the destination
     // ai_router/ directory missing (between `removeRecursive(dst)` and
@@ -25520,8 +25525,8 @@ function makeFileOps() {
     // cost of dropping it is silent data loss in a narrow but real
     // failure window. Round-3 verifier catch.
     writeFile: (p2, content) => {
-      fs14.mkdirSync(path15.dirname(p2), { recursive: true });
-      fs14.writeFileSync(p2, content, "utf8");
+      fs12.mkdirSync(path14.dirname(p2), { recursive: true });
+      fs12.writeFileSync(p2, content, "utf8");
     },
     // Set 094: atomic, symlink-safe exclusive create (temp-write → hard-link
     // publish) — fails EEXIST when the path already exists, INCLUDING a
@@ -25529,31 +25534,31 @@ function makeFileOps() {
     // (round-4 verifier catch). The caller (ensureModulesManifest) mkdirps the
     // parent first.
     writeFileExclusive: (p2, content) => writeFileExclusiveSync(p2, content),
-    mkdirp: (p2) => fs14.mkdirSync(p2, { recursive: true }),
+    mkdirp: (p2) => fs12.mkdirSync(p2, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),
     removeRecursive: (p2) => {
-      if (fs14.existsSync(p2))
-        fs14.rmSync(p2, { recursive: true, force: true });
+      if (fs12.existsSync(p2))
+        fs12.rmSync(p2, { recursive: true, force: true });
     },
-    mkdtemp: (prefix) => fs14.mkdtempSync(path15.join(os2.tmpdir(), prefix)),
+    mkdtemp: (prefix) => fs12.mkdtempSync(path14.join(os2.tmpdir(), prefix)),
     // Set 079 S3: same-directory atomic replace for the seat-setup config
     // write (fs.rename replaces an existing destination file on both NTFS
     // and POSIX filesystems).
-    rename: (oldP, newP) => fs14.renameSync(oldP, newP)
+    rename: (oldP, newP) => fs12.renameSync(oldP, newP)
   };
 }
 function copyDirSync(src, dst) {
-  fs14.mkdirSync(dst, { recursive: true });
-  for (const entry of fs14.readdirSync(src, { withFileTypes: true })) {
-    const s = path15.join(src, entry.name);
-    const d = path15.join(dst, entry.name);
+  fs12.mkdirSync(dst, { recursive: true });
+  for (const entry of fs12.readdirSync(src, { withFileTypes: true })) {
+    const s = path14.join(src, entry.name);
+    const d = path14.join(dst, entry.name);
     if (entry.isDirectory()) {
       copyDirSync(s, d);
     } else if (entry.isSymbolicLink()) {
-      const target = fs14.readlinkSync(s);
-      fs14.symlinkSync(target, d);
+      const target = fs12.readlinkSync(s);
+      fs12.symlinkSync(target, d);
     } else {
-      fs14.copyFileSync(s, d);
+      fs12.copyFileSync(s, d);
     }
   }
 }
@@ -25575,14 +25580,14 @@ function makePrompts() {
         }
       ];
       items.sort((a, b2) => a.value === defaultSource ? -1 : b2.value === defaultSource ? 1 : 0);
-      const picked = await vscode8.window.showQuickPick(items, {
+      const picked = await vscode10.window.showQuickPick(items, {
         placeHolder: "Choose how to install ai_router",
         ignoreFocusOut: true
       });
       return picked?.value;
     },
     confirmCreateVenv: async (venvAbsPath) => {
-      const choice = await vscode8.window.showInformationMessage(
+      const choice = await vscode10.window.showInformationMessage(
         `No venv found in this workspace. Create one at ${venvAbsPath}?`,
         { modal: true, detail: "ai_router needs a Python environment to install into. The recommended location is .venv at the workspace root." },
         "Create venv",
@@ -25591,13 +25596,293 @@ function makePrompts() {
       return choice === "Create venv";
     },
     promptGitHubRef: async (defaultRef) => {
-      const ref = await vscode8.window.showInputBox({
+      const ref = await vscode10.window.showInputBox({
         prompt: "Git ref for the sparse checkout (tag or branch). Leave blank for the latest released tag.",
         placeHolder: defaultRef,
         ignoreFocusOut: true
       });
       return ref;
     }
+  };
+}
+
+// src/utils/consumerBootstrap.ts
+var fs13 = __toESM(require("fs"));
+var path15 = __toESM(require("path"));
+var DEFAULT_VERIFICATION_MODE = "out-of-band-or-none";
+var BUNDLE_FILES = {
+  specTemplate: "spec.md.template",
+  sessionStateTemplate: "session-state.json.template",
+  startHereTemplate: "start-here.md.template",
+  gettingStartedTemplate: "getting-started.md.template",
+  sharedBody: "engine-file.shared-body.md",
+  claudeTail: "engine-file.claude-tail.md",
+  agentsTail: "engine-file.agents-tail.md",
+  geminiTail: "engine-file.gemini-tail.md",
+  lessonsLearnedTemplate: "lessons-learned.md.template",
+  projectGuidanceTemplate: "project-guidance.md.template",
+  lessonsArchiveTemplate: "lessons-archive.md.template",
+  crossProviderVerificationTemplate: "cross-provider-verification.md.template",
+  codeownersTemplate: "CODEOWNERS.template",
+  monorepoCiTemplate: "monorepo-ci.yml.template"
+};
+var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
+function resolveBundledTemplateDir(extensionPath) {
+  return path15.join(extensionPath, "dist", "templates", "consumer-bootstrap");
+}
+function loadTemplateBundle(bundleDir) {
+  const read = (name) => fs13.readFileSync(path15.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
+  return {
+    specTemplate: read(BUNDLE_FILES.specTemplate),
+    sessionStateTemplate: read(BUNDLE_FILES.sessionStateTemplate),
+    startHereTemplate: read(BUNDLE_FILES.startHereTemplate),
+    gettingStartedTemplate: read(BUNDLE_FILES.gettingStartedTemplate),
+    sharedBody: read(BUNDLE_FILES.sharedBody),
+    claudeTail: read(BUNDLE_FILES.claudeTail),
+    agentsTail: read(BUNDLE_FILES.agentsTail),
+    geminiTail: read(BUNDLE_FILES.geminiTail),
+    lessonsLearnedTemplate: read(BUNDLE_FILES.lessonsLearnedTemplate),
+    projectGuidanceTemplate: read(BUNDLE_FILES.projectGuidanceTemplate),
+    lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate),
+    crossProviderVerificationTemplate: read(
+      BUNDLE_FILES.crossProviderVerificationTemplate
+    ),
+    codeownersTemplate: read(BUNDLE_FILES.codeownersTemplate),
+    monorepoCiTemplate: read(BUNDLE_FILES.monorepoCiTemplate)
+  };
+}
+function padSessionNumber(n) {
+  return String(n).padStart(3, "0");
+}
+function assertPositiveSessionCount(totalSessions) {
+  if (!Number.isInteger(totalSessions) || totalSessions < 1) {
+    throw new Error(
+      `consumer-bootstrap: totalSessions must be a positive integer, got ${totalSessions}`
+    );
+  }
+}
+function verificationModeLine(ctx) {
+  if (ctx.tier !== "lightweight")
+    return "";
+  const mode = ctx.verificationMode || DEFAULT_VERIFICATION_MODE;
+  return `verificationMode: ${mode}  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full
+`;
+}
+function moduleLine(ctx) {
+  if (!ctx.module)
+    return "";
+  return `module: ${ctx.module}                      # grouping only \u2014 set names stay globally unique
+`;
+}
+function tokenTable(ctx) {
+  return {
+    REPO_NAME: ctx.repoName,
+    SET_TITLE: ctx.setTitle,
+    PURPOSE: ctx.purpose,
+    SLUG: ctx.slug,
+    CREATED: ctx.created,
+    TIER: ctx.tier,
+    MODULE_LINE: moduleLine(ctx),
+    VERIFICATION_MODE_LINE: verificationModeLine(ctx),
+    TOTAL_SESSIONS: String(ctx.totalSessions)
+  };
+}
+function substituteTokens(text, ctx) {
+  const table = tokenTable(ctx);
+  return text.replace(
+    /{{([A-Z_]+)}}/g,
+    (whole, key) => Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole
+  );
+}
+function findUnsubstitutedTokens(rendered) {
+  const out = /* @__PURE__ */ new Set();
+  for (const m of rendered.matchAll(/{{[A-Z_]+}}/g))
+    out.add(m[0]);
+  return [...out];
+}
+function expandSpecSessions(specText, totalSessions) {
+  assertPositiveSessionCount(totalSessions);
+  specText = specText.replace(/\r\n/g, "\n");
+  const SESSIONS_HEADER = "## Sessions\n";
+  const DELIVERABLES_HEADER = "## End-of-set deliverables";
+  const SEP = "\n\n---\n\n";
+  const headerIdx = specText.indexOf(SESSIONS_HEADER);
+  const deliverablesIdx = specText.indexOf(DELIVERABLES_HEADER);
+  if (headerIdx === -1 || deliverablesIdx === -1 || deliverablesIdx < headerIdx) {
+    return specText;
+  }
+  const preamble = specText.slice(0, headerIdx + SESSIONS_HEADER.length);
+  const postamble = specText.slice(deliverablesIdx);
+  const region = specText.slice(headerIdx + SESSIONS_HEADER.length, deliverablesIdx);
+  const blockStart = region.indexOf("### Session 1 of");
+  if (blockStart === -1)
+    return specText;
+  const afterStart = region.slice(blockStart);
+  const sepIdx = afterStart.indexOf(SEP);
+  const unit = (sepIdx === -1 ? afterStart : afterStart.slice(0, sepIdx)).trimEnd();
+  const blocks = [];
+  for (let k2 = 1; k2 <= totalSessions; k2++) {
+    let block = unit.replace("### Session 1 of", `### Session ${k2} of`);
+    block = block.replace(/session-001\//g, `session-${padSessionNumber(k2)}/`);
+    blocks.push(block);
+  }
+  return `${preamble}
+${blocks.join(SEP)}${SEP}${postamble}`;
+}
+function expandSessionState(stateText, totalSessions) {
+  assertPositiveSessionCount(totalSessions);
+  const parsed = JSON.parse(stateText);
+  const unit = parsed.sessions[0];
+  parsed.sessions = [];
+  for (let k2 = 1; k2 <= totalSessions; k2++) {
+    parsed.sessions.push({
+      ...unit,
+      number: k2,
+      title: `Session ${k2}`,
+      status: "not-started",
+      startedAt: null,
+      completedAt: null,
+      orchestrator: null,
+      verificationVerdict: null
+    });
+  }
+  return JSON.stringify(parsed, null, 2) + "\n";
+}
+function renderEngineFile(sharedBody, tail, ctx) {
+  return substituteTokens(sharedBody, ctx) + "\n" + substituteTokens(tail, ctx);
+}
+function renderSpec(bundle, ctx) {
+  return expandSpecSessions(
+    substituteTokens(bundle.specTemplate, ctx),
+    ctx.totalSessions
+  );
+}
+function renderSessionState(bundle, ctx) {
+  return expandSessionState(
+    substituteTokens(bundle.sessionStateTemplate, ctx),
+    ctx.totalSessions
+  );
+}
+function renderStartHere(bundle, ctx) {
+  return substituteTokens(bundle.startHereTemplate, ctx);
+}
+function specRelPath(ctx) {
+  return path15.posix.join("docs", "session-sets", ctx.slug, "spec.md");
+}
+function sessionStateRelPath(ctx) {
+  return path15.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
+}
+var START_HERE_REL_PATH = path15.posix.join("docs", "dabbler", "start-here.md");
+var GETTING_STARTED_REL_PATH = path15.posix.join(
+  "docs",
+  "dabbler",
+  "getting-started.md"
+);
+var CROSS_PROVIDER_VERIFICATION_REL_PATH = path15.posix.join(
+  "docs",
+  "dabbler",
+  "cross-provider-verification.md"
+);
+function renderCrossProviderVerification(bundle, ctx) {
+  return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
+}
+var LESSONS_LEARNED_REL_PATH = path15.posix.join("docs", "planning", "lessons-learned.md");
+var PROJECT_GUIDANCE_REL_PATH = path15.posix.join("docs", "planning", "project-guidance.md");
+var LESSONS_ARCHIVE_REL_PATH = path15.posix.join("docs", "planning", "lessons-archive.md");
+var CODEOWNERS_REL_PATH = path15.posix.join(".github", "CODEOWNERS");
+var MONOREPO_CI_REL_PATH = path15.posix.join(
+  ".github",
+  "workflows",
+  "monorepo-ci.yml"
+);
+function guidanceFiles(bundle, ctx) {
+  return {
+    [LESSONS_LEARNED_REL_PATH]: substituteTokens(bundle.lessonsLearnedTemplate, ctx),
+    [PROJECT_GUIDANCE_REL_PATH]: substituteTokens(bundle.projectGuidanceTemplate, ctx),
+    [LESSONS_ARCHIVE_REL_PATH]: substituteTokens(bundle.lessonsArchiveTemplate, ctx)
+  };
+}
+function renderConsumerBootstrap(bundle, ctx) {
+  const files = {
+    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
+    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
+    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
+    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
+    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 077 S4 (Feature 3): the engine-facing verification doc the
+    // Evaluate pointer prompts reference.
+    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
+      bundle,
+      ctx
+    ),
+    [specRelPath(ctx)]: renderSpec(bundle, ctx),
+    [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
+    // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
+    ...guidanceFiles(bundle, ctx),
+    // Set 087 S3 (ruling Q3): the module-ownership + monorepo-CI teaching
+    // templates (token-free; inert until adapted).
+    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
+    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate
+  };
+  const leftovers = /* @__PURE__ */ new Set();
+  for (const content of Object.values(files)) {
+    for (const t2 of findUnsubstitutedTokens(content))
+      leftovers.add(t2);
+  }
+  if (leftovers.size > 0) {
+    throw new Error(
+      `consumer-bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`
+    );
+  }
+  return { files };
+}
+function renderStructureBootstrap(bundle, ctx) {
+  const files = {
+    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
+    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
+    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
+    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
+    // D8 (Set 060 S3): the static Getting Started teaching doc ships
+    // with the structure scaffold too, so the editor-open path can
+    // prefer the workspace copy once the structure is built.
+    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 077 S4 (Feature 3): the verification instruction doc is repo
+    // structure — the Lightweight review flow depends on it.
+    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
+      bundle,
+      ctx
+    ),
+    // Set 064 (D7): the guidance-lifecycle starters are repo structure too,
+    // so a fresh repo built via "Build project structure" starts the
+    // lifecycle with docs/planning/ in place.
+    ...guidanceFiles(bundle, ctx),
+    // Set 087 S3 (ruling Q3): the ownership + CI teaching templates are
+    // repo structure too — a new project starts with them in place.
+    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
+    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate
+  };
+  const leftovers = /* @__PURE__ */ new Set();
+  for (const content of Object.values(files)) {
+    for (const t2 of findUnsubstitutedTokens(content))
+      leftovers.add(t2);
+  }
+  if (leftovers.size > 0) {
+    throw new Error(
+      `structure-only bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`
+    );
+  }
+  return { files };
+}
+function structureOnlyContext(repoName, tier, created, verificationMode = DEFAULT_VERIFICATION_MODE) {
+  return {
+    repoName,
+    setTitle: "(no starter set \u2014 created via the Getting Started decomposition prompt)",
+    purpose: "(no starter set)",
+    slug: "000-placeholder-unused",
+    created,
+    tier,
+    verificationMode,
+    totalSessions: 1
   };
 }
 
@@ -25716,7 +26001,7 @@ async function scaffoldConsumerRepo(deps) {
   };
 }
 async function pickDirectory() {
-  const picked = await vscode9.window.showOpenDialog({
+  const picked = await vscode11.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
@@ -25737,7 +26022,7 @@ function asTier(value) {
   );
 }
 async function promptTier(placeHolder) {
-  const picked = await vscode9.window.showQuickPick(
+  const picked = await vscode11.window.showQuickPick(
     [
       {
         label: "Full",
@@ -25766,8 +26051,8 @@ function isoDate() {
 }
 function registerGitScaffoldCommand(context) {
   context.subscriptions.push(
-    vscode9.commands.registerCommand("dabbler.setupNewProject", async (arg) => {
-      const openRoot = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    vscode11.commands.registerCommand("dabbler.setupNewProject", async (arg) => {
+      const openRoot = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const projectDir = openRoot ?? await pickDirectory();
       if (!projectDir)
         return;
@@ -25775,7 +26060,7 @@ function registerGitScaffoldCommand(context) {
       try {
         preselected = asTier(arg?.tier);
       } catch (err) {
-        vscode9.window.showErrorMessage(
+        vscode11.window.showErrorMessage(
           `Could not set up the project: ${err instanceof Error ? err.message : String(err)}`
         );
         return;
@@ -25785,9 +26070,9 @@ function registerGitScaffoldCommand(context) {
         return;
       await buildProjectStructureNoPrompt(context, projectDir, tier);
       if (!openRoot) {
-        await vscode9.commands.executeCommand(
+        await vscode11.commands.executeCommand(
           "vscode.openFolder",
-          vscode9.Uri.file(projectDir)
+          vscode11.Uri.file(projectDir)
         );
       }
     })
@@ -25802,7 +26087,7 @@ function makeScaffoldInstallPrompts() {
 }
 async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, verificationMode, transportProfile, seams = {}) {
   if (!(seams.probePython ?? probePythonPresence)(projectDir)) {
-    vscode9.window.showErrorMessage(
+    vscode11.window.showErrorMessage(
       describeMissingPython("Build project structure")
     );
     return void 0;
@@ -25823,7 +26108,7 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
   try {
     bundle = seams.loadBundle ? seams.loadBundle() : loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
   } catch (err) {
-    vscode9.window.showErrorMessage(
+    vscode11.window.showErrorMessage(
       `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
     );
     return void 0;
@@ -25838,9 +26123,9 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
   const pythonPath = resolveScaffoldBootstrapPython(projectDir) ?? resolveExplicitPythonPath(projectDir);
   const runScaffold = seams.runScaffold ?? (async (scaffoldCtx, scaffoldBundle, scaffoldPython, scaffoldBudget) => {
     let installOutcome2 = null;
-    const scaffolded = await vscode9.window.withProgress(
+    const scaffolded = await vscode11.window.withProgress(
       {
-        location: vscode9.ProgressLocation.Notification,
+        location: vscode11.ProgressLocation.Notification,
         title: "Building project structure\u2026",
         cancellable: false
       },
@@ -25875,8 +26160,8 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
   );
   const budgetNote = result.budgetOutcome === "written" ? " Budget saved to ai_router/budget.yaml." : result.budgetOutcome === "skipped-exists" ? " Existing ai_router/budget.yaml kept (budget input not applied)." : "";
   const summary = `Project structure built (${tier} tier): ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote;
-  const showInfo = seams.showInfo ?? ((m) => void vscode9.window.showInformationMessage(m));
-  const showWarning = seams.showWarning ?? ((m) => void vscode9.window.showWarningMessage(m));
+  const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
   if (result.installOk) {
     showInfo(summary);
   } else {
@@ -25984,15 +26269,15 @@ function makeRefreshChildSpawner() {
   };
 }
 async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, seams = {}) {
-  const withProgress = seams.withProgress ?? vscode9.window.withProgress.bind(vscode9.window);
+  const withProgress = seams.withProgress ?? vscode11.window.withProgress.bind(vscode11.window);
   const perform = seams.perform ?? performCopilotSeatSetup;
-  const showInfo = seams.showInfo ?? ((m) => void vscode9.window.showInformationMessage(m));
-  const showWarning = seams.showWarning ?? ((m) => void vscode9.window.showWarningMessage(m));
+  const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
   const seatId = deriveSeatId(os3.hostname(), currentUsername());
   const seatLabel = deriveSeatLabel(projectDir);
   const outcome = await withProgress(
     {
-      location: vscode9.ProgressLocation.Notification,
+      location: vscode11.ProgressLocation.Notification,
       title: "Setting up the Copilot seat \u2014 probing the seat's models (about 1\u20132 minutes)\u2026",
       cancellable: true
     },
@@ -26006,7 +26291,7 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
       fileOps: makeFileOps(),
       cancellation: token,
       registerDisposal: (dispose) => {
-        const d = new vscode9.Disposable(dispose);
+        const d = new vscode11.Disposable(dispose);
         context.subscriptions.push(d);
         return {
           // S2 review Minor 4: also splice the Disposable back out of
@@ -26033,17 +26318,17 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
 }
 
 // src/commands/openModulesManifest.ts
-var vscode10 = __toESM(require("vscode"));
+var vscode12 = __toESM(require("vscode"));
 var path18 = __toESM(require("path"));
-function defaultUi3() {
+function defaultUi6() {
   return {
-    showInformationMessage: (m) => vscode10.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode10.window.showErrorMessage(m),
-    openFile: (absPath) => vscode10.commands.executeCommand("vscode.open", vscode10.Uri.file(absPath)),
-    workspaceRoot: () => vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInformationMessage: (m) => vscode12.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode12.window.showErrorMessage(m),
+    openFile: (absPath) => vscode12.commands.executeCommand("vscode.open", vscode12.Uri.file(absPath)),
+    workspaceRoot: () => vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
-async function openModulesManifestFlow(ui = defaultUi3()) {
+async function openModulesManifestFlow(ui = defaultUi6()) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -26076,15 +26361,15 @@ async function openModulesManifestFlow(ui = defaultUi3()) {
 }
 function registerOpenModulesManifestCommand(context) {
   context.subscriptions.push(
-    vscode10.commands.registerCommand("dabbler.openModulesManifest", async () => {
+    vscode12.commands.registerCommand("dabbler.openModulesManifest", async () => {
       await openModulesManifestFlow();
     })
   );
 }
 
 // src/commands/copyModuleDecompositionPrompt.ts
-var vscode11 = __toESM(require("vscode"));
-var fs15 = __toESM(require("fs"));
+var vscode13 = __toESM(require("vscode"));
+var fs14 = __toESM(require("fs"));
 var path19 = __toESM(require("path"));
 function buildModuleDecompositionPrompt(planPresent) {
   const planLine = planPresent ? `Read the repository directly \u2014 its folders and code, and the project plan at \`${LEGACY_ROOT_PLAN_REL}\` (read that file for the project's goals and scope). Nothing is inlined here.` : `Read the repository directly \u2014 its folders and code \u2014 to understand the project's areas of work. Nothing is inlined here (there is no \`${LEGACY_ROOT_PLAN_REL}\` yet).`;
@@ -26110,17 +26395,17 @@ Hard invariants (do NOT violate):
 If the project is a single area of work, one module (or none \u2014 leave \`modules: []\`) is correct; do not invent modules to fill the file. Save \`${MODULES_MANIFEST_DISPLAY}\` when done \u2014 the Work Explorer regroups your session sets as soon as you save.
 `;
 }
-function defaultUi4() {
+function defaultUi7() {
   return {
-    workspaceRoot: () => vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    workspaceRoot: () => vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath,
     // fs.existsSync never throws — swallows errors, returns false.
-    fileExists: (abs) => fs15.existsSync(abs),
-    copyToClipboard: (text) => vscode11.env.clipboard.writeText(text),
-    showInformationMessage: (m) => vscode11.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode11.window.showErrorMessage(m)
+    fileExists: (abs) => fs14.existsSync(abs),
+    copyToClipboard: (text) => vscode13.env.clipboard.writeText(text),
+    showInformationMessage: (m) => vscode13.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode13.window.showErrorMessage(m)
   };
 }
-async function runCopyModuleDecompositionPromptFlow(ui = defaultUi4()) {
+async function runCopyModuleDecompositionPromptFlow(ui = defaultUi7()) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -26154,7 +26439,7 @@ async function runCopyModuleDecompositionPromptFlow(ui = defaultUi4()) {
 }
 function registerCopyModuleDecompositionPromptCommand(context) {
   context.subscriptions.push(
-    vscode11.commands.registerCommand(
+    vscode13.commands.registerCommand(
       "dabbler.copyModuleDecompositionPrompt",
       async () => {
         await runCopyModuleDecompositionPromptFlow();
@@ -26226,7 +26511,7 @@ async function routeGettingStartedAction(msg, handlers) {
         verificationMode = resolveVerificationMode(msg, tier);
         transportProfile = resolveTransportProfile(msg, tier);
       } catch (err) {
-        vscode12.window.showErrorMessage(
+        vscode14.window.showErrorMessage(
           `Build project structure was rejected: ${err instanceof Error ? err.message : String(err)}`
         );
         console.warn(
@@ -26263,7 +26548,7 @@ function makeGettingStartedHandlers(context) {
     // it. vscode.openFolder reopens the window on that folder; the
     // Getting Started form (now with build steps) renders there.
     async openFolder() {
-      const picked = await vscode12.window.showOpenDialog({
+      const picked = await vscode14.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -26272,7 +26557,7 @@ function makeGettingStartedHandlers(context) {
       });
       if (!picked?.[0])
         return;
-      await vscode12.commands.executeCommand("vscode.openFolder", picked[0]);
+      await vscode14.commands.executeCommand("vscode.openFolder", picked[0]);
     },
     // Step 1: scaffold into the OPEN workspace folder (D5) with no
     // prompts. Folder-picker fallback when none is open (spec S2 step 1)
@@ -26280,7 +26565,7 @@ function makeGettingStartedHandlers(context) {
     // state tracks the scaffolded root. Set 063 S2 (D1): the narrowed
     // budget pick rides through to the scaffold's budget.yaml write.
     async buildStructure(tier, budget, verificationMode, transportProfile) {
-      const openRoot = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const openRoot = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (openRoot) {
         await buildProjectStructureNoPrompt(
           context,
@@ -26292,7 +26577,7 @@ function makeGettingStartedHandlers(context) {
         );
         return;
       }
-      const picked = await vscode12.window.showOpenDialog({
+      const picked = await vscode14.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -26311,7 +26596,7 @@ function makeGettingStartedHandlers(context) {
       );
       if (!result)
         return;
-      await vscode12.commands.executeCommand("vscode.openFolder", picked[0]);
+      await vscode14.commands.executeCommand("vscode.openFolder", picked[0]);
     },
     // Set 094 (spec D1 + adjudication A): the Define-modules button —
     // create docs/modules.yaml from the canonical template if it does not
@@ -26331,15 +26616,15 @@ function makeGettingStartedHandlers(context) {
 }
 
 // src/commands/gettingStartedDoc.ts
-var vscode13 = __toESM(require("vscode"));
-var fs16 = __toESM(require("fs"));
+var vscode15 = __toESM(require("vscode"));
+var fs15 = __toESM(require("fs"));
 var path20 = __toESM(require("path"));
 function workspaceGettingStartedDoc(workspaceRoot2) {
   if (!workspaceRoot2)
     return void 0;
   const abs = path20.join(workspaceRoot2, ...GETTING_STARTED_REL_PATH.split("/"));
   try {
-    return fs16.statSync(abs).isFile() ? abs : void 0;
+    return fs15.statSync(abs).isFile() ? abs : void 0;
   } catch {
     return void 0;
   }
@@ -26350,9 +26635,9 @@ function materializeBundledDoc(context) {
     GETTING_STARTED_TEMPLATE_FILENAME
   );
   const dstDir = context.globalStorageUri.fsPath;
-  fs16.mkdirSync(dstDir, { recursive: true });
+  fs15.mkdirSync(dstDir, { recursive: true });
   const dst = path20.join(dstDir, "getting-started.md");
-  fs16.copyFileSync(src, dst);
+  fs15.copyFileSync(src, dst);
   return dst;
 }
 function tierCalloutMarkdown(tier) {
@@ -26384,7 +26669,7 @@ ${docText}`;
 }
 async function openGettingStartedDoc(context) {
   try {
-    const root = vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const workspaceDoc = workspaceGettingStartedDoc(root);
     const durable = root ? resolveDurableTier(root) : null;
     let docPath;
@@ -26393,11 +26678,11 @@ async function openGettingStartedDoc(context) {
         resolveBundledTemplateDir(context.extensionPath),
         GETTING_STARTED_TEMPLATE_FILENAME
       );
-      const text = fs16.readFileSync(src, "utf8");
+      const text = fs15.readFileSync(src, "utf8");
       const dstDir = context.globalStorageUri.fsPath;
-      fs16.mkdirSync(dstDir, { recursive: true });
+      fs15.mkdirSync(dstDir, { recursive: true });
       docPath = path20.join(dstDir, "getting-started.md");
-      fs16.writeFileSync(
+      fs15.writeFileSync(
         docPath,
         renderTierAwareGettingStarted(text, durable.tier),
         "utf8"
@@ -26405,9 +26690,9 @@ async function openGettingStartedDoc(context) {
     } else {
       docPath = workspaceDoc ?? materializeBundledDoc(context);
     }
-    await vscode13.commands.executeCommand(
+    await vscode15.commands.executeCommand(
       "markdown.showPreview",
-      vscode13.Uri.file(docPath)
+      vscode15.Uri.file(docPath)
     );
   } catch (err) {
     console.warn("[gettingStarted] could not open the instructions doc", err);
@@ -26415,9 +26700,9 @@ async function openGettingStartedDoc(context) {
 }
 function registerGetStartedCommand(context) {
   context.subscriptions.push(
-    vscode13.commands.registerCommand("dabbler.getStarted", async () => {
+    vscode15.commands.registerCommand("dabbler.getStarted", async () => {
       try {
-        await vscode13.commands.executeCommand("dabblerSessionSets.focus");
+        await vscode15.commands.executeCommand("dabblerSessionSets.focus");
       } catch (err) {
         console.warn("[gettingStarted] could not focus the Work Explorer view", err);
       }
@@ -26508,7 +26793,7 @@ var CustomSessionSetsView = class {
     webview.options = {
       enableScripts: true,
       enableCommandUris: true,
-      localResourceRoots: [vscode14.Uri.joinPath(this.context.extensionUri, "media")]
+      localResourceRoots: [vscode16.Uri.joinPath(this.context.extensionUri, "media")]
     };
     webview.onDidReceiveMessage((msg) => this.onMessage(msg));
     webviewView.onDidDispose(() => {
@@ -26563,8 +26848,8 @@ var CustomSessionSetsView = class {
     if (!plan.clipboardWrite)
       return;
     try {
-      await vscode14.env.clipboard.writeText(plan.clipboardWrite.text);
-      vscode14.window.showInformationMessage(plan.clipboardWrite.toast);
+      await vscode16.env.clipboard.writeText(plan.clipboardWrite.text);
+      vscode16.window.showInformationMessage(plan.clipboardWrite.toast);
     } catch (err) {
       console.warn(`[CustomSessionSetsView] left-click clipboard write failed for "${slug}"`, err);
     }
@@ -26587,15 +26872,16 @@ var CustomSessionSetsView = class {
     }
     await dispatchModuleAction(narrowed, this.moduleActionExec());
   }
-  /** Set 093 S2: bind the module-action dispatch to the real flows. */
+  /** Set 093 S2 (extended Set 100 S2): bind the module-action dispatch to
+   * the real flows. `renameModule` / `deleteModule` thread the narrowed
+   * slug as the writer's explicit target (no QuickPick); `addModule`
+   * ignores it (it targets a brand-new module, not the clicked row). */
   moduleActionExec() {
     return {
-      aiPlan: (slug) => copyPlanningPrompt(void 0, { preselectedSlug: slug }),
-      importPlan: (slug) => importPlanFromFile(void 0, { preselectedSlug: slug }),
       openPlan: (slug) => openModulePlan(void 0, { preselectedSlug: slug }),
-      aiSets: async (slug) => {
-        await copySessionSetGenPrompt(this.context, {}, { preselectedSlug: slug });
-      },
+      addModule: () => runNewModuleFlow(),
+      renameModule: (slug) => runRenameModuleFlow(void 0, { preselectedSlug: slug }),
+      deleteModule: (slug) => runDeleteModuleFlow(void 0, { preselectedSlug: slug }),
       assignLegacy: () => runAssignLegacySetsFlow(),
       refresh: () => this.refresh()
     };
@@ -26611,13 +26897,17 @@ var CustomSessionSetsView = class {
       return;
     const { slug, kind } = identity;
     const items = [
-      { label: "$(sparkle) AI Plan \u2014 copy a plan-authoring prompt", action: "ai-plan" },
-      { label: "$(file-add) Import Plan\u2026", action: "import-plan" },
-      { label: "$(go-to-file) Open Plan", action: "open-plan" },
-      { label: "$(sparkle) AI Sets \u2014 copy a decomposition prompt", action: "ai-sets" }
+      { label: "$(go-to-file) Open Plan", action: "open-plan" }
     ];
+    if (kind === "declared") {
+      items.push(
+        { label: "$(add) Add Module\u2026", action: "add-module" },
+        { label: "$(edit) Rename Module\u2026", action: "rename-module" },
+        { label: "$(trash) Delete Module\u2026", action: "delete-module" }
+      );
+    }
     if (kind === "pseudo") {
-      const root = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const root = vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const classified = root ? classifyModulesManifest(root) : { kind: "absent" };
       if (classified.kind === "present" && classified.entries.length > 0) {
         items.push({
@@ -26626,7 +26916,7 @@ var CustomSessionSetsView = class {
         });
       }
     }
-    const picked = await vscode14.window.showQuickPick(items, {
+    const picked = await vscode16.window.showQuickPick(items, {
       placeHolder: "Module actions"
     });
     if (!picked)
@@ -26638,7 +26928,7 @@ var CustomSessionSetsView = class {
       console.warn(`[CustomSessionSetsView] rejected command "${commandId}" \u2014 not in allowlist`);
       return;
     }
-    void vscode14.commands.executeCommand(commandId, ...args ?? []);
+    void vscode16.commands.executeCommand(commandId, ...args ?? []);
   }
   // Set 048 S3 (spec §3.3, audit Bias 3 flip): the Set 034 cursor-
   // anchored HTML popup is retired. The right-click menu is rebuilt
@@ -26666,7 +26956,7 @@ var CustomSessionSetsView = class {
     const totalActions = categorized.openFile.length + categorized.copyEval.length + categorized.flat.length;
     if (totalActions === 0)
       return;
-    const showQuickPick = opts?.showQuickPick ?? vscode14.window.showQuickPick;
+    const showQuickPick = opts?.showQuickPick ?? vscode16.window.showQuickPick;
     const topLevelChoice = await this.pickTopLevel(categorized, set.name, showQuickPick);
     if (!topLevelChoice)
       return;
@@ -26697,10 +26987,10 @@ var CustomSessionSetsView = class {
     return picked?.action;
   }
   executeRowAction(action, set) {
-    void vscode14.commands.executeCommand(action.id, { set });
+    void vscode16.commands.executeCommand(action.id, { set });
   }
   async readSupports() {
-    const cfg = vscode14.workspace.getConfiguration("dabblerSessionSets");
+    const cfg = vscode16.workspace.getConfiguration("dabblerSessionSets");
     const uatPref = cfg.get("uatSupport.enabled", "auto");
     const e2ePref = cfg.get("e2eSupport.enabled", "auto");
     const all = this.cache ?? readAllSessionSets();
@@ -26753,7 +27043,7 @@ var CustomSessionSetsView = class {
     const duplicate = all.find((set) => set.duplicateNameError)?.duplicateNameError;
     if (duplicate && !this.collisionNotificationShown) {
       this.collisionNotificationShown = true;
-      void vscode14.window.showWarningMessage(
+      void vscode16.window.showWarningMessage(
         `Duplicate session-set name "${duplicate.name}" exists in ${duplicate.conflictingDirs.length} locations. Showing ${duplicate.chosenDir}; rename one copy to restore unique actions.`
       );
     }
@@ -26841,7 +27131,7 @@ var CustomSessionSetsView = class {
   // decomposition writes the dir WITH spec.md) both signals flip
   // together. Do not "consolidate" these onto the bare-dir probe.
   buildGettingStarted(all) {
-    const folders = vscode14.workspace.workspaceFolders ?? [];
+    const folders = vscode16.workspace.workspaceFolders ?? [];
     return computeGettingStarted(
       folders.length > 0,
       folders[0]?.uri.fsPath,
@@ -26864,7 +27154,7 @@ var CustomSessionSetsView = class {
     );
   }
   buildSystemStatus(manifestFaults, hasAnySets) {
-    const root = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
       return {
         workspaceOpen: false,
@@ -26911,7 +27201,7 @@ var CustomSessionSetsView = class {
   // testable; the host owns filesystem classification and plan presence.
   buildModules(all) {
     const roots = new Set(
-      (vscode14.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath)
+      (vscode16.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath)
     );
     for (const set of all)
       roots.add(set.root);
@@ -26922,7 +27212,7 @@ var CustomSessionSetsView = class {
         classification,
         all.filter((set) => set.root === root),
         {
-          legacyRootPlanExists: fs17.existsSync(path21.join(root, LEGACY_ROOT_PLAN_REL))
+          legacyRootPlanExists: fs16.existsSync(path21.join(root, LEGACY_ROOT_PLAN_REL))
         }
       );
       const selected = chooseRenderableModuleSnapshot(
@@ -26996,16 +27286,16 @@ var CustomSessionSetsView = class {
       return "";
     const webview = this.view.webview;
     const cssUri = webview.asWebviewUri(
-      vscode14.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "tree.css")
+      vscode16.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "tree.css")
     );
     const jsUri = webview.asWebviewUri(
-      vscode14.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "client.js")
+      vscode16.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "client.js")
     );
     const gsHtmlUri = webview.asWebviewUri(
-      vscode14.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "gettingStartedHtml.js")
+      vscode16.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "gettingStartedHtml.js")
     );
     const statusHtmlUri = webview.asWebviewUri(
-      vscode14.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "systemStatusHtml.js")
+      vscode16.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "systemStatusHtml.js")
     );
     const nonce = crypto4.randomBytes(16).toString("hex");
     const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';`;
@@ -27028,11 +27318,11 @@ var CustomSessionSetsView = class {
 };
 
 // src/providers/scanState.ts
-var vscode15 = __toESM(require("vscode"));
+var vscode17 = __toESM(require("vscode"));
 var ScanState = class {
   constructor() {
     this._phase = "idle";
-    this._emitter = new vscode15.EventEmitter();
+    this._emitter = new vscode17.EventEmitter();
     /** Fires when the phase transitions. Listeners get the new phase. */
     this.onDidChange = this._emitter.event;
   }
@@ -27057,10 +27347,10 @@ var ScanState = class {
 };
 
 // src/commands/migrateSet.ts
-var vscode16 = __toESM(require("vscode"));
+var vscode18 = __toESM(require("vscode"));
 
 // src/utils/migrateSessionState.ts
-var fs18 = __toESM(require("fs"));
+var fs17 = __toESM(require("fs"));
 var path22 = __toESM(require("path"));
 var SESSION_STATE_FILENAME3 = "session-state.json";
 function isStrictPositiveInt2(v) {
@@ -27151,20 +27441,20 @@ function atomicWriteJson2(filePath, data) {
   const dir = path22.dirname(filePath);
   const base = path22.basename(filePath);
   const tmp = path22.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
-  const fd = fs18.openSync(tmp, "w");
+  const fd = fs17.openSync(tmp, "w");
   try {
-    fs18.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs18.fsyncSync(fd);
+    fs17.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs17.fsyncSync(fd);
   } finally {
-    fs18.closeSync(fd);
+    fs17.closeSync(fd);
   }
-  fs18.renameSync(tmp, filePath);
+  fs17.renameSync(tmp, filePath);
 }
 function migrateOneSet(setDir, options = {}) {
   const strategy = options.strategy ?? "regex";
   const dryRun = options.dryRun ?? false;
   const statePath = path22.join(setDir, SESSION_STATE_FILENAME3);
-  if (!fs18.existsSync(statePath)) {
+  if (!fs17.existsSync(statePath)) {
     return {
       setDir,
       action: "skipped-no-state",
@@ -27173,7 +27463,7 @@ function migrateOneSet(setDir, options = {}) {
   }
   let raw;
   try {
-    raw = fs18.readFileSync(statePath, "utf-8");
+    raw = fs17.readFileSync(statePath, "utf-8");
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {
@@ -27301,23 +27591,23 @@ var STRATEGY_CHOICES = [
 ];
 function registerMigrateSetCommand(context, deps) {
   context.subscriptions.push(
-    vscode16.commands.registerCommand(
+    vscode18.commands.registerCommand(
       "dabblerSessionSets.migrate",
       async (treeItem) => {
         const set = treeItem?.set;
         if (!set) {
-          vscode16.window.showErrorMessage(
+          vscode18.window.showErrorMessage(
             "Migrate to v3 schema must be invoked from a session-set row in the Session Sets view. Right-click a row marked '(needs migration)' to use this command."
           );
           return;
         }
         if (!set.needsMigration) {
-          vscode16.window.showInformationMessage(
+          vscode18.window.showInformationMessage(
             `${set.name} is already on schema v3 \u2014 nothing to migrate.`
           );
           return;
         }
-        const choice = await vscode16.window.showQuickPick(STRATEGY_CHOICES, {
+        const choice = await vscode18.window.showQuickPick(STRATEGY_CHOICES, {
           title: `Migrate ${set.name} to v3 schema`,
           placeHolder: "Choose how session titles should be derived",
           ignoreFocusOut: true
@@ -27330,9 +27620,9 @@ function registerMigrateSetCommand(context, deps) {
   );
 }
 async function runMigrator(set, strategy, deps) {
-  await vscode16.window.withProgress(
+  await vscode18.window.withProgress(
     {
-      location: vscode16.ProgressLocation.Notification,
+      location: vscode18.ProgressLocation.Notification,
       title: `Migrating ${set.name} to v3 schema (${strategy})\u2026`,
       cancellable: false
     },
@@ -27342,7 +27632,7 @@ async function runMigrator(set, strategy, deps) {
         result = migrateOneSet(set.dir, { strategy });
       } catch (exc) {
         const msg = exc instanceof Error ? exc.message : String(exc);
-        vscode16.window.showErrorMessage(
+        vscode18.window.showErrorMessage(
           `Migration of ${set.name} failed with an unexpected error: ${msg}`
         );
         return;
@@ -27353,35 +27643,35 @@ async function runMigrator(set, strategy, deps) {
 }
 function handleMigrationResult(set, strategy, result, deps) {
   if (result.action === "migrated") {
-    vscode16.window.showInformationMessage(
+    vscode18.window.showInformationMessage(
       `${set.name} migrated to v3 schema (${strategy}). The tree will refresh shortly; the (needs migration) badge clears on the next read.`
     );
     deps.refreshView();
     return;
   }
   if (result.action === "skipped-v3") {
-    vscode16.window.showInformationMessage(
+    vscode18.window.showInformationMessage(
       `${set.name} is already v3 \u2014 no changes written.`
     );
     deps.refreshView();
     return;
   }
   if (result.action === "would-violate") {
-    vscode16.window.showWarningMessage(
+    vscode18.window.showWarningMessage(
       `Migration of ${set.name} stopped: the resulting v3 file would violate schema invariants. Reason: ${result.reason}. Try the other strategy (regex \u2194 generic) or hand-repair the state file before retrying.`
     );
     return;
   }
-  vscode16.window.showWarningMessage(
+  vscode18.window.showWarningMessage(
     `Migration of ${set.name} skipped (${result.action}): ${result.reason}.`
   );
 }
 
 // src/commands/migrateSetV4.ts
-var vscode17 = __toESM(require("vscode"));
+var vscode19 = __toESM(require("vscode"));
 
 // src/utils/migrateSessionStateV4.ts
-var fs19 = __toESM(require("fs"));
+var fs18 = __toESM(require("fs"));
 var path23 = __toESM(require("path"));
 var SESSION_STATE_FILENAME4 = "session-state.json";
 var BACKUP_FILENAME = "session-state.v3.bak.json";
@@ -27502,32 +27792,32 @@ function atomicWriteJson3(filePath, data) {
     dir,
     `.${base}.tmp.${process.pid}.${Date.now()}`
   );
-  const fd = fs19.openSync(tmp, "w");
+  const fd = fs18.openSync(tmp, "w");
   try {
-    fs19.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs19.fsyncSync(fd);
+    fs18.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs18.fsyncSync(fd);
   } finally {
-    fs19.closeSync(fd);
+    fs18.closeSync(fd);
   }
   try {
-    fs19.renameSync(tmp, filePath);
+    fs18.renameSync(tmp, filePath);
   } catch (exc) {
     try {
-      fs19.unlinkSync(tmp);
+      fs18.unlinkSync(tmp);
     } catch {
     }
     throw exc;
   }
 }
 function atomicCopyJson(src, dst) {
-  const raw = JSON.parse(fs19.readFileSync(src, "utf-8"));
+  const raw = JSON.parse(fs18.readFileSync(src, "utf-8"));
   atomicWriteJson3(dst, raw);
 }
 function migrateOneSetV4(setDir, options = {}) {
   const dryRun = options.dryRun ?? false;
   const statePath = path23.join(setDir, SESSION_STATE_FILENAME4);
   const backupPath = path23.join(setDir, BACKUP_FILENAME);
-  if (!fs19.existsSync(statePath)) {
+  if (!fs18.existsSync(statePath)) {
     return {
       setDir,
       action: "skipped-no-state",
@@ -27536,7 +27826,7 @@ function migrateOneSetV4(setDir, options = {}) {
   }
   let raw;
   try {
-    raw = fs19.readFileSync(statePath, "utf-8");
+    raw = fs18.readFileSync(statePath, "utf-8");
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {
@@ -27734,29 +28024,29 @@ function migrateOneSetV4(setDir, options = {}) {
 // src/commands/migrateSetV4.ts
 function registerMigrateSetV4Command(context, deps) {
   context.subscriptions.push(
-    vscode17.commands.registerCommand(
+    vscode19.commands.registerCommand(
       "dabblerSessionSets.migrateToV4",
       async (treeItem) => {
         const set = treeItem?.set;
         if (!set) {
-          vscode17.window.showErrorMessage(
+          vscode19.window.showErrorMessage(
             "Migrate to v4 schema must be invoked from a session-set row in the Session Sets view. Right-click a row marked '(needs migration)' to use this command."
           );
           return;
         }
         if (set.migrationTargetSchemaVersion !== 4) {
           if (set.migrationTargetSchemaVersion === 3) {
-            vscode17.window.showInformationMessage(
+            vscode19.window.showInformationMessage(
               `${set.name} is at v1/v2 (or broken v3) \u2014 run "Migrate to v3 schema" first, then re-run this command.`
             );
           } else {
-            vscode17.window.showInformationMessage(
+            vscode19.window.showInformationMessage(
               `${set.name} is already on schema v4 \u2014 nothing to migrate.`
             );
           }
           return;
         }
-        const confirm = await vscode17.window.showInformationMessage(
+        const confirm = await vscode19.window.showInformationMessage(
           `Migrate ${set.name} to v4 schema? This will rewrite session-state.json in v4 shape and write a backup at session-state.v3.bak.json alongside it for rollback.`,
           { modal: true },
           "Migrate"
@@ -27769,9 +28059,9 @@ function registerMigrateSetV4Command(context, deps) {
   );
 }
 async function runMigratorV4(set, deps) {
-  await vscode17.window.withProgress(
+  await vscode19.window.withProgress(
     {
-      location: vscode17.ProgressLocation.Notification,
+      location: vscode19.ProgressLocation.Notification,
       title: `Migrating ${set.name} to v4 schema\u2026`,
       cancellable: false
     },
@@ -27781,7 +28071,7 @@ async function runMigratorV4(set, deps) {
         result = migrateOneSetV4(set.dir, { dryRun: false });
       } catch (exc) {
         const msg = exc instanceof Error ? exc.message : String(exc);
-        vscode17.window.showErrorMessage(
+        vscode19.window.showErrorMessage(
           `Migration of ${set.name} to v4 failed with an unexpected error: ${msg}`
         );
         return;
@@ -27792,65 +28082,65 @@ async function runMigratorV4(set, deps) {
 }
 function handleMigrationResultV4(set, result, deps) {
   if (result.action === "migrated") {
-    vscode17.window.showInformationMessage(
+    vscode19.window.showInformationMessage(
       `${set.name} migrated to v4 schema. Backup at session-state.v3.bak.json. The tree will refresh shortly; the (needs migration) badge clears on the next read.`
     );
     deps.refreshView();
     return;
   }
   if (result.action === "skipped-v4") {
-    vscode17.window.showInformationMessage(
+    vscode19.window.showInformationMessage(
       `${set.name} is already v4 \u2014 no changes written.`
     );
     deps.refreshView();
     return;
   }
   if (result.action === "skipped-not-v3") {
-    vscode17.window.showWarningMessage(
+    vscode19.window.showWarningMessage(
       `Migration of ${set.name} to v4 was skipped: ${result.reason}`
     );
     return;
   }
   if (result.action === "would-violate") {
-    vscode17.window.showWarningMessage(
+    vscode19.window.showWarningMessage(
       `Migration of ${set.name} stopped: the resulting v4 file would violate schema invariants. Reason: ${result.reason}. Hand-repair the state file before retrying.`
     );
     return;
   }
   if (result.action === "failed-backup") {
     if (result.backupPath) {
-      vscode17.window.showErrorMessage(
+      vscode19.window.showErrorMessage(
         `Migration of ${set.name} failed AFTER backup was written at ${result.backupPath}. ${result.reason} See docs/v3-to-v4-rollback-procedure.md to restore.`
       );
     } else {
-      vscode17.window.showErrorMessage(
+      vscode19.window.showErrorMessage(
         `Migration of ${set.name} could not write its backup: ${result.reason}. The state file was not modified \u2014 fix the filesystem issue (permissions / disk space) and re-run. No rollback needed.`
       );
     }
     return;
   }
-  vscode17.window.showWarningMessage(
+  vscode19.window.showWarningMessage(
     `Migration of ${set.name} skipped (${result.action}): ${result.reason}.`
   );
 }
 
 // src/commands/openFile.ts
-var vscode18 = __toESM(require("vscode"));
-var fs20 = __toESM(require("fs"));
+var vscode20 = __toESM(require("vscode"));
+var fs19 = __toESM(require("fs"));
 var path24 = __toESM(require("path"));
 function openIfExists(filePath, label) {
-  if (!filePath || !fs20.existsSync(filePath)) {
-    vscode18.window.showInformationMessage(
+  if (!filePath || !fs19.existsSync(filePath)) {
+    vscode20.window.showInformationMessage(
       `${label} does not exist yet: ${filePath ? path24.basename(filePath) : "<unknown>"}`
     );
     return;
   }
-  vscode18.commands.executeCommand("vscode.open", vscode18.Uri.file(filePath));
+  vscode20.commands.executeCommand("vscode.open", vscode20.Uri.file(filePath));
 }
 async function openPrerequisiteSpec(set) {
   const unsatisfied = set.unsatisfiedPrereqs ?? [];
   if (unsatisfied.length === 0) {
-    vscode18.window.showInformationMessage(
+    vscode20.window.showInformationMessage(
       `"${set.name}" has no unsatisfied prerequisites.`
     );
     return;
@@ -27859,7 +28149,7 @@ async function openPrerequisiteSpec(set) {
   const bySlug = new Map(allSets.map((s) => [s.name, s]));
   const openTarget = (p2) => {
     if (p2.targetState === "unknown") {
-      vscode18.window.showInformationMessage(
+      vscode20.window.showInformationMessage(
         `Prerequisite "${p2.slug}" does not match any session set \u2014 check the slug in ${set.name}/spec.md.`
       );
       return;
@@ -27870,7 +28160,7 @@ async function openPrerequisiteSpec(set) {
     openTarget(unsatisfied[0]);
     return;
   }
-  const picked = await vscode18.window.showQuickPick(
+  const picked = await vscode20.window.showQuickPick(
     unsatisfied.map((p2) => ({
       label: p2.slug,
       description: p2.targetState === "unknown" ? "unknown set \u2014 check the slug" : p2.targetState.replace("-", " "),
@@ -27882,10 +28172,10 @@ async function openPrerequisiteSpec(set) {
     openTarget(picked.prereq);
 }
 function findPlaywrightTests(set) {
-  const cfg = vscode18.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode20.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
   const playwrightDir = path24.join(set.root, testDirRel);
-  if (!fs20.existsSync(playwrightDir))
+  if (!fs19.existsSync(playwrightDir))
     return [];
   const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
   const testRefs = set.uatSummary?.e2eRefs ?? [];
@@ -27895,7 +28185,7 @@ function findPlaywrightTests(set) {
       return;
     let entries;
     try {
-      entries = fs20.readdirSync(dir, { withFileTypes: true });
+      entries = fs19.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
@@ -27916,7 +28206,7 @@ function findPlaywrightTests(set) {
       }
       if (testRefs.length > 0) {
         try {
-          const txt = fs20.readFileSync(p2, "utf8");
+          const txt = fs19.readFileSync(p2, "utf8");
           for (const ref of testRefs) {
             const short = String(ref).split(".").pop();
             if (short && txt.includes(short)) {
@@ -27934,15 +28224,15 @@ function findPlaywrightTests(set) {
 }
 function registerOpenFileCommands(context) {
   context.subscriptions.push(
-    vscode18.commands.registerCommand(
+    vscode20.commands.registerCommand(
       "dabblerSessionSets.openSpec",
       (item) => openIfExists(item?.set?.specPath, "Spec")
     ),
-    vscode18.commands.registerCommand(
+    vscode20.commands.registerCommand(
       "dabblerSessionSets.openActivityLog",
       (item) => openIfExists(item?.set?.activityPath, "Activity log")
     ),
-    vscode18.commands.registerCommand(
+    vscode20.commands.registerCommand(
       "dabblerSessionSets.openChangeLog",
       (item) => openIfExists(item?.set?.changeLogPath, "Change log")
     ),
@@ -27950,50 +28240,50 @@ function registerOpenFileCommands(context) {
     // removed. The `ai-assignment.md` file on disk continues to exist
     // for any consumer that reads it directly; the menu / palette
     // entry to open it does not.
-    vscode18.commands.registerCommand(
+    vscode20.commands.registerCommand(
       "dabblerSessionSets.openUatChecklist",
       (item) => openIfExists(item?.set?.uatChecklistPath, "UAT checklist")
     ),
-    vscode18.commands.registerCommand(
+    vscode20.commands.registerCommand(
       "dabblerSessionSets.openSessionState",
       (item) => openIfExists(item?.set?.statePath, "Session state")
     ),
     // Set 061 S2 (spec D3): blocked-marker companion. Tolerates a
     // bare Command Palette invocation (no row context) with an
     // informational no-op, matching the other openFile commands.
-    vscode18.commands.registerCommand("dabblerSessionSets.openPrerequisiteSpec", (item) => {
+    vscode20.commands.registerCommand("dabblerSessionSets.openPrerequisiteSpec", (item) => {
       if (!item?.set) {
-        vscode18.window.showInformationMessage(
+        vscode20.window.showInformationMessage(
           "Open Prerequisite Spec is available from a session-set row's context menu."
         );
         return;
       }
       void openPrerequisiteSpec(item.set);
     }),
-    vscode18.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
+    vscode20.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
       if (!item?.set)
         return;
-      vscode18.commands.executeCommand("revealInExplorer", vscode18.Uri.file(item.set.dir));
+      vscode20.commands.executeCommand("revealInExplorer", vscode20.Uri.file(item.set.dir));
     }),
-    vscode18.commands.registerCommand(
+    vscode20.commands.registerCommand(
       "dabblerSessionSets.revealPlaywrightTests",
       async (item) => {
         if (!item?.set)
           return;
         const tests = findPlaywrightTests(item.set);
         if (tests.length === 0) {
-          const cfg = vscode18.workspace.getConfiguration("dabblerSessionSets");
+          const cfg = vscode20.workspace.getConfiguration("dabblerSessionSets");
           const dir = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT);
-          vscode18.window.showInformationMessage(
+          vscode20.window.showInformationMessage(
             `No Playwright tests found for "${item.set.name}". Search root: ${dir}`
           );
           return;
         }
         if (tests.length === 1) {
-          vscode18.commands.executeCommand("vscode.open", vscode18.Uri.file(tests[0]));
+          vscode20.commands.executeCommand("vscode.open", vscode20.Uri.file(tests[0]));
           return;
         }
-        const picked = await vscode18.window.showQuickPick(
+        const picked = await vscode20.window.showQuickPick(
           tests.map((p2) => ({
             label: path24.basename(p2),
             description: path24.relative(item.set.root, p2),
@@ -28002,7 +28292,7 @@ function registerOpenFileCommands(context) {
           { placeHolder: `Playwright tests matching "${item.set.name}"` }
         );
         if (picked) {
-          vscode18.commands.executeCommand("vscode.open", vscode18.Uri.file(picked.absolute));
+          vscode20.commands.executeCommand("vscode.open", vscode20.Uri.file(picked.absolute));
         }
       }
     )
@@ -28010,10 +28300,10 @@ function registerOpenFileCommands(context) {
 }
 
 // src/commands/copyCommand.ts
-var vscode19 = __toESM(require("vscode"));
+var vscode21 = __toESM(require("vscode"));
 async function copy(text, label) {
-  await vscode19.env.clipboard.writeText(text);
-  vscode19.window.setStatusBarMessage(`Copied: ${label}`, 4e3);
+  await vscode21.env.clipboard.writeText(text);
+  vscode21.window.setStatusBarMessage(`Copied: ${label}`, 4e3);
 }
 var startCommandPresets = {
   default: (slug) => `Start the next session of \`${slug}\`.`,
@@ -28026,7 +28316,7 @@ var presetLabels = {
 function registerCopyCommands(context) {
   for (const [key, builder] of Object.entries(startCommandPresets)) {
     context.subscriptions.push(
-      vscode19.commands.registerCommand(
+      vscode21.commands.registerCommand(
         `dabblerSessionSets.copyStartCommand.${key}`,
         async (item) => {
           if (!item?.set)
@@ -28037,7 +28327,7 @@ function registerCopyCommands(context) {
     );
   }
   context.subscriptions.push(
-    vscode19.commands.registerCommand(
+    vscode21.commands.registerCommand(
       "dabblerSessionSets.copySlug",
       async (item) => {
         if (!item?.set)
@@ -28049,9 +28339,9 @@ function registerCopyCommands(context) {
 }
 
 // src/commands/copyPromptCommands.ts
-var fs21 = __toESM(require("fs"));
+var fs20 = __toESM(require("fs"));
 var path25 = __toESM(require("path"));
-var vscode20 = __toESM(require("vscode"));
+var vscode22 = __toESM(require("vscode"));
 var REVIEW_CRITERIA_DIRNAME = "review-criteria";
 var REVIEW_CRITERIA_MAX_CHARS = 8e3;
 var defaultBuildContext = {
@@ -28059,14 +28349,14 @@ var defaultBuildContext = {
   fileExists: defaultFileExists
 };
 function defaultFileExists(filePath) {
-  return fs21.existsSync(filePath);
+  return fs20.existsSync(filePath);
 }
 function defaultReadReviewCriteria(root, kind) {
   const candidate = path25.join(root, "docs", REVIEW_CRITERIA_DIRNAME, `${kind}.md`);
   try {
-    if (!fs21.existsSync(candidate))
+    if (!fs20.existsSync(candidate))
       return null;
-    const text = fs21.readFileSync(candidate, "utf8");
+    const text = fs20.readFileSync(candidate, "utf8");
     return text.length > 0 ? text : null;
   } catch {
     return null;
@@ -28121,15 +28411,15 @@ function ensureCrossProviderVerificationDoc(extensionPath, root) {
     );
     let existing = null;
     try {
-      existing = fs21.readFileSync(target, "utf8");
+      existing = fs20.readFileSync(target, "utf8");
     } catch {
       existing = null;
     }
     if (existing !== null && existing.replace(/\r\n/g, "\n") === rendered) {
       return true;
     }
-    fs21.mkdirSync(path25.dirname(target), { recursive: true });
-    fs21.writeFileSync(target, rendered, { encoding: "utf8" });
+    fs20.mkdirSync(path25.dirname(target), { recursive: true });
+    fs20.writeFileSync(target, rendered, { encoding: "utf8" });
     return true;
   } catch {
     return false;
@@ -28314,16 +28604,16 @@ function buildStartNextParallelSessionPrompt(set) {
 }
 async function copyToClipboard(text, statusMessage) {
   try {
-    await vscode20.env.clipboard.writeText(text);
-    vscode20.window.setStatusBarMessage(statusMessage, 4e3);
+    await vscode22.env.clipboard.writeText(text);
+    vscode22.window.setStatusBarMessage(statusMessage, 4e3);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    vscode20.window.showWarningMessage(`Failed to copy to clipboard: ${detail}`);
+    vscode22.window.showWarningMessage(`Failed to copy to clipboard: ${detail}`);
   }
 }
 function registerCopyPromptCommands(context) {
   context.subscriptions.push(
-    vscode20.commands.registerCommand(
+    vscode22.commands.registerCommand(
       "dabbler.copySpecReviewPrompt",
       async (item) => {
         if (!item?.set)
@@ -28336,7 +28626,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, `Copied: Spec-review prompt for ${item.set.name}`);
       }
     ),
-    vscode20.commands.registerCommand(
+    vscode22.commands.registerCommand(
       "dabbler.copySessionAccomplishmentsPrompt",
       async (item) => {
         if (!item?.set)
@@ -28349,7 +28639,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, `Copied: Session-accomplishments prompt for ${item.set.name}`);
       }
     ),
-    vscode20.commands.registerCommand(
+    vscode22.commands.registerCommand(
       "dabbler.copySetAccomplishmentsPrompt",
       async (item) => {
         if (!item?.set)
@@ -28362,7 +28652,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, `Copied: Set-accomplishments prompt for ${item.set.name}`);
       }
     ),
-    vscode20.commands.registerCommand(
+    vscode22.commands.registerCommand(
       "dabbler.copyStartNextSessionPrompt",
       async (item) => {
         if (!item?.set)
@@ -28371,7 +28661,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, message);
       }
     ),
-    vscode20.commands.registerCommand(
+    vscode22.commands.registerCommand(
       "dabbler.copyStartNextParallelSessionPrompt",
       async (item) => {
         if (!item?.set)
@@ -28380,7 +28670,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, `Copied: Start the next parallel session of ${item.set.name}`);
       }
     ),
-    vscode20.commands.registerCommand(
+    vscode22.commands.registerCommand(
       "dabbler.copyVerificationKickoffPrompt",
       async (item) => {
         if (!item?.set)
@@ -28393,15 +28683,15 @@ function registerCopyPromptCommands(context) {
 }
 
 // src/commands/troubleshoot.ts
-var vscode21 = __toESM(require("vscode"));
-var fs22 = __toESM(require("fs"));
+var vscode23 = __toESM(require("vscode"));
+var fs21 = __toESM(require("fs"));
 var path26 = __toESM(require("path"));
 var cp4 = __toESM(require("child_process"));
 function workspaceRoot() {
-  return vscode21.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return vscode23.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 function outputChannel() {
-  return vscode21.window.createOutputChannel("Dabbler Diagnostics");
+  return vscode23.window.createOutputChannel("Dabbler Diagnostics");
 }
 function checkActivation() {
   const ch = outputChannel();
@@ -28412,7 +28702,7 @@ function checkActivation() {
     return;
   }
   const dir = path26.join(root, SESSION_SETS_REL);
-  const exists2 = fs22.existsSync(dir);
+  const exists2 = fs21.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
   if (!exists2) {
@@ -28506,7 +28796,7 @@ function checkLayout() {
   ch.appendLine("");
   for (const d of dirs) {
     const full = path26.join(root, d);
-    const exists2 = fs22.existsSync(full);
+    const exists2 = fs21.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
   ch.appendLine("");
@@ -28515,7 +28805,7 @@ function checkLayout() {
 }
 function registerTroubleshootCommand(context) {
   context.subscriptions.push(
-    vscode21.commands.registerCommand("dabbler.troubleshoot", async () => {
+    vscode23.commands.registerCommand("dabbler.troubleshoot", async () => {
       const items = [
         {
           label: "$(warning) Extension not activating",
@@ -28548,7 +28838,7 @@ function registerTroubleshootCommand(context) {
           run: checkLayout
         }
       ];
-      const picked = await vscode21.window.showQuickPick(
+      const picked = await vscode23.window.showQuickPick(
         items.map((i2) => ({ label: i2.label, detail: i2.detail, _run: i2.run })),
         { placeHolder: "Select a troubleshooting topic" }
       );
@@ -28559,16 +28849,16 @@ function registerTroubleshootCommand(context) {
 }
 
 // src/commands/cancelLifecycleCommands.ts
-var vscode22 = __toESM(require("vscode"));
+var vscode24 = __toESM(require("vscode"));
 function registerCancelLifecycleCommands(context, deps) {
   context.subscriptions.push(
-    vscode22.commands.registerCommand(
+    vscode24.commands.registerCommand(
       "dabblerSessionSets.cancel",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode22.window.showInformationMessage(
+        const choice = await vscode24.window.showInformationMessage(
           `Cancel session set "${set.name}"?`,
           { modal: true, detail: "This writes a CANCELLED.md audit file in the session-set folder. The set can be restored later." },
           "Cancel Session Set",
@@ -28576,7 +28866,7 @@ function registerCancelLifecycleCommands(context, deps) {
         );
         if (choice !== "Cancel Session Set")
           return;
-        const reason = await vscode22.window.showInputBox({
+        const reason = await vscode24.window.showInputBox({
           prompt: `Reason for cancelling "${set.name}" (optional)`,
           placeHolder: "e.g. scope rolled into another set",
           ignoreFocusOut: true
@@ -28584,24 +28874,24 @@ function registerCancelLifecycleCommands(context, deps) {
         try {
           await cancelSessionSet(set.dir, reason ?? "");
         } catch (err) {
-          vscode22.window.showErrorMessage(
+          vscode24.window.showErrorMessage(
             `Failed to cancel "${set.name}": ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         deps.refreshView();
-        vscode22.window.showInformationMessage(
+        vscode24.window.showInformationMessage(
           `Cancelled "${set.name}". CANCELLED.md written to the session-set folder.`
         );
       }
     ),
-    vscode22.commands.registerCommand(
+    vscode24.commands.registerCommand(
       "dabblerSessionSets.restore",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode22.window.showInformationMessage(
+        const choice = await vscode24.window.showInformationMessage(
           `Restore session set "${set.name}"?`,
           { modal: true, detail: "This renames CANCELLED.md to RESTORED.md (history preserved) and returns the set to its prior status." },
           "Restore",
@@ -28609,7 +28899,7 @@ function registerCancelLifecycleCommands(context, deps) {
         );
         if (choice !== "Restore")
           return;
-        const reason = await vscode22.window.showInputBox({
+        const reason = await vscode24.window.showInputBox({
           prompt: `Reason for restoring "${set.name}" (optional)`,
           placeHolder: "e.g. scope is back in plan",
           ignoreFocusOut: true
@@ -28617,13 +28907,13 @@ function registerCancelLifecycleCommands(context, deps) {
         try {
           await restoreSessionSet(set.dir, reason ?? "");
         } catch (err) {
-          vscode22.window.showErrorMessage(
+          vscode24.window.showErrorMessage(
             `Failed to restore "${set.name}": ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         deps.refreshView();
-        vscode22.window.showInformationMessage(
+        vscode24.window.showInformationMessage(
           `Restored "${set.name}". RESTORED.md kept as audit trail.`
         );
       }
@@ -28632,28 +28922,28 @@ function registerCancelLifecycleCommands(context, deps) {
 }
 
 // src/commands/copilotSeatSetupCommand.ts
-var fs23 = __toESM(require("fs"));
+var fs22 = __toESM(require("fs"));
 var path27 = __toESM(require("path"));
-var vscode23 = __toESM(require("vscode"));
+var vscode25 = __toESM(require("vscode"));
 function registerCopilotSeatSetupCommand(context) {
   context.subscriptions.push(
-    vscode23.commands.registerCommand(
+    vscode25.commands.registerCommand(
       "dabblerSessionSets.setUpCopilotSeat",
       () => runSetUpCopilotSeat(context)
     )
   );
 }
 async function runSetUpCopilotSeat(context) {
-  const root = vscode23.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode25.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode23.window.showErrorMessage(
+    vscode25.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Set Up Copilot Seat."
     );
     return;
   }
   const venvPath = path27.join(root, ".venv");
-  if (!fs23.existsSync(venvPath)) {
-    vscode23.window.showErrorMessage(
+  if (!fs22.existsSync(venvPath)) {
+    vscode25.window.showErrorMessage(
       'No .venv found in this workspace \u2014 run "Build project structure" (Getting Started form) or "Dabbler: Install ai-router" first, then re-run this command.'
     );
     return;
@@ -28662,295 +28952,220 @@ async function runSetUpCopilotSeat(context) {
   await runCopilotSeatSetupWithProgress(context, root, venvPath);
 }
 
-// src/commands/newModule.ts
-var vscode24 = __toESM(require("vscode"));
-var path28 = __toESM(require("path"));
-function defaultUi5() {
-  return {
-    showInputBox: vscode24.window.showInputBox,
-    showInformationMessage: (m) => vscode24.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode24.window.showErrorMessage(m),
-    openFile: (absPath) => vscode24.commands.executeCommand("vscode.open", vscode24.Uri.file(absPath)),
-    workspaceRoot: () => vscode24.workspace.workspaceFolders?.[0]?.uri.fsPath
-  };
-}
-async function runNewModuleFlow(ui = defaultUi5()) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const existingSlugs = (readModulesManifest(root) ?? []).map((e) => e.slug);
-  const slug = await ui.showInputBox({
-    title: "New module (1/2): slug",
-    prompt: "Machine identity for the module (kebab-case). Session sets declare module: <slug> and the Explorer groups them under it.",
-    placeHolder: "greeter",
-    ignoreFocusOut: true,
-    validateInput: (v) => validateNewModuleSlug(v, existingSlugs)
-  });
-  if (slug === void 0 || slug.trim() === "")
-    return false;
-  const title = await ui.showInputBox({
-    title: "New module (2/2): display title",
-    prompt: `Shown as the module's group header in the Session Set Explorer. Press Enter to use "${slug.trim()}".`,
-    placeHolder: slug.trim(),
-    ignoreFocusOut: true
-  });
-  if (title === void 0)
-    return false;
-  let result;
-  try {
-    result = scaffoldNewModule(root, slug, title);
-  } catch (err) {
-    ui.showErrorMessage(
-      `New module was not created: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  await ui.openFile(path28.join(root, ...result.planRel.split("/")));
-  ui.showInformationMessage(
-    `Module "${slug.trim()}" ${result.manifestCreated ? `declared in a new ${MODULES_MANIFEST_DISPLAY}` : `appended to ${MODULES_MANIFEST_DISPLAY}`}. ` + (result.planCreated ? `Plan stub created at ${result.planRel} \u2014 fill it in, then decompose it into session sets.` : `Existing plan at ${result.planRel} kept.`)
-  );
-  return true;
-}
-function registerNewModuleCommand(context) {
-  context.subscriptions.push(
-    vscode24.commands.registerCommand("dabbler.newModule", async () => {
-      await runNewModuleFlow();
-    })
-  );
-}
-
-// src/commands/renameModule.ts
-var vscode25 = __toESM(require("vscode"));
-function defaultUi6() {
-  return {
-    pickModule: async (entries) => {
-      const picked = await vscode25.window.showQuickPick(
-        entries.map((e) => ({
-          label: e.title,
-          description: e.slug,
-          entry: e
-        })),
-        { placeHolder: "Which module do you want to rename?", ignoreFocusOut: true }
-      );
-      return picked?.entry;
-    },
-    promptNewSlug: (currentSlug, validate) => vscode25.window.showInputBox({
-      prompt: "New module slug (kebab-case) \u2014 leave unchanged to keep it",
-      value: currentSlug,
-      ignoreFocusOut: true,
-      validateInput: (v) => validate(v) ?? null
-    }),
-    promptNewTitle: (currentTitle) => vscode25.window.showInputBox({
-      prompt: "New module title (display name) \u2014 leave unchanged to keep it",
-      value: currentTitle,
-      ignoreFocusOut: true
-    }),
-    confirm: async (summary, detail) => {
-      const choice = await vscode25.window.showWarningMessage(
-        summary,
-        { modal: true, detail },
-        "Rename Module"
-      );
-      return choice === "Rename Module";
-    },
-    showInformationMessage: (m) => vscode25.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode25.window.showErrorMessage(m),
-    workspaceRoot: () => vscode25.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    readSets: () => readAllSessionSets()
-  };
-}
-async function runRenameModuleFlow(ui = defaultUi6()) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
-    return false;
-  }
-  const entries = classified.kind === "present" ? classified.entries : [];
-  if (entries.length === 0) {
-    ui.showInformationMessage(
-      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet. Run "Dabbler: New Module" to declare one.`
-    );
-    return false;
-  }
-  const target = await ui.pickModule(entries);
-  if (!target)
-    return false;
-  const otherSlugs = entries.map((e) => e.slug).filter((s) => s !== target.slug);
-  const rawSlug = await ui.promptNewSlug(target.slug, (value) => {
-    const v = (value ?? "").trim();
-    if (v === target.slug)
-      return void 0;
-    return validateNewModuleSlug(v, otherSlugs) ?? void 0;
-  });
-  if (rawSlug === void 0)
-    return false;
-  const rawTitle = await ui.promptNewTitle(target.title);
-  if (rawTitle === void 0)
-    return false;
-  const newSlug = rawSlug.trim();
-  const newTitle = rawTitle.trim();
-  const slugChanging = newSlug !== "" && newSlug !== target.slug;
-  const titleChanging = newTitle !== "" && newTitle !== target.title;
-  if (!slugChanging && !titleChanging) {
-    ui.showInformationMessage(
-      `Nothing to change \u2014 the slug and title are unchanged for "${target.slug}".`
-    );
-    return false;
-  }
-  const affected = slugChanging ? ui.readSets().filter((s) => s.root === root && s.config?.module === target.slug).map((s) => s.name).sort() : [];
-  const changeLines = [];
-  if (slugChanging)
-    changeLines.push(`slug: ${target.slug} \u2192 ${newSlug}`);
-  if (titleChanging)
-    changeLines.push(`title: "${target.title}" \u2192 "${newTitle}"`);
-  const restampNote = slugChanging ? affected.length > 0 ? `Restamps module: in ${affected.length} set(s): ${affected.join(", ")}.` : `No session sets are stamped module: ${target.slug} \u2014 only the manifest changes.` : "Title-only change \u2014 no session sets are touched.";
-  const confirmed = await ui.confirm(
-    `Rename module "${target.slug}"?`,
-    `${changeLines.join("\n")}
-
-${restampNote}
-
-Every file is rewritten transactionally; any failure rolls the whole change back.`
-  );
-  if (!confirmed)
-    return false;
-  const report = renameModule(root, target.slug, {
-    newSlug: slugChanging ? newSlug : void 0,
-    newTitle: titleChanging ? newTitle : void 0
-  });
-  if (report.refused) {
-    ui.showErrorMessage(
-      `Rename refused \u2014 ${report.refused.reason} Every file was left untouched.`
-    );
-    return false;
-  }
-  if (report.writeFailed) {
-    const wf = report.writeFailed;
-    ui.showErrorMessage(
-      wf.rolledBack ? `Rename failed: ${wf.reason}. All changes were rolled back \u2014 the workspace is unchanged.` : `Rename failed: ${wf.reason}. Rollback ALSO failed \u2014 reconcile docs/modules.yaml and the affected spec.md files from git.`
-    );
-    return false;
-  }
-  const parts = [];
-  if (report.slugChanged)
-    parts.push(`slug \u2192 ${report.newSlug}`);
-  if (report.titleChanged)
-    parts.push(`title \u2192 "${report.newTitle}"`);
-  const restampSummary = report.restamped.length ? ` Restamped ${report.restamped.length} set(s): ${report.restamped.join(", ")}.` : "";
-  ui.showInformationMessage(
-    `Renamed module (${parts.join(", ")}).${restampSummary}`
-  );
-  return true;
-}
-function registerRenameModuleCommand(context) {
-  context.subscriptions.push(
-    vscode25.commands.registerCommand("dabbler.renameModule", async () => {
-      await runRenameModuleFlow();
-    })
-  );
-}
-
-// src/commands/deleteModule.ts
+// src/wizard/sessionGenPrompt.ts
 var vscode26 = __toESM(require("vscode"));
-function defaultUi7() {
+var fs23 = __toESM(require("fs"));
+var path28 = __toESM(require("path"));
+var PLAN_PATH = path28.join("docs", "planning", "project-plan.md");
+var PLAN_REL_POSIX = "docs/planning/project-plan.md";
+function sampleContext(tier, verificationMode = "out-of-band-or-none", moduleSlug) {
   return {
-    pickModule: async (entries) => {
-      const picked = await vscode26.window.showQuickPick(
-        entries.map((e) => ({
-          label: e.title,
-          description: e.slug,
-          entry: e
-        })),
-        { placeHolder: "Which module do you want to delete?", ignoreFocusOut: true }
-      );
-      return picked?.entry;
-    },
-    confirm: async (summary, detail) => {
-      const choice = await vscode26.window.showWarningMessage(
-        summary,
-        { modal: true, detail },
-        "Delete Module"
-      );
-      return choice === "Delete Module";
-    },
-    showInformationMessage: (m) => vscode26.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode26.window.showErrorMessage(m),
-    workspaceRoot: () => vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath
+    repoName: "example-app",
+    setTitle: "Example feature",
+    purpose: "A worked example \u2014 replace with the real set's purpose.",
+    slug: "001-example-feature",
+    created: "2026-01-01",
+    tier,
+    verificationMode,
+    totalSessions: 3,
+    // Set 087 S3 (ruling Q2): a module-targeted decomposition renders the
+    // module: line IN the exemplar (writer-rendered, so the prompt cannot
+    // drift from what the shared writer emits); absent → no line at all.
+    module: moduleSlug
   };
 }
-function summarizeGroup(label, names) {
-  return names.length > 0 ? `${label} (${names.length}): ${names.join(", ")}` : `${label}: none`;
+var PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** You asked for parallel session sets
+  where possible: the orchestration runs independent session sets concurrently in
+  separate git worktrees, merged back to the main branch when the sets complete.
+  Minimize cross-set dependencies; when one set genuinely must follow another,
+  declare that explicitly with a \`prerequisites:\` entry in the dependent set's
+  Session Set Configuration block (slug + \`condition: complete\`). Any set with no
+  \`prerequisites:\` is treated as safe to start in parallel.
+`;
+function buildSessionGenPrompt(bundle, options = {}) {
+  const exemplarTier = options.tier ?? "full";
+  const exemplarMode = exemplarTier === "lightweight" && options.verificationMode ? options.verificationMode : "out-of-band-or-none";
+  const ctx = sampleContext(exemplarTier, exemplarMode, options.module?.slug);
+  const exampleSpec = renderSpec(bundle, ctx);
+  const exampleState = renderSessionState(bundle, ctx);
+  const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
+  const moduleRequirement = options.module ? `- **Module:** declare \`module: ${options.module.slug}\` in EVERY generated set's
+  Session Set Configuration block, exactly as the worked example shows (the value is
+  validated against \`docs/modules.yaml\`). \`module\` is a grouping attribute only \u2014
+  session-set names stay globally unique across ALL modules.
+` : "";
+  const moduleGuidance = options.module ? `- **Module.** This decomposition targets the **${options.module.slug}** module
+  (declared in \`docs/modules.yaml\`). Stamp \`module: ${options.module.slug}\` in each
+  generated set's configuration block. Recommended (not enforced): include the module
+  slug in each set's name (e.g. \`00N-${options.module.slug}-<feature>\`) so names stay
+  self-describing and collision-free across modules.
+` : "";
+  const planRefPosix = options.module?.planPath ?? PLAN_REL_POSIX;
+  const modeGuidance = exemplarTier === "lightweight" && exemplarMode === "dedicated-sessions" ? `- **Verification mode.** The operator selected **dedicated verification sessions**
+  for this project \u2014 author each Lightweight set with \`verificationMode:
+  dedicated-sessions\` unless the project plan explicitly calls for a different mode
+  on a specific set.
+` : "";
+  let tierGuidance;
+  if (options.tier && options.tierSource !== "inference") {
+    tierGuidance = `- **Tier.** The operator selected the **${options.tier}** tier for this
+  project \u2014 author each new set with \`tier: ${options.tier}\` unless the project plan
+  explicitly calls for a different tier on a specific set.
+`;
+  } else if (options.tier) {
+    tierGuidance = `- **Tier.** This workspace is set up for the **${options.tier}** tier
+  (inferred from the workspace's router configuration) \u2014 author each new set with
+  \`tier: ${options.tier}\` unless the project plan explicitly calls for a different
+  tier on a specific set.
+`;
+  } else {
+    tierGuidance = `- **Tier.** No tier choice is recorded in this workspace. The worked
+  example above uses \`tier: full\` for illustration only \u2014 do NOT treat it as the
+  operator's selection. Choose each set's tier (\`full\` | \`lightweight\`) from the
+  project plan, per the tier-model SSoT linked above.
+`;
+  }
+  return `You are a session-set architect for an AI-led software development workflow (the Dabbler session-set workflow).
+
+Given a project plan, decompose it into a sequence of session sets. Each session set is a
+focused, independently deployable unit of work that one AI coding session can complete.
+
+For EACH session set, scaffold a folder \`docs/session-sets/<NNN-slug>/\` containing a
+\`spec.md\` AND a \`session-state.json\`, matching the worked examples below EXACTLY in shape.
+
+## Hard requirements (do not deviate)
+
+- **Slug:** \`NNN-kebab-title\` \u2014 a three-digit, zero-padded, monotonically increasing
+  prefix then a kebab-case title (e.g. \`001-user-authentication\`, \`002-product-catalog\`).
+  Never emit a bare (un-prefixed) slug.
+- **\`spec.md\` Session Set Configuration block** MUST declare \`tier\` (\`full\` |
+  \`lightweight\`). \`lightweight\` sets ALSO declare \`verificationMode\`
+  (\`out-of-band-or-none\` default, or \`dedicated-sessions\`); \`full\` sets OMIT
+  \`verificationMode\` entirely \u2014 the field is Lightweight-only, and omitting it means
+  the default. The tier model is defined once, in the SSoT \u2014
+  do NOT restate it in the spec:
+  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
+- **One \`### Session K of N\` block per planned session** (progress keys keyed
+  \`session-00K/\`), and **one object in the \`session-state.json\` \`sessions\` array per
+  planned session** (\`"number": K\`, \`"title": "Session K"\`, all other fields at their
+  not-started defaults).
+- **\`session-state.json\`** MUST use \`"schemaVersion": 4\` and \`"status": "not-started"\`.
+  Never emit the retired schemaVersion-2 state shape.
+${moduleRequirement}
+
+## Worked example \u2014 \`spec.md\` for a 3-session ${exemplarTier === "lightweight" ? "Lightweight" : "Full"} set (\`001-example-feature\`)
+
+Match this shape; substitute your own title/purpose/slug/tier and emit exactly one session
+block per planned session:
+
+~~~~markdown
+${exampleSpec}
+~~~~
+
+## Worked example \u2014 its \`session-state.json\` (schemaVersion 4, three not-started sessions)
+
+~~~~json
+${exampleState}
+~~~~
+
+## Authoring guidance
+
+- Order sets so earlier ones unblock later ones.
+- Keep scope tight: prefer 2\u20134 sessions per set.
+- Set \`requiresUAT: true\` only for user-visible features that need manual verification;
+  when true, set \`uatStyle: dsl\` for web/browser UI (Playwright via dabbler-uat-dsl) or
+  \`uatStyle: ad-hoc\` for non-web surfaces (CLI, native, Access, COM apps). Default ad-hoc.
+- Set \`requiresE2E: true\` only if automated browser tests are relevant.
+- Both tiers run the same Python lifecycle (\`start_session\` / \`close_session\`), state
+  handling, and close-out. Lightweight is router-off, not Python-off \u2014 pick \`tier:
+  lightweight\` when the project opts out of metered API calls.
+${tierGuidance}${modeGuidance}${moduleGuidance}${parallelGuidance}
+---
+
+## The project plan (read it from the workspace)
+
+The authoritative input for this decomposition is the project plan at
+\`${planRefPosix}\` in this workspace. Read that file directly \u2014 it is
+intentionally NOT inlined here. Decompose the plan it describes into session
+sets per the rules above.`;
 }
-async function runDeleteModuleFlow(ui = defaultUi7()) {
-  const root = ui.workspaceRoot();
+async function copySessionSetGenPrompt(context, options = {}, pickOpts) {
+  const root = vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
+    void vscode26.window.showErrorMessage("No workspace folder is open.");
     return false;
   }
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
-    return false;
-  }
-  const entries = classified.kind === "present" ? classified.entries : [];
-  if (entries.length === 0) {
-    ui.showInformationMessage(
-      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet.`
-    );
-    return false;
-  }
-  const target = await ui.pickModule(entries);
-  if (!target)
-    return false;
-  const classification = classifyModuleSetsForDeletion(root, target.slug);
-  const toCancel = classification.filter((c3) => c3.disposition === "cancel").map((c3) => c3.name).sort();
-  const toRemove = classification.filter((c3) => c3.disposition === "remove").map((c3) => c3.name).sort();
-  const terminal = classification.filter((c3) => c3.disposition === "terminal").map((c3) => c3.name).sort();
-  const detailLines = [
-    summarizeGroup("Cancelled", toCancel),
-    summarizeGroup("Removed outright", toRemove),
-    summarizeGroup("Left untouched (completed / already cancelled)", terminal)
-  ];
-  const confirmed = await ui.confirm(
-    `Delete module "${target.slug}"?`,
-    `Removes the ${MODULES_MANIFEST_DISPLAY} entry.
-
-${detailLines.join("\n")}
-
-Re-declaring "${target.slug}" later restores this grouping for any untouched history.`
+  const modulePick = await pickModuleForAuthoring(
+    root,
+    {
+      showQuickPick: (items, opts) => vscode26.window.showQuickPick(items, opts),
+      showInformationMessage: (m) => vscode26.window.showInformationMessage(m),
+      showErrorMessage: (m) => vscode26.window.showErrorMessage(m)
+    },
+    pickOpts && pickOpts.preselectedSlug !== void 0 ? { preselectedSlug: pickOpts.preselectedSlug } : void 0
   );
-  if (!confirmed)
+  if (modulePick.kind === "cancelled" || modulePick.kind === "invalid-manifest" || modulePick.kind === "unknown-module") {
     return false;
-  const report = await deleteModule(root, target.slug);
-  if (report.refused) {
-    ui.showErrorMessage(
-      `Delete refused \u2014 ${report.refused.reason} Every file was left untouched.`
+  }
+  const moduleOpt = modulePick.entry ? {
+    slug: modulePick.entry.slug,
+    planPath: modulePlanRelPath(modulePick.entry)
+  } : void 0;
+  const planRelPosix = moduleOpt?.planPath ?? PLAN_REL_POSIX;
+  const planPath = path28.join(root, ...planRelPosix.split("/"));
+  if (!fs23.existsSync(planPath)) {
+    const action = await vscode26.window.showWarningMessage(
+      moduleOpt ? `No project plan found at ${planRelPosix} for module "${moduleOpt.slug}". Create it (the New Module command writes a stub) or import one first?` : `No project plan found at ${PLAN_PATH}. Import one first?`,
+      "Import Plan"
+    );
+    if (action === "Import Plan")
+      void vscode26.commands.executeCommand("dabbler.importPlan");
+    return false;
+  }
+  let bundle;
+  try {
+    bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
+  } catch (err) {
+    void vscode26.window.showErrorMessage(
+      `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
     );
     return false;
   }
-  if (report.partialFailure) {
-    ui.showErrorMessage(
-      `Delete stopped partway: ${report.partialFailure.reason} ${report.cancelled.length} set(s) cancelled and ${report.removed.length} scaffold(s) removed so far \u2014 re-run "Dabbler: Delete Module" to finish (already-applied steps are skipped on retry).`
-    );
-    return report.cancelled.length > 0 || report.removed.length > 0;
-  }
-  ui.showInformationMessage(
-    `Deleted module "${target.slug}" \u2014 ${report.cancelled.length} set(s) cancelled, ${report.removed.length} scaffold(s) removed, ${report.terminal.length} left untouched.`
+  const durable = options.tier === void 0 ? resolveDurableTier(root) : null;
+  const resolvedTier = options.tier ?? durable?.tier;
+  const durableMode = options.verificationMode === void 0 && resolvedTier === "lightweight" ? readVerificationModeMarker(root) : null;
+  const resolved = {
+    parallel: options.parallel,
+    tier: resolvedTier,
+    tierSource: options.tier ? "form" : durable?.source,
+    verificationMode: options.verificationMode ?? durableMode ?? void 0,
+    module: moduleOpt
+  };
+  const prompt = buildSessionGenPrompt(bundle, resolved);
+  await vscode26.env.clipboard.writeText(prompt);
+  void vscode26.window.showInformationMessage(
+    "Session-set generation prompt copied to clipboard. Paste it into your AI assistant. When you receive the specs, save each one to docs/session-sets/<NNN-slug>/spec.md (alongside its session-state.json).\n\nCost reminder: each session set typically costs $0.10\u2013$2.00 depending on model and effort. Review the generated specs before running all sessions.",
+    { modal: false }
   );
   return true;
 }
-function registerDeleteModuleCommand(context) {
+function registerSessionGenPromptCommand(context) {
   context.subscriptions.push(
-    vscode26.commands.registerCommand("dabbler.deleteModule", async () => {
-      await runDeleteModuleFlow();
-    })
+    vscode26.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
+      await copySessionSetGenPrompt(context);
+    }),
+    // Set 094 S2 (verdict amendment 7): the shelved parallel-sets UI's escape
+    // hatch — the ONLY live feeder of `parallel: true`. A deliberate,
+    // per-invocation Command-Palette variant for the narrow
+    // multiple-branches-in-one-module case (routed ruling 1a, chosen over a
+    // sticky `parallelHint` setting). The `prerequisites:` machinery + worktree
+    // tooling it references are untouched — this is UI shelving, reversible.
+    vscode26.commands.registerCommand(
+      "dabbler.generateParallelSessionSetPrompt",
+      async () => {
+        await copySessionSetGenPrompt(context, { parallel: true });
+      }
+    )
   );
 }
 

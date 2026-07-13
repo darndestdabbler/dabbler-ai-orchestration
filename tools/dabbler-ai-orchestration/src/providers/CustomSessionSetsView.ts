@@ -63,16 +63,19 @@ import {
   classifyModulesManifest,
 } from "../utils/moduleAuthoring";
 // Set 093 Session 2: the module-row action handlers (verdict amendments
-// 1 + 2). The four authoring actions reuse the existing plan / decomposition
-// flows with an explicit module target (routed ruling D1); the assign-legacy
-// flow is its own command.
-import {
-  copyPlanningPrompt,
-  importPlanFromFile,
-  openModulePlan,
-} from "../wizard/planImport";
-import { copySessionSetGenPrompt } from "../wizard/sessionGenPrompt";
+// 1 + 2). `Open Plan` reuses the existing plan flow with an explicit module
+// target (routed ruling D1); the assign-legacy flow is its own command.
+// Set 100 Session 2 (module lifecycle simplification): the retired
+// `ai-plan` / `import-plan` / `ai-sets` strip actions no longer wire here —
+// their underlying flows survive palette-only (dabbler.importPlan,
+// dabbler.generateSessionSetPrompt). `add-module` / `rename-module` /
+// `delete-module` join, dispatching to the Set 087/099 flows with the same
+// explicit-target seam (no QuickPick on the row/context path).
+import { openModulePlan } from "../wizard/planImport";
 import { runAssignLegacySetsFlow } from "../commands/assignLegacySets";
+import { runNewModuleFlow } from "../commands/newModule";
+import { runRenameModuleFlow } from "../commands/renameModule";
+import { runDeleteModuleFlow } from "../commands/deleteModule";
 import {
   ModuleActionExec,
   dispatchModuleAction,
@@ -408,18 +411,18 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     await dispatchModuleAction(narrowed, this.moduleActionExec());
   }
 
-  /** Set 093 S2: bind the module-action dispatch to the real flows. */
+  /** Set 093 S2 (extended Set 100 S2): bind the module-action dispatch to
+   * the real flows. `renameModule` / `deleteModule` thread the narrowed
+   * slug as the writer's explicit target (no QuickPick); `addModule`
+   * ignores it (it targets a brand-new module, not the clicked row). */
   private moduleActionExec(): ModuleActionExec {
     return {
-      aiPlan: (slug) => copyPlanningPrompt(undefined, { preselectedSlug: slug }),
-      importPlan: (slug) =>
-        importPlanFromFile(undefined, { preselectedSlug: slug }),
       openPlan: (slug) => openModulePlan(undefined, { preselectedSlug: slug }),
-      aiSets: async (slug) => {
-        // copySessionSetGenPrompt returns whether it copied; the exec
-        // contract is void (the info toast is its own feedback).
-        await copySessionSetGenPrompt(this.context, {}, { preselectedSlug: slug });
-      },
+      addModule: () => runNewModuleFlow(),
+      renameModule: (slug) =>
+        runRenameModuleFlow(undefined, { preselectedSlug: slug }),
+      deleteModule: (slug) =>
+        runDeleteModuleFlow(undefined, { preselectedSlug: slug }),
       assignLegacy: () => runAssignLegacySetsFlow(),
       refresh: () => this.refresh(),
     };
@@ -440,12 +443,19 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     const identity = narrowModuleIdentity(moduleSlug, moduleKind);
     if (!identity) return;
     const { slug, kind } = identity;
+    // Set 100 S2: `Open Plan` stays on every actionable kind; the retired
+    // `ai-plan` / `import-plan` / `ai-sets` items are gone (palette-only
+    // now). Declared modules gain the three lifecycle-management items.
     const items: { label: string; action: string }[] = [
-      { label: "$(sparkle) AI Plan — copy a plan-authoring prompt", action: "ai-plan" },
-      { label: "$(file-add) Import Plan…", action: "import-plan" },
       { label: "$(go-to-file) Open Plan", action: "open-plan" },
-      { label: "$(sparkle) AI Sets — copy a decomposition prompt", action: "ai-sets" },
     ];
+    if (kind === "declared") {
+      items.push(
+        { label: "$(add) Add Module…", action: "add-module" },
+        { label: "$(edit) Rename Module…", action: "rename-module" },
+        { label: "$(trash) Delete Module…", action: "delete-module" },
+      );
+    }
     // The `Assign legacy sets…` affordance rides the pseudo `Unassigned`
     // module only — i.e. a pseudo module beside >= 1 declared module. The
     // manifest having a declared entry is the same condition that labels the

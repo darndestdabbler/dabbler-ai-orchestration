@@ -60,3 +60,39 @@ retaining the analytical depth the terminal session's advisory
 path-aware critique + close-out demand; anthropic orchestration keeps
 the openai/google verification pool free. Runner-up:
 gemini / google / gemini-flash / medium.
+
+### Actuals (filled at close)
+
+- Orchestrator used: claude / anthropic / claude-sonnet-5 (matches the
+  routed recommendation — operator ran `/model sonnet` before starting
+  the session, no deviation).
+- Routed calls: phased verification discovery fan-out K=2 ($0.3065, both
+  gpt-5-6 — anthropic excluded as the orchestrator provider). Session
+  routed total ≈ **$0.31**.
+- Verification loop story: discovery round 1 returned **VERIFIED /
+  VERIFIED** on both independent fan-out calls — zero blocking findings,
+  no supplementary or remediation phase opened. Both fan-out calls
+  independently raised the same evidence/test-precision nits (dogfood
+  wording overclaimed "multi-module" and "exactly the moduleActionExec
+  code path"; a test named "skip-existing" actually tested cross-module
+  coexistence, not a same-slug re-run; the Add-module numbering test
+  asserted only a digit pattern, not exact numbers) plus one real
+  defensive-code nit (a post-append manifest re-read raced the async
+  `ui.openFile()` call and could silently suppress the scaffold-refusal
+  report) — all five folded in before authoring `disposition.json` (see
+  `s2-verification.md` / `s2-verification-fanout-2.md` for the raw NITS,
+  `disposition.json`'s summary for the remediation detail); re-verified
+  green with no second discovery round needed (the original round was
+  already non-blocking).
+- Deviations from recommendation: none — Sonnet at low effort proved
+  sufficient for the wiring work and this close-out. The spec arms
+  `pathAwareCritique: advisory` (the targeting seam spans webview
+  client, protocol, host dispatch, and the Set 099 writers). This stage
+  is a MANUAL, operator-run flow (GitHub-Copilot workspace access —
+  `route()` has no repo pull-access) — mirroring the Set 099 S2
+  precedent, it is not run inside this API-routed session; `advisory`
+  means `close_session` only warns on its absence, never blocks. Flagged
+  as an open operator follow-up in `change-log.md`.
+
+**Set 100 is now complete.** No version bump, no publish — the release
+boundary is after Set 101.

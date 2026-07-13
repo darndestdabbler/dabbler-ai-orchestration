@@ -252,13 +252,15 @@ test("multi-module workspace renders one dialect with fallback warning and Unass
   }
 });
 
-// Set 093 Session 2 (verdict amendments 1 + 2): the module-row action
-// strip. Asserts what the operator sees: declared + pseudo modules carry a
-// hover/focus-revealed toolbar; a fallback module carries none; the pseudo
-// `Unassigned` module adds the `Assign legacy sets…` affordance; the strip
-// buttons are NOT treeitems (excluded from the tree's arrow nav and name);
-// and focusing a module makes its strip the one Tab-reachable secondary
-// tabstop (routed ruling D3, s2-targeting-seam-architecture.json).
+// Set 093 Session 2 (verdict amendments 1 + 2), reworked Set 100 Session 2
+// (module lifecycle simplification): the module-row action strip. Asserts
+// what the operator sees: declared modules carry `Open Plan` / `Add` /
+// `Rename…` / `Delete…`; the pseudo module carries only `Open Plan` (plus
+// `Assign legacy sets…` when labeled `Unassigned`) and NO management
+// actions; a fallback module carries no strip at all; the strip buttons are
+// NOT treeitems (excluded from the tree's arrow nav and name); and focusing
+// a module makes its strip the one Tab-reachable secondary tabstop (routed
+// ruling D3, s2-targeting-seam-architecture.json).
 test("module rows carry a hover/focus-revealed action strip; fallback has none; Unassigned adds Assign", async () => {
   const per: PerTest = {};
   try {
@@ -284,13 +286,17 @@ test("module rows carry a hover/focus-revealed action strip; fallback has none; 
     const tree = inner.getByTestId("work-explorer-tree");
     await expect(tree).toBeVisible({ timeout: 30_000 });
 
-    // Declared module: a role=toolbar strip of four actions, HIDDEN until
-    // the header/strip is hovered or the module holds focus.
+    // Declared module: a role=toolbar strip of four actions (Open Plan,
+    // Add, Rename…, Delete…), HIDDEN until the header/strip is hovered or
+    // the module holds focus.
     const greeterModule = inner.getByTestId("module-declared-greeter");
     const strip = greeterModule.locator("> .module-action-strip");
     await expect(strip).toHaveCount(1);
     await expect(strip).toHaveAttribute("role", "toolbar");
     await expect(strip.locator(".module-action")).toHaveCount(4);
+    for (const action of ["open-plan", "add-module", "rename-module", "delete-module"]) {
+      await expect(strip.locator(`[data-module-action="${action}"]`)).toHaveCount(1);
+    }
     // The buttons are NOT treeitems — excluded from the tree name + arrow nav.
     await expect(strip.locator('[role="treeitem"]')).toHaveCount(0);
     // The module treeitem's accessible name still points only at the header.
@@ -306,14 +312,22 @@ test("module rows carry a hover/focus-revealed action strip; fallback has none; 
     const fallback = inner.getByTestId("module-fallback-not-in-manifest");
     await expect(fallback.locator("> .module-action-strip")).toHaveCount(0);
 
-    // Pseudo `Unassigned` module: the four actions PLUS `Assign legacy sets`.
+    // Pseudo `Unassigned` module: NO management actions — only `Open Plan`
+    // PLUS `Assign legacy sets…` (Set 100 S2: the pseudo module gets no
+    // lifecycle-management actions).
     const pseudo = inner.getByTestId("module-pseudo-default");
     await expect(pseudo.locator(".module-title")).toHaveText("Unassigned");
     const pseudoStrip = pseudo.locator("> .module-action-strip");
-    await expect(pseudoStrip.locator(".module-action")).toHaveCount(5);
+    await expect(pseudoStrip.locator(".module-action")).toHaveCount(2);
+    await expect(
+      pseudoStrip.locator('[data-module-action="open-plan"]'),
+    ).toHaveCount(1);
     await expect(
       pseudoStrip.locator('[data-module-action="assign-legacy"]'),
     ).toHaveCount(1);
+    for (const action of ["add-module", "rename-module", "delete-module"]) {
+      await expect(pseudoStrip.locator(`[data-module-action="${action}"]`)).toHaveCount(0);
+    }
 
     // Keyboard: focusing the module makes its strip's first button the one
     // Tab-reachable secondary tabstop (roving anchor); other strips stay off
@@ -341,14 +355,16 @@ test("module rows carry a hover/focus-revealed action strip; fallback has none; 
     // Set 093 S2 (verification R7 fix): a POINTER click on ANOTHER module's
     // strip button makes THAT button the sole roving anchor and its module the
     // active tree row — no stale anchor left in the previously-focused strip,
-    // and Shift+Tab returns to the clicked module.
+    // and Shift+Tab returns to the clicked module. Uses `open-plan` (a
+    // fire-and-forget action — never a blocking modal, unlike
+    // add-module/rename-module/delete-module's input boxes).
     const clockModule = inner.getByTestId("module-declared-clock");
     const clockStrip = clockModule.locator("> .module-action-strip");
     await clockModule.locator(".module-header").hover();
-    const clockAiPlan = clockStrip.locator('[data-module-action="ai-plan"]');
-    await clockAiPlan.click();
-    await expect(clockAiPlan).toBeFocused();
-    await expect(clockAiPlan).toHaveAttribute("tabindex", "0");
+    const clockOpenPlan = clockStrip.locator('[data-module-action="open-plan"]');
+    await clockOpenPlan.click();
+    await expect(clockOpenPlan).toBeFocused();
+    await expect(clockOpenPlan).toHaveAttribute("tabindex", "0");
     // The previously-focused greeter strip has NO stale anchor.
     await expect(strip.locator('.module-action[tabindex="0"]')).toHaveCount(0);
     // clock is now the tree tabstop; Shift+Tab off the button returns to it.

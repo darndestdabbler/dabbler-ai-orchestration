@@ -18,6 +18,7 @@ import {
   classifyModulesManifest,
   classifyModuleSetsForDeletion,
   deleteModule,
+  unknownModuleMessage,
 } from "../utils/moduleAuthoring";
 import { ModuleManifestEntry } from "../types";
 
@@ -65,6 +66,17 @@ function summarizeGroup(label: string, names: string[]): string {
 }
 
 /**
+ * Set 100 Session 2 (explicit-target seam): a row/context invocation
+ * already carries its module, so the QuickPick is skipped entirely — a
+ * slug that no longer resolves (a stale row) fails LOUD rather than
+ * falling back to the picker. Absent → today's interactive behavior (the
+ * palette command keeps its QuickPick for keyboard-driven use).
+ */
+export interface DeleteModuleOptions {
+  preselectedSlug?: string;
+}
+
+/**
  * Run the delete-module flow. Returns true when the writer changed at least
  * one file (so callers refresh the Explorer). Gathers a declared module,
  * classifies its sets with the SAME function the writer uses (so the
@@ -73,6 +85,7 @@ function summarizeGroup(label: string, names: string[]): string {
  */
 export async function runDeleteModuleFlow(
   ui: DeleteModuleUi = defaultUi(),
+  opts?: DeleteModuleOptions,
 ): Promise<boolean> {
   const root = ui.workspaceRoot();
   if (!root) {
@@ -93,8 +106,17 @@ export async function runDeleteModuleFlow(
     return false;
   }
 
-  const target = await ui.pickModule(entries);
-  if (!target) return false; // cancelled
+  let target: ModuleManifestEntry | undefined;
+  if (opts && opts.preselectedSlug !== undefined) {
+    target = entries.find((e) => e.slug === opts.preselectedSlug);
+    if (!target) {
+      ui.showErrorMessage(unknownModuleMessage(opts.preselectedSlug));
+      return false;
+    }
+  } else {
+    target = await ui.pickModule(entries);
+    if (!target) return false; // cancelled
+  }
 
   const classification = classifyModuleSetsForDeletion(root, target.slug);
   const toCancel = classification

@@ -42,19 +42,38 @@ suite("moduleActionNarrowing — identity (Set 093 S2)", () => {
   });
 });
 
-suite("moduleActionNarrowing — action (Set 093 S2)", () => {
-  test("accepts the four authoring actions on declared + pseudo", () => {
-    for (const action of ["ai-plan", "import-plan", "open-plan", "ai-sets"]) {
+suite("moduleActionNarrowing — action (Set 093 S2, reworked Set 100 S2)", () => {
+  test("open-plan is accepted on declared + pseudo", () => {
+    assert.deepStrictEqual(narrowModuleAction("open-plan", "greeter", "declared"), {
+      action: "open-plan",
+      slug: "greeter",
+      kind: "declared",
+    });
+    assert.deepStrictEqual(narrowModuleAction("open-plan", "", "pseudo"), {
+      action: "open-plan",
+      slug: "",
+      kind: "pseudo",
+    });
+  });
+
+  test("the three lifecycle-management actions are DECLARED-only — pseudo drops (Set 100 S2)", () => {
+    for (const action of ["add-module", "rename-module", "delete-module"]) {
       assert.deepStrictEqual(narrowModuleAction(action, "greeter", "declared"), {
         action,
         slug: "greeter",
         kind: "declared",
       });
-      assert.deepStrictEqual(narrowModuleAction(action, "", "pseudo"), {
-        action,
-        slug: "",
-        kind: "pseudo",
-      });
+      assert.strictEqual(
+        narrowModuleAction(action, "", "pseudo"),
+        null,
+        `${action} must drop on the pseudo module`,
+      );
+    }
+  });
+
+  test("the retired ai-plan / import-plan / ai-sets actions are outside the closed enum", () => {
+    for (const action of ["ai-plan", "import-plan", "ai-sets"]) {
+      assert.strictEqual(narrowModuleAction(action, "greeter", "declared"), null);
     }
   });
 
@@ -73,30 +92,43 @@ suite("moduleActionNarrowing — action (Set 093 S2)", () => {
   });
 
   test("inherits every identity drop (malformed identity → dropped action)", () => {
-    assert.strictEqual(narrowModuleAction("import-plan", null, "declared"), null);
-    assert.strictEqual(narrowModuleAction("import-plan", "x", "fallback"), null);
-    assert.strictEqual(narrowModuleAction("import-plan", "greeter", "pseudo"), null);
+    assert.strictEqual(narrowModuleAction("rename-module", null, "declared"), null);
+    assert.strictEqual(narrowModuleAction("rename-module", "x", "fallback"), null);
+    assert.strictEqual(narrowModuleAction("open-plan", "greeter", "pseudo"), null);
   });
 });
 
-// Set 093 S2 verification R3 (Major): the strip→handler WIRING. Each of the
-// four authoring actions must route to its handler carrying the narrowed slug
-// as `preselectedSlug`; assign-legacy runs its flow; import/assign refresh
+// Set 093 S2 verification R3 (Major), reworked Set 100 S2: the
+// strip→handler WIRING. `open-plan` routes with the narrowed slug;
+// `add-module` / `rename-module` / `delete-module` / `assign-legacy` refresh
 // only on a real change.
-suite("moduleActionNarrowing — dispatch wiring (Set 093 S2)", () => {
-  function spyExec(opts: { importWrote?: boolean; assignChanged?: boolean } = {}): {
+suite("moduleActionNarrowing — dispatch wiring (Set 093 S2, reworked Set 100 S2)", () => {
+  function spyExec(
+    opts: {
+      addWrote?: boolean;
+      renameWrote?: boolean;
+      deleteWrote?: boolean;
+      assignChanged?: boolean;
+    } = {},
+  ): {
     exec: ModuleActionExec;
     calls: string[];
   } {
     const calls: string[] = [];
     const exec: ModuleActionExec = {
-      aiPlan: async (s) => void calls.push(`aiPlan:${s}`),
-      importPlan: async (s) => {
-        calls.push(`importPlan:${s}`);
-        return !!opts.importWrote;
-      },
       openPlan: async (s) => void calls.push(`openPlan:${s}`),
-      aiSets: async (s) => void calls.push(`aiSets:${s}`),
+      addModule: async () => {
+        calls.push("addModule");
+        return !!opts.addWrote;
+      },
+      renameModule: async (s) => {
+        calls.push(`renameModule:${s}`);
+        return !!opts.renameWrote;
+      },
+      deleteModule: async (s) => {
+        calls.push(`deleteModule:${s}`);
+        return !!opts.deleteWrote;
+      },
       assignLegacy: async () => {
         calls.push("assignLegacy");
         return !!opts.assignChanged;
@@ -106,36 +138,46 @@ suite("moduleActionNarrowing — dispatch wiring (Set 093 S2)", () => {
     return { exec, calls };
   }
 
-  test("each authoring action routes to its handler with the narrowed slug", async () => {
-    const cases: Array<[string, string]> = [
-      ["ai-plan", "aiPlan:greeter"],
-      ["import-plan", "importPlan:greeter"],
-      ["open-plan", "openPlan:greeter"],
-      ["ai-sets", "aiSets:greeter"],
-    ];
-    for (const [action, expected] of cases) {
-      const { exec, calls } = spyExec();
-      const narrowed = narrowModuleAction(action, "greeter", "declared");
-      assert.ok(narrowed);
-      await dispatchModuleAction(narrowed!, exec);
-      assert.deepStrictEqual(calls, [expected]);
-    }
-  });
-
-  test("pseudo row threads the empty slug (repo-level)", async () => {
+  test("open-plan routes to its handler with the narrowed slug", async () => {
     const { exec, calls } = spyExec();
-    const narrowed = narrowModuleAction("ai-sets", "", "pseudo");
+    const narrowed = narrowModuleAction("open-plan", "greeter", "declared");
+    assert.ok(narrowed);
     await dispatchModuleAction(narrowed!, exec);
-    assert.deepStrictEqual(calls, ["aiSets:"]);
+    assert.deepStrictEqual(calls, ["openPlan:greeter"]);
   });
 
-  test("import-plan refreshes only when it wrote", async () => {
-    const wrote = spyExec({ importWrote: true });
-    await dispatchModuleAction(narrowModuleAction("import-plan", "greeter", "declared")!, wrote.exec);
-    assert.deepStrictEqual(wrote.calls, ["importPlan:greeter", "refresh"]);
-    const noWrite = spyExec({ importWrote: false });
-    await dispatchModuleAction(narrowModuleAction("import-plan", "greeter", "declared")!, noWrite.exec);
-    assert.deepStrictEqual(noWrite.calls, ["importPlan:greeter"]);
+  test("pseudo row threads the empty slug (repo-level) for open-plan", async () => {
+    const { exec, calls } = spyExec();
+    const narrowed = narrowModuleAction("open-plan", "", "pseudo");
+    await dispatchModuleAction(narrowed!, exec);
+    assert.deepStrictEqual(calls, ["openPlan:"]);
+  });
+
+  test("add-module ignores the carried slug and refreshes only on a change", async () => {
+    const wrote = spyExec({ addWrote: true });
+    await dispatchModuleAction(narrowModuleAction("add-module", "greeter", "declared")!, wrote.exec);
+    assert.deepStrictEqual(wrote.calls, ["addModule", "refresh"]);
+    const noWrite = spyExec({ addWrote: false });
+    await dispatchModuleAction(narrowModuleAction("add-module", "greeter", "declared")!, noWrite.exec);
+    assert.deepStrictEqual(noWrite.calls, ["addModule"]);
+  });
+
+  test("rename-module threads the narrowed slug and refreshes only on a change", async () => {
+    const wrote = spyExec({ renameWrote: true });
+    await dispatchModuleAction(narrowModuleAction("rename-module", "greeter", "declared")!, wrote.exec);
+    assert.deepStrictEqual(wrote.calls, ["renameModule:greeter", "refresh"]);
+    const noWrite = spyExec({ renameWrote: false });
+    await dispatchModuleAction(narrowModuleAction("rename-module", "greeter", "declared")!, noWrite.exec);
+    assert.deepStrictEqual(noWrite.calls, ["renameModule:greeter"]);
+  });
+
+  test("delete-module threads the narrowed slug and refreshes only on a change", async () => {
+    const wrote = spyExec({ deleteWrote: true });
+    await dispatchModuleAction(narrowModuleAction("delete-module", "greeter", "declared")!, wrote.exec);
+    assert.deepStrictEqual(wrote.calls, ["deleteModule:greeter", "refresh"]);
+    const noWrite = spyExec({ deleteWrote: false });
+    await dispatchModuleAction(narrowModuleAction("delete-module", "greeter", "declared")!, noWrite.exec);
+    assert.deepStrictEqual(noWrite.calls, ["deleteModule:greeter"]);
   });
 
   test("assign-legacy runs the flow and refreshes only on a change", async () => {

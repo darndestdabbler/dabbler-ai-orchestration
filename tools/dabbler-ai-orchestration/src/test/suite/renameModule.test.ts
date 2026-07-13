@@ -182,3 +182,92 @@ suite("runRenameModuleFlow (Set 099 S1)", () => {
     }
   });
 });
+
+// Set 100 Session 2 (explicit-target seam): a row/context invocation
+// carries its module directly, so the QuickPick is skipped entirely — this
+// is the "targeting parity" contract (row/context resolve identically to
+// the palette's own pick, minus the interactive step).
+suite("runRenameModuleFlow — preselectedSlug (Set 100 S2)", () => {
+  test("a preselected slug skips pickModule and renames that module", async () => {
+    const root = tmpRoot("renameflow-preselect-ok-");
+    try {
+      writeManifest(
+        root,
+        "modules:\n  - slug: greeter\n    title: Greeter\n  - slug: clock\n    title: Clock\n",
+      );
+      const log = fresh();
+      const ok = await runRenameModuleFlow(
+        makeUi(
+          {
+            pickModule: async () => {
+              throw new Error("pickModule must not be called with a preselected slug");
+            },
+          },
+          log,
+          root,
+        ),
+        { preselectedSlug: "clock" },
+      );
+      assert.strictEqual(ok, true);
+      const manifest = fs.readFileSync(path.join(root, "docs", "modules.yaml"), "utf8");
+      assert.ok(manifest.includes("slug: welcomer"));
+      assert.ok(manifest.includes("slug: greeter"), "the OTHER module is untouched");
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a stale preselected slug fails loud — never falls back to the picker", async () => {
+    const root = tmpRoot("renameflow-preselect-stale-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const before = fs.readFileSync(path.join(root, "docs", "modules.yaml"), "utf8");
+      const log = fresh();
+      const ok = await runRenameModuleFlow(
+        makeUi(
+          {
+            pickModule: async () => {
+              throw new Error("pickModule must not be called with a preselected slug");
+            },
+          },
+          log,
+          root,
+        ),
+        { preselectedSlug: "removed-module" },
+      );
+      assert.strictEqual(ok, false);
+      assert.match(log.errors.join(" "), /removed-module.*no longer declared/i);
+      assert.strictEqual(
+        fs.readFileSync(path.join(root, "docs", "modules.yaml"), "utf8"),
+        before,
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("palette path (no opts) still uses pickModule", async () => {
+    const root = tmpRoot("renameflow-palette-");
+    try {
+      writeManifest(root, "modules:\n  - slug: greeter\n    title: Greeter\n");
+      const log = fresh();
+      let picked = false;
+      const ok = await runRenameModuleFlow(
+        makeUi(
+          {
+            pickModule: async (entries) => {
+              picked = true;
+              return entries[0];
+            },
+          },
+          log,
+          root,
+        ),
+      );
+      assert.strictEqual(ok, true);
+      assert.strictEqual(picked, true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

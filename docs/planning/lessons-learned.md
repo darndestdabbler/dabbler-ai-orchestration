@@ -107,7 +107,7 @@ full text in `lessons-archive.md`:
   verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="095" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="098" status="active" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and
@@ -156,7 +156,7 @@ full text in `lessons-archive.md`:
 ## Repo-Specific Lessons
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="095" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="098" status="active" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families

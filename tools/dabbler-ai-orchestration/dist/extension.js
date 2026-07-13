@@ -16467,6 +16467,9 @@ function parseSessionSetConfig(specPath) {
   const mod = stringValue(block.match(stringRe("module")));
   if (mod)
     config.module = mod;
+  const kd = stringValue(block.match(stringRe("kind")));
+  if (kd)
+    config.kind = kd;
   return config;
 }
 function parsePrerequisites(specPath) {
@@ -16832,6 +16835,17 @@ function readSessionSets(root) {
         );
       }
     }
+    let kind;
+    if (config.kind !== void 0) {
+      const v = config.kind.toLowerCase();
+      if (v === "plan" || v === "decomposition") {
+        kind = v;
+      } else {
+        console.warn(
+          `[dabblerSessionSets] ${entry.name}: spec declares kind: ${config.kind}, which is not a known set kind (plan | decomposition) \u2014 treating as an ordinary work set.`
+        );
+      }
+    }
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
     const plusFraction = shouldRenderPlusFraction(
@@ -16867,6 +16881,7 @@ function readSessionSets(root) {
       module: module2,
       moduleTitle,
       moduleOrder,
+      kind,
       dir,
       specPath,
       activityPath,

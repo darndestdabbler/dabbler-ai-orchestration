@@ -22,6 +22,7 @@ import {
   SessionSet,
   SessionState,
   SessionSetConfig,
+  SessionSetKind,
   SessionSetPrerequisite,
   TriStateFlag,
   UnsatisfiedPrerequisite,
@@ -389,6 +390,9 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   // declared grouping slug, validated against docs/modules.yaml by the
   // caller (readSessionSets), never here (the parser has no root
   // context). Absent defaults to null (the implicit module).
+  // Set 098 Session 1: `kind` joins the parsed fields — the raw
+  // declared lifecycle-set identity, validated by the caller the same
+  // way. Absent stays undefined (an ordinary work set).
   const config: SessionSetConfig = {
     requiresUAT: false,
     requiresE2E: false,
@@ -459,6 +463,15 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   }
   const mod = stringValue(block.match(stringRe("module")));
   if (mod) config.module = mod;
+  // Set 098 Session 1: `kind` joins the parsed fields — the optional
+  // module-lifecycle set identity (verdict decision 5). RAW capture
+  // only, same posture as `module`: validation against the
+  // `SessionSetKind` enum (with the unknown-value warning) lives in the
+  // caller (`readSessionSets`), so the rewrite-path callers of this
+  // parser don't re-warn on every read. A value the `stringRe` scalar
+  // shape cannot match (flow list, empty, non-scalar) reads as absent.
+  const kd = stringValue(block.match(stringRe("kind")));
+  if (kd) config.kind = kd;
   return config;
 }
 
@@ -1163,6 +1176,25 @@ export function readSessionSets(root: string): SessionSet[] {
         );
       }
     }
+    // Set 098 Session 1: validate the spec's declared `kind:` against
+    // the two-member enum. An unknown value warns and degrades to an
+    // ordinary work set — a typo must never block or reclassify a row
+    // (the Set 091 warn-and-degrade posture); the raw declared value
+    // stays on `config.kind` so later surfaces can name the mismatch.
+    // Case-tolerant, matching the `tier` / `verificationMode` parses.
+    let kind: SessionSetKind | undefined;
+    if (config.kind !== undefined) {
+      const v = config.kind.toLowerCase();
+      if (v === "plan" || v === "decomposition") {
+        kind = v;
+      } else {
+        console.warn(
+          `[dabblerSessionSets] ${entry.name}: spec declares ` +
+            `kind: ${config.kind}, which is not a known set kind ` +
+            `(plan | decomposition) — treating as an ordinary work set.`,
+        );
+      }
+    }
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
     // Set 061 Session 1 (spec D1): derived, never persisted.
@@ -1221,6 +1253,7 @@ export function readSessionSets(root: string): SessionSet[] {
       module,
       moduleTitle,
       moduleOrder,
+      kind,
       dir,
       specPath,
       activityPath,

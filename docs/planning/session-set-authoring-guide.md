@@ -226,6 +226,7 @@ uatStyle: ad-hoc         # dsl | ad-hoc (only meaningful when requiresUAT: true;
 uatScope: per-session    # per-session | per-set | none (only meaningful when requiresUAT: true)
 verificationMode: out-of-band-or-none  # Lightweight only (Set 057); dedicated-sessions | out-of-band-or-none (default). Seeds the once-at-set-start choice. Omit on Full-tier sets (Set 082).
 pathAwareCritique: none  # tier-orthogonal (Set 066); none | advisory | required (default none). Seeds the once-at-set-start choice.
+kind: plan               # optional (Set 098); plan | decomposition — scaffolder-emitted module-lifecycle identity. Hand-authored work sets omit it.
 prerequisites:           # optional; sets that must complete before this one is workable
   - slug: 047-state-file-schema-v4-audit
     condition: complete
@@ -333,6 +334,28 @@ prerequisites:           # optional; sets that must complete before this one is 
   The stage mechanics live in `docs/ai-led-session-workflow.md` →
   *The end-of-set Path-Aware Critique stage*.
 
+- **`kind`** (Set 098; **optional**) — the module-lifecycle set
+  identity: `plan` (the set creates **or imports** — and, in a later
+  set of the same kind, amends — the module's `project-plan.md`) or
+  `decomposition` (the set reads the current plan plus the module's
+  existing sets and authors the next batch of session sets).
+  **When to use it: scaffolder output only.** The field is emitted by
+  the module-lifecycle scaffold writer when a module's two lifecycle
+  sets are created (Set 098 Session 2); hand-authored work sets omit
+  it, and omission means ordinary work set — every pre-098 spec is
+  valid unchanged. An unknown value parses as a **warning, never a
+  refusal**: the row degrades to an ordinary work set. The attribute is
+  deliberately minimal (module-lifecycle verdict decision 5) — its only
+  sanctioned machine consumers are Set 099's delete removal rule (only
+  an *unstarted* plan/decomposition set with no execution artifacts may
+  be removed outright) and human/tooling legibility; it must **not**
+  grow into a workflow/state schema. Set numbers stay global and carry
+  no meaning — the attribute, never a magic number, is what tooling
+  reads. Decomposition gating is not `kind`'s job either: the
+  scaffolded decomposition set declares its sibling plan set under
+  `prerequisites:` (`condition: complete`), reusing the existing
+  machinery (verdict decision 6).
+
 - **`requiresUAT: true`** — the set must produce a
   `<slug>-uat-checklist.json` and human-UAT review is a precondition
   for marking the set complete. The orchestrator will invoke
@@ -431,7 +454,9 @@ If the block is **present but a field is omitted**, the missing field
 takes its default (`"full"` for `tier`, `false` for boolean tri-state
 flags, `"ad-hoc"` for `uatStyle`, `none` for `uatScope`, and — for the
 opt-in attributes — `out-of-band-or-none` for `verificationMode` and
-`none` for `pathAwareCritique`, i.e. no path-aware critique gate).
+`none` for `pathAwareCritique`, i.e. no path-aware critique gate). An
+omitted `kind` has no default value at all — the set is simply an
+ordinary work set.
 
 **The safe default is no UAT and no E2E gate.** Authors who want UAT
 or E2E coverage must opt in explicitly. This keeps every set's gates

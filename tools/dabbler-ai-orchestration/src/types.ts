@@ -70,6 +70,18 @@ export type SessionSetTier = "full" | "lightweight";
 // declarative signal. Inert on Full tier.
 export type VerificationMode = "out-of-band-or-none" | "dedicated-sessions";
 
+// Set 098 Session 1 (module-lifecycle verdict decision 5): the two
+// module-lifecycle set kinds. `kind` is a small, optional,
+// machine-readable identity for scaffolded plan/decomposition sets —
+// set numbers are global and carry no meaning, so the attribute, never
+// a magic number, is what tooling reads. Exactly two sanctioned
+// consumers: Set 099's delete removal rule (only an unstarted
+// plan/decomposition set with no execution artifacts may be removed
+// outright) and human/tooling legibility. It must NOT grow into a
+// workflow/state schema. Absent means ordinary work set — every
+// pre-098 spec is untouched and valid.
+export type SessionSetKind = "plan" | "decomposition";
+
 // Set 062 Session 1 (spec D1): the quiet verification-posture marker on
 // Lightweight rows. "v?" = completed Mode-A set the Explorer cannot
 // vouch for (no external-verification.md, no typed session); "v+" =
@@ -122,6 +134,12 @@ export interface SessionSetConfig {
   // kept here so later sessions can surface a declared-but-unknown slug
   // instead of silently reading it as "no module".
   module: string | null;
+  // Set 098 Session 1: the spec's declared `kind:` key — the RAW value
+  // as authored (the `module` posture above), kept so later surfaces
+  // can show a declared-but-unknown kind instead of silently reading it
+  // as an ordinary work set. Undefined when the spec declares no kind
+  // (every pre-098 spec). The validated enum lives on `SessionSet.kind`.
+  kind?: string;
 }
 
 // Set 087 Session 1 (routed architecture ruling, saved raw at
@@ -257,6 +275,14 @@ export interface SessionSet {
   // merges carry their ordering with the data. Null exactly when
   // `module` is null (the implicit module, which always sorts last).
   moduleOrder: number | null;
+  // Set 098 Session 1: the VALIDATED lifecycle-set kind — the spec's
+  // `kind:` key when it names a `SessionSetKind` member, else undefined
+  // (absent key, or a declared-but-unknown value that warned at scan
+  // time and degrades to an ordinary work set). Undefined on every
+  // ordinary work set, so a workspace with no lifecycle sets renders
+  // byte-identically to pre-098 — no rendering change ships in this
+  // set (Set 100 owns kind-aware rows).
+  kind?: SessionSetKind;
   dir: string;
   specPath: string;
   activityPath: string;

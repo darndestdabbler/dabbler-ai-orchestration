@@ -110,6 +110,7 @@ uatScope: none | per-session | per-set  # required when requiresUAT: true
 uatStyle: ad-hoc | dsl                  # optional; default ad-hoc
 verificationMode: out-of-band-or-none | dedicated-sessions  # Lightweight only; default out-of-band-or-none; inert on Full (Full-tier scaffolds omit it, Set 082)
 pathAwareCritique: none | advisory | required  # tier-orthogonal (both tiers); default none
+kind: plan | decomposition              # optional (Set 098); scaffolder-emitted module-lifecycle identity
 effort: low | medium | high             # optional; orchestrator hint
 totalSessions: <int>                    # optional; canonical session count
 ```
@@ -159,6 +160,22 @@ immutable thereafter**; `python -m ai_router.blast_radius` *recommends* a
 value from the set's changed surface (the operator confirms — never an
 auto-set). The close-out gate itself ships in Set 066 Session 2. See the
 authoring guide → *Field semantics*.
+
+**`kind`** (Set 098; **optional**) marks a scaffolded module-lifecycle
+set: `plan` (the set creates or imports — and, via a later set of the
+same kind, amends — the module's `project-plan.md`) or `decomposition`
+(the set reads the current plan plus the module's existing sets and
+authors the next batch of session sets). Absence means ordinary work
+set — the state of every pre-098 spec, all of which stay valid
+unchanged. The field is **scaffolder output** (the module-lifecycle
+scaffold writer, Set 098 Session 2); hand-authored work sets omit it.
+Parsing is tolerant: an unknown value **warns and degrades to an
+ordinary work set, never refuses** — the raw declared value is kept on
+`SessionSetConfig.kind`, the validated enum on `SessionSet.kind`. The
+attribute is deliberately minimal (module-lifecycle verdict decision
+5): its only sanctioned machine consumers are Set 099's delete removal
+rule and human/tooling legibility, and it must not grow into a
+workflow/state schema. `ai_router` does not read the field.
 
 Both tiers declare the same field set; only `tier` (and, on
 Lightweight, `verificationMode`) drives a tier-conditional behavior

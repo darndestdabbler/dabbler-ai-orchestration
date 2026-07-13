@@ -188,6 +188,14 @@
       "dateTime": "2026-07-13T03:15:02.747722-04:00",
       "description": "Round 10 challenged the round-9 duplicate-of mechanism (sanctioned exception) and was right: aliased ids with no terminal disposition (cycles, self-references, dangling targets) counted as covered. Fixed with chain-terminating coverage: every required id must resolve to a real verdict or an exempt previously-accepted id; the ledger returns the full id universe so exempt vs dangling is decidable. +3 tests; suite 3020 passed / 6 skipped.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 14,
+      "stepKey": "round-11-remediation",
+      "dateTime": "2026-07-13T03:34:18.083471-04:00",
+      "description": "Round 11 (exemption regression hole) resolved by OPERATOR DECISION (option 1, removal-over-addition): the prior-acceptance exemption (round 5, patched rounds 9-10) deleted outright; every ledger id re-verdicted every cycle (the restatement IS the regression check); duplicate-of stays in-round with chain-terminating coverage. Whole vulnerability class removed structurally. Suite 3019 passed / 6 skipped.",
+      "status": "complete"
     }
   ]
 }

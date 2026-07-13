@@ -1018,29 +1018,20 @@ def _squash(text: str, cap: int) -> str:
     return flat[:cap].rstrip() + " ...[truncated -- see the round artifact]"
 
 
-def _render_ledger_issue(
-    issue: dict, ledger_id: str = "", accepted: bool = False
-) -> List[str]:
+def _render_ledger_issue(issue: dict, ledger_id: str = "") -> List[str]:
     """The index lines for one prior-round finding.
 
     *ledger_id* (Set 096 S2, remediation-review coverage) is the
     machinery-assigned per-render id (``L1``, ``L2``, ...) the fix-verdict
     coverage check keys on; deterministic because prior rounds' envelopes
-    are immutable and rounds render in ascending order. *accepted* marks
-    an id a PRIOR review cycle already fix-accepted — rendered exempt
-    from re-coverage, so a growing ledger never demands redundant
-    re-verdicts of already-validated points (backstop round 5 finding).
+    are immutable and rounds render in ascending order. Every blocking id
+    is re-verdicted EVERY cycle — a prior-acceptance exemption was tried
+    (rounds 5–10) and removed by operator decision (round 11): re-stating
+    ``fix-accepted`` costs the reviewer one line and doubles as the
+    regression check an exemption structurally forfeits.
     """
     severity = str(issue.get("severity") or "unrated").strip()
-    if ledger_id and accepted:
-        lid_note = (
-            f" (ledger id: {ledger_id}; fix-accepted in a prior review "
-            "cycle -- EXEMPT from re-coverage)"
-        )
-    elif ledger_id:
-        lid_note = f" (ledger id: {ledger_id})"
-    else:
-        lid_note = ""
+    lid_note = f" (ledger id: {ledger_id})" if ledger_id else ""
     issue_id = str(issue.get("issueId") or "").strip()
     id_note = f" (id: {issue_id})" if issue_id else ""
     status = str(issue.get("resolution_status") or "").strip()
@@ -1062,7 +1053,7 @@ def assemble_cross_round_ledger(
 ) -> str:
     """The rendered cross-round ledger (see
     :func:`assemble_cross_round_ledger_with_ids` for the full contract)."""
-    text, _required, _all = assemble_cross_round_ledger_with_ids(
+    text, _ids = assemble_cross_round_ledger_with_ids(
         session_set_dir, session_number, current_round
     )
     return text
@@ -1070,7 +1061,7 @@ def assemble_cross_round_ledger(
 
 def assemble_cross_round_ledger_with_ids(
     session_set_dir: Path, session_number: int, current_round: int
-) -> "tuple[str, List[str], List[str]]":
+) -> "tuple[str, List[str]]":
     """Auto-assemble the cross-round issue ledger from prior rounds' artifacts.
 
     For every round before *current_round*, reads the round's
@@ -1097,61 +1088,23 @@ def assemble_cross_round_ledger_with_ids(
     framing (a parse failure is not settlement evidence); the immutable
     artifacts on disk stay the full record.
 
-    Returns ``(ledger_text, required_ledger_ids, all_ledger_ids)``. Every
-    BLOCKING finding is numbered ``L1..Ln`` in encounter order (rounds
-    ascending, envelope order within a round) — deterministic and stable
-    across re-renders because the envelopes are immutable. ``all_ledger_ids``
-    is the full assigned universe (required + exempt) — the coverage
-    check's duplicate-chain resolution needs it to tell an exempt target
-    from a dangling one (round 10). The remediation-review phase
-    requires one ``Fix verdict:`` line per REQUIRED id, and the coverage
-    check compares the parsed id set against the required set exactly
+    Returns ``(ledger_text, blocking_ledger_ids)``. Every BLOCKING finding
+    is numbered ``L1..Ln`` in encounter order (rounds ascending, envelope
+    order within a round) — deterministic and stable across re-renders
+    because the envelopes are immutable. The remediation-review phase
+    requires one ``Fix verdict:`` line per id EVERY cycle, and the
+    coverage check compares the parsed id set against this list exactly
     (S2 verification rounds 3–4: identity-free counting double-counts
     restatements; the ids make coverage machine-checkable without fuzzy
-    text matching). An id a prior review cycle already ``fix-accepted``
-    (or accepted-with-modification, read from the prior envelopes'
-    ``fixVerdicts``) renders EXEMPT and is dropped from the required set
-    — a later cycle re-verdicts only the rejected/new/unvalidated points,
-    so a growing ledger never manufactures redundant re-coverage churn
-    (backstop round 5 finding).
+    text matching). A prior-acceptance exemption was tried (rounds 5–10)
+    and REMOVED by operator decision (round 11, removal-over-addition):
+    it structurally forfeited the regression check — a cycle-2 edit could
+    silently revert an accepted fix — while saving the reviewer only a
+    one-line ``fix-accepted`` restatement per settled id.
     """
-    # Pre-scan: ids already accepted by a PRIOR remediation-review cycle.
-    # A ``duplicate-of`` id follows its TARGET's disposition (round 9: the
-    # reviewer's sanctioned identity declaration for fan-out siblings and
-    # reworded restatements) — resolved by fixpoint so chains carry too.
-    accepted_ids: set = set()
-    duplicate_map: dict = {}
-    for prior_round in range(1, current_round):
-        envelope = _read_round_envelope(
-            session_set_dir, session_number, prior_round
-        )
-        if envelope is None:
-            continue
-        for fv in envelope.get("fixVerdicts") or []:
-            if not isinstance(fv, dict):
-                continue
-            lid = str(fv.get("ledgerId") or "").strip()
-            if not lid:
-                continue
-            fv_verdict = str(fv.get("verdict") or "").strip().lower()
-            if fv_verdict in ("fix-accepted", "accepted-with-modification"):
-                accepted_ids.add(lid)
-            elif fv_verdict == "duplicate-of":
-                target = str(fv.get("duplicateOf") or "").strip().upper()
-                if target:
-                    duplicate_map[lid] = target
-    changed = True
-    while changed:
-        changed = False
-        for lid, target in duplicate_map.items():
-            if lid not in accepted_ids and target in accepted_ids:
-                accepted_ids.add(lid)
-                changed = True
-
     settled_sections: List[str] = []
     unresolved_sections: List[str] = []
     blocking_ids: List[str] = []
-    required_ids: List[str] = []
     for prior_round in range(1, current_round):
         settled_lines: List[str] = []
         unresolved_lines: List[str] = []
@@ -1200,17 +1153,11 @@ def assemble_cross_round_ledger_with_ids(
                     else:
                         settled = round_has_settlement_note
                     ledger_id = ""
-                    id_accepted = False
                     if is_blocking_issue(issue):
                         ledger_id = f"L{len(blocking_ids) + 1}"
                         blocking_ids.append(ledger_id)
-                        id_accepted = ledger_id in accepted_ids
-                        if not id_accepted:
-                            required_ids.append(ledger_id)
                     (settled_lines if settled else unresolved_lines).extend(
-                        _render_ledger_issue(
-                            issue, ledger_id=ledger_id, accepted=id_accepted
-                        )
+                        _render_ledger_issue(issue, ledger_id=ledger_id)
                     )
                 header_line = (
                     f"Verdict: {verdict} -- {len(issues)} finding(s) "
@@ -1244,7 +1191,7 @@ def assemble_cross_round_ledger_with_ids(
             )
 
     if not settled_sections and not unresolved_sections:
-        return "", [], []
+        return "", []
 
     parts: List[str] = [
         "#### Cross-round issue ledger (auto-assembled from prior rounds' "
@@ -1278,7 +1225,7 @@ def assemble_cross_round_ledger_with_ids(
             "re-raising an unsettled point is not resurrection.\n\n"
             + "\n\n".join(unresolved_sections)
         )
-    return "\n\n".join(parts), required_ids, blocking_ids
+    return "\n\n".join(parts), blocking_ids
 
 
 # ---------------------------------------------------------------------------
@@ -1611,9 +1558,10 @@ def build_phase_framing(phase: Optional[str]) -> str:
             "discovery baseline -- not the full session diff.\n\n"
             "- The ledger numbers every prior blocking finding with a "
             "ledger id (L1, L2, ...). Give ONE per-finding verdict line "
-            "for EVERY ledger id NOT marked 'EXEMPT from re-coverage' "
-            "(ids a prior review cycle already fix-accepted are exempt "
-            "-- do not re-verdict them), in exactly this form:\n"
+            "for EVERY ledger id, every cycle -- re-stating fix-accepted "
+            "for an already-settled id is deliberate: it re-confirms the "
+            "fix still stands in the delta as it now is -- in exactly "
+            "this form:\n"
             "  - Fix verdict: L<n> <short summary> -- "
             "fix-accepted | fix-rejected | accepted-with-modification\n"
             "  Coverage is machine-checked against the non-exempt ledger "
@@ -2234,12 +2182,9 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             return EXIT_USAGE
         framing = build_phase_framing(phase) + "\n\n" + prior_findings
         ledger_ids: List[str] = []
-        all_ledger_ids: List[str] = []
     else:
-        ledger, ledger_ids, all_ledger_ids = (
-            assemble_cross_round_ledger_with_ids(
-                session_set_dir, session_number, round_number
-            )
+        ledger, ledger_ids = assemble_cross_round_ledger_with_ids(
+            session_set_dir, session_number, round_number
         )
         framing = build_phase_framing(phase)
 
@@ -2695,14 +2640,15 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                     "findings."
                 )
             elif parsed_ids:
-                # Round 10: coverage means every required id's verdict
-                # chain TERMINATES in a real disposition — a direct
+                # Round 10: coverage means every id's verdict chain
+                # TERMINATES in a real disposition — a direct
                 # fix-accepted / fix-rejected / accepted-with-modification
-                # verdict, or a duplicate-of chain ending at one (or at an
-                # EXEMPT, previously-accepted id). Cycles (L1<->L2),
-                # self-references, and dangling targets are NOT coverage:
-                # an aliased id with no terminal disposition escalates
-                # exactly like a missing one.
+                # verdict, or a duplicate-of chain ending at one. Cycles
+                # (L1<->L2), self-references, and dangling targets are NOT
+                # coverage: an aliased id with no terminal disposition
+                # escalates exactly like a missing one. Every id is
+                # re-verdicted every cycle (round 11, operator decision:
+                # the one-line restatement IS the regression check).
                 real_ids = {
                     fv["ledgerId"] for fv in fix_verdicts
                     if fv.get("ledgerId") and fv.get("verdict") in (
@@ -2716,8 +2662,7 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                     if fv.get("ledgerId")
                     and fv.get("verdict") == "duplicate-of"
                 }
-                exempt_ids = set(all_ledger_ids) - set(ledger_ids)
-                id_universe = set(all_ledger_ids)
+                id_universe = set(ledger_ids)
 
                 def _terminates(lid: str) -> bool:
                     seen: set = set()
@@ -2726,7 +2671,7 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                         if cur in seen:
                             return False  # duplicate-of cycle
                         seen.add(cur)
-                        if cur in real_ids or cur in exempt_ids:
+                        if cur in real_ids:
                             return True
                         nxt = dup_map_round.get(cur)
                         if not nxt or nxt not in id_universe:

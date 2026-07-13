@@ -77,16 +77,19 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     (anti-laundering); **fix-verdict coverage is machine-checked** —
     the auto-ledger numbers every blocking finding (`ledger id: L1..Ln`,
     deterministic over the immutable envelopes), the framing requires
-    one `Fix verdict: L<n> ...` line per NON-EXEMPT id, and a missing id
-    (or an id-less under-count) escalates an otherwise-clean round to
-    blocking instead of warning — while an id a prior review cycle
-    already fix-accepted renders EXEMPT and drops out of the required
-    set, so a growing ledger never demands redundant re-verdicts of
-    already-validated points, and a reviewer marks same-point occurrences
-    (fan-out siblings, reworded restatements) with
+    one `Fix verdict: L<n> ...` line per id EVERY cycle, and a missing
+    id (or an id-less under-count) escalates an otherwise-clean round
+    to blocking instead of warning. A reviewer marks same-point
+    occurrences (fan-out siblings, reworded restatements) with
     `Fix verdict: L<m> -- duplicate-of L<n>` — the duplicate's
-    disposition follows its target's, so redundant occurrences never
-    manufacture coverage failures; phased evidence excludes the set's own loop
+    disposition follows its target's, and a duplicate chain must
+    TERMINATE in a real verdict (cycles, self-references, and dangling
+    targets are machine-rejected as missing coverage). A
+    prior-acceptance exemption was tried and REMOVED by operator
+    decision (removal-over-addition): it structurally forfeited the
+    regression check — a later cycle's edit could silently revert an
+    accepted fix — while saving the reviewer only a one-line
+    restatement per settled id; phased evidence excludes the set's own loop
     bookkeeping (`WORK_DIFF_SET_BOOKKEEPING`, disclosed — the fix delta
     stays fixes-only and the classic path is untouched); a CLEAN
     supplementary round patches the SESSION disposition ISSUES_FOUND

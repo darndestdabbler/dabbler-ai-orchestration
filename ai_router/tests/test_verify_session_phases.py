@@ -1137,7 +1137,7 @@ class TestVerificationRoundHardening:
     def test_ledger_numbers_blocking_findings(self, repo: Path):
         set_dir = _set_dir(repo)
         self._seed_two_finding_round(repo, set_dir)
-        text, ids, all_ids = vs.assemble_cross_round_ledger_with_ids(set_dir, 1, 2)
+        text, ids = vs.assemble_cross_round_ledger_with_ids(set_dir, 1, 2)
         assert ids == ["L1", "L2"]
         assert "(ledger id: L1)" in text
         assert "(ledger id: L2)" in text
@@ -1245,20 +1245,21 @@ class TestVerificationRoundHardening:
         )
         assert code == vs.EXIT_OK
 
-    def test_duplicate_of_follows_target_acceptance_next_cycle(
-        self, repo: Path, monkeypatch
+    def test_every_cycle_re_verdicts_every_id(
+        self, repo: Path, monkeypatch, capsys
     ):
-        # A duplicate id inherits its target's acceptance for the NEXT
-        # cycle's exemption set (fixpoint, so chains carry).
+        # Round 11 (operator decision, removal-over-addition): NO
+        # prior-acceptance exemption. A cycle-2 review must re-verdict
+        # every ledger id — the one-line fix-accepted restatement IS the
+        # regression check; omitting a previously-accepted id escalates.
         _phase_config(monkeypatch)
         set_dir = _set_dir(repo)
         self._seed_two_finding_round(repo, set_dir)
         (set_dir / "s1-verification-round-2.md").write_text(
             "ISSUES FOUND\n"
             "- Fix verdict: L1 finding one -- fix-accepted\n"
-            "- Fix verdict: L2 finding two -- duplicate-of L1\n"
-            "Issue 1: an unrelated new in-hunk defect.\n"
-            "- **Severity:** Major\n",
+            "- Fix verdict: L2 finding two -- fix-rejected\n"
+            "Issue 1: finding two persists.\n- **Severity:** Major\n",
             encoding="utf-8",
         )
         (set_dir / "s1-issues-round-2.json").write_text(
@@ -1269,30 +1270,57 @@ class TestVerificationRoundHardening:
                 "verificationVerdict": "ISSUES_FOUND",
                 "phase": "remediation-review",
                 "issues": [
-                    {"description": "an unrelated new in-hunk defect.",
+                    {"description": "finding two persists.",
                      "severity": "Major"},
                 ],
                 "fixVerdicts": [
                     {"finding": "L1 finding one",
                      "verdict": "fix-accepted", "ledgerId": "L1"},
                     {"finding": "L2 finding two",
-                     "verdict": "duplicate-of", "ledgerId": "L2",
-                     "duplicateOf": "L1"},
+                     "verdict": "fix-rejected", "ledgerId": "L2"},
                 ],
             }),
             encoding="utf-8",
         )
         (set_dir / "s1-remediation-round-2.md").write_text(
-            "Fixed the new defect.", encoding="utf-8"
+            "Re-fixed finding two.", encoding="utf-8"
         )
-        text, required, all_ids = vs.assemble_cross_round_ledger_with_ids(
+        text, required = vs.assemble_cross_round_ledger_with_ids(
             set_dir, 1, 3
         )
-        # L1 accepted; L2 follows it via duplicate-of; only the round-2
-        # restatement (L3) still needs a verdict.
-        assert required == ["L3"]
-        assert all_ids == ["L1", "L2", "L3"]
-        assert "ledger id: L2; fix-accepted in a prior review cycle" in text
+        # ALL ids stay required — including the previously accepted L1.
+        assert required == ["L1", "L2", "L3"]
+        assert "EXEMPT" not in text
+        # A cycle-2 review that skips the previously accepted L1 escalates.
+        partial = (
+            "VERIFIED\n\n"
+            "- Fix verdict: L2 finding two -- fix-accepted\n"
+            "- Fix verdict: L3 finding two restatement -- duplicate-of L2\n"
+        )
+        fake = FakeMultiRoute([partial])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_BLOCKING
+        assert "L1" in capsys.readouterr().err
+        # A full re-verdict (one line per id) passes. The escalated
+        # partial round above wrote its own synthetic finding, which the
+        # next render numbers L4 — it needs a verdict like any other id.
+        complete = (
+            "VERIFIED\n\n"
+            "- Fix verdict: L1 finding one -- fix-accepted\n"
+            "- Fix verdict: L2 finding two -- fix-accepted\n"
+            "- Fix verdict: L3 finding two restatement -- duplicate-of L2\n"
+            "- Fix verdict: L4 coverage gap -- fix-accepted\n"
+        )
+        fake2 = FakeMultiRoute([complete])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW,
+                  round_number=4),
+            route_fn=fake2,
+        )
+        assert code == vs.EXIT_OK
 
 
 
@@ -1358,69 +1386,6 @@ class TestVerificationRoundHardening:
             route_fn=fake,
         )
         assert code == vs.EXIT_BLOCKING
-
-    def test_previously_accepted_ids_are_exempt_from_re_coverage(
-        self, repo: Path, monkeypatch
-    ):
-        # Backstop round 5 finding: a growing ledger must not demand
-        # redundant re-verdicts of already-validated points. An id
-        # fix-accepted by a prior review cycle renders EXEMPT, and the
-        # next cycle passes by verdicting only the remaining ids.
-        _phase_config(monkeypatch)
-        set_dir = _set_dir(repo)
-        self._seed_two_finding_round(repo, set_dir)
-        # Cycle 1 (round 2): L1 accepted, L2 rejected (blocking envelope
-        # carries the fixVerdicts with ledger ids).
-        (set_dir / "s1-verification-round-2.md").write_text(
-            "ISSUES FOUND\n"
-            "- Fix verdict: L1 finding one -- fix-accepted\n"
-            "- Fix verdict: L2 finding two -- fix-rejected\n"
-            "Issue 1: finding two persists.\n- **Severity:** Major\n",
-            encoding="utf-8",
-        )
-        (set_dir / "s1-issues-round-2.json").write_text(
-            json.dumps({
-                "schemaVersion": 1,
-                "sessionNumber": 1,
-                "verificationRound": 2,
-                "verificationVerdict": "ISSUES_FOUND",
-                "phase": "remediation-review",
-                "issues": [
-                    {"description": "finding two persists.",
-                     "severity": "Major"},
-                ],
-                "fixVerdicts": [
-                    {"finding": "L1 finding one", "verdict": "fix-accepted",
-                     "ledgerId": "L1"},
-                    {"finding": "L2 finding two", "verdict": "fix-rejected",
-                     "ledgerId": "L2"},
-                ],
-            }),
-            encoding="utf-8",
-        )
-        (set_dir / "s1-remediation-round-2.md").write_text(
-            "Re-fixed finding two.", encoding="utf-8"
-        )
-        # The next render marks L1 exempt and requires L2 + the round-2
-        # restatement's id (L3) only.
-        text, required, all_ids = vs.assemble_cross_round_ledger_with_ids(
-            set_dir, 1, 3
-        )
-        assert "ledger id: L1; fix-accepted in a prior review cycle" in text
-        assert required == ["L2", "L3"]
-        assert all_ids == ["L1", "L2", "L3"]
-        # Cycle 2 verdicts only the non-exempt ids -> clean pass.
-        response = (
-            "VERIFIED\n\n"
-            "- Fix verdict: L2 finding two -- fix-accepted\n"
-            "- Fix verdict: L3 finding two restatement -- fix-accepted\n"
-        )
-        fake = FakeMultiRoute([response])
-        code = vs.run(
-            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW),
-            route_fn=fake,
-        )
-        assert code == vs.EXIT_OK
 
     def test_second_blocking_review_cycle_suspends_to_operator(
         self, repo: Path, monkeypatch, capsys

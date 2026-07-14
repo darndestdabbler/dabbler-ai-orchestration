@@ -137,17 +137,24 @@ unchanged forever: its sets render under a single pseudo-module labelled
    Sets to Module`): pick a target declared module, then one-or-more
    currently-unstamped ("legacy") sets, and each gets `module: <slug>`
    written into its `spec.md`. **No files move** — only the stamp changes.
-3. **Adopt the lifecycle going forward** for new work. You have two equally
-   valid paths, and you never have to retrofit finished work either way:
-   - **Lifecycle sets** — declare the module with **Add Module…** (or start
-     from a fresh Build's `default` module), which scaffolds the module's
-     `plan` + `decomposition` starter sets to run.
-   - **Direct authoring** — for a module you declared via the AI
-     decomposition prompt or by hand (which do **not** scaffold starter
-     sets), author its work sets directly with **`Dabbler: Generate
-     Session-Set Prompt`** (pick the module). This is a complete
-     alternative — you are not missing anything by skipping the lifecycle
-     sets.
+3. **Adopt the lifecycle going forward** for new work. **Add Module…** and a
+   fresh Build's `default` module scaffold a module's `plan` +
+   `decomposition` starter sets automatically — but a module you declared via
+   the AI decomposition prompt or by hand does **not** get them, so pick
+   whichever of these fits (never forced, and you never retrofit finished
+   work either way):
+   - **Adopt the lifecycle sets — manual or AI.** Give the module the same
+     two starter sets a scaffolded module has: author a `kind: plan` set and
+     a `kind: decomposition` set for it (the decomposition set's
+     `prerequisites:` points at the plan set). The quickest path is to ask
+     your AI agent — *"scaffold plan and decomposition lifecycle sets for the
+     `<slug>` module, mirroring the default module's `001-default-plan` /
+     `002-default-decomposition`"* — or copy those two `spec.md` files, renumber
+     them, and restamp `module: <slug>`. Then run the plan set, then the
+     decomposition set, exactly like a fresh scaffold.
+   - **Or author work sets directly** with **`Dabbler: Generate Session-Set
+     Prompt`** (pick the module) — a complete alternative if you don't want
+     the plan/decomposition ceremony for this module.
    Completed sets stay exactly as they are.
 
 > **Labelling note (Set 091):** if you declare a literal `default` slug,

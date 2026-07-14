@@ -80,9 +80,27 @@
   getting-started template embed zero screenshots; the README's two
   screenshots already depict the shipped 0.44.0 UI, the module-tree shot
   showing the Set-100 flattened structure) and accepted as settled at
-  remediation-review. Remediation-review: VERIFIED, 0 blocking; 2 Minor nits
-  folded in post-VERIFIED. Suites green: unit 1618/1618, tsc clean, cold-start
-  goldens regenerated, Playwright Layer 3 28/28, Python cold-start 2/2.
+  remediation-review. Remediation-review R3: VERIFIED. The close-out
+  **backstop** (R4, full-session diff) then blocked with 3 more Major: a
+  migration-recipe over-correction + a consumer `modules.yaml` pointer that
+  would 404 in consumer repos (F1); the tutorial not *executing* the lifecycle
+  flow the spec required it to teach (F2); and "suite green" asserted without a
+  current full-pytest run (F3). F1/F3 fixed directly (recipe now gives both the
+  manual/AI lifecycle-adoption path and direct authoring; header pointer →
+  GitHub URL; **full `pytest` run: 3030 passed / 6 skipped**). **F2 escalated
+  to the operator**, who directed a rewrite and asked how much of the
+  tutorial's manual git could be automated — routed GPT + Gemini twice; both
+  agreed the tutorial must execute the lifecycle flow, and (after the
+  operator's reframing) that the framework should **automate the tedious git**
+  while keeping human judgment, moving the raw commands to an **appendix** — as
+  a **feature follow-on**, not a release-blocking doc edit. Operator decision:
+  *close now + feature follow-on.* Part 3 now genuinely walks running
+  `001-default-plan` then `002-default-decomposition` (a hands-on lifecycle
+  practice run) then resets to declare the team's modules, with a
+  forward-looking "git automation is coming" callout. Remediation-review R5:
+  **VERIFIED**, 0 blocking, 6 accepted + 1 accepted-with-modification. Suites
+  green: unit 1618/1618, tsc clean, cold-start goldens regenerated, Playwright
+  Layer 3 28/28, Python pytest 3030/6.
 
 ## End state
 
@@ -94,6 +112,16 @@ reorg/migration paths and is linked from every relevant surface. The
 module-lifecycle-simplification bundle (Sets 098-101) is complete and ships
 together as extension **0.44.0** — the single release boundary is reached and
 publish is the operator's click.
+
+A **git-workflow-automation follow-on set** was authored this session (per the
+operator's "close now + feature follow-on" decision and the GPT+Gemini
+consensus): confirm-gated one-click / AI-driven commands for the mechanical
+git (open PR, sync-and-clean-up after merge, cut a release tag), keeping human
+judgment (review/approval, branch-protection policy, release/rollback
+decisions), followed by an automation-first re-cut of the hello-world tutorial
+with the raw git commands moved to a reference appendix. This directly answers
+the operator's concern that operators juggling multiple concurrent
+projects/modules should not be forced into manual git tedium.
 
 ## Step 9 — reorganization review (`project-guidance.md` / `lessons-learned.md`)
 

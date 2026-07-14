@@ -88,15 +88,31 @@ Before you begin, every team member needs:
 
     > **Good to know:** if the `.venv` setup ever needs repairing later, run **`Dabbler: Install ai-router`** from the Command Palette.
 
-## Part 3 — Clear the Class1 starter, then define the real modules
+## Part 3 — Run the starter lifecycle flow, then define the real modules
 
-**Where you are:** Priya, looking at the tree Build produced: one **Default** module with `001-default-plan` and `002-default-decomposition` under it. The team already knows its three modules, so we dispose of the `Class1` starter and declare the real ones.
+**Where you are:** Priya, looking at the tree Build produced: one **Default** module with `001-default-plan` and `002-default-decomposition` under it. Before declaring the team's real modules, run those two starter sets **once** to see the two-step lifecycle *every* module follows — a **plan set** (creates the module's plan) then a **decomposition set** (turns the plan into session sets). It's a short, hands-on practice run; then this team, which already knows its three modules, resets and declares them explicitly.
 
-1. **Delete the Default module.** Hover the **Default** module row in the Work Explorer and click **Delete Module…** (or right-click → **Delete Module…**). Confirm the two-step dialog.
+1. **Run the plan set.** In the tree, left-click the **`001-default-plan`** row.
 
-    > **Expect:** the `default` entry leaves `docs/modules.yaml`, and its two *unstarted* starter sets (`001-default-plan`, `002-default-decomposition`) are removed outright. Deleting is safe **here** precisely because we haven't run those sets yet — delete removes clean, unstarted scaffolds, but *cancels* any set that already has real work (recoverable, but not what you want for work you mean to keep). So once you've actually run the starter sets, you'd **rename** Default into your first real module instead (rename re-homes its sets — see [`docs/module-reorganization.md`](../module-reorganization.md)); we delete-and-re-declare here only because it keeps this walkthrough's set names tidy. With no session sets left, the Work Explorer flips **back** to the Getting Started form.
+    > **Expect:** its `spec.md` opens and the starter line — ``Start the next session of `001-default-plan`.`` — is copied to your clipboard (a toast confirms). Open an AI chat in VS Code, paste (Ctrl+V), and send it. The AI-led session registers, **creates `docs/modules/default/project-plan.md`** (a short plan for the toy — greeter greets, clock tells time, integration composes them), verifies, and commits. When it finishes, `001-default-plan` moves to the **Complete** bucket. *That is a `plan` lifecycle set — it authored the module's plan.*
 
-2. In Section 2 of the form, titled **Define modules (optional)**, click **Copy AI decomposition prompt**.
+2. **Run the decomposition set.** With the plan set complete, **`002-default-decomposition`** is no longer blocked (it was waiting on its `prerequisites:` — the plan set). Left-click its row, paste the copied ``Start the next session of `002-default-decomposition`.`` line into the AI chat, and send it.
+
+    > **Expect:** the AI-led session reads `docs/modules/default/project-plan.md` and **authors the next batch of session-set specs** under `docs/session-sets/`, then verifies and commits. *That is a `decomposition` lifecycle set — it turned the plan into runnable session sets.* You have now executed the full **Build → plan set → decomposition set** lifecycle that every module uses.
+
+3. **Reset for the real team project.** That was a guided practice run on the `Class1` starter. This team owns **three** modules with per-module CODEOWNERS and CI, so clear the practice output and declare the real modules explicitly (a *solo* project would instead keep going — **rename** Default into its one real module and carry on; see [`docs/module-reorganization.md`](../module-reorganization.md)).
+    - Delete the Default module: hover its row → **Delete Module…** (removes the `default` manifest entry).
+    - Remove the practice sets + plan it produced (nothing here is pushed yet, so this is a local reset):
+
+      ```bash
+      rm -rf docs/session-sets/001-default-plan docs/session-sets/002-default-decomposition
+      rm -rf docs/modules/default
+      # plus any NNN-default-* specs the decomposition set wrote
+      ```
+
+    > With no session sets left, the Work Explorer flips **back** to the Getting Started form. (Re-running two AI sessions only to reset feels wasteful — it is a teaching device so you *see* the lifecycle before committing to a structure. Automating this "scaffold → run → reshape" loop is on the roadmap; see the callout at the end of Part 4.)
+
+4. In Section 2 of the form, titled **Define modules (optional)**, click **Copy AI decomposition prompt**.
 
     > **Expect:** Two things happen:
     > 1. `docs/modules.yaml` is (re-)populated on save from your AI's edit — the file is already present as an empty `modules: []` list after the delete above; the extension only ever writes it on an explicit action, never just because you opened the repo.
@@ -104,7 +120,7 @@ Before you begin, every team member needs:
 
     > **Good to know:** the **Open modules.yaml** button next to it opens the manifest at any time (also creating it from the template if missing). Both actions are also in the Command Palette as **`Dabbler: Copy Module Decomposition Prompt`** and **`Dabbler: Open modules.yaml`** — handy because, once your first real session set exists (Part 4), the form is replaced by the tree and you reach these from the palette or with **`Dabbler: Get Started`**.
 
-3. Paste the prompt into your AI agent's chat. The agent reads the repository and edits `docs/modules.yaml` in place, preserving the template's header comments. Describe your team when you paste, for example:
+5. Paste the prompt into your AI agent's chat. The agent reads the repository and edits `docs/modules.yaml` in place, preserving the template's header comments. Describe your team when you paste, for example:
 
     ```text
     <paste the copied prompt>
@@ -124,7 +140,7 @@ Before you begin, every team member needs:
     has the full rationale). A developer can still own more than one
     module; they just don't share one with a teammate concurrently.
 
-4. Review the agent's edit, then **save `docs/modules.yaml`**. Below the preserved header comments, the `modules:` list should read:
+6. Review the agent's edit, then **save `docs/modules.yaml`**. Below the preserved header comments, the `modules:` list should read:
 
     ```yaml
     modules:
@@ -161,9 +177,9 @@ Before you begin, every team member needs:
     path a set edits is either in its module's `codeRoots` or sanctioned by
     `touches`.
 
-    > **Good to know:** to add a fourth module later, hover any module row and click **Add Module…** (or run **`Dabbler: New Module`**) — it appends the manifest entry, writes a plan stub, and scaffolds that module's own `plan` and `decomposition` starter sets. (You add its `codeRoots`/`touches` by editing `docs/modules.yaml` afterward.)
+    > **Good to know:** to add a fourth module later, hover any module row and click **Add Module…** (or run **`Dabbler: New Module`**) — it appends the manifest entry, writes a plan stub, and scaffolds that module's own `plan` and `decomposition` starter sets (the same lifecycle pair you ran on Default in steps 1–2). (You add its `codeRoots`/`touches` by editing `docs/modules.yaml` afterward.)
 
-5. Commit the scaffold and manifest to `main`:
+7. Commit the scaffold and manifest to `main`:
 
     ```bash
     git add -A
@@ -171,7 +187,7 @@ Before you begin, every team member needs:
     git push
     ```
 
-6. **Now protect `main`**, so every later change — from anyone, including you — arrives by reviewed pull request. (If GitHub won't apply the rule, check Part 0's plan/visibility prerequisite: on GitHub Free this needs a **public** repo.) On the GitHub repository page:
+8. **Now protect `main`**, so every later change — from anyone, including you — arrives by reviewed pull request. (If GitHub won't apply the rule, check Part 0's plan/visibility prerequisite: on GitHub Free this needs a **public** repo.) On the GitHub repository page:
     - Go to **Settings** > **Branches** and add a branch protection rule for `main`.
     - Check **Require a pull request before merging** (leave the default of 1 required approval).
     - Check **Require status checks to pass before merging**. There are no checks to select yet — GitHub can only list checks it has already seen run, so you will come back and select the CI job names in Part 7, after the first workflow run.
@@ -234,6 +250,22 @@ Before you begin, every team member needs:
     > **One rule for every cleanup in this tutorial:** the steps assume GitHub's default **Create a merge commit** strategy. If your repo merges PRs by **squash** or **rebase** instead, the merged commit gets a new identity, so `git branch -d` will refuse with "not fully merged" at *every* cleanup point from here on — that is git protecting you, not an error in the flow. Verify the PR's changes are on your pulled `main`, then delete with `git branch -D`. Deleting merged branches never deletes the audit trail: each merged **PR** permanently keeps the branch name, changed files, and reviews, and that PR record is exactly what the companion workflow review reads once the branches themselves are gone.
 
     > **Expect:** `origin/main` now contains the greeter plan and `001-greeter-hello`. (The scaffolded CI's placeholder job runs and passes on the PR — the real per-module jobs arrive in Part 7.)
+
+> **A note on all this git — automation is coming.** From here on the
+> tutorial has you run the trunk-based git/GitHub steps **by hand**: feature
+> branches, PRs, merges, `git pull --ff-only`, branch cleanup, worktrees,
+> tags. That is deliberate *for now* — this tutorial teaches you what the
+> workflow actually is, so you understand what the framework will do on your
+> behalf. But typing these commands is exactly the tedium the framework aims
+> to remove: a planned feature set adds one-click / AI-driven commands for the
+> mechanical parts (open a PR, sync-and-clean-up after merge, cut a release
+> tag), while keeping the **decisions** yours — reviewing and approving a PR,
+> setting branch-protection policy, choosing what to release. When that lands,
+> this walkthrough's main flow becomes "approve; the framework does the git,"
+> and the raw commands move to a reference **appendix** ("here's what it ran
+> for you"). Until then, running them by hand is also the surest way to learn
+> the model. If you juggle several modules or projects at once, that's the
+> future you're waiting for — and it's on the roadmap.
 
 ## Part 5 — Meet the tree ("the tree is the checklist")
 

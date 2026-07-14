@@ -1,0 +1,9 @@
+VERIFIED — The three commands are registered, confirmation-gated, and covered by unit and real-Git dogfood tests. No likely main-path defect reaches Major/Critical severity; the remaining problems involve unusual tag names or operator-overridden defaults.
+
+#### NITS
+
+- **Nit:** Issue → Existing tags are listed with `%(refname:short)` and then passed to Git as bare arguments. A valid pre-existing tag beginning with `-` can be parsed as an option, while a branch/tag name collision can make resolution or the release push ambiguous; rollback may therefore fail to reach a detached tagged commit, and hotfix creation may use the wrong start point. Location → `listTags()`, `runStartHotfixFromTagFlow()`, `runRollBackToTagFlow()`, and `git push origin ${tag}` in `runCutReleaseTagFlow()`. Fix → Retain full `refs/tags/...` names internally and use an explicit push refspec such as `refs/tags/<tag>:refs/tags/<tag>`.
+
+- **Nit:** Issue → The claim that confirmation dialogs print the exact commands is false for all accepted inputs. Valid ref characters such as `;`, `$`, backticks, and quotes—and quotes in annotation messages—are interpolated without shell escaping, so copied command text differs semantically from the safe `execFile` execution. Location → Confirmation details and push-failure recovery text in `gitRelease.ts`. Fix → Render arguments through a shared platform-aware quoting helper or restrict input to a conservative display-safe subset.
+
+- **Nit:** Issue → The specified `hotfix/<name>` convention is only prefilled, not enforced; an operator can replace it with any valid branch name. Location → Hotfix branch input validation in `runStartHotfixFromTagFlow()`. Fix → Require the `hotfix/` prefix or accept only a suffix and prepend `HOTFIX_BRANCH_PREFIX`.

@@ -1,26 +1,21 @@
 {
   "status": "completed",
-  "summary": "Session 1 shipped the dual-host git-workflow automation core (operator directive 2026-07-14: Azure DevOps today, enterprise GitHub later). New pure host-detection module (utils/gitHost.ts: remote-URL classification + org/project/repo parsing across all ADO/GitHub URL forms, dabblerSessionSets.gitHost override for GHE custom domains, create-PR web-URL builders as the no-CLI floor), host-CLI preflight (utils/hostCli.ts: gh/az probe mirroring copilotCli.ts, explicit-setting-decides-alone, win32 .exe/.cmd/.bat shapes, per-host install/auth guidance), and the two confirm-gated commands (commands/gitWorkflow.ts): 'Dabbler: Open PR for this set' (push + gh pr create / az repos pr create with coordinates derived from the remote, templated body, PR URL reported on both hosts, degradation floor = push + create-PR web page) and 'Dabbler: Finalize merged set' (pull --ff-only, worktree remove, branch -d, fetch --prune; idempotent; refuses dirty tree / non-trunk / linked-worktree workspaces; never -D or --force). 95 new unit tests + package.json surface pins (suite 1713 green; pytest 3030 passed/6 skipped baseline). Committed real-git dogfood harness (src/test/dogfood/) which pre-verification caught the get-url/insteadOf detection defect. Live-host walks armed as operator UAT (ADO priority) per the operator's same-day deferral. Verification: discovery round 1 (gpt-5-6, reduced fan-out 1/2 after provider timeouts) found 1 Major (ADO percent-encoded names) + 6 nits; supplementary round 2 VERIFIED (nothing new); remediated once (Major + 4 nits fixed, 2 deferred with reasons in s1-remediation-round-1.md); remediation-review round 3 VERIFIED, fix accepted. Close backstop round 4 then blocked on the substituted live GitHub dogfood; remediated by EXECUTION (gh was authenticated locally): committed double-gated live harness opened a REAL PR on scratch repo darndestdabbler/dabbler-s102-dogfood-scratch (pull/1), merged it, finalized, all end-state assertions green; remediation-review round 5 VERIFIED (2 accepted). Residual: operator may delete the scratch repo (token lacks delete_repo); ADO live walk remains the armed operator UAT per the standing deferral. Total verification cost ~$0.58.",
+  "summary": "Session 2 shipped the release-side git-workflow automation: three confirm-gated, AI-invokable VS Code commands, ALL PURE GIT (host-agnostic by construction, so no host adapter/CLI preflight this session), each a thin auditable wrapper that prints the exact command lines before running. New src/commands/gitRelease.ts reuses Session 1's injectable process/UI seam (imports ProcessRunner/RunResult/GitWorkflowUi/defaultRunner/defaultUi/detectTrunkBranch from gitWorkflow.ts; added a one-word export to defaultUi). 'Dabbler: Cut release tag' = annotated tag create + `git push origin <tag>` behind a MANDATORY, NON-BYPASSABLE operator confirm (the release gate; the tag is pinned to the resolved commit sha, not the mutable ref, so it tags exactly the reviewed commit; refuses when the tag already exists=immutable, when the ref is unresolvable, or when there is no origin; on push-fail keeps the local tag and gives retry/delete recovery). 'Dabbler: Start hotfix from tag' = `git switch -c hotfix/<name> <tag>` (refuses a dirty tree so the branch is exactly the tagged snapshot; refuses an existing branch). 'Dabbler: Roll back to tag' = `git checkout <tag>` detached-HEAD redeploy (refuses a dirty tree; names the return-to-trunk command). Pure helpers refNameProblem (git check-ref-format subset, tags+branches) and parseTagRefLines. These encapsulate the EXACT Part-10 drills of docs/tutorials/module-team-hello-world.md so Session 3 can re-cut the tutorial to reference them by name. Wired extension.ts + package.json (3 commands); updated the watcherInventory allowlist line numbers (208->209, 244->245; the gitRelease import shifted both callsites +1). Tests: 54 new unit tests (src/test/suite/gitRelease.test.ts) over injected seams — the mandatory-confirm gate + confirm-declined (non-bypassable), tag-format validation table, tag-exists/unresolved-ref/no-origin/push-failed-after-local-create surfaces, sha-pinning, hotfix dirty-refuse/branch-exists/invalid-name/git-error, rollback dirty-refuse/checkout-fail/git-error, + a package.json command-surface pin — and a real-git dogfood (src/test/dogfood/gitRelease.dogfood.ts, outside the CI glob) proving all four drills against a scratch repo + local bare remote: annotated tag created AND pushed; hotfix branch cut from the TAGGED commit (not main's advanced tip); rollback lands a detached HEAD at the tagged commit; immutability guard refuses re-cutting an existing tag. Suites: extension unit 1767 passing (1713 baseline + 54), 0 failing (via the shipped vscode-stub mocha path; the @vscode/test-electron launcher is known-broken on VS Code 1.128 and is not a regression); pytest Layer 1 unchanged at 3030 passed / 6 skipped (no Python touched); tsc + eslint clean. Layer 3 Playwright deliberately NOT run: L-064-12 scopes it to Explorer-rendering/state-writer/fixture changes, and this session touches none (command files + registration + package.json only). Verification: discovery round 1 (gpt-5-6, cross-provider, anthropic auto-excluded, fan-out 2/2) returned VERIFIED with ZERO blocking findings and six Minor nits; adjudicated per the L-095-1 consequence rubric — TWO fixed (commit-sha pinning across the confirm boundary; listTags now returns null on git failure vs [] for 'no tags', so hotfix/rollback report a real error from a non-repo folder instead of a misleading 'no tags'), each covered by new deterministic unit tests + the dogfood re-run; FOUR accepted/dismissed with reasons (shell-safe display is advisory since execution is shell-free; hotfix/ prefix is a deliberate default not an invariant; branch/tag same-name push ambiguity fails loud and is recoverable; 'PR' is host-neutral across the two supported hosts, GitLab being an explicit non-goal). No re-verify round was opened (Minor-only stop; the fixes are strict improvements proven by falsifiers). Total verification cost ~$0.40. No version bump or changelog this session by design — those and the tutorial re-cut are Session 3's deliverables (the release boundary is after the set closes; publish is operator-gated).",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "tools/dabbler-ai-orchestration/src/utils/gitHost.ts",
-    "tools/dabbler-ai-orchestration/src/utils/hostCli.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitRelease.ts",
     "tools/dabbler-ai-orchestration/src/commands/gitWorkflow.ts",
     "tools/dabbler-ai-orchestration/src/extension.ts",
     "tools/dabbler-ai-orchestration/package.json",
-    "tools/dabbler-ai-orchestration/src/test/suite/gitHost.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/hostCli.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gitWorkflow.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitRelease.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/dogfood/gitWorkflow.dogfood.ts",
+    "tools/dabbler-ai-orchestration/src/test/dogfood/gitRelease.dogfood.ts",
     "tools/dabbler-ai-orchestration/dist/extension.js",
     "tools/dabbler-ai-orchestration/dist/extension.js.map",
-    "docs/session-sets/102-git-workflow-automation/102-git-workflow-automation-uat-checklist.json",
     "docs/session-sets/102-git-workflow-automation/ai-assignment.md",
-    "docs/session-sets/102-git-workflow-automation/s1-ai-assignment-analysis.json",
-    "docs/session-sets/102-git-workflow-automation/s1-remediation-round-1.md"
+    "docs/session-sets/102-git-workflow-automation/s2-ai-assignment-analysis.json"
   ],
   "blockers": [],
   "lessons_cited": [
@@ -30,11 +25,11 @@
   "next_orchestrator": {
     "engine": "claude",
     "provider": "anthropic",
-    "model": "claude-sonnet-5",
-    "effort": "low",
+    "model": "claude-opus-4-8",
+    "effort": "high",
     "reason": {
-      "code": "switch-due-to-cost",
-      "specifics": "Routed step-3.5 analysis (s1-ai-assignment-analysis.json, excl. anthropic): Session 2 (release tag + hotfix/rollback commands) is smaller, pure-git, and mechanical after Session 1 laid the host adapter and command patterns; a frontier-tier orchestrator is wasteful there. Runner-up: gpt/openai gpt-5-4-mini for provider diversity."
+      "code": "continue-current-trajectory",
+      "specifics": "Session 3 (the last session) is documentation- and critique-heavy: re-cut the hello-world tutorial to an automation-first, host-neutral main flow, move raw git/host-CLI sequences into a reference appendix, write the per-host (Azure DevOps + GitHub/GHE) setup section to the operator quality bar, retake screenshots, sweep docs, update both changelogs, and run the advisory path-aware critique + Step 9. The routed step-3.5 analysis (s2-ai-assignment-analysis.json) recommends a frontier-tier model for that higher-order authoring/reasoning; the current orchestrator (claude-opus-4-8) already fits, so continuity is warranted rather than a switch. gpt/openai gpt-5-6 is an equivalent provider-diversity alternative for the prose/critique work."
     }
   }
 }

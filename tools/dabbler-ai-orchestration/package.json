@@ -143,6 +143,21 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.cutReleaseTag",
+        "title": "Cut release tag",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.startHotfixFromTag",
+        "title": "Start hotfix from tag",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.rollBackToTag",
+        "title": "Roll back to tag",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.copySpecReviewPrompt",
         "title": "Copy: Spec-review prompt",
         "category": "Dabbler"

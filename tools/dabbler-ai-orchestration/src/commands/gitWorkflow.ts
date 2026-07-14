@@ -118,7 +118,11 @@ export function defaultRunner(): ProcessRunner {
     });
 }
 
-function defaultUi(): GitWorkflowUi {
+// Exported so the sibling release commands (commands/gitRelease.ts, Set 102
+// S2) reuse the same VS Code UI seam rather than duplicating it — the release
+// flows are pure git and never call openExternal, exactly as
+// runFinalizeMergedSetFlow already omits it.
+export function defaultUi(): GitWorkflowUi {
   return {
     confirm: async (message, detail, button) => {
       const picked = await vscode.window.showWarningMessage(

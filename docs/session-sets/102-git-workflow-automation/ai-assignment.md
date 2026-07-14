@@ -48,3 +48,60 @@ gpt-5-4-mini (adds provider diversity at similar cost/performance).
   up front, not a mid-session cut).
 - Outcome: VERIFIED after one remediation pass (1 Major + 4 nits fixed, 2
   nits deferred with reasons); suite 1713 green; dogfood harness green.
+
+## Session 2 — Release tagging + hotfix/rollback orchestration (pure git)
+
+- Orchestrator: claude / anthropic / claude-opus-4-8 (operator-invoked). The
+  Session 1 routed rec was claude-sonnet-5 / low; the operator started this
+  session on `/model default` (opus-4-8), overriding the advisory rec — an
+  operator scheduling choice, not a plan deviation.
+- Routed step-3.5 analysis: `s2-ai-assignment-analysis.json` (excl. anthropic,
+  $0.0058). Verdict: items (a)–(e) are orchestrator-direct — three
+  confirm-gated commands that are thin, auditable wrappers over PURE GIT
+  (tag/branch/checkout), a deterministic tag/ref-format validator, and tests
+  whose fidelity depends on Session 1's injected-seam harness (mirroring it 1:1
+  "risks pattern deviation for low benefit" if routed) — while the mandatory
+  cross-provider session verification (f) routes to a different provider per the
+  no-skip mandate.
+- Design note carried from the spec (do not re-litigate): this whole session is
+  host-agnostic by construction (tags/branches/refs are pure git); the only
+  host touch is keeping user-facing wording host-neutral. The commands
+  encapsulate the exact Part-10 tutorial drills — `git tag -a … -m … && git
+  push origin <tag>` (release), `git switch -c hotfix/<name> <tag>` (hotfix),
+  `git checkout <tag>` (rollback/redeploy) — so Session 3's re-cut references
+  them faithfully.
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read Session 1 outcome + the constitution's irreversible-actions rule. | Orchestrator direct — read-only reconnaissance. |
+| 2 | `Cut release tag` (annotated tag create+push, mandatory non-bypassable confirm) + pure ref/tag-name validator. | Orchestrator direct — thin git wrapper + deterministic validator (routed rec (a)). |
+| 3 | `Start hotfix from tag` / `Roll back to tag`. | Orchestrator direct — mechanical git wrappers mirroring the S1 confirm-gated pattern (routed rec (b)/(c)). |
+| 4 | Unit tests + command-surface pins + watcher-inventory line update. | Orchestrator direct — integration fidelity with the injected-seam harness (routed rec (d)). |
+| 4 | Dogfood the tag + rollback drill. | Local git mechanics in-session (routed rec (e)). |
+| Verify | Cross-provider phased verification. | Routed — `session-verification`, orchestrator provider auto-excluded (routed rec (f)). |
+
+### Next-orchestrator recommendation (Session 3 — last session)
+
+Routed (raw in `s2-ai-assignment-analysis.json`): a **frontier-tier** model with
+strong long-context reasoning and technical prose — Session 3 is
+**documentation- and critique-heavy** (tutorial re-cut, per-host setup section,
+appendix, screenshots, doc sweep, Step 9 guidance review, advisory path-aware
+critique), a higher-order authoring task rather than mechanical code. Mapped to
+the current registry: **claude / anthropic / claude-opus-4-8** (or **gpt / openai
+/ gpt-5-6** for provider diversity on the prose/critique work). Effort:
+substantive.
+
+### Actuals (filled at close)
+
+- Orchestrator used: claude / anthropic / claude-opus-4-8 (operator-invoked).
+- Routing plan followed as recommended: implementation + tests + dogfood
+  orchestrator-direct; step-3.5 analysis routed ($0.0058); verification routed
+  cross-provider (gpt-5-6, anthropic auto-excluded, fan-out 2/2, ~$0.40).
+- Deviations: none from the plan. Two Minor verification nits were remediated
+  in-session (commit-sha pinning; listTags null-on-error) with deterministic
+  test coverage; no re-verify round (Minor-only stop).
+- Outcome: VERIFIED on the discovery round with ZERO blocking findings (6 Minor
+  nits: 2 fixed, 4 accepted/dismissed with reasons); suite 1767 unit +
+  3030 pytest green; dogfood 4/4 green. Next-orchestrator (Session 3):
+  claude / anthropic / claude-opus-4-8 / high (continue-current-trajectory —
+  docs/critique-heavy last session; gpt-5-6 the diversity alternative).

@@ -60,15 +60,16 @@ const WATCHER_ALLOWLIST: WatcherEntry[] = [
     // shifted both callsites down two more. Set 102 S1: +2 — the
     // gitWorkflow command import + registration shifted both down two
     // (the second callsite; this one sits above the registrations and
-    // moved only for the import).
-    line: 208,
+    // moved only for the import). Set 102 S2: +1 — the gitRelease
+    // command import shifted both callsites down one more.
+    line: 209,
     target: "docs/session-sets/** (spec.md, session-state.json, session-events.jsonl, activity-log.json, change-log.md, CANCELLED.md, *-uat-checklist.json)",
     purpose:
       "Tree-view refresh on canonical session-set state files. Watched files are themselves the writers' source of truth (no inference from indirect signals) — D1 permits.",
   },
   {
     file: "extension.ts",
-    line: 244,
+    line: 245,
     target: "Getting Started Build-section input + module tree sources: {CLAUDE.md, AGENTS.md, GEMINI.md, docs/modules.yaml, docs/planning/project-plan.md, .venv/**/site-packages/ai_router/**}",
     purpose:
       "Set 060 Getting Started live-progress plus Set 092 manifest diagnostics: these scaffold artifacts, docs/modules.yaml, and the legacy root plan are the direct sources of truth for Build-section completion, module grouping, invalid-manifest status, and the Set 093 pseudo-module Plan node (no indirect orchestrator-state inference) — D1 permits. Set 094 dropped docs/session-sets/* (the getting-started→list flip keys on a materialized spec.md, caught by the watcher above).",

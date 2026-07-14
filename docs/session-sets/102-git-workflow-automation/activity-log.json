@@ -1,7 +1,7 @@
 {
   "sessionSetName": "102-git-workflow-automation",
   "createdDate": "2026-07-14T08:14:26.468534+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -83,6 +83,70 @@
       "stepKey": "session-001/live-github-dogfood",
       "dateTime": "2026-07-14T05:43:01.645389-04:00",
       "description": "Close backstop round 4 (gpt-5-6, $0.211) blocked on: live GitHub dogfood replaced by local simulation. Remediated by EXECUTION: gh 2.88.1 authenticated on this machine, so the spec step-7 live walk ran autonomously at zero operator cost via the new double-gated harness src/test/dogfood/gitWorkflow.live.dogfood.ts (DABBLER_LIVE_DOGFOOD=1). Real private scratch repo darndestdabbler/dabbler-s102-dogfood-scratch; runOpenPrFlow with the REAL runner + REAL gh opened https://github.com/darndestdabbler/dabbler-s102-dogfood-scratch/pull/1 (asserted OPEN); real merge; runFinalizeMergedSetFlow ff-pulled main to the merge (local==origin/main), removed worktree, deleted branch, pruned; PR asserted MERGED. 2 passing / 22s. Residuals: scratch repo needs operator delete (no delete_repo scope); ADO live walk stays the armed operator UAT per the standing deferral.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/register",
+      "dateTime": "2026-07-14T06:00:59.013552-04:00",
+      "description": "Registered session 2 via start_session (engine=claude, provider=anthropic, model=claude-opus-4-8; operator-invoked, overriding the S1 routed sonnet-5 rec). Preload read (constitution, project-guidance, lessons-learned, CLAUDE.md). Read S1 outcome: disposition.json (VERIFIED), gitWorkflow.ts + tests (injected-seam pattern), the Part-10 tutorial drills. Confirmed keys present, venv, clean tree on master. No decision-review-queue entries.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/step-3.5-ai-assignment",
+      "dateTime": "2026-07-14T06:00:59.013552-04:00",
+      "description": "Appended Session 2 block to ai-assignment.md. Routed step-3.5 analysis (task_type=analysis, excl. anthropic, $0.0058) -> s2-ai-assignment-analysis.json: items (a)-(e) orchestrator-direct (pure-git thin wrappers + validator + injected-seam tests, mirroring S1 1:1), (f) cross-provider verification routed. Session 3 next-orchestrator rec: frontier-tier (docs/critique-heavy) -> claude-opus-4-8 or gpt-5-6.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/implement-release-commands",
+      "dateTime": "2026-07-14T06:12:22.439971-04:00",
+      "description": "Created src/commands/gitRelease.ts: three confirm-gated PURE-GIT commands reusing the S1 injectable process/UI seam (imports ProcessRunner/RunResult/GitWorkflowUi/defaultRunner/defaultUi/detectTrunkBranch from gitWorkflow.ts; added export to defaultUi). Cut release tag = annotated tag create + push origin behind a MANDATORY non-bypassable confirm (release gate; refuses if tag exists=immutable, if ref unresolvable, if no origin; on push-fail keeps local tag + gives retry/delete recovery). Start hotfix from tag = git switch -c hotfix/<name> <tag> (refuses dirty tree so branch is exactly the tagged snapshot; refuses existing branch). Roll back to tag = git checkout <tag> detached-HEAD redeploy (refuses dirty tree). Pure helpers: refNameProblem (git check-ref-format subset, tag+branch) and parseTagRefLines. Encapsulates the exact Part-10 tutorial drills. Wired extension.ts (import + safeRegister) and package.json (3 command contributions). tsc --noEmit clean; eslint clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/unit-tests",
+      "dateTime": "2026-07-14T06:12:22.439971-04:00",
+      "description": "Added src/test/suite/gitRelease.test.ts (52 tests): refNameProblem good/bad validation table, parseTagRefLines, and all three flows via injected seams - mandatory-confirm gate + confirm-declined (non-bypassable), tag-exists/unresolved-ref/no-origin/push-failed-after-local-create surfaces, hotfix dirty-refuse/branch-exists/invalid-name, rollback dirty-refuse/checkout-fail, + package.json command-surface pin. Updated watcherInventory.test.ts allowlist line numbers 208->209 and 244->245 (gitRelease import shifted both callsites +1). Full extension unit suite: 1765 passing (1713 baseline + 52), 0 failing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/dogfood",
+      "dateTime": "2026-07-14T06:12:22.439971-04:00",
+      "description": "Added src/test/dogfood/gitRelease.dogfood.ts (explicit, not in CI glob): REAL git + defaultRunner against a scratch repo with a local bare remote. 4 drills PASS - (1) cut release tag creates an ANNOTATED tag and pushes it to origin; (2) start hotfix from tag cuts the branch from the TAGGED commit (not main advanced tip); (3) roll back to tag lands a detached HEAD at the tagged commit; (4) immutability guard refuses re-cutting an existing tag with no remote churn. Pure git => no host CLI, no live-host walk to defer (unlike S1).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/build-and-suite",
+      "dateTime": "2026-07-14T06:35:48.599555-04:00",
+      "description": "Recompiled the esbuild bundle (dist/extension.js). Full suites GREEN: extension unit 1767 passing / 0 failing via the vscode-stub mocha path (electron launcher known-broken on VS Code 1.128, not a regression); pytest Layer 1 3030 passed / 6 skipped (identical to S1 baseline; no Python touched). tsc --noEmit + eslint clean. Layer 3 Playwright deliberately NOT run per L-064-12 scoping (no Explorer-rendering/state-writer/fixture changes this session).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/verification",
+      "dateTime": "2026-07-14T06:35:48.599555-04:00",
+      "description": "Mandatory cross-provider verification: verify_session --phase discovery with an up-front conventions file (suite baseline + release contract + by-design exclusions + L-095-1 consequence rubric). git add -A first so new files appear in the evidence bundle (L-064-9). Verifier gpt-5-6 (anthropic auto-excluded), fan-out 2/2 -> VERIFIED, ZERO blocking findings + 6 Minor nits, ~$0.40. Adjudicated per L-095-1: FIXED 2 (commit-sha pinning across the confirm boundary; listTags null-on-git-failure vs [] so hotfix/rollback error honestly from a non-repo) with new deterministic tests (+2) + dogfood re-run; ACCEPTED/DISMISSED 4 with reasons. No re-verify round (Minor-only stop; fixes are strict improvements proven by falsifiers). Raw: s2-verification.md + s2-verification-fanout-2.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/close",
+      "dateTime": "2026-07-14T06:35:48.599555-04:00",
+      "description": "Authored full disposition.json for the mid-set completion (status=completed, verification_verdict=VERIFIED preserved, next_orchestrator=claude/anthropic/claude-opus-4-8/high continue-current-trajectory for the docs/critique-heavy Session 3, blockers=[]). Filled ai-assignment Actuals. Committing + pushing, then close_session + cite_lessons + notify.",
       "status": "complete"
     }
   ]

@@ -11,8 +11,8 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.33.0] — 2026-07-14 (Set 096 — consequence-graded severity + the phased verification loop)
 
-> **Published 2026-07-14** to PyPI (tag `v0.33.0`, operator-authorized via
-> Set 104's coordinated release — see `docs/session-sets/104-coordinated-release/`),
+> **Published 2026-07-14** to PyPI (tag `v0.33.0`, operator-authorized 2026-07-14 as a coordinated release
+> before the operator's vacation),
 > **superseding the live `0.32.0`** (`v0.32.0`, published 2026-07-10; the
 > Set-086 Copilot-seat `copilot_preflight` shipped there and remains live).
 > Co-released with extension `0.45.0`.

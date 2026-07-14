@@ -3,10 +3,11 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.45.0] — 2026-07-14 (Set 104 coordinated release — publishing Set 102's git-workflow automation)
+## [0.45.0] — 2026-07-14 (coordinated release — publishing Set 102's git-workflow automation)
 
 > **Published 2026-07-14** to the VS Code Marketplace + Open VSX (tag
-> `vsix-v0.45.0`, operator-authorized — see `docs/session-sets/104-coordinated-release/`),
+> `vsix-v0.45.0`, operator-authorized 2026-07-14 for a coordinated release
+> before the operator's vacation),
 > **superseding the live `0.42.0`** (`vsix-v0.42.0`, published 2026-07-13).
 > This single 0.45.0 VSIX carries all the accumulated work whose interim
 > changelog sections below (`0.43.0`, `0.44.0`) were staged but **never

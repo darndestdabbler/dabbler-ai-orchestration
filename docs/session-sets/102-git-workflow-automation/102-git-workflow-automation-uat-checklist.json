@@ -1,0 +1,63 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "dabbler-ai-orchestration 0.44.0 working tree (Set 102 Session 1; no VSIX rebuilt yet, no publish)",
+  "DocumentDate": "7/14/2026",
+  "Notes": "ARMED, NOT YET WALKED (operator directive 2026-07-14: live-host tests deferred so the set ships this morning; the operator's existing ADO repo has real content, so these walks need a NEW scratch project/repo). Walk order: Walk 1 then Walk 2, both in the same scratch Azure DevOps repo - ADO is the team's live host, so these two are the priority; Walks 3-4 (GitHub) are optional because the in-repo dogfood harness (src/test/dogfood/gitWorkflow.dogfood.ts) already exercises push + finalize end-to-end against real git with a github-shaped remote, and the unit suite pins both hosts' PR commands. Automation at arming time: 1708 extension unit tests passing (90 new for Set 102), 3-test real-git dogfood passing. What automation genuinely cannot check and these walks exist for: a real az/gh authenticated PR create against a live host, and the host-side merge round-trip.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Git workflow automation (Azure DevOps)",
+      "Subarea": "Walk 1 - Open PR for this set against a scratch ADO repo",
+      "ItemLabel": "One confirm-gated action pushes the session branch and opens a real ADO pull request",
+      "HumanAction": "Where you are: your machine with the Azure CLI signed in, using a brand-new scratch Azure DevOps repo (never the real one).\n1. One-time setup if not already done: install the Azure CLI (winget install Microsoft.AzureCLI), then run: az extension add --name azure-devops, then: az login\n2. In your Azure DevOps organization, create a new project named 'dabbler-uat-scratch' (Private is fine), which creates an empty repo of the same name. On the repo page choose 'Initialize with a README'.\n3. In a terminal:\n   git clone https://dev.azure.com/<your-org>/dabbler-uat-scratch/_git/dabbler-uat-scratch\n   cd dabbler-uat-scratch\n   git checkout -b session-set/uat-walk-1\n   echo test > uat-walk-1.txt\n   git add . && git commit -m \"uat walk 1\"\n4. Open this cloned folder in VS Code (File > Open Folder...).\n5. Press Ctrl+Shift+P and run: Dabbler: Open PR for this set\n6. In the 'PR title' input box, press Enter to accept the default.\n7. Read the modal dialog carefully before clicking anything, then click 'Push + create PR'.",
+      "Expectation": "Step 7's modal is titled 'Push this branch and open a PR?' and lists, verbatim, the two commands it will run: a 'git push -u origin session-set/uat-walk-1' line and an 'az repos pr create ...' line naming --organization https://dev.azure.com/<your-org>, --project dabbler-uat-scratch, and --repository dabbler-uat-scratch (derived from the remote URL - you never ran az devops configure). It also says 'Target: azure-devops'. After clicking: an information message reads 'PR created: https://dev.azure.com/<your-org>/dabbler-uat-scratch/_git/dabbler-uat-scratch/pullrequest/<number>' and that page opens in the browser showing an active PR from session-set/uat-walk-1 into main.",
+      "ProgrammaticVerification": "gitWorkflow.test.ts 'Azure DevOps happy path' pins the exact az argv (derived org/project/repo) and the pullrequest URL from the JSON id; gitHost.test.ts pins the remote-URL parsing table for all ADO URL forms.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    },
+    {
+      "FunctionalArea": "Git workflow automation (Azure DevOps)",
+      "Subarea": "Walk 2 - Finalize merged set after the ADO merge",
+      "ItemLabel": "After merging on ADO, one confirm-gated action pulls the trunk and cleans up branch state",
+      "HumanAction": "Where you are: straight after Walk 1, same scratch repo, the PR from Walk 1 still open in the browser.\n1. In the ADO PR page, click 'Approve', then 'Complete'. In the completion dialog UNCHECK 'Delete session-set/uat-walk-1 after merging' (leave the local cleanup to the command under test), keep the default merge type, and click 'Complete merge'.\n2. Back in VS Code (same folder), run: git checkout main\n3. Press Ctrl+Shift+P and run: Dabbler: Finalize merged set\n4. Read the modal dialog, then click 'Finalize'.\n5. In the terminal run: git branch  and then: git log --oneline -1",
+      "Expectation": "Step 4's modal is titled \"Finalize merged set 'session-set/uat-walk-1'?\" and lists exactly these commands in order: 'git pull --ff-only', 'git branch -d session-set/uat-walk-1', 'git fetch --prune' (no worktree line - this walk used a plain branch, not a worktree). It states branch deletion uses -d, never -D. After clicking: an information message starting 'Merged set finalized.' lists each command with its outcome. Step 5: 'git branch' shows only main (the session branch is gone), and the latest commit on main is the merge from ADO.",
+      "ProgrammaticVerification": "gitWorkflow.test.ts pins the branch-only cleanup path, the idempotent re-run, and the unmerged-branch refusal; the dogfood harness proves the same sequence end-to-end (with a worktree) against real git.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    },
+    {
+      "FunctionalArea": "Git workflow automation (Azure DevOps)",
+      "Subarea": "Walk 3 (OPTIONAL) - the no-CLI degradation floor",
+      "ItemLabel": "Without a usable az CLI the command still pushes and opens the ADO create-PR web page",
+      "HumanAction": "Where you are: same scratch repo, only if you want to see the degradation floor. This walk temporarily hides az from the extension.\n1. In VS Code settings (Ctrl+,), search 'dabbler az' and set 'Dabbler Session Sets: Az Cli Path' to exactly: C:\\does-not-exist\\az.cmd\n2. In the terminal: git checkout -b session-set/uat-walk-3 && echo floor > floor.txt && git add . && git commit -m \"uat walk 3\"\n3. Run: Dabbler: Open PR for this set, accept the default title, and read the modal.\n4. Click 'Push + create PR'.\n5. Afterwards, clear the 'Az Cli Path' setting back to empty.",
+      "Expectation": "Step 3's modal lists the push line and, instead of an az line, a line saying no az CLI was found and the browser create-PR page will open instead. Step 4: the branch is pushed, the browser opens https://dev.azure.com/<your-org>/dabbler-uat-scratch/_git/dabbler-uat-scratch/pullrequestcreate?sourceRef=session-set%2Fuat-walk-3&targetRef=main with the source branch preselected, and a warning message includes the literal install guidance 'winget install Microsoft.AzureCLI' and 'az extension add --name azure-devops'. This is an operator-error surface, not a failure: a broken explicit azCliPath setting is honestly reported rather than silently bypassed to PATH.",
+      "ProgrammaticVerification": "gitWorkflow.test.ts 'CLI absent' pins push-still-runs + the pullrequestcreate URL + the guidance text; hostCli.test.ts pins that an explicit-but-missing setting is never bypassed to PATH.",
+      "IsJudgmentItem": true,
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    },
+    {
+      "FunctionalArea": "Git workflow automation (GitHub)",
+      "Subarea": "Walk 4 (OPTIONAL) - GitHub round-trip with gh",
+      "ItemLabel": "The same two commands work unchanged against a scratch GitHub repo",
+      "HumanAction": "Where you are: your machine with the GitHub CLI signed in (gh auth login), using a new scratch GitHub repo.\n1. gh repo create dabbler-uat-scratch --private --add-readme --clone\n2. cd dabbler-uat-scratch, then: git checkout -b session-set/uat-walk-4 && echo test > t.txt && git add . && git commit -m \"uat walk 4\"\n3. Open the folder in VS Code and run: Dabbler: Open PR for this set, accept the default title, read the modal, click 'Push + create PR'.\n4. Merge the PR on github.com (leave 'Delete branch' unclicked), run git checkout main in the terminal, then run: Dabbler: Finalize merged set and click 'Finalize'.",
+      "Expectation": "Step 3's modal lists 'git push -u origin session-set/uat-walk-4' and a 'gh pr create --head session-set/uat-walk-4 --base main ...' line, says 'Target: github (github.com)', and afterwards reports 'PR created: https://github.com/<you>/dabbler-uat-scratch/pull/1' and opens it. Step 4 behaves exactly as Walk 2 (pull --ff-only, branch -d, fetch --prune; main ends at the merge commit; the session branch is gone).",
+      "ProgrammaticVerification": "gitWorkflow.test.ts 'GitHub happy path' pins the gh argv and URL parse; the dogfood harness runs the full push+finalize loop against a github-shaped remote with real git.",
+      "IsJudgmentItem": true,
+      "Result": "",
+      "Feedback": "",
+      "Passes": null
+    }
+  ]
+}

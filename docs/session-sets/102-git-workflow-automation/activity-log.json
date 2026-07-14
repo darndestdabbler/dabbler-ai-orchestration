@@ -1,0 +1,73 @@
+{
+  "sessionSetName": "102-git-workflow-automation",
+  "createdDate": "2026-07-14T08:14:26.468534+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-14T08:14:26.468534+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/register",
+      "dateTime": "2026-07-14T04:16:35.607779-04:00",
+      "description": "Registered session 1 via start_session (engine=claude, model=claude-fable-5). Read spec.md (as amended pre-start for dual-host Azure DevOps + GitHub support, operator directive 2026-07-14), both cross-provider consensus artifacts from Set 101, ai_router/worktree.py (open/close/list CLI), and the command-registration + preflight patterns (gitScaffold.ts, copilotCli.ts, newModule.ts, extension.ts). Operator time-pressure directive: live ADO dogfood deferred to armed UAT walk.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/host-detection",
+      "dateTime": "2026-07-14T04:27:04.643907-04:00",
+      "description": "utils/gitHost.ts: pure remote-URL classifier + parser (ADO dev.azure.com/user@/visualstudio.com/DefaultCollection/ssh v3 forms; GitHub https/scp/ssh), dabblerSessionSets.gitHost override resolution (GHE custom-domain force), create-PR web-URL builders (the no-CLI floor), az organization/PR URL builders.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/host-cli-preflight",
+      "dateTime": "2026-07-14T04:27:04.643907-04:00",
+      "description": "utils/hostCli.ts: gh/az presence probe mirroring copilotCli.ts (explicit ghCliPath/azCliPath setting decides alone, else PATH; win32 probes .exe/.cmd/.bat since az ships as az.cmd), returns the resolved path so probe and spawn agree; per-host install/auth guidance text (winget + gh auth login --hostname / az extension add + az login / AZURE_DEVOPS_EXT_PAT) that the Session-3 docs section must mirror verbatim.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/open-pr-command",
+      "dateTime": "2026-07-14T04:27:04.650221-04:00",
+      "description": "commands/gitWorkflow.ts runOpenPrFlow: confirm-gated push + host-adapter PR create (gh pr create / az repos pr create with org/project/repo parsed from the remote), templated body linking the session set, PR URL reported on both hosts (gh stdout / az JSON pullRequestId), no-CLI degradation floor = push + open the create-PR web page, dirty-tree warning, trunk-branch refusal, .cmd spawn via cmd.exe /d /s /c with conservatively validated args (BatBadBut hardening).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/finalize-merge-command",
+      "dateTime": "2026-07-14T04:27:04.650221-04:00",
+      "description": "runFinalizeMergedSetFlow: confirm dialog lists the exact commands (pull --ff-only, worktree remove, branch -d, fetch --prune); idempotent (absent target reports already-done); refuses dirty tree, non-trunk checkout, and running from inside a linked worktree; never -D / never --force (unmerged branch refuses; messy path pointed at ai_router.cancel_session). Registered dabbler.openPrForSet + dabbler.finalizeMergedSet in package.json + extension.ts; settings gitHost/ghCliPath/azCliPath added.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/unit-tests",
+      "dateTime": "2026-07-14T04:41:21.522524-04:00",
+      "description": "90 new unit tests: gitHost remote-URL parsing table (all ADO/GitHub forms + unknown/non-remote), settings-override resolution (GHE force, ADO force cannot invent a project), web-URL builders; hostCli probe core (explicit setting decides alone, win32 .exe/.cmd/.bat shapes, az.cmd found where the copilot probe deliberately would not); gitWorkflow pure builders (cmd-shim validation/wrapping, gh/az argv, URL parsers) + both flows driven through injected seams (happy path both hosts, CLI-absent floor, unknown-host, confirm-declined, dirty-tree refusal, push/PR failure paths, finalize idempotency + refusals); package.json command-surface + settings pins. Full unit suite 1708 passing. Fixed watcherInventory allowlist line shift (+2 in extension.ts). Lint: 7 pre-existing errors in untouched test files (baseline), new files lint-clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/dogfood",
+      "dateTime": "2026-07-14T04:41:21.522524-04:00",
+      "description": "Committed re-runnable dogfood harness (src/test/dogfood/gitWorkflow.dogfood.ts, outside the CI suite glob): real defaultRunner + real git against a scratch repo (github-shaped remote URL, transport rewritten to a local bare repo via insteadOf) - Open PR CLI-absent floor pushes for real + offers the real compare URL; simulated host merge; Finalize leaves the exact asserted end-state (trunk ff, worktree gone+unregistered, branch gone); second run reports Nothing to finalize. DOGFOOD CAUGHT A REAL DEFECT pre-verification: host detection via git remote get-url returns the insteadOf-REWRITTEN url; fixed to read git config --get remote.origin.url (the operator-configured logical host) with get-url fallback. Live-host walks ARMED for the operator (102-...-uat-checklist.json; ADO priority) per the 2026-07-14 time-pressure directive.",
+      "status": "complete"
+    }
+  ]
+}

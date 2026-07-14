@@ -1,15 +1,19 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "102-git-workflow-automation",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-14T04:14:26.454808-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "model": "claude-fable-5",
+        "identityProvenance": "direct"
+      },
       "verificationVerdict": null
     },
     {

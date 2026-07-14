@@ -133,6 +133,16 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.openPrForSet",
+        "title": "Open PR for this set",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.finalizeMergedSet",
+        "title": "Finalize merged set",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabbler.copySpecReviewPrompt",
         "title": "Copy: Spec-review prompt",
         "category": "Dabbler"
@@ -401,6 +411,26 @@
           "type": "string",
           "default": "",
           "markdownDescription": "GitHub Copilot CLI executable used by the Full-tier Copilot seat option (`transport.profile: copilot-cli`). Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `copilot` on `PATH` — on Windows the auto-detect (like the catalog subprocess it pre-flights) resolves a `copilot.exe` only, so an npm-installed `copilot.cmd` shim is found only when this setting points at it explicitly (with its extension)."
+        },
+        "dabblerSessionSets.gitHost": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "github",
+            "azure-devops"
+          ],
+          "default": "auto",
+          "markdownDescription": "Which git host the git-workflow commands (`Dabbler: Open PR for this set`) talk to.\n\n- `auto` (default): detect from the `origin` remote URL — `github.com` → GitHub, `dev.azure.com` / `*.visualstudio.com` → Azure DevOps.\n- `github`: force GitHub — required for a GitHub Enterprise host on a custom domain, which auto-detect cannot recognize.\n- `azure-devops`: force Azure DevOps.\n\nEverything except PR creation is pure git and identical on every host."
+        },
+        "dabblerSessionSets.ghCliPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "GitHub CLI executable used by `Dabbler: Open PR for this set` on GitHub repos. Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `gh` on `PATH`. Install: `winget install GitHub.cli`, then `gh auth login` (add `--hostname <host>` for GitHub Enterprise)."
+        },
+        "dabblerSessionSets.azCliPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Azure CLI executable used by `Dabbler: Open PR for this set` on Azure DevOps repos. Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `az` on `PATH` (including the standard `az.cmd`). Install: `winget install Microsoft.AzureCLI`, then `az extension add --name azure-devops`, then `az login` (or set the `AZURE_DEVOPS_EXT_PAT` environment variable)."
         },
         "dabblerSessionSets.aiRouterRepoUrl": {
           "type": "string",

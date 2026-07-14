@@ -10,6 +10,7 @@ import { registerOpenFileCommands } from "./commands/openFile";
 import { registerCopyCommands } from "./commands/copyCommand";
 import { registerCopyPromptCommands } from "./commands/copyPromptCommands";
 import { registerGitScaffoldCommand } from "./commands/gitScaffold";
+import { registerGitWorkflowCommands } from "./commands/gitWorkflow";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerInstallAiRouterCommands } from "./commands/installAiRouterCommands";
@@ -307,6 +308,7 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerCopyCommands", () => registerCopyCommands(context));
   safeRegister("registerCopyPromptCommands", () => registerCopyPromptCommands(context));
   safeRegister("registerGitScaffoldCommand", () => registerGitScaffoldCommand(context));
+  safeRegister("registerGitWorkflowCommands", () => registerGitWorkflowCommands(context));
   safeRegister("registerTroubleshootCommand", () => registerTroubleshootCommand(context));
   safeRegister("registerGetStartedCommand", () => registerGetStartedCommand(context));
   safeRegister("registerPlanImportCommand", () => registerPlanImportCommand(context));

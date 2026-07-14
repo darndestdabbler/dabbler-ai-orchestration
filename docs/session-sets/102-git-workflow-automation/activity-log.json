@@ -76,6 +76,14 @@
       "dateTime": "2026-07-14T05:35:25.883917-04:00",
       "description": "Phased loop: discovery round 1 (gpt-5-6, $0.224, reduced fan-out 1/2 - two provider read-timeouts on the second identical call) -> ISSUES_FOUND, 1 Major (ADO percent-encoded project/repo names passed to az undecoded + %2520 double-encoding in web URLs) + 6 nits. Supplementary round 2 ($0.049) VERIFIED, nothing new. Remediated once: Major + 4 nits fixed (decode-once/encode-once, session-set/* worktree filter, case-insensitive _git, refs/heads full refs in the ADO fallback, toplevel-based main-checkout guard), 2 deferred with reasons (az execution-probe: copilotCli filesystem-probe posture + guidance-bearing failure path; detached-worktree reporting: excluded by-rule now). Remediation-review round 3 ($0.038) VERIFIED, fix accepted. Suite 1713 green post-fix; dogfood re-run green. Total verification cost ~$0.31.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-001/live-github-dogfood",
+      "dateTime": "2026-07-14T05:43:01.645389-04:00",
+      "description": "Close backstop round 4 (gpt-5-6, $0.211) blocked on: live GitHub dogfood replaced by local simulation. Remediated by EXECUTION: gh 2.88.1 authenticated on this machine, so the spec step-7 live walk ran autonomously at zero operator cost via the new double-gated harness src/test/dogfood/gitWorkflow.live.dogfood.ts (DABBLER_LIVE_DOGFOOD=1). Real private scratch repo darndestdabbler/dabbler-s102-dogfood-scratch; runOpenPrFlow with the REAL runner + REAL gh opened https://github.com/darndestdabbler/dabbler-s102-dogfood-scratch/pull/1 (asserted OPEN); real merge; runFinalizeMergedSetFlow ff-pulled main to the merge (local==origin/main), removed worktree, deleted branch, pruned; PR asserted MERGED. 2 passing / 22s. Residuals: scratch repo needs operator delete (no delete_repo scope); ADO live walk stays the armed operator UAT per the standing deferral.",
+      "status": "complete"
     }
   ]
 }

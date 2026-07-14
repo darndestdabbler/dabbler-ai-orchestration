@@ -1,11 +1,17 @@
-> ⚠️ **DRAFT — not yet validated live.** This walkthrough was authored against the
-> shipped extension and router code, and every machine-checkable claim (command
-> titles, dialog text, settings keys, the pipeline YAML) was verified — but it has
-> **not yet been walked end-to-end on a real Azure DevOps organization with a real
-> GitHub Copilot seat**. That live validation is Session 2 of session set
-> `103-copilot-ado-hello-world-tutorial`; until it passes, treat the Azure DevOps
-> bootstrap and Copilot-seat steps as unverified and expect rough edges. Do not link
-> this document from onboarding surfaces as "ready" until this banner is removed.
+> ℹ️ **PREVIEW — usable now, not yet walked end-to-end. Please report issues.**
+> This walkthrough was authored against the shipped extension and router code, and
+> every machine-checkable claim (command titles, dialog text, settings keys) was
+> verified against that code. The `azure-pipelines.yml` test logic and the toy
+> program were **run locally and pass** — the per-module and all-modules jobs, the
+> "never vacuously green" zero-test guard, and the `Hello, world! It is 12:00.`
+> output all behave as documented. **Not yet walked on a live system:** the Azure
+> DevOps UI steps (project / branch policies / pipeline registration / automatically
+> included reviewers), the pipeline's ADO **PR change-detection on a real agent**,
+> and the **GitHub Copilot seat** setup — those need a real Azure DevOps
+> organization and a Copilot seat. **Try it, and if any step doesn't behave as
+> written, tell us — we'll fix it fast;** that feedback drives the follow-on
+> live-validation/remediation session. (Mind the Set-086 auth-preflight in Part 0.6
+> so a mis-authed seat fails loudly rather than faking a verification.)
 
 # Walkthrough: Your First Three-Person Module-Based Project (GitHub Copilot + Azure DevOps)
 

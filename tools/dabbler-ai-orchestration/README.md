@@ -72,6 +72,18 @@ cost.
   tier the same step is a copyable review prompt you paste into a
   second AI chat and a verdict you record yourself.
 
+- **Confirm-gated git automation — remove keystrokes, not oversight.**
+  The mechanical trunk-based loop (push a session branch and open its
+  PR, sync-and-clean-up after the merge, cut a release tag, start a
+  hotfix, roll back) is one command each — on **GitHub (incl.
+  Enterprise) and Azure DevOps** alike, with the host auto-detected
+  from your remote. Every command previews the exact git/CLI lines it
+  will run and waits for your confirm; PR review/approval, release
+  decisions, and rollback authorization stay yours (an AI agent can
+  *invoke* the commands, but the confirm modal always goes to the
+  human). No host CLI installed? The PR command still pushes and
+  opens the host's create-a-PR page in your browser.
+
 ---
 
 ## Get started
@@ -337,6 +349,22 @@ Sign-up links and a full prerequisites checklist live in the
 - **Worktree auto-discovery** — parallel session sets running in
   sibling git worktrees show up in the activity-bar tree even when
   the worktree isn't open as a separate workspace folder.
+- **Git workflow commands (dual-host: GitHub incl. Enterprise, Azure
+  DevOps).** Five confirm-gated Command Palette actions wrap the
+  trunk-based loop's mechanical git: `Dabbler: Open PR for this set`
+  (push + create the PR via `gh` or `az repos`, auto-detecting the
+  host from the `origin` remote; falls back to pushing and opening
+  the host's create-a-PR web page when no CLI is installed),
+  `Dabbler: Finalize merged set` (post-merge `git pull --ff-only` +
+  worktree removal + `git branch -d` + `git fetch --prune`,
+  idempotent and safely re-runnable), `Dabbler: Cut release tag`
+  (annotated tag + push, sha-pinned, mandatory confirm — the release
+  gate), `Dabbler: Start hotfix from tag`, and `Dabbler: Roll back
+  to tag`. Settings: `dabblerSessionSets.gitHost` (`auto` | `github`
+  | `azure-devops`) plus `ghCliPath` / `azCliPath` executable
+  overrides. Setup and the raw commands each action runs are
+  documented in the hello-world tutorial's per-host setup section
+  and "Git under the hood" appendix.
 
 ---
 

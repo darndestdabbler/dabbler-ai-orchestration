@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "102-git-workflow-automation",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-07-14T08:33:39.564314-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "I reviewed the set spec, change log, verification notes, release metadata, README/quick-start/template/golden docs, and the underlying git-workflow implementation in tools/dabbler-ai-orchestration/src/{commands,utils}. The shipped command names, settings, and most host-agnostic workflow claims line up with code, but the set's close-out artifacts make a concrete claim that the advisory path-aware critique was run and saved, and the referenced artifact is not on disk.",
+      "findings": [
+        {
+          "description": "Severity: Major\nCategory: false-confidence\nLocation: docs/session-sets/102-git-workflow-automation/disposition.json:3; docs/session-sets/102-git-workflow-automation/ai-assignment.md:167\nViolation: the set claims the end-of-set critique artifact exists and was recorded: disposition.json says \"advisory path-aware critique run via the sanctioned pull surface (see path-aware-critique.json)\", while the path-aware-critique contract says \"A clean review still produces an artifact... this artifact's presence means the critique ran.\" The spec also ends Session 3 with \"Step 9 + advisory critique recorded\".\nImpact: this is the set's persisted evidence that the extra review surface actually happened. With no artifact on disk, a reviewer cannot audit the claimed multi-provider critique or trust the close-out record that says it ran. That changes the merge decision because the session is asserting completion of a documented end-of-set review discipline without the required evidence file.\nEvidence: reading docs/path-aware-critique-schema.md shows the artifact contract; grep/read on the set directory shows multiple claims pointing at docs/session-sets/102-git-workflow-automation/path-aware-critique.json; attempting to read that path returns no such file.\nFix: either commit the raw path-aware-critique.json artifact exactly as produced, or retract the claims in disposition/assignment/close-out materials that the critique was run and recorded.",
+          "severity": "Major",
+          "category": "false-confidence"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "The changes were reviewed, focusing on the consistency between the specification, the changelog, and the primary user-facing document, `docs/tutorials/module-team-hello-world.md`. The tutorial was successfully updated to reflect the new automation-first workflow, and its content largely aligns with the technical descriptions of the new commands. One minor documentation drift was found.",
+      "findings": [
+        {
+          "description": "**Violation**: The tutorial states that `Dabbler: Open PR for this set` can be used from \"any branch that isn't the trunk\", which contradicts the `change-log.md` claim that it also \"refuses from... detached HEAD\".\n\n**Impact**: A user following the tutorial might be surprised when the command refuses to run from a detached HEAD state (e.g., after checking out a tag), as the tutorial does not mention this limitation. This could cause minor confusion, but is unlikely to block work as being on a branch is the standard workflow for opening a PR. This does not change the merge decision.\n\n**Evidence**:\n- `docs/tutorials/module-team-hello-world.md`, Part 4, Step 7: \"Despite the command's name, it works from any branch that isn't the trunk\"\n- `tools/dabbler-ai-orchestration/CHANGELOG.md`, `0.45.0` -> `Added` -> `Dabbler: Open PR for this set`: \"Refuses from the trunk, a detached HEAD, or a missing `origin`\"",
+          "severity": "Minor",
+          "category": "contract-drift"
+        }
+      ]
+    }
+  ]
+}

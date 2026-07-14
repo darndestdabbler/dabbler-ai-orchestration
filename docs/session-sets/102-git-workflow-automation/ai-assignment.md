@@ -105,3 +105,72 @@ substantive.
   3030 pytest green; dogfood 4/4 green. Next-orchestrator (Session 3):
   claude / anthropic / claude-opus-4-8 / high (continue-current-trajectory —
   docs/critique-heavy last session; gpt-5-6 the diversity alternative).
+
+## Session 3 — Automation-first tutorial re-cut + manual-git appendix (last session)
+
+- Orchestrator: claude / anthropic / claude-fable-5 (operator-invoked). The
+  Session 2 routed rec was claude-opus-4-8 or gpt-5-6 at substantive effort;
+  the operator started this session on claude-fable-5 — a same-provider
+  frontier-tier substitution consistent with the rec's "frontier-tier, strong
+  long-context reasoning and technical prose" requirement.
+- Routed step-3.5 analysis: `s3-ai-assignment-analysis.json` (excl. anthropic,
+  $0.0060). Verdict — a split the prior sessions did not have: the tutorial
+  re-cut (a) and appendix (b) are substantive narrative restructuring, so
+  **route the authoring** ("routing initial authoring is more efficient than
+  orchestrator authoring followed by a heavy corrective review"); the per-host
+  setup section (c) is verbatim transcription of shipped in-product strings, so
+  orchestrator-direct; sweeps/version-walk/build (d)/(e) orchestrator-direct;
+  **route the CHANGELOG synthesis** (multi-session narrative); end-of-set
+  reviews (g) routed by design. Orchestrator owns assembling the routed
+  authoring's source-of-truth bundle and a post-authoring fidelity pass
+  (exact command names, settings keys, preflight strings) — the fidelity
+  risk is why (c) stays direct.
+- Screenshots determination (spec step 4, Set 095 convention): the shipped
+  PNGs are rendered from HTML mockups via `media/render-mockup.mjs`
+  (tree / getting-started form / spec view). Set 102 shipped palette commands
+  only — no webview, tree, or form surface changed — so **no screenshot is
+  affected**; recorded here rather than silently skipped.
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read S1/S2 shipped surfaces + current tutorial. | Orchestrator direct — read-only reconnaissance. |
+| 2–3 | Tutorial main-flow re-cut (automated, host-neutral) + "Git under the hood" appendix. | **Routed** — `documentation` authoring (routed rec (a)/(b)); orchestrator assembles the source bundle and runs the fidelity pass. |
+| 3b | Per-host setup section mirroring the preflight guidance verbatim. | Orchestrator direct — verbatim transcription (routed rec (c)). |
+| 4 | Doc sweep (quick-start / README / getting-started template), version walk; screenshots: none affected (determination above). | Orchestrator direct — mechanical sweep (routed rec (d)). |
+| 4 | Both CHANGELOG entries. | **Routed** — multi-session synthesis (routed rec (d)). |
+| 5 | Build + full suite. | Orchestrator direct — command execution (routed rec (e)). |
+| Verify | Cross-provider phased verification. | Routed — `session-verification`, orchestrator provider auto-excluded. |
+| 9 | Guidance reorganization review + advisory path-aware critique. | Routed by design (routed rec (g)). |
+
+### Next-set recommendation (post-102)
+
+Routed (raw in `s3-ai-assignment-analysis.json`): **pause for the
+operator-gated publish first** — starting a new set before the release ships
+adds risk, and a clean state is wanted for any post-publish hotfix of the 102
+surface. Then proceed to the **077-redo UAT session** once the Marketplace +
+PyPI releases are confirmed stable. First-session orchestrator for that set:
+a top-tier reasoning model (frontier Claude / GPT class), effort medium —
+UAT-checklist redo needs nuanced quality-bar interpretation and structured
+document generation.
+
+### Actuals (filled at close)
+
+- Orchestrator used: claude / anthropic / claude-fable-5 (operator-invoked).
+- Routing plan followed as the routed analysis recommended: tutorial re-cut +
+  appendix ROUTED (documentation, gemini-2.5-pro, 11.2k output tokens,
+  $0.133, truncation-clean) with an orchestrator-assembled source-of-truth
+  bundle and a ~20-edit post-authoring fidelity pass; changelog synthesis
+  ROUTED (gemini-2.5-pro, $0.012) with fidelity corrections
+  (annotated-not-signed, dirty-tree-warns, ADO-UAT-armed-not-run); setup
+  section / sweeps / version walk / build orchestrator-direct; verification
+  routed cross-provider (gpt-5-6, anthropic auto-excluded, fan-out 2/2,
+  $0.38); advisory path-aware critique via the sanctioned pull surface.
+- Deviations: none from the plan. One mid-session operator directive
+  received and QUEUED rather than absorbed (a Copilot-flavored tutorial cut
+  — recorded as a follow-on set in disposition/change-log, not a mid-flight
+  scope expansion).
+- Outcome: VERIFIED on discovery round 1 with ZERO findings of any severity;
+  suites unit 1767 / pytest 3030+6skip green; extension 0.45.0 staged
+  (publish operator-gated); router 0.33.0 untouched. Set complete — no next
+  session. Next-set rec (routed): pause for the operator publish click, then
+  077-redo; the operator's Copilot-tutorial directive is queued alongside.

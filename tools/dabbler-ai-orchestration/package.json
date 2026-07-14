@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Getting Started form (the onboarding entry point), Work Explorer, and cost dashboard for the Dabbler AI-led workflow.",
-  "version": "0.44.0",
+  "version": "0.45.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {

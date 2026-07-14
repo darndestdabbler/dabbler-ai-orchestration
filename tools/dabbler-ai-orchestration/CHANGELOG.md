@@ -3,6 +3,104 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.45.0] — Unreleased (Set 102 — git workflow automation)
+
+> **The Set 102 release boundary: confirm-gated git-workflow automation.**
+> The framework now runs the mechanical trunk-based git — push a session
+> branch and open its PR, sync-and-clean-up after the merge, cut a release
+> tag, start a hotfix, roll back — while the human keeps every judgment
+> call: PR review/approval, branch-protection policy, what/when to release,
+> rollback authorization. Every command previews the exact command lines it
+> will run and waits for the operator's confirm (an AI agent may *invoke*
+> the commands; the modal always goes to the human). Marketplace + Open VSX
+> publish stays an **operator-gated** action (push tag `vsix-v0.45.0` per
+> the [CONTRIBUTING publish runbook](../../CONTRIBUTING.md#publishing); the
+> workflow verifies the tag against this `package.json` version). Until
+> then the registry-live extension remains `0.40.0`, with
+> `0.42.0`/`0.43.0`/`0.44.0` also queued ahead of this one.
+>
+> **Extension-only** — `dabbler-ai-router` stays at `0.33.0`; zero
+> `ai_router/` changes accrued across Set 102.
+
+### Added
+
+- **(Set 102 S1) `Dabbler: Open PR for this set` — dual-host PR
+  automation.** Pushes the current branch and creates the pull request via
+  the host CLI (`gh pr create` on GitHub/GHE, `az repos pr create` on Azure
+  DevOps — org/project/repo parsed from the remote URL, no `az devops
+  configure --defaults` needed), with a templated title/body linking the
+  session set; the created PR's URL is reported and opened. Confirm-gated:
+  the modal lists the exact push + PR-create lines and nothing else runs.
+  Refuses from the trunk, a detached HEAD, or a missing `origin`; a dirty
+  tree warns (uncommitted changes won't be part of the PR) before
+  proceeding. **No-CLI degradation floor:** the push still happens (pure
+  git) and the host's create-a-PR web page opens with install/auth
+  guidance — the operator is never stranded.
+- **(Set 102 S1) `Dabbler: Finalize merged set` — post-merge
+  sync-and-clean-up.** After the operator merges on the host: `git pull
+  --ff-only` + `git worktree remove` + `git branch -d` + `git fetch
+  --prune` as one confirm-gated action from the main checkout. Idempotent
+  and safely re-runnable (an already-done step reports itself and the flow
+  continues); only `session-set/*` worktrees/branches are candidates;
+  `-d` never `-D` (an unmerged branch refuses rather than losing work).
+  Refuses from inside a worktree, off the trunk, or on a dirty tree.
+- **(Set 102 S1) Git-host detection + host-CLI preflight** (the one
+  host-specific seam; everything else in the command set is pure git).
+  `utils/gitHost.ts` classifies the `origin` remote across all real URL
+  forms — GitHub https/ssh/scp and Azure DevOps `dev.azure.com`,
+  `{org}.visualstudio.com` (incl. `DefaultCollection`), and
+  `ssh.dev.azure.com` v3, with percent-decoded project/repo names — and
+  reads the **configured** `remote.origin.url` so `url.insteadOf`
+  transport rewrites don't change the logical host. `utils/hostCli.ts`
+  probes for the CLI the detected host needs in the shapes the CLIs
+  actually ship as on Windows (`gh.exe`, `az.cmd`) and never hard-fails.
+  On win32, `.cmd` targets spawn through `cmd.exe /d /s /c` with
+  conservatively validated arguments (the BatBadBut hardening): free text
+  carrying a cmd metacharacter is refused up front with an
+  operator-actionable message.
+- **(Set 102 S1) Settings:** `dabblerSessionSets.gitHost` (`auto` |
+  `github` | `azure-devops`) — the explicit override for hosts auto-detect
+  cannot know (chiefly GHE custom domains) — plus
+  `dabblerSessionSets.ghCliPath` / `dabblerSessionSets.azCliPath`
+  executable-path overrides mirroring `copilotCliPath`.
+- **(Set 102 S2) `Dabbler: Cut release tag` — the release gate.** Creates
+  an **annotated** tag and pushes it to origin, with a mandatory,
+  non-bypassable operator confirm. Live ref-format validation,
+  existing-tag refusal (pushed tags are immutable by convention), and the
+  tag is pinned to the resolved commit sha shown in the dialog — a branch
+  moving while the modal is open cannot change what gets tagged.
+- **(Set 102 S2) `Dabbler: Start hotfix from tag` / `Dabbler: Roll back to
+  tag` — the recovery drills.** Hotfix branches from the deployed tag
+  (never the trunk, which may hold unreleased work); rollback is
+  redeploying the previous tag (`git checkout <tag>`, detached HEAD, with
+  return-to-trunk guidance) — not git surgery. Both refuse a dirty tree,
+  and tag listing distinguishes "repo has no tags" from "not a git
+  repository" so the drills error honestly from a non-repo folder. Pure
+  git, host-agnostic by construction.
+- **(Set 102 S3) Automation-first tutorial re-cut.** The hello-world
+  tutorial's main flow now teaches "the human approves; the framework runs
+  the git," with every human-decision point called out and the per-set
+  loop host-neutral across GitHub and Azure DevOps (ADO-equivalent
+  callouts annotate the GitHub-worked one-time bootstrap). New **Part 0.5
+  per-host setup section** (install + auth + settings + what "green" looks
+  like, mirroring the in-product preflight guidance) and a new **"Git
+  under the hood" appendix** with the exact raw command sequence each
+  automated action runs (PR step shown for both hosts) plus what the
+  automation deliberately does **not** cover. README, quick-start, and the
+  scaffolded getting-started template now reference the five commands.
+
+### Verification
+
+- ~120 new unit tests across S1/S2 (remote-URL parse table over every
+  ADO/GitHub form; CLI-absent, unknown-host, confirm-declined, and
+  dirty-tree paths; mandatory-confirm non-bypassability; tag/branch-name
+  validation; hotfix/rollback mechanics) + package.json command-surface
+  pins. Live dogfoods: a real GitHub PR round-trip (open → merge →
+  finalize, asserting the local end-state) and real-git tag/hotfix/
+  rollback drills against a scratch repo with a bare remote. The Azure
+  DevOps live walk is an **armed operator UAT** (needs an ADO org); the
+  ADO code paths are pinned by the unit suite.
+
 ## [0.44.0] — Unreleased (Sets 098–101 — module-lifecycle simplification)
 
 > **The single 098–101 release-boundary VSIX.** The four-set

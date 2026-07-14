@@ -191,6 +191,13 @@ The agent then:
 The human then starts the next session or approves the set as complete.
 Sessions on different sets can run in parallel using worktrees — see
 [`docs/planning/repo-worktree-layout.md`](planning/repo-worktree-layout.md).
+The mechanical git around the loop is one confirm-gated VS Code command
+each — `Dabbler: Open PR for this set`, `Dabbler: Finalize merged set`,
+`Dabbler: Cut release tag` (plus hotfix/rollback drills) — working on
+both GitHub and Azure DevOps; PR review/approval and the release
+decision stay human. Setup and the raw commands each action runs:
+[`docs/tutorials/module-team-hello-world.md`](tutorials/module-team-hello-world.md)
+(Part 0.5 and the "Git under the hood" appendix).
 
 ---
 

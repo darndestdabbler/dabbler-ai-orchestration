@@ -71,7 +71,7 @@ whose trigger moment is situational, moved full-text to
 | L-079-2 | spec-authoring rule — see the authoring guide (gate flags live in the config block, prose cannot arm a gate) |
 
 ## Windows cp1252 Is A Standing Bug Class — Bytes At Subprocess Boundaries, Persist Before Printing
-<!-- lesson: id="L-079-1" added-set="079" last-used-set="087" status="active" scope="portable" -->
+<!-- lesson: id="L-079-1" added-set="079" last-used-set="102" status="active" scope="portable" -->
 
 - The child Python's stdout text layer defaults to `cp1252` on Windows,
   so any non-ASCII payload crossing a pipe *as text* is a latent crash in
@@ -97,7 +97,7 @@ full text in `lessons-archive.md`:
 | L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="101" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="102" status="active" scope="portable" -->
 
 - Prose carried over from a superseded doc was true (or tolerated) in the
   old context and reads authoritative in the new one — a defect class of
@@ -156,7 +156,7 @@ full text in `lessons-archive.md`:
 ## Repo-Specific Lessons
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="101" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="102" status="active" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families

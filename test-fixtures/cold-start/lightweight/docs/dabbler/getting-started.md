@@ -147,6 +147,16 @@ you deliberately want a parallel decomposition, use the
 **`Dabbler: Generate Parallel Session-Set Prompt (advanced)`**
 command from the Command Palette.
 
+The mechanical git around that loop is automated, confirm-gated, and
+works on both GitHub and Azure DevOps: **`Dabbler: Open PR for this
+set`** pushes the session branch and opens its pull request, and —
+after you review and merge on your git host — **`Dabbler: Finalize
+merged set`** syncs the trunk and cleans up the branch and worktree.
+Release actions are commands too (**`Dabbler: Cut release tag`**,
+**`Dabbler: Start hotfix from tag`**, **`Dabbler: Roll back to
+tag`**). Every command previews the exact git commands it will run
+and waits for your confirmation.
+
 ## 4. Start the First Session
 
 After steps 1–3 above, you can start using the AI orchestration.

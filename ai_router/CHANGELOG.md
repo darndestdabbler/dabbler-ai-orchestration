@@ -3,6 +3,12 @@
 All notable changes to the `ai_router` Python package are documented
 here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+> **Set 102 notation (2026-07-14):** the `102-git-workflow-automation` set
+> shipped **extension-only** (extension `0.45.0` staged) — zero `ai_router/`
+> changes accrued, so the router stays `0.33.0` and that set has no entries
+> below. Recorded here so the release walk has an explicit router-side
+> notation, not just the extension changelog's cross-reference.
+
 ## [0.33.0] — Unreleased (Set 096 — consequence-graded severity + the phased verification loop)
 
 > Makes the Set 095 verification-churn fix durable and framework-level.

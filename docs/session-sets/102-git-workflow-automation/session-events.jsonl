@@ -8,3 +8,5 @@
 {"timestamp": "2026-07-14T10:39:50.470639Z", "session_number": 2, "event_type": "verification_completed", "method": "api", "source": "close_session_backstop", "verdict": "VERIFIED"}
 {"timestamp": "2026-07-14T10:39:51.396305Z", "session_number": 2, "event_type": "closeout_succeeded", "method": "api", "engine": "claude", "provider": "anthropic", "model": "claude-opus-4-8", "verdict": "VERIFIED", "lessons_cited": ["L-064-9", "L-095-1"]}
 {"timestamp": "2026-07-14T11:32:15.739857Z", "session_number": 3, "event_type": "work_started"}
+{"timestamp": "2026-07-14T12:35:09.430925Z", "session_number": 3, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-14T12:36:52.695103Z", "session_number": 3, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "blocking_findings"}

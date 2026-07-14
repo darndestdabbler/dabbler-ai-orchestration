@@ -212,6 +212,14 @@
       "dateTime": "2026-07-14T08:34:31.340475-04:00",
       "description": "Advisory path-aware critique COMPLETE (pull surface, 2 providers): google gemini-2.5-pro VERIFIED (1 Minor nit), openai gpt-5.4 ISSUES_FOUND (1 Major). Adjudicated per L-070-1: the openai Major ('path-aware-critique.json not on disk') is MOOT BY CONSTRUCTION - a timing artifact of the critique run itself (sandbox snapshot predates the artifact its own run wrote; artifact ships in the close commit = exactly the demanded fix). The google Minor (detached-HEAD wording drift between tutorial and changelog) FIXED with a one-clause tutorial clarification. Converged: no new code defect, one wording improvement. Artifact raw + never edited; adjudication recorded in disposition.json.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-003/backstop-remediation",
+      "dateTime": "2026-07-14T08:44:58.855586-04:00",
+      "description": "First close attempt: the Set 084 backstop re-verified (post-round-1 edits had invalidated the round-1 stamp; fresh gpt-5-6, no conventions block) -> ISSUES_FOUND: 1 Major (tutorial not an executable host-neutral ADO main flow) + 4 nits (\\.16). Remediated along the verifier's own alternative fix line (s3-remediation-round-2.md): Part-7 host-scope block, ADO callouts upgraded to actionable policy walks (Automatically included reviewers w/ path filters; Build validation; ADO Delete-source-branch on completion), host-wide claims scoped, checklist ADO acceptance; nits 1/3/4 fixed (0.5-green placement + real PAT read; PowerShell hotfix validation; router-changelog Set-102 notation), nit 2 dismissed with the spec's verbatim 'a human, or a different agent, approves' citation. Full ADO pipelines walkthrough deliberately NOT authored blind (no ADO org; untested-instructions bar) - queued to the ADO-first/Copilot follow-on. Round 3 (classic re-verify, --diff-base pre-session, conventions + auto ledger; phased remediation-review refused fails-closed for lack of a baseline tree): gpt-5-6 -> VERIFIED, ZERO findings, \\.19.",
+      "status": "complete"
     }
   ]
 }

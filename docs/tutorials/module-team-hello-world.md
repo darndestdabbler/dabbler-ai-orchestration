@@ -73,7 +73,13 @@ the exact `gh pr create …` (or `az repos pr create …`) line it will run; whe
 it is not found, the dialog says "(no gh CLI found — the browser create-PR
 page will open instead)" (or "az"), and after the push your browser opens the
 host's create-a-PR page with the same guidance in a notification. Either way
-you can finish the job — the CLI just saves the browser trip.
+you can finish the job — the CLI just saves the browser trip. (This
+in-product check needs a repository with an `origin` remote and a non-trunk
+branch to exist, so it first becomes runnable in Part 4 — until then, the
+CLI-level checks above are your confirmation. And for PAT-based ADO auth,
+prove the PAT actually works against your organization with a real read —
+`az repos list --organization https://dev.azure.com/{org} --project {project} --output table`
+— rather than treating the set environment variable as success.)
 
 ## Part 1 — Init the trunk
 
@@ -243,7 +249,7 @@ you can finish the job — the CLI just saves the browser trip.
     - While you are in Settings, also enable **Automatically delete head branches** (under **Settings** > **General**). GitHub then deletes each PR's remote branch on merge — merged branches piling up is exactly the clutter trunk hygiene forbids, and this setting handles the remote half for free. (The local half is handled by **`Dabbler: Finalize merged set`** for session branches, and by a one-line `git branch -d` for the authoring and hotfix branches — the tutorial reminds you at each spot.)
     - Save the rule. (GitHub's setting names drift over time; the intent is: no direct pushes to `main` for anyone, one approval, green CI.)
 
-    > **Azure DevOps note:** Set **Branch Policies** on `main`. The key settings are "Require a minimum number of reviewers" (set it to 1) and "Build validation" (you'll add the pipeline here in Part 7).
+    > **Azure DevOps note:** Set **Branch Policies** on `main` (**Project Settings** > **Repositories** > (your repo) > **Policies** > **Branch Policies**). The key settings are **Require a minimum number of reviewers** (set it to 1) and **Build validation** (you'll add the pipeline here in Part 7). While you are there, note ADO's remote-branch-cleanup equivalent of GitHub's auto-delete: PR completion offers **Delete <branch> after merging** (checked by default in the complete dialog) — leave it on so merged source branches don't pile up on the remote.
 
     > **Expect:** from this point on, a direct `git push` of a `main` commit is rejected — every later change in this tutorial lands through a pull request.
 
@@ -406,6 +412,22 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
 
 **Where you are:** The AI sessions are running. Meanwhile, one person — Priya — activates the ownership and CI guardrails in the main checkout, as a small PR to `main`.
 
+> **Host scope — read this first on Azure DevOps.** This part's hands-on
+> walk is **GitHub-concrete**: CODEOWNERS and GitHub Actions are GitHub
+> features. The **automated loop the framework runs (Parts 4–10) is
+> genuinely identical on both hosts** — only this one-time guardrails
+> bootstrap is host-specific. Each step below therefore carries an **Azure
+> DevOps note** naming the exact equivalent policy to set (required
+> reviewers on paths, a build-validation pipeline) so an ADO admin knows
+> precisely what to configure — but this walkthrough does not hand-run the
+> ADO setup: authoring and validating an Azure Pipelines pipeline belongs
+> to your organization's pipeline standards and to the planned ADO-first
+> companion walkthrough. If you are on ADO, do the policy setup from the
+> notes (they are one-time admin actions), then rejoin the main flow at
+> Part 8 — nothing in Parts 8–10 depends on *how* the guardrails were
+> configured, only that a PR needs an approval and green validation to
+> merge.
+
 1. Open `.github/CODEOWNERS`. The scaffolded template's worked example **is this tutorial's cast** — uncomment and adapt it so the active rules read:
 
     ```text
@@ -427,7 +449,7 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
 
     Also write the module→owner mapping down somewhere **other** than CODEOWNERS itself — the simplest is one `# owners: @priya-gh` comment line per module in `docs/modules.yaml`. CODEOWNERS routes reviews, but nothing in GitHub checks that its handles are the *right people*; a mistyped or stale handle still "covers" every path. The companion workflow review treats that separate roster as the ground truth to audit CODEOWNERS against, and without one it can verify only path coverage, not owner identity.
 
-    > **Azure DevOps note:** CODEOWNERS is a GitHub feature. The Azure DevOps equivalent is a required-reviewers branch policy, which can be set to require individuals or groups to approve changes to specific paths.
+    > **Azure DevOps note:** CODEOWNERS is a GitHub feature. The ADO equivalent is the **Automatically included reviewers** branch policy: **Project Settings** > **Repositories** > (your repo) > **Policies** > **Branch Policies** on `main` > **Automatically included reviewers** > **+** — one entry per module, naming the owner(s) and a **path filter** (e.g. `/services/greeter/*;/docs/modules/greeter/*` for Priya), each marked **Required**. That reproduces both halves of CODEOWNERS: the review request *and* the requirement. The module→owner roster advice above applies unchanged.
 
 2. Open `.github/workflows/monorepo-ci.yml`. The scaffolded template teaches a two-layer contract — **path-scoped module jobs** for fast PR feedback, and the **`all-modules` guardrail** on every push to `main` (the anti-integration-bomb rule: cross-module breakage surfaces on the merge that caused it). Rather than hand-assembling it from the template's two commented examples, replace the whole file with this complete, final workflow for our three modules:
 
@@ -532,7 +554,7 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
     - **An existing module can't go green while testing nothing.** `unittest discover` exits 0 on "Ran 0 tests" (and top-level discovery does not descend into plain, non-package subfolders), so a naive command can pass vacuously — for example when a PR forgot its promised test. Every module job therefore counts collected tests and fails on zero, and the `all-modules` job applies the same count guard to every `services/` directory that exists. One honest boundary: a module whose directory is *entirely missing* is invisible to this job — that gap is owned by the module's own PR review and by the final self-check item that asserts all three declared `codeRoots` exist on `main`.
     - This guardrails PR merges **before** any module code exists on `main` (the implementation PRs land in Part 8), so the missing-`services/` branch passes vacuously exactly once, at rollout — and says so in the log.
 
-    > **Azure DevOps note:** The conceptual equivalent is an Azure Pipelines YAML file. It would use path filters on its triggers to run jobs conditionally, plus a build-validation branch policy to make it required (Part 3's note).
+    > **Azure DevOps note:** the equivalent is one **Azure Pipelines** YAML (`azure-pipelines.yml`) with the same two-layer contract — per-module jobs conditioned on changed paths, plus an always-on all-modules job for `main` — wired to `main` as a **Build validation** branch policy (**Branch Policies** > **Build validation** > **+**, pick the pipeline, **Required**). Build validation is ADO's "required status check": a red pipeline blocks PR completion. Authoring that pipeline is deliberately out of this walkthrough's scope (see the host-scope note at the top of this part); the workflow above is the behavioral spec to reproduce.
 
 3. Land both files on `main` as a small PR:
 
@@ -547,13 +569,15 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
 
     > **Honest limitation (fine for this toy, know it for real projects):** GitHub treats a *skipped* required check as satisfied, and the module jobs are conditional on the `changes` filter — that is what makes path-scoping work at all. Requiring `changes` closes the filter-failure hole, but the airtight production pattern is one always-running aggregate gate job (e.g. `ci-ok`) that `needs:` the filter and every module job, fails if any of them failed, and is the single required check. Worth adopting the day this workflow guards something real.
 
+    > **Azure DevOps note:** there is no separate check-selection step — the **Build validation** policy from step 2's note *is* the required check, configured once.
+
 ## Part 8 — Small PRs to main
 
 **Where you are:** Priya's session finished: the `session-set/001-greeter-hello` branch has the code committed. The guardrails PR is merged. The core habit: **merge a set when it completes.** Small, frequent, boring merges.
 
 1. **Priya:** From inside the worktree window, open the Command Palette and run **`Dabbler: Open PR for this set`**.
 
-    > **Expect:** the confirm dialog from Part 4, now on the session branch — "Push this branch and open a PR?", with the title defaulting to "Session set 001-greeter-hello". After you confirm, the PR triggers the path-scoped **greeter** CI job (the filter matched `services/greeter/**`) — and not clock's. No reviewer is auto-requested by CODEOWNERS: the only owner of the touched paths is Priya herself, and the host never requests a review from a PR's own author. Branch protection still wants one approval — Sam gives it.
+    > **Expect:** the confirm dialog from Part 4, now on the session branch — "Push this branch and open a PR?", with the title defaulting to "Session set 001-greeter-hello". After you confirm, the PR triggers the path-scoped **greeter** CI job (the filter matched `services/greeter/**`) — and not clock's. No reviewer is auto-requested by CODEOWNERS: the only owner of the touched paths is Priya herself, and GitHub never requests a review from a PR's own author (Azure DevOps likewise won't count the author's own vote toward the reviewer minimum). Branch protection still wants one approval — Sam gives it.
 
 2. Once the PR is approved and CI is green, merge it on your git host.
 
@@ -623,10 +647,20 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
       git commit -am "fix(greeter): correct the greeting"
       ```
     - Run **`Dabbler: Open PR for this set`** and confirm (the path-scoped `greeter` job runs on the PR — pull requests trigger CI regardless of branch name). Get a teammate's approval and wait for green.
-    - **Validate before you tag.** One subtlety: the PR check runs against the host's *preview merge* of your branch with `main` — good for compatibility, but not literally the snapshot you are about to tag — and the path-scoped job tested only the changed module, while the tag ships **all** of them. So run the full integrated suite locally on the exact hotfix commit first:
+    - **Validate before you tag.** One subtlety: the PR check runs against the host's *preview merge* of your branch with `main` — good for compatibility, but not literally the snapshot you are about to tag — and the path-scoped job tested only the changed module, while the tag ships **all** of them. So run the full integrated suite locally on the exact hotfix commit first (Bash / Git Bash):
 
       ```bash
       ( for d in services/*/; do python -m unittest discover -s "${d%/}" -v || exit 1; done ) &&
+      python services/integration/app.py
+      ```
+
+      PowerShell equivalent:
+
+      ```powershell
+      Get-ChildItem services -Directory | ForEach-Object {
+        python -m unittest discover -s $_.FullName -v
+        if ($LASTEXITCODE -ne 0) { throw "tests failed in $($_.Name)" }
+      }
       python services/integration/app.py
       ```
 
@@ -659,7 +693,7 @@ Tick these off; each one is directly verifiable:
 - [ ] `main` is protected: a direct push is rejected; PRs need one approval and green checks.
 - [ ] On GitHub, `.github/CODEOWNERS` is active: Alex's integration PR auto-requested reviews from Priya and Sam. (On Azure DevOps, the required-reviewers branch policy did the same job.)
 - [ ] The host's **Actions**/**Pipelines** tab shows path-scoped jobs for all three modules on their PRs (including `integration` on Alex's), and the `all-modules` job on every merge to `main`.
-- [ ] The `changes` filter job and the module jobs are selected as **required** status checks in the `main` branch-protection rule (Part 7 step 4) — a failing check blocks the merge (see Part 7's note on the skipped-check limitation and the production-grade aggregate gate).
+- [ ] The `changes` filter job and the module jobs are selected as **required** status checks in the `main` branch-protection rule (Part 7 step 4) — a failing check blocks the merge (see Part 7's note on the skipped-check limitation and the production-grade aggregate gate). (On Azure DevOps: the **Build validation** branch policy is the equivalent gate — red validation blocks PR completion.)
 - [ ] The loop ran through the framework: session PRs opened by **`Dabbler: Open PR for this set`**, post-merge sync/cleanup by **`Dabbler: Finalize merged set`**, both tags by **`Dabbler: Cut release tag`** — and every one of those actions previewed its exact commands and waited for your confirm.
 - [ ] `git tag -l` lists `v0.1.0` and `v0.1.1`, and `git for-each-ref refs/tags --format="%(refname:short) %(objecttype)"` shows both as `tag` (annotated).
 - [ ] Every declared `codeRoot` exists on `main` with code and tests: `services/greeter/`, `services/clock/`, and `services/integration/` all match what `docs/modules.yaml` declares (a missing directory is the one gap the `all-modules` job cannot see — this check owns it).

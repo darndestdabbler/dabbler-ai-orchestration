@@ -68,6 +68,14 @@
       "dateTime": "2026-07-14T04:41:21.522524-04:00",
       "description": "Committed re-runnable dogfood harness (src/test/dogfood/gitWorkflow.dogfood.ts, outside the CI suite glob): real defaultRunner + real git against a scratch repo (github-shaped remote URL, transport rewritten to a local bare repo via insteadOf) - Open PR CLI-absent floor pushes for real + offers the real compare URL; simulated host merge; Finalize leaves the exact asserted end-state (trunk ff, worktree gone+unregistered, branch gone); second run reports Nothing to finalize. DOGFOOD CAUGHT A REAL DEFECT pre-verification: host detection via git remote get-url returns the insteadOf-REWRITTEN url; fixed to read git config --get remote.origin.url (the operator-configured logical host) with get-url fallback. Live-host walks ARMED for the operator (102-...-uat-checklist.json; ADO priority) per the 2026-07-14 time-pressure directive.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/verification",
+      "dateTime": "2026-07-14T05:35:25.883917-04:00",
+      "description": "Phased loop: discovery round 1 (gpt-5-6, $0.224, reduced fan-out 1/2 - two provider read-timeouts on the second identical call) -> ISSUES_FOUND, 1 Major (ADO percent-encoded project/repo names passed to az undecoded + %2520 double-encoding in web URLs) + 6 nits. Supplementary round 2 ($0.049) VERIFIED, nothing new. Remediated once: Major + 4 nits fixed (decode-once/encode-once, session-set/* worktree filter, case-insensitive _git, refs/heads full refs in the ADO fallback, toplevel-based main-checkout guard), 2 deferred with reasons (az execution-probe: copilotCli filesystem-probe posture + guidance-bearing failure path; detached-worktree reporting: excluded by-rule now). Remediation-review round 3 ($0.038) VERIFIED, fix accepted. Suite 1713 green post-fix; dogfood re-run green. Total verification cost ~$0.31.",
+      "status": "complete"
     }
   ]
 }

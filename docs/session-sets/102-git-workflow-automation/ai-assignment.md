@@ -37,4 +37,14 @@ gpt-5-4-mini (adds provider diversity at similar cost/performance).
 
 ### Actuals (filled at close)
 
-- (pending)
+- Orchestrator used: claude / anthropic / claude-fable-5 (operator-invoked).
+- Routing plan followed as recommended: implementation + tests
+  orchestrator-direct; step-3.5 analysis routed ($0.0055); verification
+  routed cross-provider (gpt-5-6; discovery $0.224 at reduced fan-out 1/2
+  after two provider read-timeouts, supplementary $0.049, remediation-review
+  $0.038 — ~$0.31 total).
+- Deviations: none from the plan. The live ADO dogfood was deferred to the
+  armed operator UAT walk per the operator's same-day directive (recorded
+  up front, not a mid-session cut).
+- Outcome: VERIFIED after one remediation pass (1 Major + 4 nits fixed, 2
+  nits deferred with reasons); suite 1713 green; dogfood harness green.

@@ -121,3 +121,39 @@ for the team and the admin's own account at Project Settings > Repositories >
 Priya"). UAT Walk 4 adds a deny-push-bypass step before the rejection test and a
 literal expectation covering the admin account. Re-verifying via the close
 backstop.
+
+## Round 6 (close backstop, Set 084) — 3 new blocking Majors → fixed
+
+The round-5 fix commit re-invalidated the stamp; the backstop re-verified the full
+diff at round 6 and found three further distinct, genuinely-real Majors (none a
+reopened settled point — each a new, correct issue, two of them refinements
+exposed by the round-5 fix itself):
+
+### F9 — `Not set` does not close an INHERITED ADO bypass permission (Major, Correctness) — FIXED
+The round-5 fix offered "Deny (or 'Not set')", but in Azure DevOps ACLs a project
+admin usually *inherits* `Allow` for the bypass permissions from another group,
+and "Not set" leaves that inherited `Allow` effective — only an explicit **Deny**
+overrides it (Deny wins). **Fix:** Part 3 step 8 and UAT Walk 4 now require an
+explicit **Deny** (removed the "or Not set" equivalence) and explain the
+inheritance, with the Expect updated to name the "Not set over inherited Allow"
+failure mode.
+
+### F10 — Project-creation step missing from the ADO bootstrap (Major, Completeness) — FIXED
+The spec's authoritative design puts "project/repo/membership" in the executable
+bootstrap, but Part 1 created only the repo and treated the project as a Part-0
+prerequisite. **Fix:** Part 1 step 2 now includes a literal **New project** step
+(name, Private visibility, Version control = Git) before repo creation, and UAT
+Walk 2 mirrors it. (The spec's Session-2 precondition still supplies a *scratch*
+org+project; this makes the standalone bootstrap runnable from "org but no
+project" rather than assuming a project exists.)
+
+### F11 — Cross-links said "validated-live draft" (reads as validated live) (Major, Correctness) — FIXED
+The discoverability pointers described the doc as a "validated-live draft", which
+a reader reasonably parses as "validated live" — contradicting the DRAFT banner
+("not yet validated live") and defeating the draft gate. **Fix:** every
+occurrence (quick-start, base tutorial intro + Part 7 pointer, README) now reads
+"draft pending live validation".
+
+Re-checks: UAT JSON parses (11 walks, Passes=null); tutorial clean of drift-guard
+banned phrases; all command titles match; embedded pipeline parses; no
+"validated-live draft" residual. Re-verifying via the close backstop.

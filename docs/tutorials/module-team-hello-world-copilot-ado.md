@@ -116,7 +116,9 @@ az repos list --organization https://dev.azure.com/{org} --project {project} --o
     git commit -m "chore: init trunk"
     ```
 
-2. In your Azure DevOps project, create a new **empty** repository named `hello-modules` (no README, no `.gitignore` from the template — you already committed those locally).
+2. Create the Azure DevOps **project and repository**. In your Azure DevOps organization (`https://dev.azure.com/{org}`):
+    - **If you don't already have a project to use, create one:** click **New project**, name it (e.g. `hello-modules`), set **Visibility** to **Private**, expand **Advanced** and confirm **Version control** is **Git**, then **Create**. (For the operator walk, this is the "scratch project" precondition — one you can freely create and destroy repos, policies, and pipelines in.)
+    - Inside that project, go to **Repos** and create a new **empty** repository named `hello-modules` (**do not** initialize it with a README or `.gitignore` — you already committed those locally). A brand-new project ships with one default repo named after the project; either rename/reuse it or add a second repo named `hello-modules`.
 
 3. Connect and push (replace `{org}`, `{project}`, and `{repo}` with your organization, project, and repository names):
 
@@ -244,9 +246,9 @@ az repos list --organization https://dev.azure.com/{org} --project {project} --o
         - **Bypass policies when pushing** — lets the holder push straight to `main`, skipping the policy entirely. This is the one that breaks the "no direct push" guarantee.
         - **Bypass policies when completing pull requests** — lets the holder complete a PR without satisfying the policies.
 
-      Set **both** to **Deny** (or "Not set") for the normal team, at **Project Settings** > **Repositories** > (your repo) > **Security** — select the Contributors group (and each teammate, and Priya's own account if it inherits Allow) and deny the two "Bypass policies…" entries. Until you do, "protected `main`" is only protected for accounts that lack these permissions.
+      Set **both** to an explicit **Deny** at **Project Settings** > **Repositories** > (your repo) > **Security** — select the Contributors group **and Priya's own account** and set the two "Bypass policies…" entries to **Deny**. Use **Deny**, not "Not set": a project administrator usually *inherits* `Allow` for these from another group, and "Not set" leaves that inherited `Allow` in effect — only an explicit **Deny** overrides it (Deny wins in Azure DevOps ACLs). Until you do, "protected `main`" is only protected for accounts that don't already hold the bypass.
 
-    > **Expect:** with the reviewer policy on **and** push-bypass denied, a direct `git push` of a `main` commit is rejected for everyone — including Priya — and every later change in this tutorial lands through a pull request. (If your own push still succeeds, your account still has **Bypass policies when pushing** — deny it, or run the check from a plain Contributors account.)
+    > **Expect:** with the reviewer policy on **and** both bypass permissions set to **Deny**, a direct `git push` of a `main` commit is rejected for everyone — including Priya — and every later change in this tutorial lands through a pull request. (If your own push still succeeds, your account's effective **Bypass policies when pushing** is still `Allow` — it was left "Not set" over an inherited `Allow` rather than explicitly Denied; set it to **Deny**, or run the check from a plain Contributors account.)
 
 ## Part 4 — The first plan and the first session set (Command Palette)
 

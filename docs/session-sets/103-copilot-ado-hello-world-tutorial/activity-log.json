@@ -1,0 +1,81 @@
+{
+  "sessionSetName": "103-copilot-ado-hello-world-tutorial",
+  "createdDate": "2026-07-14T13:16:41.745496+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-14T13:16:41.746058+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/reconnaissance",
+      "dateTime": "2026-07-14T09:24:16.444624-04:00",
+      "description": "Read preload (constitution, project-guidance, lessons-learned, CLAUDE.md); read spec + authoring-structure-analysis; confirmed prereq Set 102 complete; read base tutorial, 102 change-log + s3-remediation-round-2, Copilot-seat surfaces (copilotSeatSetupCommand.ts, copilotSeatSetup.ts, copilotCli.ts, copilot_preflight.py, copilot-seat-setup-checklist.md), git-workflow command fact base (gitWorkflow.ts, gitRelease.ts, package.json command titles), review-prompt companion, quick-start, README, 078 UAT exemplar.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/ai-assignment-routed",
+      "dateTime": "2026-07-14T09:24:16.721528-04:00",
+      "description": "Routed step-3.5 assignment analysis (route task_type=analysis, exclude anthropic -> gemini-2.5-pro, $0.0092, truncation-clean); raw saved to s1-ai-assignment-analysis.json; ai-assignment.md authored. Verdict: route tutorial authoring (documentation) + fidelity-pass direct; UAT checklist / cross-links / machine-check orchestrator-direct; verification routed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/tutorial-authored",
+      "dateTime": "2026-07-14T09:39:05.261239-04:00",
+      "description": "Authored docs/tutorials/module-team-hello-world-copilot-ado.md (801 lines): routed documentation authoring (gemini-2.5-pro, $0.18, truncation-clean) + orchestrator fidelity pass. Machine-checked: embedded azure-pipelines.yml parses; all 13 Dabbler command titles match package.json; all 5 relative links resolve; all confirm-dialog strings quoted verbatim against shipped gitWorkflow.ts/gitRelease.ts. Fixed vs routed draft: scaffold writes .github templates NOT azure-pipelines.yml (Part 2/7 corrected to author pipeline new + register ADO pipeline); removed unrunnable preflight step + wrong package name; restored verbatim dialog quotes + command titles; fixed authoring/02-clock-hello typo; DRAFT banner retained.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/uat-checklist-authored",
+      "dateTime": "2026-07-14T09:42:44.995487-04:00",
+      "description": "Authored 103 per-set UAT checklist (11 walks, 078 bar): literal copy-pasteable HumanAction + literal-string Expectation, where-you-are preamble per walk, checklist-level order map in Notes mirroring tutorial order, every walk carries ProgrammaticVerification or an honest operator-only reason, Passes=null (authored not walked). Walks 5+8 flagged as the Set-102-armed ADO UAT discharge; Walk 7 flagged first-ever live pipeline run; seat auth-failure walk deliberately not included (unsafe to deauth, same call as 078).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/crosslinks-maintenance",
+      "dateTime": "2026-07-14T09:45:31.603648-04:00",
+      "description": "Cross-links to the new doc added from base tutorial (+ Part 7 companion-pointer update), quick-start, and README (README line staged, reaches Marketplace only at next operator-gated publish). Reciprocal every-echo maintenance note added to the base tutorial (the new doc carries its own in the sync-map appendix). Drift line item added to the companion review-prompt (audits the tutorial pair for shared-spine drift). All relative links verified resolving.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/build-suite",
+      "dateTime": "2026-07-14T09:58:25.051372-04:00",
+      "description": "Build+suite: docs-only (zero product .ts/.py deltas). Extension unit suite 1767 passing, tsc --noEmit clean, Layer 1 pytest 3030 passed / 6 skipped. The suite CAUGHT one real defect my new doc introduced: drift_guard stale-framing check flagged 'no Python/venv' at copilot-ado.md:88 (collides with the 'Lightweight is router-off, not Python-off' invariant) -> reworded to 'a direct CLI call ... before the project .venv exists'; drift_guard test 25/25 green after fix. Layer 3 Playwright not run (docs-only; L-064-12 scopes it to Explorer/state-writer/fixture changes, none touched).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/verification",
+      "dateTime": "2026-07-14T10:46:47.396521-04:00",
+      "description": "Cross-provider phased verification (gpt-5-6, anthropic auto-excluded, conventions block + L-095-1 rubric). discovery: 6 blocking (dedup to 4); supplementary: 3 more -> 7 distinct real defects, all agreed. Remediated all 7 (pipeline register-before-push, changes fetch-ref + persistCredentials, hosted-parallelism prereq, 3 UAT completeness gaps); s1-remediation-round-1.md sidecar. remediation-review cycle 1: 6 accepted, 1 rejected (Walk 9 didn't take integration to Complete) -> fixed; cycle 2: VERIFIED, 8/8 accepted, 0 findings. ~$0.92 verification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/disposition",
+      "dateTime": "2026-07-14T10:46:47.688510-04:00",
+      "description": "Authored full disposition.json (status completed, verification_method=api, verification_verdict=VERIFIED preserved from verify patch; next_orchestrator gpt/openai/gpt-5-6/high reason=other for the cross-provider live UAT walk; blockers []). validate_disposition -> (True, []). ai-assignment.md Actuals filled.",
+      "status": "complete"
+    }
+  ]
+}

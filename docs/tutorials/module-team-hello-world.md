@@ -6,6 +6,9 @@ This tutorial walks a three-person team (Priya, Sam, and Alex) through their fir
 - **Time to complete:** About half a day, including time for the AI agent to complete its work sessions.
 - **Read this first:** This tutorial teaches the *how*. For the *why* behind this workflow (monorepos, modules, trunk-based development, tags), read the [Module-Organized Projects Primer](../planning/module-organized-projects-primer.md) first. The formal specification is the [Module-Organized Projects Recommendation](../planning/module-organized-projects-recommendation.md).
 - **When you finish:** run the companion [module workflow review prompt](./module-team-hello-world-review-prompt.md) against your repo as a graduation check.
+- **On GitHub Copilot + Azure DevOps?** There is a standalone [Copilot + Azure DevOps cut](./module-team-hello-world-copilot-ado.md) of this walkthrough for teams locked to GitHub Copilot as their only agent and hosted on Azure DevOps — same cast and toy program, re-cut for the Copilot seat and ADO branch policies + an executable `azure-pipelines.yml`. *(That doc is currently a validated-live draft — see its banner.)*
+
+> **Maintainer note (tutorial pair):** the module / trunk / worktree / session-lifecycle **spine** of this document is shared verbatim with [`module-team-hello-world-copilot-ado.md`](./module-team-hello-world-copilot-ado.md). An edit to shared-spine content must land in **both** documents in the **same PR** (the L-065-1 every-echo discipline); host/agent-specific content is edited independently. That doc's sync-map appendix maps the parts; the companion review prompt audits the pair for drift.
 
 The cast, used throughout:
 
@@ -421,8 +424,11 @@ Each session set runs on its own short-lived branch, checked out in its own **gi
 > reviewers on paths, a build-validation pipeline) so an ADO admin knows
 > precisely what to configure — but this walkthrough does not hand-run the
 > ADO setup: authoring and validating an Azure Pipelines pipeline belongs
-> to your organization's pipeline standards and to the planned ADO-first
-> companion walkthrough. If you are on ADO, do the policy setup from the
+> to your organization's pipeline standards and to the standalone
+> [Copilot + Azure DevOps walkthrough](./module-team-hello-world-copilot-ado.md),
+> which carries a complete, executable `azure-pipelines.yml` and the ADO
+> policy bootstrap (a validated-live draft as of this writing — see its
+> banner). If you are on ADO, do the policy setup from the
 > notes (they are one-time admin actions), then rejoin the main flow at
 > Part 8 — nothing in Parts 8–10 depends on *how* the guardrails were
 > configured, only that a PR needs an approval and green validation to

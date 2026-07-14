@@ -1,15 +1,20 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "103-copilot-ado-hello-world-tutorial",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-14T09:16:41.738550-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "model": "claude-opus-4-8",
+        "effort": "high",
+        "identityProvenance": "direct"
+      },
       "verificationVerdict": null
     },
     {

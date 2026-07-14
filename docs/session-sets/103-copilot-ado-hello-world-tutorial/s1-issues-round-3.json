@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Walk 10 still assumes the integration set is Complete without establishing that state**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** Every operator following the checklist literally leaves `003-integration-compose` unexecuted through Walk 8. Walk 6 explicitly says “do NOT run it yet,” and Walk 8 completes and finalizes only greeter and clock. The discovery baseline’s Walk 9 did not complete and finalize the integration PR, and there is no Walk 9 modification in this fix delta. Consequently, Walk 10’s opening state—“all three sets Complete”—is unattainable on the documented path. This is probable because it occurs on every literal execution, not only under an unusual configuration.\n  - **Details:**\n    - **Violation:** The checklist must provide “literal copy-pasteable HumanAction” in a walk order that establishes each subsequent precondition. Walk 10 requires: “Where you are: all three sets Complete.”\n    - **Impact:** Session 2 cannot validate the tutorial linearly without improvising the missing integration PR completion and `Dabbler: Finalize merged set` actions. That defeats the checklist’s acceptance-test role and leaves the integration lifecycle unvalidated.\n    - **Evidence:** The remediation changes Walks 5, 6, and 8, but not Walk 9. Walk 6 explicitly leaves integration blocked and unrun; Walk 8 finalizes only `001-greeter-hello` and `002-clock-hello`; Walk 10 then assumes all three are Complete. This explicitly challenges the Round 1 L2/L6 remediation because the presented delta does not repair the finalization portion of those findings.\n    - **Location:** `103-copilot-ado-hello-world-tutorial-uat-checklist.json`, transition from Walk 9 to Walk 10.\n    - **Fix:** Extend Walk 9 to run `003-integration-compose`, open and validate its ADO PR, obtain the required owner approvals, complete the PR, run `Dabbler: Finalize merged set`, and verify that `003-integration-compose` appears in the Complete bucket before Walk 10 begins.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "Every operator following the checklist literally leaves `003-integration-compose` unexecuted through Walk 8. Walk 6 explicitly says “do NOT run it yet,” and Walk 8 completes and finalizes only greeter and clock. The discovery baseline’s Walk 9 did not complete and finalize the integration PR, and there is no Walk 9 modification in this fix delta. Consequently, Walk 10’s opening state—“all three sets Complete”—is unattainable on the documented path. This is probable because it occurs on every literal execution, not only under an unusual configuration."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 pipeline YAML is pushed before registration",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 integration lifecycle remains incomplete before Walk 10",
+      "verdict": "fix-rejected",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 hosted-agent capacity prerequisite is documented",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 target branch is fetched into an explicit remote-tracking ref",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 checkout credentials are persisted for the fetch",
+      "verdict": "fix-accepted",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8 all decomposition-generated default sets are removed",
+      "verdict": "fix-accepted",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 full hotfix PR, CI, validation, deployment, completion, and cleanup are walked",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    }
+  ]
+}

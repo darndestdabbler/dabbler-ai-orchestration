@@ -239,11 +239,14 @@ az repos list --organization https://dev.azure.com/{org} --project {project} --o
     ```
 
 8. **Now protect `main`** with Azure DevOps **Branch Policies**, so every later change — from anyone, including you — arrives by a reviewed pull request. On the Azure DevOps repository: **Project Settings** > **Repositories** > (your repo) > **Policies** > **Branch Policies**, and select the `main` branch:
-    - Turn on **Require a minimum number of reviewers** and set the minimum to **1**. (Azure DevOps does not count the PR author's own vote toward the minimum — the same reason GitHub never requests a review from a PR's own author.)
-    - You will add two more policies in Part 7, after the first pipeline run: **Build validation** (Azure DevOps' required status check) and **Automatically included reviewers** (the CODEOWNERS equivalent). For now, the reviewer minimum is enough to stop direct pushes.
-    - If your organization grants some accounts the **Bypass policies when completing pull requests** permission (Priya as project administrator might have it), decide consciously whether to leave it on — it lets those accounts merge past the policy. For a real project, turning it off for everyone keeps the rule honest.
+    - Turn on **Require a minimum number of reviewers** and set the minimum to **1**. (Azure DevOps does not count the PR author's own vote toward the minimum — the same reason GitHub never requests a review from a PR's own author.) This is what makes a change to `main` require a PR; you add **Build validation** and **Automatically included reviewers** in Part 7.
+    - **Close the two bypass permissions — this is the ADO analogue of GitHub's "include administrators", and it is easy to miss.** Azure DevOps has **two separate** bypass permissions, and a **project administrator or the org/project creator (i.e. Priya) commonly inherits both**, which would let *her own* direct push to `main` succeed even with the policy on:
+        - **Bypass policies when pushing** — lets the holder push straight to `main`, skipping the policy entirely. This is the one that breaks the "no direct push" guarantee.
+        - **Bypass policies when completing pull requests** — lets the holder complete a PR without satisfying the policies.
 
-    > **Expect:** from this point on, a direct `git push` of a `main` commit is rejected — every later change in this tutorial lands through a pull request.
+      Set **both** to **Deny** (or "Not set") for the normal team, at **Project Settings** > **Repositories** > (your repo) > **Security** — select the Contributors group (and each teammate, and Priya's own account if it inherits Allow) and deny the two "Bypass policies…" entries. Until you do, "protected `main`" is only protected for accounts that lack these permissions.
+
+    > **Expect:** with the reviewer policy on **and** push-bypass denied, a direct `git push` of a `main` commit is rejected for everyone — including Priya — and every later change in this tutorial lands through a pull request. (If your own push still succeeds, your account still has **Bypass policies when pushing** — deny it, or run the check from a plain Contributors account.)
 
 ## Part 4 — The first plan and the first session set (Command Palette)
 

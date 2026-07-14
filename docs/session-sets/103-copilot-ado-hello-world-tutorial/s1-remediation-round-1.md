@@ -98,3 +98,26 @@ Build validation, complete the PR (delete source branch), run `Dabbler: Finalize
 merged set`, and verify `003-integration-compose` in the Complete bucket. Now all
 three sets are genuinely Complete before Walk 10 begins. UAT JSON re-validated (11
 walks parse).
+
+## Round 5 (close backstop, Set 084) — 1 new blocking Major → fixed
+
+The post-round-4 close-out commit (disposition, ai-assignment Actuals, activity
+log, cite_lessons) invalidated the round-4 stamp, so `close_session`'s Set-084
+backstop re-verified the FULL session diff (base b21b2dd) at round 5 and surfaced
+one finding the fix-delta reviews could not (they inspect only fix hunks, not the
+whole diff) — genuinely real, and agreed:
+
+### F8 — Branch-policy bootstrap ignores ADO's separate push-bypass permission (Major, Correctness) — FIXED
+The tutorial promises "a direct `git push` of a `main` commit is rejected", but
+Part 3 covered only "Bypass policies when completing pull requests" — not the
+distinct **"Bypass policies when pushing"** permission, which a project
+creator/administrator (Priya, the primary operator) commonly inherits. With it,
+her own direct push to `main` succeeds and the protected-trunk guarantee (and UAT
+Walk 4) is false. This is the ADO analogue of the base tutorial's GitHub
+"include administrators" note. **Fix:** Part 3 step 8 now documents BOTH bypass
+permissions and instructs denying **both** (esp. "Bypass policies when pushing")
+for the team and the admin's own account at Project Settings > Repositories >
+(repo) > Security, with a corrected Expect ("rejected for everyone — including
+Priya"). UAT Walk 4 adds a deny-push-bypass step before the rejection test and a
+literal expectation covering the admin account. Re-verifying via the close
+backstop.

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The branch-policy bootstrap does not account for Azure DevOps’ separate push-bypass permission**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** Priya follows the main path as the creator/administrator of the new Azure DevOps project, enables the reviewer policy, and then performs Walk 4’s direct-push test. Azure DevOps administrators commonly have or inherit **Bypass policies when pushing**, so the push can succeed instead of being rejected. This is probable because the tutorial explicitly makes Priya the policy administrator in a brand-new organization—the identity most likely to hold bypass permissions.\n  - **Details:**\n    - **Violation:** The tutorial promises, “**from this point on, a direct `git push` of a `main` commit is rejected**,” and the UAT expects “the direct push to main is **REJECTED**.” The required executable branch-policy bootstrap must establish that condition.\n    - **Impact:** The tutorial’s protected-trunk guarantee is false for its primary operator, Walk 4 fails on the documented path, and the throwaway test commit may be pushed directly to `main`, bypassing the PR/review workflow the tutorial is intended to validate.\n    - **Evidence:** Part 3 configures only the minimum-reviewer policy and discusses **Bypass policies when completing pull requests**. It never checks or removes the distinct Azure DevOps permission **Bypass policies when pushing**. UAT Walk 4 then asks the same project-admin operator to prove rejection without first establishing that the account lacks push bypass.\n    - **Location:** `docs/tutorials/module-team-hello-world-copilot-ado.md`, Part 3 step 8; `103-copilot-ado-hello-world-tutorial-uat-checklist.json`, Walk 4.\n    - **Fix:** Explicitly inspect and remove/deny **Bypass policies when pushing** for normal team accounts, or perform the rejection test using a Contributors account known not to have that permission. Document push bypass separately from completion bypass and verify both intended restrictions.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Priya follows the main path as the creator/administrator of the new Azure DevOps project, enables the reviewer policy, and then performs Walk 4’s direct-push test. Azure DevOps administrators commonly have or inherit **Bypass policies when pushing**, so the push can succeed instead of being rejected. This is probable because the tutorial explicitly makes Priya the policy administrator in a brand-new organization—the identity most likely to hold bypass permissions."
+    }
+  ]
+}

@@ -100,6 +100,22 @@
       "dateTime": "2026-07-13T19:25:59.620515-04:00",
       "description": "Remediated all 4 merged findings (s1-remediation-round-1.md): (1&2) scaffoldDefaultModuleAndLifecycleSets now refuses whenever docs/session-sets/ already has any set dirs, regardless of manifest-creation signal -- fixes a real bug where a legacy repo upgrading and re-running Build would get an unsolicited Default module; (3) packaged the real VSIX (vsce package, 43 files, clean) and added a genuine Playwright Layer-3 spec driving a real VS Code Electron instance against the scaffold's exact fixture shape; (4) added Work-Explorer tree-model tests (computeVisibleModules/buildVisibleModulePayloads) for both tiers plus the legacy-pseudo-module non-interference case. Suite after remediation: extension unit 1617/1617 (+4), Playwright Layer 3 27/27 (+1, 0 regressions), tsc/eslint/esbuild clean.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 12,
+      "stepKey": "session-001/close-backstop-dispute",
+      "dateTime": "2026-07-13T20:00:58.313143-04:00",
+      "description": "close_session backstop ran its own verification (round 4) and re-raised the VSIX-walkthrough finding with a more literal demand (install the .vsix, drive native dialogs), disputing round 3 acceptance. Per operator direction, routed a neutral third-party opinion (gemini-pro, excluding anthropic+openai) rather than grinding another round or overriding unilaterally -- raw at s1-third-opinion-vsix-dispute.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 13,
+      "stepKey": "session-001/remediation-round-2",
+      "dateTime": "2026-07-13T20:00:58.314141-04:00",
+      "description": "Third opinion: the verifier is literal demand (install VSIX + native dialog automation) is technically infeasible given this repo is own documented constraints, but identified a real, narrower, previously-untested gap -- no test proved the registered dabbler.setupNewProject command callback actually dispatches into buildProjectStructureNoPrompt. Fixed with a new offline wiring test in gitScaffoldCore.test.ts (captures the real registered callback, invokes it with an explicit tier arg against a missing-python fixture, proves the friendly pre-flight error only fires if the full command-to-scaffold chain executed). Suite: 1618/1618 (+1). s1-remediation-round-2.md.",
+      "status": "complete"
     }
   ]
 }

@@ -12,6 +12,7 @@ import * as vscode from "vscode";
 import {
   asTier,
   buildProjectStructureNoPrompt,
+  registerGitScaffoldCommand,
   scaffoldConsumerRepo,
 } from "../../commands/gitScaffold";
 import { FileOps } from "../../utils/aiRouterInstall";
@@ -362,6 +363,98 @@ suite("gitScaffold — Python pre-flight leaves no artifacts (Set 077 S3, M7)", 
         "pre-flight failure must leave no setup artifacts",
       );
     } finally {
+      ws.getConfiguration = savedGetConfiguration;
+      win.showErrorMessage = savedShowError;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ---------------------------------------------------------------------
+// Set 101 S1 close-out dispute, third-opinion remediation: a routed
+// second opinion (gemini-pro, s1-third-opinion-vsix-dispute.json) on the
+// close backstop's "locally built VSIX walkthrough" finding agreed the
+// verifier's literal demand (install the .vsix, drive native dialogs via
+// Playwright) is technically infeasible given this repo's own documented
+// constraints, but identified a REAL, narrower, previously-untested gap:
+// nothing proved that the REGISTERED `dabbler.setupNewProject` command's
+// callback actually dispatches into `buildProjectStructureNoPrompt` with
+// the right arguments — every existing test (unit + Playwright) calls
+// `buildProjectStructureNoPrompt` directly, bypassing
+// `vscode.commands.registerCommand` / the command palette entirely.
+// `activationNoFolder.test.ts` proves the command NAME registers; this
+// proves the registered CALLBACK truly wires through.
+//
+// Reuses the missing-python pre-flight as a wiring probe (not because the
+// missing-interpreter case itself is interesting here, but because its
+// friendly error can ONLY fire if the callback correctly resolved
+// projectDir + tier and called all the way into
+// buildProjectStructureNoPrompt's real pre-flight) — entirely offline, no
+// network install, no native-dialog automation, using the SAME
+// vscode-stub substitution this repo's own CONTRIBUTING.md already
+// prescribes in place of the known-broken @vscode/test-electron harness.
+suite("gitScaffold — dabbler.setupNewProject command wiring (Set 101 S1 third-opinion remediation)", () => {
+  test("invoking the REGISTERED callback reaches buildProjectStructureNoPrompt with the right args", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-cmd-wiring-"));
+    const missingInterpreter = path.join(tmpDir, "definitely", "missing", "python.exe");
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const cmds = vscode.commands as any;
+    const ws = vscode.workspace as any;
+    const win = vscode.window as any;
+    const savedRegisterCommand = cmds.registerCommand;
+    const savedWorkspaceFolders = ws.workspaceFolders;
+    const savedGetConfiguration = ws.getConfiguration;
+    const savedShowError = win.showErrorMessage;
+
+    let captured: ((arg?: { tier?: string }) => Promise<void>) | undefined;
+    cmds.registerCommand = (id: string, cb: (arg?: { tier?: string }) => Promise<void>) => {
+      if (id === "dabbler.setupNewProject") captured = cb;
+      return { dispose() {} };
+    };
+    ws.workspaceFolders = [
+      { uri: vscode.Uri.file(tmpDir), name: "tmp", index: 0 },
+    ];
+    ws.getConfiguration = () => ({
+      inspect: (key: string) =>
+        key === "pythonPath" ? { globalValue: missingInterpreter } : undefined,
+      get: (_k: string, dflt: unknown) => dflt,
+    });
+    const errors: string[] = [];
+    win.showErrorMessage = async (msg: string) => {
+      errors.push(msg);
+      return undefined;
+    };
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    try {
+      const fakeContext = {
+        extensionPath: path.resolve(__dirname, "../../.."),
+        subscriptions: [],
+      } as unknown as import("vscode").ExtensionContext;
+      registerGitScaffoldCommand(fakeContext);
+      assert.ok(captured, "dabbler.setupNewProject must register a callback");
+
+      // An explicit tier arg skips the tier QuickPick (the command's own
+      // documented wizard-arg contract); the open workspace folder skips
+      // the folder picker — so invoking the callback drives the REAL
+      // dispatch (asTier parsing -> buildProjectStructureNoPrompt) with no
+      // further native-dialog interaction needed to reach the pre-flight.
+      await captured!({ tier: "full" });
+
+      assert.strictEqual(
+        errors.length,
+        1,
+        "the friendly Python-missing error only fires if the callback truly reached buildProjectStructureNoPrompt's pre-flight",
+      );
+      assert.ok(errors[0].includes("python.org"));
+      assert.deepStrictEqual(
+        fs.readdirSync(tmpDir),
+        [],
+        "no partial artifacts — the same pre-flight-first contract holds through the real command dispatch",
+      );
+    } finally {
+      cmds.registerCommand = savedRegisterCommand;
+      ws.workspaceFolders = savedWorkspaceFolders;
       ws.getConfiguration = savedGetConfiguration;
       win.showErrorMessage = savedShowError;
       fs.rmSync(tmpDir, { recursive: true, force: true });

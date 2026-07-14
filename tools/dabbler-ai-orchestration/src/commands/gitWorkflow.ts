@@ -568,8 +568,13 @@ export async function runFinalizeMergedSetFlow(deps: GitWorkflowDeps): Promise<v
     ui.showError("This workspace is not inside a git repository.");
     return;
   }
-  const normalizedRoot = path.resolve(root);
-  if (path.resolve(primary) !== normalizedRoot) {
+  // Compare CHECKOUT toplevels, not the workspace folder itself (S1
+  // round-1 nit): a workspace opened at a subdirectory of the main
+  // checkout is still the main checkout; only a LINKED worktree (whose
+  // toplevel differs from the primary root) must be refused, because
+  // the worktree it sits in cannot remove itself.
+  const toplevel = await gitLine(run, root, "rev-parse", "--show-toplevel");
+  if (!toplevel || path.resolve(toplevel) !== path.resolve(primary)) {
     ui.showError(
       `Finalize runs from the main checkout (${primary}), not from inside a worktree — open the main checkout and re-run, so the worktree you are in can be removed.`,
     );
@@ -578,8 +583,13 @@ export async function runFinalizeMergedSetFlow(deps: GitWorkflowDeps): Promise<v
 
   // Pick the session branch to finalize: linked worktrees first, then
   // merged local session branches (covers the no-worktree flow).
+  // Only session-set/* worktrees are candidates (S1 round-1 nit): an
+  // unrelated linked worktree must never be offered for removal by a
+  // command named "Finalize merged set".
   const worktrees = await listLinkedWorktrees(run, primary);
-  const sessionWorktrees = worktrees.filter((w) => w.branch);
+  const sessionWorktrees = worktrees.filter((w) =>
+    w.branch?.startsWith(SESSION_BRANCH_PREFIX),
+  );
   let chosenBranch: string | null = null;
   let chosenWorktree: WorktreeEntry | null = null;
   if (sessionWorktrees.length === 1) {

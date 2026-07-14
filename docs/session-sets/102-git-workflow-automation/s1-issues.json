@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "URL-encoded Azure DevOps project/repository names are not decoded before reuse**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** An Azure DevOps user clones a repository whose project or repository name contains spaces, producing an origin such as `https://dev.azure.com/acme/My%20Project/_git/My%20Repo`. This is a common ADO naming pattern, especially on the session’s priority host. The command passes literal `My%20Project` to `az --project` and constructs browser URLs containing `My%2520Project`, so both CLI PR creation and the required browser fallback can fail.\n  - **Details:**\n    - **Violation:** The task requires parsing ADO org/project/repo coordinates and providing working PR creation and CLI-absent fallback on Azure DevOps.\n    - **Impact:** A common class of ADO repositories cannot use the one-click path, and the fallback URL is also malformed. That materially breaks the primary-host objective.\n    - **Evidence:** `gitHost.ts` stores path segments without `decodeURIComponent`; `gitHost.test.ts` explicitly asserts that `\"My%20Project\"` remains encoded. `buildAzPrCreateArgs()` then passes `info.project` directly to `--project`, while `createPrWebUrl()` and `adoPrWebUrl()` call `encodeURIComponent` again, turning `%20` into `%2520`.\n    - **Location:** `src/utils/gitHost.ts` — `splitRemote()`, `classifyRemoteUrl()`, `createPrWebUrl()`, and `adoPrWebUrl()`; incorrect expectation in `src/test/suite/gitHost.test.ts`.\n    - **Fix:** Safely decode each path segment during parsing, rejecting malformed percent escapes, retain decoded logical coordinates, and encode them exactly once when constructing web URLs. Add tests for encoded project and repository names across CLI arguments and both ADO URL builders.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "An Azure DevOps user clones a repository whose project or repository name contains spaces, producing an origin such as `https://dev.azure.com/acme/My%20Project/_git/My%20Repo`. This is a common ADO naming pattern, especially on the session’s priority host. The command passes literal `My%20Project` to `az --project` and constructs browser URLs containing `My%2520Project`, so both CLI PR creation and the required browser fallback can fail.",
+      "discoveryCall": 1
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "cd2b7f2657d35a6cc2dad5cd4ce6f49a9f40ff60"
+}

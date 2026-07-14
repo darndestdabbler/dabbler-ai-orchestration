@@ -1,0 +1,1 @@
+VERIFIED — The supplied evidence contains no in-scope working-tree delta, and the only untracked files are explicitly excluded verification/close-out artifacts. No additional defect beyond the already-reported URL-decoding issue can be substantiated without inventing facts about files not present in the evidence.

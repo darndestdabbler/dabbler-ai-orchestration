@@ -310,7 +310,7 @@ suite("gitWorkflow — Open PR flow", () => {
     await runOpenPrFlow(t.deps);
     assert.deepStrictEqual(t.errors, []);
     assert.ok(t.calls.some((c) => c.file === "git" && c.args[0] === "push"));
-    assert.ok(t.opened[0].includes("/pullrequestcreate?sourceRef=session-set%2F102-x"));
+    assert.ok(t.opened[0].includes("/pullrequestcreate?sourceRef=refs%2Fheads%2Fsession-set%2F102-x"));
     assert.ok(t.warnings.some((m) => m.includes("winget install Microsoft.AzureCLI")));
   });
 
@@ -386,11 +386,14 @@ function finalizeDeps(opts: {
   porcelain?: string;
   currentBranch?: string;
   dirty?: boolean;
+  /** What `git rev-parse --show-toplevel` reports for the workspace. */
+  toplevel?: string;
 } = {}) {
   const uiBundle = makeUi(opts.ui ?? { root: "/repo" });
   const { run, calls } = makeRunner([
     ...(opts.extraHandlers ?? []),
     [/rev-parse --path-format=absolute --git-common-dir/, { stdout: "/repo/.git\n" }],
+    [/rev-parse --show-toplevel/, { stdout: `${opts.toplevel ?? opts.ui?.root ?? "/repo"}\n` }],
     [/^git worktree list --porcelain$/, { stdout: opts.porcelain ?? WORKTREE_PORCELAIN }],
     [/symbolic-ref --short refs\/remotes\/origin\/HEAD/, { stdout: "origin/main\n" }],
     [/^git rev-parse --abbrev-ref HEAD$/, { stdout: `${opts.currentBranch ?? "main"}\n` }],
@@ -493,6 +496,32 @@ suite("gitWorkflow — Finalize merged set flow", () => {
       extraHandlers: [[/for-each-ref/, { stdout: "" }]],
     });
     await runFinalizeMergedSetFlow(t.deps);
+    assert.ok(t.infos[0].includes("Nothing to finalize"));
+  });
+
+  test("workspace opened at a SUBDIRECTORY of the main checkout still finalizes (toplevel comparison)", async () => {
+    const t = finalizeDeps({ ui: { root: "/repo/docs" }, toplevel: "/repo" });
+    await runFinalizeMergedSetFlow(t.deps);
+    assert.deepStrictEqual(t.errors, []);
+    assert.ok(t.infos.some((m) => m.includes("finalized")));
+  });
+
+  test("an unrelated (non session-set/*) linked worktree is never offered for removal", async () => {
+    const t = finalizeDeps({
+      porcelain: [
+        "worktree /repo",
+        "HEAD 111",
+        "branch refs/heads/main",
+        "",
+        "worktree /repo-worktrees/experiment",
+        "HEAD 222",
+        "branch refs/heads/feature/experiment",
+        "",
+      ].join("\n"),
+      extraHandlers: [[/for-each-ref/, { stdout: "" }]],
+    });
+    await runFinalizeMergedSetFlow(t.deps);
+    assert.ok(!t.calls.some((c) => c.args[0] === "worktree" && c.args[1] === "remove"));
     assert.ok(t.infos[0].includes("Nothing to finalize"));
   });
 

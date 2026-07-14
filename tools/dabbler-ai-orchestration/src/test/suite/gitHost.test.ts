@@ -54,12 +54,29 @@ suite("gitHost — classifyRemoteUrl: Azure DevOps forms", () => {
     });
   }
 
-  test("project names with spaces (URL-encoded) survive parsing", () => {
+  test("URL-encoded project/repo names decode to their logical values (S1 R1 Major)", () => {
     const got = classifyRemoteUrl(
-      "https://dev.azure.com/acme/My%20Project/_git/orders",
+      "https://dev.azure.com/acme/My%20Project/_git/My%20Repo",
     );
     assert.strictEqual(got.kind, "azure-devops");
-    assert.strictEqual(got.project, "My%20Project");
+    assert.strictEqual(got.project, "My Project");
+    assert.strictEqual(got.repo, "My Repo");
+  });
+
+  test("a malformed percent escape is kept literally, never thrown", () => {
+    const got = classifyRemoteUrl(
+      "https://dev.azure.com/acme/Bad%ZZName/_git/orders",
+    );
+    assert.strictEqual(got.kind, "azure-devops");
+    assert.strictEqual(got.project, "Bad%ZZName");
+  });
+
+  test("the _git segment is located case-insensitively", () => {
+    const got = classifyRemoteUrl(
+      "https://dev.azure.com/acme/Platform/_GIT/orders",
+    );
+    assert.strictEqual(got.kind, "azure-devops");
+    assert.strictEqual(got.repo, "orders");
   });
 
   test("dev.azure.com URL without _git segment is unknown", () => {
@@ -179,11 +196,18 @@ suite("gitHost — web URL builders (the no-CLI floor)", () => {
     );
   });
 
-  test("ADO pullrequestcreate URL", () => {
+  test("ADO pullrequestcreate URL uses full refs and single-encodes", () => {
     assert.strictEqual(
       createPrWebUrl(ado, "session-set/102-x", "main"),
-      "https://dev.azure.com/acme/Platform/_git/orders/pullrequestcreate?sourceRef=session-set%2F102-x&targetRef=main",
+      "https://dev.azure.com/acme/Platform/_git/orders/pullrequestcreate?sourceRef=refs%2Fheads%2Fsession-set%2F102-x&targetRef=refs%2Fheads%2Fmain",
     );
+  });
+
+  test("a decoded project name is re-encoded exactly once (no %2520)", () => {
+    const spacey: GitHostInfo = { ...ado, project: "My Project", repo: "My Repo" };
+    const url = createPrWebUrl(spacey, "b", "main")!;
+    assert.ok(url.includes("/My%20Project/_git/My%20Repo/"), url);
+    assert.ok(!url.includes("%2520"), url);
   });
 
   test("ADO ssh-remote host maps to the https org URL", () => {

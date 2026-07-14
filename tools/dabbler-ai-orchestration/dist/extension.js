@@ -28731,6 +28731,15 @@ var GIT_SUFFIX = /\.git$/i;
 function stripGitSuffix(s) {
   return s.replace(GIT_SUFFIX, "");
 }
+function decodeSegment(s) {
+  if (!s.includes("%"))
+    return s;
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
 function splitRemote(url) {
   const trimmed2 = url.trim();
   if (trimmed2 === "")
@@ -28753,8 +28762,11 @@ function splitRemote(url) {
     host = scpHost;
     pathPart = scpPath.replace(/^\/+/, "");
   }
-  const segments = pathPart.split("/").map((s) => s.trim()).filter((s) => s !== "");
+  const segments = pathPart.split("/").map((s) => decodeSegment(s.trim())).filter((s) => s !== "");
   return { host: host.toLowerCase(), segments };
+}
+function gitSegmentIndex(segments) {
+  return segments.findIndex((s) => s.toLowerCase() === "_git");
 }
 function classifyRemoteUrl(url) {
   const unknown = { kind: "unknown", host: "", owner: "", repo: "" };
@@ -28763,7 +28775,7 @@ function classifyRemoteUrl(url) {
     return unknown;
   const { host, segments } = split;
   if (host === "dev.azure.com") {
-    const gitIdx = segments.indexOf("_git");
+    const gitIdx = gitSegmentIndex(segments);
     if (gitIdx >= 2 && segments.length > gitIdx + 1) {
       return {
         kind: "azure-devops",
@@ -28789,7 +28801,7 @@ function classifyRemoteUrl(url) {
   }
   const vsMatch = /^([^.]+)\.visualstudio\.com$/.exec(host);
   if (vsMatch) {
-    const gitIdx = segments.indexOf("_git");
+    const gitIdx = gitSegmentIndex(segments);
     if (gitIdx >= 1 && segments.length > gitIdx + 1) {
       return {
         kind: "azure-devops",
@@ -28849,8 +28861,8 @@ function createPrWebUrl(info, branch, targetBranch) {
   if (info.kind === "azure-devops") {
     const base = info.host === "dev.azure.com" || info.host === "ssh.dev.azure.com" ? `https://dev.azure.com/${info.owner}/${enc(info.project ?? "")}` : `https://${info.host}/${enc(info.project ?? "")}`;
     return `${base}/_git/${enc(info.repo)}/pullrequestcreate?sourceRef=${enc(
-      branch
-    )}&targetRef=${enc(targetBranch)}`;
+      `refs/heads/${branch}`
+    )}&targetRef=${enc(`refs/heads/${targetBranch}`)}`;
   }
   return null;
 }
@@ -29300,15 +29312,17 @@ async function runFinalizeMergedSetFlow(deps) {
     ui.showError("This workspace is not inside a git repository.");
     return;
   }
-  const normalizedRoot = path27.resolve(root);
-  if (path27.resolve(primary) !== normalizedRoot) {
+  const toplevel = await gitLine(run, root, "rev-parse", "--show-toplevel");
+  if (!toplevel || path27.resolve(toplevel) !== path27.resolve(primary)) {
     ui.showError(
       `Finalize runs from the main checkout (${primary}), not from inside a worktree \u2014 open the main checkout and re-run, so the worktree you are in can be removed.`
     );
     return;
   }
   const worktrees = await listLinkedWorktrees(run, primary);
-  const sessionWorktrees = worktrees.filter((w) => w.branch);
+  const sessionWorktrees = worktrees.filter(
+    (w) => w.branch?.startsWith(SESSION_BRANCH_PREFIX)
+  );
   let chosenBranch = null;
   let chosenWorktree = null;
   if (sessionWorktrees.length === 1) {

@@ -46,6 +46,23 @@ function stripGitSuffix(s: string): string {
 }
 
 /**
+ * Decode one percent-encoded path segment to its LOGICAL value (S1
+ * verification round 1, Major): ADO remotes carry project/repo names
+ * with spaces as `My%20Project`, and the logical name is what
+ * `az --project` needs — while the web-URL builders re-encode exactly
+ * once. A malformed escape (`%ZZ`) is kept literally rather than
+ * thrown: the raw string is then itself the best available name.
+ */
+function decodeSegment(s: string): string {
+  if (!s.includes("%")) return s;
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+/**
  * Parse a URL-ish remote into (host, path segments). Handles the three
  * shapes git remotes actually take:
  *   - https://[user@]host/path
@@ -80,9 +97,14 @@ function splitRemote(url: string): { host: string; segments: string[] } | null {
 
   const segments = pathPart
     .split("/")
-    .map((s) => s.trim())
+    .map((s) => decodeSegment(s.trim()))
     .filter((s) => s !== "");
   return { host: host.toLowerCase(), segments };
+}
+
+/** Case-insensitive locator for the structural `_git` segment. */
+function gitSegmentIndex(segments: string[]): number {
+  return segments.findIndex((s) => s.toLowerCase() === "_git");
 }
 
 /**
@@ -113,7 +135,7 @@ export function classifyRemoteUrl(url: string): GitHostInfo {
   // ---- Azure DevOps ----
   if (host === "dev.azure.com") {
     // {org}/{project}/_git/{repo}
-    const gitIdx = segments.indexOf("_git");
+    const gitIdx = gitSegmentIndex(segments);
     if (gitIdx >= 2 && segments.length > gitIdx + 1) {
       return {
         kind: "azure-devops",
@@ -141,7 +163,7 @@ export function classifyRemoteUrl(url: string): GitHostInfo {
   const vsMatch = /^([^.]+)\.visualstudio\.com$/.exec(host);
   if (vsMatch) {
     // {project}/_git/{repo}, optionally prefixed with DefaultCollection
-    const gitIdx = segments.indexOf("_git");
+    const gitIdx = gitSegmentIndex(segments);
     if (gitIdx >= 1 && segments.length > gitIdx + 1) {
       return {
         kind: "azure-devops",
@@ -240,9 +262,11 @@ export function createPrWebUrl(
       info.host === "dev.azure.com" || info.host === "ssh.dev.azure.com"
         ? `https://dev.azure.com/${info.owner}/${enc(info.project ?? "")}`
         : `https://${info.host}/${enc(info.project ?? "")}`;
+    // Full refs (S1 round-1 nit): ADO's create-PR page preselects
+    // branches reliably from refs/heads/... values.
     return `${base}/_git/${enc(info.repo)}/pullrequestcreate?sourceRef=${enc(
-      branch,
-    )}&targetRef=${enc(targetBranch)}`;
+      `refs/heads/${branch}`,
+    )}&targetRef=${enc(`refs/heads/${targetBranch}`)}`;
   }
   return null;
 }

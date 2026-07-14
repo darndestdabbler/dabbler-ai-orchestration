@@ -595,8 +595,19 @@ export interface LaunchedVSCode {
  * fully isolated: a fresh user-data-dir and a fresh extensions-dir
  * are spawned per call, so concurrent test invocations cannot fight
  * over profile state.
+ *
+ * `extraArgs` (Set 101 S1): optional additional CLI args, inserted
+ * before the workspace path. The first consumer is
+ * `--enable-smoke-test-driver`, which forces workbench dialogs to the
+ * CUSTOM (HTML) style so a modal confirm is clickable from Playwright —
+ * `window.dialogStyle` defaults to "native" on desktop, and a native OS
+ * dialog is invisible to the automation (the exact facility VS Code's
+ * own smoke tests use).
  */
-export async function launchVSCode(workspacePath: string): Promise<LaunchedVSCode> {
+export async function launchVSCode(
+  workspacePath: string,
+  extraArgs: string[] = [],
+): Promise<LaunchedVSCode> {
   const code = findCodeBinary();
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-userdata-"));
   const extensionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-extensions-"));
@@ -612,6 +623,7 @@ export async function launchVSCode(workspacePath: string): Promise<LaunchedVSCod
       "--disable-telemetry",
       "--disable-updates",
       "--new-window",
+      ...extraArgs,
       workspacePath,
     ],
     env: _electronEnv(),

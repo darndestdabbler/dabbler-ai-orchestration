@@ -87,16 +87,22 @@ clears the manifest entry; re-adding a real module (`payments`) via the same
 `Add` action calls produces a fresh, correctly-numbered plan/decomposition
 pair — the full first-run loop the spec's Session 1 "Ends with" line names.
 
-**Known, named gap (mirrors Set 100 S2):** this run drives the real
-`buildProjectStructureNoPrompt` entry point and the real
+**Known, named gap (mirrors Set 100 S2) — SINCE CLOSED:** this run drives
+the real `buildProjectStructureNoPrompt` entry point and the real
 `moduleAuthoring.js` writers directly, not the full interactive VS Code
 command-flow layer (native input boxes / confirm dialogs / the Getting
-Started webview form) — headlessly driving those is out of scope for this
-session's dogfood. That layer is covered instead by the existing
-`renameModule.test.ts` / `deleteModule.test.ts` `preselectedSlug` suites,
-the `runNewModuleFlow` lifecycle-scaffold suite in `moduleAuthoring.test.ts`,
-this session's new `gitScaffoldDefaultModule.test.ts` (fake-seam gating +
-one real-writer wiring test), and optional, non-gating ad-hoc UAT.
+Started webview form). The verification loop's round-5 finding held the
+session to the spec's literal "full first-run loop against the locally
+built VSIX" wording, and the gap was subsequently closed for real:
+`src/test/playwright/vsix-first-run-walkthrough.spec.ts` now drives the
+whole loop through the extension's ACTUAL UI in a real VS Code Electron
+instance — the real Build button in the real Getting Started webview
+(real venv + network pip install), the real Command Palette, the real
+QuickPicks / InputBoxes / modal confirms for rename → delete → re-add —
+asserting the rendered tree after every step. PASSING; details and the
+five hard-won automation lessons in `s1-remediation-round-3.md`. The
+writer-level walk below stands as the fast, offline complement (it runs
+in milliseconds and needs no network), not the only evidence.
 
 The legacy-repo non-interference case (Build on a repo whose
 `docs/modules.yaml` already exists, however empty) is unit-pinned rather

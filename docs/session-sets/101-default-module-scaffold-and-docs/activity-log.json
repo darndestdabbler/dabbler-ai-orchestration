@@ -116,6 +116,22 @@
       "dateTime": "2026-07-13T20:00:58.314141-04:00",
       "description": "Third opinion: the verifier is literal demand (install VSIX + native dialog automation) is technically infeasible given this repo is own documented constraints, but identified a real, narrower, previously-untested gap -- no test proved the registered dabbler.setupNewProject command callback actually dispatches into buildProjectStructureNoPrompt. Fixed with a new offline wiring test in gitScaffoldCore.test.ts (captures the real registered callback, invokes it with an explicit tier arg against a missing-python fixture, proves the friendly pre-flight error only fires if the full command-to-scaffold chain executed). Suite: 1618/1618 (+1). s1-remediation-round-2.md.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 14,
+      "stepKey": "session-001/remediation-review-round-5",
+      "dateTime": "2026-07-13T20:55:53.499732-04:00",
+      "description": "Remediation-review round 5 (gpt-5-6): 3 of 4 ledger findings fix-accepted (legacy-repo gate, VSIX/render coverage, Work Explorer end-state tests); L5 (the literal VSIX walkthrough) fix-REJECTED -- the offline stub-callback wiring test proves dispatch, not the real interactive journey. Operator directed continued work on the real walkthrough (model upgraded to Fable) instead of adjudicating it away.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 15,
+      "stepKey": "session-001/remediation-round-3",
+      "dateTime": "2026-07-13T20:55:53.499732-04:00",
+      "description": "Built the REAL first-run walkthrough the spec names verbatim: vsix-first-run-walkthrough.spec.ts drives a real VS Code Electron instance through the actual UI end to end -- real Build button in the Getting Started webview (real venv + network pip install, the new default-module scaffold), real Command Palette + QuickPick + InputBoxes + modal confirms for rename -> delete -> re-add, tree asserted after every step. PASSING (23s warm). Five real automation blockers discovered and documented (activation-on-view-reveal, client-side budget validation silently no-ops Build, F1 command-prefix wiped by fill(), placeholder-vs-text QuickPick waits, window.dialogStyle defaults NATIVE -- fixed via --enable-smoke-test-driver, with an additive extraArgs param on launchVSCode). The earlier infeasibility judgment (mine + the routed third opinion) was WRONG; the verifier was right to hold the line. s1-remediation-round-3.md.",
+      "status": "complete"
     }
   ]
 }

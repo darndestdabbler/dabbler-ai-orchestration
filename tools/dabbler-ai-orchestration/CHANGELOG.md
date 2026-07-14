@@ -3,8 +3,18 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.45.0] — Unreleased (Set 102 — git workflow automation)
+## [0.45.0] — 2026-07-14 (Set 104 coordinated release — publishing Set 102's git-workflow automation)
 
+> **Published 2026-07-14** to the VS Code Marketplace + Open VSX (tag
+> `vsix-v0.45.0`, operator-authorized — see `docs/session-sets/104-coordinated-release/`),
+> **superseding the live `0.42.0`** (`vsix-v0.42.0`, published 2026-07-13).
+> This single 0.45.0 VSIX carries all the accumulated work whose interim
+> changelog sections below (`0.43.0`, `0.44.0`) were staged but **never
+> separately published** — Set 097's `Dabbler: Set Up Copilot Seat` command +
+> the seat-status-revert fix (`0.43.0`), Sets 098–101's module-lifecycle
+> simplification (`0.44.0`), and Set 102's git-workflow automation (this
+> section). Co-released with `dabbler-ai-router 0.33.0` (tag `v0.33.0`).
+>
 > **The Set 102 release boundary: confirm-gated git-workflow automation.**
 > The framework now runs the mechanical trunk-based git — push a session
 > branch and open its PR, sync-and-clean-up after the merge, cut a release
@@ -12,15 +22,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > call: PR review/approval, branch-protection policy, what/when to release,
 > rollback authorization. Every command previews the exact command lines it
 > will run and waits for the operator's confirm (an AI agent may *invoke*
-> the commands; the modal always goes to the human). Marketplace + Open VSX
-> publish stays an **operator-gated** action (push tag `vsix-v0.45.0` per
-> the [CONTRIBUTING publish runbook](../../CONTRIBUTING.md#publishing); the
-> workflow verifies the tag against this `package.json` version). Until
-> then the registry-live extension remains `0.40.0`, with
-> `0.42.0`/`0.43.0`/`0.44.0` also queued ahead of this one.
+> the commands; the modal always goes to the human).
 >
-> **Extension-only** — `dabbler-ai-router` stays at `0.33.0`; zero
-> `ai_router/` changes accrued across Set 102.
+> **Extension-only across Set 102** — `dabbler-ai-router` accrued zero
+> `ai_router/` changes in Set 102 itself; the co-released router `0.33.0`
+> carries Set 096's phased-verification work.
 
 ### Added
 
@@ -101,7 +107,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   DevOps live walk is an **armed operator UAT** (needs an ADO org); the
   ADO code paths are pinned by the unit suite.
 
-## [0.44.0] — Unreleased (Sets 098–101 — module-lifecycle simplification)
+## [0.44.0] — folded into 0.45.0, 2026-07-14 (Sets 098–101 — module-lifecycle simplification)
 
 > **The single 098–101 release-boundary VSIX.** The four-set
 > module-lifecycle-simplification bundle ships together (a half-shipped
@@ -111,7 +117,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > **operator-gated** action (push tag `vsix-v0.44.0` per the
 > [CONTRIBUTING publish runbook](../../CONTRIBUTING.md#publishing); the
 > workflow verifies the tag against this `package.json` version). Until
-> then the registry-live extension remains `0.40.0`, with `0.42.0`/`0.43.0`
+> then the registry-live extension remained `0.40.0` at authoring time (this section shipped inside the 0.45.0 VSIX on 2026-07-14). Superseded by `0.45.0`; `0.42.0`/`0.43.0`
 > also queued ahead of this one.
 >
 > **Extension-only** — `dabbler-ai-router` stays at `0.33.0`; zero
@@ -179,12 +185,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `Dabbler: Copy Module Decomposition Prompt`) for legacy repos that
   predate `kind` sets.
 
-## [0.43.0] — Unreleased (Set 097 — Copilot seat-status visibility + module-ownership copy)
+## [0.43.0] — folded into 0.45.0, 2026-07-14 (Set 097 — Copilot seat-status visibility + module-ownership copy)
 
 Extension-only release: `dabbler-ai-router` stays at 0.33.0 (zero
 `ai_router/` changes in this set). Publish remains **operator-gated**
-(tag-driven, same runbook as 0.42.0); the registry-live extension is
-still `0.40.0` until the operator publishes the queued 0.42.0/0.43.0
+(tag-driven, same runbook as 0.42.0). At authoring time the registry-live extension was `0.40.0`; `0.42.0` published 2026-07-13 and this 0.43.0 work shipped inside the 0.45.0 VSIX on 2026-07-14. Historical note: the operator published the queued 0.42.0/0.43.0
 work.
 
 ### Added
@@ -253,7 +258,7 @@ work.
   module-ownership copy (captured against a locally built
   0.43.0-candidate build).
 
-## [0.42.0] — Unreleased (Sets 087 + 091–094 — Work Explorer module-first redesign)
+## [0.42.0] — 2026-07-13 (Sets 087 + 091–094 — Work Explorer module-first redesign)
 
 > **The single 091–094 release-boundary VSIX** (verdict: no Marketplace
 > publish until Sets A–D of the Work Explorer module-first redesign are all
@@ -261,7 +266,7 @@ work.
 > Open VSX publish stays an **operator-gated** action (push tag
 > `vsix-v0.42.0` per the [CONTRIBUTING publish runbook](../../CONTRIBUTING.md#publishing);
 > the workflow verifies the tag against this `package.json` version). Until
-> then the registry-live extension remains `0.40.0`.
+> at authoring time the registry-live extension was `0.40.0`; this 0.42.0 was published 2026-07-13 (tag `vsix-v0.42.0`).
 >
 > **Supersedes the never-published `0.41.0`** (Set 086, below): `0.41.0` was
 > prepared but never tagged/published, so a `0.40.0 → 0.42.0` upgrade also

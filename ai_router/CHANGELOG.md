@@ -9,7 +9,14 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
-## [0.33.0] — Unreleased (Set 096 — consequence-graded severity + the phased verification loop)
+## [0.33.0] — 2026-07-14 (Set 096 — consequence-graded severity + the phased verification loop)
+
+> **Published 2026-07-14** to PyPI (tag `v0.33.0`, operator-authorized via
+> Set 104's coordinated release — see `docs/session-sets/104-coordinated-release/`),
+> **superseding the live `0.32.0`** (`v0.32.0`, published 2026-07-10; the
+> Set-086 Copilot-seat `copilot_preflight` shipped there and remains live).
+> Co-released with extension `0.45.0`.
+
 
 > Makes the Set 095 verification-churn fix durable and framework-level.
 > Evidence: Set 095's loop (17 non-converging rounds / 39 fresh Majors under
@@ -233,7 +240,7 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (`EXIT_VERIFICATION_UNAVAILABLE`, writing nothing) with actionable guidance
   (exclude generated files / split the change / raise the cap).
 
-## [0.32.0] — Unreleased (out-of-band verification-loop remediation)
+## [0.32.0] — 2026-07-10 (out-of-band verification-loop remediation)
 
 > Prepared **out of band** — NOT through the framework's own verification loop,
 > which this work repairs — on branches `fix/critical-eval-ss1..ss3`, reviewed
@@ -299,11 +306,11 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   decisions correct), an attempt-history round budget (needs a durable attempt
   ledger), and honest machine-verified vs operator-waived release labels.
 
-## [0.31.0] — Unreleased (Set 086 — Copilot-seat verification integrity)
+## [0.31.0] — folded into 0.32.0, 2026-07-10 (Set 086 — Copilot-seat verification integrity)
 
 > Prepared in Set 086; **not yet published**. The PyPI publish is an
 > operator-gated action (tag `v0.31.0`). Until then the registry-live
-> router remains `0.30.0`. Ships the router half of Set 086 — the
+> router was `0.30.0` at authoring time; this Set-086 work shipped inside `0.32.0` (published 2026-07-10) and remains live. Ships the router half of Set 086 — the
 > prevention + fail-loud + legibility layer so a Full-tier session on an
 > **unauthenticated Copilot-CLI seat** either verifies for real or stops
 > loudly, never silently accepts a confabulated result.

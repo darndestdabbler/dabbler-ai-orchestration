@@ -126,7 +126,13 @@ suite("Getting Started instructions doc (Set 060 S3, D8)", () => {
 
   test("teaches the project-plan contract and both tiers", () => {
     assert.ok(doc.includes("project-plan.md"));
-    assert.ok(doc.includes("docs/planning"));
+    // Set 101: the onboarding flow is module-first — a fresh Build scaffolds
+    // a `default` module, so the plan the doc teaches lives at the module's
+    // path, not the pre-module docs/planning/ location.
+    assert.ok(
+      doc.includes("docs/modules/default/project-plan.md"),
+      "teaches the default-module plan path (Set 101 module-first scaffold)",
+    );
     assert.ok(/Full tier/.test(doc));
     assert.ok(/Lightweight tier/.test(doc));
   });

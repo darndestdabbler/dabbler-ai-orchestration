@@ -159,6 +159,10 @@ const MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml — the module manifes
 # file in, run the "Dabbler: Copy Module Decomposition Prompt" command
 # (Command Palette) — or the "Copy AI decomposition prompt" button in the
 # Getting Started form — then paste the copied prompt into your assistant.
+#
+# Renaming, deleting, splitting, or merging modules later (and adopting
+# modules in an older repo) is covered in the module reorganization guide:
+# https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/module-reorganization.md
 `;
 
 /**

@@ -97,7 +97,7 @@ full text in `lessons-archive.md`:
 | L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="095" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="101" status="active" scope="portable" -->
 
 - Prose carried over from a superseded doc was true (or tolerated) in the
   old context and reads authoritative in the new one — a defect class of
@@ -138,7 +138,7 @@ full text in `lessons-archive.md`:
   the resolved installed version at close, not just the declared floor.
 
 ## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
-<!-- lesson: id="L-095-1" added-set="095" last-used-set="100" status="active" scope="portable" -->
+<!-- lesson: id="L-095-1" added-set="095" last-used-set="101" status="active" scope="portable" -->
 
 - Reviewers are salience-limited, not context-limited: each pass returns
   the most salient handful of technically-real findings, and fixing them

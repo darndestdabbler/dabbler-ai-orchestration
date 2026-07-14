@@ -68,23 +68,34 @@ once you know your project's real module names.
 
 ## 2. Define Modules (Optional)
 
-If your project is split across areas or teams — say two developers
-each own a service — you can declare **modules** in
-`docs/modules.yaml`, and the Work Explorer groups your session sets
-by module. The form's second section, **Define modules (optional)**,
-has two buttons: **Open modules.yaml** creates the file from a
-commented template (only on that explicit click — the extension
-never writes it just because you opened the repo) and opens it to
-edit; **Copy AI decomposition prompt** copies a ready-made prompt
-that has your AI assistant fill the file in for you. Save the file
-when it's filled in.
+Build already declared a `default` module for you (Section 1). If your
+project is split across areas or teams — say two developers each own a
+service — you can declare **more modules** in `docs/modules.yaml`, and
+the Work Explorer groups your session sets by module.
 
-Solo or single-area projects can skip this entirely — your work
-stays under one default group. Two rules to know if you do use
-modules: session-set names stay globally unique across ALL modules,
-and `module` is just a grouping label, never part of a set's
-identity. For a hands-on team tutorial (three people, three modules,
-CODEOWNERS, monorepo CI, tags), see
+You have three ways to declare a module:
+
+- **From the tree:** hover a module's row and click **Add Module…** — it
+  appends the manifest entry and scaffolds that module's own plan and
+  decomposition sets, ready to run.
+- **From the form:** re-open it any time with **`Dabbler: Get Started`**
+  (Command Palette). Its second section, **Define modules (optional)**,
+  has **Open modules.yaml** (creates the file from a commented template
+  on that explicit click — never just because you opened the repo — and
+  opens it to edit) and **Copy AI decomposition prompt** (a ready-made
+  prompt that has your AI assistant fill the whole manifest in for you,
+  handy for declaring several modules at once with their code paths).
+- **By hand / by asking your AI** — edit `docs/modules.yaml` directly.
+
+Solo or single-area projects can skip this entirely — rename **Default**
+to your project's name, or just keep it. Two rules to know if you do use
+modules: session-set names stay globally unique across ALL modules, and
+`module` is just a grouping label, never part of a set's identity.
+Reorganizing modules later (rename, delete, split, merge, or adopting
+modules in an older repo) is covered in
+<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/module-reorganization.md>.
+For a hands-on team tutorial (three people, three modules, CODEOWNERS,
+monorepo CI, tags), see
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world.md>;
 its companion — a reusable AI review prompt that coaches your team on
 the same workflow afterward — is
@@ -99,27 +110,28 @@ constraints ... etc. — which is then **decomposed into session
 sets**, each with a `spec.md` describing what each work session will
 do.
 
-The Getting Started form shows only while the repo has no session
-sets yet; the Work Explorer switches to its tree view the moment the
-first session set exists. So the *first* plan and session set are
-created from the **Command Palette** (Ctrl+Shift+P), which works
-while the form is still up:
+You do not start from scratch: Build already scaffolded the Default
+module's two starter sets, and running them *is* how you create your
+plan and your first real work sets. Because those sets now exist, the
+Work Explorer shows its **tree** (the Getting Started form only shows
+while a repo has no session sets — re-open it any time with
+**`Dabbler: Get Started`**). Under the **Default** module you will see:
 
-1. **`Dabbler: Import Project Plan`** — import a plan file you
-   already have (if you declared modules, it first asks which module
-   the plan belongs to). Don't have one? Ask your AI assistant in
-   chat to draft it with you and save it — `docs/planning/project-plan.md`
-   for a plain project, or the module's own plan path (e.g.
-   `docs/modules/<slug>/project-plan.md`) if you declared modules.
-2. **`Dabbler: Generate Session-Set Prompt`** — copies a
-   decomposition prompt (module-aware when modules are declared).
-   Paste it into your AI chat; the AI writes the session-set folders
-   under `docs/session-sets/`, which you review and save.
+1. **`001-default-plan`** (a `plan` set) — run it first. It **creates or
+   imports** your project plan (`docs/modules/default/project-plan.md`).
+2. **`002-default-decomposition`** (a `decomposition` set, shown blocked
+   until the plan set completes) — run it next. It reads that plan and
+   writes your project's real session sets under `docs/session-sets/`,
+   which you review and save.
 
-Saving the first set flips the Explorer from the form to the tree.
-From then on, the same actions are one click away on each module's
-row in the tree (**AI Plan**, **Import Plan…**, **Open Plan**,
-**AI Sets**) — that's how you add more plans and sets later.
+You run a set by left-clicking its row — see Section 4 for the exact
+mechanics. Once you know your project's real module names, retire the
+Default module from its row in the tree: **rename** it into your first real
+module (rename **re-homes** the work sets your decomposition set just
+created — nothing is lost), or **delete** it if you have not invested any
+work in it yet (delete *cancels* non-terminal sets, so rename is the right
+move once you have run the sets). See the reorganization guide linked in
+Section 2. On a single-area project it is perfectly fine to just keep it.
 
 For the full tier option, every session runs the router's `verify_session`
 command for cross-provider verification before it closes — verification is

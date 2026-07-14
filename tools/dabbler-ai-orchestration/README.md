@@ -132,27 +132,24 @@ companion step-by-step instructions in the editor:
    single-area projects can skip this — your work stays under one
    default group.
 
-Project-plan authoring and decomposition-into-session-sets — the old
-steps 2 and 3 — left the form. The Getting Started form shows only
-while the repo has **no session sets yet**; it is replaced by the Work
-Explorer **tree** as soon as the **first session set exists**. So the
-first plan and the first session set are created from the **Command
-Palette**, which works while the form is still up:
+Build hands you a working starting point, not a blank repo. It
+declares a `default` module and scaffolds its two starter sets —
+`001-default-plan` (create or import your project plan) and
+`002-default-decomposition` (turn that plan into your real work sets),
+the Visual Studio `Class1` pattern. Because those sets exist, the
+Getting Started form is immediately replaced by the Work Explorer
+**tree** (the form only shows while a repo has **no session sets** —
+re-focus it any time with **`Dabbler: Get Started`**). Run the plan
+set, then the decomposition set, then **rename** the Default module into
+your first real module once you know your project's names (rename re-homes
+the work sets; **delete** instead only if you have not run them yet).
 
-1. **`Dabbler: Import Project Plan`** — import an existing
-   `docs/planning/project-plan.md`, or draft one with your AI agent.
-2. **`Dabbler: Generate Session-Set Prompt`** — copy a
-   decomposition prompt (module-aware when `docs/modules.yaml` declares
-   modules); your AI agent turns the plan into ordered session sets,
-   which you review and **save** under `docs/session-sets/`.
-
-Saving that first set flips the Explorer from the form to the tree.
-From then on the **same actions are one click on each module's row**
-(the row action strip: *AI Plan*, *Import Plan*, *Open Plan*,
-*AI Sets*) — that's how you add *more* sets to a module — and you tell
-your AI agent **"start the next session"** to work through them. (You
-can re-focus the form anytime with **`Dabbler: Get Started`** from the
-command palette.)
+From the tree, each **module's row** carries a one-click action strip —
+*Open Plan*, *Add Module…*, *Rename Module…*, *Delete Module…* — and
+you tell your AI agent **"start the next session"** to work through the
+sets under it. Reorganizing modules later (rename, delete, split,
+merge, or adopting modules in an older repo) is covered in the
+[module reorganization guide](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/module-reorganization.md).
 
 Working as a small team? The hands-on
 [three-person Hello World walkthrough](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world.md)

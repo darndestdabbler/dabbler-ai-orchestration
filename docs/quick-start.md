@@ -33,8 +33,16 @@ different-engine verification session, or opted out.
 
 The extension's Getting Started form (**`Dabbler: Get Started`** in VS Code)
 walks you through the setup interactively — tier choice, the Full-tier
-verification budget step, and the project scaffold. The quick version
-(**both tiers**):
+verification budget step, and the project scaffold. **Build** also declares
+a `default` module with two starter sets already scaffolded —
+`001-default-plan` (create or import your project plan) and
+`002-default-decomposition` (turn that plan into your real work sets) — the
+Visual Studio `Class1` pattern: run the plan set, then the decomposition
+set, then **rename** Default into your first real module once you know your
+module names (rename re-homes the work sets; delete instead only when you
+have not run them yet — see
+[`docs/module-reorganization.md`](module-reorganization.md)). The quick
+version of the environment setup (**both tiers**):
 
 ```bash
 python -m venv .venv
@@ -72,9 +80,12 @@ Changes to provider API keys and Pushover credentials belong in `local-overrides
 
 ---
 
-## Minimal session-set scaffold
+## Minimal session-set scaffold (manual / without VS Code)
 
-Create two files before your first session:
+If you used the extension's **Build**, you already have runnable starter
+sets (the `default` module's plan + decomposition sets above) — skip this.
+Setting a repo up **by hand** (no VS Code), create two files before your
+first session:
 
 **`docs/session-sets/001-my-first-set/spec.md`** — the session plan:
 

@@ -6,23 +6,29 @@
     {
       "number": 1,
       "title": "Session 1",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-13T18:38:00.060866-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-13T21:08:39.805815-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,
       "title": "Session 2",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-07-13T21:13:54.084310-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-4-8",
+        "effort": "medium",
+        "identityProvenance": "direct"
+      },
       "verificationVerdict": null
     }
   ]

@@ -79,25 +79,32 @@ Before you begin, every team member needs:
     > - `ai_router/` — router configuration, including your `budget.yaml`;
     > - `docs/session-sets/` — the home for all session sets;
     > - AI-agent instruction files at the repo root (e.g. `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`);
-    > - two comment-only templates: `.github/CODEOWNERS` and `.github/workflows/monorepo-ci.yml` (deliberately harmless as-is; you adapt them in Part 7).
+    > - two comment-only templates: `.github/CODEOWNERS` and `.github/workflows/monorepo-ci.yml` (deliberately harmless as-is; you adapt them in Part 7);
+    > - a **`default` module** in `docs/modules.yaml` with two starter session sets already scaffolded — `001-default-plan` and `002-default-decomposition` (the Visual Studio `Class1` pattern: a working starting point, not a template to study).
     >
     > A **System Status strip** appears above the form **only if something is wrong** (a missing provider key, a missing Python) — no strip means a healthy environment.
 
+    > **The form is now replaced by the tree.** Because Build scaffolded two session sets, the Work Explorer switches from the Getting Started form to the module **tree** (it shows the form only while a repo has *no* session sets). You'll see one module, **Default**, with `001-default-plan` and `002-default-decomposition` under it. This team already knows its three modules, so Part 3 clears that `Class1` starter and declares the real ones — a solo project that *didn't* yet know its structure would instead run those two starter sets to generate its plan and first work sets (see the [quick start](../quick-start.md)), then rename Default. Re-open the form any time with **`Dabbler: Get Started`**.
+
     > **Good to know:** if the `.venv` setup ever needs repairing later, run **`Dabbler: Install ai-router`** from the Command Palette.
 
-## Part 3 — Define modules with the AI decomposition prompt
+## Part 3 — Clear the Class1 starter, then define the real modules
 
-**Where you are:** Still Priya, still the Getting Started form. The project structure exists but no modules are declared yet.
+**Where you are:** Priya, looking at the tree Build produced: one **Default** module with `001-default-plan` and `002-default-decomposition` under it. The team already knows its three modules, so we dispose of the `Class1` starter and declare the real ones.
 
-1. In Section 2 of the form, titled **Define modules (optional)**, click **Copy AI decomposition prompt**.
+1. **Delete the Default module.** Hover the **Default** module row in the Work Explorer and click **Delete Module…** (or right-click → **Delete Module…**). Confirm the two-step dialog.
+
+    > **Expect:** the `default` entry leaves `docs/modules.yaml`, and its two *unstarted* starter sets (`001-default-plan`, `002-default-decomposition`) are removed outright. Deleting is safe **here** precisely because we haven't run those sets yet — delete removes clean, unstarted scaffolds, but *cancels* any set that already has real work (recoverable, but not what you want for work you mean to keep). So once you've actually run the starter sets, you'd **rename** Default into your first real module instead (rename re-homes its sets — see [`docs/module-reorganization.md`](../module-reorganization.md)); we delete-and-re-declare here only because it keeps this walkthrough's set names tidy. With no session sets left, the Work Explorer flips **back** to the Getting Started form.
+
+2. In Section 2 of the form, titled **Define modules (optional)**, click **Copy AI decomposition prompt**.
 
     > **Expect:** Two things happen:
-    > 1. `docs/modules.yaml` is created from a commented template (the extension only ever writes this file on an explicit action like this click — never just because you opened the repo).
+    > 1. `docs/modules.yaml` is (re-)populated on save from your AI's edit — the file is already present as an empty `modules: []` list after the delete above; the extension only ever writes it on an explicit action, never just because you opened the repo.
     > 2. A module-decomposition prompt is copied to your clipboard, and a notice tells you to paste it into your AI assistant and **save the file** when it has been filled in.
 
-    > **Good to know:** the **Open modules.yaml** button next to it opens the manifest at any time (also creating it from the template if missing). Both actions are also in the Command Palette as **`Dabbler: Copy Module Decomposition Prompt`** and **`Dabbler: Open modules.yaml`**.
+    > **Good to know:** the **Open modules.yaml** button next to it opens the manifest at any time (also creating it from the template if missing). Both actions are also in the Command Palette as **`Dabbler: Copy Module Decomposition Prompt`** and **`Dabbler: Open modules.yaml`** — handy because, once your first real session set exists (Part 4), the form is replaced by the tree and you reach these from the palette or with **`Dabbler: Get Started`**.
 
-2. Paste the prompt into your AI agent's chat. The agent reads the repository and edits `docs/modules.yaml` in place, preserving the template's header comments. Describe your team when you paste, for example:
+3. Paste the prompt into your AI agent's chat. The agent reads the repository and edits `docs/modules.yaml` in place, preserving the template's header comments. Describe your team when you paste, for example:
 
     ```text
     <paste the copied prompt>
@@ -117,7 +124,7 @@ Before you begin, every team member needs:
     has the full rationale). A developer can still own more than one
     module; they just don't share one with a teammate concurrently.
 
-3. Review the agent's edit, then **save `docs/modules.yaml`**. Below the preserved header comments, the `modules:` list should read:
+4. Review the agent's edit, then **save `docs/modules.yaml`**. Below the preserved header comments, the `modules:` list should read:
 
     ```yaml
     modules:
@@ -154,9 +161,9 @@ Before you begin, every team member needs:
     path a set edits is either in its module's `codeRoots` or sanctioned by
     `touches`.
 
-    > **Good to know:** to add a fourth module later, run **`Dabbler: New Module`** — it appends the manifest entry and writes a plan stub.
+    > **Good to know:** to add a fourth module later, hover any module row and click **Add Module…** (or run **`Dabbler: New Module`**) — it appends the manifest entry, writes a plan stub, and scaffolds that module's own `plan` and `decomposition` starter sets. (You add its `codeRoots`/`touches` by editing `docs/modules.yaml` afterward.)
 
-4. Commit the scaffold and manifest to `main`:
+5. Commit the scaffold and manifest to `main`:
 
     ```bash
     git add -A
@@ -164,7 +171,7 @@ Before you begin, every team member needs:
     git push
     ```
 
-5. **Now protect `main`**, so every later change — from anyone, including you — arrives by reviewed pull request. (If GitHub won't apply the rule, check Part 0's plan/visibility prerequisite: on GitHub Free this needs a **public** repo.) On the GitHub repository page:
+6. **Now protect `main`**, so every later change — from anyone, including you — arrives by reviewed pull request. (If GitHub won't apply the rule, check Part 0's plan/visibility prerequisite: on GitHub Free this needs a **public** repo.) On the GitHub repository page:
     - Go to **Settings** > **Branches** and add a branch protection rule for `main`.
     - Check **Require a pull request before merging** (leave the default of 1 required approval).
     - Check **Require status checks to pass before merging**. There are no checks to select yet — GitHub can only list checks it has already seen run, so you will come back and select the CI job names in Part 7, after the first workflow run.
@@ -178,7 +185,7 @@ Before you begin, every team member needs:
 
 **Where you are:** Priya, in the main `hello-modules` window. Modules are declared, but there are no plans and no session sets, so the Getting Started form is still showing.
 
-**The key sequencing fact:** the Getting Started form shows only while the repo has **no session sets**; the Work Explorer switches to the module **tree** the moment the first set exists. So the *first* plan and *first* session set are created from the **Command Palette**, which works while the form is still up. From the second module onward you will use the tree's one-click row actions instead (Part 5).
+**The key sequencing fact:** the Getting Started form shows only while the repo has **no session sets**; the Work Explorer switches to the module **tree** the moment the first set exists. Plan-authoring and set-generation are **Command Palette** actions (module-aware) that work in either view — the same two you'll use for every module (Part 5). The tree's module-row strip carries the *module* lifecycle actions (**Open Plan**, **Add Module…**, **Rename Module…**, **Delete Module…**), not plan/set authoring.
 
 1. Author the greeter plan. Ask your AI agent in chat, in your own words — for example:
 
@@ -237,25 +244,19 @@ One per-machine setup step first: the `.venv` is ignored by git (Part 1) and exi
 What the Work Explorer now shows, top to bottom:
 
 - One collapsible group per module, in manifest order: **Greeter**, **Clock**, **Cross-Module Integration**.
-- Under **every** module, two permanent child nodes:
-    - **Plan** — shows whether that module's plan file is present or missing;
-    - **Session sets** — shows *blocked until plan* / *empty* / or, once sets exist, the four status buckets nested under it: **In Progress**, **Not Started**, **Complete**, **Cancelled**.
-- Priya's `001-greeter-hello` sits under **Greeter** > **Session sets** > **Not Started**. Clock's and Integration's **Plan** nodes still say missing.
-- Hovering or keyboard-focusing a module row reveals its action strip: **AI Plan**, **Import Plan…**, **Open Plan**, **AI Sets**. The same actions are on the row's right-click menu.
+- **The status buckets are the module's direct children** — no intermediate nodes. Once a module has sets, they nest under **In Progress** / **Not Started** / **Complete** / **Cancelled** right beneath the module row; a module with no sets yet simply shows empty.
+- Priya's `001-greeter-hello` sits under **Greeter** > **Not Started**. Clock and Integration have no sets yet.
+- Hovering or keyboard-focusing a module row reveals its action strip: **Open Plan**, **Add Module…**, **Rename Module…**, **Delete Module…**. The same actions are on the row's right-click menu.
 
 > **Good to know:** a session set whose `spec.md` has no `module:` stamp never disappears — it shows under a group named **Unassigned** (or **Default**, when it is the only group in the repo). If you ever see **Unassigned**, someone forgot a stamp.
 
-Now Sam and Alex self-serve from their own rows:
+Now Sam and Alex author their own module's plan and first set. The plan-authoring and set-generation prompts are **Command Palette** actions (module-aware — they ask which module you mean): the tree row itself carries the *module* lifecycle actions (add/rename/delete/open-plan), while authoring a plan or a set is the same palette flow Priya used in Part 4.
 
 Do these two in order — **Sam first, then Alex** — because the AI picks each new set's number from the sets it can see: two people generating from the same `main` snapshot can both get `002`. (Collisions are fail-loud, not silent — the workspace refuses duplicate set names, and the slug-in-name convention keeps even racing sets from producing the same *name* — but serializing keeps the numbering tidy.)
 
 1. **Sam (Clock) — plan, generate, land:**
-    - Hover the **Clock** row and click **AI Plan**.
-
-        > **Expect:** a notice that the plan-authoring prompt was copied to the clipboard.
-
-    - Paste it into the AI chat; the agent writes `docs/modules/clock/project-plan.md` (scope: a `now_text()` function in `services/clock/` returning the time as `HH:MM`, plus a test). Save it.
-    - Click **AI Sets** on the **Clock** row, paste the copied prompt, and let the agent write `docs/session-sets/002-clock-hello/`.
+    - Author the clock plan: ask the AI in chat to write `docs/modules/clock/project-plan.md` (scope: a `now_text()` function in `services/clock/` returning the time as `HH:MM`, plus a test), or run **`Dabbler: Import Project Plan`** (pick **clock**) to bring in a plan file you already have. Save it.
+    - Run **`Dabbler: Generate Session-Set Prompt`** from the Command Palette, pick **clock**, paste the copied prompt into the AI chat, and let the agent write `docs/session-sets/002-clock-hello/`.
     - Land the plan + set on `main` as a small PR, exactly like Priya did in Part 4:
 
       ```bash
@@ -275,8 +276,8 @@ Do these two in order — **Sam first, then Alex** — because the AI picks each
 
 2. **Alex (Integration) — after Sam's PR merges:**
     - Pull `main` first (`git pull`) — Alex's AI now sees `001` and `002`, so his set becomes `003`.
-    - Same two clicks on the **Cross-Module Integration** row: **AI Plan** (scope: compose greeter + clock into one program printing `Hello, world! It is HH:MM.`), then **AI Sets** producing `docs/session-sets/003-integration-compose/`.
-    - **Declare the dependency.** Integration work needs the other two modules' code to exist on `main` first, and the framework has a first-class way to say so: `prerequisites:` in the set's configuration block. Tell the AI when you paste the **AI Sets** prompt ("this set depends on 001-greeter-hello and 002-clock-hello being complete"), or add it to the generated `spec.md` by hand:
+    - Same two steps for the **integration** module: author its plan (ask the AI in chat, or **`Dabbler: Import Project Plan`** → pick **integration** — scope: compose greeter + clock into one program printing `Hello, world! It is HH:MM.`), then **`Dabbler: Generate Session-Set Prompt`** → pick **integration**, producing `docs/session-sets/003-integration-compose/`.
+    - **Declare the dependency.** Integration work needs the other two modules' code to exist on `main` first, and the framework has a first-class way to say so: `prerequisites:` in the set's configuration block. Tell the AI when you paste the **Generate Session-Set Prompt** ("this set depends on 001-greeter-hello and 002-clock-hello being complete"), or add it to the generated `spec.md` by hand:
 
       ```yaml
       prerequisites:
@@ -298,7 +299,7 @@ Do these two in order — **Sam first, then Alex** — because the AI picks each
 
       PR, approval, merge, then `git pull --ff-only && git branch -d authoring/003-integration-compose`.
 
-    > **Expect:** clicking **AI Sets** on a module whose **Plan** node still says missing pops a warning naming the missing plan path and offering **Import Plan** — author the plan first. And once the prerequisites are declared, Alex's set renders as blocked in the tree (its row offers **Open Prerequisite Spec**) until both dependencies complete.
+    > **Expect:** running **Generate Session-Set Prompt** for a module whose plan file doesn't exist yet pops a warning naming the missing plan path and offering **Import Plan** — author the plan first. And once the prerequisites are declared, Alex's set renders as blocked in the tree (its row offers **Open Prerequisite Spec**) until both dependencies complete.
 
 ## Part 6 — Worktrees and running sessions
 
@@ -602,7 +603,7 @@ The core habit: **merge a set when it completes.** Small, frequent, boring merge
 Tick these off; each one is directly verifiable:
 
 - [ ] `docs/modules.yaml` on `main` declares `greeter`, `clock`, and `integration` (with `touches: [greeter, clock]` on integration), and the Work Explorer lists the three module groups in that order.
-- [ ] Each module's **Plan** node shows present, and the plan files exist at their `planPath`s (e.g. `docs/modules/greeter/project-plan.md`).
+- [ ] Each module's plan file exists at its `planPath` (e.g. `docs/modules/greeter/project-plan.md`) — the module row's **Open Plan** action opens it.
 - [ ] `docs/session-sets/` contains exactly `001-greeter-hello`, `002-clock-hello`, `003-integration-compose` — globally-unique names, each `spec.md` stamped with its `module:`.
 - [ ] `003-integration-compose`'s spec declares `prerequisites:` on the other two sets, and its row showed as blocked in the tree until both completed.
 - [ ] All three sets sit in the **Complete** bucket under their modules; nothing appears under an **Unassigned** group.

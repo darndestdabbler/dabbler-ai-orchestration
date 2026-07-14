@@ -3,6 +3,84 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.44.0] — Unreleased (Sets 098–101 — module-lifecycle simplification)
+
+> **The single 098–101 release-boundary VSIX.** The four-set
+> module-lifecycle-simplification bundle ships together (a half-shipped
+> lifecycle UX is worse than either whole): set kinds (098) → rename/delete
+> writers (099) → the flattened, lifecycle-action tree (100) → the real
+> `default` scaffold + docs (101). Marketplace + Open VSX publish stays an
+> **operator-gated** action (push tag `vsix-v0.44.0` per the
+> [CONTRIBUTING publish runbook](../../CONTRIBUTING.md#publishing); the
+> workflow verifies the tag against this `package.json` version). Until
+> then the registry-live extension remains `0.40.0`, with `0.42.0`/`0.43.0`
+> also queued ahead of this one.
+>
+> **Extension-only** — `dabbler-ai-router` stays at `0.33.0`; zero
+> `ai_router/` changes accrued across Sets 098–101, so no coordinated PyPI
+> bump is required.
+
+### Added
+
+- **(Set 098) The `kind: plan | decomposition` session-set identity.** An
+  optional `spec.md` config field (raw-captured, warn-and-degrade on an
+  unknown value; every pre-098 spec is unchanged), two scaffolded
+  lifecycle-set templates (`module-plan-set` / `module-decomposition-set`,
+  the latter prerequisite-linked to the former), and a reusable
+  `scaffoldModuleLifecycleSets` writer that mints a module's
+  `NNN-<slug>-plan` + `NNN-<slug>-decomposition` starter sets (renders from
+  the checked-in templates; identity-based skip-existing; parse-after-write
+  guarded). A quiet, presentation-only kind badge renders on set rows.
+- **(Set 099) Transactional module Rename and Delete writers** (palette:
+  `Dabbler: Rename Module`, `Dabbler: Delete Module`). Rename is
+  all-or-nothing: it rewrites the `docs/modules.yaml` entry (format-
+  preserving) and restamps `module: <old>` → `module: <new>` in every
+  affected set, rolling back on any failure; it refuses a slug that
+  collides with an undeclared slug already carrying stamped sets, and
+  refuses while any affected set has a running session. Delete removes the
+  manifest entry and, per set, leaves completed/cancelled history
+  untouched, removes only unstarted clean scaffolds outright, and cancels
+  any in-flight set (never hard-deletes work).
+- **(Set 100) Module-row lifecycle actions** — `Open Plan`, `Add Module…`,
+  `Rename Module…`, `Delete Module…` on the row strip + context menu
+  (declared modules only; the pseudo `Unassigned` module keeps only
+  `Open Plan` + `Assign legacy sets to module…`). `Add Module…` now also
+  scaffolds the new module's two lifecycle sets.
+- **(Set 101) A real `default` module on fresh Build.** `Build project
+  structure` now declares a `default` module in `docs/modules.yaml` and
+  scaffolds its `001-default-plan` + `002-default-decomposition` starter
+  sets — the Visual Studio `Class1` pattern (a working starting point,
+  rename-or-delete one action away). Gated to a genuinely fresh scaffold:
+  a re-run, or a legacy repo that already has `docs/session-sets/` content,
+  is left byte-for-byte untouched. The consumer-bootstrap
+  `getting-started` / `start-here` docs teach the pattern; a new
+  [`docs/module-reorganization.md`](../../docs/module-reorganization.md)
+  guide covers rename/delete/split/merge and the optional legacy-repo
+  migration recipe.
+
+### Changed
+
+- **(Set 100) The module subtree is flattened.** Status buckets
+  (`In Progress` / `Not Started` / `Complete` / `Cancelled`) are now the
+  module's **direct** children; the scaffolded decomposition set's
+  blocked-until-plan signal rides its existing `prerequisites:` gate.
+- **(Set 101) Onboarding docs re-cut to the shipped flow.** The scaffolded
+  `getting-started.md`, the repo `quick-start.md`, the extension README,
+  and the three-person Hello World tutorial teach Build → Default module +
+  starter sets → run the plan set → run the decomposition set →
+  rename/delete Default, with no references to retired UI.
+
+### Removed
+
+- **(Set 100) The Set 093 persistent `Plan` / `Session sets` child nodes**
+  (and the `blocked-until-plan` module state / `deriveModuleChildren`
+  plumbing) — superseding the unpublished `0.42.0` behavior — and the
+  **`AI Plan` / `Import Plan` / `AI Sets` module-row strip actions**. Their
+  underlying flows survive **palette-only**
+  (`Dabbler: Import Project Plan`, `Dabbler: Generate Session-Set Prompt`,
+  `Dabbler: Copy Module Decomposition Prompt`) for legacy repos that
+  predate `kind` sets.
+
 ## [0.43.0] — Unreleased (Set 097 — Copilot seat-status visibility + module-ownership copy)
 
 Extension-only release: `dabbler-ai-router` stays at 0.33.0 (zero

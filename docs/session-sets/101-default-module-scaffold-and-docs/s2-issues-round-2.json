@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The primary onboarding sequence offers deletion after decomposition even though deletion cancels the work sets decomposition just created**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** A fresh-project user follows the documented main path: runs `001-default-plan`, runs `002-default-decomposition` to create real work sets, and then chooses the explicitly offered **Delete Default** option when splitting the project into multiple real modules. Those generated sets are non-terminal sets stamped `module: default`, so Delete cancels them rather than preserving or re-homing them. This is probable for multi-module projects because deletion is presented as interchangeable with rename, while one Default module cannot simply be renamed into several modules.\n  - **Details:**\n    - **Violation:** The release contract requires docs to teach “Build → Default module + starter sets → run the plan set → run the decomposition set → rename/delete Default.” The produced docs say the decomposition set “writes your project's real session sets,” immediately followed by “rename or delete the Default module.” However, the new reorganization guide states that Delete cancels “any other non-terminal set (real work in flight).”\n    - **Impact:** Following the central onboarding flow can deterministically cancel the newly generated work queue, forcing users to recover or regenerate it. That materially defeats the purpose of the decomposition step and should block the documentation release.\n    - **Evidence:** The contradiction appears in `docs/templates/consumer-bootstrap/getting-started.md.template` Section 3, both synchronized cold-start fixtures, `docs/quick-start.md`, and `tools/dabbler-ai-orchestration/README.md`. The deletion behavior is documented in `docs/module-reorganization.md` under **Delete a module**.\n    - **Fix:** After decomposition, recommend **Rename** when retaining Default’s generated sets. For a split into multiple modules, instruct users to declare the target modules and re-home/restamp the generated sets before deleting Default. Present Delete as safe without migration only before running the starter sets, as the team tutorial does.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A fresh-project user follows the documented main path: runs `001-default-plan`, runs `002-default-decomposition` to create real work sets, and then chooses the explicitly offered **Delete Default** option when splitting the project into multiple real modules. Those generated sets are non-terminal sets stamped `module: default`, so Delete cancels them rather than preserving or re-homing them. This is probable for multi-module projects because deletion is presented as interchangeable with rename, while one Default module cannot simply be renamed into several modules."
+    }
+  ],
+  "phase": "supplementary",
+  "discoveryBaselineTree": "f5ff99963b98f4045a69c9ec2d3b828a77bc09e4"
+}

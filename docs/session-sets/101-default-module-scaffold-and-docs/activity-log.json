@@ -132,6 +132,78 @@
       "dateTime": "2026-07-13T20:55:53.499732-04:00",
       "description": "Built the REAL first-run walkthrough the spec names verbatim: vsix-first-run-walkthrough.spec.ts drives a real VS Code Electron instance through the actual UI end to end -- real Build button in the Getting Started webview (real venv + network pip install, the new default-module scaffold), real Command Palette + QuickPick + InputBoxes + modal confirms for rename -> delete -> re-add, tree asserted after every step. PASSING (23s warm). Five real automation blockers discovered and documented (activation-on-view-reveal, client-side budget validation silently no-ops Build, F1 command-prefix wiped by fill(), placeholder-vs-text QuickPick waits, window.dialogStyle defaults NATIVE -- fixed via --enable-smoke-test-driver, with an additive extraArgs param on launchVSCode). The earlier infeasibility judgment (mine + the routed third opinion) was WRONG; the verifier was right to hold the line. s1-remediation-round-3.md.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-002/register",
+      "dateTime": "2026-07-13T21:14:31.883043-04:00",
+      "description": "Registered session 2 via start_session (engine=claude, provider=anthropic, model=claude-opus-4-8, effort=medium; operator invoked opus, deviating from the routed sonnet recommendation for equal-or-better prose). Read the full preload (constitution, project-guidance, active lessons, CLAUDE.md), spec.md, Session 1 disposition + ai-assignment. decision-review-queue.jsonl absent -> nothing to triage.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-002/prereqs-and-assignment",
+      "dateTime": "2026-07-13T21:21:24.030661-04:00",
+      "description": "Step 3-3.5: confirmed S1 deliverables exist (gitScaffold scaffold fn, both bootstrap templates, tutorial, quick-start); established the shipped flow from Set 098/099/100 change-logs + lifecycle-set templates + newModule.ts (fresh Build => default module + 001-default-plan/002-default-decomposition; tree flattened to module->buckets->rows; strip = Open Plan/Add/Rename/Delete; AI Plan/Import Plan/AI Sets retired to palette-only). Routed next-set (077-redo) analysis (gemini-pro, $0.0036, s2-next-set-analysis.json): claude/anthropic/sonnet/low. Appended the S2 ai-assignment block incl. the delegation split (documentation routes; surgical consistency fixes orchestrator-direct).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-002/tutorial-updated",
+      "dateTime": "2026-07-13T21:38:54.463516-04:00",
+      "description": "Rewrote the hello-world tutorial to the shipped flow: Part 2 Build now scaffolds default+001-default-plan/002-default-decomposition and flips form->tree; Part 3 deletes the Default Class1 starter (teaches Delete Module; form returns) then declares the 3 real modules; Part 5 tree description flattened (buckets are direct children; strip = Open Plan/Add/Rename/Delete Module); AI Plan/AI Sets self-serve replaced with the surviving palette commands (Import Project Plan / Generate Session-Set Prompt). Renumbered Part 3 steps; fixed Part 4 intro + self-check Plan-node ref.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-002/reorg-guidance-authored",
+      "dateTime": "2026-07-13T21:38:54.463516-04:00",
+      "description": "Authored docs/module-reorganization.md (routed documentation draft, gemini-pro $0.016, refined for accurate relative links + shipped-fact fidelity): rename/delete/add UI ops (Set 099/100 semantics), the ask-the-AI split/merge path, and the optional never-forced legacy-repo migration recipe (declare -> Assign legacy sets -> adopt lifecycle). Linked from the tutorial, quick-start, getting-started template, README, and the modules.yaml header comment.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-002/doc-sweep-clean",
+      "dateTime": "2026-07-13T21:38:54.463516-04:00",
+      "description": "Doc sweep: rewrote getting-started.md.template Sections 2-3 (form-is-up premise now false post-Build; teach run-plan-then-decomposition + Add/Rename/Delete), README old-flow block + retired strip line, quick-start (default-scaffold note + manual-path framing), and added the reorg-guide pointer to the modules.yaml header (MODULES_YAML_HEADER_COMMENTS). All remaining retired-UI grep hits are historical records (proposals/verdicts/closed change-logs) or the not-yet-regenerated cold-start goldens.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-002/changelogs-staged",
+      "dateTime": "2026-07-13T21:38:54.463516-04:00",
+      "description": "Extension CHANGELOG: new 0.44.0 entry for the module-lifecycle-simplification bundle (Sets 098-101; Added/Changed/Removed), package.json 0.43.0->0.44.0. Router untouched (0.33.0; zero ai_router/ changes accrued) so no ai_router/CHANGELOG entry. Version walk confirmed against repository-reference (tracks published 0.40.0; unreleased queue lives in the CHANGELOG per its do-not-duplicate rule). package-lock.json left at its pre-existing stale 0.41.0, matching the 0.42/0.43 precedent.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-002/suite-green",
+      "dateTime": "2026-07-13T22:09:18.219171-04:00",
+      "description": "Build + full suite: recompiled (esbuild + dist/template sync), regenerated cold-start goldens (both tiers, byte-match). Extension unit 1618/1618 (1 test copy-pin updated in place, 0 net-new); tsc --noEmit clean; eslint 7 pre-existing errors in untouched files (baseline unchanged, moduleAuthoring.ts clean); Playwright Layer 3 28/28 (L-064-12); Python cold-start acceptance 2/2 (no ai_router/ touched -> pytest 3030/6 baseline unchanged).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-002/verification-verified",
+      "dateTime": "2026-07-13T22:09:18.220165-04:00",
+      "description": "Mandatory cross-provider verification (phased, verifier gpt-5-6, anthropic excluded). Discovery R1 (K=2): ISSUES_FOUND 4 Major (2 real: consumer modules.yaml pointer to a repo-only doc; reorg migration recipe assuming lifecycle sets exist; 2 = duplicate screenshot false-positive). Supplementary R2: 1 Major (delete-Default-after-decomposition cancels the generated work). Remediation R1: F1 pointer->GitHub URL, F3 migration recipe clarified (Add-Module/Build scaffold lifecycle sets; other paths use Generate Session-Set Prompt), F5 rename-vs-delete nuance across reorg doc/getting-started/quick-start/README/tutorial; screenshots DISPUTED false-positive (tutorial+template embed zero images; README getting-started.png=unchanged 2-section form; work-explorer-modules.png already shows the Set-100 flattened tree). Remediation-review R3: VERIFIED, 0 blocking, 2 accepted + 2 accepted-with-modification, 0 rejected; 2 Minor nits folded in post-VERIFIED (module-reorganization.md). Verification cost ~$0.58.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-002/set-closed",
+      "dateTime": "2026-07-13T22:12:25.966529-04:00",
+      "description": "Step 8-9: authored full disposition.json (next_orchestrator=null, set-terminal; VERIFIED preserved) + set-level change-log.md (both sessions) + Step 9 reorg review (no changes recommended; one observed-not-promoted pattern recorded). cite_lessons ran for L-064-8/L-064-9/L-064-12/L-095-1. Advisory path-aware critique is operator-run post-close (099/100 precedent - routed route() has no repo pull-access; advisory => close only warns). Release boundary reached: extension 0.44.0 publish-ready, operator-gated.",
+      "status": "complete"
     }
   ]
 }

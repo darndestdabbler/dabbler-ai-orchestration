@@ -50,3 +50,58 @@ advisory path-aware critique. Runner-up: gemini / google / gemini-pro —
 its large context window is a tactical advantage for the repo-wide doc
 sweep specifically, though the primary recommendation's prose quality
 outweighs that for this session's dominant workload.
+
+## Session 2 of 2 — Docs, guidance, and the release gate
+
+Orchestrator: **claude / anthropic / claude-opus-4-8 / medium effort**
+(operator-invoked as `opus[1m]`). This deviates from the routed
+`claude-sonnet-5` recommendation only on the *model tier* within the same
+engine/provider — the operator chose the more capable Opus for a
+docs-heavy, cross-file-consistency-critical session, an equal-or-better
+substitution that preserves the recommendation's core logic (keep
+anthropic orchestrating so the openai/google pool stays free for the
+mandatory cross-provider verification + the armed advisory path-aware
+critique).
+
+Design variance in this session is LOW-to-MODERATE: the shipped flow is
+fully determined by Sets 098–101 S1 (no design latitude — the docs must
+faithfully describe what the code does), but the *tutorial restructure*
+(mapping the solo-shaped "Build → Default → run plan set → run
+decomposition set → rename/delete Default" beats onto the existing
+three-person team narrative) carries some authoring judgment. Per the
+delegation config (`documentation` ∈ `always_route_task_types`), the
+substantial authoring routes; surgical retired-term→shipped-term
+consistency fixes are the mechanical exception the orchestrator owns; the
+mandatory cross-provider session verification independently reviews the
+whole diff.
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1–3 | Register; read the preload, spec, S1 outcome, the shipped Set 098/099/100 change-logs, the lifecycle-set templates, and the Add/Rename/Delete module flows. | Orchestrator direct — read-only reconnaissance to establish the shipped facts before any doc claims (L-064-8). |
+| 3.5 | Next-set (077-redo) orchestrator recommendation. | Routed — analysis, excl. anthropic; raw at `s2-next-set-analysis.json` (gemini-pro, $0.0036): **claude / anthropic / sonnet / low**, runner-up openai / gpt. |
+| 4 (module-reorganization.md) | Author the net-new reorg/migration guidance doc. | Routed — `documentation`; orchestrator supplies the shipped-fact brief, reviews the return against code, applies. |
+| 4 (tutorial + quick-start) | Rewrite the hello-world tutorial Parts 2–5 and quick-start to the shipped flow; retake affected screenshots. | Routed `documentation` for the substantive rewrites; orchestrator-direct for surgical retired-term→shipped-term consistency edits. |
+| 4 (doc sweep) | Pointer/consistency fixes across workflow doc, authoring guide, repo-reference, README, and the shipping getting-started template Section 3. | Orchestrator direct — mechanical find-replace of retired-UI references; verified by the cross-provider check. |
+| 5 | Changelogs + version walk. | Orchestrator direct — mechanical metadata edits per `repository-reference.md`. |
+| 6–7 | Build + full suite; mandatory cross-provider session verification (phased loop). | Routed — session verification, excluding the anthropic orchestrator provider. |
+| 8–9 | Close-out, `change-log.md`, Step 9 reorg review, advisory path-aware critique, operator release-boundary notice. | Orchestrator mechanics; path-aware critique is a multi-provider routed/operator-run stage. |
+
+### Actuals (filled at close)
+
+- Orchestrator used: claude / anthropic / claude-opus-4-8 / medium (operator-invoked; model-tier deviation from the sonnet rec, as noted above).
+- Routed calls: recorded in `disposition.json` / `s2-*` artifacts at close.
+- Deviations from recommendation: model tier only (opus vs sonnet, same engine/provider), operator-directed.
+
+## Next set — routed recommendation (set-terminal)
+
+Set 101 is the last set of the module-lifecycle-simplification bundle;
+`next_orchestrator` is `null` in this session's disposition (set-terminal,
+no in-set successor). For the next *set* the operator is expected to run —
+**077-redo** (redo 077's UAT checklist to the 078/087-S3 bar + a live
+dogfood walk) — routed analysis (raw: `s2-next-set-analysis.json`,
+gemini-pro, $0.0036) recommends **claude / anthropic / claude-sonnet-5 /
+low effort**: the dominant workload is strict-format UAT-instruction
+authoring plus an interactive live walk, where strong instruction-
+following at high capability-per-dollar minimizes operator refinement
+loops. Runner-up: openai / gpt — highest first-pass adherence to the
+strict UAT format if minimizing operator interaction outranks token cost.

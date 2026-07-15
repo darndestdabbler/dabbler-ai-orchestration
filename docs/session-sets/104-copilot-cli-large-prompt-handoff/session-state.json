@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Session 1",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-14T21:21:07.436365-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-14T22:05:19.043981-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

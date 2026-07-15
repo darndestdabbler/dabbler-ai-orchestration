@@ -41,13 +41,18 @@ Section 4), and retry orchestration across dispatch calls belongs to the
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import queue
+import secrets
 import subprocess
+import sys
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Optional, Protocol, Sequence
 
 
@@ -66,6 +71,15 @@ ERROR_CLASS_GENERIC = "generic-unknown"
 ERROR_CLASS_SPAWN_TIMEOUT = "spawn-timeout"
 ERROR_CLASS_FIRST_BYTE_TIMEOUT = "first-byte-timeout"
 ERROR_CLASS_TOTAL_TIMEOUT = "total-timeout"
+# Set 104: the large-prompt file-handoff error class. The whole task
+# specification is dispatched via a temp file (see the handoff section below);
+# a random per-request nonce lives ONLY in that file's footer, so echoing it
+# back proves EOF access. Absence or mismatch of the acknowledgement is a
+# gross under-read (NOT proof of comprehension) and fails closed here: the
+# call is already billed and tools may already have run, so this is
+# deliberately NON-retryable (kept out of RETRYABLE_ERROR_CLASSES, like every
+# other class today).
+ERROR_CLASS_HANDOFF_INCOMPLETE = "handoff-incomplete"
 
 # The load-bearing rule (design lock Section 4): any unclassifiable non-zero
 # exit is auth-class-or-worse, never silently retryable. Kept empty, not
@@ -96,6 +110,189 @@ DEFAULT_TOTAL_TIMEOUT_SECONDS = 300.0
 
 _NO_AUTO_UPDATE_FLAG = "--no-auto-update"
 _NO_AUTO_UPDATE_ENV = {"COPILOT_AUTO_UPDATE": "false"}
+
+
+# ---------------------------------------------------------------------------
+# Large-prompt file handoff (Set 104, consult-locked design — see
+# docs/session-sets/104-copilot-cli-large-prompt-handoff/spec.md and
+# authoring-consult-synthesis.md; do not re-litigate at runtime).
+#
+# The whole system+user prompt travels as ONE ``-p`` argv element, and Windows
+# ``CreateProcessW`` caps the entire command line at 32,767 UTF-16 code units
+# (quoting and the terminating NUL included). Linux has a per-arg limit too
+# (``MAX_ARG_STRLEN``, 128 KiB); Windows just hits it first. Above a
+# conservative threshold we switch to a PULL: write the prompt to a per-request
+# temp file, dispatch a short ``-p`` bootstrap that points the agentic CLI at
+# the file (the system temp dir is auto-allowed and ``--allow-all-tools`` is
+# already passed), and require an EOF nonce acknowledgement.
+# ---------------------------------------------------------------------------
+
+# At or above this RENDERED-command-line size (UTF-16 code units), switch to
+# handoff. Measured on the rendered argv (``subprocess.list2cmdline``) on EVERY
+# OS -- quoting expansion and astral chars are otherwise miscounted, and the
+# uniform rule gives predictable behavior plus automatic protection from the
+# Linux per-arg limit. 24,000 leaves ample headroom below Windows' 32,767 for
+# the executable path, quoting expansion, and future flags. A module constant
+# by design (consult: no config knob initially).
+HANDOFF_THRESHOLD_UTF16_UNITS = 24000
+
+# The acknowledgement line shape. The bootstrap tells the model the file's
+# footer specifies an exact ack line; the nonce itself appears ONLY in the
+# file (never in argv), so a model that never read to EOF cannot produce it.
+_HANDOFF_ACK_PREFIX = "HANDOFF-ACK"
+
+# Retention affordance: by default the payload file is deleted on every path
+# (retention would weaken the transport's existing ``-p`` redaction posture).
+# Only when the Set 086 diagnostics toggle is enabled do we retain the file and
+# log its path. This mirrors the env-truthy semantics of
+# ``transport_diagnostics.diagnostics_enabled`` (env wins) but reads ONLY the
+# env var -- the transport does not consult the config dict -- so retention is
+# an explicit, process-level debug affordance. The canonical config+env
+# resolution lives in ``ai_router.transport_diagnostics``.
+_DIAGNOSTICS_ENV_VAR = "DABBLER_COPILOT_DIAGNOSTICS"
+_DIAGNOSTICS_TRUTHY = frozenset({"1", "true", "yes", "on"})
+
+
+def _diagnostics_retention_enabled(env: Optional[dict] = None) -> bool:
+    """True iff the diagnostics env toggle is explicitly truthy -- the only
+    condition under which a handoff payload file is retained rather than
+    deleted."""
+    env = env if env is not None else os.environ
+    raw = env.get(_DIAGNOSTICS_ENV_VAR)
+    if raw is None:
+        return False
+    return raw.strip().lower() in _DIAGNOSTICS_TRUTHY
+
+
+def _rendered_utf16_units(argv: Sequence[str]) -> int:
+    """UTF-16 code units in the RENDERED command line for ``argv``.
+
+    ``subprocess.list2cmdline`` applies Windows quoting rules; encoding the
+    result UTF-16 and counting units (``// 2``) measures exactly what
+    ``CreateProcessW`` counts against its 32,767 limit. ``+ 1`` accounts for
+    the terminating NUL the limit includes. Astral (non-BMP) characters are
+    two UTF-16 units each, which this counts correctly and a raw ``len()`` on
+    the Python string would not."""
+    rendered = subprocess.list2cmdline(list(argv))
+    return len(rendered.encode("utf-16-le")) // 2 + 1
+
+
+def _build_handoff_footer(nonce: str) -> str:
+    """The transport-control footer appended to the payload file. Carries the
+    per-request nonce (which never appears in argv) and the exact ack line the
+    model must end its response with."""
+    return (
+        "\n\n"
+        "===== TRANSPORT CONTROL FOOTER -- not part of the task =============\n"
+        "You have now reached the END of the task specification file. Reaching\n"
+        "this footer is what proves you read the file completely. The FINAL\n"
+        "line of your response must be exactly the following line, with nothing\n"
+        "after it:\n"
+        f"{_HANDOFF_ACK_PREFIX} {nonce}\n"
+        "===================================================================\n"
+    )
+
+
+def _build_handoff_bootstrap(posix_path: str) -> str:
+    """The short ``-p`` bootstrap for a handoff dispatch. Names the payload
+    path in POSIX forward-slash form (models mangle backslashes), instructs a
+    complete sequential read BEFORE acting, and defers the ack line to the
+    file's footer (so the nonce stays out of argv). Contains NO nonce."""
+    return (
+        "Your complete and authoritative task instructions for this turn are in "
+        "a UTF-8 text file. Before doing anything else, use your file-read tool "
+        "to read the ENTIRE file at the path below, from the first byte through "
+        "the end of file, reading in sequential chunks if it is large:\n"
+        f"{posix_path}\n"
+        "Execute the file's contents as your full instructions. Do not summarize "
+        "the file back to me. The file ends with a transport-control footer that "
+        "specifies an exact acknowledgement line; obey it -- the final line of "
+        "your response must be exactly that acknowledgement line."
+    )
+
+
+def _sha256_file(path: str) -> Optional[str]:
+    """Hex sha256 of the file at ``path``, or ``None`` if it cannot be read
+    (removed/unreadable). Never raises -- it runs on already-failing paths."""
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def _best_effort_remove(path: str) -> None:
+    """Delete ``path``, swallowing a missing/locked file. The agent may have
+    already deleted it (it holds write tools); that is not an error here."""
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+@dataclass(frozen=True)
+class _HandoffContext:
+    """State a handoff dispatch threads through ``_run`` so the result builders
+    can validate the ack, record ``payload_bytes``, and detect a payload-file
+    mutation (the agent has write tools; a mutation is recorded, not gated)."""
+
+    nonce: str
+    payload_path: str
+    payload_bytes: int
+    hash_before: Optional[str]
+
+
+def _payload_modified(handoff: "_HandoffContext") -> bool:
+    """Did the payload file change between spawn and exit? A removed/unreadable
+    file counts as modified (the agent deleting it is a mutation)."""
+    after = _sha256_file(handoff.payload_path)
+    if after is None:
+        return True
+    return after != handoff.hash_before
+
+
+def _handoff_metadata_fields(
+    handoff: Optional["_HandoffContext"], *, ack_outcome: Optional[str]
+) -> dict:
+    """The additive ``transport_metadata`` handoff fields. Inline dispatches
+    carry ``handoff: False`` and nothing else; handoff dispatches also carry
+    ``payload_bytes``, the ack outcome, and ``payload_file_modified``."""
+    if handoff is None:
+        return {"handoff": False}
+    return {
+        "handoff": True,
+        "payload_bytes": handoff.payload_bytes,
+        "handoff_ack": ack_outcome,
+        "payload_file_modified": _payload_modified(handoff),
+    }
+
+
+def _validate_ack(content: str, nonce: str) -> tuple[Optional[str], str]:
+    """Validate the EOF acknowledgement on a handoff response.
+
+    Returns ``(stripped_content, outcome)`` where ``outcome`` is one of
+    ``"validated"`` / ``"mismatch"`` / ``"missing"``. ``stripped_content`` is
+    the response with the ack line removed, and is only non-``None`` when the
+    outcome is ``"validated"``. The ack must be the final NON-BLANK line
+    (trailing blank lines are tolerated); a model that appended anything else
+    after it fails closed. Honest framing: this is a gross under-read detector,
+    not proof that every intervening byte was read."""
+    expected = f"{_HANDOFF_ACK_PREFIX} {nonce}"
+    lines = content.splitlines()
+    idx = len(lines) - 1
+    while idx >= 0 and not lines[idx].strip():
+        idx -= 1
+    if idx < 0:
+        return None, "missing"
+    last = lines[idx].strip()
+    if last == expected:
+        return "\n".join(lines[:idx]).rstrip("\n"), "validated"
+    if last.startswith(_HANDOFF_ACK_PREFIX):
+        return None, "mismatch"
+    return None, "missing"
 
 
 @dataclass(frozen=True)
@@ -392,7 +589,7 @@ class CopilotCliTransport:
         prompt = (
             f"{system_prompt}\n\n{user_message}" if system_prompt else user_message
         )
-        argv = [
+        inline_argv = [
             self._binary,
             "-p", prompt,
             "--model", model_id,
@@ -400,9 +597,66 @@ class CopilotCliTransport:
             "--output-format", "json",
             _NO_AUTO_UPDATE_FLAG,
         ]
-        return self._run(argv)
+        # Threshold-gated handoff (Set 104): inline stays primary and
+        # highest-fidelity; switch to the file pull only when the rendered
+        # inline command line reaches the size ceiling. One helper owns the
+        # decision so both branches stay tested.
+        if _rendered_utf16_units(inline_argv) < HANDOFF_THRESHOLD_UTF16_UNITS:
+            return self._run(inline_argv)
+        return self._run_handoff(prompt, model_id)
 
-    def _run(self, argv: Sequence[str]) -> TransportResult:
+    def _run_handoff(self, prompt: str, model_id: str) -> TransportResult:
+        """Dispatch a large prompt via a temp-file pull.
+
+        The payload (composed prompt + nonce footer) is written UTF-8 (no BOM),
+        flushed and CLOSED before spawn (an open handle blocks the child from
+        reading it on Windows), then a short bootstrap ``-p`` points the CLI at
+        the file. The payload file is deleted in ``finally`` on EVERY path --
+        success, spawn failure, either timeout class, malformed output -- with
+        retention only under the diagnostics toggle."""
+        nonce = secrets.token_hex(16)
+        payload_text = prompt + _build_handoff_footer(nonce)
+        payload_bytes = payload_text.encode("utf-8")  # UTF-8, no BOM
+        fd, path = tempfile.mkstemp(suffix=".txt", prefix="dabbler-copilot-handoff-")
+        with os.fdopen(fd, "wb") as f:
+            f.write(payload_bytes)
+            f.flush()
+            os.fsync(f.fileno())
+        # The handle is now closed -- required for a reliable child read on
+        # Windows. Hash the payload before spawn so a mutation by the agent
+        # (it holds write tools) is observable on the result.
+        handoff = _HandoffContext(
+            nonce=nonce,
+            payload_path=path,
+            payload_bytes=len(payload_bytes),
+            hash_before=_sha256_file(path),
+        )
+        argv = [
+            self._binary,
+            "-p", _build_handoff_bootstrap(Path(path).as_posix()),
+            "--model", model_id,
+            "--allow-all-tools",
+            "--output-format", "json",
+            _NO_AUTO_UPDATE_FLAG,
+        ]
+        try:
+            return self._run(argv, handoff=handoff)
+        finally:
+            # payload_file_modified is read inside _run (before this finally),
+            # so the file still exists when the result is built. Cleanup runs
+            # last, on every path, unless diagnostics retention is enabled.
+            if _diagnostics_retention_enabled():
+                print(
+                    "[dabbler] Copilot handoff payload retained for diagnostics: "
+                    f"{path}",
+                    file=sys.stderr,
+                )
+            else:
+                _best_effort_remove(path)
+
+    def _run(
+        self, argv: Sequence[str], handoff: Optional[_HandoffContext] = None
+    ) -> TransportResult:
         timeouts = self._timeouts
 
         try:
@@ -414,7 +668,7 @@ class CopilotCliTransport:
                 error_class=ERROR_CLASS_SPAWN_TIMEOUT,
                 raw_stdout="", raw_stderr="",
                 partial_output_discarded=False,
-                argv=argv,
+                argv=argv, handoff=handoff,
             )
         except Exception as exc:  # noqa: BLE001 - any spawner failure is a
             # classified result, never an escaping exception (a bad-argv
@@ -424,7 +678,7 @@ class CopilotCliTransport:
                 error_class=ERROR_CLASS_GENERIC,
                 raw_stdout="", raw_stderr=str(exc),
                 partial_output_discarded=False,
-                argv=argv,
+                argv=argv, handoff=handoff,
             )
 
         # Anchored AFTER the spawn tier resolves: first-byte and total budget
@@ -473,7 +727,7 @@ class CopilotCliTransport:
                 error_class=timed_out_class,
                 raw_stdout=raw_stdout, raw_stderr=raw_stderr,
                 partial_output_discarded=bool(stdout_lines),
-                argv=argv,
+                argv=argv, handoff=handoff,
             )
 
         # stdout hit EOF cleanly. Bound the exit wait by whatever remains of
@@ -489,7 +743,7 @@ class CopilotCliTransport:
                 error_class=ERROR_CLASS_TOTAL_TIMEOUT,
                 raw_stdout=raw_stdout, raw_stderr=raw_stderr,
                 partial_output_discarded=bool(stdout_lines),
-                argv=argv,
+                argv=argv, handoff=handoff,
             )
         try:
             exit_code = proc.wait(timeout=remaining_total)
@@ -501,7 +755,7 @@ class CopilotCliTransport:
                 error_class=ERROR_CLASS_TOTAL_TIMEOUT,
                 raw_stdout=raw_stdout, raw_stderr=raw_stderr,
                 partial_output_discarded=bool(stdout_lines),
-                argv=argv,
+                argv=argv, handoff=handoff,
             )
 
         raw_stdout = "".join(stdout_lines)
@@ -522,11 +776,12 @@ class CopilotCliTransport:
                 exit_code=exit_code,
                 reprobe_cli_version=reprobe_cli_version,
                 reprobed=error_class == ERROR_CLASS_AUTH,
+                handoff=handoff,
             )
 
         return self._success_result(
             raw_stdout=raw_stdout, raw_stderr=raw_stderr, argv=argv,
-            exit_code=exit_code,
+            exit_code=exit_code, handoff=handoff,
         )
 
     def _error_result(
@@ -540,7 +795,23 @@ class CopilotCliTransport:
         exit_code: Optional[int] = None,
         reprobed: bool = False,
         reprobe_cli_version: Optional[str] = None,
+        handoff: Optional[_HandoffContext] = None,
+        handoff_ack_outcome: Optional[str] = None,
     ) -> TransportResult:
+        metadata = {
+            "error_class": error_class,
+            "retryable": error_class in RETRYABLE_ERROR_CLASSES,
+            "argv": list(argv),
+            "exit_code": exit_code,
+            "reprobed": reprobed,
+            "reprobe_cli_version": reprobe_cli_version,
+            "reprobe_cli_alive": reprobe_cli_version is not None
+            if reprobed else None,
+            "utf8_replacement_seen": _has_utf8_replacement(raw_stdout, raw_stderr),
+        }
+        metadata.update(
+            _handoff_metadata_fields(handoff, ack_outcome=handoff_ack_outcome)
+        )
         return TransportResult(
             content="",
             input_tokens=0,
@@ -552,22 +823,12 @@ class CopilotCliTransport:
             partial_output_discarded=partial_output_discarded,
             raw_stdout=raw_stdout,
             raw_stderr=raw_stderr,
-            transport_metadata={
-                "error_class": error_class,
-                "retryable": error_class in RETRYABLE_ERROR_CLASSES,
-                "argv": list(argv),
-                "exit_code": exit_code,
-                "reprobed": reprobed,
-                "reprobe_cli_version": reprobe_cli_version,
-                "reprobe_cli_alive": reprobe_cli_version is not None
-                if reprobed else None,
-                "utf8_replacement_seen": _has_utf8_replacement(raw_stdout, raw_stderr),
-            },
+            transport_metadata=metadata,
         )
 
     def _success_result(
         self, *, raw_stdout: str, raw_stderr: str, argv: Sequence[str],
-        exit_code: int,
+        exit_code: int, handoff: Optional[_HandoffContext] = None,
     ) -> TransportResult:
         events, malformed_lines = _parse_jsonl(raw_stdout)
         final_message = _last_event(events, "assistant.message")
@@ -581,7 +842,7 @@ class CopilotCliTransport:
                 error_class=ERROR_CLASS_GENERIC,
                 raw_stdout=raw_stdout, raw_stderr=raw_stderr,
                 partial_output_discarded=bool(events or malformed_lines),
-                argv=argv, exit_code=exit_code,
+                argv=argv, exit_code=exit_code, handoff=handoff,
             )
 
         # Every field below came off the wire as arbitrary JSON — a
@@ -651,9 +912,40 @@ class CopilotCliTransport:
                 error_class=ERROR_CLASS_GENERIC,
                 raw_stdout=raw_stdout, raw_stderr=raw_stderr,
                 partial_output_discarded=True,
-                argv=argv, exit_code=exit_code,
+                argv=argv, exit_code=exit_code, handoff=handoff,
             )
 
+        # Handoff integrity gate (Set 104): the payload's footer required the
+        # response to END with the exact nonce ack line. Validate it and strip
+        # it before returning content; on absence/mismatch fail closed as
+        # handoff-incomplete (non-retryable -- the call is billed and tools may
+        # have run). A gross under-read detector, not proof of comprehension.
+        ack_outcome: Optional[str] = None
+        if handoff is not None:
+            stripped, ack_outcome = _validate_ack(content, handoff.nonce)
+            if stripped is None:
+                return self._error_result(
+                    error_class=ERROR_CLASS_HANDOFF_INCOMPLETE,
+                    raw_stdout=raw_stdout, raw_stderr=raw_stderr,
+                    partial_output_discarded=True,
+                    argv=argv, exit_code=exit_code,
+                    handoff=handoff, handoff_ack_outcome=ack_outcome,
+                )
+            content = stripped
+
+        metadata = {
+            "error_class": None,
+            "retryable": False,
+            "argv": list(argv),
+            "exit_code": exit_code,
+            "echoed_model": echoed_model,
+            "session_id": session_id,
+            "premium_requests": usage.get("premiumRequests"),
+            "total_api_duration_ms": usage.get("totalApiDurationMs"),
+            "session_duration_ms": usage.get("sessionDurationMs"),
+            "utf8_replacement_seen": _has_utf8_replacement(raw_stdout, raw_stderr),
+        }
+        metadata.update(_handoff_metadata_fields(handoff, ack_outcome=ack_outcome))
         return TransportResult(
             content=content,
             input_tokens=0,  # never reported by the CLI (S1 finding)
@@ -665,18 +957,7 @@ class CopilotCliTransport:
             partial_output_discarded=False,
             raw_stdout=raw_stdout,
             raw_stderr=raw_stderr,
-            transport_metadata={
-                "error_class": None,
-                "retryable": False,
-                "argv": list(argv),
-                "exit_code": exit_code,
-                "echoed_model": echoed_model,
-                "session_id": session_id,
-                "premium_requests": usage.get("premiumRequests"),
-                "total_api_duration_ms": usage.get("totalApiDurationMs"),
-                "session_duration_ms": usage.get("sessionDurationMs"),
-                "utf8_replacement_seen": _has_utf8_replacement(raw_stdout, raw_stderr),
-            },
+            transport_metadata=metadata,
         )
 
 

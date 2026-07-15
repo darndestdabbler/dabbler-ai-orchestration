@@ -9,6 +9,74 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
+## [0.34.0] — Unreleased (Set 104 — Copilot CLI large-prompt file handoff)
+
+> **Staged, publish operator-gated.** The version bump to `0.34.0` in
+> `pyproject.toml` and the live >32 KiB probe evidence line land in Session 2;
+> the tag push → `release.yml` → PyPI step stays an operator action. Once
+> `0.34.0` is live, **restore Set 103** (`restore_session_set`) per its
+> `CANCELLED.md` pause record — this release is that set's resume condition.
+
+### Added
+
+- **(Set 104 S1) Threshold-gated large-prompt file handoff for the
+  Copilot CLI transport.** The whole system+user prompt travels as one `-p`
+  argv element, and Windows `CreateProcessW` caps the entire command line at
+  32,767 UTF-16 code units — so a large dispatch (session-verification
+  bundles especially) could not spawn at all, and the failure was
+  misclassified as generic. `ai_router/cli_transport.py` now measures the
+  **rendered** inline command line in UTF-16 units
+  (`subprocess.list2cmdline(argv)`, so quoting expansion and astral chars are
+  counted correctly) and, at or above **24,000 units**, switches to a **pull**:
+  the composed prompt is written to a per-request UTF-8 (no-BOM) temp file,
+  closed before spawn (an open handle blocks the child read on Windows), and a
+  short `-p` bootstrap points the agentic CLI at the file in **POSIX
+  forward-slash form** with read-completely / execute-don't-summarize
+  instructions. The same rule runs on every OS (predictable, and protects
+  against the Linux `MAX_ARG_STRLEN` per-arg limit too). Inline stays primary
+  and byte-identical below the threshold. Design consult-locked
+  (openai:gpt-5-6 + google:gemini-3-1-pro, aligned;
+  `docs/session-sets/104-copilot-cli-large-prompt-handoff/authoring-consult-synthesis.md`).
+- **(Set 104 S1) Nonce EOF acknowledgement + the `handoff-incomplete` error
+  class.** A random per-request 128-bit nonce (`secrets.token_hex(16)`)
+  appears **only** in the payload file's transport-control footer — never in
+  argv — so echoing it proves the model read to EOF. The transport validates
+  the final response line is exactly `HANDOFF-ACK <nonce>`, **strips it** from
+  the returned content, and on absence/mismatch classifies
+  `ERROR_CLASS_HANDOFF_INCOMPLETE` — **fail-closed and NON-retryable** (the
+  call is billed and tools may already have run; the class stays out of
+  `RETRYABLE_ERROR_CLASSES`). Honest framing, kept in the code: this is a
+  gross under-read detector, **not** proof of comprehension.
+- **(Set 104 S1) Additive `transport_metadata` handoff fields:** `handoff`
+  (bool, `False` on the inline path), `payload_bytes`, `handoff_ack`
+  (`validated` / `missing` / `mismatch`), and `payload_file_modified` (sha256
+  of the payload file before spawn vs. after exit — the agent holds write
+  tools, so a mutation is **recorded, not gated**). The Set 086 diagnostics
+  `-p` redaction posture is unchanged: under handoff the `-p` value is the
+  small bootstrap, and the payload never appears in argv or diagnostics.
+
+### Changed
+
+- **(Set 104 S1) Payload-file lifecycle: deleted on every path by default.**
+  The per-request temp file is removed in a `finally` covering success, spawn
+  failure, both timeout classes, and malformed-output classification — no
+  default retention (retention would weaken the transport's `-p` redaction
+  posture). Retaining the file and logging its path is permitted **only** when
+  the Set 086 diagnostics toggle (`DABBLER_COPILOT_DIAGNOSTICS`) is enabled, as
+  an explicit debug affordance.
+
+### Docs
+
+- **(Set 104 S1) The cancel-to-pause recipe** is documented in
+  `docs/ai-led-session-workflow.md` (→ *The cancel-to-pause recipe*): the
+  framework's answer to the set-blocks-its-own-fix impasse, using the existing
+  blessed `cancel_session_set` / `restore_session_set` writers with a
+  structured reason, an explicit **no-`paused`-enum** decision record, the
+  session-boundary-only guard, and the "paused sets don't count against D6, so
+  review the Cancelled bucket at set selection" discipline. Set 103's
+  `CANCELLED.md` is the first worked example. A pointer is added from
+  `ai_router/docs/close-out.md`.
+
 ## [0.33.0] — 2026-07-14 (Set 096 — consequence-graded severity + the phased verification loop)
 
 > **Published 2026-07-14** to PyPI (tag `v0.33.0`, operator-authorized 2026-07-14 as a coordinated release

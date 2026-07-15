@@ -1,21 +1,22 @@
 {
   "schemaVersion": 4,
-  "sessionSetName": "103-copilot-ado-hello-world-tutorial",
-  "status": "cancelled",
+  "sessionSetName": "104-copilot-cli-large-prompt-handoff",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "complete",
-      "startedAt": "2026-07-14T09:16:41.738550-04:00",
-      "completedAt": "2026-07-14T11:06:21.668559-04:00",
+      "status": "in-progress",
+      "startedAt": "2026-07-14T21:21:07.436365-04:00",
+      "completedAt": null,
       "orchestrator": {
         "engine": "claude",
+        "provider": "anthropic",
         "model": "claude-opus-4-8",
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": "VERIFIED"
+      "verificationVerdict": null
     },
     {
       "number": 2,
@@ -26,6 +27,5 @@
       "orchestrator": null,
       "verificationVerdict": null
     }
-  ],
-  "preCancelStatus": "in-progress"
+  ]
 }

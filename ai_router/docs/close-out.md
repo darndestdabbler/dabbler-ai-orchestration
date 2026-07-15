@@ -880,6 +880,17 @@ record (if it does not). To inspect manually:
 The reconciler emits `format_summary(...)` output describing what it
 would do. If the dry-run looks right, drop `--dry-run` to apply.
 
+> **Stranded is accidental; a deliberately suspended set uses
+> cancel-to-pause, not a lingering `in-progress`.** If a set must be put
+> down on purpose because it is blocked on a dependency (a fix set, a
+> release, an operator precondition), do **not** leave it `in-progress`
+> for the reconciler to flag as stranded — suspend it at a session
+> boundary with `session_lifecycle.cancel_session_set(dir, reason)` using
+> a structured pause reason, and bring it back with `restore_session_set`.
+> The recipe (including the explicit no-`paused`-enum decision) is in
+> `docs/ai-led-session-workflow.md` → *The cancel-to-pause recipe*; Set
+> 103's `CANCELLED.md` is the worked example.
+
 **Lock contention without an obvious holder.** If `--repair` shows a
 lock file but `pid_file_path` does not point to a live daemon,
 something killed the previous close-out hard. Read the lock file:

@@ -118,6 +118,15 @@ not a formality.
   through a **seat-local discovered catalog** and dispatches every call
   via the CLI transport. Seat-wide concerns (auth, catalog, quota,
   failure semantics) live in the transport layer, not on model entries.
+  > **Set 104 update (2026-07-14):** `cli_transport.py` now switches large
+  > dispatches to a temp-file **handoff** above a rendered-argv UTF-16
+  > threshold (the whole `-p` prompt otherwise exceeds Windows'
+  > `CreateProcessW` command-line cap). This is a transport-internal detail —
+  > the seat contract here (profile selection, `TransportResult` shape,
+  > provenance/verification semantics) is **unchanged**; the handoff only adds
+  > additive `transport_metadata` fields and the non-retryable
+  > `handoff-incomplete` error class. See
+  > `docs/session-sets/104-copilot-cli-large-prompt-handoff/spec.md`.
 - **Seat-local catalog lockfile, not checked-in picker strings**
   (Critique-2 M7, Critique-1 M5). A discovery command
   (`python -m ai_router.copilot_catalog --refresh`) generates

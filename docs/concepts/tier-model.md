@@ -231,6 +231,17 @@ guarantees** — never as byte-equivalent to the direct-API Full tier:
   profile and the skip is always logged; a hard, non-cost-keyed circuit
   breaker (`transport.max_invocations_per_session`, default 200) caps seat
   burn instead.
+- **Large prompts dispatch via a file handoff (Set 104).** The whole prompt
+  travels as one `-p` argv element, and Windows caps the command line at
+  32,767 UTF-16 units, so a large dispatch (verification bundles especially)
+  could not spawn at all. At or above a rendered-argv threshold the transport
+  transparently writes the prompt to a per-request temp file and sends a short
+  bootstrap pointing the CLI at it, gated by a nonce EOF acknowledgement that
+  fails closed as `handoff-incomplete` on an under-read. Inline stays primary
+  and byte-identical below the threshold; the payload file is deleted on every
+  path. This fixes **argv transport only**, not model context capacity — the
+  longer-term direction for large verification payloads remains manifests +
+  path-aware retrieval, not ever-larger monolithic prompts.
 
 **Per-machine setup (do this first):** a Copilot-locked seat must have the
 `copilot` CLI installed and **interactively logged in** to its `.ghe.com`

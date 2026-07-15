@@ -644,6 +644,79 @@ so the file accumulates the full history across multiple toggles.
   pure-operator action.
 - Cancellation of an individual session within a set. Cancellation
   applies to whole session sets only.
+
+### The cancel-to-pause recipe (suspending a set blocked on a dependency)
+
+Set 104 canonized a specific, recurring impasse: **a set that is
+blocked on a fix which the one-active-set rule (D6) won't let another
+set start to deliver.** Set 103's Session 2 (a live Copilot + Azure
+DevOps walk) could not run until the Copilot CLI's 32 KiB argv ceiling
+was fixed — but starting the dedicated fix set (Set 104) while 103 was
+still `in-progress` would violate one-active-set. The set was blocking
+its own fix.
+
+The answer — locked by an operator-initiated cross-provider consult
+(openai:gpt-5-6 + google:gemini-3-1-pro, `task_type: architecture`,
+**aligned**;
+`docs/session-sets/104-copilot-cli-large-prompt-handoff/authoring-consult-synthesis.md`)
+— is **no new machinery.** The existing blessed cancel/restore writers
+*are* the pause. This differs from the "not a pause for the day"
+caveat above: that caveat rejects casually cancelling a *mid-session,
+self-resumable* set. Cancel-to-pause is the opposite case — a genuine
+**external** blocker (a dependency set / release / operator
+precondition), suspended at a **session boundary**, with an objective
+resume condition on the record.
+
+**No `paused` schema enum (explicit decision record).** The consult was
+unanimous against adding a first-class `"paused"` `status` value.
+Older routers and extensions validate the status enum and reject
+unknown values, so a new status has a cross-version blast radius
+(schema, validators, the D6 drift guard, the CLI, and the Work
+Explorer would all need coordinated changes, and writers could not
+safely emit it until every consumer repo upgraded) — disproportionate
+to a rare operation. Revisit a first-class status **only** if pauses
+become frequent, long-lived, or hard to discover, and then in two
+phases: ship readers / validators / guards / UI that understand
+`paused` and treat it as non-active *first*, and release writers that
+emit it only after the compatibility floor has moved.
+
+**The recipe:**
+
+- **Pause** = `session_lifecycle.cancel_session_set(dir, reason)` with a
+  **structured reason string** — the reason *is* the contract:
+
+  ```
+  Paused, not abandoned: blocked by <set/issue>; resume when
+  <objective, checkable condition>; owner: <who>; next session: <K>.
+  ```
+
+  Record the blocking dependency, an objective resume condition, the
+  owner, and the intended next session (and the related fix set /
+  release where applicable). The cancel writer prepends this to
+  `CANCELLED.md` and captures `preCancelStatus`, so the pause is a
+  durable, operator-readable audit entry.
+- **Resume** = `session_lifecycle.restore_session_set(dir, reason)` —
+  verified lossless: it round-trips `preCancelStatus` back to the
+  status the set held before the pause and leaves every session entry
+  untouched (a paused set's in-flight-vs-not sessions come back exactly
+  as they were). `CANCELLED.md` becomes `RESTORED.md` (audit-only).
+- **Legal only at a session boundary** — zero sessions `in-progress`.
+  A mid-session emergency has ambiguous partial outputs and recovery
+  semantics; use real cancellation / recovery for that, never pause.
+- **Paused sets do not count against one-active-set.** The D6 drift
+  guard counts only literal `"in-progress"`, and a paused set is
+  `"cancelled"` on disk — so **any number** of sets may be paused at
+  once; there is no cap. Because they are invisible to D6, the
+  discipline that keeps them from being forgotten is human: **review
+  the Cancelled bucket during set selection** and check each paused
+  entry's resume condition.
+
+Set 103's `CANCELLED.md`
+(`docs/session-sets/103-copilot-ado-hello-world-tutorial/CANCELLED.md`)
+is the first live worked example of this recipe — it names Set 104's
+slug as its resume condition and is restored via `restore_session_set`
+once router 0.34.0 (this set's deliverable) publishes.
+
 ---
 
 ## Setting Up a New Session Set

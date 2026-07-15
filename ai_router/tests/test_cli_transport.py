@@ -1,5 +1,8 @@
 import io
+import json
+import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -530,3 +533,448 @@ def test_default_spawner_decodes_utf8_bytes_cp1252_cannot():
     stdout, _ = proc.communicate(timeout=5)
     assert proc.returncode == 0
     assert stdout == "caf—e"
+
+
+# ===========================================================================
+# Set 104 — threshold-gated large-prompt file handoff. Every test drives the
+# real state machine through the injected spawner; no test invokes a real CLI.
+# ===========================================================================
+
+_NONCE_RE = re.compile(r"HANDOFF-ACK ([0-9a-f]{32})")
+
+
+def _extract_payload_path(argv: Sequence[str]) -> Optional[str]:
+    """The handoff payload path is named on its own line inside the bootstrap
+    `-p` value (argv[2]); find the line that is an existing file."""
+    for line in str(argv[2]).splitlines():
+        cand = line.strip()
+        if cand and os.path.exists(cand):
+            return cand
+    return None
+
+
+class HandoffSpawner:
+    """A fake spawner for the handoff path: reads the payload file the
+    transport wrote, records what it saw at spawn time (existence, exact
+    payload, whether the handle was closed, whether the nonce leaked into
+    argv), and returns a FakeProcess whose assistant.message echoes an ack
+    line derived from the file's footer nonce.
+    """
+
+    def __init__(
+        self,
+        *,
+        ack: str = "valid",  # "valid" | "missing" | "mismatch"
+        body: str = "The answer is 42.",
+        mutate: bool = False,
+        delete: bool = False,
+        raise_exc: Optional[BaseException] = None,
+        block_stdout_after: Optional[float] = None,
+        stdout_lines: Optional[list] = None,
+    ):
+        self.ack = ack
+        self.body = body
+        self.mutate = mutate
+        self.delete = delete
+        self.raise_exc = raise_exc
+        self.block_stdout_after = block_stdout_after
+        self.stdout_lines = stdout_lines
+        self.calls: list[SpawnerCall] = []
+        self.seen: dict = {}
+
+    def __call__(self, argv: Sequence[str], env: Optional[dict]) -> FakeProcess:
+        self.calls.append(SpawnerCall(argv, env))
+        path = _extract_payload_path(argv)
+        self.seen["path"] = path
+        self.seen["exists_at_spawn"] = bool(path and os.path.exists(path))
+        nonce = None
+        if path and os.path.exists(path):
+            # Opening r+ proves the parent already CLOSED its handle: on
+            # Windows an still-open mkstemp handle blocks reopening.
+            with open(path, "r+", encoding="utf-8") as f:
+                payload = f.read()
+            self.seen["payload"] = payload
+            self.seen["payload_bytes"] = os.path.getsize(path)
+            with open(path, "rb") as fb:
+                self.seen["raw_head"] = fb.read(3)
+            m = _NONCE_RE.search(payload)
+            nonce = m.group(1) if m else None
+            self.seen["nonce"] = nonce
+            self.seen["nonce_in_argv"] = any(
+                nonce is not None and nonce in str(a) for a in argv
+            )
+            if self.mutate:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write("tampered by the agent")
+            if self.delete:
+                os.remove(path)
+        if self.raise_exc is not None:
+            raise self.raise_exc
+        if self.stdout_lines is not None:
+            lines = list(self.stdout_lines)
+        else:
+            if self.ack == "valid":
+                content = f"{self.body}\nHANDOFF-ACK {nonce}"
+            elif self.ack == "mismatch":
+                content = f"{self.body}\nHANDOFF-ACK {'0' * 32}"
+            else:  # missing
+                content = self.body
+            lines = [
+                json.dumps(
+                    {
+                        "type": "assistant.message",
+                        "data": {"content": content, "outputTokens": 3},
+                    }
+                )
+                + "\n",
+                json.dumps({"type": "result", "usage": {"premiumRequests": 1}})
+                + "\n",
+            ]
+        return FakeProcess(
+            stdout_lines=lines, block_stdout_after=self.block_stdout_after
+        )
+
+
+def _over_threshold_message(extra: str = "") -> str:
+    """A user message guaranteed to push the rendered argv past the handoff
+    threshold on any OS."""
+    return ("X" * (cli_transport.HANDOFF_THRESHOLD_UTF16_UNITS + 5000)) + extra
+
+
+# --- UTF-16 rendered-argv measurement -------------------------------------
+
+
+def test_rendered_utf16_units_exact_ascii():
+    # list2cmdline(["a"]) == "a" -> 1 UTF-16 unit + 1 for the terminating NUL.
+    assert cli_transport._rendered_utf16_units(["a"]) == 2
+
+
+def test_rendered_utf16_units_counts_astral_as_two_units():
+    # A non-BMP character (U+1F600) is a surrogate pair: two UTF-16 units,
+    # where a raw Python len() would count it as one.
+    with_astral = cli_transport._rendered_utf16_units(["c", "\U0001F600"])
+    with_bmp = cli_transport._rendered_utf16_units(["c", "a"])
+    assert with_astral - with_bmp == 1  # one extra UTF-16 unit for the pair
+
+
+def test_rendered_utf16_units_accounts_for_quoting_of_spaces():
+    # A value with a space is quoted by list2cmdline (two added quote chars),
+    # so the rendered size exceeds what the raw character count implies.
+    spaced = cli_transport._rendered_utf16_units(["c", "hello world"])
+    unspaced = cli_transport._rendered_utf16_units(["c", "helloXworld"])
+    # same raw length (11), but the quoted form renders larger.
+    assert spaced > unspaced
+
+
+def test_rendered_utf16_units_handles_backslashes():
+    # Backslash-heavy Windows-style paths must not raise and must render a
+    # positive size (list2cmdline applies backslash-doubling rules).
+    units = cli_transport._rendered_utf16_units(
+        ["c", "-p", r"C:\Users\x\AppData\Local\Temp\a b\file.txt"]
+    )
+    assert units > 0
+
+
+# --- Threshold branch selection -------------------------------------------
+
+
+def test_below_threshold_uses_inline_path():
+    spawner = HandoffSpawner()
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    result = transport.dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message="tiny prompt"
+    )
+    # Inline: the full prompt is the -p value, no temp file, handoff False.
+    assert spawner.calls[0].argv[2] == "tiny prompt"
+    assert result.transport_metadata["handoff"] is False
+    assert "payload_bytes" not in result.transport_metadata
+
+
+def test_at_threshold_switches_to_handoff(monkeypatch):
+    # Precisely exercise the boundary: `< threshold` is inline, `== threshold`
+    # is handoff (the switch is `>=`). Pin the measurement so the boundary is
+    # deterministic regardless of argv content.
+    threshold = cli_transport.HANDOFF_THRESHOLD_UTF16_UNITS
+    monkeypatch.setattr(cli_transport, "_rendered_utf16_units", lambda argv: threshold)
+    spawner = HandoffSpawner()
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    result = transport.dispatch(model_id="gpt-5.4", system_prompt="", user_message="p")
+    assert result.transport_metadata["handoff"] is True
+
+
+def test_just_below_threshold_stays_inline(monkeypatch):
+    threshold = cli_transport.HANDOFF_THRESHOLD_UTF16_UNITS
+    monkeypatch.setattr(
+        cli_transport, "_rendered_utf16_units", lambda argv: threshold - 1
+    )
+    spawner = HandoffSpawner()
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    result = transport.dispatch(model_id="gpt-5.4", system_prompt="", user_message="p")
+    assert result.transport_metadata["handoff"] is False
+
+
+def test_large_prompt_selects_handoff_without_monkeypatch():
+    spawner = HandoffSpawner()
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    result = transport.dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    assert result.ok
+    assert result.transport_metadata["handoff"] is True
+
+
+# --- Payload file: exact content, UTF-8 no BOM, closed handle -------------
+
+
+def test_handoff_payload_is_exact_prompt_plus_footer_utf8_no_bom():
+    body_prompt = _over_threshold_message(extra="— an em dash \U0001F600")
+    spawner = HandoffSpawner()
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    transport.dispatch(
+        model_id="gpt-5.4", system_prompt="System.", user_message=body_prompt
+    )
+    payload = spawner.seen["payload"]
+    composed = f"System.\n\n{body_prompt}"
+    # The exact composed prompt is the head of the file...
+    assert payload.startswith(composed)
+    # ...followed by a clearly-delimited transport-control footer with the ack.
+    footer = payload[len(composed):]
+    assert "TRANSPORT CONTROL FOOTER" in footer
+    assert _NONCE_RE.search(footer) is not None
+    # UTF-8, no BOM (raw first bytes are not the UTF-8 BOM).
+    assert spawner.seen["raw_head"] != b"\xef\xbb\xbf"
+    # Non-BMP + em-dash survived the UTF-8 round trip.
+    assert "\U0001F600" in payload and "—" in payload
+
+
+def test_handoff_file_exists_and_handle_closed_at_spawn():
+    spawner = HandoffSpawner()
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    transport.dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    # The spawner opened the file r+ at spawn time without error -> the parent
+    # closed its write handle before spawning (the Windows-lock requirement).
+    assert spawner.seen["exists_at_spawn"] is True
+    assert "payload" in spawner.seen
+
+
+# --- Bootstrap: POSIX path, no nonce in argv ------------------------------
+
+
+def test_handoff_bootstrap_carries_posix_path_and_no_nonce():
+    spawner = HandoffSpawner()
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    transport.dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    bootstrap = spawner.calls[0].argv[2]
+    path = spawner.seen["path"]
+    # The path appears in POSIX forward-slash form and never with backslashes.
+    assert path in bootstrap
+    assert "\\" not in path
+    # The nonce lives ONLY in the file — it must not appear anywhere in argv
+    # (that is what makes the ack non-fakeable).
+    assert spawner.seen["nonce"] is not None
+    assert spawner.seen["nonce_in_argv"] is False
+
+
+# --- Ack validation: success / missing / mismatch -------------------------
+
+
+def test_handoff_ack_success_strips_ack_and_records_metadata():
+    spawner = HandoffSpawner(ack="valid", body="Line one.\nLine two.")
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    result = transport.dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    assert result.ok
+    # The ack line is stripped from the returned content.
+    assert result.content == "Line one.\nLine two."
+    assert "HANDOFF-ACK" not in result.content
+    meta = result.transport_metadata
+    assert meta["handoff"] is True
+    assert meta["handoff_ack"] == "validated"
+    assert meta["payload_bytes"] == spawner.seen["payload_bytes"]
+    assert meta["payload_file_modified"] is False
+
+
+def test_handoff_ack_missing_is_handoff_incomplete_nonretryable():
+    spawner = HandoffSpawner(ack="missing")
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    result = transport.dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    assert not result.ok
+    assert not result.retryable
+    assert result.transport_metadata["error_class"] == (
+        cli_transport.ERROR_CLASS_HANDOFF_INCOMPLETE
+    )
+    assert result.transport_metadata["handoff_ack"] == "missing"
+    # Content is discarded — never returned on an under-read.
+    assert result.content == ""
+
+
+def test_handoff_ack_mismatch_is_handoff_incomplete():
+    spawner = HandoffSpawner(ack="mismatch")
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    result = transport.dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    assert not result.ok
+    assert result.transport_metadata["error_class"] == (
+        cli_transport.ERROR_CLASS_HANDOFF_INCOMPLETE
+    )
+    assert result.transport_metadata["handoff_ack"] == "mismatch"
+    assert result.content == ""
+
+
+def test_handoff_incomplete_is_not_in_retryable_set():
+    assert (
+        cli_transport.ERROR_CLASS_HANDOFF_INCOMPLETE
+        not in cli_transport.RETRYABLE_ERROR_CLASSES
+    )
+
+
+# --- payload_file_modified -------------------------------------------------
+
+
+def test_handoff_records_payload_mutation():
+    spawner = HandoffSpawner(mutate=True)
+    transport = cli_transport.CopilotCliTransport(spawner=spawner)
+    result = transport.dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    # A mutation by the agent (it holds write tools) is recorded, not gated —
+    # the dispatch still succeeds and validates the ack.
+    assert result.ok
+    assert result.transport_metadata["payload_file_modified"] is True
+
+
+# --- Cleanup on every path -------------------------------------------------
+
+
+def _assert_cleaned_up(spawner: HandoffSpawner):
+    path = spawner.seen.get("path")
+    assert path is not None
+    assert not os.path.exists(path)
+
+
+def test_handoff_cleanup_on_success():
+    spawner = HandoffSpawner(ack="valid")
+    cli_transport.CopilotCliTransport(spawner=spawner).dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    _assert_cleaned_up(spawner)
+
+
+def test_handoff_cleanup_on_handoff_incomplete():
+    spawner = HandoffSpawner(ack="missing")
+    cli_transport.CopilotCliTransport(spawner=spawner).dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    _assert_cleaned_up(spawner)
+
+
+def test_handoff_cleanup_on_spawn_failure():
+    spawner = HandoffSpawner(raise_exc=OSError("boom"))
+    result = cli_transport.CopilotCliTransport(spawner=spawner).dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    assert result.transport_metadata["error_class"] == cli_transport.ERROR_CLASS_GENERIC
+    _assert_cleaned_up(spawner)
+
+
+def test_handoff_cleanup_on_first_byte_timeout():
+    timeouts = cli_transport.TransportTimeouts(
+        spawn_seconds=1.0, first_byte_seconds=0.2, total_seconds=5.0
+    )
+    spawner = HandoffSpawner(stdout_lines=[], block_stdout_after=1.0)
+    result = cli_transport.CopilotCliTransport(
+        spawner=spawner, timeouts=timeouts
+    ).dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    assert result.transport_metadata["error_class"] == (
+        cli_transport.ERROR_CLASS_FIRST_BYTE_TIMEOUT
+    )
+    # Handoff metadata is present on the error path too.
+    assert result.transport_metadata["handoff"] is True
+    _assert_cleaned_up(spawner)
+
+
+def test_handoff_cleanup_on_total_timeout():
+    timeouts = cli_transport.TransportTimeouts(
+        spawn_seconds=1.0, first_byte_seconds=1.0, total_seconds=0.3
+    )
+    spawner = HandoffSpawner(
+        stdout_lines=['{"type":"session.start"}\n'], block_stdout_after=2.0
+    )
+    result = cli_transport.CopilotCliTransport(
+        spawner=spawner, timeouts=timeouts
+    ).dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    assert result.transport_metadata["error_class"] == (
+        cli_transport.ERROR_CLASS_TOTAL_TIMEOUT
+    )
+    _assert_cleaned_up(spawner)
+
+
+def test_handoff_cleanup_on_malformed_jsonl():
+    spawner = HandoffSpawner(stdout_lines=["not valid json\n"])
+    result = cli_transport.CopilotCliTransport(spawner=spawner).dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    assert result.transport_metadata["error_class"] == cli_transport.ERROR_CLASS_GENERIC
+    _assert_cleaned_up(spawner)
+
+
+# --- Retention under the diagnostics toggle -------------------------------
+
+
+def test_handoff_retains_payload_under_diagnostics_toggle(monkeypatch):
+    monkeypatch.setenv("DABBLER_COPILOT_DIAGNOSTICS", "1")
+    spawner = HandoffSpawner(ack="valid")
+    cli_transport.CopilotCliTransport(spawner=spawner).dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    path = spawner.seen["path"]
+    try:
+        # Retained as a debug affordance when the toggle is on.
+        assert os.path.exists(path)
+    finally:
+        cli_transport._best_effort_remove(path)
+
+
+def test_handoff_falsy_diagnostics_toggle_still_deletes(monkeypatch):
+    monkeypatch.setenv("DABBLER_COPILOT_DIAGNOSTICS", "0")
+    spawner = HandoffSpawner(ack="valid")
+    cli_transport.CopilotCliTransport(spawner=spawner).dispatch(
+        model_id="gpt-5.4", system_prompt="", user_message=_over_threshold_message()
+    )
+    _assert_cleaned_up(spawner)
+
+
+# --- Inline path regression: unchanged below threshold --------------------
+
+
+def test_inline_path_argv_byte_identical_below_threshold():
+    spawner = HandoffSpawner()
+    transport = cli_transport.CopilotCliTransport(
+        binary="gh-copilot", spawner=spawner
+    )
+    transport.dispatch(
+        model_id="gpt-5.4", system_prompt="Be concise.", user_message="Say hello."
+    )
+    # Identical to the pre-Set-104 inline argv contract.
+    assert spawner.calls[0].argv == [
+        "gh-copilot",
+        "-p", "Be concise.\n\nSay hello.",
+        "--model", "gpt-5.4",
+        "--allow-all-tools",
+        "--output-format", "json",
+        "--no-auto-update",
+    ]
+    # No payload file was ever created on the inline path.
+    assert spawner.seen.get("path") is None

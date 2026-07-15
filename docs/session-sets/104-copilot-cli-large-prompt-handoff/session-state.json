@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "104-copilot-cli-large-prompt-handoff",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -21,9 +21,9 @@
     {
       "number": 2,
       "title": "Session 2",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-14T22:12:58.823566-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-15T03:56:10.140670-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -31,7 +31,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "WAIVED"
     }
   ]
 }

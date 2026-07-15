@@ -1,0 +1,17 @@
+ISSUES FOUND
+
+- **Issue 1: The live-validation and Set 102 discharge claims remain unsupported by the required per-item evidence**
+  - **Category:** Completeness / False Positive
+  - **Severity:** Major
+  - **Failure scenario:** A maintainer evaluating this set’s principal acceptance objective cannot verify that the mandatory live actions—especially the ADO PR round trip, pipeline execution, Copilot-driven session, delete-source-branch completion, and release drills—actually occurred. This is not hypothetical: every evidence-bearing `Result` and `Feedback` field is blank, while the only attributable operator statement is a generic set-level approval. Because live validation is the central purpose of Session 2, a reasonable reviewer would not merge the de-drafted tutorial or discharge Set 102 on this record.
+  - **Details:**
+    - **Violation:** The plan explicitly requires: **“Record each item's PASS/FAIL with evidence.”** The checklist’s own `Notes` further promise that every item’s **“Passes/Result/Feedback is filled in DURING that walk.”**
+    - **Impact:** The repository publicly asserts that the tutorial was validated end-to-end and that Set 102’s armed ADO UAT was discharged, but it provides no concrete observation, PR or pipeline identifier, URL, command outcome, or per-item operator narrative supporting those claims. Removing duplicate failure rows fixed the contradiction but did not fix the missing evidence; therefore the round-2 `VERIFIED` conclusion is false confidence.
+    - **Evidence:** In `docs/session-sets/103-copilot-ado-hello-world-tutorial/103-copilot-ado-hello-world-tutorial-uat-checklist.json`, all 11 `Passes` values changed from `null` to `true`, but every `Result` and `Feedback` remains empty. `s2-uat-attestation.md` records only the verbatim statement **“I verify that 103 is good as is. I just completed the UAT for 103.”** That statement neither itemizes the walks nor confirms their specific outcomes. The attestation’s assertion that the operator filled all 11 items is therefore an unattributed extrapolation, not evidence. The public tutorial additionally claims PR change detection ran **“on a hosted agent,”** although the documented precondition permits either hosted or self-hosted execution and no recorded result identifies which was used.
+    - **Location:** `docs/session-sets/103-copilot-ado-hello-world-tutorial/103-copilot-ado-hello-world-tutorial-uat-checklist.json`; `docs/session-sets/103-copilot-ado-hello-world-tutorial/s2-uat-attestation.md`; validation claims in `docs/tutorials/module-team-hello-world-copilot-ado.md` and its cross-links.
+    - **Fix:** Obtain attributable per-item evidence for all mandatory walks—at minimum concrete observed outcomes and identifiers for the ADO PRs, pipeline run, policy behavior, Copilot session, finalize/delete-source operation, and release drills. Retain only public claims supported by that evidence. If it cannot be obtained, restore the preview wording and do not mark Set 102’s armed UAT discharged.
+
+#### NITS
+
+- **Nit:** The checklist `Notes` still starts with **“AUTHORED IN SESSION 1, NOT YET WALKED”** and describes Session 2 in the future tense, contradicting its current completed-walk claim.
+- **Nit:** Walk 11 remains labeled `OPTIONAL`, although the session plan requires **“the one no-CLI floor spot check.”**

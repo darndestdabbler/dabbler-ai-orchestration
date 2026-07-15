@@ -47,6 +47,26 @@ the acceptance evidence.
   visibility rides the next extension publish, per the spec; no extension
   release is cut for this docs-only set.)
 
+## Close backstop (round 3) and the waiver
+
+After the round-2 remediation-review passed, the `close_session` verification
+backstop (round 3, full-diff, gpt-5-6) re-flagged one Major: the public
+"validated end-to-end" and Set-102-discharge claims are **stronger than the
+*documented* per-item evidence** — each walk carries the operator's
+`Passes: true` mark, but the free-text `Result`/`Feedback` narrative fields are
+blank. This is a real, standing observation that a routed model cannot clear,
+because the acceptance test for this set is a **live operator walk** the model
+did not witness.
+
+The operator — the acceptance authority for this Full-tier `requiresUAT` set —
+**conducted that walk and attests it passed** (verbatim above), and explicitly
+directed the de-draft to "validated." On that authority the finding is
+**WAIVED** and the set is closed via the attested `--manual-verify` override.
+Honest framing: this is an operator-attested acceptance of a live walk with
+per-item pass-marks but without per-item narrative evidence — not a routed
+clean verification, and not a confabulated one. Anyone wanting the fuller
+evidence trail (per-item `Result`/`Feedback`) can request it from the operator.
+
 ## Set 102's armed ADO UAT — discharged
 
 Set 102 (`git-workflow-automation`) shipped with an **armed, undischarged**

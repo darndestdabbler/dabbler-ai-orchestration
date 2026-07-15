@@ -9,12 +9,21 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
-## [0.34.0] — Unreleased (Set 104 — Copilot CLI large-prompt file handoff)
+## [0.34.0] — 2026-07-15 (Set 104 — Copilot CLI large-prompt file handoff)
 
-> **Staged, publish operator-gated.** The version bump to `0.34.0` in
-> `pyproject.toml` and the live >32 KiB probe evidence line land in Session 2;
-> the tag push → `release.yml` → PyPI step stays an operator action. Once
-> `0.34.0` is live, **restore Set 103** (`restore_session_set`) per its
+> **Published 2026-07-15** to PyPI (tag `v0.34.0`, operator-authorized
+> 2026-07-15), superseding the live `0.33.0`. Session 2 bumped `pyproject.toml`
+> to `0.34.0` and ran the live >32 KiB probe (below): the handoff transport
+> works live. The probe ran on Copilot CLI **1.0.69** (the installed seat) while
+> `ai_router/copilot-catalog.lock` still pins **1.0.68** — a **pre-existing**
+> catalog drift, not introduced here, that only bites the `copilot-cli`
+> transport profile (this repo defaults to `api`). Operator decision (Set 104
+> S2): **ship 0.34.0 now** — the transport code is proven and version-agnostic
+> — and **reconcile the catalog pin as part of Set 103's seat prep**, alongside
+> its other unmet preconditions (ADO org, Copilot seat, parallel-jobs grant),
+> since a `copilot-cli`-profile `route()` fail-closes on the drift and Set 103
+> is what first exercises that path. See the **Known issue** entry below. Once
+> `0.34.0` is live on PyPI, **restore Set 103** (`restore_session_set`) per its
 > `CANCELLED.md` pause record — this release is that set's resume condition.
 
 ### Added
@@ -76,6 +85,40 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   review the Cancelled bucket at set selection" discipline. Set 103's
   `CANCELLED.md` is the first worked example. A pointer is added from
   `ai_router/docs/close-out.md`.
+
+### Verified
+
+- **(Set 104 S2) Live >32 KiB handoff dispatch works on Windows (Copilot CLI
+  1.0.69).** A real 81,829-char composed prompt (rendered inline command line
+  81,925 UTF-16 units — far past Windows' 32,767 ceiling, where an inline
+  dispatch cannot spawn at all) went through the handoff pull path via
+  `CopilotCliTransport.dispatch` with model `claude-sonnet-4.6`: three
+  unguessable facts placed at the beginning, the exact middle, and immediately
+  before the footer were **all** fused into the single required answer line,
+  proving the agentic CLI read the whole 82,231-byte payload file end-to-end;
+  the nonce EOF ack validated and was stripped; `handoff: true`,
+  `payload_file_modified: false`; 1 premium request. A below-threshold control
+  dispatch confirmed the inline path is untouched (`handoff: false`). The
+  transport surfaced no defects (the fix loop was a no-op — S1 had already
+  baked in the Set 078 S4 wire-shape fixes the live path depends on). Evidence:
+  `docs/session-sets/104-copilot-cli-large-prompt-handoff/s2-live-probe.md`.
+
+### Known issue (blocks the copilot-cli profile, deferred to Set-103 seat prep)
+
+- **(Set 104 S2) Catalog version-pin drift.** The probe ran on
+  `GitHub Copilot CLI 1.0.69` while `ai_router/copilot-catalog.lock` pins
+  `1.0.68` (`cli_version_pin_required = true`, probed 2026-07-04 — a
+  pre-existing drift, not introduced by this release). `validate_catalog` is
+  fail-closed on this drift and runs during `route()` setup for the
+  `copilot-cli` profile, so a real profile dispatch on a 1.0.69 seat raises
+  `CLI version drift` before the handoff runs (the S2 probe bypassed the gate
+  by calling `CopilotCliTransport` directly, which is why it worked). This does
+  **not** affect the default `api` profile or the router-package publish. It
+  **does** block Set 103's `copilot-cli`-profile walk. Per the Set 104 S2
+  operator decision, the pin is reconciled as part of **Set 103 seat prep** —
+  downgrade the seat to 1.0.68 and reprobe, or repin to 1.0.69 via
+  `python -m ai_router.copilot_catalog --refresh` and reconfirm — bundled with
+  Set 103's other unmet seat preconditions.
 
 ## [0.33.0] — 2026-07-14 (Set 096 — consequence-graded severity + the phased verification loop)
 

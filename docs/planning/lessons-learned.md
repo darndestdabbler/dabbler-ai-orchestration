@@ -116,7 +116,7 @@ full text in `lessons-archive.md`:
   alongside the diff so additions are visible.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="103" status="active" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="104" status="active" scope="portable" -->
 
 - A consistency finding is rarely local: the same claim echoes in the
   summary table, body prose, per-row cells, and the bottom line, and each

@@ -1,0 +1,12 @@
+{
+  "task_type": "analysis",
+  "excluded_providers": [
+    "anthropic"
+  ],
+  "model": null,
+  "provider": null,
+  "tier": 2,
+  "cost": null,
+  "response": "### Assessment\n\nSet 104 is complete, and router 0.34.0 is staged. The primary follow-on, RESTORE Set 103, is blocked pending an operator's manual publication of the router to PyPI. The one-active-set constraint (D6) requires selecting an unblocked work item that can execute immediately. The \"Configurable severity knob\" task from the Set 096 backlog is the most suitable candidate; it is small, unblocked, operator-favored, and represents forward progress on a known feature request. This allows productive work to continue while awaiting the external dependency for Set 103.\n\n### Recommendation\n\n| Item | Recommendation |\n| :--- | :--- |\n| **Next Work** | Configurable severity knob (from Set 096 backlog) |\n| **Orchestrator Engine** | `gpt-4-turbo` |\n| **Provider** | `openai` |\n| **Model** | `gpt-4-turbo-2024-04-09` |\n| **Effort** | `small` |\n\n### Rationale\n\nThis is the highest-value unblocked task that can run immediately while awaiting the operator action required to un-pause Set 103.",
+  "truncated": false
+}

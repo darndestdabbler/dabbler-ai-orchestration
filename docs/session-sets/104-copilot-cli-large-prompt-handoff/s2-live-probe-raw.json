@@ -1,0 +1,103 @@
+{
+  "model": "claude-sonnet-4.6",
+  "threshold_utf16_units": 24000,
+  "handoff_probe": {
+    "composed_prompt_chars": 81829,
+    "rendered_inline_utf16_units": 81925,
+    "will_take_handoff": true,
+    "facts": {
+      "A": "The project codename is BLUE-HERON-42.",
+      "B": "The authorized deployment window is 03:17 UTC.",
+      "C": "The rollback token is QX-7791."
+    },
+    "result": {
+      "ok": true,
+      "content": "DEPLOY-AUTH: BLUE-HERON-42 may deploy at 03:17 UTC using rollback token QX-7791.",
+      "stop_reason": "end_turn",
+      "output_tokens": 199,
+      "content_complete": true,
+      "partial_output_discarded": false,
+      "raw_stdout_len": 264406,
+      "raw_stderr": "",
+      "transport_metadata": {
+        "error_class": null,
+        "retryable": false,
+        "exit_code": 0,
+        "echoed_model": "claude-sonnet-4.6",
+        "session_id": "e432508d-23bf-4e78-8662-3e793cfb7106",
+        "premium_requests": 1,
+        "total_api_duration_ms": 28955,
+        "session_duration_ms": 35627,
+        "utf8_replacement_seen": false,
+        "handoff": true,
+        "payload_bytes": 82231,
+        "handoff_ack": "validated",
+        "payload_file_modified": false
+      },
+      "argv_shape": [
+        "copilot",
+        "-p",
+        "<PROMPT 616 chars>",
+        "--model",
+        "claude-sonnet-4.6",
+        "--allow-all-tools",
+        "--output-format",
+        "json",
+        "--no-auto-update"
+      ],
+      "assertions": {
+        "handoff_true": true,
+        "ack_validated": true,
+        "ok": true,
+        "content_has_fact_A": true,
+        "content_has_fact_B": true,
+        "content_has_fact_C": true,
+        "ack_stripped_from_content": true,
+        "payload_bytes": 82231,
+        "premium_requests": 1
+      }
+    }
+  },
+  "control_probe": {
+    "prompt": "Reply with exactly this line and nothing else: INLINE-CONTROL-OK-9F3A",
+    "result": {
+      "ok": true,
+      "content": "INLINE-CONTROL-OK-9F3A",
+      "stop_reason": "end_turn",
+      "output_tokens": 15,
+      "content_complete": true,
+      "partial_output_discarded": false,
+      "raw_stdout_len": 5101,
+      "raw_stderr": "",
+      "transport_metadata": {
+        "error_class": null,
+        "retryable": false,
+        "exit_code": 0,
+        "echoed_model": "claude-sonnet-4.6",
+        "session_id": "1ab2dca2-d5ca-4b77-b955-90045f0cc7dc",
+        "premium_requests": 1,
+        "total_api_duration_ms": 1858,
+        "session_duration_ms": 4270,
+        "utf8_replacement_seen": false,
+        "handoff": false
+      },
+      "argv_shape": [
+        "copilot",
+        "-p",
+        "<PROMPT 69 chars>",
+        "--model",
+        "claude-sonnet-4.6",
+        "--allow-all-tools",
+        "--output-format",
+        "json",
+        "--no-auto-update"
+      ],
+      "assertions": {
+        "handoff_false": true,
+        "ok": true,
+        "content_has_sentinel": true,
+        "premium_requests": 1
+      }
+    }
+  }
+}

@@ -119,6 +119,16 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   downgrade the seat to 1.0.68 and reprobe, or repin to 1.0.69 via
   `python -m ai_router.copilot_catalog --refresh` and reconfirm — bundled with
   Set 103's other unmet seat preconditions.
+  - **Interim workaround applied post-release (2026-07-15, operator-authorized
+    during a time-critical staff release):** `ai_router/copilot-catalog.lock`
+    `cli_version` was manually bumped `1.0.68 → 1.0.69` to match the seat and
+    clear the drift gate so the `copilot-cli` route runs on this machine. This
+    is **not** a full re-probe — per-model entries still carry
+    `confirmed_on_cli_version = 1.0.68` and only `claude-sonnet-4.6` was
+    live-confirmed on 1.0.69 (the S2 probes). The proper
+    `copilot_catalog --refresh` reconciliation remains owed as Set 103 seat
+    prep (see the lock's `manual_pin_bump_note`). This lock is seat-scoped
+    (`op-personal`) and does not govern other seats.
 
 ## [0.33.0] — 2026-07-14 (Set 096 — consequence-graded severity + the phased verification loop)
 

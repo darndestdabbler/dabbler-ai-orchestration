@@ -76,6 +76,22 @@
       "dateTime": "2026-07-14T10:46:47.688510-04:00",
       "description": "Authored full disposition.json (status completed, verification_method=api, verification_verdict=VERIFIED preserved from verify patch; next_orchestrator gpt/openai/gpt-5-6/high reason=other for the cross-provider live UAT walk; blockers []). validate_disposition -> (True, []). ai-assignment.md Actuals filled.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "live-uat-walk",
+      "dateTime": "2026-07-15T04:57:03.186800-04:00",
+      "description": "Operator conducted the live ADO+Copilot UAT walk (2026-07-15), marked all 11 checklist walks Passes: true, attests validated. De-drafted the tutorial (PREVIEW->validated) + activated preview cross-links (base tutorial x2, quick-start, README). Recorded s2-uat-attestation.md. Discharged Set 102 armed ADO UAT (Walks 5 & 8).",
+      "status": "done"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "verify",
+      "dateTime": "2026-07-15T04:57:03.186800-04:00",
+      "description": "Discovery (gpt-5-6, 2/2) found 4 Major from one root cause: UAT checklist had 11 blank duplicate rows appended by the UAT tool alongside the 11 real Passes: true walks. Remediated (removed blanks -> 11 consistent passes; corrected attestation; bounded claims). Remediation-review VERIFIED (3 accepted). Close backstop (round 3) re-flagged claims-vs-documented-evidence (per-item narrative blank) -> operator WAIVED via --manual-verify attestation (operator is the UAT acceptance authority; live walk unwitnessable by a model).",
+      "status": "done"
     }
   ]
 }

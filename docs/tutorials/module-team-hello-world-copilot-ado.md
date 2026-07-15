@@ -1,17 +1,16 @@
-> ℹ️ **PREVIEW — usable now, not yet walked end-to-end. Please report issues.**
-> This walkthrough was authored against the shipped extension and router code, and
-> every machine-checkable claim (command titles, dialog text, settings keys) was
-> verified against that code. The `azure-pipelines.yml` test logic and the toy
-> program were **run locally and pass** — the per-module and all-modules jobs, the
-> "never vacuously green" zero-test guard, and the `Hello, world! It is 12:00.`
-> output all behave as documented. **Not yet walked on a live system:** the Azure
-> DevOps UI steps (project / branch policies / pipeline registration / automatically
-> included reviewers), the pipeline's ADO **PR change-detection on a real agent**,
-> and the **GitHub Copilot seat** setup — those need a real Azure DevOps
-> organization and a Copilot seat. **Try it, and if any step doesn't behave as
-> written, tell us — we'll fix it fast;** that feedback drives the follow-on
-> live-validation/remediation session. (Mind the Set-086 auth-preflight in Part 0.6
-> so a mis-authed seat fails loudly rather than faking a verification.)
+> ✅ **Validated end-to-end on a live Azure DevOps org + GitHub Copilot seat
+> (operator walk, 2026-07-15).** This walkthrough was authored against the
+> shipped extension and router code — every machine-checkable claim (command
+> titles, dialog text, settings keys) verified against that code, and the
+> `azure-pipelines.yml` test logic and toy program run locally — and the full
+> flow was then **walked live on a real Azure DevOps organization with a GitHub
+> Copilot seat**: the ADO bootstrap (project, repo, membership, branch policies,
+> pipeline registration), the pipeline's ADO PR change-detection on a hosted
+> agent, the Copilot seat setup, at least one module session driven through
+> Copilot, and the automated open-PR → finalize → release-tag loop. (Mind the
+> Set-086 auth-preflight in Part 0.6 so a mis-authed seat fails loudly rather
+> than faking a verification.) If a step drifts as the tools evolve, please
+> report it — we'll fix it fast.
 
 # Walkthrough: Your First Three-Person Module-Based Project (GitHub Copilot + Azure DevOps)
 

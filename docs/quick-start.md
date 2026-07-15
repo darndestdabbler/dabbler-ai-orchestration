@@ -306,7 +306,7 @@ and say:
   (agent-agnostic, GitHub-worked) — or, for a team on **GitHub Copilot + Azure
   DevOps**, the standalone
   [Copilot + Azure DevOps cut](tutorials/module-team-hello-world-copilot-ado.md)
-  (Copilot-seat Full tier + an executable `azure-pipelines.yml`; a usable preview, pending a live end-to-end walk) — and their companion
+  (Copilot-seat Full tier + an executable `azure-pipelines.yml`; validated end-to-end on a live ADO org + Copilot seat, 2026-07-15) — and their companion
   [module workflow review prompt](tutorials/module-team-hello-world-review-prompt.md);
   concepts in the [primer](planning/module-organized-projects-primer.md).
 - **Writing a spec:** [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md).

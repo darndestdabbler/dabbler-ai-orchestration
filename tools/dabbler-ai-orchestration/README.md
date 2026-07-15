@@ -172,7 +172,7 @@ gives your team evidence-cited coaching on the workflow afterward. Locked to
 **GitHub Copilot** and hosted on **Azure DevOps**? There is a standalone
 [Copilot + Azure DevOps cut](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world-copilot-ado.md)
 of the walkthrough — Copilot-seat Full tier plus an executable
-`azure-pipelines.yml` and ADO branch policies (a usable preview, pending a live end-to-end walk on a real ADO org + Copilot seat).
+`azure-pipelines.yml` and ADO branch policies (validated end-to-end on a live ADO org + Copilot seat, 2026-07-15).
 
 ---
 

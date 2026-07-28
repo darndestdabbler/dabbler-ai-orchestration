@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The documented Node.js minimum is unsupported by GitHub Copilot CLI\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Location:** `docs/tutorials/hello-world.md`, Part 1 prerequisite 4\n- **Failure scenario:** A reader with Node.js 18 or 20 sees that their installation satisfies “Node.js 18 or newer,” runs `npm install -g @github/copilot`, and then encounters the package’s unsupported-engine warning or a CLI runtime failure. They cannot authenticate or run the AI sessions in Part 4. This is probable because Node.js 18 and 20 are common installations and the tutorial explicitly declares both valid.\n- **Details:**\n  - **Violation:** The tutorial promises a performable clean-start path and says every literal prerequisite was verified, but states: “**Node.js 18 or newer**.” The published `@github/copilot` package requires Node.js 22 or newer.\n  - **Impact:** Readers who satisfy the stated prerequisite can still be stopped before the first AI-led session, so the remediation does not resolve L6 and should block merging.\n  - **Evidence:** The added prerequisite permits Node.js 18+, while the installed dependency’s engine contract requires Node.js 22+.\n  - **Fix:** Require **Node.js 22 or newer** and verify the corresponding supported npm version before running `npm install -g @github/copilot`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A reader with Node.js 18 or 20 sees that their installation satisfies “Node.js 18 or newer,” runs `npm install -g @github/copilot`, and then encounters the package’s unsupported-engine warning or a CLI runtime failure. They cannot authenticate or run the AI sessions in Part 4. This is probable because Node.js 18 and 20 are common installations and the tutorial explicitly declares both valid."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 app lifecycle assets and Sam synchronization",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 direct-provider AI-agent path",
+      "verdict": "fix-accepted",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 repository-root Python invocation",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 configurable Azure DevOps solo-review policy",
+      "verdict": "fix-accepted",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 Copilot CLI interaction surface",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 Node.js prerequisite for Copilot CLI",
+      "verdict": "fix-rejected",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 generated implementation-set name handling",
+      "verdict": "fix-accepted",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8 performable module-declaration pull request",
+      "verdict": "fix-accepted",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 Sam pulls the merged app declaration",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    },
+    {
+      "finding": "L10 Sam completes per-machine AI setup",
+      "verdict": "fix-accepted",
+      "ledgerId": "L10"
+    },
+    {
+      "finding": "L11 real CODEOWNERS usernames required",
+      "verdict": "fix-accepted",
+      "ledgerId": "L11"
+    },
+    {
+      "finding": "L12 Azure DevOps validation is configured before the PR",
+      "verdict": "fix-accepted",
+      "ledgerId": "L12"
+    },
+    {
+      "finding": "L13 Azure DevOps contributor permission",
+      "verdict": "fix-accepted",
+      "ledgerId": "L13"
+    },
+    {
+      "finding": "L14 literal direct-provider environment variables",
+      "verdict": "fix-accepted",
+      "ledgerId": "L14"
+    },
+    {
+      "finding": "L15 explicit Azure DevOps self-approval vote and later removal",
+      "verdict": "fix-accepted",
+      "ledgerId": "L15"
+    },
+    {
+      "finding": "L16 Azure pipeline guidance is explicitly scoped as an administrator checklist",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L16"
+    }
+  ]
+}

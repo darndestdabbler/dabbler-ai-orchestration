@@ -14,36 +14,36 @@ the framework is built around.
 1. **Visual Studio Code** 1.85 or newer.
 2. The **Dabbler AI Orchestration** extension from the VS Code Marketplace.
 3. **Python** 3.10 or newer — check with `python --version`.
-4. **Node.js** 18 or newer (it provides `npm`, which installs the Copilot CLI) — check with
-   `node --version`.
-5. **GitHub Copilot CLI** (your AI agent for this tutorial; needs an active Copilot seat).
+4. **GitHub Copilot CLI** (your AI agent for this tutorial; needs an active Copilot seat).
    Install it, then sign in by running `copilot` once and following its prompt:
 
    ```bash
-   npm install -g @github/copilot
+   winget install GitHub.Copilot
    copilot --version
    copilot -p "Write PI to 10 decimal places" --model claude-sonnet-4.6
    ```
 
    The last should print π to ten places and exit 0; `No authentication information found`
-   means you are not signed in yet.
+   means you are not signed in yet. That `winget` install is self-contained — no Node.js
+   needed. On macOS or Linux install from npm instead (`npm install -g @github/copilot`),
+   which needs **Node.js 22 or newer**.
 
    **This CLI is where you run the AI sessions.** Wherever this tutorial says *paste it into
    Copilot*, it means: open a terminal inside VS Code (**Terminal > New Terminal**), run
    `copilot`, and paste at its prompt. It is a separate tool from the GitHub Copilot Chat VS
    Code extension, which you do not need.
 
-   > **CLI versions move.** Dabbler pins the Copilot CLI version it probed your seat with, so
-   > routed calls fail closed rather than silently change behavior. When `copilot --version`
-   > stops matching the pin, re-probe with **`Dabbler: Set Up Copilot Seat`** (available once
-   > Part 3 has created the `.venv`).
+   > **CLI versions move — the Copilot CLI updates itself.** Dabbler pins the version it probed
+   > your seat with, so routed calls fail closed rather than silently change behavior. Expect
+   > `copilot --version` to drift past the pin; when it does, re-probe with **`Dabbler: Set Up
+   > Copilot Seat`** (available once Part 3 has created the `.venv`).
 
-6. **GitHub CLI**, so Dabbler can open pull requests without a browser trip: install it from
+5. **GitHub CLI**, so Dabbler can open pull requests without a browser trip: install it from
    [cli.github.com](https://cli.github.com), then run `gh auth login` and `gh auth status`.
 
 > **Variant — direct provider API keys instead of a Copilot seat.** Set
 > `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` in your
-> environment, skip steps 4–5, and in Part 3 leave **Provider access** on its default. You still
+> environment, skip step 4, and in Part 3 leave **Provider access** on its default. You still
 > need an AI agent inside VS Code — Claude Code, Codex, or Gemini Code Assist all work; paste the
 > starter lines into that agent's chat instead of the Copilot CLI.
 

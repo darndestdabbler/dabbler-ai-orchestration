@@ -108,6 +108,14 @@
       "dateTime": "2026-07-28T17:37:52.452035-04:00",
       "description": "Remediation-review round 3 (gpt-5.6, $0.1257): 9 fix-accepted, 1 accepted-with-modification, 3 rejected. 2 of the 3 new Majors fixed (literal DABBLER_* names restored; ADO self-approval vote made explicit). 1 DISPUTED (R3-3: verifier prescribes shipping azure-pipelines.yml, which the operator-confirmed cut list forbids verbatim) - escalated to operator, not re-rounded. Sidecar s1-remediation-round-3.md written.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 13,
+      "stepKey": "close-blocked",
+      "dateTime": "2026-07-28T17:46:41.096321-04:00",
+      "description": "Committed (02a3212, d68c9e5, 8f5d026) and PUSHED. close_session REFUSED on the verification_backstop gate: OpenAI 429 across 4 verify_session attempts plus the backstop 2 tries; OpenAI holds the only tier-3 verifiers outside the orchestrator provider (anthropic), and google has no tier-3 verifier enabled, so the cross-provider fallback has nowhere to go. Session left in-flight for the operator: re-run close_session when the provider recovers. --manual-verify NOT self-authorized (operator-only). Notification NOT fired (fires only after a successful close).",
+      "status": "blocked"
     }
   ]
 }

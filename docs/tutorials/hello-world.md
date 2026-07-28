@@ -117,6 +117,13 @@ Every module follows the same lifecycle: a **plan** set writes the module's plan
 **decomposition** set turns that plan into implementation sets, and each implementation set
 writes real code. You run all three now, on work you keep.
 
+`main` is protected as of Part 3, so nothing reaches it by direct push any more — including the
+docs these first two sets write. Start an authoring branch and stay on it for steps 1–2:
+
+```bash
+git switch -c authoring/greeter-lifecycle
+```
+
 1. **Run the plan set.** Left-click **`003-greeter-plan`** in the Work Explorer. Its spec opens
    and this line is copied to your clipboard:
 
@@ -141,7 +148,18 @@ writes real code. You run all three now, on work you keep.
    implementation set — expect `005-greeter-hello` or similar. **Write down the name it actually
    gave you**: everywhere below that says `005-greeter-hello`, type your set's real name.
 
-3. **Open a worktree for it.** Each work set runs on its own branch in its own folder, so an AI
+3. **Land the plan and the new set on `main`.** Commit whatever the two sessions left uncommitted
+   (`git add -A && git commit -m "docs: greeter plan and its implementation set"`), run
+   **`Dabbler: Open PR for this set`**, merge it, then get back onto an up-to-date trunk:
+
+   ```bash
+   git switch main && git pull --ff-only && git branch -d authoring/greeter-lifecycle
+   ```
+
+   This matters for the next step: the worktree is cut from `main`, so the set has to be on
+   `main` before you open one.
+
+4. **Open a worktree for it.** Each work set runs on its own branch in its own folder, so an AI
    session never edits your `main` checkout:
 
    ```text
@@ -151,11 +169,11 @@ writes real code. You run all three now, on work you keep.
    A sibling folder `hello-modules-worktrees/005-greeter-hello/` appears, on the branch
    `session-set/005-greeter-hello`. (macOS/Linux: use `.venv/bin/python`.)
 
-4. **Open that folder in a new VS Code window**, left-click the set's row, and paste its starter
+5. **Open that folder in a new VS Code window**, left-click the set's row, and paste its starter
    line into `copilot` running in *that* window's terminal. The session implements the module,
    tests it, and commits to the session branch. Watch it work.
 
-5. **Turn on CI, on the same branch.** A module with tests now exists, so open
+6. **Turn on CI, on the same branch.** A module with tests now exists, so open
    `.github/workflows/monorepo-ci.yml` in the worktree and adapt the scaffolded file down to
    exactly one active job: replace the placeholder `run:` block with a real test command, and
    delete any `if: github.event_name == 'push' …` line so it also runs on pull requests.
@@ -187,23 +205,23 @@ writes real code. You run all three now, on work you keep.
    > pipeline standards — this tutorial does not ship one) and add it under **Branch Policies**
    > on `main` > **Build validation**, marked **Required** — without it, step 7 has no check.
 
-6. **Open the pull request.** From the worktree window, run **`Dabbler: Open PR for this set`**.
+7. **Open the pull request.** From the worktree window, run **`Dabbler: Open PR for this set`**.
    A dialog lists the exact `git push` and `gh pr create` commands it will run, and you click to
    approve — every remote-touching Dabbler command works this way: it removes the typing, never
    the decision.
 
-7. Wait for the `test` check to pass and merge the pull request on GitHub. Then, in your **main**
+8. Wait for the `test` check to pass and merge the pull request on GitHub. Then, in your **main**
    VS Code window, run **`Dabbler: Finalize merged set`** and confirm — it pulls the merge onto
    your local `main`, removes the worktree folder, deletes the session branch, and prunes stale
    remotes. The set now shows as **Complete**.
 
-8. **Protect `main` (stage 2 of 3).** The workflow has run once, so GitHub knows the check
+9. **Protect `main` (stage 2 of 3).** The workflow has run once, so GitHub knows the check
    exists: reopen the `main` rule, turn on **Require status checks to pass before merging**, and
    select **`test`**. Without this the check runs but blocks nothing. *(Azure DevOps: nothing to
    do here — the Build validation policy you added above already* is *the required check.)*
 
-9. Run it, from the repository root — `python -m services.greeter.greeter` prints
-   `Hello, world!`.
+10. Run it, from the repository root — `python -m services.greeter.greeter` prints
+    `Hello, world!`.
 
 **Solo repositories can stop here.** You have a declared module, a plan, a completed AI-led set,
 a protected trunk, and a green required check — the whole loop. Part 5 adds a second person and
@@ -280,7 +298,7 @@ a second module.
      the current time, and prints `Hello, world! It is HH:MM.`; runnable from the repository
      root with `python -m services.app.app`*
    - **Decomposition set**, which writes `app`'s implementation set.
-   - **Then**, before running it, open that new set's `spec.md` and declare the dependency:
+   - **Then**, before landing anything, open that new set's `spec.md` and declare the dependency:
 
      ```yaml
      prerequisites:
@@ -289,6 +307,9 @@ a second module.
      ```
 
      Its row shows as blocked in the Work Explorer until `greeter`'s set is complete.
+   - **Land all of it on `main`** by the same authoring-branch + **`Dabbler: Open PR for this
+     set`** route as Part 4 step 3 — the prerequisite has to be on `main` before the worktree is
+     cut, or the worktree gets a spec without it.
    - **Implementation set**, in a worktree, exactly as in Part 4.
 
 ## Part 6 — Review, merge, and clean up *(scene 6)*

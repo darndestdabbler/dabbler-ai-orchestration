@@ -292,8 +292,14 @@ a second module.
    authoring/app-module`.
 
 6. **Sam pulls first** (`git pull --ff-only`), or `app` and its sets exist in neither his clone
-   nor his Work Explorer. He then runs `app`'s lifecycle exactly as you ran `greeter`'s, in this
-   order:
+   nor his Work Explorer. `main` is protected for him too, so — exactly as in Part 4 — he starts
+   on an authoring branch and stays on it until the lifecycle output is landed:
+
+   ```bash
+   git switch -c authoring/app-lifecycle
+   ```
+
+   He then runs `app`'s lifecycle exactly as you ran `greeter`'s, in this order:
    - **Plan set**, with the scope *`services/app/app.py` imports `greeter`'s `greet()`, appends
      the current time, and prints `Hello, world! It is HH:MM.`; runnable from the repository
      root with `python -m services.app.app`*
@@ -307,9 +313,10 @@ a second module.
      ```
 
      Its row shows as blocked in the Work Explorer until `greeter`'s set is complete.
-   - **Land all of it on `main`** by the same authoring-branch + **`Dabbler: Open PR for this
-     set`** route as Part 4 step 3 — the prerequisite has to be on `main` before the worktree is
-     cut, or the worktree gets a spec without it.
+   - **Land all of it on `main`** from that authoring branch with **`Dabbler: Open PR for this
+     set`**, exactly as in Part 4 step 3, then `git switch main && git pull --ff-only`. The
+     prerequisite has to be on `main` before the worktree is cut, or the worktree gets a spec
+     without it.
    - **Implementation set**, in a worktree, exactly as in Part 4.
 
 ## Part 6 — Review, merge, and clean up *(scene 6)*

@@ -68,6 +68,22 @@
       "dateTime": "2026-07-28T09:43:36.183432-04:00",
       "description": "Open sub-decision SETTLED: structural reclassification alone is sufficient (self-witnessing VERIFIED round did not flag its own bookkeeping files). verification.md framing line NOT added -- smaller change wins (removal-over-addition; prefer-smaller). The routed analyst (gemini) recommended adding it, but the self-witness supersedes that advisory.",
       "status": "done"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "close",
+      "dateTime": "2026-07-28T10:05:21.660103-04:00",
+      "description": "Authored full disposition.json (VERIFIED); commit 797eb5f + pushed (operator-confirmed); close_session succeeded (6/6 gates PASS; close backstop round-2 gpt-5-6 VERIFIED $0.0938); close-out commit e80c1ad pushed; Pushover notification sent (status=1).",
+      "status": "done"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "step9-review",
+      "dateTime": "2026-07-28T10:05:21.660103-04:00",
+      "description": "Step 9 guidance reorg (routed gemini-2.5-pro $0.0028): added L-105-1 to lessons-archive.md (born archived -- executable-gate-encoded), no project-guidance change, no L-069-1 reactivation, no other reorg. validate_guidance_meta OK; ceiling unaffected. Artifact: s1-step9-guidance-review.md.",
+      "status": "done"
     }
   ]
 }

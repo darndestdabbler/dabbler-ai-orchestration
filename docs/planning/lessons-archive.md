@@ -729,3 +729,31 @@ each id is in the active tier (D2: one id, one trailer).
 - **Archival rationale (Set 095):** situational trigger (authoring a
   rollback/release instruction), not per-session context; search the
   archive at that trigger moment.
+
+## Archived by Set 105 (born archived — executable-gate-encoded on admission)
+
+## A Verification Finding That Re-Appears On A File You Delete Is Being Re-Synthesized Out Of Band — Fix The Evidence Layer, Not The File
+<!-- lesson: id="L-105-1" added-set="105" last-used-set="105" status="archived" scope="portable" encoded-in="ai_router/verify_session.py::_collect_untracked_contents (FRAMEWORK_BOOKKEEPING_FILES)" -->
+
+- When a cross-provider verification finding **re-appears every round on a
+  file you deleted between rounds**, the file is being **re-created out of
+  band** by a read-triggered writer — deleting it (or re-running the
+  verifier) can never win. In Set 105 the file was a lazily-synthesized
+  `not-started` `session-state.json`: `verify_session` NEVER writes state; the
+  writer is `session_state.py` `read_status` → `ensure_session_state_file`
+  (the Set 7 "every spec folder carries a state file" invariant), fired across
+  every set by any all-sets status scan / Work Explorer refresh. The field
+  diagnosis blamed `verify_session` for "auto-bootstrapping" — **directionally
+  right, wrong on the writer** — which is exactly why the "delete before each
+  run" workaround failed. Diagnostic move: before deleting an evidence artifact
+  a verifier keeps flagging, find *who writes it and when*; if it is a
+  read-triggered/blessed writer, the fix belongs in the **evidence-assembly
+  layer** (reclassify the machine-written file as expected bookkeeping, not
+  reviewed work), not in the file or the writer.
+- **Archival rationale (born archived, Set 105):** the fix shipped an
+  executable gate — the untracked collector now reclassifies
+  `session-state.json` / `session-events.jsonl` / `activity-log.json` by
+  basename into a bookkeeping partition, with a real-git regression test — so
+  the admission test's "no executable-gate equivalent" criterion does not hold
+  for the active tier. The diagnostic wisdom above is situational; search here
+  at that trigger moment.

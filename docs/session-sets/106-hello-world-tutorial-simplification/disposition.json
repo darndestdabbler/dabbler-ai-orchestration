@@ -37,7 +37,8 @@
   ],
   "next_orchestrator": null,
   "blockers": [
-    "Operator adjudication required on verification finding R3-3: the cross-provider verifier requires a shippable azure-pipelines.yml in the tutorial; the operator-confirmed cut list forbids it verbatim. Accept the named-equivalents scope statement as shipped, or authorize a follow-on set for an ADO host-setup doc. Session 2 is not blocked by this on its own terms - the decision is whether S1's tutorial is final."
+    "Operator adjudication required on verification finding R3-3: the cross-provider verifier requires a shippable azure-pipelines.yml in the tutorial; the operator-confirmed cut list forbids it verbatim. Accept the named-equivalents scope statement as shipped, or authorize a follow-on set for an ADO host-setup doc. Session 2 is not blocked by this on its own terms - the decision is whether S1's tutorial is final.",
+    "close_session gate 'verification_backstop' FAILED: OpenAI returned HTTP 429 on every attempt across ~25 minutes (4 verify_session runs + the backstop's own 2 tries). gpt-5.4/5.5/5.6 are the only tier-3 verifiers not on the orchestrator's excluded provider (anthropic), and google has no tier-3 verifier enabled (gemini-3-1-pro is is_enabled_as_verifier: false), so the escalation ladder's cross-provider fallback has nowhere to go. Provider unavailability at close blocks by design. RESOLUTION: re-run close_session once OpenAI recovers -- the work is committed and pushed (02a3212, d68c9e5), so nothing is at risk. The attested --manual-verify path is operator-only and was NOT self-authorized."
   ],
   "lessons_cited": [
     "L-064-8",

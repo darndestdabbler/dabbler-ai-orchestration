@@ -148,6 +148,14 @@
       "dateTime": "2026-07-28T18:13:37.292902-04:00",
       "description": "Round 7 (gpt-5.6, $0.3395): 1 blocking Major, accepted - round 6 fixed the authoring-branch requirement for Part 4 (greeter) but not Part 5 step 6 (Sam/app), so the team path still started its lifecycle sessions on protected main. Third L-065-1 every-echo miss this session. Fixed: Part 5 step 6 now opens with git switch -c authoring/app-lifecycle and the landing bullet names that branch and the return to trunk. Blocking-per-round: 11,2,3,1,1,2,1.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 18,
+      "stepKey": "stop-to-operator",
+      "dateTime": "2026-07-28T18:18:35.912520-04:00",
+      "description": "Round 8 (gpt-5.6, $0.4115): 2 Majors, neither closable by another round. R8-1 worktrees: kernel accepted (my prose over-claimed that no AI session touches the main checkout - sentence narrowed), remedy DISPUTED against cut list SS E step 7 / SS F. R8-2 size: 344 lines vs <=260 Ends-with, every line above the 269-line pre-verification draft added by verifier-demanded fixes; unresolvable without reversing Majors. Session STOPS to the operator per the constitution (unfixed/disputed Critical-Major goes to the human, never another round). Blocking-per-round 11,2,3,1,1,2,1,2. Verification spend ~$3.6. close_session correctly still refuses; NOT forced.",
+      "status": "blocked"
     }
   ]
 }

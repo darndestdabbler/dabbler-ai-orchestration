@@ -159,8 +159,10 @@ git switch -c authoring/greeter-lifecycle
    This matters for the next step: the worktree is cut from `main`, so the set has to be on
    `main` before you open one.
 
-4. **Open a worktree for it.** Each work set runs on its own branch in its own folder, so an AI
-   session never edits your `main` checkout:
+4. **Open a worktree for it.** Implementation sets write code, and they get their own folder as
+   well as their own branch — so your main checkout stays on `main`, usable, while the AI works.
+   (The doc-only plan and decomposition sets above are short and were fine on a branch in place;
+   the isolation matters once a session is changing code.)
 
    ```text
    .venv\Scripts\python.exe -m ai_router.worktree open 005-greeter-hello

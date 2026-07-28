@@ -97,7 +97,7 @@ full text in `lessons-archive.md`:
 | L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="104" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="106" status="active" scope="portable" -->
 
 - Prose carried over from a superseded doc was true (or tolerated) in the
   old context and reads authoritative in the new one — a defect class of
@@ -107,7 +107,7 @@ full text in `lessons-archive.md`:
   verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="105" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="106" status="active" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and
@@ -138,7 +138,7 @@ full text in `lessons-archive.md`:
   the resolved installed version at close, not just the declared floor.
 
 ## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
-<!-- lesson: id="L-095-1" added-set="095" last-used-set="103" status="active" scope="portable" -->
+<!-- lesson: id="L-095-1" added-set="095" last-used-set="106" status="active" scope="portable" -->
 
 - Reviewers are salience-limited, not context-limited: each pass returns
   the most salient handful of technically-real findings, and fixing them

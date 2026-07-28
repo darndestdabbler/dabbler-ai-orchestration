@@ -331,6 +331,14 @@ models:
     is_enabled_as_verifier: false
     notes: "Identity registry only: Gemini Code Assist orchestrator
       sessions (the Set 084 S2 ai-assignment recommendation)."
+  claude-opus-5:
+    provider: anthropic
+    model_id: claude-opus-5
+    is_enabled: false
+    is_enabled_as_verifier: false
+    notes: "Identity registry only: Claude Code orchestrator sessions
+      (Set 106 S1 was the first; recording claude-opus-4-8 would have
+      been a false identity)."
 
 # --- Routing Thresholds ---
 # Complexity score 1-100 mapped to tiers.

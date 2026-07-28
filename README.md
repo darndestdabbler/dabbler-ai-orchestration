@@ -186,12 +186,12 @@ module they belong to. The four-tier budget mapping is documented in
 [docs/ai-led-session-workflow.md → Cost-budgeted verification modes](docs/ai-led-session-workflow.md#cost-budgeted-verification-modes).
 
 New to the module-organized workflow? The hands-on tutorial
-[docs/tutorials/module-team-hello-world.md](docs/tutorials/module-team-hello-world.md)
-walks a three-person team through the whole flow end to end — scaffold,
-modules, per-module plans and session sets, worktrees, CODEOWNERS +
-monorepo CI, small PRs, tags and hotfixes — and pairs with a reusable
-[module workflow review prompt](docs/tutorials/module-team-hello-world-review-prompt.md)
-that coaches a team on how well they are practicing it.
+[docs/tutorials/hello-world.md](docs/tutorials/hello-world.md) walks you
+through the whole flow end to end — scaffold, modules, per-module plans and
+session sets, worktrees, CI, and a reviewed pull request — solo-first, with a
+second module and a teammate added at the end. Release, hotfix, and rollback
+operations live in
+[docs/tutorials/release-and-recovery.md](docs/tutorials/release-and-recovery.md).
 
 Setting up without VS Code? See the manual-setup note in
 [docs/quick-start.md](docs/quick-start.md). (The former conversational

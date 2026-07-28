@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The direct-provider remediation removed the actual environment-variable names\n\n- **Location:** `docs/tutorials/hello-world.md`, Part 1 direct-provider variant\n- **Fix:** Restore `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` explicitly.\n- **Category:** Completeness\n- **Severity:** Major\n- **Failure scenario:** A reader chooses the advertised direct-provider path and is told to set “the three `DABBLER_*` provider keys.” That wildcard is not an environment-variable name, and the document provides no way to determine the three required names. A reader who does not already know Dabbler’s private configuration contract cannot configure the path and stops before Part 3. This is probable for the tutorial’s clean-start audience.\n- **Details:**\n  - **Violation:** The tutorial must provide a performable “direct-API” inline variant, and the response claims literal keys were checked against shipped behavior.\n  - **Impact:** The alternate provider path remains unexecutable from the instructions, so L2 is not resolved.\n  - **Evidence:** The removed text named all three variables explicitly; the replacement reduces them to “the three `DABBLER_*` provider keys.”",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A reader chooses the advertised direct-provider path and is told to set “the three `DABBLER_*` provider keys.” That wildcard is not an environment-variable name, and the document provides no way to determine the three required names. A reader who does not already know Dabbler’s private configuration contract cannot configure the path and stops before Part 3. This is probable for the tutorial’s clean-start audience."
+    },
+    {
+      "description": "The Azure DevOps solo policy still blocks merging unless the author performs an undocumented approval\n\n- **Location:** `docs/tutorials/hello-world.md`, Part 3 branch policy and Part 4 PR merge\n- **Fix:** Tell the Azure DevOps requester to vote **Approve** on the solo PR, then explicitly untick **Allow requestors to approve their own changes** in Part 5. Alternatively, document another enforceable stage-one policy that does not require a vote.\n- **Category:** Correctness\n- **Severity:** Major\n- **Failure scenario:** An Azure DevOps reader configures one required reviewer and enables **Allow requestors to approve their own changes**. That setting merely permits the requester’s vote to count; it does not automatically approve the PR. Part 4 tells the reader to wait for CI and merge without instructing them to cast that vote, so the PR remains blocked with zero of one required approvals. This occurs on the literal Azure DevOps path.\n- **Details:**\n  - **Violation:** The tutorial calls this setting “ADO’s equivalent of ‘0 approvals,’” but one explicit approval is still required.\n  - **Impact:** The first implementation PR cannot be merged as written, stopping the advertised Azure DevOps walkthrough.\n  - **Evidence:** The fix sets the minimum to one, while no later Part 4 instruction tells the requester to approve their own PR. Part 5 also says only to “raise” approvals from zero to one rather than explicitly disabling requester self-approval.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "An Azure DevOps reader configures one required reviewer and enables **Allow requestors to approve their own changes**. That setting merely permits the requester’s vote to count; it does not automatically approve the PR. Part 4 tells the reader to wait for CI and merge without instructing them to cast that vote, so the PR remains blocked with zero of one required approvals. This occurs on the literal Azure DevOps path."
+    },
+    {
+      "description": "The Azure DevOps CI remediation still delegates the runnable pipeline to the reader\n\n- **Location:** `docs/tutorials/hello-world.md`, Part 4 steps 5–8\n- **Fix:** Provide a valid Azure Pipelines definition running the required installation and test commands, tell the reader where to commit it, and give the concrete pipeline-registration and build-validation steps.\n- **Category:** Completeness\n- **Severity:** Major\n- **Failure scenario:** An Azure DevOps reader reaches step 5 with only the GitHub Actions scaffold. The replacement says to “create a pipeline” but explicitly declines to provide its YAML. Without a pipeline definition, committed YAML location, or concrete registration flow, a reader following the walkthrough cannot create the required build-validation check and cannot merge the implementation PR. This is probable for users relying on the tutorial rather than an existing organization-specific pipeline.\n- **Details:**\n  - **Violation:** The walkthrough requires a runnable CI check before step 7; the remediation itself says “without it, step 7 has no check.”\n  - **Impact:** The same ADO-path stop identified by L12 remains: the required check cannot be established from the supplied instructions.\n  - **Evidence:** The new paragraph states that the YAML “belongs to your organization’s pipeline standards — this tutorial does not ship one.” It names the policy location but supplies neither the pipeline implementation nor sufficient registration instructions.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "An Azure DevOps reader reaches step 5 with only the GitHub Actions scaffold. The replacement says to “create a pipeline” but explicitly declines to provide its YAML. Without a pipeline definition, committed YAML location, or concrete registration flow, a reader following the walkthrough cannot create the required build-validation check and cannot merge the implementation PR. This is probable for users relying on the tutorial rather than an existing organization-specific pipeline."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 Sam receives generated app lifecycle sets",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 direct-provider execution path",
+      "verdict": "fix-rejected",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 repository-root Python invocation",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 Azure DevOps stage-one reviewer policy",
+      "verdict": "fix-rejected",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 Copilot CLI interaction surface",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 Node/npm prerequisite",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 generated implementation-set names",
+      "verdict": "fix-accepted",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8 performable app declaration pull request",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 Sam pulls the app module and sets",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    },
+    {
+      "finding": "L10 Sam performs per-machine AI setup",
+      "verdict": "fix-accepted",
+      "ledgerId": "L10"
+    },
+    {
+      "finding": "L11 real CODEOWNERS handles",
+      "verdict": "fix-accepted",
+      "ledgerId": "L11"
+    },
+    {
+      "finding": "L12 runnable Azure DevOps CI pipeline",
+      "verdict": "fix-rejected",
+      "ledgerId": "L12"
+    },
+    {
+      "finding": "L13 Sam receives Azure DevOps repository permissions",
+      "verdict": "fix-accepted",
+      "ledgerId": "L13"
+    }
+  ]
+}

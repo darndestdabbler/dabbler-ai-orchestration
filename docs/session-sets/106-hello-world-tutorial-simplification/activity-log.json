@@ -1,0 +1,113 @@
+{
+  "sessionSetName": "106-hello-world-tutorial-simplification",
+  "createdDate": "2026-07-28T20:44:38.769279+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-07-28T20:44:38.769279+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "read-inputs",
+      "dateTime": "2026-07-28T16:50:08.809297-04:00",
+      "description": "Read spec, routed cut list, the three current tutorials, consumer-bootstrap templates, and the shipped command surface (package.json contributed commands, moduleAuthoring writers, copilot_catalog).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "unknowns-resolved",
+      "dateTime": "2026-07-28T16:50:08.809297-04:00",
+      "description": "Resolved both named runtime unknowns EMPIRICALLY against shipped code: (a) renameModule restamps module: in starter specs + manifest slug/title only - folder names, planPath and codeRoots do NOT follow; fallback New Module + Delete Module probed and is clean. (b) Copilot CLI live 1.0.75 vs lock pin 1.0.69 = live version-pin drift; --model claude-sonnet-4.6 smoke test ran exit 0 on 1.0.75.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "ai-assignment",
+      "dateTime": "2026-07-28T17:06:06.285096-04:00",
+      "description": "Routed step-3.5 analysis (gemini-2.5-pro, anthropic excluded, $0.0119, truncation-clean); ai-assignment.md authored. Verdict: authoring orchestrator-direct for fidelity, add a routed reader-simulation review before Step 7.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "tutorial-rewritten",
+      "dateTime": "2026-07-28T17:06:06.285096-04:00",
+      "description": "Authored docs/tutorials/hello-world.md - 264 lines, six parts 1:1 with six video scenes, solo-first with the explicit \"Solo repositories can stop here.\" at the end of Part 4, GitHub + Copilot CLI worked path, ADO/direct-API inline variants, staged 3-stage branch protection, minimally-adapted scaffolded CI, five-item check, no appendices.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "release-doc-authored",
+      "dateTime": "2026-07-28T17:06:06.285096-04:00",
+      "description": "Authored docs/tutorials/release-and-recovery.md (154 lines) from the excised Part 10 + Git-under-the-hood appendix; all command literals re-verified against src/commands/gitRelease.ts and gitWorkflow.ts.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "pair-retired",
+      "dateTime": "2026-07-28T17:06:06.286095-04:00",
+      "description": "git rm the 821-line Copilot+ADO cut and the 390-line review prompt; module-team-hello-world.md reduced to the single one-line redirect stub.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "links-repaired",
+      "dateTime": "2026-07-28T17:06:06.286095-04:00",
+      "description": "Repaired inbound links in docs/quick-start.md, README.md, tools/dabbler-ai-orchestration/README.md, and docs/module-reorganization.md. Remaining references are exactly the three files S2 owns (getting-started.md.template + two cold-start fixtures).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "drift-discipline-retired",
+      "dateTime": "2026-07-28T17:06:06.286095-04:00",
+      "description": "Confirmed zero surviving shared-spine / sync-map / every-echo / tutorial-pair obligations in docs/tutorials/. Teaching surface 1,968 -> 419 lines.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "suite-green",
+      "dateTime": "2026-07-28T17:37:52.451034-04:00",
+      "description": "Layer 1 pytest: 3060 passed, 6 skipped. Extension unit suite (vscode-stub mocha): 1767 passing, 0 failing. Layer 3 Playwright not run - no Explorer-rendering, state-writer, or fixture change (L-064-12 triggers absent).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "reader-simulation",
+      "dateTime": "2026-07-28T17:37:52.452035-04:00",
+      "description": "Routed pre-verification reader-simulation pass (gemini-2.5-pro, documentation, $0.0134): 2 blocking + 3 confusing findings, all five fixed before verification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "verify-discovery",
+      "dateTime": "2026-07-28T17:37:52.452035-04:00",
+      "description": "Phased discovery (gpt-5.6 x2 fan-out, $0.7276): ISSUES_FOUND, 11 blocking. Supplementary pass (gpt-5.6, $0.2849): 2 further blocking. All 13 accepted and remediated in one pass; sidecar s1-remediation-round-2.md written.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 12,
+      "stepKey": "verify-remediation-review",
+      "dateTime": "2026-07-28T17:37:52.452035-04:00",
+      "description": "Remediation-review round 3 (gpt-5.6, $0.1257): 9 fix-accepted, 1 accepted-with-modification, 3 rejected. 2 of the 3 new Majors fixed (literal DABBLER_* names restored; ADO self-approval vote made explicit). 1 DISPUTED (R3-3: verifier prescribes shipping azure-pipelines.yml, which the operator-confirmed cut list forbids verbatim) - escalated to operator, not re-rounded. Sidecar s1-remediation-round-3.md written.",
+      "status": "complete"
+    }
+  ]
+}

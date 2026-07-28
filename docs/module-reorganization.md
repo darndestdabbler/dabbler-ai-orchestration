@@ -6,7 +6,7 @@
 > the concepts behind modules, read the
 > [Module-Organized Projects Primer](planning/module-organized-projects-primer.md);
 > for a hands-on team setup, the
-> [three-person Hello World walkthrough](tutorials/module-team-hello-world.md).
+> [Hello World walkthrough](tutorials/hello-world.md).
 
 A **module** is a unit of work owned by one developer at a time, declared
 in `docs/modules.yaml` (`slug`, `title`, `codeRoots`, `planPath`,

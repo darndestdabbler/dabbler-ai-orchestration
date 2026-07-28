@@ -163,16 +163,14 @@ sets under it. Reorganizing modules later (rename, delete, split,
 merge, or adopting modules in an older repo) is covered in the
 [module reorganization guide](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/module-reorganization.md).
 
-Working as a small team? The hands-on
-[three-person Hello World walkthrough](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world.md)
-drives this whole flow end to end (modules, worktrees, CODEOWNERS +
-monorepo CI, tags), and its companion
-[module workflow review prompt](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world-review-prompt.md)
-gives your team evidence-cited coaching on the workflow afterward. Locked to
-**GitHub Copilot** and hosted on **Azure DevOps**? There is a standalone
-[Copilot + Azure DevOps cut](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world-copilot-ado.md)
-of the walkthrough — Copilot-seat Full tier plus an executable
-`azure-pipelines.yml` and ADO branch policies (validated end-to-end on a live ADO org + Copilot seat, 2026-07-15).
+New here? The hands-on
+[Hello World walkthrough](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/hello-world.md)
+drives this whole flow end to end (modules, worktrees, CI, a reviewed pull
+request) on GitHub with the **GitHub Copilot CLI**, adding a teammate and a
+second module at the end — **Azure DevOps** and direct-provider-API variants
+are inline callouts, not separate walkthroughs. Tagging, hotfixing, and rolling
+back are covered in
+[Release and recovery operations](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/release-and-recovery.md).
 
 ---
 

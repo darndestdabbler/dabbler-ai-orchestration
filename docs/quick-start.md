@@ -196,8 +196,8 @@ each — `Dabbler: Open PR for this set`, `Dabbler: Finalize merged set`,
 `Dabbler: Cut release tag` (plus hotfix/rollback drills) — working on
 both GitHub and Azure DevOps; PR review/approval and the release
 decision stay human. Setup and the raw commands each action runs:
-[`docs/tutorials/module-team-hello-world.md`](tutorials/module-team-hello-world.md)
-(Part 0.5 and the "Git under the hood" appendix).
+[`docs/tutorials/release-and-recovery.md`](tutorials/release-and-recovery.md)
+("Git under the hood").
 
 ---
 
@@ -301,14 +301,12 @@ and say:
 ## Where to go next
 
 - **Session procedure in full:** [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md) — Steps 0–10, rules, config flags. Use the quick-nav at the top to jump past the UAT reference material for simple sessions.
-- **Working as a 2–4 person team (modules):** the hands-on
-  [three-person Hello World walkthrough](tutorials/module-team-hello-world.md)
-  (agent-agnostic, GitHub-worked) — or, for a team on **GitHub Copilot + Azure
-  DevOps**, the standalone
-  [Copilot + Azure DevOps cut](tutorials/module-team-hello-world-copilot-ado.md)
-  (Copilot-seat Full tier + an executable `azure-pipelines.yml`; validated end-to-end on a live ADO org + Copilot seat, 2026-07-15) — and their companion
-  [module workflow review prompt](tutorials/module-team-hello-world-review-prompt.md);
-  concepts in the [primer](planning/module-organized-projects-primer.md).
+- **Your first module (solo or as a small team):** the hands-on
+  [Hello World walkthrough](tutorials/hello-world.md) — GitHub + GitHub Copilot
+  CLI worked end to end, with Azure DevOps and direct-provider-API variants
+  inline; concepts in the [primer](planning/module-organized-projects-primer.md).
+- **Releasing, hotfixing, rolling back:**
+  [`docs/tutorials/release-and-recovery.md`](tutorials/release-and-recovery.md).
 - **Writing a spec:** [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md).
 - **Setting up a new project:** the extension's Getting Started form (`Dabbler: Get Started`); without VS Code, the manual-setup note under [Two adoption tiers](#two-adoption-tiers) above.
 - **UAT checklists, outsource-last, adjudication, advanced flags:** Reference section of the workflow doc — only read what applies to your set's configuration.

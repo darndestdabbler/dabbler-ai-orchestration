@@ -1,0 +1,47 @@
+{
+  "status": "requires_review",
+  "summary": "Collapsed the hello-world teaching surface from 1,968 lines across three documents to 469 across two (a 76% reduction). Authored docs/tutorials/hello-world.md - six parts mapping 1:1 to the six planned video scenes, solo-first with an explicit \"Solo repositories can stop here.\" at the end of Part 4, GitHub + GitHub Copilot CLI as the worked path, Azure DevOps and direct-provider-API as inline variants, three-stage branch protection, one minimally-adapted aggregate CI job, and a five-item final check. Authored docs/tutorials/release-and-recovery.md from the excised release/hotfix/rollback part and the Git-under-the-hood appendix. Deleted the 821-line Copilot+ADO cut and the 390-line workflow review prompt, retiring the hand-maintained shared-spine drift discipline outright; left one redirect stub and repaired every inbound link outside the three files Session 2 owns. Both named runtime unknowns were resolved EMPIRICALLY before the affected steps were written (s1-runtime-unknowns.md): the shipped module writers were driven against a real-scaffolder fixture, which showed Rename Module does not carry folder names, planPath, or codeRoots - so Part 3 takes the spec's sanctioned New Module + Delete Module fallback; and the Copilot CLI was probed live, confirming --model claude-sonnet-4.6 runs on CLI 1.0.75 while surfacing live version-pin drift against the 1.0.69 lockfile pin. A routed reader-simulation pass caught 5 issues pre-verification; cross-provider verification then caught 13 more blocking findings across discovery and supplementary, all remediated in one pass. CLOSES REQUIRING OPERATOR ADJUDICATION on exactly one point. The remediation-review round raised three further Majors: two were accepted and fixed (the literal DABBLER_* variable names, which my own line-count trim had regressed to a wildcard; and ADO's self-approval vote, which the 'allow requestors to approve their own changes' setting permits but does not cast). The third (R3-3) prescribes shipping a full azure-pipelines.yml plus its registration flow - which the operator-confirmed cut list forbids verbatim ('Do not include Azure Pipelines YAML here') and which would rebuild part of the 821-line ADO cut this session deleted. Per the constitution a disputed Critical/Major goes to the human and is never re-rounded. The finding's IMPACT was addressed inside the binding scope by a one-time scope statement in Part 2 saying the ADO notes are a named-equivalents configuration checklist, not a second walkthrough. See s1-remediation-round-3.md for the adjudication package and the two options.",
+  "verification_method": "api",
+  "verification_verdict": "ISSUES_FOUND",
+  "verification_message_ids": [],
+  "files_changed": [
+    "README.md",
+    "ai_router/router-config.yaml",
+    "docs/module-reorganization.md",
+    "docs/quick-start.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/activity-log.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/ai-assignment.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/authoring-cut-consult-gpt56.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/disposition.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-ai-assignment-analysis.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-issues-round-2.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-issues-round-3.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-issues.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-reader-simulation.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-remediation-round-2.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-remediation-round-3.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-runtime-unknowns.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification-fanout-2.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification-round-2.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification-round-3.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/session-events.jsonl",
+    "docs/session-sets/106-hello-world-tutorial-simplification/session-state.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/spec.md",
+    "docs/tutorials/hello-world.md",
+    "docs/tutorials/module-team-hello-world-copilot-ado.md",
+    "docs/tutorials/module-team-hello-world-review-prompt.md",
+    "docs/tutorials/module-team-hello-world.md",
+    "docs/tutorials/release-and-recovery.md",
+    "tools/dabbler-ai-orchestration/README.md"
+  ],
+  "next_orchestrator": null,
+  "blockers": [
+    "Operator adjudication required on verification finding R3-3: the cross-provider verifier requires a shippable azure-pipelines.yml in the tutorial; the operator-confirmed cut list forbids it verbatim. Accept the named-equivalents scope statement as shipped, or authorize a follow-on set for an ADO host-setup doc. Session 2 is not blocked by this on its own terms - the decision is whether S1's tutorial is final."
+  ],
+  "lessons_cited": [
+    "L-064-8",
+    "L-064-9",
+    "L-095-1"
+  ]
+}

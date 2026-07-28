@@ -34,7 +34,7 @@ In this toy project, deploying is running the tagged snapshot:
 
 ```bash
 git checkout v0.1.0
-python services/app/app.py
+python -m services.app.app
 git switch main
 ```
 
@@ -67,7 +67,7 @@ want to ship.
 
    ```bash
    for module in services/*/; do python -m pytest -q "$module" || exit 1; done
-   python services/app/app.py
+   python -m services.app.app
    ```
 
 4. Still on `hotfix/v0.1.0`, run **`Dabbler: Cut release tag`** with name `v0.1.1`

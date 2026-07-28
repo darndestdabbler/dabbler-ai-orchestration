@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The release guide still uses the broken direct-script invocation**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** A reader completes the tutorial with `services/app/app.py` importing `services.greeter`, then follows the release guide to deploy or validate a hotfix. Running `python services/app/app.py` places `services/app` rather than the repository root at `sys.path[0]`, so the sibling-module import likely fails with `ModuleNotFoundError`. This is probable because the tutorial explicitly designs and tests the application for module execution with `python -m services.app.app`.\n  - **Details:**\n    - **Violation:** The task requires the release/recovery document’s commands to be verified and performable. The tutorial’s established execution contract is `python -m services.app.app`.\n    - **Impact:** The documented deployment and exact-hotfix validation steps can fail even after the tutorial’s tests and main-path execution succeed, materially breaking a primary deliverable.\n    - **Evidence:** `docs/tutorials/release-and-recovery.md` uses `python services/app/app.py` under both **What \"deploy\" means here** and **Validate before you tag**, while `docs/tutorials/hello-world.md` consistently requires `python -m services.app.app`.\n    - **Location:** `docs/tutorials/release-and-recovery.md`, lines 36 and 69.\n    - **Fix:** Replace both invocations with `python -m services.app.app`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A reader completes the tutorial with `services/app/app.py` importing `services.greeter`, then follows the release guide to deploy or validate a hotfix. Running `python services/app/app.py` places `services/app` rather than the repository root at `sys.path[0]`, so the sibling-module import likely fails with `ModuleNotFoundError`. This is probable because the tutorial explicitly designs and tests the application for module execution with `python -m services.app.app`."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "status": "completed",
+  "summary": "Session 1 (of 1, final): closed the verify_session false-positive loop where lazily-synthesized session-state.json files were inlined as deliverables and flagged as 'never hand-author state' violations. Corrected root cause (the field diagnosis blamed the wrong writer): verify_session NEVER writes state; the lazy-synth writer is session_state.py read_status -> ensure_session_state_file (the Set 7 'every spec folder carries a state file' invariant), fired across every set by any all-sets status scan / Work Explorer refresh, materializing UNTRACKED not-started state files out of band -- which is why 'delete then re-verify' could not win (the files re-synth between rounds). FIX (ai_router/verify_session.py): new FRAMEWORK_BOOKKEEPING_FILES set {session-state.json, session-events.jsonl, activity-log.json}; _collect_untracked_contents now returns a THIRD partition (bookkeeping) matched by BASENAME (covers own + sibling sets at any depth) BEFORE the generated-bundle/inline partitions; EvidenceBundle gains untracked_bookkeeping, rendered under a new 'Expected framework bookkeeping (blessed-writer / lazy-synth output -- NOT reviewed work)' section -- paths disclosed (honesty preserved), content NOT inlined and NOT placed in the 'review directly' bucket. Deliberately NOT a DEFAULT_DIFF_EXCLUDES entry: a blanket pathspec exclude would drop TRACKED state-file changes from the diff, blinding the verifier to legitimate state-machinery work (schema/meta sets, committed fixtures); the tracked diff is untouched. Non-goal (declared): the lazy-synth / Set 7 invariant itself is load-bearing and not touched. TESTS: new TestFrameworkBookkeepingReclassification (real-git fixture) proves the three buckets -- sibling not-started -> bookkeeping (not inlined / not review-directly), genuine untracked deliverable still inlined, tracked state change still in diff, events + activity-log symmetric, basename-at-any-depth. SUB-DECISION settled: the optional verification.md framing line was NOT added -- the structural reclassification alone proved sufficient (smaller change wins; removal-over-addition). Suite green: 3060 passed / 6 skipped; drift_guard OK; guidance ceiling OK. VERIFICATION: routed cross-provider verify_session --phase discovery (fan-out 2/2, gpt-5-6, anthropic auto-excluded) returned VERIFIED, 0 findings, $0.1557 -- and this round is its own regression witness: the evidence rendered THIS set's own session-state.json/session-events.jsonl/activity-log.json under the new bookkeeping section (not flagged), the exact false positive the set closes. Router-side, NOT published (version bump / PyPI publish is operator-gated; CHANGELOG carries an [Unreleased] Set 105 entry).",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "ai_router/verify_session.py",
+    "ai_router/tests/test_verify_session.py",
+    "ai_router/CHANGELOG.md",
+    "docs/session-sets/105-verify-evidence-excludes-bookkeeping/spec.md",
+    "docs/session-sets/105-verify-evidence-excludes-bookkeeping/ai-assignment.md",
+    "docs/session-sets/105-verify-evidence-excludes-bookkeeping/s1-ai-assignment-analysis.json",
+    "docs/session-sets/105-verify-evidence-excludes-bookkeeping/change-log.md"
+  ],
+  "next_orchestrator": null,
+  "lessons_cited": [
+    "L-064-9",
+    "L-069-1"
+  ],
+  "blockers": []
+}

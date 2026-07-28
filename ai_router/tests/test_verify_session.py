@@ -428,6 +428,134 @@ class TestEvidenceAssembly:
 
 
 # ---------------------------------------------------------------------------
+# Set 105: framework bookkeeping is reclassified out of the reviewed buckets
+# ---------------------------------------------------------------------------
+
+class TestFrameworkBookkeepingReclassification:
+    """An untracked, lazily-synthesized ``session-state.json`` (and the ledger
+    siblings) is blessed-writer output, not a session deliverable. It must
+    render as *expected framework bookkeeping* -- never inlined as content the
+    verifier grades, and never in the "review directly / do not assume clean"
+    bucket -- so the cross-provider "never hand-author state" rule stops
+    false-positiving on machine-written files. The tracked diff is untouched.
+    """
+
+    # A distinctive marker embedded in a synthesized state file's CONTENT: if the
+    # bookkeeping partition works, this string is NEVER inlined into the rendered
+    # evidence (the section lists paths only).
+    _SENTINEL = "SENTINEL_BOOKKEEPING_CONTENT_MUST_NOT_INLINE"
+
+    def _write_sibling_not_started(self, repo: Path, slug: str) -> Path:
+        sib = repo / "docs" / "session-sets" / slug
+        sib.mkdir(parents=True)
+        (sib / "spec.md").write_text("# Sibling spec\n", encoding="utf-8")
+        (sib / "session-state.json").write_text(
+            json.dumps(
+                {
+                    "schemaVersion": 4,
+                    "sessionSetName": slug,
+                    "status": "not-started",
+                    "_marker": self._SENTINEL,
+                    "sessions": [
+                        {
+                            "number": 1,
+                            "title": "Session 1",
+                            "status": "not-started",
+                            "startedAt": None,
+                            "completedAt": None,
+                            "orchestrator": None,
+                            "verificationVerdict": None,
+                        }
+                    ],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        return sib
+
+    def test_sibling_not_started_state_is_bookkeeping_not_inlined(self, repo: Path):
+        sib = self._write_sibling_not_started(repo, "999-sibling-not-started")
+        rel = "docs/session-sets/999-sibling-not-started/session-state.json"
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        # Third bucket -- classified as framework bookkeeping...
+        assert rel in evidence.untracked_bookkeeping
+        # ...and NOT in either reviewed bucket.
+        assert not any(rel == p for p, _ in evidence.untracked_included)
+        assert not any(rel == p for p, _ in evidence.untracked_omitted)
+        rendered = evidence.as_response_under_review()
+        # The section renders, the path is disclosed (honesty), but the CONTENT
+        # is never inlined -- the verifier does not grade a machine-written blob.
+        assert "Expected framework bookkeeping" in rendered
+        assert rel in rendered
+        assert self._SENTINEL not in rendered
+        # Never a silent exclusion: git status --short lists the new dir (a fresh
+        # directory collapses to `<dir>/`), and the bookkeeping section discloses
+        # the exact file path -- so the fact of the file is visible two ways.
+        assert "999-sibling-not-started" in evidence.git_status
+        assert sib.exists()
+
+    def test_events_and_activity_log_covered_symmetrically(self, repo: Path):
+        # session-events.jsonl and activity-log.json are the ledger siblings --
+        # same blessed-writer / lazy-synth class, same reclassification.
+        (repo / "session-events.jsonl").write_text(
+            '{"event": "' + self._SENTINEL + '"}\n', encoding="utf-8"
+        )
+        (repo / "activity-log.json").write_text(
+            '{"log": "' + self._SENTINEL + '"}\n', encoding="utf-8"
+        )
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        for name in ("session-events.jsonl", "activity-log.json"):
+            assert name in evidence.untracked_bookkeeping
+            assert not any(name == p for p, _ in evidence.untracked_included)
+            assert not any(name == p for p, _ in evidence.untracked_omitted)
+        assert self._SENTINEL not in evidence.as_response_under_review()
+
+    def test_bookkeeping_classified_at_any_depth_by_basename(self, repo: Path):
+        # By BASENAME: a state file under ANY directory (own set or sibling) is
+        # bookkeeping. Here, a fresh set folder's own not-started file.
+        self._write_sibling_not_started(repo, "998-deep-sibling")
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        assert any(
+            p.endswith("998-deep-sibling/session-state.json")
+            for p in evidence.untracked_bookkeeping
+        )
+
+    def test_genuine_untracked_deliverable_still_inlined(self, repo: Path):
+        # No SS3 regression: a real new source/doc file is STILL inlined so the
+        # verifier reviews its content. Only bookkeeping files are reclassified.
+        (repo / "real_feature.py").write_text(
+            "def feature():\n    return 'reviewed'\n", encoding="utf-8"
+        )
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        assert any(
+            p == "real_feature.py" for p, _ in evidence.untracked_included
+        )
+        assert "real_feature.py" not in evidence.untracked_bookkeeping
+        assert "def feature" in evidence.as_response_under_review()
+
+    def test_tracked_state_change_still_appears_in_diff(self, repo: Path):
+        # The fixture's session-state.json is COMMITTED (tracked). A deliberate
+        # change to it -- e.g. a schema/meta set's actual deliverable -- must
+        # STILL surface in the diff: the reclassification touches only untracked
+        # inlining, never the tracked diff (deliberately NOT a diff exclude).
+        state = _set_dir(repo) / "session-state.json"
+        blob = state.read_text(encoding="utf-8")
+        state.write_text(
+            blob.replace('"schemaVersion": 4', '"schemaVersion": 5'),
+            encoding="utf-8",
+        )
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        assert '"schemaVersion": 5' in evidence.diff
+        # A tracked, changed state file is NOT swept into the untracked
+        # bookkeeping bucket (that bucket is untracked-only).
+        assert not any(
+            p.endswith("session-state.json")
+            for p in evidence.untracked_bookkeeping
+        )
+
+
+# ---------------------------------------------------------------------------
 # Artifact naming across rounds
 # ---------------------------------------------------------------------------
 

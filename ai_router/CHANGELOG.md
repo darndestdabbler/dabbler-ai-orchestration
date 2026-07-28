@@ -9,6 +9,39 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
+## [Unreleased] (Set 105 — verification evidence excludes framework bookkeeping)
+
+> Router-side, not yet published. A version bump / PyPI publish is
+> operator-gated and recorded at release time.
+
+### Fixed
+
+- **(Set 105) `verify_session` no longer false-positives on lazily-synthesized
+  state files.** Any all-sets status scan / Work Explorer refresh calls
+  `read_status` → `ensure_session_state_file` for every spec folder lacking a
+  `session-state.json` (the Set 7 "every spec folder carries a state file"
+  invariant), materializing **untracked** `not-started` state files out of
+  band. `verify_session._collect_untracked_contents` previously inlined their
+  content as session deliverables, and the cross-provider verifier — correctly
+  applying the "blessed writers only, never hand-author `session-state.json`"
+  discipline — flagged them as violations. The finding never cleared (observed:
+  3 rounds, same finding) because the files re-synth between rounds. The
+  collector now classifies `session-state.json` / `session-events.jsonl` /
+  `activity-log.json` (new `FRAMEWORK_BOOKKEEPING_FILES` set, matched by
+  **basename**, covering own + sibling sets at any depth) into a **third
+  partition** — neither inlined nor placed in the "review directly / do not
+  assume clean" bucket. `EvidenceBundle` grows an `untracked_bookkeeping` field
+  rendered under a new *"Expected framework bookkeeping (blessed-writer /
+  lazy-synth output — NOT reviewed work)"* section: the paths stay visible
+  (honesty preserved — never a silent exclusion), but the machine-written
+  content is not graded. **Deliberately NOT a `DEFAULT_DIFF_EXCLUDES` entry** —
+  a blanket pathspec exclude would also drop **tracked** changes to these files
+  from the diff, blinding the verifier to legitimate state-machinery work
+  (schema/meta sets, committed fixtures). Only the untracked-content inlining is
+  reclassified; the tracked diff is untouched. Mirrors Set 089's
+  evidence-layer approach. New `TestFrameworkBookkeepingReclassification`
+  covers the three buckets against a real-git fixture.
+
 ## [0.34.0] — 2026-07-15 (Set 104 — Copilot CLI large-prompt file handoff)
 
 > **Published 2026-07-15** to PyPI (tag `v0.34.0`, operator-authorized

@@ -312,6 +312,31 @@ DEFAULT_DIFF_EXCLUDES = (
     "*.vsix",
 )
 
+# Framework state/ledger bookkeeping written by blessed writers or read-triggered
+# lazy-synth (Set 105). An all-sets status scan / Work Explorer refresh calls
+# ``read_status`` -> ``ensure_session_state_file`` for every spec folder lacking a
+# state file (the Set 7 "every spec folder carries a session-state.json"
+# invariant), materializing UNTRACKED ``not-started`` state files out of band.
+# When the untracked collector inlines their content as "deliverables", the
+# cross-provider verifier -- correctly applying the "blessed writers only, never
+# hand-author session-state.json" discipline -- flags them as violations. They
+# are machine-written, so the finding is a false positive that never clears
+# (the files re-synth between rounds). Classified by BASENAME so the fix covers
+# the set-under-review's own in-progress state file AND sibling sets' not-started
+# files uniformly; both are blessed-writer output that needs no cross-provider
+# review. Deliberately NOT a ``DEFAULT_DIFF_EXCLUDES`` entry: a blanket pathspec
+# exclude would also drop TRACKED changes to these files from the diff, blinding
+# the verifier to legitimate state-machinery work (schema/meta sets, committed
+# fixtures). This reclassifies ONLY the untracked-content inlining; the tracked
+# diff is left untouched.
+FRAMEWORK_BOOKKEEPING_FILES = frozenset(
+    {
+        "session-state.json",
+        "session-events.jsonl",
+        "activity-log.json",
+    }
+)
+
 
 class VerifySessionError(Exception):
     """Raised for deterministic pre-route failures (usage / state)."""
@@ -684,6 +709,14 @@ class EvidenceBundle:
     # be safely inlined (reported as explicitly uncovered).
     untracked_included: List[tuple] = field(default_factory=list)
     untracked_omitted: List[tuple] = field(default_factory=list)
+    # Set 105: untracked FRAMEWORK_BOOKKEEPING_FILES (blessed-writer / lazy-synth
+    # state + ledger output). Neither inlined (untracked_included) nor placed in
+    # the "review directly / do not assume clean" bucket (untracked_omitted):
+    # they are expected framework output, not reviewed work. Kept as bare paths
+    # (no content) -- the schema, close gate, and writer-discipline check own this
+    # surface, so the verifier does not need their bytes. Still surfaced in
+    # ``git status --short`` (honesty preserved -- exclusion is never silent).
+    untracked_bookkeeping: List[str] = field(default_factory=list)
     # Set 089: TRACKED changed files dropped from the diff by a generated-bundle
     # exclude. Reported EXPLICITLY (never silently absent) so a reviewer knows a
     # tracked path was excluded on purpose -- the same honesty SS3 gave untracked
@@ -744,6 +777,25 @@ class EvidenceBundle:
             parts.append(
                 "\n\n#### Uncovered untracked paths (NOT inlined -- review these "
                 "directly; do not assume they are clean)\n\n" + lines
+            )
+        if self.untracked_bookkeeping:
+            lines = "\n".join(
+                f"- `{path}`" for path in self.untracked_bookkeeping
+            )
+            parts.append(
+                "\n\n#### Expected framework bookkeeping (blessed-writer / "
+                "lazy-synth output -- NOT reviewed work)\n\n"
+                "These untracked files are framework state/ledger bookkeeping "
+                "materialized by a blessed writer or by the read-triggered "
+                "`not-started` state synth (the Set 7 \"every spec folder carries "
+                "a `session-state.json`\" invariant, fired by any all-sets status "
+                "scan). They are machine-written, carry no reviewed content, and "
+                "are owned by the schema, the close gate, and the writer-discipline "
+                "check -- do NOT review them as session deliverables, and do NOT "
+                "flag them as hand-authored state (they are not). Listed here "
+                "(not silently dropped) for honesty; the tracked diff still "
+                "surfaces any DELIBERATE change to these files for review.\n\n"
+                + lines
             )
         if self.tracked_excluded:
             lines = "\n".join(f"- `{path}`" for path in self.tracked_excluded)
@@ -816,14 +868,18 @@ def _collect_untracked_contents(
     real source path like ``src/dist/x.py``, which a segment-matcher would wrongly
     drop).
 
-    Returns ``(included, omitted)``: ``included`` is ``[(path, text), ...]`` for
-    UTF-8 text files under the size cap; ``omitted`` is ``[(path, reason), ...]``
-    for files that cannot be safely inlined -- **generated-bundle-excluded**,
-    symlink, oversized, binary/non-UTF-8, or unreadable. Every non-inlined file is
-    reported EXPLICITLY (including excluded ones) so a reviewer never mistakes
-    silence for coverage. (.gitignore-ignored files are intentionally NOT
-    disclosed -- git itself treats them as non-source; the generated-bundle
-    excludes may hold real files, so those ARE disclosed as uncovered.)
+    Returns ``(included, omitted, bookkeeping)``: ``included`` is
+    ``[(path, text), ...]`` for UTF-8 text files under the size cap; ``omitted``
+    is ``[(path, reason), ...]`` for files that cannot be safely inlined --
+    **generated-bundle-excluded**, symlink, oversized, binary/non-UTF-8, or
+    unreadable; ``bookkeeping`` is ``[path, ...]`` for
+    :data:`FRAMEWORK_BOOKKEEPING_FILES` (Set 105 -- blessed-writer / lazy-synth
+    state + ledger output that is expected framework bookkeeping, not reviewed
+    work). Every non-inlined file is reported EXPLICITLY (including excluded and
+    bookkeeping ones) so a reviewer never mistakes silence for coverage.
+    (.gitignore-ignored files are intentionally NOT disclosed -- git itself treats
+    them as non-source; the generated-bundle excludes may hold real files, so
+    those ARE disclosed as uncovered.)
     """
     all_untracked = _ls_untracked(root, run_git, ["."])
     kept = set(
@@ -831,7 +887,17 @@ def _collect_untracked_contents(
     )
     included: List[tuple] = []
     omitted: List[tuple] = []
+    bookkeeping: List[str] = []
     for rel in all_untracked:
+        # Set 105: framework state/ledger bookkeeping is classified by BASENAME
+        # (covers own + sibling sets, any depth) BEFORE any other partition -- it
+        # is expected machine output regardless of where it lands, and must never
+        # be inlined as a deliverable nor demanded for direct review. This touches
+        # ONLY untracked files (this collector's whole domain); a tracked/committed
+        # change to one of these names still flows through the diff for review.
+        if os.path.basename(rel) in FRAMEWORK_BOOKKEEPING_FILES:
+            bookkeeping.append(rel)
+            continue
         if rel not in kept:
             omitted.append((rel, "excluded (generated-bundle pattern)"))
             continue
@@ -854,7 +920,7 @@ def _collect_untracked_contents(
             omitted.append((rel, "binary / non-UTF-8"))
             continue
         included.append((rel, text))
-    return included, omitted
+    return included, omitted, bookkeeping
 
 
 def _diff_names(
@@ -927,8 +993,8 @@ def assemble_evidence(
     diff_args = ["diff", "--no-color", diff_base, "--"]
     diff_args.extend(build_diff_pathspecs(excludes) or ["."])
     diff = run_git(root, diff_args)
-    untracked_included, untracked_omitted = _collect_untracked_contents(
-        root, excludes, run_git
+    untracked_included, untracked_omitted, untracked_bookkeeping = (
+        _collect_untracked_contents(root, excludes, run_git)
     )
     tracked_excluded = _tracked_excluded_paths(root, diff_base, excludes, run_git)
 
@@ -940,6 +1006,7 @@ def assemble_evidence(
         excludes=list(excludes),
         untracked_included=untracked_included,
         untracked_omitted=untracked_omitted,
+        untracked_bookkeeping=untracked_bookkeeping,
         tracked_excluded=tracked_excluded,
     )
 

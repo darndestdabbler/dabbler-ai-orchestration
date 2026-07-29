@@ -757,6 +757,29 @@ Worth noting for its own sake: this is the third correction in a row where the
 right answer came from asking **how the machine actually works** rather than
 whether the prose is consistent. Rounds 1–5 asked the second question very well.
 
+### Round 10 — the backstop's third catch: the prerequisite is never committed
+
+`Dabbler: Open PR for this set` **pushes commits and opens a pull request. It does
+not commit.** Its own confirm dialog says so — the two commands it lists are
+`git push` and `gh pr create`.
+
+The decomposition session commits the spec it generates. The reader then adds the
+`prerequisites:` block **by hand**, and every surface went straight from that edit
+to Open PR: tutorial Part 5 step 6, scene 5 beats 11→12, and checklist Walk 8
+steps 4→5. So the edit is still in the working tree, and Open PR either trips its
+dirty-tree warning or ships a pull request without it — after which the worktree
+is cut from a `main` that never received the prerequisite. That is the exact
+failure the surrounding prose promises to prevent, three sentences after
+promising it.
+
+**Fixed in all three**, with the reason stated rather than just the command added:
+the prerequisite bullet now ends in `git add -A && git commit -m "docs: app's
+implementation set depends on greeter's"`, the landing step says Open PR *"pushes
+commits and opens the pull request, it does not commit for you, which is why the
+step above ends in a commit"*, and Walk 8's Expectation adds a check that
+`git status --short` is **empty** after the commit — because a loose edit here is
+invisible until the worktree is already wrong.
+
 ## What the backstop is worth
 
 Three times now, a *different reading* has found what a converged loop could not.

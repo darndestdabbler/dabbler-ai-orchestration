@@ -317,8 +317,17 @@ prerequisites:
     condition: complete
 ```
 
+Then commit it — the session committed the spec it generated, but this edit is yours, and the
+next beat's **`Dabbler: Open PR for this set`** pushes commits rather than making one:
+
+```bash
+git add -A
+git commit -m "docs: app's implementation set depends on greeter's"
+```
+
 **Say.** "One thing before he lands it. `app` composes `greeter`, so `app`'s implementation
-set genuinely depends on `greeter`'s being finished. Declare that."
+set genuinely depends on `greeter`'s being finished. Declare that — and commit it, because
+Open PR pushes what you've committed; it doesn't commit for you."
 
 **See.** **Nothing changes on screen** — `greeter`'s set is already complete, so the
 prerequisite is satisfied the moment it is written and the row renders exactly as before.

@@ -326,12 +326,16 @@ a second module.
      ```
 
      Because `greeter`'s set is already complete, nothing changes on screen. Were it not,
-     that row would carry a ⛓︎ marker naming what it is waiting for.
+     that row would carry a ⛓︎ marker naming what it is waiting for. **Commit that edit** —
+     the decomposition session committed the spec it generated, but this change is yours:
+     `git add -A && git commit -m "docs: app's implementation set depends on greeter's"`.
    - **Land all of it on `main`** from that authoring branch with **`Dabbler: Open PR for this
-     set`**, exactly as in Part 4 step 3. This one is all planning files, so no CODEOWNERS rule
-     matches and nobody is requested automatically — Sam asks **you** to approve it, then merges,
-     then `git switch main && git pull --ff-only`. The prerequisite has to be on `main` before
-     the worktree is cut, or the worktree gets a spec without it.
+     set`**, exactly as in Part 4 step 3 — it pushes commits and opens the pull request, it does
+     not commit for you, which is why the step above ends in a commit. This one is all planning
+     files, so no CODEOWNERS rule matches and nobody is requested automatically — Sam asks
+     **you** to approve it, then merges, then `git switch main && git pull --ff-only`. The
+     prerequisite has to be on `main` before the worktree is cut, or the worktree gets a spec
+     without it.
    - **Implementation set**, in a worktree, exactly as in Part 4.
 
 ## Part 6 — Review, merge, and clean up *(scene 6)*

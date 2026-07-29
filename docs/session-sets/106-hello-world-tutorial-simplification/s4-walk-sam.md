@@ -40,14 +40,15 @@ Then the rest of the tutorial's **Part 1**, on your machine:
   code --version
   python --version
   ```
-- **GitHub Copilot CLI** — install it, then run `copilot` once and complete the sign-in.
-  You need an active Copilot seat; **tell Priya now if you do not have one**, because we need
-  a different setup for you and she has to arrange it before we start.
+- **GitHub Copilot CLI** — install it, then run `copilot` once and complete the sign-in, using
+  the account your Copilot seat is on.
   ```bash
   winget install GitHub.Copilot
   copilot -p "Write PI to 10 decimal places" --model claude-sonnet-4.6
   ```
-  That last line should print π to ten places. It is the proof your seat works.
+  **Send Priya whatever that last line prints, before the walk day** — it should be π to ten
+  decimal places. *Having* a seat and having a **working** seat on *this* machine are
+  different things, and two minutes now beats finding out an hour into a two-hour session.
 - **GitHub CLI** — install from [cli.github.com](https://cli.github.com), then:
   ```bash
   gh auth login

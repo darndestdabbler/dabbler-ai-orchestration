@@ -29,7 +29,12 @@ mark the item passed.
 2. **Do not pre-install the extension or pre-authenticate the Copilot CLI on your machine.**
    Walk 1 exists to install and authenticate them, and a pre-provisioned machine cannot walk it.
 3. A throwaway **public** GitHub repo you can create, and Sam's handle to invite.
-4. About two hours.
+4. **Sam's Copilot smoke test, in writing, before the walk day.** He has a seat; his card asks
+   him to send you what `copilot -p "Write PI to 10 decimal places" --model claude-sonnet-4.6`
+   prints on *his* machine. Having a seat and having a working seat on that machine are
+   different claims — Session 1 of this set found your own seat six CLI versions past the
+   pinned one. Two minutes of his time now, or an hour lost at handoff 3.
+5. About two hours.
 
 ## Two machines — three things in the checklist do not apply to you
 
@@ -66,9 +71,8 @@ real finding; record it.
 
 Finish with Walk 10's five checks, then Walks 11–13.
 
-## If Sam has no Copilot seat
+## One budget note
 
-He runs three AI sessions, so he needs one. If he does not have a seat, he needs the
-**direct provider API keys** variant instead — the callout in Part 1 and
-[`scene-1-alt-direct-api.md`](../../tutorials/video/scene-1-alt-direct-api.md). That spends
-your provider budget rather than his seat, so decide before the walk rather than during it.
+Sam runs three of the walk's AI sessions — `app`'s plan, decomposition, and implementation —
+and they run on **his** Copilot seat, not your capacity. The only spend on your side is
+whatever S4's own verification costs.

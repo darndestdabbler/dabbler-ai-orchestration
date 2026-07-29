@@ -402,6 +402,14 @@
       "dateTime": "2026-07-29T04:19:34.256498-04:00",
       "description": "close_session gate failed on the Set 084 close backstop: its in-process round 6 (gpt-5-6, $0.3545) found 1 Major that only shows when the scripts are read as a SYSTEM \u2014 five authentication beats said to switch OBS to \"a scene that hides the device code\" while the README defined four scenes, all capture scenes. Fixed by defining a fifth OBS scene, Privacy (no capture at all), naming it literally in all five beats, switching BEFORE the credential appears, and declaring it per script; three stale beat references corrected in the same pass. Round 7 ($0.1830): 18/18 prior fixes accepted, 1 new Major created by the fix itself (scene 5 beat 3 gh auth login did not name Privacy) \u2014 fixed and closed on orchestrator judgment per the operator ruling rather than another round. Gates: 107/107 and 345/345.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 17,
+      "stepKey": "close-blocked-provider",
+      "dateTime": "2026-07-29T04:33:15.415573-04:00",
+      "description": "close_session backstop rounds 8 and 10 each found real Majors, all fixed (fail-closed Passes, the az identity sibling and its own wrong first fix, and the uncommitted prerequisite). The final close attempt is blocked NOT on quality but on provider availability: OpenAI returned 429 Too Many Requests on three consecutive backstop attempts (3 retries each), and the gate correctly treats provider unavailability at close as a BLOCK, never a pass. All work is committed and pushed (9670797). Resolvable by re-running close_session when OpenAI recovers, or by the operator-attested --manual-verify path \u2014 both operator decisions. Notification deliberately NOT fired: it fires only after a successful close.",
+      "status": "complete"
     }
   ]
 }

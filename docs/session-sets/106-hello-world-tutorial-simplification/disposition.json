@@ -1,42 +1,39 @@
 {
   "status": "completed",
-  "summary": "Collapsed the hello-world teaching surface from 1,968 lines across three documents to 469 across two (a 76% reduction), retiring the hand-maintained shared-spine drift discipline outright rather than relocating it. Authored docs/tutorials/hello-world.md - six parts mapping 1:1 to the six planned video scenes, solo-first with an explicit \"Solo repositories can stop here.\" at the end of Part 4, GitHub + GitHub Copilot CLI as the worked path, Azure DevOps and direct-provider-API as inline variants, three-stage branch protection, one minimally-adapted aggregate CI job, and a five-item final check. Authored docs/tutorials/release-and-recovery.md from the excised release/hotfix/rollback part and the Git-under-the-hood appendix, every command re-verified against gitWorkflow.ts and gitRelease.ts rather than inherited from the retired appendix (L-064-8). Deleted the 821-line Copilot+ADO cut and the 390-line workflow review prompt; left one redirect stub and repaired every inbound link outside the three files Session 2 owns. Both named runtime unknowns were resolved EMPIRICALLY before the affected steps were written (s1-runtime-unknowns.md): the shipped module writers were bundled with esbuild and driven against a real-scaffolder fixture, showing Rename Module carries neither folder names, planPath, nor codeRoots - so Part 3 takes the spec's sanctioned New Module + Delete Module fallback; and the Copilot CLI was probed live, confirming --model claude-sonnet-4.6 runs on CLI 1.0.75 while surfacing live catalog version-pin drift against the 1.0.69 lock (router-side, out of scope, flagged to the operator). Verification was unusually productive and every finding was resolved in flight: a routed reader-simulation pass caught 5 issues pre-verification; cross-provider discovery + supplementary caught 13 blocking findings (including a genuinely broken sys.path on 'python services/app/app.py', the Copilot-CLI-vs-Copilot-Chat conflation, and an ADO policy that cannot be set to zero reviewers), all remediated in one pass; remediation-review cycle 1 caught 2 regressions in that remediation - one of them introduced by my own line-count trimming - both fixed; cycle 2 settled the disputed Azure Pipelines finding (the verifier accepted the named-equivalents scope statement, so the operator-confirmed cut list held without an override) and raised one Node.js-floor Major whose stated evidence was checked and found false (npm view @github/copilot reports engines: null) but whose concern was real - fixed by REMOVING the Node prerequisite entirely, after winget list proved the walk machine runs the standalone GitHub.Copilot build with no Node involved. That same check established the CLI self-updates, which is the mechanism behind the pin drift, now taught explicitly. Known deviation, disclosed not hidden: the tutorial is 314 source lines against a spec target of ~240 and an Ends-with of <=260. Every line above the first 269-line draft closed a step a reader could not perform; the overage was not bought back by reversing fixes. S4's live operator walk is the right place to find further cuts.",
+  "summary": "Made the extension's scaffolded output agree with the tutorial Session 1 rewrote, changing template content and doc text only - no scaffolder logic, no new commands, no Work Explorer changes. CODEOWNERS.template dropped the retired three-person cast (greeter/clock/integration, @priya-gh/@sam-gh/@alex-gh) for the tutorial's two modules, with its worked example reduced to exactly the two rule lines the tutorial tells the reader to uncomment, in the same leading-slash form the tutorial prints; the plan-folder ownership rules, the three-paragraph integration-touches narration, and the commented conflict-magnet rule pair all went (41 -> 27 lines). monorepo-ci.yml.template was cut 84 -> 43 lines: the active job is renamed all-modules -> test and its push-only `if:` gate removed, so it runs on every pull request as well as every push to main, and the ~45-line commented paths-filter block became a four-line pointer. Both changes exist because the tutorial has the reader require a status check literally named `test`, and on GitHub the required-check name IS the job name - a scaffolded mismatch would have had readers renaming a job GitHub had already been told to require. getting-started.md.template now points at docs/tutorials/hello-world.md and drops the review-prompt URL, whose target Session 1 deleted; its 'rename Default' advice now says what Dabbler: Rename Module does and does not carry, using Session 1's empirical finding, because the old wording tacitly contradicted the tutorial's deliberate use of New Module + Delete Module. Cold-start goldens regenerated through the sanctioned UPDATE_GOLDEN=1 path and dist/ rebuilt, so template, golden, and shipped copy are byte-identical - asserted, not assumed, by the proof's check C. The spec's demand that green-on-empty be proven rather than asserted was met by execution: a structure pass establishes the active job's only repo-contributed failure surface is its run block, that exact block then runs under bash -e in a fresh empty git repo (exit 0, writes nothing), and parity is checked across all three templates and both tiers - 29/29 PASS, with the three things it cannot prove locally named rather than glossed. Extension bumped 0.45.0 -> 0.46.0 with a template-bundle-only CHANGELOG section; dabbler-ai-router deliberately NOT bumped (this session touched zero files under ai_router/), said explicitly rather than left implicit. Nothing was published and no tag was pushed. Suite green across all three layers on the shipped tree: 3060 passed / 6 skipped (pytest), 1767 passing (extension unit), 28 passed (Playwright, run because the cold-start fixture tree changed - L-064-12). Verification: round 1 discovery (fan-out 2/2) VERIFIED with three nits, round 2 discovery (fan-out 2/2) VERIFIED with five - zero blocking findings in either, so the loop closed at the two-pass bound with no remediation cycle ever opened. All eight nits were fixed anyway because each was a factual error in this session's own prose or a one-line wording repair; round 2 is the one that earned its cost, catching three inaccuracies round 1 had passed, two of them inside the proof artifact whose whole purpose is to stop this session asserting what it has not established (a hand-typed 31/31 tally against 27 printed checks, and a wrong rationale excusing one file from byte comparison). The tally is now machine-computed from the counter that prints the checks, so it cannot drift again.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "README.md",
-    "ai_router/router-config.yaml",
-    "docs/module-reorganization.md",
-    "docs/quick-start.md",
+    "docs/repository-reference.md",
     "docs/session-sets/106-hello-world-tutorial-simplification/activity-log.json",
     "docs/session-sets/106-hello-world-tutorial-simplification/ai-assignment.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/authoring-cut-consult-gpt56.md",
     "docs/session-sets/106-hello-world-tutorial-simplification/disposition.json",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-ai-assignment-analysis.json",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-issues-round-2.json",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-issues-round-3.json",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-issues-round-4.json",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-issues.json",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-reader-simulation.json",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-remediation-round-2.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-remediation-round-3.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-remediation-round-4.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-runtime-unknowns.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification-fanout-2.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification-round-2.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification-round-3.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification-round-4.md",
-    "docs/session-sets/106-hello-world-tutorial-simplification/s1-verification.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-ai-assignment-analysis.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-ci-template-analysis.json",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-green-on-empty-proof.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-remediation-round-2.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-remediation-round-3.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-verification-fanout-2.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-verification-round-2-fanout-2.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-verification-round-2.md",
+    "docs/session-sets/106-hello-world-tutorial-simplification/s2-verification.md",
     "docs/session-sets/106-hello-world-tutorial-simplification/session-events.jsonl",
     "docs/session-sets/106-hello-world-tutorial-simplification/session-state.json",
-    "docs/session-sets/106-hello-world-tutorial-simplification/spec.md",
-    "docs/tutorials/hello-world.md",
-    "docs/tutorials/module-team-hello-world-copilot-ado.md",
-    "docs/tutorials/module-team-hello-world-review-prompt.md",
-    "docs/tutorials/module-team-hello-world.md",
-    "docs/tutorials/release-and-recovery.md",
-    "tools/dabbler-ai-orchestration/README.md"
+    "docs/templates/consumer-bootstrap/CODEOWNERS.template",
+    "docs/templates/consumer-bootstrap/getting-started.md.template",
+    "docs/templates/consumer-bootstrap/monorepo-ci.yml.template",
+    "test-fixtures/cold-start/full/.github/CODEOWNERS",
+    "test-fixtures/cold-start/full/.github/workflows/monorepo-ci.yml",
+    "test-fixtures/cold-start/full/docs/dabbler/getting-started.md",
+    "test-fixtures/cold-start/lightweight/.github/CODEOWNERS",
+    "test-fixtures/cold-start/lightweight/.github/workflows/monorepo-ci.yml",
+    "test-fixtures/cold-start/lightweight/docs/dabbler/getting-started.md",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/CODEOWNERS.template",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/getting-started.md.template",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/monorepo-ci.yml.template",
+    "tools/dabbler-ai-orchestration/package.json"
   ],
   "next_orchestrator": {
     "engine": "codex",
@@ -45,22 +42,22 @@
     "effort": "high",
     "reason": {
       "code": "switch-due-to-cost",
-      "specifics": "The routed step-3.5 analysis recommended switching provider for Session 2: it is structured-config work (YAML/JSON templates, an extension build, a version bump) rather than prose authoring, and a different provider avoids compounding this orchestrator's blind spots into the session that must make the scaffolded output agree with the tutorial S1 just wrote. The analyst named gpt-4o, which does not resolve in this repo's model registry; gpt-5.6 is the registry-valid equivalent. Continuing on claude-opus-5 is also defensible for continuity - the operator's call at invocation."
+      "specifics": "The routed step-3.5 analysis (gemini-2.5-pro, anthropic excluded) recommends codex/openai/gpt-5.6 for Session 3: authoring six OBS scene scripts plus the S4 UAT checklist is precision-structured prose work where a different model family adds cognitive diversity. This is the SECOND consecutive recommendation to switch off Anthropic for this set - Session 1's advisor said the same for Session 2, and the operator invoked Claude anyway. Recorded, not disputed: the counter-argument is genuinely thinner here than it was for S2, because S3 authors new files against a finished tutorial rather than keeping two surfaces consistent, and S3 is the last chance for independent eyes on the teaching sequence before the operator spends ~2 hours walking it in S4. The pick remains the operator's at invocation; continuing on claude-opus-5 is defensible but buys less than it did this session."
     }
   },
   "blockers": [],
-  "lessons_cited": [
-    "L-064-8",
-    "L-064-9",
-    "L-095-1"
+  "residual_findings": [
+    "TUTORIAL-SIDE, NOT FIXED HERE (Session 2 does not own docs/tutorials/hello-world.md; the spec assigns it to S1 and lets S3 touch it only if scripting exposes a gap). Part 4 step 6 instructs the reader to 'adapt the scaffolded file down to exactly one active job' and to 'delete any `if: github.event_name == 'push' ...` line'. After this re-cut there is exactly one active job and no `if:` line, so both clauses are now no-ops. The wording is conditional ('any'), so it is stale rather than false, and the tutorial's minimal-edit promise is better satisfied than before - but S3 should trim it when it scripts scene 4.",
+    "TUTORIAL-SIDE, NOT FIXED HERE. The same step says 'replace the placeholder `run:` block with a real test command', while its finished YAML also adds an actions/setup-python@v5 step and a `python -m pip install pytest` step that the language-agnostic template cannot carry. The tutorial prints the complete target file, so a reader can match it - but the prose undersells the edit by two steps. S3 should reconcile the sentence with the snippet.",
+    "PRE-EXISTING, OUT OF SCOPE. tools/dabbler-ai-orchestration/package-lock.json still reads 0.41.0 while package.json is now 0.46.0. This drift predates this session by at least four releases (0.42.0-0.45.0 all shipped with it stale) and was deliberately left alone rather than folded into a template-content session."
   ],
-  "operator_adjudication": {
-    "date": "2026-07-28",
-    "authority": "operator, in-session, explicit",
-    "decisions": [
-      "R8-2 (tutorial size, 344 lines vs the spec's <=260 Ends-with): ACCEPTED AS STANDS. The operator elected option 1 from s1-remediation-round-8.md - accept the tutorial at its current length and re-baseline the criterion - on the grounds that every line above the 269-line pre-verification draft closed a verifier-rated Major, and the set still delivers 1,968 -> ~499 lines across the surviving docs.",
-      "R8-1 (worktrees for all four lifecycle sets): the orchestrator's dispute STANDS. The operator-confirmed cut list (authoring-cut-consult-gpt56.md section E step 7 and section F) puts only the implementation set in a worktree. The finding's valid kernel - an over-broad claim in the tutorial's own prose - was fixed by narrowing the sentence.",
-      "Verification budget: the operator authorized THREE further rounds past the bound (the constitution requires operator say-so to persist past a cap), after which the close proceeds via the operator-attested --manual-verify path."
-    ]
-  }
+  "declined_recommendations": [
+    "The routed CI-template analysis recommended a FAIL-CLOSED placeholder: a run block exiting 0 when no modules exist and 1 once any appear, so a consumer cannot end up with a green required check that tests nothing. Declined, and the reasoning is on the record because it is a judgment call rather than a fact. It hardcodes `services/` as the module location into a template that is deliberately layout- and language-agnostic (codeRoots can be any path), so it would fail-open anyway on any repo not using that convention; it would go red on a fresh repo holding a services/ directory for unrelated reasons, which is exactly the harmless-as-scaffolded property the spec makes binding; and it is arguably a behavior change, which this set's non-goals forbid. Adopted instead: a ::warning:: annotation on every run - zero branching, zero layout assumptions - so the placeholder is visible rather than silent. Round 1's verifier correctly noted that visible is not unmissable, and the CHANGELOG now says so in as many words rather than overclaiming. The residual hazard is real and named, not closed.",
+    "The same analysis proposed proving green-on-empty with `act` (a Docker-backed local GitHub Actions runner). Not installed on this machine, and installing one was judged disproportionate for a three-echo run block. The substitute keeps the standard - run the thing - at the level actually reachable: a structure pass that establishes the run block is the ONLY repo-contributed failure surface, which is what makes executing just that block sufficient. What remains unproven locally is named in the artifact rather than papered over."
+  ],
+  "lessons_cited": [
+    "L-064-9",
+    "L-064-12",
+    "L-095-1"
+  ]
 }

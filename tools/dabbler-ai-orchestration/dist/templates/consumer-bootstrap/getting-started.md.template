@@ -88,18 +88,19 @@ You have three ways to declare a module:
 - **By hand / by asking your AI** — edit `docs/modules.yaml` directly.
 
 Solo or single-area projects can skip this entirely — rename **Default**
-to your project's name, or just keep it. Two rules to know if you do use
-modules: session-set names stay globally unique across ALL modules, and
+to your project's name, or just keep it. (**`Dabbler: Rename Module`**
+changes the module's slug, its title, and the `module:` stamp on its
+sets; it does not move its plan file or set folders, so if you want
+those named after the module too, declare a new one and delete
+**Default** instead.) Two rules to know if you do use modules:
+session-set names stay globally unique across ALL modules, and
 `module` is just a grouping label, never part of a set's identity.
 Reorganizing modules later (rename, delete, split, merge, or adopting
 modules in an older repo) is covered in
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/module-reorganization.md>.
-For a hands-on team tutorial (three people, three modules, CODEOWNERS,
-monorepo CI, tags), see
-<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world.md>;
-its companion — a reusable AI review prompt that coaches your team on
-the same workflow afterward — is
-<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/module-team-hello-world-review-prompt.md>.
+For a hands-on walkthrough — one person and one module first, then a
+teammate, a second module, CODEOWNERS, and monorepo CI — see
+<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/hello-world.md>.
 
 ## 3. Create the Project Plan and First Session Set
 

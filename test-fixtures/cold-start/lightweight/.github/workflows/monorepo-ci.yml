@@ -1,20 +1,28 @@
 # .github/workflows/monorepo-ci.yml — monorepo CI for module-organized
 # projects (Dabbler). Scaffolded by the Dabbler AI Orchestration extension.
 #
-# The two-layer contract (keep it in sync with docs/modules.yaml):
+# ONE always-running job that builds and tests EVERY module, on every pull
+# request and every push to `main`. That is the anti-integration-bomb rule:
+# cross-module breakage surfaces on the change that causes it, not weeks later
+# when the victim module next changes. Make this job the single required status
+# check on `main`.
 #
-#   1. PATH-SCOPED MODULE JOBS — fast feedback: each module's job runs only
-#      when its `codeRoots` change (the `changes` detection job below).
-#   2. THE ALL-MODULE GUARDRAIL — every merge to `main` builds and tests
-#      EVERY module, unconditionally. This is the anti-integration-bomb
-#      rule: cross-module breakage surfaces on the merge that caused it,
-#      not weeks later when the victim module next changes.
+# HOW TO ADAPT: replace the placeholder `run:` block below with the commands
+# that build and test every module in this repo. Test each module's directory
+# on its own rather than running one repo-wide command, so a module shipping
+# ZERO tests fails the build instead of hiding behind another module's passing
+# tests. Worked example — Python, two modules (`greeter`, and `app` declaring
+# `touches: [greeter]`):
+# https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/hello-world.md
 #
-# HOW TO ADAPT: replace the `echo` placeholder in `all-modules` with your
-# real build/test commands, then uncomment the `changes` + per-module jobs
-# and point each filter at that module's `codeRoots` from docs/modules.yaml.
-# The scaffolded file is deliberately harmless as-is (the placeholder step
-# succeeds), so committing it before adapting cannot break your builds.
+# As scaffolded this job only succeeds, so committing it before you adapt it
+# cannot break your builds. It logs a warning on every run, so the placeholder
+# is visible in the job log rather than silent.
+#
+# LARGE REPOS: you can add path-scoped per-module jobs for faster feedback
+# (dorny/paths-filter@v3, one filter per module's `codeRoots` in
+# docs/modules.yaml). Keep this aggregate job as well, always-running and
+# required — path filtering is an optimization, not the gate.
 
 name: Monorepo CI
 
@@ -24,61 +32,12 @@ on:
   pull_request:
 
 jobs:
-  # ---- 1. Path-scoped module jobs (uncomment and adapt) ----------------
-  # Detect which modules a PR touches. Filters mirror each module's
-  # `codeRoots` in docs/modules.yaml (worked example: Priya's `greeter`,
-  # Sam's `clock`, Alex's `integration` composing both).
-  #
-  # changes:
-  #   runs-on: ubuntu-latest
-  #   permissions:
-  #     contents: read        # declaring ANY permission zeroes the rest;
-  #     pull-requests: read   # checkout needs contents, the filter needs PRs
-  #   outputs:
-  #     greeter: ${{ steps.filter.outputs.greeter }}
-  #     clock: ${{ steps.filter.outputs.clock }}
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: dorny/paths-filter@v3
-  #       id: filter
-  #       with:
-  #         filters: |
-  #           greeter:
-  #             - 'services/greeter/**'
-  #           clock:
-  #             - 'services/clock/**'
-  #
-  # greeter:
-  #   needs: changes
-  #   if: needs.changes.outputs.greeter == 'true'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Build and test the greeter module
-  #       run: |
-  #         echo "TODO: this module's build/test commands, e.g.:"
-  #         echo "  npm ci && npm test --workspace services/greeter"
-  #
-  # clock:
-  #   needs: changes
-  #   if: needs.changes.outputs.clock == 'true'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Build and test the clock module
-  #       run: |
-  #         echo "TODO: this module's build/test commands"
-
-  # ---- 2. The all-module guardrail (active; replace the placeholder) ---
-  all-modules:
-    # Runs on every merge to main, NEVER path-filtered: integration
-    # breakage must surface on the merge that caused it.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build and test ALL modules (replace this placeholder)
+      - name: Build and test every module
         run: |
+          echo "::warning::Monorepo CI is still the scaffolded placeholder: it runs no tests. Adapt .github/workflows/monorepo-ci.yml."
           echo "TODO: replace with the commands that build and test every"
           echo "module in this repo (the anti-integration-bomb guardrail)."
-          echo "Until then this placeholder succeeds so CI stays green."

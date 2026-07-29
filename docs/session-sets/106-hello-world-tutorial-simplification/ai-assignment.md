@@ -110,3 +110,134 @@ the operator may want to rank against that:
 - Deviation from the routed plan: none. The analyst's `gpt-4o` next-orchestrator
   id was recorded-with-correction rather than followed verbatim (it does not
   resolve in the registry); the provider-switch intent is preserved.
+
+---
+
+## Session 2 of 4 — Make the scaffolded output agree with the tutorial
+
+- Orchestrator: claude / anthropic / **claude-opus-5** / high (operator-invoked).
+  S1's routed advisor recommended switching to an OpenAI orchestrator for this
+  session; the operator invoked Claude Code instead, which S1's own disposition
+  named as the defensible continuity alternative ("the operator's call at
+  invocation"). Recorded as a **known, operator-made deviation from the routed
+  recommendation**, not an oversight — see *Continuity control* below.
+- Routed step-3.5 analysis: [`s2-ai-assignment-analysis.json`](s2-ai-assignment-analysis.json)
+  (`task_type=analysis`, anthropic excluded → gemini-2.5-pro, tier 2,
+  **$0.0111**, truncation-clean).
+- Set-level facts carried from the spec (**immutable at runtime**): **Full
+  tier**, `requiresUAT: true` (S4 is the acceptance walk — not this session),
+  `requiresE2E: false` (S2's delta is scaffolded-template *content*, and
+  asserting template prose in an E2E test would pin copy, not behavior),
+  `uatStyle: ad-hoc`, `uatScope: per-set`, `pathAwareCritique: advisory` (runs
+  at the set-terminal close in S4). The **cut list is binding**.
+- Scope boundary honored all session: S2 does **not** own
+  `docs/tutorials/hello-world.md`. A template/tutorial contradiction that can
+  only be fixed on the tutorial side is **recorded as a finding**, never
+  silently edited into the tutorial.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read S1's disposition, the new tutorial, and the three templates. | Orchestrator direct — read-only reconnaissance. |
+| 2 | Re-cut `CODEOWNERS.template` to the two-module cast. | Orchestrator direct — a 42-line, comment-only file with a prescriptive target. |
+| 3 | Re-cut `monorepo-ci.yml.template`. | **Routed** — `analysis`, cross-provider. Adopted from the analyst. |
+| 3b | Prove green-on-empty. | Orchestrator direct — **execution**, per the analyst's own control (below). |
+| 4 | `getting-started.md.template` URLs; regenerate the cold-start goldens. | Orchestrator direct — text replacement plus the repo's prescribed `UPDATE_GOLDEN=1` regeneration. |
+| 5 | Rebuild `dist/`; version bump + CHANGELOG; router-side no-op call. | Orchestrator direct — release-engineering mechanics. |
+| 6 | Full suite; phased `verify_session`; disposition; commit + push; `close_session`. | **Routed** for verification (`session-verification`, anthropic auto-excluded); orchestrator direct for the mechanics. |
+
+### Why step 3 is the one authoring step worth routing
+
+The analyst singled it out and the reason survives scrutiny: the CI template is
+the only deliverable here carrying a **genuine design tension** rather than a
+prescribed target. The tutorial teaches an adapted job that **fails when a
+module collects zero tests**, while the scaffolded template must be
+**green on a repo with no modules at all** — the same file, two opposite
+requirements, separated only by the reader's adaptation. That is reasoning about
+GitHub Actions semantics, not text manipulation, so it goes out. `CODEOWNERS`
+and `getting-started` have no such tension: their target is fully specified by
+the tutorial and the spec, and routing them would buy variance on an axis that
+must not vary (the same argument S1 made for the tutorial itself).
+
+### Biggest risk and its control (analyst's, adopted verbatim in substance)
+
+> "The AI's 'proof' of the CI template's harmlessness is a plausible but
+> incorrect assertion."
+
+This is exactly the gap the spec's own wording anticipates — *"state how that is
+achieved and **prove it**"* — and it is the L-064-8 failure mode one layer down:
+an assertion inherited from the old template's comment (*"the placeholder step
+succeeds, so committing it before adapting cannot break your builds"*) reads
+authoritative in the re-cut file even if the re-cut broke it.
+
+Control applied: the proof is **executed, not argued**. The analyst suggested
+`act`; it is not installed on this machine and installing a Docker-backed runner
+is disproportionate. The substitute keeps the analyst's standard — run the
+thing — at the level that is actually reachable: parse the emitted workflow,
+assert structurally that the active job's only failure surface is its `run:`
+block, then **execute that exact block in a fresh empty repository** and assert
+exit 0. What cannot be executed locally is named as such rather than asserted.
+
+### Continuity control (the same orchestrator that wrote the tutorial judges the templates)
+
+> Analyst: "Mandate that the final `session_verification` task is routed to a
+> non-Anthropic model … to provide a genuinely independent review of the work's
+> conformance to the tutorial authored by the orchestrator in Session 1."
+
+Already structurally guaranteed, not merely mandated: `verify_session` excludes
+the orchestrator's own provider, so this session's verifier is non-Anthropic by
+construction. Two additions, because "same orchestrator, same blind spot" is the
+real exposure and one automatic exclusion is thin cover for it:
+
+1. The verification evidence bundle presents the **tutorial's** CI/CODEOWNERS
+   text and the **template's** side by side, so the verifier is asked to find
+   contradictions rather than to trust a summary that they agree.
+2. Step 3's routed CI analysis is itself cross-provider, putting an independent
+   read on the one deliverable where S1's authoring choices are load-bearing.
+
+### Next-orchestrator recommendation (S3)
+
+Routed (gemini-2.5-pro, anthropic excluded): **`codex/openai/gpt-5.6`** —
+"Session 3 is a creative authoring task requiring high precision and structure
+for video scripts. A different top-tier model family … introduces cognitive
+diversity."
+
+Recorded as the routed recommendation. Note for the operator: this is now the
+**second consecutive** recommendation to switch off Anthropic for this set, and
+the S3 deliverable (six OBS scene scripts plus the S4 UAT checklist, held to the
+Set 078 literal-copy-pasteable bar) is the last chance to get independent eyes on
+the tutorial's teaching sequence *before* the operator spends ~2 hours walking
+it in S4. The counter-argument is thinner here than it was for S2: S3 authors
+*new* files against a finished tutorial, so continuity buys less. The pick
+remains the operator's at invocation.
+
+### Next-set recommendation (after S4)
+
+Routed: **`107-post-uat-hardening`** — a follow-on set that immediately absorbs
+what S4's live operator walk finds, "ensuring the project rapidly capitalizes on
+the UAT's insights."
+
+Recorded with a caveat of fact: S4's own plan already remediates everything the
+walk catches and re-walks the remediated items, so a blanket follow-on set would
+duplicate it. The part that genuinely cannot land in S4 is the residue S4 is
+explicitly forbidden to fix — *"any **product** defect found is triaged: an
+in-scope doc workaround plus a named follow-on set for the code fix — this set
+ships no product behavior change."* That is the real shape of 107, and its
+content is unknowable until the walk happens. S1's routed advisor named a
+different candidate (`107-docs-consistency-and-scope-audit`, applying this set's
+simplification lens to the rest of the docs suite), which does not depend on the
+walk. Both are recorded; the operator ranks them after S4, alongside the two
+live items S1 surfaced (the Copilot catalog pin reconciliation, and the gated
+extension publish).
+
+### Actuals (filled at close)
+
+- Orchestrator used: claude / anthropic / claude-opus-5 / high.
+- Routing plan followed as recommended: CI-template re-cut routed
+  (`analysis`, cross-provider); session verification routed cross-provider;
+  everything else orchestrator-direct.
+- Deviation from the routed plan: the **orchestrator identity** — the operator
+  invoked Claude rather than the recommended OpenAI switch (recorded above, and
+  compensated by the two continuity controls). The analyst's `act`-based proof
+  mechanism was substituted, with the substitution and its limits stated.

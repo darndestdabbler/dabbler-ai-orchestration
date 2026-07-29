@@ -5,37 +5,23 @@
 # rules win over earlier ones). Docs:
 # https://docs.github.com/articles/about-code-owners
 #
-# HOW TO ADAPT THIS FILE (keep it in sync with docs/modules.yaml):
+# Comment-only as scaffolded — nothing is routed until you uncomment a rule.
 #
-#   1. One rule per module: map each module's `codeRoots` (and its
-#      docs/modules/<slug>/ plan folder) to the module's owner(s).
-#   2. Shared conflict-magnets get everyone: docs/modules.yaml itself,
-#      CI workflows, and any root config several modules depend on.
-#   3. The integration `touches` rule is a PROCESS, not a path rule:
-#      CODEOWNERS can only match paths, so for a PR that changes an
-#      integration module (one with a `touches:` list in docs/modules.yaml),
-#      the reviewers must ensure the owners of EVERY touched module are
-#      added as reviewers — the integration module composes their code, so
-#      each named module's owner reviews. Encode what you can with path
-#      rules on the integration module's codeRoots (list every touched
-#      module's owner on that rule, as the example below shows), and treat
-#      the rest as review discipline.
+# HOW TO ADAPT: one rule per entry in a module's `codeRoots` in
+# docs/modules.yaml, mapping that path to the module's owner(s) — a module
+# owning several unrelated paths needs one rule each. A module with a
+# `touches:` list composes another module's code, so name that module's owner
+# on the rule too — the owner of the code being composed should see it before
+# it lands.
 #
-# WORKED EXAMPLE — a three-person team (uncomment and adapt):
-# Priya owns `greeter`, Sam owns `clock`, and Alex owns `integration`
-# with `touches: [greeter, clock]` — so the integration rule names all
-# three: Alex as the owner, Priya and Sam because their modules are
-# composed there.
+# WORKED EXAMPLE — the two modules from the Hello World tutorial. Priya owns
+# `greeter`; Sam owns `app`, which declares `touches: [greeter]`, so Priya is
+# named on it as well. Uncomment both lines and replace the handles with real
+# GitHub usernames — GitHub silently declines to route reviews to handles that
+# do not exist.
 #
-# services/greeter/          @priya-gh
-# docs/modules/greeter/      @priya-gh
+# /services/greeter/  @priya-gh
+# /services/app/      @sam-gh @priya-gh
 #
-# services/clock/            @sam-gh
-# docs/modules/clock/        @sam-gh
-#
-# services/integration/      @alex-gh @priya-gh @sam-gh
-# docs/modules/integration/  @alex-gh @priya-gh @sam-gh
-#
-# Shared conflict-magnets — every module owner reviews:
-# docs/modules.yaml          @priya-gh @sam-gh @alex-gh
-# .github/                   @priya-gh @sam-gh @alex-gh
+# On a larger repo, also give every module owner a rule on the files they all
+# depend on — docs/modules.yaml and .github/ are the usual conflict magnets.

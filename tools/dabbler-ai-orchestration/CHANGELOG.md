@@ -3,6 +3,68 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.46.0] — 2026-07-28 (staged; publish gated on the operator)
+
+> **Template-bundle-only.** No extension code changed — no scaffolder logic,
+> no new commands, no Work Explorer changes. This release re-cuts the
+> *content* of three scaffolded consumer-bootstrap templates so that a fresh
+> scaffold stops contradicting the rewritten Hello World tutorial on first
+> contact (Set 106 S2). `dabbler-ai-router` is deliberately **not** bumped:
+> Set 106 S2 accrued zero `ai_router/` changes, and bumping it for symmetry
+> would claim a release that carries nothing.
+>
+> **Not published.** The version bump is staged; no tag was pushed and no
+> publish was run. The click is the operator's.
+
+### Changed
+
+- **(Set 106 S2) `CODEOWNERS.template` re-cut to the tutorial's two-module
+  cast.** The worked example was a three-person team (`greeter` / `clock` /
+  `integration`, `@priya-gh` / `@sam-gh` / `@alex-gh`) carried over from the
+  retired team tutorial. It is now the two modules the new tutorial actually
+  builds — `greeter`, and `app` declaring `touches: [greeter]` — reduced to
+  exactly the **two rule lines** the tutorial tells the reader to uncomment,
+  in the same leading-slash form the tutorial prints. Dropped: the
+  `docs/modules/<slug>/` plan-folder ownership rules, the three-paragraph
+  integration-`touches` process narration, and the commented
+  conflict-magnet rule pair (now one sentence). Still comment-only as
+  scaffolded — nothing is routed until a rule is uncommented.
+
+- **(Set 106 S2) `monorepo-ci.yml.template` re-cut to one always-running
+  aggregate job.** The active job is renamed `all-modules` → **`test`** and
+  its `if: github.event_name == 'push' && github.ref == 'refs/heads/main'`
+  gate is removed, so it runs on every pull request as well as every push to
+  `main`. Both changes make the scaffolded file agree with the tutorial,
+  whose adapted job is literally named `test` — which is also the required
+  status check name the reader configures in branch protection, so a
+  mismatch would have had readers renaming a job that GitHub had already
+  been told to require. The ~45-line commented `dorny/paths-filter`
+  per-module block is reduced to a four-line pointer for large repos. File
+  size 84 → 43 lines.
+
+- **(Set 106 S2) The scaffolded CI placeholder now annotates itself.** It
+  still only succeeds — a fresh repo with no modules must not go red, and
+  that is now proven by execution rather than asserted in a comment — but it
+  emits a `::warning::` annotation on every run, which makes an unadapted
+  placeholder visible rather than silent. It does not make it unmissable:
+  a green check on a job that tests nothing is still possible if the
+  annotation is ignored.
+
+- **(Set 106 S2) `getting-started.md.template` re-pointed.** The tutorial
+  link now targets `docs/tutorials/hello-world.md` and is described as it
+  now reads (one person and one module first, then a teammate, a second
+  module, CODEOWNERS, and monorepo CI). The companion review-prompt link is
+  **removed** — that document was deleted in Set 106 S1, so the scaffolded
+  URL would 404 (a known, operator-accepted consequence; this stops it
+  reaching newly scaffolded repos). Its "rename **Default** to your
+  project's name" advice now says what `Dabbler: Rename Module` does and
+  does not carry.
+
+- Cold-start goldens (`test-fixtures/cold-start/{full,lightweight}/`)
+  regenerated through the sanctioned `UPDATE_GOLDEN=1` path, and the bundled
+  `dist/templates/` rebuilt, so template, golden, and shipped copy are
+  byte-identical.
+
 ## [0.45.0] — 2026-07-14 (coordinated release — publishing Set 102's git-workflow automation)
 
 > **Published 2026-07-14** to the VS Code Marketplace + Open VSX (tag

@@ -21,9 +21,9 @@
     {
       "number": 2,
       "title": "Session 2",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-07-28T20:29:03.196607-04:00",
-      "completedAt": null,
+      "completedAt": "2026-07-28T21:36:13.058173-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -31,7 +31,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

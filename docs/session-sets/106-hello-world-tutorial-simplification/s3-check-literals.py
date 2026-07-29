@@ -38,7 +38,11 @@ titles = {
     f"{c.get('category', '')}: {c['title']}".strip(): c["command"]
     for c in pkg["contributes"]["commands"]
 }
-md_files = sorted(TUT.rglob("*.md"))
+# The two S4 walk cards live beside this script, not under docs/tutorials/, but
+# they quote the same commands at the operator and at a teammate who has no other
+# document — so drift there costs walk time. Gate them with everything else.
+WALK_CARDS = sorted(pathlib.Path(__file__).resolve().parent.glob("s4-walk-*.md"))
+md_files = sorted(TUT.rglob("*.md")) + WALK_CARDS
 cmd_re = re.compile(r"Dabbler: ([A-Z][A-Za-z0-9 \-]*[A-Za-z0-9])")
 seen_cmds = {}
 for f in md_files:
@@ -59,6 +63,7 @@ tutorial = (TUT / "hello-world.md").read_text(encoding="utf-8")
 scripts = {
     p.name: p.read_text(encoding="utf-8") for p in sorted(VIDEO.glob("*.md"))
 }
+scripts.update({p.name: p.read_text(encoding="utf-8") for p in WALK_CARDS})
 tutorial_n = norm(tutorial)
 scripts_n = {k: norm(v) for k, v in scripts.items()}
 # (literal, script file that must carry it byte-identically)
@@ -120,6 +125,19 @@ SHARED = [
     ("DABBLER_GEMINI_API_KEY", "scene-1-alt-direct-api.md"),
     ("DABBLER_OPENAI_API_KEY", "scene-1-alt-direct-api.md"),
     ("dev.azure.com", "scene-2-alt-azure-devops.md"),
+    # Sam's card is the ONLY document his teammate reads, so every command it
+    # quotes must still be the tutorial's.
+    ('copilot -p "Write PI to 10 decimal places" --model claude-sonnet-4.6',
+     "s4-walk-sam.md"),
+    ("winget install GitHub.Copilot", "s4-walk-sam.md"),
+    ("gh auth login", "s4-walk-sam.md"),
+    ("Dabbler: Install ai-router", "s4-walk-sam.md"),
+    ("Dabbler: Open PR for this set", "s4-walk-sam.md"),
+    ("Dabbler: Finalize merged set", "s4-walk-sam.md"),
+    ("python -m services.app.app", "s4-walk-sam.md"),
+    ("Hello, world! It is HH:MM.", "s4-walk-sam.md"),
+    ("Solo repositories can stop here.", "s4-walk-priya.md"),
+    ("Require approvals", "s4-walk-priya.md"),
 ]
 for lit, script in SHARED:
     litn = norm(lit)

@@ -49,6 +49,12 @@ for i, it in enumerate(doc["Review"], 1):
           f"item {i}: Passes is a boolean")
     check(it.get("Result") == "" and it.get("Feedback") == "", "D",
           f"item {i}: Result/Feedback are empty (filled during the walk)")
+    # Fail CLOSED. An item that claims to pass while carrying no Result is a
+    # contradiction, and on an authored-not-yet-walked checklist it is the whole
+    # acceptance artifact reading as green before anyone walked it.
+    if not it.get("Result"):
+        check(it.get("Passes") is False, "D",
+              f"item {i}: Passes is False while Result is empty (not yet walked)")
     for key in it:
         check(key in REQUIRED_ITEM_KEYS or key in (
             "ProgrammaticVerification", "NoProgrammaticPathReason",

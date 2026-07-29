@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 9,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The Azure DevOps identity remediation relies on environment-variable propagation that does not occur**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** A recorder follows the prescribed one-machine Azure DevOps route and sets each actor’s `AZURE_DEVOPS_EXT_PAT` inside that actor’s VS Code integrated terminal. Sam then invokes **`Dabbler: Open PR for this set`** from the Command Palette. The Dabbler extension runs `az repos pr create` from the VS Code extension host, which cannot inherit an environment-variable change made by its child terminal process. The PAT is therefore unavailable to Dabbler, and `az` falls back to the globally cached identity established by `az login`. Sam’s PR is authored as the initial actor, preventing the required independent approval. This is probable for every one-machine recording that follows the new instructions literally.\n  - **Location:** `docs/tutorials/video/scene-2-alt-azure-devops.md`, downstream-change table; `docs/tutorials/video/scene-5-second-module.md`, Azure DevOps staging note; `docs/tutorials/video/scene-6-pr-and-merge.md`, Beat 1.\n  - **Details:**\n    - **Violation:** Session step 3 requires each beat to have a “literal and copy-pasteable” action. The remediation claims: “give each VS Code window its own `AZURE_DEVOPS_EXT_PAT` … set off camera in that window’s terminal.” A terminal process cannot modify the environment of its already-running parent extension host.\n    - **Impact:** The documented ADO rejoin path still dead-ends when Priya must approve a PR created under her own identity. The fix therefore does not resolve L27’s material followability failure.\n    - **Evidence:** The scripts explicitly set the PAT in the integrated terminal but open PRs through a Command Palette extension action. In contrast, `gh auth switch` works because it updates shared CLI configuration on disk; a shell-local environment variable is visible only to that shell and its descendants. Walk 11 also stops before any downstream Dabbler PR action, so the checklist would not expose this failure.\n  - **Fix:** Use separate machines or OS users for the ADO actors, or start genuinely isolated VS Code processes from shells where each actor’s PAT is already present in the process environment. Alternatively, run the `az repos pr create` action directly from the PAT-scoped terminal and document that departure. Do not claim that setting the variable in an existing integrated terminal changes the identity used by the extension host.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A recorder follows the prescribed one-machine Azure DevOps route and sets each actor’s `AZURE_DEVOPS_EXT_PAT` inside that actor’s VS Code integrated terminal. Sam then invokes **`Dabbler: Open PR for this set`** from the Command Palette. The Dabbler extension runs `az repos pr create` from the VS Code extension host, which cannot inherit an environment-variable change made by its child terminal process. The PAT is therefore unavailable to Dabbler, and `az` falls back to the globally cached identity established by `az login`. Sam’s PR is authored as the initial actor, preventing the required independent approval. This is probable for every one-machine recording that follows the new instructions literally."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 Marketplace version dependency",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 missing approval for lifecycle PR",
+      "verdict": "fix-accepted",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 incorrect manual CODEOWNERS request",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 unconditional empty commit",
+      "verdict": "fix-accepted",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 CI log omitted module paths",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 missing Azure DevOps repository setup",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 nonexistent zero-approval selector",
+      "verdict": "fix-accepted",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8 nonexistent personal-repository role selector",
+      "verdict": "fix-accepted",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 bash-only macOS key probe",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    },
+    {
+      "finding": "L10 missing Azure CLI installation",
+      "verdict": "fix-accepted",
+      "ledgerId": "L10"
+    },
+    {
+      "finding": "L11 nonliteral AI-agent installation",
+      "verdict": "fix-accepted",
+      "ledgerId": "L11"
+    },
+    {
+      "finding": "L12 contradictory Walk 1 preconditions",
+      "verdict": "fix-accepted",
+      "ledgerId": "L12"
+    },
+    {
+      "finding": "L13",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L13"
+    },
+    {
+      "finding": "L14",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L14"
+    },
+    {
+      "finding": "L15",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L10",
+      "ledgerId": "L15"
+    },
+    {
+      "finding": "L16",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L6",
+      "ledgerId": "L16"
+    },
+    {
+      "finding": "L17",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L3",
+      "ledgerId": "L17"
+    },
+    {
+      "finding": "L18 missing VS Code version check",
+      "verdict": "fix-accepted",
+      "ledgerId": "L18"
+    },
+    {
+      "finding": "L19 Azure DevOps privacy conflict",
+      "verdict": "fix-accepted",
+      "ledgerId": "L19"
+    },
+    {
+      "finding": "L20 direct-API route incorrectly required Copilot",
+      "verdict": "fix-accepted",
+      "ledgerId": "L20"
+    },
+    {
+      "finding": "L21",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L6",
+      "ledgerId": "L21"
+    },
+    {
+      "finding": "L22",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L19",
+      "ledgerId": "L22"
+    },
+    {
+      "finding": "L23 unavailable local-build dependency for recorders",
+      "verdict": "fix-accepted",
+      "ledgerId": "L23"
+    },
+    {
+      "finding": "L24 missing OBS privacy scene",
+      "verdict": "fix-accepted",
+      "ledgerId": "L24"
+    },
+    {
+      "finding": "L25 unprotected Sam authentication beat",
+      "verdict": "fix-accepted",
+      "ledgerId": "L25"
+    },
+    {
+      "finding": "L26 unexecuted checklist pre-populated as passing",
+      "verdict": "fix-accepted",
+      "ledgerId": "L26"
+    },
+    {
+      "finding": "L27 Azure DevOps CLI identity staging",
+      "verdict": "fix-rejected",
+      "ledgerId": "L27"
+    }
+  ]
+}

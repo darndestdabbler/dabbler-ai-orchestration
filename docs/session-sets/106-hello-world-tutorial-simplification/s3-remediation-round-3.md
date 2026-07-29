@@ -657,13 +657,121 @@ opinion, then close*; that is spent, the change is two lines applying an existin
 rule to one beat, and the finding is neither disputed nor open. Re-rounding it is
 exactly the grinding the bound exists to prevent.
 
+## Round 8 — the backstop again, and it was right both times
+
+The second close attempt's backstop (round 8, $0.3834) found **two more Majors**.
+Both are accepted; one of them overturns a call this session had explicitly
+defended in its own conventions block.
+
+### BS8-1 — the unwalked checklist shipped every item as passing
+
+All 13 items carried `"Passes": true` with empty `Result` and `Feedback`. This
+session had declared that a **by-design exclusion**, on the grounds that Sets 078
+and 103 shipped the same shape. The verifier's answer is better than the
+precedent:
+
+> "The acceptance artifact is fail-open. A human or automated completion check
+> that relies on `Passes` sees thirteen successful items even though `Result` and
+> `Feedback` are empty and the checklist explicitly says 'NOT YET WALKED.'"
+
+That is correct, and "the exemplars did it" is not a defence — an acceptance
+artifact for a set whose entire premise is *do not ship untested instructions*
+must fail **closed**.
+
+**Fixed, as a deliberate departure from the 078/103 exemplars**, stated as such
+rather than slipped in:
+
+- Every item now ships `"Passes": false`.
+- `Notes` gains a **PASSES STARTS FALSE** paragraph saying that false means *not
+  yet walked*, not *failed*; that Session 4 flips each item true at the moment it
+  records that item's `Result`; and that this departs from the exemplars, with
+  the reason.
+- `s3-check-checklist.py` now **refuses** any item with `Passes: true` and an
+  empty `Result`, so the fail-open shape cannot come back. The gate grew from 345
+  to **358 checks**.
+
+### BS8-2 — the `az` sibling of the `gh` identity trap
+
+This is the L-069-1 miss, in its textbook form: *a bug is a bug CLASS — fix every
+sibling site.* The third-provider opinion found that `gh auth login` is global and
+decides a pull request's author; the fix logged both accounts into `gh` and
+switched before every PR action. **`az login` is global in exactly the same way**,
+Dabbler runs `az repos pr create` on an Azure DevOps remote, and every one of
+those `gh auth switch` calls does **nothing** on that route. A one-machine ADO
+recording dead-ends at the first approval-dependent pull request, precisely as the
+GitHub route would have.
+
+Walk 11 could not have caught it: it stops at the take's rejoin point and never
+runs a Dabbler session on Azure DevOps.
+
+**Fixed by fixing the sibling, not by narrowing the scope** — narrowing was
+available (the spec's non-goals do say "no ADO walkthrough") and was rejected,
+because the take's downstream table already claims scenes 3–6 follow with its
+substitutions, and deleting that claim would take the ADO route's usefulness with
+it. The Azure CLI has no `auth switch`, so the identity is scoped **per window**
+instead:
+
+- Scene 5's staging note gains an Azure DevOps paragraph: give each VS Code window
+  its own **`AZURE_DEVOPS_EXT_PAT`** (a Code Read & Write token for that person),
+  set **off camera**, and — stated explicitly because it is the trap inside the
+  trap — **`gh auth switch` does nothing on an ADO remote; do not substitute one
+  for the other.**
+- The ADO take's downstream table gains a sixth row pointing at it.
+- Scene 6 beat 1's `gh` switch gains the ADO parenthetical: confirm this window's
+  `AZURE_DEVOPS_EXT_PAT` is Sam's, off camera, never printed.
+
+### Round 9 — BS8-2's fix was itself wrong, and the correction is the interesting part
+
+19 of 20 fixes accepted; **the `az` fix rejected**. The objection is technical and
+correct:
+
+> "A terminal process cannot modify the environment of its already-running parent
+> extension host. … `gh auth switch` works because it updates shared CLI
+> configuration on disk; a shell-local environment variable is visible only to
+> that shell and its descendants."
+
+`Dabbler: Open PR for this set` runs in the **extension host**, which inherits its
+environment when VS Code *starts*. Exporting `AZURE_DEVOPS_EXT_PAT` in the
+integrated terminal afterwards reaches nothing. The fix was shaped like the `gh`
+one without checking that the mechanism transfers — and it does not, because one
+writes a file on disk and the other sets a process variable.
+
+**Fixed properly**, with the limit stated rather than worked around: the PAT must
+be set **before VS Code starts**, in a **genuinely separate instance** per actor —
+
+```bash
+code --user-data-dir <a-folder-for-this-actor> <that-actor's-clone>
+```
+
+— because two windows of one instance share one extension host and therefore one
+environment. And because that is real staging complexity to carry on camera, the
+note says plainly that **two machines or two OS users** is the alternative, and
+that it **cannot be done inside one VS Code instance** — so nobody spends the
+recording session trying.
+
+Scene 6 beat 1's ADO parenthetical was corrected the same way: what matters is
+how the instance was **launched**, and *"nothing you type in the terminal now can
+change it."*
+
+Worth noting for its own sake: this is the third correction in a row where the
+right answer came from asking **how the machine actually works** rather than
+whether the prose is consistent. Rounds 1–5 asked the second question very well.
+
 ## What the backstop is worth
 
-This is the second time in this session that a *different reading* found what a
-converged loop could not — the third-provider opinion read the **machine**, and
-the backstop read the scripts **as a set**. Both findings were invisible to five
-rounds that read the documents one at a time. That is an argument for the
-backstop existing, not against the loop.
+Three times now, a *different reading* has found what a converged loop could not.
+The third-provider opinion read the **machine**. The backstop's round 6 read the
+scripts **as a set**. Its round 8 read the artifact **as a gate** (is `Passes`
+fail-open?) and applied **L-069-1** (`gh` was a class, and `az` was its unfixed
+sibling).
+
+Not one of those is a defect a sixth round of the same reading would have found —
+and two of them overturned things this session had explicitly defended: the
+`Passes` shape was written into the conventions block as a by-design exclusion,
+and the `gh` fix was recorded as complete. **A verifier that only ever sees the
+orchestrator's framing inherits the orchestrator's blind spots**, and both
+mechanisms that broke that framing were cheap: $0.074 for the opinion, and the
+backstop is mandatory anyway.
 
 ## What is still not established
 

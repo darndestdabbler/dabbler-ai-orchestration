@@ -2,7 +2,7 @@
   "ProjectName": "Dabbler AI Orchestration",
   "ReleaseLabel": "dabbler-ai-orchestration extension 0.46.0 + docs/tutorials/hello-world.md (Set 106 'Hello-World Tutorial Simplification', walked in Session 4 of 4)",
   "DocumentDate": "7/28/2026",
-  "Notes": "AUTHORED IN SESSION 3, NOT YET WALKED. This checklist IS the acceptance test for this set. The operator quality bar forbids shipping untested step-by-step instructions, and docs/tutorials/hello-world.md is a brand-new document that replaced 1,968 lines across three retired ones -- every command, UI label and expected string in it was verified against shipped code by Session 1, but NOBODY HAS EVER PERFORMED IT END TO END. Session 4 runs this walk with the operator and fills in every Result / Feedback / Passes DURING the walk.\n\nTHE WALK DOUBLES AS THE VIDEO DRY RUN. Session 3 also authored nine OBS scene scripts under docs/tutorials/video/. Each walk below names the scene script that covers it, and you follow that script AS WRITTEN rather than improvising from the tutorial. A beat that cannot be performed as scripted is a DEFECT IN THE SCRIPT, not operator error -- record it in Feedback with the beat number. You are not recording video during this walk; you are proving the scripts are followable.\n\nWALK ORDER MIRRORS THE TUTORIAL'S NATURAL ORDER, Part 1 through Part 6, with no reordering and no skipped steps inside the main path: Walk 1 = Part 1 (scene 1); Walk 2 = Part 2 (scene 2); Walk 3 = Part 3 (scene 3); Walk 4 = Part 4 steps 1-3 (scene 4 beats 1-9); Walk 5 = Part 4 steps 4-6 (scene 4 beats 10-14); Walk 6 = Part 4 steps 7-10 and the solo cutoff (scene 4 beats 15-21); Walk 7 = Part 5 steps 1-5 (scene 5 beats 1-8); Walk 8 = Part 5 step 6 (scene 5 beats 9-13); Walk 9 = Part 6 steps 1-3 (scene 6 beats 1-7); Walk 10 = Part 6's five-item final check (scene 6 beat 8). Walks 11 and 12 are DELIBERATELY OUT OF TUTORIAL ORDER and flagged as intentional: they are spot checks of the two alternate takes, which replace scenes already walked, so walking them in place would mean scaffolding the repository twice. Walk 13 is the whole-script attestation and can only run last.\n\nTHE SOLO CUTOFF IS A REAL CHECKPOINT. Parts 1-4 must read correctly for a one-person, one-module repository that will never add a second module (an operator requirement the spec names). Walk 6 ends on the tutorial's literal line 'Solo repositories can stop here.' -- at that moment, stop and ask yourself whether a solo reader who closed the page there would have a working, honest result. If not, that is a Major finding even though Parts 5-6 go on to work.\n\nOPERATOR-SUPPLIED PRECONDITIONS, all named in the spec and ALL REQUIRED before Walk 1 begins -- if any is missing, STOP AND RESCHEDULE rather than run degraded, because a degraded walk re-creates the untested-instructions gap this set exists to close: (1) a GitHub account able to create a throwaway PUBLIC repository named hello-modules (public is what makes branch protection available on GitHub Free -- the tutorial's own caveat) and invite a collaborator; (2) a SECOND GitHub account or handle to play Sam, signed in in a separate browser profile; (3) a GitHub account holding an ACTIVE Copilot seat -- the seat must exist before the walk, but do NOT pre-authenticate the Copilot CLI and do NOT pre-install the Dabbler extension on the walk machine: Walk 1 installs and authenticates them, and a pre-provisioned machine cannot walk it; (4) a LOCAL BUILD of Session 2's 0.46.0 bump present as a .vsix, which Walk 1 installs INSTEAD of the Marketplace copy -- the Marketplace is still 0.45.0 and carries the OLD scaffolded templates, so walking on it would test the wrong CODEOWNERS and the wrong monorepo-ci.yml; that substitution is the ONE deliberate departure from a scene script in this whole walk -- scene 1 beat 2 tells a RECORDER to wait for the Marketplace rather than sideload, which is right for a video and wrong for this walk, whose entire job is to test 0.46.0 before the operator publishes it; (5) about two hours.\n\nTHE ONE-MACHINE STAGING TRAP, and it will wall Walk 8 if you skip it. You are playing two people. A second BROWSER PROFILE is not enough, because `gh auth login` writes ONE credential for the whole OS user -- not per folder and not per VS Code window -- and Dabbler: Open PR for this set runs `gh pr create`, so GitHub records the pull request's author as whoever `gh` is logged in as, NOT whoever wrote the commits. Leave `gh` signed in as Priya and every one of Sam's pull requests is authored by Priya, at which point Priya cannot approve them (GitHub refuses self-approval) and CODEOWNERS never requests her either (it never requests an author) -- Walks 8 and 9 both dead-end. Two people on two machines never hit this; you, on one, hit it every time. The fix is in Walk 7 step 2: log Sam's account into `gh` as a SECOND account, then `gh auth switch --user <handle>` before every pull-request action, checking `gh auth status` rather than trusting your memory. Walks 7, 8 and 9 each name the switch explicitly. This trap was found by the operator-ordered third-provider opinion after five same-provider verification rounds missed it.\n\nPLATFORM: the literal commands below are the WINDOWS forms, because that is the walk machine (winget, .venv\\Scripts\\python.exe). The scene scripts carry the macOS/Linux equivalents at each beat -- npm install -g @github/copilot, brew install azure-cli, .venv/bin/python. On a non-Windows walk machine, take them from the scripts and record that you did.\n\nWHAT AUTOMATION CANNOT CHECK, and why these walks exist: whether a stranger can FOLLOW the instructions. Every literal in the tutorial is machine-checked against shipped code (Session 1) and every literal shared between the tutorial and the scene scripts is machine-checked byte-identical (Session 3's s3-authoring-gates.md, 98/98 PASS). Neither gate can tell you that step 4 assumes something step 3 never established, that a wait is long enough to look broken, or that the reader is on the wrong branch by the time they get to the worktree. That is what a human walking it start to finish finds, and nothing else does.\n\nPRODUCT DEFECTS ARE TRIAGED, NOT FIXED. This set ships no product behaviour change (spec non-goal). If a walk exposes a genuine product bug, record it in Feedback, apply an in-scope DOC workaround to the tutorial or the script, and name a follow-on set for the code fix. Do not change extension or router behaviour to make a walk pass.",
+  "Notes": "AUTHORED IN SESSION 3, NOT YET WALKED. This checklist IS the acceptance test for this set. The operator quality bar forbids shipping untested step-by-step instructions, and docs/tutorials/hello-world.md is a brand-new document that replaced 1,968 lines across three retired ones -- every command, UI label and expected string in it was verified against shipped code by Session 1, but NOBODY HAS EVER PERFORMED IT END TO END. Session 4 runs this walk with the operator and fills in every Result / Feedback / Passes DURING the walk.\n\nPASSES STARTS FALSE, AND THAT IS NOT A CLAIM OF FAILURE. Every item ships with Passes: false because nobody has walked it. False here means NOT YET WALKED; Session 4 flips each one to true at the moment it records that item's Result. This DELIBERATELY DEPARTS from the Set 078 and 103 exemplars, which shipped unwalked items as true, and the reason is that an acceptance artifact must fail CLOSED: a human or a script reading Passes on the old shape saw thirteen successes on a checklist whose own first sentence says NOT YET WALKED. An item with Passes: true and an empty Result is a contradiction, and the checklist gate now refuses it.\n\nTHE WALK DOUBLES AS THE VIDEO DRY RUN. Session 3 also authored nine OBS scene scripts under docs/tutorials/video/. Each walk below names the scene script that covers it, and you follow that script AS WRITTEN rather than improvising from the tutorial. A beat that cannot be performed as scripted is a DEFECT IN THE SCRIPT, not operator error -- record it in Feedback with the beat number. You are not recording video during this walk; you are proving the scripts are followable.\n\nWALK ORDER MIRRORS THE TUTORIAL'S NATURAL ORDER, Part 1 through Part 6, with no reordering and no skipped steps inside the main path: Walk 1 = Part 1 (scene 1); Walk 2 = Part 2 (scene 2); Walk 3 = Part 3 (scene 3); Walk 4 = Part 4 steps 1-3 (scene 4 beats 1-9); Walk 5 = Part 4 steps 4-6 (scene 4 beats 10-14); Walk 6 = Part 4 steps 7-10 and the solo cutoff (scene 4 beats 15-21); Walk 7 = Part 5 steps 1-5 (scene 5 beats 1-8); Walk 8 = Part 5 step 6 (scene 5 beats 9-13); Walk 9 = Part 6 steps 1-3 (scene 6 beats 1-7); Walk 10 = Part 6's five-item final check (scene 6 beat 8). Walks 11 and 12 are DELIBERATELY OUT OF TUTORIAL ORDER and flagged as intentional: they are spot checks of the two alternate takes, which replace scenes already walked, so walking them in place would mean scaffolding the repository twice. Walk 13 is the whole-script attestation and can only run last.\n\nTHE SOLO CUTOFF IS A REAL CHECKPOINT. Parts 1-4 must read correctly for a one-person, one-module repository that will never add a second module (an operator requirement the spec names). Walk 6 ends on the tutorial's literal line 'Solo repositories can stop here.' -- at that moment, stop and ask yourself whether a solo reader who closed the page there would have a working, honest result. If not, that is a Major finding even though Parts 5-6 go on to work.\n\nOPERATOR-SUPPLIED PRECONDITIONS, all named in the spec and ALL REQUIRED before Walk 1 begins -- if any is missing, STOP AND RESCHEDULE rather than run degraded, because a degraded walk re-creates the untested-instructions gap this set exists to close: (1) a GitHub account able to create a throwaway PUBLIC repository named hello-modules (public is what makes branch protection available on GitHub Free -- the tutorial's own caveat) and invite a collaborator; (2) a SECOND GitHub account or handle to play Sam, signed in in a separate browser profile; (3) a GitHub account holding an ACTIVE Copilot seat -- the seat must exist before the walk, but do NOT pre-authenticate the Copilot CLI and do NOT pre-install the Dabbler extension on the walk machine: Walk 1 installs and authenticates them, and a pre-provisioned machine cannot walk it; (4) a LOCAL BUILD of Session 2's 0.46.0 bump present as a .vsix, which Walk 1 installs INSTEAD of the Marketplace copy -- the Marketplace is still 0.45.0 and carries the OLD scaffolded templates, so walking on it would test the wrong CODEOWNERS and the wrong monorepo-ci.yml; that substitution is the ONE deliberate departure from a scene script in this whole walk -- scene 1 beat 2 tells a RECORDER to wait for the Marketplace rather than sideload, which is right for a video and wrong for this walk, whose entire job is to test 0.46.0 before the operator publishes it; (5) about two hours.\n\nTHE ONE-MACHINE STAGING TRAP, and it will wall Walk 8 if you skip it. You are playing two people. A second BROWSER PROFILE is not enough, because `gh auth login` writes ONE credential for the whole OS user -- not per folder and not per VS Code window -- and Dabbler: Open PR for this set runs `gh pr create`, so GitHub records the pull request's author as whoever `gh` is logged in as, NOT whoever wrote the commits. Leave `gh` signed in as Priya and every one of Sam's pull requests is authored by Priya, at which point Priya cannot approve them (GitHub refuses self-approval) and CODEOWNERS never requests her either (it never requests an author) -- Walks 8 and 9 both dead-end. Two people on two machines never hit this; you, on one, hit it every time. The fix is in Walk 7 step 2: log Sam's account into `gh` as a SECOND account, then `gh auth switch --user <handle>` before every pull-request action, checking `gh auth status` rather than trusting your memory. Walks 7, 8 and 9 each name the switch explicitly. This trap was found by the operator-ordered third-provider opinion after five same-provider verification rounds missed it.\n\nPLATFORM: the literal commands below are the WINDOWS forms, because that is the walk machine (winget, .venv\\Scripts\\python.exe). The scene scripts carry the macOS/Linux equivalents at each beat -- npm install -g @github/copilot, brew install azure-cli, .venv/bin/python. On a non-Windows walk machine, take them from the scripts and record that you did.\n\nWHAT AUTOMATION CANNOT CHECK, and why these walks exist: whether a stranger can FOLLOW the instructions. Every literal in the tutorial is machine-checked against shipped code (Session 1) and every literal shared between the tutorial and the scene scripts is machine-checked byte-identical (Session 3's s3-authoring-gates.md, 98/98 PASS). Neither gate can tell you that step 4 assumes something step 3 never established, that a wait is long enough to look broken, or that the reader is on the wrong branch by the time they get to the worktree. That is what a human walking it start to finish finds, and nothing else does.\n\nPRODUCT DEFECTS ARE TRIAGED, NOT FIXED. This set ships no product behaviour change (spec non-goal). If a walk exposes a genuine product bug, record it in Feedback, apply an in-scope DOC workaround to the tutorial or the script, and name a follow-on set for the code fix. Do not change extension or router behaviour to make a walk pass.",
   "Configuration": {
     "reviewWidths": [
       "6%",
@@ -22,7 +22,7 @@
       "ProgrammaticVerification": "The literal command strings, the model alias claude-sonnet-4.6 and the smoke test's exit-0 behaviour were run live on this operator's seat during Session 1 and recorded in s1-runtime-unknowns.md ('Unknown 2 - The Copilot CLI version pin and the --model alias'), including the lockfile confirmation that claude-sonnet-4.6 has enablement = confirmed. The router's handling of this CLI's success and failure SHAPES is pinned by ai_router/tests/test_cli_transport.py and test_copilot_catalog.py against a fake transport; the live seat call here is what those fakes stand in for.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 2 - the repository",
@@ -33,7 +33,7 @@
       "NoProgrammaticPathReason": "Creating a live GitHub repository and cloning it over the network is entirely host-side and operator-only; there is no extension or router code path for it, and the tutorial deliberately teaches the stock GitHub UI and VS Code's built-in Git: Clone rather than anything Dabbler ships. The remote-URL FORMS this produces are parsed by gitHost.test.ts.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 3 - Dabbler setup",
@@ -44,7 +44,7 @@
       "ProgrammaticVerification": "The exact behaviour of both writers against a REAL scaffolder-built fixture was established empirically in Session 1 and recorded in s1-runtime-unknowns.md ('Unknown 1'), including the finding that drove this branch: renameModule() does NOT follow the rename onto set folder names, planPath, or the plan file. The writers themselves are pinned by moduleAuthoring.test.ts, deleteModule.test.ts, renameModule.test.ts, modulesManifest.test.ts and gitScaffoldDefaultModule.test.ts; the seat-probe -> config-write flow by gitScaffoldSeatSetup.test.ts and copilotSeatSetup.test.ts on a fake spawner; the form's two-section shape and the Full-only transport sub-choice by gettingStartedHtml.test.ts and budgetSection.test.ts. The LIVE seat probe and the live GitHub settings page are what this walk adds.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 4 - first module",
@@ -55,7 +55,7 @@
       "ProgrammaticVerification": "The clipboard text and the dual left-click behaviour are pinned by copyPromptCommands.test.ts (asserting the exact string 'Start the next session of `<slug>`.') and by the planLeftClickActivation unit tests in sessionSetsProvider.test.ts; the Open PR confirm-dialog composition, the trunk refusal, and the gh argv are pinned by gitWorkflow.test.ts and hostCli.test.ts against a fake process runner. What has NO programmatic counterpart is the part this walk is for: whether a real AI session, given only the tutorial's Scope paragraph, produces a usable plan.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 4 - first module",
@@ -66,7 +66,7 @@
       "ProgrammaticVerification": "The worktree CLI's canonical path, branch prefix, refusal cases and exact three-line output are pinned by ai_router/tests/test_worktree.py. The 'add steps only' claim is machine-checked by Session 3's s3-authoring-gates.md, which asserts the tutorial's YAML block is byte-identical to scene 4's AND that the fragments 'jobs:\\n  test:', '- uses: actions/checkout@v4' and '- name: Build and test every module' are present in BOTH the scaffolded monorepo-ci.yml.template and the tutorial's target YAML, and that the template contains no 'if: github.event_name' gate to delete. Session 2's s2-green-on-empty-proof.md separately proves the scaffolded file is green on a repo with no modules. None of that proves a real GitHub runner accepts the adapted file -- that is Walk 6.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 4 - first module",
@@ -77,7 +77,7 @@
       "ProgrammaticVerification": "Finalize's step list, its ordering, its refusal to run from inside a worktree, its refusal on a dirty tree or a non-trunk checkout, and its use of -d rather than -D are pinned by gitWorkflow.test.ts against a fake process runner. Nothing programmatic covers the first live execution of the adapted workflow on a real GitHub runner, or GitHub accepting 'test' as a required status check -- both are first-time events in this walk.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 5 - a teammate and a composing module",
@@ -88,7 +88,7 @@
       "ProgrammaticVerification": "The manifest round-trip including touches:, and the Explorer's module grouping, are pinned by modulesManifest.test.ts, moduleAuthoring.test.ts, moduleTier.test.ts and visibleModules.test.ts, plus the Layer-3 module-tier.spec.ts rendering test. The two CODEOWNERS rule lines this step uncomments are byte-identical to the ones Session 2 shipped in CODEOWNERS.template and are machine-checked against the tutorial by s3-authoring-gates.md. GitHub's own review routing and the live approvals policy are host-side and only observable here.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 5 - a teammate and a composing module",
@@ -99,7 +99,7 @@
       "ProgrammaticVerification": "Prerequisite parsing, the satisfied/unsatisfied derivation and the blocked marker's suppression on satisfied rows are pinned by prerequisites.test.ts and fileSystem.test.ts, and the marker's rendering by the Layer-3 blocked-by-prereqs.spec.ts. Session 3 read deriveBlockedByPrereqs directly to establish that a SATISFIED prerequisite renders no marker, which is why the tutorial now says nothing changes -- this walk confirms the reader reads it that way.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 6 - review and merge",
@@ -110,7 +110,7 @@
       "ProgrammaticVerification": "The PR flow, the finalize refusals and their exact messages are pinned by gitWorkflow.test.ts. The composed program's output shape is fixed by the Scope paragraph the tutorial hands the AI session, not by any test -- which is precisely why a human has to run it once and read the line.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Part 6 - review and merge",
@@ -121,7 +121,7 @@
       "ProgrammaticVerification": "The worktree list output format, its [main]/[canonical]/[drift] classification and the always-listed primary checkout are pinned by ai_router/tests/test_worktree.py, and the exact one-line shape was run live in this repository during Session 3. Branch-protection enforcement is GitHub's, not ours, and check 4 is the only step in the entire walk that deliberately provokes a failure -- there is no safe automated equivalent.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Alternate takes",
@@ -132,7 +132,7 @@
       "ProgrammaticVerification": "Azure DevOps remote-URL parsing (including the legacy visualstudio.com form) is pinned by gitHost.test.ts; the az repos pr create argv and the az CLI probe are pinned by gitWorkflow.test.ts and hostCli.test.ts. Set 103 Session 2 separately walked a full live ADO round trip (operator-attested, 11/11). What NO test can check is whether Microsoft has since renamed a settings page -- which is exactly what this spot check is for.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Alternate takes",
@@ -143,7 +143,7 @@
       "NoProgrammaticPathReason": "Executing this take would require re-scaffolding the walked repository onto the api transport profile and spending real metered provider budget to re-prove a path Set 078 already validated end to end on this machine -- destructive and duplicative, so it is deliberately read-only. The key-presence probe in step 2 is the safe, repeatable part and is the only part executed. The api profile's own routing is covered by the router's full pytest suite on every session.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     },
     {
       "FunctionalArea": "Video scripts",
@@ -154,7 +154,7 @@
       "NoProgrammaticPathReason": "Whether a script can be FOLLOWED by a human while recording is the definition of a judgment that has no programmatic path -- it is the same reason this set declares requiresUAT: true. The mechanical layer beneath it is already gated: Session 3's s3-authoring-gates.md machine-checks every Dabbler: command title in docs/tutorials/ against the extension's contributed commands, every literal shared between the tutorial and the scripts for byte-identity, and every relative link for resolution (98/98 PASS). What that gate cannot judge is whether a correct instruction is a followable one.",
       "Result": "",
       "Feedback": "",
-      "Passes": true
+      "Passes": false
     }
   ]
 }

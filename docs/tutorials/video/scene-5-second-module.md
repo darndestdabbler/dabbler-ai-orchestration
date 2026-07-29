@@ -51,6 +51,30 @@ the same desktop wallpaper on "Sam's machine" stops trusting the rest of the vid
 > it, and `gh auth status` tells you who is active. Every beat below that opens or approves a
 > pull request names the switch explicitly — do not skip them, and check `gh auth status`
 > rather than trusting your memory of the last switch.
+>
+> **On the Azure DevOps take the same trap is `az`, and it is harder.** Dabbler drives
+> `az repos pr create` on an ADO remote, so the pull request's author is the Azure DevOps
+> identity — and `az login` is global for the OS user in exactly the way `gh auth login` is.
+> `gh auth switch` does **nothing** on an ADO remote; do not substitute one for the other.
+>
+> The Azure CLI has no `auth switch` either. Its per-identity lever is the
+> **`AZURE_DEVOPS_EXT_PAT`** environment variable — and that has a trap of its own:
+> **`Dabbler: Open PR for this set` runs from the VS Code extension host, not from your
+> terminal**, so a variable you export in the integrated terminal never reaches it. The
+> extension host inherits its environment **when VS Code starts**, so the PAT has to be set
+> before that, in a genuinely separate VS Code instance per actor:
+>
+> ```bash
+> # off camera, in a shell where only THAT actor's Code Read & Write PAT is set:
+> code --user-data-dir <a-folder-for-this-actor> <that-actor's-clone>
+> ```
+>
+> `--user-data-dir` is what forces a separate instance; two windows of one instance share one
+> extension host and therefore one environment.
+>
+> **If that is more staging than you want on camera, use two machines or two OS user
+> accounts for the Azure DevOps two-person half** — which is what a real team has anyway.
+> Do not try to solve it inside one VS Code instance; it cannot be done.
 
 ---
 

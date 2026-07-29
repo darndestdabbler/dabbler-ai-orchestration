@@ -21,6 +21,7 @@ instead of describing it. Say so as you go.
 | Scene 4 beat 19 | **Nothing to do.** The Build validation policy you added *is* the required check. Say that out loud; a viewer who has been following along will be waiting for a second settings trip. |
 | [Scene 5](scene-5-second-module.md) beat 6 | CODEOWNERS is GitHub-only. The equivalent is **Automatically included reviewers** — one entry per module with a path filter, each marked **Required**. |
 | Scene 5 beat 7 | Instead of raising approvals 0 → 1: keep the minimum at **1** and **untick** *Allow requestors to approve their own changes*, so your own vote stops counting. |
+| [Scene 5](scene-5-second-module.md) staging note, and every PR beat in scenes 5–6 | **`az` replaces `gh` as the identity that decides a pull request's author, and it does not switch the same way.** `az login` is global for the OS user just as `gh auth login` is, the Azure CLI has no `auth switch`, and its `AZURE_DEVOPS_EXT_PAT` lever cannot be set from the integrated terminal because `Dabbler: Open PR for this set` runs in the extension host. Each actor needs a **separate VS Code instance launched from a shell that already carries their PAT** (`code --user-data-dir …`), or **two machines / two OS users**. `gh auth switch` does nothing here. Full recipe in scene 5's staging note — read it before recording the two-person half on ADO. |
 
 Every **Dabbler** command is identical on both hosts — `Open PR for this set`, `Finalize
 merged set`, the worktree CLI, the Work Explorer. Only the host's guardrails differ.

@@ -29,6 +29,10 @@ gh auth switch --user <sams-handle>
 gh auth status
 ```
 
+*(Azure DevOps: `gh` is irrelevant here. What matters is that this VS Code instance was
+**launched** carrying Sam's `AZURE_DEVOPS_EXT_PAT`, or that Sam is on his own machine or OS
+user — nothing you type in the terminal now can change it. See scene 5's staging note.)*
+
 Then Command Palette → **`Dabbler: Open PR for this set`**. Accept the prefilled **PR title**,
 read the dialog, click **Push + create PR**.
 

@@ -80,6 +80,7 @@ re-cropping):
 | `Worktree` | Window Capture → the second VS Code window (scene 4 onward) |
 | `Browser` | Window Capture → the browser, single tab |
 | `Full screen` | Display Capture — only for the Command Palette, which can render outside the window capture on some setups |
+| `Privacy` | **No capture at all.** One Colour Source (or a title card image) and nothing else. Set this up *first* — several beats switch to it while a device code, a sign-in page, or a token is on your real screen, and a scene that captures anything defeats the point. |
 
 **Sources and settings:**
 
@@ -91,8 +92,13 @@ re-cropping):
 - Use **Window Capture, never Display Capture**, for the editor and browser, so a stray
   notification on another monitor cannot land in the recording.
 
+**Every beat that touches a credential names the `Privacy` scene by name** — the Copilot CLI
+sign-in, `gh auth login`, `az login`, and the direct-API take's agent sign-in. Switch to it
+*before* the credential appears, not after you notice it.
+
 **Before the first take:** do a 30-second test recording, play it back, and confirm the
-terminal text is readable and the toast in the bottom-right is not covered.
+terminal text is readable, the toast in the bottom-right is not covered, and switching to
+`Privacy` shows a blank slate rather than your desktop.
 
 ## The beat format
 

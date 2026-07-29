@@ -394,6 +394,14 @@
       "dateTime": "2026-07-29T04:12:12.063624-04:00",
       "description": "Full disposition authored preserving the patched verification fields (api / VERIFIED). Session cost $1.6081 across 7 routed calls.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 16,
+      "stepKey": "close-backstop",
+      "dateTime": "2026-07-29T04:19:34.256498-04:00",
+      "description": "close_session gate failed on the Set 084 close backstop: its in-process round 6 (gpt-5-6, $0.3545) found 1 Major that only shows when the scripts are read as a SYSTEM \u2014 five authentication beats said to switch OBS to \"a scene that hides the device code\" while the README defined four scenes, all capture scenes. Fixed by defining a fifth OBS scene, Privacy (no capture at all), naming it literally in all five beats, switching BEFORE the credential appears, and declaring it per script; three stale beat references corrected in the same pass. Round 7 ($0.1830): 18/18 prior fixes accepted, 1 new Major created by the fix itself (scene 5 beat 3 gh auth login did not name Privacy) \u2014 fixed and closed on orchestrator judgment per the operator ruling rather than another round. Gates: 107/107 and 345/345.",
+      "status": "complete"
     }
   ]
 }

@@ -592,6 +592,79 @@ close, and re-reviewing this delta would be cycle 4. They are markdown and JSON
 staging notes in this session's own deliverables, and the S4 walk is where they
 get exercised for real.
 
+---
+
+# Round-6 addendum — the close backstop, and the one it caught
+
+`close_session` ran the Set 084 **close backstop**, which re-verifies the whole
+session in-process rather than trusting the recorded verdict. Round 6
+(gpt-5-6, $0.3545, diff base `b0dff1b`) returned **one Major**, and it is the
+kind that only shows up when someone reads the scripts as a *system* rather than
+one file at a time.
+
+## BS-1 — the authentication beats switch to an OBS scene that was never defined
+
+Five beats across three scripts say to switch OBS to "a scene that hides the
+device code" before a sign-in — the Copilot CLI login, `gh auth login` (twice),
+`az login`, and the direct-API take's agent sign-in. The README's **OBS setup**
+table defines four scenes: `Editor`, `Worktree`, `Browser`, `Full screen`. **All
+four are capture scenes. None hides anything.**
+
+So at the exact moments the scripts are most careful about credentials, the
+instruction was unperformable, and the recorder would improvise *while a live
+device code was on screen* — which is the precise failure the OBS notes exist to
+prevent.
+
+**Accepted and fixed.**
+
+- `video/README.md` gains a fifth OBS scene, **`Privacy`** — *"No capture at all.
+  One Colour Source (or a title card image) and nothing else"* — with a note that
+  it must be set up **first**, and a line stating that every credential-touching
+  beat names it by name.
+- All five beats now say **"switch OBS to the `Privacy` scene"** literally rather
+  than describing a scene the recorder was left to invent, and the two beats
+  where the credential appears *as the command runs* (the Copilot sign-in, the
+  agent sign-in) switch **before** running it rather than after.
+- The README's pre-flight test recording now also checks that `Privacy` shows a
+  blank slate rather than your desktop.
+- Each affected script's `OBS scenes used` line names `Privacy` and the beats
+  that use it, so the recorder sets it up before the take rather than discovering
+  it mid-scene.
+
+While in those lines, three stale beat references were corrected (scene 3's
+browser beats are 11–12 not 9–10; scene 4's worktree window opens at beat 11 not
+9, and its browser beats are 9, 16–17 and 19).
+
+Gates after the backstop fix: literals **107/107 PASS**, checklist **345/345
+PASS**.
+
+## Round 7 — the fix's own consequence, caught immediately
+
+Re-verifying the backstop fix delta returned **18 of 18 prior fixes accepted** and
+one new Major, which the fix itself created: the README now claims *"every beat
+that touches a credential names the `Privacy` scene by name"*, and **scene 5 beat
+3's `gh auth login`** — added two rounds earlier for the third-provider `gh`
+staging fix — did not. A new rule met a beat written before the rule existed.
+
+**Accepted and fixed**: beat 3 switches to `Privacy` before `gh auth login` and
+back only once the device code and sign-in page are gone, and scene 5's
+`OBS scenes used` line names `Privacy` at beat 3. Gates re-run: **107/107** and
+**345/345**.
+
+This one is closed on the orchestrator's judgment rather than by another verifier
+round. The operator's standing ruling was *one more cycle, then the third-provider
+opinion, then close*; that is spent, the change is two lines applying an existing
+rule to one beat, and the finding is neither disputed nor open. Re-rounding it is
+exactly the grinding the bound exists to prevent.
+
+## What the backstop is worth
+
+This is the second time in this session that a *different reading* found what a
+converged loop could not — the third-provider opinion read the **machine**, and
+the backstop read the scripts **as a set**. Both findings were invisible to five
+rounds that read the documents one at a time. That is an argument for the
+backstop existing, not against the loop.
+
 ## What is still not established
 
 Unchanged from `s3-authoring-gates.md`, and now with two additions worth naming.

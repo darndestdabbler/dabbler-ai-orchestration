@@ -16,7 +16,7 @@ nothing reaches it except through a pull request.
 - The Dabbler AI Orchestration extension installed; its Activity Bar icon visible but **not
   yet clicked**.
 - Signed in to the Copilot CLI (scene 1) and to GitHub in the browser.
-- OBS scenes used: `Editor`, and `Browser` for beats 9–10.
+- OBS scenes used: `Editor`, and `Browser` for beats 11–12.
 
 > **This scene uses `New Module` + `Delete Module`, not `Rename Module`.** That is
 > deliberate and it is what the tutorial says. `Dabbler: Rename Module` changes a module's

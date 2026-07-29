@@ -21,7 +21,8 @@ stands on.
   --version` fails, stop and fix it off camera.
 - A GitHub account with an **active Copilot seat**, **not yet signed in** on this machine's
   Copilot CLI.
-- Focus Assist / Do Not Disturb on. OBS scene: `Editor`.
+- Focus Assist / Do Not Disturb on. OBS scenes used: `Editor`, and `Privacy` at beats 5
+  and 8.
 
 ---
 
@@ -103,8 +104,8 @@ be recorded without it on Windows.
 
 ## Beat 5 — Sign in to the Copilot CLI *(Part 1 step 4)*
 
-**Do.** Run `copilot` with no arguments and follow the sign-in prompt it shows. **Switch OBS
-to a scene that hides the device code**, or blur it in post — do not leave it legible.
+**Do.** **Switch OBS to the `Privacy` scene first.** Then run `copilot` with no arguments and
+follow the sign-in prompt it shows. Switch back once the device code is off screen.
 
 **Say.** "Running `copilot` on its own the first time walks you through signing in. You need
 an active Copilot seat on the account you sign in with."
@@ -167,7 +168,7 @@ gh auth login
 gh auth status
 ```
 
-Run `gh auth login` with **OBS on a scene that hides the device code**.
+Run `gh auth login` with **OBS switched to the `Privacy` scene**.
 
 **Say.** "Last one — the GitHub CLI. Dabbler uses it to open pull requests for you without a
 trip to the browser. Everything still works without it; you just finish the pull request in

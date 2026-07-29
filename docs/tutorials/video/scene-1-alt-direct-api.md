@@ -35,7 +35,8 @@ showing one**.
 - Python on `PATH`.
 - API keys for Anthropic, Google, and OpenAI **already obtained and set off camera** — see
   the warning below.
-- Focus Assist / Do Not Disturb on. OBS scene: `Editor`.
+- Focus Assist / Do Not Disturb on. OBS scenes used: `Editor`, and `Privacy` at beats 5
+  and 6.
 
 > ## Set the keys off camera. All three. Before you press record.
 >
@@ -144,8 +145,8 @@ everywhere this take says "Claude Code", and say so on camera at this beat.
 1. Extensions view (`Ctrl+Shift+X`), type `Claude Code`, click **Install** on the extension
    published by **Anthropic**.
 2. Open its panel from the Activity Bar icon that appears.
-3. If it asks you to sign in, complete the sign-in — **switch OBS to a scene that hides the
-   browser** while you do.
+3. If it asks you to sign in, **switch OBS to the `Privacy` scene** first, complete the
+   sign-in, then switch back.
 
 **Say.** "You still need an AI agent living inside VS Code to run the sessions. I'm using
 Claude Code; Codex and Gemini Code Assist work the same way. Everywhere the main walkthrough
@@ -170,7 +171,7 @@ gh auth login
 gh auth status
 ```
 
-Run `gh auth login` with **OBS on a scene that hides the device code**.
+Run `gh auth login` with **OBS switched to the `Privacy` scene**.
 
 **Say.** "One more — the GitHub CLI, so Dabbler can open pull requests without a browser trip.
 It's optional; without it you just finish the pull request in a browser tab."

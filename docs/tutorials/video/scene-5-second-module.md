@@ -16,7 +16,7 @@ per-set prerequisites worth showing. `main` now needs somebody else's approval.
   open.
 - The main VS Code window is on `main`, clean.
 - **Two GitHub accounts available** (see the staging note below).
-- OBS scenes used: `Editor`, `Browser`, and `Worktree` at beat 12.
+- OBS scenes used: `Editor`, `Browser`, `Privacy` at beat 3, and `Worktree` at beat 12.
 
 ## Staging note — you are playing two people
 
@@ -89,7 +89,9 @@ second folder, and open it in a second VS Code window. Then in that window, Comm
 **`Dabbler: Install ai-router`**.
 
 Then, in that window's terminal, add Sam's account to the GitHub CLI and confirm both are
-there — this is the staging fix from the note at the top of this scene:
+there — this is the staging fix from the note at the top of this scene. **Switch OBS to the
+`Privacy` scene before `gh auth login`**, and switch back only once the device code and
+sign-in page are gone:
 
 ```bash
 gh auth login

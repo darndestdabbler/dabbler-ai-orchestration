@@ -36,7 +36,7 @@ is cloned and open in VS Code, with the Azure CLI able to open pull requests aga
 - Signed in to Azure DevOps in the browser, on an organisation you are willing to have on
   camera — see the warning below.
 - VS Code shows the welcome screen; nothing cloned.
-- OBS scenes used: `Browser`, then `Editor`.
+- OBS scenes used: `Browser`, then `Editor`, and `Privacy` at beat 5.
 
 > ## Use a scratch organisation, not your employer's — and turn on public projects first
 >
@@ -130,7 +130,7 @@ az --version
 *(macOS: `brew install azure-cli`. Linux: follow the distro instructions at
 [learn.microsoft.com/cli/azure/install-azure-cli](https://learn.microsoft.com/cli/azure/install-azure-cli).)*
 
-Then, with **OBS on a scene that hides the sign-in code**:
+Then, with **OBS switched to the `Privacy` scene**:
 
 ```bash
 az login

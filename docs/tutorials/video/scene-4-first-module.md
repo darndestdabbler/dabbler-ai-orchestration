@@ -18,8 +18,9 @@ the tutorial's own line: **"Solo repositories can stop here."**
 - Work Explorer shows the module group **Greeter** with **003-greeter-plan** and
   **004-greeter-decomposition** in **Not Started**.
 - Local `main` is clean and pushed.
-- One VS Code window open. A second window appears at beat 9.
-- OBS scenes used: `Editor`, then `Worktree` from beat 9, `Browser` for beats 14–18.
+- One VS Code window open. A second window appears at beat 11.
+- OBS scenes used: `Editor`; `Browser` at beats 9, 16–17 and 19; `Worktree` from beat 11
+  to beat 15.
 
 > **The set name in beat 6 is not knowable in advance.** The decomposition session names the
 > implementation set itself. This script writes `005-greeter-hello` throughout; whatever your

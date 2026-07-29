@@ -376,6 +376,77 @@ Still on the table, unchanged and ranked by the operator after S4:
   now two CLI versions staler (lock `1.0.69`, seat `1.0.75`).
 - **The extension publish** (S2's 0.46.0 bump) — operator-gated.
 
+### Operator correction (2026-07-29) — why the switch was declined three times
+
+**The record above is wrong about the reason, and the correction matters more
+than the recommendation did.** S1, S2 and S3 each characterized the declined
+provider switch as the operator's call at invocation, and this session's block
+went further, calling the counter-argument "at its weakest of the whole set".
+
+The actual reason, stated by the operator after S3: **cost.** They had been
+spending **hundreds of dollars of their own money** on these sessions, cut back,
+and have **very limited GitHub Copilot capacity** — enough to run a session, but
+not to run one carelessly. Three routed advisors recommended a switch while
+reasoning purely about cognitive diversity, because **none of them was ever told
+what a switch costs**, and neither was the orchestrator.
+
+Two things follow, and they are durable:
+
+1. **A next-orchestrator recommendation that names only the benefit is
+   half a recommendation.** Future step-3.5 blocks in this repo should state the
+   **budget** a proposed switch draws on, not just the diversity it buys — and
+   must never frame a declined switch as advice ignored.
+2. **There are two budgets, and they are not interchangeable.** The Copilot seat
+   (premium requests) pays for the **orchestrator**. The `DABBLER_*` provider
+   keys pay for **routed verification** — this repo runs
+   `transport.profile: api`, so routed calls do **not** touch the seat. Moving
+   the orchestrator to Copilot moves orchestrator cost onto the seat and leaves
+   verification spend exactly where it was.
+
+**The operator has decided S4 changes hands to GitHub Copilot.** The guidance
+below exists so that session can be run conservatively without cutting its scope.
+
+### Budget guidance for Session 4 (operator-constrained)
+
+**What S3 actually cost, as the baseline S4 is being asked to beat:** ~**$3.55**
+across 12 routed calls on the direct-API budget, of which ~**$3.4** was
+**verification** — ten rounds, because the walk-quality findings kept being real.
+`ai_router/budget.yaml` carries `threshold_usd: 10`, `scope: per-project`.
+
+**Levers, cheapest and least invasive first:**
+
+- **The two committed gates are free.** `s3-check-literals.py` (108 checks) and
+  `s3-check-checklist.py` (358 checks) are pure local Python and make **no API
+  calls**. Re-run them as often as you like; push work onto them before spending
+  a routed round.
+- **`verification.discovery.fan_out: 2 → 1`** in `router-config.yaml` (clamped
+  `[1, 4]`). Roughly halves each discovery round. Set 096's own experiment says
+  K=2 harvests ~81% of the finding pool against ~50% for K=1 — so this is a real
+  trade, not a free win, and it is the operator's to make.
+- **`pathAwareCritique` is `advisory`, not `required`** for this set. It warns at
+  the set-terminal close and never blocks. It is also the single most expensive
+  stage in the workflow (multi-provider, ≥2 providers, each critic reading the
+  repo). Skipping it with the skip **recorded** is a legitimate operator call on
+  a constrained budget; skipping it silently is not.
+- **Stop the loop on Minor-only rounds.** The constitution already says a
+  Minor-only round is effectively VERIFIED. S3's ten rounds were justified —
+  every one found a material Major — but that is the exception, not the target.
+- **One third-provider opinion is disproportionately cheap.** S3's cost **$0.074**
+  and caught a Critical that five same-provider rounds had missed. If any single
+  routed call is worth making on a tight budget, it is that one.
+
+**Two traps that would cost money to discover the hard way:**
+
+- **Do not flip `transport.profile` to `copilot-cli`** hoping to move
+  verification spend onto the seat. The catalog lockfile pins CLI `1.0.69` and
+  the operator's seat runs `1.0.75`, so `validate_catalog` **fails closed inside
+  `route()` before any model call** (`s1-runtime-unknowns.md`, Unknown 2). The
+  `--refresh` reconciliation owed since Set 104 is the prerequisite, and it is a
+  router-side change this set's non-goals forbid.
+- **A Copilot orchestrator must pass `--model` to `start_session`**, validated
+  against the model registry — Set 084 F1: a seat's identity is its underlying
+  model, never the seat label. Getting this wrong fails the registration.
+
 ### Actuals (filled at close)
 
 - Orchestrator used: claude / anthropic / claude-opus-5 / high.
@@ -383,6 +454,10 @@ Still on the table, unchanged and ranked by the operator after S4:
   step-3.5 analysis routed ($0.0098, truncation-clean); session verification
   routed cross-provider.
 - Deviation from the routed plan: the **orchestrator identity** (third
-  consecutive; operator's call, recorded above). The analyst's clean-environment
-  desk-check control was **declined with reasons** and replaced by the four
-  controls listed above.
+  consecutive) — recorded above as the operator's call, and **corrected above**:
+  the reason was budget capacity, which no advisor had been told. The analyst's
+  clean-environment desk-check control was **declined with reasons** and replaced
+  by the four controls listed above.
+- Verification actuals: **10 rounds + one third-provider opinion**, ~$3.55 total.
+  25 findings, every one accepted, none disputed. The rounds that earned their
+  cost were the ones that changed *reading*, not the ones that repeated it.

@@ -410,6 +410,14 @@
       "dateTime": "2026-07-29T04:33:15.415573-04:00",
       "description": "close_session backstop rounds 8 and 10 each found real Majors, all fixed (fail-closed Passes, the az identity sibling and its own wrong first fix, and the uncommitted prerequisite). The final close attempt is blocked NOT on quality but on provider availability: OpenAI returned 429 Too Many Requests on three consecutive backstop attempts (3 retries each), and the gate correctly treats provider unavailability at close as a BLOCK, never a pass. All work is committed and pushed (9670797). Resolvable by re-running close_session when OpenAI recovers, or by the operator-attested --manual-verify path \u2014 both operator decisions. Notification deliberately NOT fired: it fires only after a successful close.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 18,
+      "stepKey": "operator-handoff-and-budget",
+      "dateTime": "2026-07-29T04:39:55.281546-04:00",
+      "description": "Operator stated the real reason the routed switch was declined three times: COST. They had been spending hundreds of dollars of personal money on these sessions, cut back, and have VERY limited GitHub Copilot capacity. S4 changes hands to Copilot and must be run conservatively. Corrected the record in ai-assignment.md (three sessions had framed it as a preference) and rewrote disposition.next_orchestrator to engine=copilot, code=operator-directed, carrying the concrete levers: the two committed gates are free; fan_out 2->1; pathAwareCritique is advisory so a RECORDED skip is legitimate; a ~$0.07 third-provider opinion is the best-value routed call available. Named two money-wasting traps: do NOT flip transport.profile to copilot-cli (catalog pin fails closed in route()), and a Copilot orchestrator MUST pass --model to start_session (Set 084 F1).",
+      "status": "complete"
     }
   ]
 }

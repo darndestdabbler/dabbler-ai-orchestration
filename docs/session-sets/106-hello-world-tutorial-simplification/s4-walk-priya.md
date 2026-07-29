@@ -21,6 +21,32 @@ You own the module `greeter`. Your teammate is **Sam**, on his own machine, and 
 written is a defect in the document. Record it and move on; do not improvise a fix and then
 mark the item passed.
 
+### Sam does not touch the checklist — but his words go in it
+
+One JSON file, one editor, one person filling it in. That is a practical constraint (two
+people editing one file loses work) and a deliberate one: **the moment Sam is grading a
+checklist he stops being a naive reader, which is the entire reason he is here.**
+
+**There is deliberately no second checklist**, and that is a rule rather than a preference:
+the workflow gives each session set exactly one, named
+`<session-set-slug>-uat-checklist.json`, and the extension resolves that exact filename — a
+second one would be an orphan `Dabbler: Open UAT Checklist` cannot even open.
+
+So the split is: **he produces raw observations, you transcribe them.** His container is
+[`s4-walk-sam-notes.md`](s4-walk-sam-notes.md) — four lines per note (where / did / expected /
+saw), no pass-fail column, labelled by tutorial Part rather than walk number, since he never
+sees the walks. He sends it as he goes.
+
+The failure mode to guard against is *your* summary replacing *his* experience — writing
+"PASS" for a step he found after ninety seconds of hunting. When his notes cover a walk:
+
+- Paste his **verbatim words** into `Feedback`, prefixed `SAM:`. Not your paraphrase.
+- If he hesitated, got lost, or had to re-read something, that is `Feedback` content **even
+  on a PASS**. A step that works but reads badly is still a finding.
+- **Walk 8 is almost entirely his**, and Walks 7 and 9 are shared — those three are where
+  secondhand recording costs the most. Grade them on what he reports, not on what you saw
+  over his shoulder.
+
 ## Before you start
 
 1. **Extension 0.46.0 or newer must be live on the Marketplace.** Confirm on the extension

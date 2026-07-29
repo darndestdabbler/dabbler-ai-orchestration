@@ -111,10 +111,12 @@ it refuses to delete the folder it is running in, which is correct.
 
 ## What to write down
 
-Anything, however small: a button that was not where the tutorial said, a wait long enough
-that you thought it had hung, a sentence you had to read twice, a command that printed
-nothing when you expected output. Rough notes in your own words are perfect — Priya turns
-them into the record.
+**Use [`s4-walk-sam-notes.md`](s4-walk-sam-notes.md)** — copy it, fill it in as you go, send
+it to Priya. It is four lines per note and there is deliberately no pass/fail column: you are
+reporting what happened, not grading it. She turns it into the formal record.
+
+Send notes **as you go**, not at the end. Two hours compresses badly in memory, and the
+detail that gets lost is always the one worth having.
 
 Thank you. Genuinely — the only way to know whether instructions are followable is to watch
 someone follow them.

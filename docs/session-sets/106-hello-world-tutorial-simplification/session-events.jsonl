@@ -27,3 +27,5 @@
 {"timestamp": "2026-07-29T08:32:22.097489Z", "session_number": 3, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "route_failed"}
 {"timestamp": "2026-07-29T08:32:29.668827Z", "session_number": 3, "event_type": "closeout_requested", "force": false, "manual_verify": false}
 {"timestamp": "2026-07-29T08:32:49.986944Z", "session_number": 3, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "route_failed"}
+{"timestamp": "2026-07-29T08:40:01.747570Z", "session_number": 3, "event_type": "closeout_requested", "force": false, "manual_verify": false}
+{"timestamp": "2026-07-29T08:43:12.229210Z", "session_number": 3, "event_type": "closeout_failed", "failed_checks": ["verification_backstop"], "backstop_status": "blocking_findings"}

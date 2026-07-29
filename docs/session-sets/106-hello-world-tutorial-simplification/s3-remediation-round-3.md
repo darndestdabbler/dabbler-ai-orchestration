@@ -780,6 +780,31 @@ step above ends in a commit"*, and Walk 8's Expectation adds a check that
 `git status --short` is **empty** after the commit — because a loose edit here is
 invisible until the worktree is already wrong.
 
+### Round 11 — the third sibling-site miss, same shape as the first two
+
+Fix **D** made the post-session commit conditional in `scene-4-first-module.md`
+beat 8 (`git status --short` first, commit only if it printed anything) and in
+`hello-world.md` Part 4 step 3. **Checklist Walk 4 step 7 kept the unconditional
+`git add -A && git commit`** — so the walk would hit `nothing to commit`, exit
+nonzero, and the operator would either record a false failure or improvise around
+the checklist that exists precisely to remove improvisation.
+
+**Fixed**: Walk 4 step 7 now mirrors the other two surfaces, and its Expectation
+states that an **empty `git status --short` is a PASS, not a missing step** —
+because "the command printed nothing" is exactly the shape an operator
+mid-walk reads as *something went wrong*.
+
+**This is the third time in this session the same class recurred:** `gh` fixed
+and `az` left (round 8), the tutorial and scene fixed and the checklist left
+(round 11), and in between a fix whose *mechanism* did not transfer between the
+two (round 9). Every one was **L-069-1** — *a bug is a bug CLASS; fix every
+sibling site, or name the deferred residual as a decision*. The lesson has a
+sharper edge here than its text carries: this session's surfaces are **three
+parallel renderings of one walkthrough** (tutorial → scene script → checklist
+walk), so *every* content fix has two siblings by construction, and "I fixed the
+tutorial" is never the whole fix. The literal gate catches divergence only where
+a check was written for that exact string.
+
 ## What the backstop is worth
 
 Three times now, a *different reading* has found what a converged loop could not.

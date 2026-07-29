@@ -406,6 +406,48 @@ Two things follow, and they are durable:
 **The operator has decided S4 changes hands to GitHub Copilot.** The guidance
 below exists so that session can be run conservatively without cutting its scope.
 
+### Post-close operator decision (2026-07-29): publish 0.46.0 before the walk
+
+Raised by the operator after S3 closed: the staff member playing Sam needs the
+extension, and a gated 0.46.0 meant they had no way to get it. **The question
+exposed a defect independent of how the file travels — Sam's extension install
+was never in any `Do`.** Scene 5 beat 3 said "accept, clone, open the window, run
+`Dabbler: Install ai-router`", and Walk 7 step 2 said the same: a *Dabbler*
+command on a machine with no Dabbler. The narration carried it ("all of part
+one"); the literal action did not. That is the exact class the S3 verifier
+hammered — **the `Do` must be literal** — surviving twelve rounds because every
+reader assumed Sam's setup was covered by a sentence about Priya's.
+
+Three delivery options were weighed. **Committing the `.vsix` was argued against
+on evidence, not taste:** `*.vsix` is gitignored, nothing is tracked, and
+`publish-vscode.yml` carries a defensive single-VSIX check whose comment names
+the reason — a committed VSIX caused a real wrong-version publish here (v0.12.1
+shipped on the `vsix-v0.13.0` run). The `-rcN` path was rejected too: its version
+gate requires `package.json` to read `0.46.0-rc1`, so the walk would test an
+rc-versioned build while every surface says 0.46.0.
+
+**The operator chose to publish 0.46.0 first**, which is the best answer
+available and not merely the least bad one: the walk now tests **the path a real
+reader takes**, and the sideload branch — the checklist's "one deliberate
+departure" — is **deleted rather than documented**. Risk is bounded: 0.46.0 is a
+template-content-only bump that S2 verified and the scaffolder tests pin, most S4
+findings will be docs that never touch the extension, and anything the walk finds
+ships as 0.46.1. Tagged commit `52d3c05`, which carries a green `Test` run — the
+release prerequisite. Per `CONTRIBUTING.md`, the tag push is the operator's; it
+is never done on automation.
+
+Changed as a result, with the free gates re-run (**358/358**):
+
+- Precondition (4) is now *"extension 0.46.0 or newer live on the Marketplace"*,
+  and says to **STOP** if the extension page reads 0.45.0 — the publish did not
+  land, and Walk 5 would fail its add-two-steps-only check for the wrong reason.
+- Walk 1 step 1 follows scene 1 beat 2 **as written**. There is now **no
+  deliberate departure anywhere in the walk**.
+- Walk 7 step 2 and scene 5 beat 3 spell out Sam's **whole** Part 1, extension
+  first, with the reason the ordering matters.
+- Both surfaces now require Sam's extension version to **match** the operator's —
+  a mismatched pair makes Walk 9's CI result unattributable.
+
 ### Budget guidance for Session 4 (operator-constrained)
 
 **What S3 actually cost, as the baseline S4 is being asked to beat:** ~**$3.55**

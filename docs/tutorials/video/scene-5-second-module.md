@@ -109,8 +109,16 @@ there is **no role dropdown** in this dialog — do not go looking for one on ca
 ## Beat 3 — Sam accepts and sets up *(Part 5 step 1)*
 
 **Do.** Switch to Sam's browser profile, accept the invitation, clone the repository into a
-second folder, and open it in a second VS Code window. Then in that window, Command Palette →
-**`Dabbler: Install ai-router`**.
+second folder, and open it in a second VS Code window.
+
+Then **all of Part 1, on his side** — this is easy to skip because you already did it on
+yours, and the next command silently depends on it:
+
+1. Install the **Dabbler AI Orchestration** extension from the Marketplace in that window.
+   `Dabbler: Install ai-router` is a *Dabbler* command; without the extension there is nothing
+   to run it.
+2. Python, the Copilot CLI including its sign-in, and the GitHub CLI — exactly as in scene 1.
+3. Command Palette → **`Dabbler: Install ai-router`**.
 
 Then, in that window's terminal, add Sam's account to the GitHub CLI and confirm both are
 there — this is the staging fix from the note at the top of this scene. **Switch OBS to the
@@ -135,12 +143,14 @@ machine; his clone needs its own."
 > sign in to the Copilot CLI. `Dabbler: Install ai-router` is unchanged. See
 > [`scene-1-alt-direct-api.md`](scene-1-alt-direct-api.md).
 
-**See.** A `.venv/` folder appears in Sam's clone and a notification confirms the router
-install completed.
+**See.** Sam's extension page shows the **same version you installed in scene 1** — a
+mismatched pair makes the CI result in scene 6 unattributable. A `.venv/` folder then appears
+in his clone and a notification confirms the router install completed.
 
-**If this fails on camera.** If the install reports a Python problem, it is the same stop as
-scene 1 beat 3 — Sam's machine needs Python 3.10 or newer. Nothing in this scene works
-without it.
+**If this fails on camera.** `Dabbler: Install ai-router` not appearing in the Command Palette
+means step 1 did not happen — install the extension in *that* window and try again. If the
+install reports a Python problem, it is the same stop as scene 1 beat 3: Sam's machine needs
+Python 3.10 or newer. Nothing in this scene works without it.
 
 ---
 

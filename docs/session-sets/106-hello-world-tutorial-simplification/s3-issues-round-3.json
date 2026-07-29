@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The checklist still cannot establish that the Azure DevOps take is followable\n\n- **Category:** Completeness\n- **Severity:** Major\n- **Failure scenario:** Session 4 follows Walk 11 exactly. It creates the project/repository using only beats 1–2 and inspects policy controls, but never performs the alternate take’s clone, Azure CLI installation/authentication, extension setup, or rejoin path. Walk 13 then asks for a whole-script followability verdict without testing those beats. This is certain from the prescribed walk, and it can allow a materially broken alternate take to pass UAT.\n- **Location:** `106-hello-world-tutorial-simplification-uat-checklist.json`, Walks 11 and 13.\n- **Details:**\n  - **Violation:** The checklist says the walk proves scripts are “followable” and Walk 13’s item claims, “Every scene script is followable as written.” Walk 11 expressly remains “a SPOT CHECK” and executes only scene beats 1–2 before inspecting four controls.\n  - **Impact:** The operator cannot reach a defensible PASS/FAIL verdict for the Azure DevOps script. In particular, the newly added Azure CLI installation and authentication remediation is never exercised.\n  - **Evidence:** Walk 11 omits the clone and CLI beats, while Walk 13 only asks the operator to confirm “every beat you performed”; that wording cannot detect unperformed beats.\n  - **Fix:** Have Walk 11 execute the complete alternate scene in its isolated scratch project and clone, including Azure CLI setup and the rejoin point, with expectations for every beat.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "Session 4 follows Walk 11 exactly. It creates the project/repository using only beats 1–2 and inspects policy controls, but never performs the alternate take’s clone, Azure CLI installation/authentication, extension setup, or rejoin path. Walk 13 then asks for a whole-script followability verdict without testing those beats. This is certain from the prescribed walk, and it can allow a materially broken alternate take to pass UAT."
+    },
+    {
+      "description": "The remediation weakens an explicit privacy requirement instead of satisfying it\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Failure scenario:** A recorder follows the Azure DevOps take and displays the newly created **Private** project and repository. This happens on every recording performed as written. The result violates the specification’s explicit rule that private repositories must never appear on screen, so the recording cannot satisfy the required OBS privacy contract.\n- **Location:** `docs/tutorials/video/README.md`, “What must never be on screen”; `scene-2-alt-azure-devops.md`, Beat 1/privacy note.\n- **Details:**\n  - **Violation:** The task requires OBS notes covering “what must never be: real tokens, org names, private repos.” The remediation instead says, “The scratch repository itself may be private” and calls the ADO repository “the one repository allowed on screen while private.”\n  - **Impact:** The operator may approve and publish a recording that violates a hard deliverable requirement. Changing the README does not amend the governing specification.\n  - **Evidence:** The ADO scene still instructs creation with visibility **Private**, while the README now expressly carves out that private repository.\n  - **Fix:** Keep the prohibition on displaying private repositories and create a public throwaway Azure DevOps project/repository for the recorded take, or redesign the take so no private repository appears.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A recorder follows the Azure DevOps take and displays the newly created **Private** project and repository. This happens on every recording performed as written. The result violates the specification’s explicit rule that private repositories must never appear on screen, so the recording cannot satisfy the required OBS privacy contract."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 Marketplace/local-VSIX version handling",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 required approval for Sam’s lifecycle PR",
+      "verdict": "fix-accepted",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 automatic CODEOWNERS review request",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 conditional commit after lifecycle sessions",
+      "verdict": "fix-accepted",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 visible per-module CI log lines",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 Azure DevOps repository prerequisites",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 GitHub zero-approval control",
+      "verdict": "fix-accepted",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8 personal-repository collaborator flow",
+      "verdict": "fix-accepted",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 macOS-compatible key-presence probe",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    },
+    {
+      "finding": "L10 Azure CLI installation",
+      "verdict": "fix-accepted",
+      "ledgerId": "L10"
+    },
+    {
+      "finding": "L11 literal canonical AI-agent installation",
+      "verdict": "fix-accepted",
+      "ledgerId": "L11"
+    },
+    {
+      "finding": "L12 Walk 1 precondition contradiction",
+      "verdict": "fix-accepted",
+      "ledgerId": "L12"
+    },
+    {
+      "finding": "L13",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L13"
+    },
+    {
+      "finding": "L14",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L14"
+    },
+    {
+      "finding": "L15",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L10",
+      "ledgerId": "L15"
+    },
+    {
+      "finding": "L16 Azure DevOps whole-script verdict coverage",
+      "verdict": "fix-rejected",
+      "ledgerId": "L16"
+    },
+    {
+      "finding": "L17",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L3",
+      "ledgerId": "L17"
+    },
+    {
+      "finding": "L18 VS Code version verification",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L18"
+    },
+    {
+      "finding": "L19 private Azure DevOps repository privacy conflict",
+      "verdict": "fix-rejected",
+      "ledgerId": "L19"
+    },
+    {
+      "finding": "L20 direct-API setup for Sam",
+      "verdict": "fix-accepted",
+      "ledgerId": "L20"
+    }
+  ]
+}

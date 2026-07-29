@@ -241,3 +241,148 @@ extension publish).
   invoked Claude rather than the recommended OpenAI switch (recorded above, and
   compensated by the two continuity controls). The analyst's `act`-based proof
   mechanism was substituted, with the substitution and its limits stated.
+
+---
+
+## Session 3 of 4 — OBS scene scripts + the S4 UAT checklist
+
+- Orchestrator: claude / anthropic / **claude-opus-5** / high (operator-invoked).
+  This is the **third consecutive** session in which the routed advisor
+  recommended switching off Anthropic and the operator invoked Claude Code.
+  Recorded as a known, operator-made deviation — not an oversight. The operator
+  owns the pick at invocation; the exposure it creates (one model family authored
+  the tutorial, its templates, *and* the scripts that dry-run it) is real and is
+  controlled below rather than waved off.
+- Routed step-3.5 analysis: [`s3-ai-assignment-analysis.json`](s3-ai-assignment-analysis.json)
+  (`task_type=analysis`, anthropic excluded → gemini-2.5-pro, tier 2,
+  **$0.0098**, truncation-clean).
+- Set-level facts carried from the spec (**immutable at runtime**): **Full
+  tier**, `requiresUAT: true` — and unlike S1/S2, this session is the one that
+  **authors the checklist** the S4 walk executes, so the ad-hoc UAT floor
+  (`ProgrammaticVerification` **or** `NoProgrammaticPathReason` on every
+  non-judgment functional item, validated locally before the human is notified)
+  binds this session's output directly. `requiresE2E: false`, `uatStyle:
+  ad-hoc`, `uatScope: per-set`, `pathAwareCritique: advisory` (runs at the
+  set-terminal close in S4). The **cut list is binding**.
+- Scope boundary: S3 owns `docs/tutorials/video/` and the checklist. It may
+  touch `docs/tutorials/hello-world.md` **only where scripting exposes a gap** —
+  which the spec explicitly permits and S2 explicitly queued (two named
+  tutorial-side residuals in its disposition). A scripting-exposed gap is
+  fixed; a stylistic preference is not.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read the spec, S1/S2 dispositions, the runtime-unknowns artifact, and the new tutorial end to end as a reader would. | Orchestrator direct — read-only reconnaissance. |
+| 2 | Author the nine files under `docs/tutorials/video/`. | **Orchestrator direct** — see below. |
+| 3 | Reconcile the two S2-queued tutorial residuals exposed by scripting scene 4. | Orchestrator direct — a two-sentence edit in one file. |
+| 4 | Author `106-hello-world-tutorial-simplification-uat-checklist.json`. | **Orchestrator direct** — literal transformation of a doc only the orchestrator can read. |
+| 4b | **Mechanically validate the checklist** against the ad-hoc floor and the editor schema before it is offered to the human. | Orchestrator direct — an executable gate, not an opinion. |
+| 5 | Full suite; phased `verify_session`; disposition; commit + push; `close_session`. | **Routed** for verification (`session-verification`, anthropic auto-excluded); orchestrator direct for the mechanics. |
+
+The analyst returned `orchestrator-direct` for all four authoring steps and
+`routed:session-verification` for the close — the same shape S1 and S2 settled
+on, reached independently. Its reason is this set's standing countervailing
+principle: these deliverables are literal transcriptions of *this repo's*
+shipped strings, and a routed author cannot read the repo.
+
+### Biggest risk and its control (analyst's, adopted with a correction)
+
+> "Drift between the newly authored scripts/checklist and the source tutorial or
+> underlying codebase. A single incorrect command, UI label, or expected outcome
+> in the scripts will cause the live Session 4 UAT to fail, requiring
+> significant rework."
+
+Correct, and it is the expensive failure mode here: a defect in these files is
+paid for in **operator minutes on camera**, not in a re-verify round.
+
+The analyst's proposed control — *"a full, literal desk check … against a clean
+developer environment"* — is **not adoptable as stated and is recorded as
+declined**. A clean-environment desk check of these scripts is exactly the
+~2-hour walk S4 exists to perform, on operator-supplied resources (a GitHub
+account, a Copilot seat, a throwaway public repo) this session does not have.
+Running it here would either duplicate S4 or, worse, produce a half-walk whose
+partial evidence invites S4 to be skipped.
+
+What is adopted instead, cheapest first:
+
+1. **Traceability by construction.** Every beat cites the tutorial step it
+   performs. A beat with no tutorial step is either a gap in the tutorial (fix
+   it) or invented ceremony (cut it) — the same discipline that produced the
+   tutorial.
+2. **Literals are copied, never paraphrased.** Command titles come from the
+   extension's `package.json` `contributes.commands`; shell lines, YAML, and
+   expected on-screen strings are copied from `hello-world.md`, which S1 already
+   verified against shipped code. A string that appears in a scene script and in
+   the tutorial must be **byte-identical**, and that is checked mechanically,
+   not by eye.
+3. **The checklist floor is executed.** Every non-judgment functional item is
+   machine-checked for `ProgrammaticVerification` / `NoProgrammaticPathReason`
+   and for the "where you are" preamble before close.
+4. **S4 is the acceptance test and stays that way.** This session's job is to
+   make the walk cheap and unambiguous, not to pre-empt it.
+
+### Scene-script pitfalls (analyst's, adopted into the beat structure)
+
+The five it named are folded into the format rather than left as advice: no
+magic transitions (every scene states the exact repo/UI state it starts from,
+and every beat names the window it happens in); literal atomic actions, never
+"configure the service"; explicit **wait** beats for anything asynchronous (AI
+sessions, CI runs); narration written as speakable prose beside — not instead of
+— the action; and an `If this fails on camera` line on every beat with a known
+failure mode.
+
+### Next-orchestrator recommendation (S4)
+
+Routed (gemini-2.5-pro, anthropic excluded): **`github-copilot` / `openai` /
+`gpt-5.6` / high** — "Session 4 is a live UAT focused on rapid, accurate
+remediation of unexpected failures."
+
+Recorded with one correction of fact, the same class as S1's `gpt-4o` slip: the
+analyst paired the **`github-copilot` engine** with `gpt-5.6`. That pairing is
+representable (a Copilot seat's identity is its underlying model — Set 084 F1),
+but it is not what the reasoning describes; "a code-native OpenAI interface" is
+**Codex**, which reads `AGENTS.md`. The portable recommendation — *run S4 on an
+OpenAI orchestrator* — stands; `engine: codex` is the coherent form of it, and
+the pick remains the operator's at invocation.
+
+The counter-argument is now at its **weakest of the whole set**, and this is
+worth stating plainly because it is the third time: S4 remediates defects in
+documents this orchestrator family authored, found by a human walking them. An
+author is the worst possible reviewer of their own instructions — they read the
+step they meant, not the step they wrote. If any session of this set should
+change hands, it is this one.
+
+### Next-set recommendation (after S4)
+
+Routed: **`107-advanced-topic-tutorial-simplification`** — apply this set's
+simplification + scripting + UAT pattern to the next tutorial.
+
+Recorded, but it is the weakest of the three candidates now on the table and the
+reason is factual: **after this set there is no second tutorial left to
+simplify.** `docs/tutorials/` will contain exactly `hello-world.md`,
+`release-and-recovery.md`, `video/`, and one redirect stub — the 821-line cut
+and the 390-line review prompt are gone. The transferable form of the analyst's
+idea is S1's advisor's candidate, `107-docs-consistency-and-scope-audit` (apply
+the lens to the wider docs suite), which does not depend on the walk.
+
+Still on the table, unchanged and ranked by the operator after S4:
+
+- **`107-post-uat-hardening`** (S2's advisor) — only for the residue S4 is
+  *forbidden* to fix: product defects the walk exposes. Unknowable until the
+  walk happens.
+- **The Copilot catalog pin reconciliation** — router-side, owed since Set 104,
+  now two CLI versions staler (lock `1.0.69`, seat `1.0.75`).
+- **The extension publish** (S2's 0.46.0 bump) — operator-gated.
+
+### Actuals (filled at close)
+
+- Orchestrator used: claude / anthropic / claude-opus-5 / high.
+- Routing plan followed as recommended: all authoring orchestrator-direct;
+  step-3.5 analysis routed ($0.0098, truncation-clean); session verification
+  routed cross-provider.
+- Deviation from the routed plan: the **orchestrator identity** (third
+  consecutive; operator's call, recorded above). The analyst's clean-environment
+  desk-check control was **declined with reasons** and replaced by the four
+  controls listed above.

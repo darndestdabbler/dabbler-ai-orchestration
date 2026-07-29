@@ -236,6 +236,140 @@
       "dateTime": "2026-07-28T21:33:47.664507-04:00",
       "description": "Verification closed VERIFIED. Round 1 discovery (fan-out 2/2, gpt-5-6, $0.3425): VERIFIED, 0 blocking, 3 nits - all fixed. --phase remediation-review then correctly refused (round 1 recorded no findings, so there is no discovery baseline to review a fix delta against); ran a second discovery pass instead, which is the honest way to cover bytes changed after a verified round. Round 2 discovery (fan-out 2/2, gpt-5-6, $0.2895): VERIFIED, 0 blocking, 5 nits - all fixed, no round 3 opened (two discovery passes is the bound; Minor-only is effectively VERIFIED; L-095-1). Total verification cost $0.632. Final suite re-run on the shipped tree: pytest 3060 passed/6 skipped, extension unit 1767 passing, Playwright 28 passed.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register-and-read",
+      "dateTime": "2026-07-28T21:44:39.404192-04:00",
+      "description": "Registered S3 (claude/anthropic/claude-opus-5/high); read the preload, the spec, S1+S2 dispositions, s1-runtime-unknowns.md, and docs/tutorials/hello-world.md end to end as a reader would.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "ai-assignment",
+      "dateTime": "2026-07-28T21:44:39.405193-04:00",
+      "description": "Routed step-3.5 assignment analysis (analysis, anthropic excluded -> gemini-2.5-pro, $0.0098, truncation-clean); appended the S3 block to ai-assignment.md. Analyst returned orchestrator-direct for all four authoring steps; its clean-environment desk-check control declined with reasons (it IS the S4 walk) and replaced by four cheaper controls.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "task_type": "analysis",
+          "model_id": "gemini-2.5-pro",
+          "cost_usd": 0.0098425,
+          "purpose": "step-3.5 assignment analysis"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "scene-scripts-authored",
+      "dateTime": "2026-07-28T22:12:53.291919-04:00",
+      "description": "Authored docs/tutorials/video/ \u2014 9 files, 1,952 lines: README (scene order, variant matrix, runtime estimates, OBS scenes/sources, the must-never-be-on-screen checklist, the beat format) + six scene scripts 1:1 with the tutorial parts. Every beat carries Do / Say / See, cites its tutorial step in a per-file traceability table, and adds an \"If this fails on camera\" line wherever a known failure mode exists (Copilot auth, CLI version pin drift, branch protection on GitHub Free, red CI, finalize refusals). Async beats are marked WAIT with a duration; take boundaries are marked CUT.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "alt-takes-authored",
+      "dateTime": "2026-07-28T22:12:53.292918-04:00",
+      "description": "Authored the two alternate takes: scene-1-alt-direct-api (replaces scene 1; names its 3 downstream changes and its rejoin point; keys set OFF CAMERA with a presence-only probe) and scene-2-alt-azure-devops (replaces scene 2; names its 5 downstream beat substitutions and its rejoin point; scratch-org warning).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "tutorial-gaps-fixed",
+      "dateTime": "2026-07-28T22:12:53.292918-04:00",
+      "description": "Fixed three things in docs/tutorials/hello-world.md that scripting exposed. Two were S2-queued residuals in Part 4 step 6 (a stale \"delete any if: line\" clause that is a no-op after S2 re-cut the template, and prose that undersold the CI edit by two steps) \u2014 fixed together by rewriting the sentence to the real add-two-steps-replace-one-run-block edit and renaming the printed step to the scaffolded \"Build and test every module\", so the edit really is add-only. The third is NEW and is the more serious: Part 5 step 6 promised the app implementation set \"shows as blocked in the Work Explorer\" \u2014 but blockedMarker() suppresses on a SATISFIED prerequisite, and greeter is already complete at that point, so the reader would look for a marker that can never appear. Rewritten to say nothing changes on screen, and why.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "uat-checklist-authored",
+      "dateTime": "2026-07-28T22:12:53.293919-04:00",
+      "description": "Authored 106-hello-world-tutorial-simplification-uat-checklist.json \u2014 13 walks to the Set 078 bar. Walks 1-10 follow the tutorial Part 1 -> Part 6 in its natural order with no reordering; walks 11-12 are the alternate-take spot checks, flagged INTENTIONALLY out of order in both Subarea and HumanAction; walk 13 is the whole-script attestation. Every walk opens with a \"Where you are\" preamble, carries literal copy-pasteable HumanAction steps and literal-string Expectations, and names the scene script it dry-runs. 10 items declare ProgrammaticVerification, 3 declare NoProgrammaticPathReason.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "authoring-gates-run",
+      "dateTime": "2026-07-28T22:12:53.294919-04:00",
+      "description": "Ran two committed mechanical gates instead of the routed analyst-proposed clean-environment desk check (declined with reasons \u2014 it IS the S4 walk). s3-check-literals.py: 98/98 PASS (command titles resolve to real contributed commands; 44 shared literals identical; CI YAML byte-identical tutorial<->scene 4 and add-only from the scaffolded template; all relative links resolve). s3-check-checklist.py: 345/345 PASS (schema shape; the ad-hoc UAT floor; the 078 authoring bar). Evidence: s3-authoring-gates.md, which also names the five things the gates do NOT establish.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "suite-green",
+      "dateTime": "2026-07-28T22:12:53.294919-04:00",
+      "description": "Full suite on the reviewed tree: Layer 1 pytest 3060 passed / 6 skipped (410.82s, exit 0); Layer 2 npx tsc --noEmit clean + npm run test:unit 1767 passing. Layer 3 Playwright deliberately NOT run \u2014 L-064-12 arms it for Explorer-rendering surfaces, state-file writers, or the fixture harness, and this session changes none of them (markdown under docs/tutorials/ plus one session-set JSON artifact).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "verify-discovery",
+      "dateTime": "2026-07-28T22:52:37.555960-04:00",
+      "description": "Round 1 discovery (fan-out 2/2, gpt-5-6, $0.7013): ISSUES_FOUND, 18 blocking. Round 2 supplementary completeness critic run BEFORE any remediation per the loop discipline (gpt-5-6, $0.3002): 2 more blocking. The fan-out duplicated 5, so the merged harvest is 15 distinct defects. All 15 accepted; none disputed.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "task_type": "session-verification",
+          "model_id": "gpt-5-6",
+          "cost_usd": 0.7013,
+          "purpose": "discovery fan-out 2/2"
+        },
+        {
+          "task_type": "session-verification",
+          "model_id": "gpt-5-6",
+          "cost_usd": 0.3002,
+          "purpose": "supplementary completeness critic"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "remediation",
+      "dateTime": "2026-07-28T22:52:37.556961-04:00",
+      "description": "Fixed all 15 in one pass across 10 files; sidecar s3-remediation-round-3.md. The dominant class was a step that cannot be performed from the state the previous step leaves behind -- both authoring gates were green while all 15 were live, which is exactly the limitation s3-authoring-gates.md names about itself. 7 of the 15 touched hello-world.md under the spec's scripting-exposed-gap clause, each listed individually in the sidecar so the judgment can be audited. Extended s3-check-literals.py so the 4 most drift-prone fixes cannot silently re-open: 104/104 PASS (was 98/98); checklist gate 345/345 PASS; extension unit re-run 1767 passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "remediation-review",
+      "dateTime": "2026-07-28T23:01:26.970647-04:00",
+      "description": "Cycle 1 (round 3, gpt-5-6, $0.1785): 13 accepted / 1 accepted-with-modification / 2 rejected. Both rejections were the Azure DevOps take: Walk 11 was a spot check that never exercised the newly added Azure CLI install while Walk 13 attested every script followable, and fix N had WEAKENED the private-repos-never-on-screen rule instead of satisfying it. Fixed by making Walk 11 a full beat 1-6 execution, scoping Walk 13's claim to walked-vs-reviewed, and making the ADO scratch project PUBLIC (org policy toggle scripted, hard stop if unavailable) so the README's rule is restored unconditional.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "task_type": "session-verification",
+          "model_id": "gpt-5-6",
+          "cost_usd": 0.1785,
+          "purpose": "remediation-review cycle 1"
+        }
+      ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "remediation-review-2",
+      "dateTime": "2026-07-28T23:01:26.972646-04:00",
+      "description": "Cycle 2 (round 4, gpt-5-6, $0.1855): 15 of 16 accepted, 1 rejected -- fix A had swapped one unavailable dependency for another (a future recorder has no way to obtain the 0.46.0 VSIX the scene now told them to sideload). Accepted and fixed BY REMOVAL: both scene-1 takes drop the sideload branch for a recording precondition (do not record until the Marketplace is at 0.46.0 -- a video must show a path a viewer can follow), and the VSIX stays only in the S4 walk, named in both places as the one deliberate departure from a scene script. THE BOUNDED TOTAL OF 2 REMEDIATION-REVIEW CYCLES IS NOW REACHED: the loop suspends and the session stops to the operator for adjudication rather than opening cycle 3. Convergence across four rounds: 18 -> 2 -> 2 -> 1 blocking, acceptance 13/16 -> 15/16, zero findings disputed, nothing reopened.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "task_type": "session-verification",
+          "model_id": "gpt-5-6",
+          "cost_usd": 0.1855,
+          "purpose": "remediation-review cycle 2"
+        }
+      ]
     }
   ]
 }

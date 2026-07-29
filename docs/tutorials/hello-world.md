@@ -102,8 +102,9 @@ the framework is built around.
    and declare the greeter module"`, then `git push`.
 
 5. **Protect `main` (stage 1 of 3).** On GitHub: **Settings** > **Branches**, add a rule for
-   `main`, turn on **Require a pull request before merging**, and set required approvals to
-   **0** — you are alone until Part 5. If you are an admin, also enable the
+   `main`, turn on **Require a pull request before merging**, and leave **Require approvals**
+   **unticked** — that is zero approvals, and you need it, because you are alone until Part 5
+   and nobody else can approve you. If you are an admin, also enable the
    do-not-allow-bypass option so the rule binds you too. From here on, every change reaches
    `main` through a pull request. *(Azure DevOps: **Project Settings** > **Repositories** > your
    repo > **Policies** > **Branch Policies** on `main` > **Require a minimum number of
@@ -148,9 +149,10 @@ git switch -c authoring/greeter-lifecycle
    implementation set — expect `005-greeter-hello` or similar. **Write down the name it actually
    gave you**: everywhere below that says `005-greeter-hello`, type your set's real name.
 
-3. **Land the plan and the new set on `main`.** Commit whatever the two sessions left uncommitted
-   (`git add -A && git commit -m "docs: greeter plan and its implementation set"`), run
-   **`Dabbler: Open PR for this set`**, merge it, then get back onto an up-to-date trunk:
+3. **Land the plan and the new set on `main`.** Both sessions commit their own work, so
+   `git status --short` is usually empty here — if it is not, commit the remainder
+   (`git add -A && git commit -m "docs: greeter plan and its implementation set"`). Then run
+   **`Dabbler: Open PR for this set`**, merge it, and get back onto an up-to-date trunk:
 
    ```bash
    git switch main && git pull --ff-only && git branch -d authoring/greeter-lifecycle
@@ -176,9 +178,10 @@ git switch -c authoring/greeter-lifecycle
    tests it, and commits to the session branch. Watch it work.
 
 6. **Turn on CI, on the same branch.** A module with tests now exists, so open
-   `.github/workflows/monorepo-ci.yml` in the worktree and adapt the scaffolded file down to
-   exactly one active job: replace the placeholder `run:` block with a real test command, and
-   delete any `if: github.event_name == 'push' …` line so it also runs on pull requests.
+   `.github/workflows/monorepo-ci.yml` in the worktree and make the scaffolded job real: add
+   two steps that install Python and pytest, then replace the placeholder step's `run:` block
+   with a command that tests every module. Nothing else changes — the job is already named
+   `test`, and it already runs on pull requests as well as on pushes to `main`.
 
    ```yaml
    jobs:
@@ -190,17 +193,20 @@ git switch -c authoring/greeter-lifecycle
            with:
              python-version: "3.12"
          - run: python -m pip install pytest
-         - name: Test every module
+         - name: Build and test every module
            run: |
              for module in services/*/; do
+               echo "== $module"
                python -m pytest -q "$module" || exit 1
              done
    ```
 
    One job, always running, testing every module. Because each module directory is tested on its
    own, a module shipping **zero** tests fails the build instead of hiding behind another
-   module's passing tests. Commit this change on the session branch. (Large repositories can add
-   path filtering — but keep one always-running aggregate job as the required check.)
+   module's passing tests — and the `echo` puts one `== services/<module>/` line per module in
+   the job log, so you can see that happening. Commit this change on the session branch. (Large
+   repositories can add path filtering — but keep one always-running aggregate job as the
+   required check.)
 
    > **Azure DevOps** ignores GitHub Actions workflows. Instead, **now, before opening the PR**,
    > create a pipeline running the same test command (its YAML belongs to your organization's
@@ -236,11 +242,14 @@ a second module.
 | Priya (you) | `greeter` | `services/greeter/` | done in Part 4 |
 | Sam | `app` | `services/app/` | imports `greeter`, adds the time |
 
-1. **Invite Sam.** **Settings** > **Collaborators** > **Add people**, with the **Write** role.
-   *(Azure DevOps: add him to the project's **Contributors** group under **Project Settings** >
-   **Permissions**.)* He accepts, clones the repo, and does his own one-time setup: **all of
-   Part 1**, including signing in to the Copilot CLI, plus **`Dabbler: Install ai-router`** once
-   in his clone (the `.venv` is git-ignored, so it exists only on your machine).
+1. **Invite Sam.** **Settings** > **Collaborators** > **Add people**, and add his handle.
+   Accepting the invitation is what gives him push access — a personal repository has no role
+   picker; on an organisation repository, choose **Write**. *(Azure DevOps: add him to the
+   project's **Contributors** group under **Project Settings** > **Permissions**.)* He then
+   clones the repo and does his own one-time setup: **all of Part 1** exactly as you did it —
+   including the Copilot CLI sign-in, or the provider API keys if that is the variant you
+   chose — plus **`Dabbler: Install ai-router`** once in his clone (the `.venv` is git-ignored,
+   so it exists only on your machine).
 
 2. **Declare the `app` module.** Run **`Dabbler: New Module`** with slug `app` and title `App`.
    As in Part 3 it declares the module, writes a plan stub, and scaffolds `app`'s two lifecycle
@@ -269,15 +278,16 @@ a second module.
    /services/app/      @sam-gh @priya-gh
    ```
 
-   On a real team repository these rules request the right reviewers automatically; this
-   tutorial asks for Priya's review by hand, because rules added in the same pull request are
-   not a useful demonstration of routing. *(Azure DevOps: CODEOWNERS is GitHub-only; the
-   equivalent is **Automatically included reviewers** — one entry per module with a path
-   filter, each marked **Required**.)*
+   Once these are on `main`, GitHub requests the right reviewer by itself on any pull request
+   touching those paths — which is what happens to Sam in Part 6. Rules only route on pull
+   requests opened *after* they land, so this one, which adds them, still needs asking by hand.
+   *(Azure DevOps: CODEOWNERS is GitHub-only; the equivalent is **Automatically included
+   reviewers** — one entry per module with a path filter, each marked **Required**.)*
 
-4. **Protect `main` (stage 3 of 3).** Raise required approvals from **0** to **1** — from now on
-   somebody else has to say yes. *(Azure DevOps: keep the minimum at 1 and untick **Allow
-   requestors to approve their own changes**, so your own vote no longer counts.)*
+4. **Protect `main` (stage 3 of 3).** Tick **Require approvals** on the `main` rule and set the
+   count to **1** — from now on somebody else has to say yes, including on the pull request in
+   the next step. *(Azure DevOps: keep the minimum at 1 and untick **Allow requestors to approve
+   their own changes**, so your own vote no longer counts.)*
 
 5. Land everything from steps 2–3 — the manifest edit, the plan stub, `app`'s two lifecycle
    sets, and CODEOWNERS — as one small pull request. `main` is protected now, so it goes on a
@@ -289,8 +299,9 @@ a second module.
    git commit -m "docs: declare the app module and route reviews"
    ```
 
-   Then run **`Dabbler: Open PR for this set`** — it works from any non-trunk branch — approve
-   and merge it, then `git switch main && git pull --ff-only && git branch -d
+   Then run **`Dabbler: Open PR for this set`** — it works from any non-trunk branch. **Ask Sam
+   to approve it**: you raised approvals to 1 a moment ago, and you cannot approve your own pull
+   request. Merge it, then `git switch main && git pull --ff-only && git branch -d
    authoring/app-module`.
 
 6. **Sam pulls first** (`git pull --ff-only`), or `app` and its sets exist in neither his clone
@@ -314,18 +325,22 @@ a second module.
          condition: complete
      ```
 
-     Its row shows as blocked in the Work Explorer until `greeter`'s set is complete.
+     Because `greeter`'s set is already complete, nothing changes on screen. Were it not,
+     that row would carry a ⛓︎ marker naming what it is waiting for.
    - **Land all of it on `main`** from that authoring branch with **`Dabbler: Open PR for this
-     set`**, exactly as in Part 4 step 3, then `git switch main && git pull --ff-only`. The
-     prerequisite has to be on `main` before the worktree is cut, or the worktree gets a spec
-     without it.
+     set`**, exactly as in Part 4 step 3. This one is all planning files, so no CODEOWNERS rule
+     matches and nobody is requested automatically — Sam asks **you** to approve it, then merges,
+     then `git switch main && git pull --ff-only`. The prerequisite has to be on `main` before
+     the worktree is cut, or the worktree gets a spec without it.
    - **Implementation set**, in a worktree, exactly as in Part 4.
 
 ## Part 6 — Review, merge, and clean up *(scene 6)*
 
-1. From his worktree window, Sam runs **`Dabbler: Open PR for this set`** and requests
-   **Priya's** review. She reads the composition — this is the point of `touches:`: the owner
-   of the code being composed sees it before it lands. The `test` check runs both modules.
+1. From his worktree window, Sam runs **`Dabbler: Open PR for this set`**. This one changes
+   `services/app/`, so the CODEOWNERS rules you landed in Part 5 request **Priya** for him —
+   nobody has to remember. She reads the composition: `touches:` is what let `app` reach into
+   `greeter`'s code, and the ownership rule is what puts that change in front of `greeter`'s
+   owner before it lands. The `test` check runs both modules.
 2. Priya approves, Sam merges, and Sam runs **`Dabbler: Finalize merged set`** from his main
    checkout.
 3. Pull and run the composed program from the repository root — `git pull --ff-only`, then

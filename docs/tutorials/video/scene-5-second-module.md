@@ -31,6 +31,27 @@ video, the simplest honest staging is:
 Say this out loud once, at beat 1. Do not pretend there are two humans — a viewer who spots
 the same desktop wallpaper on "Sam's machine" stops trusting the rest of the video.
 
+> ## The browser profile is not enough — `gh` is global, and it will break this scene
+>
+> `gh auth login` writes one credential for the whole OS user, **not per folder and not per
+> VS Code window**. `Dabbler: Open PR for this set` runs `gh pr create`, and GitHub records
+> the pull request's author as **whoever `gh` is logged in as** — not whoever wrote the
+> commits. So if you leave `gh` signed in as Priya from scene 1, "Sam's" pull requests are
+> authored by *Priya*, and then:
+>
+> - **Priya cannot approve them** (GitHub refuses self-approval), which walls beat 12 and
+>   scene 6 beat 5; and
+> - **scene 6 beat 2's automatic review request never appears**, because CODEOWNERS never
+>   requests the author of a pull request.
+>
+> Two people on two machines never hit this. You, playing both on one, hit it every time.
+>
+> **The fix, once, in beat 3:** log Sam's account into `gh` as a second account, then switch
+> accounts before every pull-request action. `gh auth switch` (GitHub CLI 2.40+) is what does
+> it, and `gh auth status` tells you who is active. Every beat below that opens or approves a
+> pull request names the switch explicitly — do not skip them, and check `gh auth status`
+> rather than trusting your memory of the last switch.
+
 ---
 
 ## Beat 1 — Introduce the cast *(Part 5 opening)*
@@ -66,6 +87,17 @@ there is **no role dropdown** in this dialog — do not go looking for one on ca
 **Do.** Switch to Sam's browser profile, accept the invitation, clone the repository into a
 second folder, and open it in a second VS Code window. Then in that window, Command Palette →
 **`Dabbler: Install ai-router`**.
+
+Then, in that window's terminal, add Sam's account to the GitHub CLI and confirm both are
+there — this is the staging fix from the note at the top of this scene:
+
+```bash
+gh auth login
+gh auth status
+```
+
+Sign in as **Sam** this time. `gh auth status` then lists **both** accounts, with one marked
+active.
 
 **Say.** "Sam accepts, clones, and does his own one-time setup — all of part one, exactly the
 way I did it, including signing in to the Copilot CLI. Plus one extra command: **Dabbler:
@@ -176,6 +208,13 @@ git add -A
 git commit -m "docs: declare the app module and route reviews"
 ```
 
+Make sure `gh` is acting as **you**, then open the pull request:
+
+```bash
+gh auth switch --user <your-handle>
+gh auth status
+```
+
 Then Command Palette → **`Dabbler: Open PR for this set`**, set a real title, approve the
 dialog. **Switch to Sam's browser profile and have him approve it** — you cannot approve your
 own pull request, and you set required approvals to 1 one beat ago. Back as Priya, merge it.
@@ -270,10 +309,17 @@ chain-link marker naming exactly what it was waiting on, and you'd know not to s
 
 ## Beat 12 — Sam lands it, then works in a worktree *(Part 5 step 6)* — **WAIT / CUT**
 
-**Do.** In Sam's window: **`Dabbler: Open PR for this set`** from the authoring branch. Then,
-as **Priya**, open that pull request and **Approve** it — this one is all planning files, so no
-CODEOWNERS rule matches and nobody was requested automatically; Sam has to ask. Back as Sam:
-merge it, then:
+**Do.** In Sam's window, **switch `gh` to Sam first** — the pull request's author is whoever
+`gh` is logged in as, and Priya has to be able to approve it:
+
+```bash
+gh auth switch --user <sams-handle>
+gh auth status
+```
+
+Then **`Dabbler: Open PR for this set`** from the authoring branch. Then, as **Priya**, open
+that pull request and **Approve** it — this one is all planning files, so no CODEOWNERS rule
+matches and nobody was requested automatically; Sam has to ask. Back as Sam: merge it, then:
 
 ```bash
 git switch main
@@ -288,9 +334,11 @@ exactly as in scene 4 beats 10–12.
 all planning files, so no ownership rule matches it and he has to ask me directly. Then a
 worktree, a new window, and the session writes the code."
 
-**See.** The pull request shows **no** automatically requested reviewer; after Priya's
-approval it merges. The implementation session then creates `services/app/app.py` and its test,
-and commits to `session-set/<app-set-name>`.
+**See.** The pull request is **authored by Sam** — check the byline before anything else; if it
+says Priya, the `gh auth switch` did not take and Priya will not be able to approve. It shows
+**no** automatically requested reviewer, and after Priya's approval it merges. The
+implementation session then creates `services/app/app.py` and its test, and commits to
+`session-set/<app-set-name>`.
 
 **WAIT:** 5–15 minutes. **CUT.**
 

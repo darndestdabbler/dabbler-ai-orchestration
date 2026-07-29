@@ -110,6 +110,9 @@ SHARED = [
     ("Require approvals", "scene-5-second-module.md"),
     ('echo "== $module"', "scene-4-first-module.md"),
     ("Automatically included reviewers", "scene-2-alt-azure-devops.md"),
+    # Added after the third-provider opinion caught the one-machine `gh` trap.
+    ("gh auth status", "scene-5-second-module.md"),
+    ("gh auth status", "scene-6-pr-and-merge.md"),
     ("python -m services.app.app", "scene-6-pr-and-merge.md"),
     ("Hello, world! It is 14:32.", "scene-6-pr-and-merge.md"),
     (".venv\\Scripts\\python.exe -m ai_router.worktree list", "scene-6-pr-and-merge.md"),

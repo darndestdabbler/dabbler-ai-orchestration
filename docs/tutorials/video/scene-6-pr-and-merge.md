@@ -21,13 +21,23 @@ The composed program runs on `main`. The video ends on five checks the viewer ca
 
 ## Beat 1 — Sam opens the pull request *(Part 6 step 1)*
 
-**Do.** As **Sam**, in his worktree window: Command Palette → **`Dabbler: Open PR for this
-set`**. Accept the prefilled **PR title**, read the dialog, click **Push + create PR**.
+**Do.** As **Sam**, in his worktree window, confirm `gh` is still acting as Sam before anything
+else — everything in this scene depends on it (see scene 5's staging note):
+
+```bash
+gh auth switch --user <sams-handle>
+gh auth status
+```
+
+Then Command Palette → **`Dabbler: Open PR for this set`**. Accept the prefilled **PR title**,
+read the dialog, click **Push + create PR**.
 
 **Say.** "Sam opens the pull request from his worktree window — same command, same
 approval dialog as every other time."
 
-**See.** `PR created: …` and the pull request opens in Sam's browser profile.
+**See.** `PR created: …` and the pull request opens in Sam's browser profile, **authored by
+Sam**. If the byline says Priya, stop — the next two beats cannot work, because CODEOWNERS
+never requests a pull request's own author and GitHub never lets one approve it.
 
 ---
 

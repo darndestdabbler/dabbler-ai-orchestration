@@ -451,6 +451,147 @@ For the record, the arc across four rounds is one of convergence, not grinding:
 and every finding in every round accepted rather than disputed. Nothing has
 reopened under fresh wording.
 
+---
+
+# Round-5 and the third-provider opinion — operator adjudication, 2026-07-29
+
+The operator was stopped to at the bound and ruled: **"One more cycle, then
+third-provider opinion, then close."** Both ran.
+
+## Round 5 — remediation-review cycle 3 (operator-authorized)
+
+`VERIFIED`. **Zero findings.** Fix verdicts: **16 accepted, 0 rejected, 1
+accepted-with-modification.** Cost $0.1583. The round-4 fix (the Marketplace
+recording precondition) was accepted.
+
+That closed the loop on the same-provider axis: **18 → 2 → 2 → 1 → 0**.
+
+## The third-provider opinion — and it was worth every cent of $0.074
+
+All five rounds were judged by **openai / gpt-5-6**; the orchestrator is
+**anthropic**. The opinion went to **google / gemini-3.1-pro-preview** — the one
+provider family that had not seen the work — with the whole evidence bundle
+(198k chars: the tutorial, all nine scripts, the checklist, both gate artifacts,
+and this remediation record) and one question a same-provider re-run cannot
+answer: *did this converge because the work became sound, or because the verifier
+stopped noticing?*
+
+Its answer: **`ISSUES_FOUND`. `convergence_assessment.genuine: false`.** Raw
+output in [`s3-third-provider-opinion.md`](s3-third-provider-opinion.md).
+
+> "The verifier successfully cleaned up logical gaps, UI mismatches, and script
+> contradictions, leaving a tutorial that is narratively flawless. However, it
+> completely lost sight of the physical constraints of the execution
+> environment. … It achieved 0 findings by ignoring the execution layer."
+
+And it named the thing five rounds walked past.
+
+### TP-1 (Critical) — `gh` is global, and it breaks the two-person staging every time
+
+`gh auth login` writes **one credential for the whole OS user** — not per folder,
+not per VS Code window. `Dabbler: Open PR for this set` runs `gh pr create`, and
+GitHub records a pull request's author as **whoever `gh` is logged in as**, not
+whoever authored the commits.
+
+The staging asks one operator to play two people on one machine, separated by a
+second *browser profile* and a second *clone*. Neither touches `gh`. So every
+pull request "Sam" opens is authored by **Priya**, and two things follow, both
+certain rather than probable:
+
+- **Priya cannot approve them.** GitHub refuses self-approval. Scene 5 beat 12
+  and scene 6 beat 5 — and checklist Walks 8 and 9 — dead-end at a disabled
+  Merge button.
+- **Scene 6 beat 2's automatic review request never appears.** CODEOWNERS never
+  requests a pull request's own author. The beat this session *added* in round 1,
+  as the payoff for the whole CODEOWNERS story, would have shown an empty
+  Reviewers box.
+
+Two people on two machines never hit this. One person playing both hits it every
+time — and the operator was about to spend two hours doing exactly that.
+
+**Why five rounds missed it, in the opinion's own words:** *"salience exhaustion
+on the physical staging layer. The verifier perfectly verified the logical
+narrative (Sam opens PR → Priya approves) but completely forgot that both actors
+are sharing a single local OS user session where `gh auth login` is global
+state."* Every round reasoned about the **documents**; none reasoned about the
+**machine**.
+
+**Accepted and fixed.** The fix stays entirely in the staging — scene scripts and
+checklist — and **does not touch the tutorial**, because the tutorial is correct:
+real Priya and real Sam are on their own machines with their own `gh` logins.
+This is a video-and-walk artefact, not a product or doc defect.
+
+- **Scene 5's staging note** gains a block explaining the trap, its two
+  consequences, and the fix. It says plainly that a second browser profile is not
+  enough.
+- **Scene 5 beat 3** (Sam's setup) adds `gh auth login` as Sam, then
+  `gh auth status`, so both accounts exist in the CLI from the moment Sam appears.
+- **Scene 5 beats 8 and 12, and scene 6 beat 1** each add an explicit
+  `gh auth switch --user <handle>` + `gh auth status` before the pull-request
+  action — *"check `gh auth status` rather than trusting your memory of the last
+  switch."*
+- **Scene 5 beat 12 and scene 6 beat 1** add the byline to their **See** clauses:
+  if the pull request says Priya, stop, because the next beats cannot work.
+- **Checklist**: a new `THE ONE-MACHINE STAGING TRAP` paragraph in `Notes`, the
+  second `gh auth login` in Walk 7 step 2, the switch in Walk 7 step 7, Walk 8
+  step 5 and Walk 9 step 1, and byline checks in the Walk 8 and Walk 9
+  Expectations.
+- **The literal gate** now pins `gh auth status` in scenes 5 and 6, so the switch
+  discipline cannot be edited away silently. **107/107 PASS.**
+
+### TP-2 (Minor) — the checklist flattened cross-platform commands to Windows
+
+The checklist quotes `winget install GitHub.Copilot` and
+`.venv\Scripts\python.exe` as literals; the scene scripts carry the macOS/Linux
+forms beside them and the checklist dropped them.
+
+**Accepted, graded Minor and fixed at that weight** — the walk machine is
+Windows, so the probability for *this* walk is low, but a defect in the checklist
+is a defect. `Notes` gains a `PLATFORM` paragraph naming the three substitutions
+and telling the operator to take them from the scripts and record that they did.
+
+### What the third provider did *not* find
+
+`fixes_i_would_challenge` came back **empty** — it challenged none of the 19
+fixes made across rounds 1–4, including the two that were themselves corrections
+of earlier fixes (the privacy rule, the Marketplace precondition). That is the
+useful shape of this result: the *document-layer* work was sound, and the loop
+that produced it was converging honestly on that axis. What it could not see,
+because it never looked at the machine, was an entire second axis.
+
+### The lesson this earns
+
+A same-provider verification loop converges on the axis it started reasoning
+about. Five rounds of increasingly clean results on the **document** layer were
+genuine *and* said nothing about the **execution** layer. `VERIFIED` from a loop
+is a statement about what that loop looks at — and the cheapest way to find out
+what it does not look at is one call to a provider family that has not been in
+the room. It cost **$0.074** and it saved a two-hour walk from walling at Walk 8.
+
+## Gates after the third-provider remediation
+
+```text
+$ .venv/Scripts/python.exe docs/session-sets/106-hello-world-tutorial-simplification/s3-check-literals.py
+[A] 10/10 PASS
+[B] 59/59 PASS
+[C] 38/38 PASS
+
+TOTAL: 107/107 PASS
+
+$ .venv/Scripts/python.exe docs/session-sets/106-hello-world-tutorial-simplification/s3-check-checklist.py
+[D] 255/255 PASS
+[E] 26/26 PASS
+[F] 64/64 PASS
+
+TOTAL: 345/345 PASS
+```
+
+Extension unit re-run: **1767 passing**. The TP-1/TP-2 fixes are **not
+verifier-reviewed** — the operator's ruling was one cycle, then the opinion, then
+close, and re-reviewing this delta would be cycle 4. They are markdown and JSON
+staging notes in this session's own deliverables, and the S4 walk is where they
+get exercised for real.
+
 ## What is still not established
 
 Unchanged from `s3-authoring-gates.md`, and now with two additions worth naming.
@@ -467,3 +608,15 @@ looking at it — which is precisely the class of claim a walk exists to settle:
   fresh organisation is likewise reasoned. If it turns out not to be reachable,
   the take's own hard stop fires and Walk 11 reports that it could not run —
   which is the designed outcome, not a surprise, but it has not been observed.
+- **Fix TP-1 — `gh auth switch`.** That the GitHub CLI supports multiple logged-in
+  accounts and switches between them with `gh auth switch --user <handle>`
+  (GitHub CLI 2.40+), and that `gh auth status` shows which is active, is
+  reasoned from the CLI's documented surface, not run. Walk 7 step 2's
+  expectation — *"`gh auth status` must list BOTH handles; if it lists one, the
+  second login did not take"* — is where that gets settled, and it is deliberately
+  placed one walk **before** the walk it protects.
+
+And one thing this session now knows it cannot establish at all: **what a
+verification loop is not looking at.** Five rounds on one provider converged
+honestly on the document layer and were silent about the execution layer. That
+is not a gap a sixth round of the same kind closes.

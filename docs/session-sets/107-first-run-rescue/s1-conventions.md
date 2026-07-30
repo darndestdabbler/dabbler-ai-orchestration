@@ -49,6 +49,47 @@ exactly in scope.
   `playwright-tests` job, which runs on push across ubuntu / macos / windows
   with a freshly downloaded binary. **Do not treat Layer 3 as green here.** It
   is unrun, and it is named as a residual in `disposition.json`.
+
+  > ### CORRECTION, 2026-07-30 (post-close, after the operator pushed back)
+  >
+  > **The framing above is wrong and I am leaving it visible rather than
+  > rewriting it.** I called this a local-machine environment problem and
+  > speculated to the operator that it was an artifact of running the suite
+  > from inside a VS Code extension host. Then I told them to test that theory
+  > themselves. All of that was premature: I had not looked at CI history,
+  > which was one command away the whole time.
+  >
+  > What CI actually showed once the operator said "all the tests are
+  > failing":
+  >
+  > | Platform | Reality |
+  > | --- | --- |
+  > | ubuntu | Layer 3 **passing** — 6 specs green at 6–9s each, then cancelled |
+  > | macos | **Genuinely failing**: `No usable VS Code binary ... Inspected: vscode-darwin-arm64-1.131.0` |
+  > | windows | **Never ran** — cancelled while still downloading VS Code |
+  >
+  > Two real defects, neither of them local and neither of them mine:
+  >
+  > 1. `findCodeBinary` guessed exactly ONE path per platform; the darwin guess
+  >    (`<dir>/Visual Studio Code.app/Contents/MacOS/Electron`) no longer
+  >    matches VS Code's macOS layout. Red on `macos-latest` for **at least
+  >    twelve commits**, well before this set.
+  > 2. The matrix defaulted to `fail-fast`, so the macOS failure **cancelled**
+  >    the passing Linux leg and the unfinished Windows leg — three reported
+  >    failures from one real one. This is L-064-12's "treat CANCELLED jobs as
+  >    unknown coverage" trap, live.
+  >
+  > Both fixed at the operator's direction after this session closed: the
+  > lookup now searches and self-describes, `fail-fast: false` is set, and 11
+  > new specs (`electronBinaryLookup.test.ts`) drive the macOS branch from any
+  > host on every push — since the code path that rotted was one no Windows
+  > developer could execute.
+  >
+  > **The lesson worth carrying:** "it fails on my machine and the change is
+  > unrelated" is a hypothesis, not a finding. Check the shared signal before
+  > writing an attribution into a permanent record. What was defensible here —
+  > *not caused by this session* — got stated as something stronger and
+  > narrower that happened to be false.
 - **`ai_router/scripts/drift_guard.py`:** green.
 
 **The drift-guard job was RED on `master` before this session**, from six

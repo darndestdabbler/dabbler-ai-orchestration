@@ -102,7 +102,41 @@ decide it, so this is re-stated at the set-terminal close, not fixed here.
 
 ### Actuals (filled at close)
 
-- Orchestrator used: _(pending)_
-- Routing plan followed as recommended: _(pending)_
-- Deviations: _(pending)_
-- Outcome: _(pending)_
+- **Orchestrator used:** claude / anthropic / claude-opus-5 / high (operator-invoked).
+- **Routing plan followed as recommended.** Implementation stayed
+  orchestrator-direct as planned (spec-locked execution, not generation); the
+  added step 2b routed the user-facing strings. The analyst's advice to route
+  steps 2/3/4/8 as "code generation" was declined for the reason recorded
+  above, and the session's own verification rounds — which found five real
+  blockers in that orchestrator-direct code — are the honest counter-evidence
+  worth recording: the code needed *review*, which it got, not different
+  authorship.
+- **Deviations:** three, all disclosed at the time.
+  1. Step 5 installs `pytest`? No — the sample was switched to stdlib
+     `unittest` so step 5 installs exactly one package, since
+     `dabbler-ai-router` does not depend on pytest.
+  2. Three in-scope fixes outside the literal plan: the `close_session` EOF
+     guard (router-side, same bug class), the recursive `sample-dist-in-sync`
+     drift check, and repairing the `drift-guards` CI job that was **already
+     red on master** from the previous set.
+  3. `docs/repository-reference.md` was corrected: it claimed extension
+     `0.46.0` was staged-and-unpublished with `0.45.0` live, a day after
+     `0.46.0` had actually published (verified against the workflow run, not
+     assumed).
+- **Sub-decisions settled:** resumability via the incomplete-sample marker
+  (a `.venv` cannot be relocated, so temp-dir-then-move is unsound here);
+  repository-local git identity over a command-scoped `-c` (the developer's own
+  agent commits here later and must inherit a working identity).
+- **Verification:** six rounds. Discovery fan-out 2/2 → supplementary →
+  remediation-review ×2 → **operator-authorized** third remediation review →
+  close-backstop round 6. Closed **VERIFIED**, 0 findings, on both the working
+  tree and the pushed diff. Five distinct blockers found and fixed.
+- **A third-provider opinion was taken** (gemini-2.5-pro, both parties
+  excluded) after the loop hit its 2-cycle bound on a severity dispute. It
+  ruled **against the orchestrator** and surfaced two further real defects.
+  The dispute was withdrawn rather than carried.
+- **Cost:** $1.26 across 10 routed calls, all on the `DABBLER_*` keys. Zero
+  Copilot seat capacity, as forecast.
+- **Outcome:** VERIFIED. Suites: pytest 3066 passed / 6 skipped; Layer 2 1810
+  passing; drift guard green. Layer 3 unrun locally (environment; CI is the
+  signal). Extension `0.47.0` staged, publish operator-gated.

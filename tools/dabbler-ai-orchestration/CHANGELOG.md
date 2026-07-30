@@ -3,19 +3,15 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.47.0] — 2026-07-30 (staged; publish gated on the operator)
+## [Unreleased]
 
-> **The first-run entry point.** Staff called the Hello World tutorial "way
-> too complicated" and some abandoned it; four review rounds across two
-> engines converged on one diagnosis — **first-run cognitive load, not raw
-> git**. No path through this product reached *"an AI session wrote my code"*
-> without first teaching branch protection, worktrees, CI and pull requests.
-> This release ships the path that skips all of it (Set 107 S1), and the
-> tutorial rewritten around it (Set 107 S2). Session 3 puts it under a
-> stopwatch.
->
-> **Not published.** The version bump is staged; no tag was pushed and no
-> publish was run. The click is the operator's.
+> **Not in `0.47.0`.** The entry below was written into `0.47.0`'s section
+> while that version was still staged, and then `0.47.0` published from a
+> commit that predates it. It is moved here rather than left where it was: a
+> CHANGELOG entry under a published version is a claim about bytes a user can
+> install, and this change is not in those bytes. (Set 107 S1 fixed the same
+> class in the other direction — a `0.47.0` entry claiming a router fix the
+> VSIX cannot deliver.)
 
 ### Changed
 
@@ -31,8 +27,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   CODEOWNERS, and monorepo CI", and `monorepo-ci.yml.template`'s worked-example
   comment names the `greeter` / `app` modules. Both now point at
   `adopt-dabbler.md`; `getting-started.md.template` additionally points a
-  first-time reader at `hello-world.md`. No version bump was needed for it —
-  0.47.0 is staged and unpublished, so the change folds into this release.
+  first-time reader at `hello-world.md`.
+
+  **User-visible consequence while this is unreleased:** a developer who
+  scaffolds a repo with `0.47.0` and follows the `getting-started.md` link
+  lands on the 15-minute first run while the sentence promises the teammate /
+  CODEOWNERS / CI walkthrough. The link resolves and the document exists, so
+  this is a wrong-destination defect rather than a broken one — and the same
+  mismatch was already live in `0.46.0`, so it is an incompletely-delivered
+  fix, not a regression. Operator decision 2026-07-30: **fold into the next
+  release rather than cut `0.48.0` for it.**
+
+## [0.47.0] — 2026-07-30 (PUBLISHED 2026-07-30)
+
+> **The first-run entry point.** Staff called the Hello World tutorial "way
+> too complicated" and some abandoned it; four review rounds across two
+> engines converged on one diagnosis — **first-run cognitive load, not raw
+> git**. No path through this product reached *"an AI session wrote my code"*
+> without first teaching branch protection, worktrees, CI and pull requests.
+> This release ships the path that skips all of it (Set 107 S1). Session 2
+> rewrote the tutorial around it; Session 3 puts it under a stopwatch.
+>
+> **Publish record.** Tag `vsix-v0.47.0` on commit
+> [`7f2f2f8`](https://github.com/darndestdabbler/dabbler-ai-orchestration/commit/7f2f2f8),
+> publish-vscode.yml run
+> [30561157896](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/30561157896),
+> success; Test green on the tagged commit (run
+> [30559901882](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/30559901882)).
+>
+> **The tag landed on Session 1's last commit, not on Session 2's.** The
+> operator tagged from a checkout that predated S2's pushes; `package.json`
+> was already `0.47.0` from S1, so the workflow's version check passed and the
+> publish went through. **What shipped is therefore exactly S1's tree** — the
+> `Dabbler: Try a sample project` command, the canonical sample bundle, and
+> `azure-pipelines.yml.template`. S2's two template link fixes are **not** in
+> it and are recorded under `[Unreleased]` above. This is recorded rather than
+> quietly corrected because a future reader diffing the tag against this
+> section would otherwise find changes here that are not in the artifact.
+>
+> **Session 3's acceptance walk is valid against this build.** It exercises the
+> command and the sample bundle, and `git diff 7f2f2f8..HEAD` over
+> `docs/templates/sample-project/` and `dist/templates/sample-project/` is
+> empty — the published sample is byte-identical to the one the new
+> `hello-world.md` describes.
 
 ### Added
 

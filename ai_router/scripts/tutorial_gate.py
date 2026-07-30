@@ -527,12 +527,67 @@ def _interpreter_invocations(text: str) -> tuple[Counter, Counter]:
     return win, posix
 
 
+def canonical_invocations(bundle: dict) -> set[str]:
+    """The argument strings the tutorial is allowed to show, from bundle.json.
+
+    Round 6 (close backstop) found symmetry to be the wrong contract: editing
+    BOTH platform lines to `-m unitest` left the Counters equal and the gate
+    green, while every reader got `No module named unitest`. Symmetry cannot
+    catch a symmetric typo. The bundle already carries the canonical forms --
+    `testCommandArgs` and `programEntryPoint` are the same fields the smoke test
+    runs -- so validating against them closes the whole class (symmetric typo,
+    asymmetric typo, and a dropped platform) instead of one shape of it.
+    """
+    out = set()
+    args = bundle.get("testCommandArgs")
+    if args:
+        out.add(" ".join(args))
+    entry = bundle.get("programEntryPoint")
+    if entry:
+        out.add(entry)
+    return out
+
+
 def check_platform_pairs(repo_root: Path) -> list[Violation]:
     text = _first_run_text(repo_root)
     if text is None:
         return []
     win, posix = _interpreter_invocations(text)
     violations: list[Violation] = []
+
+    bundle = load_bundle(repo_root)
+    canonical = canonical_invocations(bundle) if bundle else set()
+    if canonical:
+        for args in sorted(set(win) | set(posix)):
+            if args and args not in canonical:
+                violations.append(
+                    Violation(
+                        check="platform-pairs",
+                        location=FIRST_RUN_DOC,
+                        detail=(
+                            f"the tutorial runs the project's Python with "
+                            f"{args!r}, which is not a command bundle.json "
+                            f"defines (expected one of "
+                            f"{sorted(canonical)}) -- a reader following this "
+                            "literally gets an error"
+                        ),
+                    )
+                )
+        # Both canonical commands must actually appear, or the tutorial has
+        # silently dropped a step rather than mistyped one.
+        for args in sorted(canonical):
+            if args not in win and args not in posix:
+                violations.append(
+                    Violation(
+                        check="platform-pairs",
+                        location=FIRST_RUN_DOC,
+                        detail=(
+                            f"bundle.json defines {args!r} but the tutorial "
+                            "never shows the reader running it"
+                        ),
+                    )
+                )
+
     for args in sorted(set(win) | set(posix)):
         w, p = win.get(args, 0), posix.get(args, 0)
         if w == p:
@@ -607,8 +662,13 @@ def check_links(repo_root: Path) -> list[Violation]:
 # same reason the sample bundle derives its own file list instead of hardcoding
 # one. The negative lookahead carries the two forms that are prose, not
 # instructions.
+# Round 6 caught the option forms: `git --version`, `git -C <dir>` and
+# `git -c user.email=...` all start with a dash, and the subcommand branch below
+# requires a letter. `git --version` beside the new Git prerequisite is an
+# especially plausible edit.
 _GIT_COMMAND_RE = re.compile(
-    r"\bgit\s+(?!commands?\b|history\b|identity\b)[a-z][a-z-]{1,20}\b",
+    r"\bgit\s+(?:-{1,2}[A-Za-z]"
+    r"|(?!commands?\b|history\b|identity\b)[a-z][a-z-]{1,20}\b)",
     re.IGNORECASE,
 )
 
@@ -656,6 +716,11 @@ _YAML_CONTENT_RE = re.compile(r"^\s*(?:-\s+)?[A-Za-z_][A-Za-z0-9_-]*:(?:\s|$)")
 _YAML_LIST_ITEM_RE = re.compile(r"^\s+-\s+\S")
 # Comment lines and document markers: YAML furniture, skipped when classifying.
 _YAML_FURNITURE_RE = re.compile(r"^\s*(?:#|---\s*$|\.\.\.\s*$)")
+# A block-scalar header: `script: |`, `run: >-`, etc. Its continuation lines are
+# arbitrary text at a deeper indent.
+_BLOCK_SCALAR_RE = re.compile(
+    r"^\s*(?:-\s+)?[A-Za-z_][A-Za-z0-9_-]*:\s*[|>][+-]?\d*\s*$"
+)
 
 
 def _fenced_blocks(lines: list[str]) -> list[tuple[int, list[str]]]:
@@ -714,10 +779,26 @@ def _untagged_yaml_blocks(lines: list[str]) -> list[int]:
             continue
         if not any(_YAML_CONTENT_RE.match(b) for b in real):
             continue
-        if all(
-            _YAML_CONTENT_RE.match(b) or _YAML_LIST_ITEM_RE.match(b)
-            for b in real
-        ):
+        # Block scalars: `script: |` (or `>`) followed by indented continuation
+        # lines that are arbitrary text. Round 5 asked for these and the round-5
+        # remediation did not implement them; round 6 caught the omission. Once
+        # a block-scalar header is seen, its more-indented continuation lines
+        # are part of that scalar, not disqualifying content.
+        classified = []
+        scalar_indent: int | None = None
+        for b in real:
+            indent = len(b) - len(b.lstrip())
+            if scalar_indent is not None and indent > scalar_indent:
+                classified.append(True)
+                continue
+            scalar_indent = None
+            ok = bool(
+                _YAML_CONTENT_RE.match(b) or _YAML_LIST_ITEM_RE.match(b)
+            )
+            if ok and _BLOCK_SCALAR_RE.match(b):
+                scalar_indent = indent
+            classified.append(ok)
+        if all(classified):
             out.append(start)
     return out
 

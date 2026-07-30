@@ -20,7 +20,7 @@ not measured"**; measuring it is S3's entire job and this session cannot do it.
 
 | Suite | Result |
 | --- | --- |
-| pytest (`ai_router`) | **3143 passed / 6 skipped** (674s), final tree. Was 3066/6 at S1 close; the delta is exactly the **77 new tests** in `test_tutorial_gate.py`. Zero failures, zero tracked failures. (The gate started at 34 tests; rounds 1, 4 and 5 each found escapes past it, and every one of those escapes now has a test. The count is a record of what has been attempted against the gate, not a claim about the whole space.) |
+| pytest (`ai_router`) | **3149 passed / 6 skipped** (651s), final tree. Was 3066/6 at S1 close; the delta is exactly the **83 new tests** in `test_tutorial_gate.py`. Zero failures, zero tracked failures. (The gate started at 34 tests; rounds 1, 4 and 5 each found escapes past it, and every one of those escapes now has a test. The count is a record of what has been attempted against the gate, not a claim about the whole space.) |
 | Extension unit (vscode-stub mocha) | **1821 passing** |
 | `npx tsc --noEmit` | clean, exit 0 |
 | `drift_guard.py` | OK, exit 0 |
@@ -57,10 +57,13 @@ not measured"**; measuring it is S3's entire job and this session cannot do it.
    abandoned it. `ai_router/scripts/tutorial_gate.py` check 6 machine-enforces
    this. **Corrected after round 1**, which rightly found the first version of
    that check enforcing far less than this file claimed for it. The gate is now
-   falsified by **62** tests (was 34); round 1's specific escapes — `git diff` /
-   `git log` / `git worktree`, untagged YAML fences, generic branch and commit
-   instructions, sentence-initial casing — each have a test. Details in
-   `s2-remediation-round-3.md`.
+   falsified by **83** tests (was 34). Rounds 1, 4, 5 and 6 each found a way
+   past a version that had just been called complete, and every one of those
+   escapes now has a test — `git diff` and `git --version`, untagged then
+   commented then block-scalar YAML, a duplicated argument and a symmetric
+   typo. The command class is now pinned to `bundle.json`'s own
+   `testCommandArgs` / `programEntryPoint` rather than to a list of wrong
+   shapes. Details in `s2-remediation-round-3.md`, `-5.md`, `-6.md`, `-7.md`.
 3. **Two Minors are already recorded and adjudicated** in
    `s2-duplicate-procedure-adjudication.md`: the starter-line mechanic appearing
    in both tutorials (judged different work, with the residual named), and the

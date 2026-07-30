@@ -53,6 +53,7 @@ def repo(tmp_path: Path) -> Path:
                 "bundleVersion": 1,
                 "sampleSetSlug": "001-add-a-shout",
                 "programEntryPoint": "main.py",
+                "testCommandArgs": ["-m", "unittest"],
                 "expectedTestCount": 2,
                 "expectedProgramOutput": ["Hello, world!", "HELLO, WORLD!"],
                 "missingFunction": "shout",
@@ -463,7 +464,7 @@ def test_windows_only_command_is_flagged(repo: Path):
         "\n",
     )
     found = _checks(tutorial_gate.run_all(repo), "platform-pairs")
-    assert found and "POSIX reader" in found[0].detail
+    assert any("POSIX reader" in v.detail for v in found)
 
 
 def test_posix_only_command_is_flagged(repo: Path):
@@ -474,7 +475,7 @@ def test_posix_only_command_is_flagged(repo: Path):
         "\n",
     )
     found = _checks(tutorial_gate.run_all(repo), "platform-pairs")
-    assert found and "Windows reader" in found[0].detail
+    assert any("Windows reader" in v.detail for v in found)
 
 
 def test_mistyped_platform_alternative_is_flagged(repo: Path):
@@ -506,7 +507,7 @@ def test_removing_only_the_second_posix_test_command_is_flagged(repo: Path):
 
     found = _checks(tutorial_gate.run_all(repo), "platform-pairs")
     assert found, "the second-occurrence removal must be caught"
-    assert "2 time(s) for Windows but 1 time(s)" in found[0].detail
+    assert any("2 time(s) for Windows but 1 time(s)" in v.detail for v in found)
 
 
 def test_commented_untagged_yaml_is_flagged(repo: Path):
@@ -525,6 +526,53 @@ def test_yaml_document_markers_do_not_defeat_detection(repo: Path):
         repo,
         HELLO_WORLD,
         "```\n---\nmodules:\n  - slug: greeter\n```\n",
+    )
+    assert _checks(tutorial_gate.run_all(repo), "first-run-constraint")
+
+
+def test_symmetric_typo_in_both_platform_commands_is_flagged(repo: Path):
+    """Round 6: symmetry was the wrong contract.
+
+    Editing BOTH platform lines the same way -- the natural result of a global
+    find-and-replace -- left the Counters equal and the gate green, while every
+    reader got `No module named unitest`. The commands are now validated
+    against bundle.json's own `testCommandArgs` / `programEntryPoint`.
+    """
+    _edit(repo, HELLO_WORLD, "-m unittest", "-m unitest")
+    found = _checks(tutorial_gate.run_all(repo), "platform-pairs")
+    assert found and "not a command bundle.json defines" in found[0].detail
+
+
+def test_dropping_a_canonical_command_entirely_is_flagged(repo: Path):
+    _edit(repo, HELLO_WORLD, ".venv\\Scripts\\python.exe main.py\n", "")
+    _edit(repo, HELLO_WORLD, ".venv/bin/python main.py\n", "")
+    found = _checks(tutorial_gate.run_all(repo), "platform-pairs")
+    assert found and "never shows the reader running it" in found[-1].detail
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        # Round 6: option forms start with a dash, so the subcommand branch
+        # never matched them. `git --version` beside the Git prerequisite is
+        # the most plausible edit of the lot.
+        "Check it worked with `git --version`.\n",
+        "Run `git -C myfolder status`.\n",
+        "Use `git -c user.email=you@example.com commit`.\n",
+    ],
+)
+def test_git_option_forms_are_flagged(repo: Path, snippet: str):
+    _append(repo, HELLO_WORLD, snippet)
+    assert _checks(tutorial_gate.run_all(repo), "first-run-constraint")
+
+
+def test_block_scalar_yaml_is_flagged(repo: Path):
+    """Round 5 asked for block scalars; the round-5 fix did not implement them
+    and round 6 caught the omission."""
+    _append(
+        repo,
+        HELLO_WORLD,
+        "```\nsteps:\n  script: |\n    python build.py\n    python test.py\n```\n",
     )
     assert _checks(tutorial_gate.run_all(repo), "first-run-constraint")
 

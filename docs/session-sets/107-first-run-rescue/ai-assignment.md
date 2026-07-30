@@ -135,8 +135,12 @@ decide it, so this is re-stated at the set-terminal close, not fixed here.
   excluded) after the loop hit its 2-cycle bound on a severity dispute. It
   ruled **against the orchestrator** and surfaced two further real defects.
   The dispute was withdrawn rather than carried.
-- **Cost:** $1.26 across 10 routed calls, all on the `DABBLER_*` keys. Zero
-  Copilot seat capacity, as forecast.
+- **Cost:** **$1.578 across 12 routed calls**, all on the `DABBLER_*` keys.
+  Zero Copilot seat capacity, as forecast. Breakdown: $0.023 planning +
+  strings, $1.436 verification (six rounds, incl. the operator-authorized
+  extra round at $0.119 and the close backstop at $0.299), $0.012 the
+  third-provider adjudication. The verification loop is ~91% of the session's
+  spend — worth naming, because it also found five blockers the suites did not.
 - **Outcome:** VERIFIED. Suites: pytest 3066 passed / 6 skipped; Layer 2 1810
   passing; drift guard green. Layer 3 unrun locally (environment; CI is the
   signal). Extension `0.47.0` staged, publish operator-gated.

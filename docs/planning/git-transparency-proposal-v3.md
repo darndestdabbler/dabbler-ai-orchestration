@@ -289,7 +289,102 @@ creation, reconciliation, the `team-workflow.md` split. All of those are B or C.
   once. This was the defect that made ADO staff abandon the tutorial.
 - **The ADO CI dead end is named**, with an explicit stopping point.
 
-## 12. Cost of analysis
+## 12. Corrections accepted from the v3 review — binding on the spec
+
+Added 2026-07-30 after [v3 GPT](git-transparency-proposal-gpt-v3.md) and
+[v3 Gemini](git-transparency-proposal-gemini-v3.md). **Both approved the
+direction and said no further architecture round is needed** — GPT: *"close
+enough to author increment A"*; Gemini: *"Proceed with Increment A."* These
+corrections belong in the session-set spec, not in another proposal version.
+
+### 12.1 §3 was right, but incomplete — there is a **third** flow *(binding on B)*
+
+Both reviewers confirmed the flow decomposition and that **no lifecycle-contract
+change and no `Ready for review` state are needed**. Gemini: *"YOU ARE CORRECT.
+NO CONTRACT CHANGE NEEDED."*
+
+But GPT found a case §3 missed: **post-session human edits on a session branch.**
+The session has already closed *and pushed*, and the developer then adds more
+files before opening the PR. Verified in the current tutorial — Part 4 step 6
+has the reader hand-edit `.github/workflows/monorepo-ci.yml` and commit it on the
+session branch *after* the implementation session closed.
+
+This is the same error §3 criticised in v1: **treating branch naming as the
+authority instead of inspecting state.** *Send for review* must therefore branch
+on the working tree, not on the branch prefix:
+
+| State | Action |
+| --- | --- |
+| Clean session branch | Create or update the PR |
+| **Dirty session branch after close** | Show, scan, commit and push the remainder, then create or update the PR |
+| Human authoring branch | Show, scan, commit, push, then create or update the PR |
+
+**A correctness consequence worth more than the UI point:** post-session edits
+are **not covered by the completed session's verification**. The CI YAML a
+developer hand-writes after the session closed was reviewed by nothing. Prefer
+moving such edits *into* session scope; failing that, *Send for review* must say
+in as many words that these are **additional unverified changes**.
+
+### 12.2 Increment A depended on an action it deferred *(binding on A)*
+
+§5 step 7 ends by putting **Start work** in view, but §9 defers *Start work* to
+increment B. There is no such command today — the shipped affordances are
+`Dabbler: Copy: Start next session` and the Work Explorer's left-click, which
+copy the starter line.
+
+**Resolution, per GPT's smaller option:** increment A exposes the **existing**
+copy-the-starter-line affordance. The full branch/worktree automation stays in B.
+
+### 12.3 Sample creation is not resumable, and will fail on a truly fresh machine *(binding on A)*
+
+Two defects in the §5 contract:
+
+- **Not resumable.** Step 1 refuses a non-empty folder, but step 5 (venv + pip
+  install) fails *after* steps 3–4 have created a git repo and rendered the
+  sample. A retry then finds a non-empty folder and **refuses the project it
+  just partially created**. Fix: build in a temporary directory and move into
+  place only on success, or write an incomplete-sample marker and resume from it.
+- **No git identity.** Step 3's baseline commit fails on a machine with no
+  `user.email` configured — which is exactly the true cold start this feature
+  targets. Fix: a **command-scoped or repository-local** identity. Never mutate
+  the developer's global git config.
+
+### 12.4 Step 5's error text is a first-run experience *(binding on A)*
+
+Gemini: on proxy/VPN/network failure the command *"must immediately output the
+exact terminal command they need to run manually to bypass it or retry, rather
+than throwing a raw generic Python exception."* This is the most likely
+real-world failure on a corporate network and the first thing many developers
+will ever see the product do.
+
+### 12.5 Video: relocate now, author later
+
+The two reviewers appear to disagree; they do not. GPT (v2) requires the **nine
+existing scripts to move with `adopt-dabbler.md`** in increment A — they describe
+that tutorial, and leaving them behind makes the shipped doc and its video
+surface contradictory. Gemini (v3) says **defer authoring a new Hello World
+scene** until the short tutorial survives the stopwatch test. Both are right and
+they concern different work.
+
+**Resolved:** move the existing directory in A; **defer** the new Hello World
+scene. This settles §10 decision 4.
+
+### 12.6 `azure-pipelines.yml` — bundle it into A
+
+Gemini: *"just write it. It is a tiny, static file that completely eliminates the
+ADO dead-end."* After four review rounds this is the only open item nobody has
+argued against. Bundling it into A closes the gap that made ADO staff abandon the
+tutorial in the first place. **Operator's call** (§10 decision 3).
+
+### 12.7 Confirmed without change
+
+The corrected prerequisite and network claims; `.dabbler/local-only` as the right
+mechanism for a hostless sample; read-only reconciliation on activation as the
+correct safety boundary; the document split being safe because procedures have
+named owners; and the 15-minute acceptance definition as executable and
+measuring the right outcome.
+
+## 13. Cost of analysis
 
 One routed GPT-5.4 architecture consult (**$0.49**) plus four operator-run
 evaluation rounds outside the router. All verification of code claims in this

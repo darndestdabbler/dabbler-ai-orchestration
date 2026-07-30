@@ -121,9 +121,11 @@ Therefore **Dabbler: Try a sample project** should own the complete hidden setup
 5. create the venv and install the router;
 6. open the folder and put the sample set's **Start work** action in view.
 
+<!-- drift-guard:allow-begin -->
 The developer should not type Git, but the product must still establish the
 repository invariants the session lifecycle depends on. This makes increment A
 a real extension feature, not a docs-only change.
+<!-- drift-guard:allow-end -->
 
 ### 5. High — increment A omits the required video move
 
@@ -186,7 +188,9 @@ adoption guide still contains the team workflow. That is acceptable as an
 intermediate state if it is clearly labeled, but it weakens the claim that the
 four-document information architecture exists after increment A.
 
+<!-- drift-guard:allow-begin -->
 ### 8. Medium — increment A's scope cannot be called small or docs-only
+<!-- drift-guard:allow-end -->
 
 The proposal is right to make A first. It is also right that A alone can satisfy
 the time-to-value criterion. But if the local sample command is selected, A
@@ -201,9 +205,11 @@ contains:
 - video relocation; and
 - a real fresh-machine acceptance walk.
 
+<!-- drift-guard:allow-begin -->
 That is not a docs-only increment and may not be one small session. Estimate it
 only after selecting the sample mechanism and writing its executable acceptance
 contract.
+<!-- drift-guard:allow-end -->
 
 ### 9. Medium — the sample source needs one canonical owner
 

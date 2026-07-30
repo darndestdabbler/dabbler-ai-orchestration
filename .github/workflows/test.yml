@@ -91,6 +91,58 @@ jobs:
           'src/test/suite/consumerBootstrap.test.ts'
           'src/test/suite/coldStartSnapshot.test.ts'
 
+  sample-project-smoke:
+    name: Sample-project smoke (Set 107)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    # Set 107 S1: the executable acceptance floor for `Dabbler: Try a sample
+    # project`. Layer 2 as a whole is skipped in CI (see the note at the
+    # bottom of this file), so these two specs run directly via mocha +
+    # ts-node — the same pattern the template-snapshot job uses. Without this
+    # job the sample would be local-only-tested and would rot silently, which
+    # is exactly the failure L-064-12 records.
+    #
+    # The smoke spec drives real subprocesses: `git`, and `python -m
+    # ai_router.{start,close}_session` against a genuinely empty temp folder.
+    # It therefore needs BOTH runtimes on the runner, and a git identity —
+    # the walk deliberately proves the sample's repo-LOCAL identity works, so
+    # the runner must not supply a global one that would mask a regression.
+    # Both OSes run it because the resume marker, the venv path shape, and
+    # the working-tree cleanliness check are all platform-sensitive.
+    env:
+      DABBLER_ANTHROPIC_API_KEY: ci-dummy-anthropic-key
+      DABBLER_GEMINI_API_KEY: ci-dummy-gemini-key
+      DABBLER_OPENAI_API_KEY: ci-dummy-openai-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install ai_router (the sample's lifecycle shells out to it)
+        run: pip install -e .
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install extension dependencies
+        run: npm ci
+        working-directory: tools/dabbler-ai-orchestration
+
+      - name: Run the sample-project core + smoke specs
+        working-directory: tools/dabbler-ai-orchestration
+        run: >-
+          npx mocha --require ts-node/register
+          --require ./src/test/vscode-stub.js --ui tdd --timeout 180000
+          'src/test/suite/sampleProjectCore.test.ts'
+          'src/test/suite/sampleProjectSmoke.test.ts'
+
   python-tests:
     name: Python tests
     runs-on: ${{ matrix.os }}

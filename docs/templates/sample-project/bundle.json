@@ -1,0 +1,14 @@
+{
+  "bundleVersion": 1,
+  "sampleSetSlug": "001-add-a-shout",
+  "tier": "lightweight",
+  "programEntryPoint": "main.py",
+  "testCommandArgs": ["-m", "unittest"],
+  "expectedTestCount": 2,
+  "expectedProgramOutput": [
+    "Hello, world!",
+    "HELLO, WORLD!"
+  ],
+  "missingFunction": "shout",
+  "description": "The canonical Dabbler sample project. One source of truth for three consumers: the `Dabbler: Try a sample project` command, docs/tutorials/hello-world.md (bound in Set 107 Session 2, which authors that tutorial), and the Layer-2 smoke test. Files under files/ are rendered verbatim into the target folder; a `dot-` filename prefix renders as a leading dot. The tests are stdlib unittest on purpose -- the sample must need no install beyond dabbler-ai-router itself. Every CONTRACT field here is read by a test, because a claimed-but-unenforced contract is worse than no contract; this `description` is the sole exception and is prose for humans, carrying no contract."
+}

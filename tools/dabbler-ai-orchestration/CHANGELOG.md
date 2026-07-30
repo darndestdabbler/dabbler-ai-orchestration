@@ -3,7 +3,88 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.46.0] — 2026-07-28 (staged; publish gated on the operator)
+## [0.47.0] — 2026-07-30 (staged; publish gated on the operator)
+
+> **The first-run entry point.** Staff called the Hello World tutorial "way
+> too complicated" and some abandoned it; four review rounds across two
+> engines converged on one diagnosis — **first-run cognitive load, not raw
+> git**. No path through this product reached *"an AI session wrote my code"*
+> without first teaching branch protection, worktrees, CI and pull requests.
+> This release ships the path that skips all of it (Set 107 S1). Session 2
+> rewrites the tutorial around it; Session 3 puts it under a stopwatch.
+>
+> **Not published.** The version bump is staged; no tag was pushed and no
+> publish was run. The click is the operator's.
+
+### Added
+
+- **(Set 107 S1) `Dabbler: Try a sample project`.** One command creates a
+  small, local, hostless sample project and opens it, so a developer can
+  watch an AI session change real code, see tests go from red to green, and
+  run the program — without typing a git command, editing YAML, configuring
+  a host, or touching a governance setting. It runs the seven-step contract
+  from proposal v3 §5: refuse a non-empty folder by name, render the sample,
+  `git init` with a **repository-local** identity plus a baseline commit,
+  write the sanctioned `.dabbler/local-only` marker, create the `.venv` and
+  install `dabbler-ai-router`, open the folder, and surface the sample's
+  starter line. The landing uses the **existing**
+  `Dabbler: Copy: Start next session` affordance rather than a new
+  `Start work` command — that stays deferred to increment B (v3 §12.2).
+
+- **(Set 107 S1) The canonical sample bundle**
+  (`docs/templates/sample-project/`, copied to
+  `dist/templates/sample-project/` at build time). One source of truth for
+  three consumers: the command, the rewritten `hello-world.md`, and the
+  smoke test. It ships a two-function Python module with `shout` **missing**,
+  so the sample starts at one failing test, and one already-authored
+  Lightweight task set that asks the developer's own AI agent to write it.
+  The tests are standard-library `unittest` on purpose: step 5 installs
+  exactly one package, so a sample needing pytest could never run.
+  `bundle.json` carries the machine-readable contract (expected program
+  output, expected test counts), so a drifting sample fails the build rather
+  than failing a reader.
+
+- **(Set 107 S1) `azure-pipelines.yml.template`** in the consumer-bootstrap
+  bundle, written to the repository root alongside the GitHub
+  `monorepo-ci.yml`. Azure DevOps ignores `.github/workflows/` entirely, so
+  an ADO repo previously received no working CI at all — the dead end that
+  made ADO staff abandon the tutorial. The file is byte-for-byte the YAML the
+  tutorial already prints inline, and inert until a pipeline is pointed at it.
+
+- **(Set 107 S1) A `sample-dist-in-sync` drift guard** covering the new
+  bundle, and a Layer-2 smoke test that renders it, runs the whole Lightweight
+  lifecycle (`start_session` → change → tests → program → `close_session`),
+  and asserts the program output against `bundle.json`. Both now run in CI.
+
+### Fixed
+
+> **Not in this release: the router-side `close_session` fix.** Set 107 S1 also
+> fixed `close_session` exiting with a raw traceback when stdin has no tty, but
+> that fix lives in `dabbler-ai-router` and is recorded in
+> [`ai_router/CHANGELOG.md`](../../ai_router/CHANGELOG.md) under `[Unreleased]`.
+> **This VSIX does not deliver it**: `Dabbler: Try a sample project`
+> pip-installs the currently *published* router, so a sample created by 0.47.0
+> keeps the old behavior until `dabbler-ai-router` is republished. The sample's
+> instructions pass `--accept-suggestions`, which sidesteps the prompt on
+> either version.
+
+- **(Set 107 S1) The `drift-guards` CI job was red on `master`** and is now
+  green. Six occurrences of the banned stale-tier label in the frozen
+  git-transparency proposal and review records tripped the framing ban while
+  carrying that word's ordinary English sense (a documentation-only change).
+  They are wrapped in the guard's own
+  auditable allow-regions (anchored on block boundaries so no table or
+  paragraph is split), and the four files are added to `ALLOWED_MARKER_FILES`
+  as a recorded decision rather than reworded — they are historical records of
+  what each reviewer wrote.
+
+## [0.46.0] — 2026-07-28 (PUBLISHED 2026-07-29)
+
+> Publish record added 2026-07-30 by Set 107 S1: tag `vsix-v0.46.0`,
+> publish-vscode.yml run
+> [30438358346](https://github.com/darndestdabbler/dabbler-ai-orchestration/actions/runs/30438358346),
+> success. This header and `docs/repository-reference.md` both still read
+> "staged; NOT published" a day after the publish had happened.
 
 > **Template-bundle-only.** No extension code changed — no scaffolder logic,
 > no new commands, no Work Explorer changes. This release re-cuts the

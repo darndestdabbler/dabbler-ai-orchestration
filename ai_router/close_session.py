@@ -2149,7 +2149,19 @@ def run(
                             f"without a recorded verification verdict? "
                             f"[y/N]: "
                         )
-                        answer = (prompt_fn(prompt) or "").strip().lower()
+                        # Set 107 S1: guard EOF/interrupt the same way the
+                        # sibling `_prompt_manual_attestation` already does
+                        # (L-069-1 — fix every site of the class). An agent
+                        # or CI runner invoking close_session with no tty
+                        # gets EOFError from `input()`; unguarded, that
+                        # escaped as a raw traceback with the remediation
+                        # buried above it. Treat it as the safe "no" answer
+                        # so the operator-facing abort message — which
+                        # names --accept-suggestions — is what they see.
+                        try:
+                            answer = (prompt_fn(prompt) or "").strip().lower()
+                        except (EOFError, KeyboardInterrupt):
+                            answer = ""
                         if answer not in ("y", "yes"):
                             outcome.result = "aborted_at_soft_gate"
                             outcome.messages.append(

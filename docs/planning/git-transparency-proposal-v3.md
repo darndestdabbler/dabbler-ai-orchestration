@@ -39,11 +39,13 @@ worth your round.
 
 All accepted without argument. v2 overstated three things.
 
+<!-- drift-guard:allow-begin -->
 | v2 claimed | Correction | Evidence |
 | --- | --- | --- |
 | "no credential setup" | Lightweight removes **Dabbler router** credentials — provider keys, seat probe, budget, routed spend. It does **not** provide the AI. An authenticated AI coding agent remains a prerequisite. | — |
 | "no network" | Both tiers create a `.venv` and pip-install `dabbler-ai-router` (`installRouter` in [`gitScaffold.ts`](../../tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts)). Package network access is required; so is the AI agent's. | verified |
 | increment A "can be docs-only" | It cannot. A local sample command is a real extension feature (§5), and the video relocation (§6) is mandatory in the same increment. | — |
+<!-- drift-guard:allow-end -->
 
 **The honest starting line for Hello World:**
 
@@ -247,7 +249,9 @@ part of first success.
 
 ## 9. Increment A — actual scope
 
+<!-- drift-guard:allow-begin -->
 Not docs-only. Naming it honestly so it can be estimated.
+<!-- drift-guard:allow-end -->
 
 1. `Dabbler: Try a sample project` — command, UI entry point, the seven-step
    contract in §5

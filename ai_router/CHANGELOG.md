@@ -9,12 +9,30 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
-## [Unreleased] (Set 105 — verification evidence excludes framework bookkeeping)
+## [Unreleased] (Sets 105, 107 — router-side fixes awaiting a publish)
 
 > Router-side, not yet published. A version bump / PyPI publish is
 > operator-gated and recorded at release time.
 
 ### Fixed
+
+- **(Set 107 S1) `close_session` no longer exits with a raw traceback when
+  stdin has no tty.** The `external-verification.md` soft gate (Set 048 §3.5)
+  called `input()` unguarded, so an AI coding agent or a CI runner invoking
+  close-out non-interactively got an `EOFError` stack trace with the actual
+  remediation buried above it. EOF and keyboard interrupt are now treated as
+  the safe "no" answer, which surfaces the existing operator-facing abort
+  message — the one that names `--accept-suggestions`. The sibling prompt in
+  the same module (`_prompt_manual_attestation`) already guarded both
+  exceptions; this closes the class (L-069-1).
+
+  **Delivery note:** this fix reaches users only when `dabbler-ai-router` is
+  next published. The Set 107 extension release (`0.47.0`) does **not** carry
+  it — its `Dabbler: Try a sample project` command pip-installs the currently
+  published router, so a sample created by that VSIX has the old behavior
+  until the router is republished. The sample's own instructions therefore
+  pass `--accept-suggestions`, which avoids the prompt entirely on both the
+  old and the new router.
 
 - **(Set 105) `verify_session` no longer false-positives on lazily-synthesized
   state files.** Any all-sets status scan / Work Explorer refresh calls

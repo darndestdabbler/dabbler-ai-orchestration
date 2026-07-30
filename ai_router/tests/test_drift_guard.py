@@ -288,6 +288,93 @@ def test_dist_in_sync_extra_stale_dist_file_flagged(tmp_path: Path):
 
 
 # ---------------------------------------------------------------------------
+# Check 4 — sample-project dist-in-sync guard (Set 107 S1)
+#
+# Same shipping defect as check 3 on the second template tree the extension
+# ships, with one difference that matters: the sample bundle is a TREE, so the
+# comparison must recurse. A flat comparison would have compared only
+# bundle.json and silently ignored every file under files/ — which is the
+# entire user-facing sample.
+# ---------------------------------------------------------------------------
+
+
+def _make_sample_bundles(base: Path, src_files: dict, dst_files: dict) -> None:
+    src = base.joinpath("docs", "templates", "sample-project")
+    dst = base.joinpath(
+        "tools", "dabbler-ai-orchestration", "dist", "templates", "sample-project"
+    )
+    for root, files in ((src, src_files), (dst, dst_files)):
+        for rel, content in files.items():
+            path = root.joinpath(*rel.split("/"))
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        root.mkdir(parents=True, exist_ok=True)
+
+
+def test_sample_dist_in_sync_identical_ok(tmp_path: Path):
+    files = {"bundle.json": "{}\n", "files/main.py": "print(1)\n"}
+    _make_sample_bundles(tmp_path, files, dict(files))
+    assert drift_guard.check_sample_bundle_in_sync(tmp_path) == []
+
+
+def test_sample_dist_in_sync_recurses_into_files_subtree(tmp_path: Path):
+    # The whole point of the recursive walk: a nested drift must be caught.
+    _make_sample_bundles(
+        tmp_path,
+        {"bundle.json": "{}\n", "files/hello/greeting.py": "def greet(): ...\n"},
+        {"bundle.json": "{}\n", "files/hello/greeting.py": "STALE\n"},
+    )
+    violations = drift_guard.check_sample_bundle_in_sync(tmp_path)
+    assert len(violations) == 1
+    assert violations[0].check == "sample-dist-in-sync"
+    assert "files/hello/greeting.py" in violations[0].location
+
+
+def test_sample_dist_in_sync_missing_nested_dist_file_flagged(tmp_path: Path):
+    _make_sample_bundles(
+        tmp_path,
+        {"bundle.json": "{}\n", "files/docs/session-sets/001-x/spec.md": "x\n"},
+        {"bundle.json": "{}\n"},
+    )
+    violations = drift_guard.check_sample_bundle_in_sync(tmp_path)
+    assert any("001-x/spec.md" in v.location for v in violations)
+
+
+def test_sample_dist_in_sync_extra_stale_nested_dist_file_flagged(tmp_path: Path):
+    _make_sample_bundles(
+        tmp_path,
+        {"bundle.json": "{}\n"},
+        {"bundle.json": "{}\n", "files/hello/retired.py": "old\n"},
+    )
+    violations = drift_guard.check_sample_bundle_in_sync(tmp_path)
+    assert any("files/hello/retired.py" in v.location for v in violations)
+
+
+def test_sample_dist_in_sync_crlf_normalized_ok(tmp_path: Path):
+    src = tmp_path.joinpath("docs", "templates", "sample-project", "files")
+    dst = tmp_path.joinpath(
+        "tools",
+        "dabbler-ai-orchestration",
+        "dist",
+        "templates",
+        "sample-project",
+        "files",
+    )
+    src.mkdir(parents=True, exist_ok=True)
+    dst.mkdir(parents=True, exist_ok=True)
+    (src / "main.py").write_bytes(b"print(1)\n")
+    (dst / "main.py").write_bytes(b"print(1)\r\n")
+    assert drift_guard.check_sample_bundle_in_sync(tmp_path) == []
+
+
+def test_sample_dist_in_sync_missing_dist_dir_flagged(tmp_path: Path):
+    tmp_path.joinpath("docs", "templates", "sample-project").mkdir(parents=True)
+    violations = drift_guard.check_sample_bundle_in_sync(tmp_path)
+    assert len(violations) == 1
+    assert "npm run compile" in violations[0].detail
+
+
+# ---------------------------------------------------------------------------
 # Real-repo green — this suite IS the gate
 # ---------------------------------------------------------------------------
 

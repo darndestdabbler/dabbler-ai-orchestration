@@ -232,9 +232,11 @@ uses a prepared sample repository with an already-authored set, the reader never
 creates a module at all** — the gap moves entirely to `adopt-dabbler.md`, whose
 readers are past the first run.
 
+<!-- drift-guard:allow-begin -->
 That materially lowers the cost of increment A: it can be **docs-only**, with the
 one-form module creation deferred. Unless §6.2 resolves against a prepared
 sample, in which case the module dance is back on the critical path.
+<!-- drift-guard:allow-end -->
 
 ## 7. Risks of the model, and mitigations
 

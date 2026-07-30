@@ -116,6 +116,17 @@ export interface TemplateBundle {
    * {@link MONOREPO_CI_REL_PATH}. Token-free.
    */
   monorepoCiTemplate: string;
+  /**
+   * Set 107 S1: the Azure DevOps counterpart to {@link monorepoCiTemplate},
+   * written to {@link AZURE_PIPELINES_REL_PATH}. Azure DevOps ignores
+   * ``.github/workflows/`` entirely, so an ADO repo that received only the
+   * GitHub workflow had no CI at all — the dead end that made ADO staff
+   * abandon the Hello World tutorial. Shipped symmetrically with the GitHub
+   * workflow (both hosts are first-class here) and byte-identical to the YAML
+   * the tutorial prints inline. Token-free, and inert until a pipeline is
+   * pointed at it.
+   */
+  azurePipelinesTemplate: string;
 }
 
 /** Filenames inside ``docs/templates/consumer-bootstrap/``. */
@@ -134,6 +145,7 @@ const BUNDLE_FILES = {
   crossProviderVerificationTemplate: "cross-provider-verification.md.template",
   codeownersTemplate: "CODEOWNERS.template",
   monorepoCiTemplate: "monorepo-ci.yml.template",
+  azurePipelinesTemplate: "azure-pipelines.yml.template",
 } as const;
 
 /**
@@ -182,6 +194,7 @@ export function loadTemplateBundle(bundleDir: string): TemplateBundle {
     ),
     codeownersTemplate: read(BUNDLE_FILES.codeownersTemplate),
     monorepoCiTemplate: read(BUNDLE_FILES.monorepoCiTemplate),
+    azurePipelinesTemplate: read(BUNDLE_FILES.azurePipelinesTemplate),
   };
 }
 
@@ -479,6 +492,16 @@ export const MONOREPO_CI_REL_PATH = path.posix.join(
   "monorepo-ci.yml",
 );
 
+/**
+ * Set 107 S1: output path of the Azure DevOps pipeline. Repository ROOT, not
+ * a subdirectory — Azure DevOps resolves `/azure-pipelines.yml` by convention,
+ * and the tutorial's ADO instructions name that exact path. Emitted by both
+ * scaffold paths for the same reason {@link MONOREPO_CI_REL_PATH} is: this is
+ * a dual-host product, and a repo whose host the scaffold cannot know must
+ * start with a working CI shape for either one.
+ */
+export const AZURE_PIPELINES_REL_PATH = "azure-pipelines.yml";
+
 /** Render the three guidance-lifecycle starters (token-substituted). */
 function guidanceFiles(
   bundle: TemplateBundle,
@@ -521,6 +544,8 @@ export function renderConsumerBootstrap(
     // templates (token-free; inert until adapted).
     [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
     [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate,
+    // Set 107 S1: the ADO half of the same teaching pair.
+    [AZURE_PIPELINES_REL_PATH]: bundle.azurePipelinesTemplate,
   };
 
   const leftovers = new Set<string>();
@@ -577,6 +602,8 @@ export function renderStructureBootstrap(
     // repo structure too — a new project starts with them in place.
     [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
     [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate,
+    // Set 107 S1: the ADO half of the same teaching pair.
+    [AZURE_PIPELINES_REL_PATH]: bundle.azurePipelinesTemplate,
   };
 
   const leftovers = new Set<string>();

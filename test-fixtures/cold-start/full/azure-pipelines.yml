@@ -1,0 +1,41 @@
+# Azure Pipelines — the all-module guardrail build.
+#
+# Set 107 S1. The Azure DevOps counterpart to `monorepo-ci.yml.template`
+# (GitHub Actions), and byte-for-byte the same pipeline the Hello World
+# tutorial prints inline for ADO readers — so a reader who follows the
+# tutorial and an operator who takes the shipped template land on the same
+# file. Azure DevOps ignores `.github/workflows/` entirely, so an ADO repo
+# that only has the GitHub workflow has no CI at all; that dead end is what
+# made ADO staff abandon the tutorial.
+#
+# This file is a WORKING starting point, not a mandate. If your organisation
+# has its own pipeline standards, use them.
+#
+# To wire it up once it is committed at the repository root:
+#   Pipelines > New pipeline > Azure Repos Git > your repo >
+#   Existing Azure Pipelines YAML file > /azure-pipelines.yml > Save
+# Then add it under Branch Policies on `main` > Build validation, marked
+# Required — without that, a pull request has nothing to wait on.
+
+trigger:
+  branches:
+    include: [main]
+pr:
+  branches:
+    include: [main]
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "3.12"
+  - script: python -m pip install pytest
+    displayName: Install pytest
+  - script: |
+      for module in services/*/; do
+        echo "== $module"
+        python -m pytest -q "$module" || exit 1
+      done
+    displayName: Build and test every module

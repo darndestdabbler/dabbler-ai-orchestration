@@ -10,6 +10,7 @@ import { registerOpenFileCommands } from "./commands/openFile";
 import { registerCopyCommands } from "./commands/copyCommand";
 import { registerCopyPromptCommands } from "./commands/copyPromptCommands";
 import { registerGitScaffoldCommand } from "./commands/gitScaffold";
+import { registerTrySampleProjectCommand } from "./commands/trySampleProject";
 import { registerGitWorkflowCommands } from "./commands/gitWorkflow";
 import { registerGitReleaseCommands } from "./commands/gitRelease";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
@@ -309,6 +310,11 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerCopyCommands", () => registerCopyCommands(context));
   safeRegister("registerCopyPromptCommands", () => registerCopyPromptCommands(context));
   safeRegister("registerGitScaffoldCommand", () => registerGitScaffoldCommand(context));
+  // Set 107 S1: the first-run entry point. Also replays the post-openFolder
+  // landing (steps 6-7 of the contract) on the activation that follows.
+  safeRegister("registerTrySampleProjectCommand", () =>
+    registerTrySampleProjectCommand(context),
+  );
   safeRegister("registerGitWorkflowCommands", () => registerGitWorkflowCommands(context));
   safeRegister("registerGitReleaseCommands", () => registerGitReleaseCommands(context));
   safeRegister("registerTroubleshootCommand", () => registerTroubleshootCommand(context));

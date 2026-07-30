@@ -195,6 +195,7 @@ suite("consumerBootstrap — spec.md render", () => {
       ),
       codeownersTemplate: crlf(bundle.codeownersTemplate),
       monorepoCiTemplate: crlf(bundle.monorepoCiTemplate),
+      azurePipelinesTemplate: crlf(bundle.azurePipelinesTemplate),
     };
     const spec = renderSpec(crlfBundle, ctx({ totalSessions: 3 }));
     const headers = (spec.match(/### Session \d+ of 3:/g) || []).map((h) =>
@@ -256,7 +257,7 @@ suite("consumerBootstrap — engine files", () => {
 });
 
 suite("consumerBootstrap — full render", () => {
-  test("produces the thirteen artifacts at canonical relative paths", () => {
+  test("produces the fourteen artifacts at canonical relative paths", () => {
     const { files } = renderConsumerBootstrap(bundle, ctx());
     const keys = Object.keys(files).sort();
     assert.deepStrictEqual(keys, [
@@ -266,6 +267,9 @@ suite("consumerBootstrap — full render", () => {
       "AGENTS.md",
       "CLAUDE.md",
       "GEMINI.md",
+      // Set 107 S1: the Azure DevOps counterpart to monorepo-ci.yml. Repo
+      // ROOT by ADO convention, so it sorts before docs/.
+      "azure-pipelines.yml",
       // Set 077 S4 (Feature 3): the engine-facing verification doc.
       "docs/dabbler/cross-provider-verification.md",
       // Set 060 S3 (D8): the static Getting Started teaching doc.
@@ -323,7 +327,7 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
     );
   });
 
-  test("the REAL packaged dist bundle exists with all fourteen files", () => {
+  test("the REAL packaged dist bundle exists with all fifteen files", () => {
     // Pins the actual build artifact the .vsix ships (esbuild copyTemplateBundle
     // writes it; it is committed alongside dist/extension.js). A broken copy
     // step or a missing packaged bundle fails here, not on a user's machine.
@@ -346,6 +350,8 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
       // Set 087 S3 (ruling Q3): ownership + monorepo-CI templates.
       "CODEOWNERS.template",
       "monorepo-ci.yml.template",
+      // Set 107 S1: the Azure DevOps pipeline template.
+      "azure-pipelines.yml.template",
     ];
     for (const f of required) {
       assert.ok(
@@ -355,7 +361,7 @@ suite("consumerBootstrap — packaged-runtime bundle path", () => {
     }
     // And it must actually render.
     const { files } = renderConsumerBootstrap(loadTemplateBundle(distDir), ctx());
-    assert.strictEqual(Object.keys(files).length, 13);
+    assert.strictEqual(Object.keys(files).length, 14);
   });
 
   test("loadTemplateBundle reads a bundle laid out at the packaged path", () => {

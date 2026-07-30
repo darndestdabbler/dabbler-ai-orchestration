@@ -1,0 +1,15 @@
+ISSUES FOUND
+
+- **Issue 1:** Extension 0.47.0 claims a router fix that the extension cannot deliver
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Failure scenario:** The operator publishes the staged VSIX 0.47.0, and a developer uses its normal sample-project flow. Step 5 installs the currently published `dabbler-ai-router` from PyPI, so the developer receives 0.33.0 without this session’s `close_session` EOF fix. An agent or CI process closing non-interactively without `--accept-suggestions` therefore still encounters the traceback that the 0.47.0 release notes claim is fixed. This is probable because PyPI installation is the command’s default path and non-interactive agent execution is the stated motivation for the fix.
+  - **Details:**
+    - **Violation:** The 0.47.0 extension CHANGELOG says, “`close_session` no longer exits with a raw traceback,” while `docs/repository-reference.md` says the router fix “rides along.” Release notes must describe behavior actually delivered by that release.
+    - **Impact:** Publishing 0.47.0 produces a release whose documented fix is absent. This misleads users and leaves the reported agent/CI failure unchanged, which should block release staging.
+    - **Evidence:** Only `tools/dabbler-ai-orchestration/package.json` is bumped. Neither `pyproject.toml` nor `ai_router/CHANGELOG.md` is changed, and the repository reference identifies 0.33.0 as the published router version. `runTrySampleProject` explicitly selects `"pypi"` for installation, so the VSIX does not package or install the modified working-tree router code.
+    - **Fix:** Either stage a new router version and router CHANGELOG entry without publishing it, or remove the router fix from the 0.47.0 release claims and defer the source change and announcement to a versioned router release.
+
+#### NITS
+
+- **Nit:** `createSampleProject` claims it “Never throws,” but `writeMarker()` after successful steps and `await deps.installRouter()` are outside protective `try/catch` blocks. Filesystem exceptions or an unexpected installer rejection can escape the command instead of producing its recoverable `SampleProjectResult`.

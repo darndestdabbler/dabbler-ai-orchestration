@@ -34,6 +34,8 @@ function copyTemplateBundle() {
     // Set 087 S3 (ruling Q3): module ownership + monorepo CI templates.
     "CODEOWNERS.template",
     "monorepo-ci.yml.template",
+    // Set 107 S1: the Azure DevOps counterpart to monorepo-ci.yml.template.
+    "azure-pipelines.yml.template",
   ];
   for (const f of required) {
     if (!fs.existsSync(path.join(src, f))) {
@@ -48,12 +50,45 @@ function copyTemplateBundle() {
   console.log(`[esbuild] copied consumer-bootstrap template bundle -> ${path.relative(__dirname, dst)}`);
 }
 
-// Re-copy the bundle on every (re)build so `--watch` never serves a stale
-// dist/templates after the canonical bundle is edited.
+// Copy the canonical sample-project bundle (repo-root
+// docs/templates/sample-project/, the Set 107 S1 deliverable) into dist/ so
+// `Dabbler: Try a sample project` can render it at runtime without reaching
+// outside the installed extension. Unlike the consumer-bootstrap bundle this
+// one is a TREE (files/ has subdirectories), so the copy recurses. Same
+// hard-failure posture: a .vsix with no dist/templates/sample-project cannot
+// create a sample at all, which is the whole feature.
+function copySampleProjectBundle() {
+  const src = path.resolve(__dirname, "..", "..", "docs", "templates", "sample-project");
+  const dst = path.join(__dirname, "dist", "templates", "sample-project");
+  const required = [
+    "bundle.json",
+    path.join("files", "main.py"),
+    path.join("files", "test_greeting.py"),
+    path.join("files", "AGENTS.md"),
+    path.join("files", "hello", "greeting.py"),
+    path.join("files", "docs", "session-sets", "001-add-a-shout", "spec.md"),
+  ];
+  for (const f of required) {
+    if (!fs.existsSync(path.join(src, f))) {
+      throw new Error(`[esbuild] required sample-project bundle file missing: ${path.join(src, f)}`);
+    }
+  }
+  // Full replace rather than merge: a file deleted from the canonical bundle
+  // must disappear from dist/ too, or the packaged sample renders a ghost.
+  fs.rmSync(dst, { recursive: true, force: true });
+  fs.cpSync(src, dst, { recursive: true });
+  console.log(`[esbuild] copied sample-project bundle -> ${path.relative(__dirname, dst)}`);
+}
+
+// Re-copy the bundles on every (re)build so `--watch` never serves a stale
+// dist/templates after a canonical bundle is edited.
 const copyBundlePlugin = {
-  name: "copy-consumer-bootstrap-bundle",
+  name: "copy-template-bundles",
   setup(build) {
-    build.onEnd(() => copyTemplateBundle());
+    build.onEnd(() => {
+      copyTemplateBundle();
+      copySampleProjectBundle();
+    });
   },
 };
 

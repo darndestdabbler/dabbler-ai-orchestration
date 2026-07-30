@@ -147,16 +147,29 @@ ALLOW_BEGIN = "drift-guard:allow-begin"
 ALLOW_END = "drift-guard:allow-end"
 
 # The allow-region escape hatch is NOT unrestricted: only these repo-relative
-# files may use it, and they may use it only to quote the banned-phrase
-# catalogue while documenting the ban. A marker anywhere else is itself a
-# violation, so a stray suppression cannot silently hide real drift. To exempt
-# a new file, add it here deliberately (a reviewed decision), not by dropping a
-# marker into it.
+# files may use it, and only for one of the two sanctioned reasons below. A
+# marker anywhere else is itself a violation, so a stray suppression cannot
+# silently hide real drift. To exempt a new file, add it here deliberately (a
+# reviewed decision), not by dropping a marker into it.
+#
+# Reason 1 -- quoting the banned-phrase catalogue while documenting the ban.
+# Reason 2 (Set 107 S1) -- a FROZEN proposal/review record in which the label
+#   carries its ordinary English sense ("a documentation-only change") and has
+#   nothing to do with tier framing. These four files are the git-transparency
+#   audit trail: they are historical records of what each reviewer wrote, so
+#   the honest fix is an auditable suppression rather than rewording another
+#   engine's review after the fact. `docs/proposals/` and `docs/session-sets/`
+#   get the same treatment wholesale via _EXCLUDED_DOC_SUBTREES; these live
+#   under docs/planning/ only because that is where the operator filed them.
 ALLOWED_MARKER_FILES: frozenset[str] = frozenset(
     {
         "docs/concepts/tier-model.md",
         "docs/templates/consumer-bootstrap/README.md",
         "tools/dabbler-ai-orchestration/CHANGELOG.md",
+        "docs/planning/git-transparency-proposal-v2.md",
+        "docs/planning/git-transparency-proposal-v3.md",
+        "docs/planning/git-transparency-proposal-gpt-v2.md",
+        "docs/planning/git-transparency-proposal-gpt-v3.md",
     }
 )
 
@@ -335,6 +348,23 @@ _DIST_BUNDLE = (
     "consumer-bootstrap",
 )
 
+# Set 107 S1: the sample-project bundle is the SECOND template tree the
+# extension ships, and it had exactly the same stale-dist exposure the
+# consumer-bootstrap guard exists to close -- a committed dist/ copy that
+# drifts from its canonical source means the Marketplace build creates a
+# stale sample. Unlike the consumer-bootstrap bundle this one is a TREE
+# (files/ has subdirectories), so the comparison below walks recursively;
+# that is a superset of the flat case, so both pairs share one comparator
+# (L-069-1: fix the class, not the reported site).
+_CANONICAL_SAMPLE = ("docs", "templates", "sample-project")
+_DIST_SAMPLE = (
+    "tools",
+    "dabbler-ai-orchestration",
+    "dist",
+    "templates",
+    "sample-project",
+)
+
 
 def _read_bytes_normalized(path: Path) -> bytes:
     """Read bytes with CRLF normalized to LF so a Windows checkout that flips
@@ -343,39 +373,55 @@ def _read_bytes_normalized(path: Path) -> bytes:
     return path.read_bytes().replace(b"\r\n", b"\n")
 
 
-def check_dist_bundle_in_sync(repo_root: Path) -> list[Violation]:
-    """The committed ``dist/`` template bundle must match the canonical source.
+def _relative_files(root: Path) -> set[str]:
+    """Every file under *root*, as posix paths relative to it (recursive)."""
+    return {
+        p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()
+    }
 
-    Both directories must contain the same filenames with byte-identical
-    (LF-normalized) content. A drift here means ``npm run compile`` was not
-    re-run after editing a template, so the .vsix would ship a stale bundle.
+
+def _compare_bundle_pair(
+    repo_root: Path,
+    canonical: tuple[str, ...],
+    dist: tuple[str, ...],
+    label: str,
+    check: str,
+) -> list[Violation]:
+    """Compare a canonical template tree against its committed ``dist/`` copy.
+
+    Both trees must contain the same relative paths with byte-identical
+    (LF-normalized) content. A drift means ``npm run compile`` was not re-run
+    after editing a template, so the .vsix would ship a stale bundle. The walk
+    is RECURSIVE so a nested tree (the sample bundle's ``files/``) is covered
+    as thoroughly as a flat one.
     """
-    src = repo_root.joinpath(*_CANONICAL_BUNDLE)
-    dst = repo_root.joinpath(*_DIST_BUNDLE)
-    violations: list[Violation] = []
+    src = repo_root.joinpath(*canonical)
+    dst = repo_root.joinpath(*dist)
+    dist_display = "/".join(dist)
     if not src.is_dir():
         return [
             Violation(
-                check="dist-in-sync",
+                check=check,
                 location=src.relative_to(repo_root).as_posix(),
-                detail="canonical consumer-bootstrap bundle directory is missing.",
+                detail=f"canonical {label} bundle directory is missing.",
             )
         ]
     if not dst.is_dir():
         return [
             Violation(
-                check="dist-in-sync",
-                location="/".join(_DIST_BUNDLE),
+                check=check,
+                location=dist_display,
                 detail="packaged dist bundle is missing; run `npm run compile`.",
             )
         ]
-    src_files = {p.name for p in src.iterdir() if p.is_file()}
-    dst_files = {p.name for p in dst.iterdir() if p.is_file()}
+    violations: list[Violation] = []
+    src_files = _relative_files(src)
+    dst_files = _relative_files(dst)
     for name in sorted(src_files - dst_files):
         violations.append(
             Violation(
-                check="dist-in-sync",
-                location="/".join(_DIST_BUNDLE) + "/" + name,
+                check=check,
+                location=f"{dist_display}/{name}",
                 detail="present in the canonical bundle but missing from dist; "
                 "run `npm run compile`.",
             )
@@ -383,8 +429,8 @@ def check_dist_bundle_in_sync(repo_root: Path) -> list[Violation]:
     for name in sorted(dst_files - src_files):
         violations.append(
             Violation(
-                check="dist-in-sync",
-                location="/".join(_DIST_BUNDLE) + "/" + name,
+                check=check,
+                location=f"{dist_display}/{name}",
                 detail="present in dist but not in the canonical bundle; it is a "
                 "stale copy. Run `npm run compile`.",
             )
@@ -393,13 +439,41 @@ def check_dist_bundle_in_sync(repo_root: Path) -> list[Violation]:
         if _read_bytes_normalized(src / name) != _read_bytes_normalized(dst / name):
             violations.append(
                 Violation(
-                    check="dist-in-sync",
-                    location="/".join(_DIST_BUNDLE) + "/" + name,
+                    check=check,
+                    location=f"{dist_display}/{name}",
                     detail="dist copy differs from the canonical template; run "
                     "`npm run compile` to recopy the bundle.",
                 )
             )
     return violations
+
+
+def check_dist_bundle_in_sync(repo_root: Path) -> list[Violation]:
+    """The committed ``dist/`` consumer-bootstrap bundle matches its source."""
+    return _compare_bundle_pair(
+        repo_root,
+        _CANONICAL_BUNDLE,
+        _DIST_BUNDLE,
+        "consumer-bootstrap",
+        "dist-in-sync",
+    )
+
+
+def check_sample_bundle_in_sync(repo_root: Path) -> list[Violation]:
+    """The committed ``dist/`` sample-project bundle matches its source.
+
+    Set 107 S1. The sample bundle is the user-facing contract three things
+    pin (the ``Try a sample project`` command, ``hello-world.md``, and the
+    smoke test), so a stale packaged copy is the same shipping defect the
+    consumer-bootstrap guard already prevents.
+    """
+    return _compare_bundle_pair(
+        repo_root,
+        _CANONICAL_SAMPLE,
+        _DIST_SAMPLE,
+        "sample-project",
+        "sample-dist-in-sync",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +484,7 @@ ALL_CHECKS = (
     ("stale-framing", scan_stale_framing),
     ("one-active-set", check_one_active_set),
     ("dist-in-sync", check_dist_bundle_in_sync),
+    ("sample-dist-in-sync", check_sample_bundle_in_sync),
 )
 
 

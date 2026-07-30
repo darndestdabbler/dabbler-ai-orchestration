@@ -133,14 +133,15 @@ suite("scaffoldConsumerRepo — file writes", () => {
       fileOps: ops,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Fifteen writes: thirteen artifacts (the seven Set-060 artifacts,
+    // Sixteen writes: fourteen artifacts (the seven Set-060 artifacts,
     // the three Set 064 D7 docs/planning/ guidance-lifecycle starters,
-    // the Set 077 S4 cross-provider verification doc, and the two Set
-    // 087 S3 ownership/CI teaching templates), the Set 077 S2 durable
-    // tier marker, and the Set 094 docs/modules.yaml ensure-write. (The
-    // verification-mode marker is Lightweight-only as of Set 082; this is
-    // a Full scaffold, so it is not written.)
-    assert.strictEqual(result.written.length, 15);
+    // the Set 077 S4 cross-provider verification doc, the two Set 087 S3
+    // ownership/CI teaching templates, and the Set 107 S1
+    // azure-pipelines.yml), the Set 077 S2 durable tier marker, and the
+    // Set 094 docs/modules.yaml ensure-write. (The verification-mode
+    // marker is Lightweight-only as of Set 082; this is a Full scaffold,
+    // so it is not written.)
+    assert.strictEqual(result.written.length, 16);
     assert.strictEqual(result.skipped.length, 0);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
@@ -156,6 +157,8 @@ suite("scaffoldConsumerRepo — file writes", () => {
     // Set 087 S3 (ruling Q3): ownership + monorepo-CI teaching templates.
     assert.ok(store.has("/repo/.github/CODEOWNERS"));
     assert.ok(store.has("/repo/.github/workflows/monorepo-ci.yml"));
+    // Set 107 S1: the ADO half of the same pair, at the repository root.
+    assert.ok(store.has("/repo/azure-pipelines.yml"));
     // Set 094 (adjudication A): the scaffold ensures docs/modules.yaml.
     assert.ok(store.has("/repo/docs/modules.yaml"), "modules.yaml ensured");
   });
@@ -171,9 +174,10 @@ suite("scaffoldConsumerRepo — file writes", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    // 12 artifacts + tier marker + modules.yaml (Full: no verification-mode
-    // marker, Set 082; Set 094: + the modules.yaml ensure-write).
-    assert.strictEqual(result.written.length, 14);
+    // 13 artifacts + tier marker + modules.yaml (Full: no verification-mode
+    // marker, Set 082; Set 094: + the modules.yaml ensure-write; Set 107 S1:
+    // + azure-pipelines.yml).
+    assert.strictEqual(result.written.length, 15);
   });
 });
 
@@ -226,7 +230,7 @@ suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
     assert.strictEqual(result.installOk, false);
     assert.strictEqual(result.installMessage, "pip failed");
     // artifacts + tier marker + modules.yaml still written (Full); Set 094.
-    assert.strictEqual(result.written.length, 15);
+    assert.strictEqual(result.written.length, 16);
   });
 });
 

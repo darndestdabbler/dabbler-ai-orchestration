@@ -1,0 +1,71 @@
+{
+  "status": "completed",
+  "summary": "Set 107 Session 1 built the first-run path that lets a new developer watch an AI session change real code inside 15 minutes: the canonical sample bundle (docs/templates/sample-project/), the `Dabbler: Try a sample project` command implementing proposal v3 section 5's seven-step contract with all three section 12 corrections (resumable via an incomplete-sample marker rather than temp-dir-then-move, because a .venv cannot be relocated; a REPOSITORY-LOCAL git identity, never global; and traceback-free actionable step-5 failure text with the exact manual commands), `azure-pipelines.yml.template` in the consumer-bootstrap bundle closing the ADO CI dead end, a Layer-2 smoke test running the whole Lightweight lifecycle against bundle.json, a recursive `sample-dist-in-sync` drift guard, and a new CI job so the smoke test cannot rot. Extension bumped 0.46.0 -> 0.47.0; publish operator-gated. VERIFICATION: five phased rounds (discovery fan-out 2/2, supplementary, three remediation reviews -- the third operator-authorized past the 2-cycle bound). Closed VERIFIED, 0 findings, 4 fixes accepted + 1 accepted-with-modification. Five distinct blockers were found and fixed: (1) an empty folder INSIDE an existing repo skipped git init and committed to the PARENT repository while rewriting its git identity; (2) the sample taught every reader to record a cross-engine verification that never happened; (3) bundle.json was called a single source of truth without being enforced; (4) the extension CHANGELOG claimed a router fix the VSIX cannot deliver; (5) the rendered task spec was unbound from the contract. A third-provider opinion (gemini-2.5-pro, both parties excluded) broke a severity dispute AGAINST the orchestrator and surfaced two further real defects, including a presence-check that was satisfied by a docstring and would have stayed green with the sample's only failing test deleted. Three defects were caught by the executable gates rather than by review: the resume marker was being committed then deleted (dirty tree -> the reader's first close_session would have failed), the PyPI install seeded a router config into a Lightweight sample, and the drift-guard CI job was already RED on master from the previous set.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "files_changed": [
+    "docs/templates/sample-project/bundle.json",
+    "docs/templates/sample-project/README.md",
+    "docs/templates/sample-project/files/AGENTS.md",
+    "docs/templates/sample-project/files/CLAUDE.md",
+    "docs/templates/sample-project/files/GEMINI.md",
+    "docs/templates/sample-project/files/README.md",
+    "docs/templates/sample-project/files/main.py",
+    "docs/templates/sample-project/files/test_greeting.py",
+    "docs/templates/sample-project/files/dot-gitignore",
+    "docs/templates/sample-project/files/hello/__init__.py",
+    "docs/templates/sample-project/files/hello/greeting.py",
+    "docs/templates/sample-project/files/docs/session-sets/001-add-a-shout/spec.md",
+    "docs/templates/sample-project/files/docs/session-sets/001-add-a-shout/session-state.json",
+    "docs/templates/consumer-bootstrap/azure-pipelines.yml.template",
+    "tools/dabbler-ai-orchestration/src/utils/sampleProject.ts",
+    "tools/dabbler-ai-orchestration/src/commands/trySampleProject.ts",
+    "tools/dabbler-ai-orchestration/src/utils/consumerBootstrap.ts",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sampleProjectCore.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sampleProjectSmoke.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/consumerBootstrap.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldCore.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gettingStartedActions.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
+    "tools/dabbler-ai-orchestration/esbuild.js",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/dist/",
+    "ai_router/close_session.py",
+    "ai_router/CHANGELOG.md",
+    "ai_router/scripts/drift_guard.py",
+    "ai_router/tests/test_drift_guard.py",
+    ".github/workflows/test.yml",
+    "docs/repository-reference.md",
+    "docs/planning/git-transparency-proposal-v2.md",
+    "docs/planning/git-transparency-proposal-v3.md",
+    "docs/planning/git-transparency-proposal-gpt-v2.md",
+    "test-fixtures/cold-start/full/azure-pipelines.yml",
+    "test-fixtures/cold-start/lightweight/azure-pipelines.yml"
+  ],
+  "next_orchestrator": {
+    "engine": "gpt-5-6",
+    "provider": "openai",
+    "model": "gpt-5.6",
+    "effort": "high",
+    "reason": {
+      "code": "other",
+      "specifics": "Session 2 is documentation authoring against a hard negative constraint (zero git / YAML / host / governance terminology) plus a duplicate-procedure grep, and it must bind the new hello-world.md to bundle.json -- the one residual S1 leaves. A different provider from the one that wrote S1's code reads that code with fresh eyes, and gpt-5.6 demonstrated strong judgement across all five verification rounds of this session, being right on every substantive finding including one the orchestrator initially disputed."
+    }
+  },
+  "blockers": [
+    "NONE BLOCKING. Recorded for the operator, not blocking the close:",
+    "OPERATOR-GATED: publishing extension 0.47.0 to the Marketplace (tag vsix-v0.47.0 not created; no publish run). Separately, publishing dabbler-ai-router -- which carries this session's close_session EOF fix. The 0.47.0 VSIX deliberately does NOT deliver that fix, and the CHANGELOG, ai_router/CHANGELOG.md and docs/repository-reference.md all say so explicitly.",
+    "RESIDUAL, owned by Session 2: docs/tutorials/hello-world.md is named as a bundle consumer but is not bound to bundle.json. It cannot be bound here -- the file on disk is the old tutorial that S2 relocates to adopt-dabbler.md before authoring a new one around the sample. The obligation is written into the bundle README ('Not yet bound') and bundle.json's description so S2 inherits it explicitly.",
+    "RESIDUAL, environment: Layer 3 (Playwright) could not run on this machine. All 28 specs fail identically inside _electron.launch/firstWindow before any window opens, on all four cached VS Code builds (1.118.1 / 1.124.2 / 1.128.0), while the same binary with the same flags launches fine outside Playwright. Not attributable to this session's changes, and this session touched no Explorer-rendering surface, state-file writer, or fixture harness, so L-064-12's local-Layer-3 trigger does not fire. CI's playwright-tests job is the authoritative E2E signal. Worth an operator look: the local Layer-3 harness is currently unusable on this box."
+  ],
+  "lessons_cited": [
+    "L-064-9",
+    "L-064-12",
+    "L-065-1",
+    "L-069-1",
+    "L-095-1"
+  ]
+}

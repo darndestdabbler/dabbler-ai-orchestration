@@ -438,14 +438,15 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
       structureOnly: true,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Thirteen writes: eleven structure artifacts (the five Set-060
+    // Fourteen writes: twelve structure artifacts (the five Set-060
     // structure artifacts, the three Set 064 D7 docs/planning/
     // guidance-lifecycle starters, the Set 077 S4 cross-provider
-    // verification doc, and the two Set 087 S3 ownership/CI teaching
-    // templates), the Set 077 S2 durable tier marker, and the Set 094
-    // docs/modules.yaml ensure-write. (The verification-mode marker is
-    // Lightweight-only as of Set 082; this is a Full scaffold.)
-    assert.strictEqual(result.written.length, 13);
+    // verification doc, the two Set 087 S3 ownership/CI teaching
+    // templates, and the Set 107 S1 azure-pipelines.yml), the Set 077 S2
+    // durable tier marker, and the Set 094 docs/modules.yaml
+    // ensure-write. (The verification-mode marker is Lightweight-only as
+    // of Set 082; this is a Full scaffold.)
+    assert.strictEqual(result.written.length, 14);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
     assert.ok(store.has("/repo/GEMINI.md"));
@@ -458,6 +459,8 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     // Set 087 S3 (ruling Q3): ownership + monorepo-CI teaching templates.
     assert.ok(store.has("/repo/.github/CODEOWNERS"));
     assert.ok(store.has("/repo/.github/workflows/monorepo-ci.yml"));
+    // Set 107 S1: the ADO half of the same pair, at the repository root.
+    assert.ok(store.has("/repo/azure-pipelines.yml"));
     // Set 094 (adjudication A): the scaffold is one of the explicit-action
     // ensure-write sites — docs/modules.yaml is created from the canonical
     // template (the sole writer; not part of the static template bundle).
@@ -507,9 +510,10 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    // 10 artifacts + tier marker + modules.yaml (Full: no verification-mode
-    // marker, Set 082; Set 094: + the modules.yaml ensure-write).
-    assert.strictEqual(result.written.length, 12);
+    // 11 artifacts + tier marker + modules.yaml (Full: no verification-mode
+    // marker, Set 082; Set 094: + the modules.yaml ensure-write; Set 107 S1:
+    // + azure-pipelines.yml).
+    assert.strictEqual(result.written.length, 13);
   });
 
   test("Set 094: a pre-existing docs/modules.yaml is kept, never overwritten (skipped)", async () => {
@@ -539,7 +543,7 @@ suite("scaffoldConsumerRepo — structureOnly (Set 060 S2, spec D5)", () => {
 });
 
 suite("renderStructureBootstrap (Set 060 S2)", () => {
-  test("renders the eleven structure files, fully token-substituted", () => {
+  test("renders the twelve structure files, fully token-substituted", () => {
     const { files } = renderStructureBootstrap(
       bundle,
       structureOnlyContext("my-app", "full", "2026-06-10"),
@@ -553,6 +557,8 @@ suite("renderStructureBootstrap (Set 060 S2)", () => {
         "AGENTS.md",
         "CLAUDE.md",
         "GEMINI.md",
+        // Set 107 S1: the Azure DevOps counterpart to monorepo-ci.yml.
+        "azure-pipelines.yml",
         // Set 077 S4 (Feature 3): the engine-facing verification doc.
         "docs/dabbler/cross-provider-verification.md",
         // Set 060 S3 (D8): the static Getting Started teaching doc.

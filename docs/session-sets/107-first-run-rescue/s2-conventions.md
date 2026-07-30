@@ -20,7 +20,7 @@ not measured"**; measuring it is S3's entire job and this session cannot do it.
 
 | Suite | Result |
 | --- | --- |
-| pytest (`ai_router`) | **3133 passed / 6 skipped** (629s), final tree. Was 3066/6 at S1 close; the delta is exactly the **67 new tests** in `test_tutorial_gate.py`. Zero failures, zero tracked failures. (Rounds 1-2 ran against 3100/6, when the gate had 34 tests; round 1's findings are what took it to 67.) |
+| pytest (`ai_router`) | **3143 passed / 6 skipped** (674s), final tree. Was 3066/6 at S1 close; the delta is exactly the **77 new tests** in `test_tutorial_gate.py`. Zero failures, zero tracked failures. (The gate started at 34 tests; rounds 1, 4 and 5 each found escapes past it, and every one of those escapes now has a test. The count is a record of what has been attempted against the gate, not a claim about the whole space.) |
 | Extension unit (vscode-stub mocha) | **1821 passing** |
 | `npx tsc --noEmit` | clean, exit 0 |
 | `drift_guard.py` | OK, exit 0 |

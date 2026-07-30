@@ -92,6 +92,22 @@
       "dateTime": "2026-07-30T13:34:17.512423-04:00",
       "description": "Final suite on the finished tree: pytest 3133 passed / 6 skipped (delta from S1's 3066 is exactly the 67 gate tests). Extension unit 1821 passing; tsc clean; drift_guard OK; tutorial_gate OK. disposition.json authored; committing and pushing, then close_session.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "backstop-remediation",
+      "dateTime": "2026-07-30T13:57:44.294490-04:00",
+      "description": "Close attempt 1 FAILED the verification_backstop gate (round 4, $0.2658): the tutorial gate was materially fail-open, and would not have caught this session's own Windows-only step 4. Accepted 4 of 5 points, held the settled duplicate-procedure adjudication with reasons. Round 5 (remediation-review cycle 2, $0.1700) then REJECTED two of those fixes and was right twice more: commented YAML defeated the untagged detector, and the platform check used sets so the duplicated '-m unittest' masked the very regression it was written for. Both fixed (YAML furniture-skipping; Counter multiplicities) with the regression test round 5 specified. Gate tests 34 -> 77. Sidecars: s2-remediation-round-5.md, s2-remediation-round-6.md. Remediation-review bound now SPENT -- no further discretionary rounds; the close backstop adjudicates.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "suite-final",
+      "dateTime": "2026-07-30T13:57:44.543682-04:00",
+      "description": "Final suite: pytest 3143 passed / 6 skipped (delta from S1's 3066 is exactly the 77 gate tests). tutorial_gate OK, drift_guard OK.",
+      "status": "complete"
     }
   ]
 }

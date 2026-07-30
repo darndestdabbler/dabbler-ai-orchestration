@@ -60,6 +60,7 @@ import argparse
 import json
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -251,6 +252,23 @@ def check_bundle_test_count(repo_root: Path) -> list[Violation]:
                     ),
                 )
             )
+
+    # ...and a tally at BOTH ends, not just one. The close backstop (round 4)
+    # caught the version above passing a tutorial with only one `Ran N tests`
+    # block: `FAILED` and `OK` were both present, so the endpoints looked
+    # covered while a reader had nothing to compare the first run against.
+    if len(found) < 2:
+        violations.append(
+            Violation(
+                check="bundle-test-count",
+                location=FIRST_RUN_DOC,
+                detail=(
+                    f"the tutorial shows only {len(found)} 'Ran N tests' "
+                    "block; the reader needs one before the AI's change and "
+                    "one after, or there is nothing to compare"
+                ),
+            )
+        )
     return violations
 
 
@@ -372,6 +390,11 @@ _BOUND_UI_STRINGS = (
 # must produce the identical string -- v3 section 12.2 exposes the EXISTING
 # affordance rather than inventing a second one, so the two can never drift.
 _STARTER_LINE_TEMPLATE = "Start the next session of `{slug}`."
+# The backtick-free prefix. Used where a backtick would not survive the round
+# trip: the TypeScript escapes it inside a template literal
+# (``Start the next session of \`${slug}\`.``), and the adoption tutorial
+# substitutes the reader's own slug rather than the sample's.
+_STARTER_LINE_PREFIX = "Start the next session of"
 
 
 def check_ui_strings(repo_root: Path) -> list[Violation]:
@@ -414,6 +437,25 @@ def check_ui_strings(repo_root: Path) -> list[Violation]:
                 )
             )
 
+    # The starter-line TEMPLATE is itself pinned to the shipped implementation.
+    # The close backstop (round 4) pointed out that hard-coding it here just
+    # moves the drift one level up: if `buildSampleStarterLine` changes wording,
+    # this gate would happily keep enforcing the old form against the tutorial
+    # and report everything green.
+    prefix = _STARTER_LINE_PREFIX
+    if ts is not None and prefix not in ts:
+        violations.append(
+            Violation(
+                check="ui-strings",
+                location=SAMPLE_PROJECT_SOURCES[0],
+                detail=(
+                    f"the gate pins the starter line as {prefix!r}, but the "
+                    "shipped buildSampleStarterLine no longer produces that "
+                    "wording -- update the gate and both tutorials together"
+                ),
+            )
+        )
+
     bundle = load_bundle(repo_root)
     if bundle and bundle.get("sampleSetSlug"):
         starter = _STARTER_LINE_TEMPLATE.format(slug=bundle["sampleSetSlug"])
@@ -426,6 +468,97 @@ def check_ui_strings(repo_root: Path) -> list[Violation]:
                         f"the tutorial does not carry the starter line "
                         f"{starter!r} verbatim -- that exact string is what "
                         "the landing copies to the clipboard"
+                    ),
+                )
+            )
+
+    # The adoption tutorial carries the same starter-line mechanic for its own
+    # sets, so it drifts from the product the same way. It is checked on the
+    # PREFIX rather than the whole line, because its slugs are the reader's own
+    # (`003-greeter-plan`), not the sample's. Round 3's adjudication named this
+    # exact residual -- "pinned only by the command-title check" -- and the
+    # close backstop was right that naming it is not the same as closing it.
+    adopt = repo_root / "docs" / "tutorials" / "adopt-dabbler.md"
+    if adopt.is_file() and prefix not in adopt.read_text(encoding="utf-8"):
+        violations.append(
+            Violation(
+                check="ui-strings",
+                location="docs/tutorials/adopt-dabbler.md",
+                detail=(
+                    f"the adoption tutorial no longer shows the starter line "
+                    f"{prefix!r}; it and hello-world.md must not drift apart "
+                    "on the one string a reader copies"
+                ),
+            )
+        )
+    return violations
+
+
+# ---------------------------------------------------------------------------
+# Check 4c — every Windows interpreter command has its POSIX twin
+# ---------------------------------------------------------------------------
+
+# The close backstop (round 4) named the gap that mattered most: nothing checked
+# the interpreter commands, so THIS SESSION'S OWN DEFECT -- step 4 shipping only
+# `.venv\Scripts\python.exe` while step 2 gave both forms -- would have stayed
+# green. A macOS or Linux reader hits a path that does not exist, at the exact
+# step where the tutorial pays off.
+#
+# The contract is a pair: every argument list shown for the Windows interpreter
+# must also be shown for the POSIX one. Comparing ARGUMENTS rather than whole
+# lines means a reworded surrounding sentence cannot break the check, and a
+# typo'd or dropped platform alternative cannot pass it.
+_WIN_PY_RE = re.compile(r"\.venv\\Scripts\\python\.exe([^\n`]*)")
+_POSIX_PY_RE = re.compile(r"\.venv/bin/python([^\n`]*)")
+
+
+def _interpreter_invocations(text: str) -> tuple[Counter, Counter]:
+    """Counted, not de-duplicated.
+
+    Round 5 caught the set-based version being unable to detect the very
+    regression it was written for. `-m unittest` is shown TWICE (once before the
+    AI's change, once after), so deleting section 4's POSIX line left
+    `-m unittest` still present in the POSIX set via section 2, and the check
+    reported green. Multiplicity is the contract: N Windows occurrences require
+    N POSIX ones.
+    """
+    win = Counter(m.group(1).strip() for m in _WIN_PY_RE.finditer(text))
+    posix = Counter(m.group(1).strip() for m in _POSIX_PY_RE.finditer(text))
+    return win, posix
+
+
+def check_platform_pairs(repo_root: Path) -> list[Violation]:
+    text = _first_run_text(repo_root)
+    if text is None:
+        return []
+    win, posix = _interpreter_invocations(text)
+    violations: list[Violation] = []
+    for args in sorted(set(win) | set(posix)):
+        w, p = win.get(args, 0), posix.get(args, 0)
+        if w == p:
+            continue
+        shown = f"python -- {args}".strip() if args else "python"
+        if w > p:
+            violations.append(
+                Violation(
+                    check="platform-pairs",
+                    location=FIRST_RUN_DOC,
+                    detail=(
+                        f"'{shown}' is shown {w} time(s) for Windows but "
+                        f"{p} time(s) for macOS/Linux; at least one step "
+                        "leaves a POSIX reader with no runnable command"
+                    ),
+                )
+            )
+        else:
+            violations.append(
+                Violation(
+                    check="platform-pairs",
+                    location=FIRST_RUN_DOC,
+                    detail=(
+                        f"'{shown}' is shown {p} time(s) for macOS/Linux but "
+                        f"{w} time(s) for Windows; at least one step leaves a "
+                        "Windows reader with no runnable command"
                     ),
                 )
             )
@@ -521,6 +654,8 @@ _YAML_CONTENT_RE = re.compile(r"^\s*(?:-\s+)?[A-Za-z_][A-Za-z0-9_-]*:(?:\s|$)")
 # An indented scalar list item under a mapping key (`providers:` / `  - codex`).
 # Round 3's nit: requiring EVERY line to be a `key:` missed exactly this shape.
 _YAML_LIST_ITEM_RE = re.compile(r"^\s+-\s+\S")
+# Comment lines and document markers: YAML furniture, skipped when classifying.
+_YAML_FURNITURE_RE = re.compile(r"^\s*(?:#|---\s*$|\.\.\.\s*$)")
 
 
 def _fenced_blocks(lines: list[str]) -> list[tuple[int, list[str]]]:
@@ -565,7 +700,16 @@ def _untagged_yaml_blocks(lines: list[str]) -> list[int]:
     """
     out = []
     for start, body in _fenced_blocks(lines):
-        real = [b for b in body if b.strip()]
+        # Comment-only lines and document markers are YAML furniture, not
+        # content. Round 5 caught the previous version failing open on an
+        # ordinary commented block: a `# ...` line matched neither pattern, so
+        # the `all(...)` went false and the block was silently accepted --
+        # exactly the shape a maintainer pastes when copying real config.
+        real = [
+            b
+            for b in body
+            if b.strip() and not _YAML_FURNITURE_RE.match(b)
+        ]
         if len(real) < 2:
             continue
         if not any(_YAML_CONTENT_RE.match(b) for b in real):
@@ -690,6 +834,7 @@ ALL_CHECKS = (
     ("bundle-test-count", check_bundle_test_count),
     ("bundle-literals", check_bundle_literals),
     ("ui-strings", check_ui_strings),
+    ("platform-pairs", check_platform_pairs),
     ("links", check_links),
     ("first-run-constraint", check_first_run_constraint),
 )

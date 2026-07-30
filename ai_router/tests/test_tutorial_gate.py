@@ -82,7 +82,16 @@ def repo(tmp_path: Path) -> Path:
 
     tutorials = root / "docs" / "tutorials"
     tutorials.mkdir(parents=True)
-    (tutorials / "adopt-dabbler.md").write_text("# Adopt\n", encoding="utf-8")
+    (tutorials / "adopt-dabbler.md").write_text(
+        "# Adopt\n"
+        "\n"
+        "Left-click the set and paste the line it copies:\n"
+        "\n"
+        "```\n"
+        "Start the next session of `003-greeter-plan`.\n"
+        "```\n",
+        encoding="utf-8",
+    )
     (tutorials / "hello-world.md").write_text(
         "# Hello World\n"
         "\n"
@@ -105,15 +114,39 @@ def repo(tmp_path: Path) -> Path:
         "The set is `001-add-a-shout` and `test_greeting.py` holds the tests.\n"
         "\n"
         "```\n"
+        ".venv\\Scripts\\python.exe -m unittest\n"
+        "```\n"
+        "```\n"
+        ".venv/bin/python -m unittest\n"
+        "```\n"
+        "\n"
+        "```\n"
         "Ran 2 tests in 0.000s\n"
         "\n"
         "FAILED (errors=1)\n"
+        "```\n"
+        "\n"
+        # The SECOND pair -- mirrors the real tutorial, where the test command
+        # is shown once before the AI's change and once after. This duplication
+        # is what defeated the set-based platform check (round 5).
+        "```\n"
+        ".venv\\Scripts\\python.exe -m unittest\n"
+        "```\n"
+        "```\n"
+        ".venv/bin/python -m unittest\n"
         "```\n"
         "\n"
         "```\n"
         "Ran 2 tests in 0.000s\n"
         "\n"
         "OK\n"
+        "```\n"
+        "\n"
+        "```\n"
+        ".venv\\Scripts\\python.exe main.py\n"
+        "```\n"
+        "```\n"
+        ".venv/bin/python main.py\n"
         "```\n"
         "\n"
         "```\n"
@@ -137,7 +170,10 @@ def repo(tmp_path: Path) -> Path:
         '"Copied to clipboard. Paste it into your AI chat to begin.";\n'
         'export function describeSuccess() { return '
         '"Your sample project is ready. To start the first AI task, copy the '
-        'starter prompt and paste it into your AI chat."; }\n',
+        'starter prompt and paste it into your AI chat."; }\n'
+        "export function buildSampleStarterLine(slug: string): string {\n"
+        "  return `Start the next session of \\`${slug}\\`.`;\n"
+        "}\n",
         encoding="utf-8",
     )
     cmd_dir = root / "tools" / "dabbler-ai-orchestration" / "src" / "commands"
@@ -383,6 +419,121 @@ def test_starter_line_must_appear_verbatim(repo: Path):
 def test_ui_string_check_tolerates_a_line_wrap(repo: Path):
     """The success notification is quoted across two lines in the fixture."""
     assert not _checks(tutorial_gate.run_all(repo), "ui-strings")
+
+
+def test_starter_line_template_is_pinned_to_the_shipped_source(repo: Path):
+    """Hard-coding the template in the gate would just move the drift up a
+    level: if the product reworded it, the gate would keep enforcing the old
+    form and report green. Round 4 (close backstop) named this."""
+    _edit(
+        repo,
+        "tools/dabbler-ai-orchestration/src/utils/sampleProject.ts",
+        "Start the next session of",
+        "Begin the next session for",
+    )
+    found = _checks(tutorial_gate.run_all(repo), "ui-strings")
+    assert found and "no longer produces that wording" in found[0].detail
+
+
+def test_adoption_tutorial_starter_line_is_pinned_too(repo: Path):
+    """Round 3 named the residual; round 4 was right that naming is not
+    closing. adopt-dabbler.md is checked on the PREFIX, since its slugs are the
+    reader's own rather than the sample's."""
+    _edit(
+        repo,
+        "docs/tutorials/adopt-dabbler.md",
+        "Start the next session of `003-greeter-plan`.",
+        "Kick off the next session.",
+    )
+    found = _checks(tutorial_gate.run_all(repo), "ui-strings")
+    assert found and "adopt-dabbler.md" in found[0].location
+
+
+# ---------------------------------------------------------------------------
+# Check 4c — platform pairs. This is the check that would have caught THIS
+# session's own Windows-only step 4.
+# ---------------------------------------------------------------------------
+
+
+def test_windows_only_command_is_flagged(repo: Path):
+    _edit(
+        repo,
+        HELLO_WORLD,
+        "\n.venv/bin/python main.py\n",
+        "\n",
+    )
+    found = _checks(tutorial_gate.run_all(repo), "platform-pairs")
+    assert found and "POSIX reader" in found[0].detail
+
+
+def test_posix_only_command_is_flagged(repo: Path):
+    _edit(
+        repo,
+        HELLO_WORLD,
+        "\n.venv\\Scripts\\python.exe main.py\n",
+        "\n",
+    )
+    found = _checks(tutorial_gate.run_all(repo), "platform-pairs")
+    assert found and "Windows reader" in found[0].detail
+
+
+def test_mistyped_platform_alternative_is_flagged(repo: Path):
+    """A dropped alternative and a typo'd one fail the same way -- the check
+    compares ARGUMENTS, so the pair must match, not merely both exist."""
+    _edit(repo, HELLO_WORLD, ".venv/bin/python main.py", ".venv/bin/python maim.py")
+    assert _checks(tutorial_gate.run_all(repo), "platform-pairs")
+
+
+def test_matched_platform_pairs_pass(repo: Path):
+    assert not _checks(tutorial_gate.run_all(repo), "platform-pairs")
+
+
+def test_removing_only_the_second_posix_test_command_is_flagged(repo: Path):
+    """The regression round 5 asked for, and the one the set-based version
+    could not see.
+
+    `-m unittest` is shown twice -- before the AI's change and after. Deleting
+    only the SECOND POSIX occurrence (section 4's) left the argument string
+    present via section 1, so the old set comparison reported green while a
+    macOS reader reached the completion proof with no runnable command. This is
+    precisely this session's own original defect.
+    """
+    text = (repo / HELLO_WORLD).read_text(encoding="utf-8")
+    needle = "```\n.venv/bin/python -m unittest\n```\n"
+    assert text.count(needle) == 2, "fixture must show the pair twice"
+    head, sep, tail = text.rpartition(needle)
+    (repo / HELLO_WORLD).write_text(head + tail, encoding="utf-8")
+
+    found = _checks(tutorial_gate.run_all(repo), "platform-pairs")
+    assert found, "the second-occurrence removal must be caught"
+    assert "2 time(s) for Windows but 1 time(s)" in found[0].detail
+
+
+def test_commented_untagged_yaml_is_flagged(repo: Path):
+    """Round 5: a `# comment` line matched neither YAML pattern, so `all(...)`
+    went false and an ordinary commented config block was accepted."""
+    _append(
+        repo,
+        HELLO_WORLD,
+        "```\nproviders:\n  # Choose one provider.\n  - codex\n```\n",
+    )
+    assert _checks(tutorial_gate.run_all(repo), "first-run-constraint")
+
+
+def test_yaml_document_markers_do_not_defeat_detection(repo: Path):
+    _append(
+        repo,
+        HELLO_WORLD,
+        "```\n---\nmodules:\n  - slug: greeter\n```\n",
+    )
+    assert _checks(tutorial_gate.run_all(repo), "first-run-constraint")
+
+
+def test_a_comment_only_block_is_not_yaml(repo: Path):
+    """Furniture is skipped, not treated as content -- a fence of pure
+    comments must not become a YAML violation on its own."""
+    _append(repo, HELLO_WORLD, "```\n# just a note\n# and another\n```\n")
+    assert not _checks(tutorial_gate.run_all(repo), "first-run-constraint")
 
 
 # ---------------------------------------------------------------------------

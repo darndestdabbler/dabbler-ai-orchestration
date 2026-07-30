@@ -24,12 +24,9 @@ the framework is built around.
 > **Read only the line for your host and ignore the other. They are alternatives, never both.**
 > Anything *not* inside a `▸ Your host` block is the same on both hosts — just do it.
 >
-> **On Azure DevOps, one step needs something this tutorial does not ship.** Part 4's CI step
-> uses a GitHub Actions workflow, which Azure DevOps ignores. You will need an
-> `azure-pipelines.yml` of your own that runs the same test command. If you do not already have
-> a pipeline pattern to copy, **do Parts 1–3 and Part 4 up to the CI step**, then get that YAML
-> from whoever owns your pipeline standards before continuing. That is a known gap, not
-> something you have misread.
+> **On Azure DevOps, Part 4's CI step is the one real divergence.** GitHub Actions workflows
+> are ignored by Azure DevOps, so that step gives you a working `azure-pipelines.yml` to use
+> instead. Everything else is a setting with a different name.
 
 ## Part 1 — Install and verify the tools *(scene 1)*
 
@@ -242,12 +239,43 @@ git switch -c authoring/greeter-lifecycle
    > diverge, rather than just naming a different setting.
    >
    > - **GitHub:** the YAML above is all of it. Commit it on the session branch.
-   > - **Azure DevOps:** GitHub Actions workflows are ignored entirely. **Before** opening the
-   >   pull request, create a pipeline that runs the same test command and add it under **Branch
-   >   Policies** on `main` > **Build validation**, marked **Required** — without it, step 7 has
-   >   nothing to wait on. **This tutorial does not ship an `azure-pipelines.yml`**, because the
-   >   YAML belongs to your organisation's pipeline standards. If you do not have one to copy,
-   >   stop here and get it before continuing; this is a known gap, not something you misread.
+   > - **Azure DevOps:** GitHub Actions workflows are ignored entirely. Delete
+   >   `.github/workflows/monorepo-ci.yml`, and create `azure-pipelines.yml` at the repository
+   >   root instead — it does exactly the same job:
+   >
+   >   ```yaml
+   >   trigger:
+   >     branches:
+   >       include: [main]
+   >   pr:
+   >     branches:
+   >       include: [main]
+   >
+   >   pool:
+   >     vmImage: ubuntu-latest
+   >
+   >   steps:
+   >     - task: UsePythonVersion@0
+   >       inputs:
+   >         versionSpec: "3.12"
+   >     - script: python -m pip install pytest
+   >       displayName: Install pytest
+   >     - script: |
+   >         for module in services/*/; do
+   >           echo "== $module"
+   >           python -m pytest -q "$module" || exit 1
+   >         done
+   >       displayName: Build and test every module
+   >   ```
+   >
+   >   Commit it on the session branch. Then **Pipelines** > **New pipeline** > **Azure Repos
+   >   Git** > your repo > **Existing Azure Pipelines YAML file** > `/azure-pipelines.yml` >
+   >   **Save**. Finally — **before** opening the pull request — add it under **Branch Policies**
+   >   on `main` > **Build validation**, marked **Required**; without that, step 7 has nothing to
+   >   wait on.
+   >
+   >   *If your organisation has its own pipeline standards, use them — this is a working
+   >   starting point, not a mandate.*
 
 7. **Open the pull request.** From the worktree window, run **`Dabbler: Open PR for this set`**.
    A dialog lists the exact commands it will run — `git push`, then `gh pr create` on GitHub or

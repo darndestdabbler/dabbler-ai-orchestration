@@ -538,6 +538,132 @@ function _cmpVersion(a: number[] | null, b: number[] | null): number {
   return 0;
 }
 
+/** The filesystem surface {@link resolveCodeExecutable} needs. */
+export interface BinaryProbeIo {
+  exists: (p: string) => boolean;
+  isDirectory: (p: string) => boolean;
+  readdir: (p: string) => string[];
+}
+
+/**
+ * macOS executable names inside `<bundle>.app/Contents/MacOS/`, most likely
+ * first. VS Code has shipped its main binary under more than one name across
+ * versions, so this is a preference order rather than a single guess.
+ */
+const _DARWIN_EXEC_PREFERENCE = [
+  "Electron",
+  "Code Helper",
+  "Visual Studio Code",
+  "Code",
+];
+
+/**
+ * Resolve the launchable VS Code executable inside one downloaded version
+ * directory, or null when there isn't one.
+ *
+ * Pure + injected IO so the Layer-2 suite can drive the macOS branch from any
+ * host — which matters, because the bug this replaces was macOS-only and
+ * therefore invisible to everyone developing on Windows or Linux.
+ *
+ * The previous implementation guessed exactly ONE path per platform
+ * (`<dir>/Visual Studio Code.app/Contents/MacOS/Electron` on darwin) and
+ * reported only "no usable binary" when the guess missed. CI had been red on
+ * macOS for at least twelve commits because of it, with an error that named
+ * the directory but nothing about what was actually inside. This searches, and
+ * {@link describeVersionDir} makes any remaining miss diagnosable.
+ */
+export function resolveCodeExecutable(
+  versionDir: string,
+  platform: NodeJS.Platform,
+  io: BinaryProbeIo,
+): string | null {
+  if (platform === "darwin") {
+    // The .app bundle is normally a child of the version dir, but tolerate the
+    // version dir itself already being the bundle.
+    const bundles: string[] = [];
+    if (io.exists(path.join(versionDir, "Contents", "MacOS"))) {
+      bundles.push(versionDir);
+    }
+    for (const entry of io.readdir(versionDir)) {
+      if (entry.endsWith(".app")) bundles.push(path.join(versionDir, entry));
+    }
+    for (const bundle of bundles) {
+      const macOsDir = path.join(bundle, "Contents", "MacOS");
+      if (!io.exists(macOsDir) || !io.isDirectory(macOsDir)) continue;
+      const present = io.readdir(macOsDir);
+      for (const preferred of _DARWIN_EXEC_PREFERENCE) {
+        if (present.includes(preferred)) return path.join(macOsDir, preferred);
+      }
+      // Unknown name, but there is exactly one thing in there — take it rather
+      // than fail on a rename we have not seen yet.
+      if (present.length === 1) return path.join(macOsDir, present[0]);
+    }
+    return null;
+  }
+
+  if (platform === "win32") {
+    const exact = path.join(versionDir, "Code.exe");
+    if (io.exists(exact)) return exact;
+    const exe = io.readdir(versionDir).find((e) => e.toLowerCase().endsWith(".exe"));
+    return exe ? path.join(versionDir, exe) : null;
+  }
+
+  // Linux (and anything else): the tarball puts `code` at the top level.
+  for (const rel of [["code"], ["bin", "code"]]) {
+    const candidate = path.join(versionDir, ...rel);
+    if (io.exists(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * One line describing what a version directory actually contains, for the
+ * failure message. An error that says only "no usable binary" costs a whole CI
+ * round-trip to diagnose; one that lists the tree does not.
+ */
+export function describeVersionDir(
+  versionDir: string,
+  platform: NodeJS.Platform,
+  io: BinaryProbeIo,
+): string {
+  const name = path.basename(versionDir);
+  if (!io.exists(versionDir)) return `${name} (missing)`;
+  const top = io.readdir(versionDir);
+  if (platform !== "darwin") return `${name} -> [${top.join(", ") || "empty"}]`;
+  const parts: string[] = [];
+  for (const entry of top) {
+    if (!entry.endsWith(".app")) continue;
+    const macOsDir = path.join(versionDir, entry, "Contents", "MacOS");
+    parts.push(
+      io.exists(macOsDir)
+        ? `${entry}/Contents/MacOS -> [${io.readdir(macOsDir).join(", ") || "empty"}]`
+        : `${entry} (no Contents/MacOS)`,
+    );
+  }
+  return `${name} -> [${top.join(", ") || "empty"}]${parts.length ? `; ${parts.join("; ")}` : ""}`;
+}
+
+/** Real-fs {@link BinaryProbeIo}. */
+function realProbeIo(): BinaryProbeIo {
+  return {
+    exists: (p) => fs.existsSync(p),
+    isDirectory: (p) => {
+      try {
+        return fs.statSync(p).isDirectory();
+      } catch {
+        return false;
+      }
+    },
+    readdir: (p) => {
+      try {
+        return fs.readdirSync(p);
+      } catch {
+        return [];
+      }
+    },
+  };
+}
+
 function findCodeBinary(): string {
   const override = process.env.VSCODE_BIN;
   if (override) {
@@ -568,18 +694,22 @@ function findCodeBinary(): string {
     .readdirSync(vsTestDir)
     .filter((e) => e.startsWith("vscode-"))
     .sort((a, b) => _cmpVersion(_parseCachedVersion(a), _parseCachedVersion(b)));
+  const io = realProbeIo();
   for (const dir of entries) {
-    const candidate =
-      process.platform === "win32"
-        ? path.join(vsTestDir, dir, "Code.exe")
-        : process.platform === "darwin"
-          ? path.join(vsTestDir, dir, "Visual Studio Code.app", "Contents", "MacOS", "Electron")
-          : path.join(vsTestDir, dir, "code");
-    if (fs.existsSync(candidate)) return candidate;
+    const found = resolveCodeExecutable(
+      path.join(vsTestDir, dir),
+      process.platform,
+      io,
+    );
+    if (found) return found;
   }
   throw new Error(
-    `No usable VS Code binary in ${vsTestDir}. ` +
-      `Inspected: ${entries.join(", ") || "(empty)"}`,
+    `No usable VS Code binary in ${vsTestDir} (platform ${process.platform}). ` +
+      `Inspected: ${
+        entries
+          .map((d) => describeVersionDir(path.join(vsTestDir, d), process.platform, io))
+          .join(" | ") || "(empty)"
+      }`,
   );
 }
 

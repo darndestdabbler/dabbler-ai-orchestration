@@ -90,6 +90,13 @@ jobs:
           --require ./src/test/vscode-stub.js --ui tdd --timeout 120000
           'src/test/suite/consumerBootstrap.test.ts'
           'src/test/suite/coldStartSnapshot.test.ts'
+          'src/test/suite/electronBinaryLookup.test.ts'
+
+      # electronBinaryLookup.test.ts rides in this Node-only job on purpose:
+      # it drives the Layer-3 macOS binary lookup through injected IO, so the
+      # macOS-only branch is exercised on EVERY push from a Linux runner. The
+      # bug it covers went undetected for twelve commits precisely because
+      # nobody developing on Windows could run the code path that broke.
 
   sample-project-smoke:
     name: Sample-project smoke (Set 107)
@@ -176,6 +183,15 @@ jobs:
     name: Playwright Layer 3
     runs-on: ${{ matrix.os }}
     strategy:
+      # 2026-07-30: fail-fast was HIDING the real per-OS picture. When the
+      # macOS leg failed on a stale binary-lookup path, GitHub cancelled the
+      # other two — so the Linux leg (which was passing its specs cleanly) and
+      # the Windows leg (still downloading VS Code) both reported as failures
+      # with no results at all. That is precisely the trap L-064-12 warns
+      # about: "treat CANCELLED jobs as unknown coverage, not passing
+      # coverage." Run all three to completion; a red matrix should say WHICH
+      # platform is red.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     # Same dummy API-key envs the python-tests job uses. Several

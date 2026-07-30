@@ -10,11 +10,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > engines converged on one diagnosis — **first-run cognitive load, not raw
 > git**. No path through this product reached *"an AI session wrote my code"*
 > without first teaching branch protection, worktrees, CI and pull requests.
-> This release ships the path that skips all of it (Set 107 S1). Session 2
-> rewrites the tutorial around it; Session 3 puts it under a stopwatch.
+> This release ships the path that skips all of it (Set 107 S1), and the
+> tutorial rewritten around it (Set 107 S2). Session 3 puts it under a
+> stopwatch.
 >
 > **Not published.** The version bump is staged; no tag was pushed and no
 > publish was run. The click is the operator's.
+
+### Changed
+
+- **(Set 107 S2) The two shipped templates now link to the right tutorial.**
+  Set 107 splits the old 448-line tutorial in two: the new
+  `docs/tutorials/hello-world.md` is a 15-minute first run on the local
+  sample, and the adoption walkthrough it replaced moves to
+  `docs/tutorials/adopt-dabbler.md`. The set's spec expected the shipped
+  links to need no change, on the reasoning that the new document keeps the
+  old filename — but both shipped templates describe the **adoption** content
+  by name, so the link resolving is not the test. `getting-started.md.template`
+  said "one person and one module first, then a teammate, a second module,
+  CODEOWNERS, and monorepo CI", and `monorepo-ci.yml.template`'s worked-example
+  comment names the `greeter` / `app` modules. Both now point at
+  `adopt-dabbler.md`; `getting-started.md.template` additionally points a
+  first-time reader at `hello-world.md`. No version bump was needed for it —
+  0.47.0 is staged and unpublished, so the change folds into this release.
 
 ### Added
 

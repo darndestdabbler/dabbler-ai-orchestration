@@ -1,1 +1,1 @@
-This walkthrough was replaced by [Hello World: ship your first module with Dabbler](hello-world.md) — release, hotfix, and rollback operations now live in [Release and recovery operations](release-and-recovery.md).
+This walkthrough was replaced by [Adopt Dabbler: ship your first module in a real repository](adopt-dabbler.md) — release, hotfix, and rollback operations now live in [Release and recovery operations](release-and-recovery.md). If you have never used Dabbler at all, start with the 15-minute [Hello World](hello-world.md) instead.

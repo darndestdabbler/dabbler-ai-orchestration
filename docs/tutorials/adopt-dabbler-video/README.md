@@ -1,8 +1,14 @@
-# Video walkthrough — scene scripts
+# Video walkthrough — scene scripts for `adopt-dabbler.md`
 
-Six scenes, 1:1 with the six parts of [`hello-world.md`](../hello-world.md), plus two
+Six scenes, 1:1 with the six parts of [`adopt-dabbler.md`](../adopt-dabbler.md), plus two
 alternate takes. Each script is written to be **followed live while recording**: every beat
 carries the literal action, the words to say, and the literal result to wait for.
+
+> **These scripts are not the Hello World video.** They script the ~2-hour adoption
+> walkthrough — hosts, branch protection, worktrees, CI and pull requests. The 15-minute
+> [Hello World](../hello-world.md) first run has **no scene yet**; authoring one is deferred
+> until that tutorial has been walked against a stopwatch. Do not publish these six scenes as
+> Hello World's video.
 
 ## Scene order
 

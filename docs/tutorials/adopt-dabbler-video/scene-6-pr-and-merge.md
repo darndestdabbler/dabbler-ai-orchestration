@@ -1,6 +1,6 @@
 # Scene 6 — Review, merge, and clean up
 
-Covers [`hello-world.md`](../hello-world.md) **Part 6**, including the five-item final check.
+Covers [`adopt-dabbler.md`](../adopt-dabbler.md) **Part 6**, including the five-item final check.
 
 **Finished length:** ~6 minutes.
 

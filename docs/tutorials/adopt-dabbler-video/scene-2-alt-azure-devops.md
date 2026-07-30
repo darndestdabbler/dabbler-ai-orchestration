@@ -4,7 +4,7 @@
 **Rejoin at:** [`scene-3-dabbler-setup.md`](scene-3-dabbler-setup.md) beat 1, unchanged.
 
 Covers the Azure DevOps equivalents named inline throughout
-[`hello-world.md`](../hello-world.md) **Part 2** and after.
+[`adopt-dabbler.md`](../adopt-dabbler.md) **Part 2** and after.
 
 **Finished length:** ~4 minutes.
 

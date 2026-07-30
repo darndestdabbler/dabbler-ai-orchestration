@@ -1,6 +1,6 @@
 # Scene 1 — Install and verify the tools
 
-Covers [`hello-world.md`](../hello-world.md) **Part 1**.
+Covers [`adopt-dabbler.md`](../adopt-dabbler.md) **Part 1**.
 Alternate take: [`scene-1-alt-direct-api.md`](scene-1-alt-direct-api.md) replaces this whole
 scene for viewers using direct provider API keys instead of a Copilot seat.
 

@@ -100,6 +100,9 @@ modules in an older repo) is covered in
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/module-reorganization.md>.
 For a hands-on walkthrough — one person and one module first, then a
 teammate, a second module, CODEOWNERS, and monorepo CI — see
+<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/adopt-dabbler.md>.
+Never used Dabbler at all? Start with the 15-minute first run on a local
+sample instead, which needs no host and no git commands from you:
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/hello-world.md>.
 
 ## 3. Create the Project Plan and First Session Set

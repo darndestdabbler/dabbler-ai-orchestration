@@ -144,3 +144,205 @@ decide it, so this is re-stated at the set-terminal close, not fixed here.
 - **Outcome:** VERIFIED. Suites: pytest 3066 passed / 6 skipped; Layer 2 1810
   passing; drift guard green. Layer 3 unrun locally (environment; CI is the
   signal). Extension `0.47.0` staged, publish operator-gated.
+
+---
+
+## Session 2 of 3 — the new `hello-world.md`, and relocating the old one
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked).
+  **S1's disposition recommended `openai / gpt-5-6`;** the operator launched
+  Claude instead. Recorded, not re-argued — the operator owns scheduling and
+  engine choice, and the memory of a very limited Copilot/spend budget makes a
+  provider switch a real cost, not a free one. The consequence that *does* bind
+  this session: S1's code and S2's prose now share an author, so the
+  fresh-eyes reading S1's disposition wanted has to come from somewhere else —
+  it comes from the mandatory cross-provider verification (anthropic excluded)
+  and from routing the authoring itself off-provider.
+- Routed step-3.5 analysis: `s2-ai-assignment-analysis.json` (route
+  `task_type=analysis`, excl. anthropic → gemini-pro, tier 2, $0.0168).
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` (S3 runs the stopwatch walk; **this session writes the
+  document that walk executes**), `requiresE2E true`, `pathAwareCritique
+  advisory` (set-terminal, in S3). Not re-litigated here.
+- Budget note: this session is prose, greps and one gate — the cheapest of the
+  three. It draws on the **`DABBLER_*` provider keys** only (routed authoring +
+  routed semantic review + mandatory verification) and spends **zero Copilot
+  seat capacity**.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read S1's disposition; **run `Try a sample project` and record what a reader actually sees** (dialog labels, messages, rendered tree, the start affordance). | Orchestrator direct — reconnaissance. Its *output* is the ground truth every later step depends on, so it is written down as an artifact, not held in context. |
+| 2 | Author the new `docs/tutorials/hello-world.md`. | **Routed** (`documentation`) — always-route type, and this is the set's actual deliverable: cognitive load is the product. Departure from the analyst below. |
+| 2b | Bind every literal in the routed draft to `bundle.json` and to the command's real strings. | Orchestrator direct — mechanical substitution against a contract; generating literals independently would be circular (S1's step-8 precedent). |
+| 3 | Relocate the 448-line tutorial to `adopt-dabbler.md` + one labelled note. | Orchestrator direct — `git mv` plus one inserted note. |
+| 4 | Move `docs/tutorials/video/` with it; repoint the README, nine scene links and the traceability tables; state the new tutorial's scene is deferred. | Orchestrator direct — mechanical, but **L-065-1 applies**: every echo in one pass, then grep for the old claim. |
+| 5 | Repair every inbound link. | Orchestrator direct — but see the **scope correction** below; the spec undercounts the inbound set. |
+| 6 | Duplicate-procedure check against the concept-ownership table. | **Mechanical grep AND routed** (`analysis`) — the grep gathers evidence, the routed pass reads for paraphrase. Neither alone answers the question. |
+| 7 | The literal gate covering both documents. | **Routed** (`test-generation`) for the assertion *design*; orchestrator-direct for wiring it into pytest + CI. Scope correction below. |
+| Verify | Phased `verify_session` for this set. | **Routed** — `session-verification`, anthropic auto-excluded per the no-skip mandate. |
+| Close | `disposition.json`; commit + push; `close_session`; notify. | Orchestrator direct. |
+
+### Where this departs from the routed analyst, and why
+
+**Adopted:** its step-2 routing, its step-6 answer (semantic, not literal — a
+literal grep finds repeated *strings* and the ownership table is about repeated
+*procedures*), its step-7 routing, and — most usefully — its **missing step**.
+
+**Adopted with a change of shape (E, the missing step).** The analyst wants an
+orchestrator "desk check" of the new tutorial *before* the gate is written and
+before S3's human walk. That is right, and it is the same instinct
+`project-guidance.md` already encodes as an operator-set bar: *any step
+automation can verify must be verified before the checklist is offered to the
+human*, and *untested instructions are not known to be followable*. Set 106
+declined this exact recommendation on the grounds that the desk check **is** the
+S4 walk — and then its verification loop found fifteen defects whose dominant
+class was "a step that cannot be performed from the state the previous step
+leaves behind," with both mechanical gates green the whole time. That is the
+precedent, and it argues for adopting the check, not declining it again.
+
+The change of shape: this is **not** a rehearsal of S3. S3's walk is defined by
+resources this session does not have — a clean VS Code profile, a released
+VSIX, no editable install, a stopwatch. Running a half version of it here would
+produce partial evidence that invites S3 to be skipped, which is the failure
+Set 106 correctly feared. So the check is scoped to exactly what this machine
+*can* falsify and S3 should not spend human minutes discovering: **does each
+step's stated precondition hold given the state the previous step leaves
+behind, and does every literal match reality?** Recorded as `s2-desk-check.md`,
+naming what it does *not* establish (timing, clean-profile behavior, released-
+VSIX behavior) so it cannot be mistaken for the acceptance test.
+
+**Departed from — A, step 2's authoring.** The analyst proposes: route the whole
+document with `bundle.json` as context and instruct the model to derive the
+literals, then route a second `analysis` pass to check them. The second half is
+sound; the first half is not. A model asked to *derive* literals from a bundle
+it can only read as pasted text will paraphrase some of them — and this
+document's literals are the one thing S3's walk cannot recover from, because a
+reader who types a command that does not exist stops. So: **route the prose,
+bind the literals mechanically.** The prompt supplies the exact strings as
+fixed quantities rather than asking for them to be derived, and step 2b
+re-substitutes every one from `bundle.json` and the command's real source
+afterwards. The routed model is being asked for the thing it is actually better
+at — sequencing, framing, and holding a hard negative constraint across 150
+lines of prose — and not for a job a `json.load` does perfectly.
+
+**Departed from — the next-orchestrator effort.** The analyst says `medium`.
+S3 is the set's only real acceptance test, it carries the set-terminal close,
+the advisory path-aware critique and the Step 9 guidance review, and it is the
+session where a wrong call costs operator walk-time. `high`.
+
+**Recorded, not adopted — C.** The analyst's gate assertions are directionally
+right but two of its five name things that do not exist (`dabbler-ai run`,
+`files/tests/test_main.py`). Corrected against the real bundle below. This is
+the second consecutive session where the analyst invented an identifier; treat
+its *judgement* as valuable and its *literals* as unverified.
+
+### Scope corrections this session inherits
+
+**1. The spec's step 5 undercounts the inbound links.** It names `README.md`,
+`docs/quick-start.md`, `docs/module-reorganization.md` and the two templates.
+A grep finds more that are *semantically* wrong after the move, because they
+point at `hello-world.md` while describing the content that becomes
+`adopt-dabbler.md`: `docs/tutorials/module-team-hello-world.md` (the tombstone
+redirect), `docs/tutorials/release-and-recovery.md` ("Reference for after the
+Hello World tutorial"), `docs/quick-start.md:305` (which describes it as
+"GitHub + GitHub Copilot"), and the nine video scripts. Under L-065-1 the fix
+is one pass over every echo, and the test is not "does the link resolve" but
+"does it point at the document that owns what the sentence claims."
+
+**2. Set 106's "committed literal gate" is run by nobody.**
+`s3-check-literals.py` lives in `docs/session-sets/106-.../` and is not
+referenced by CI, by pytest, or by any npm script — it is a re-runnable
+artifact, not a gate. Extending it in place would satisfy the spec's words and
+not its purpose ("so the two tutorials cannot drift apart silently"). This
+session authors its **successor** at repo level, wired into the pytest suite
+and therefore into CI, the way `drift_guard.py` already is. The 106 script is
+kept and left working — it is cited in that set's evidence and must not be
+invalidated.
+
+**3. The residual S1 handed over.** `bundle.json`'s own README names
+`hello-world.md` as its third consumer and says the binding is "not yet bound…
+the one place this contract can drift silently." Discharging that is what step
+7 is *for*; the gate's assertions are therefore drawn from `bundle.json`'s
+enforced-field table, not invented.
+
+### The gate's assertions (C, corrected against the real bundle)
+
+Every one is derived from `bundle.json`, which is already the source of truth
+for the other two consumers:
+
+1. Every `Dabbler: <Title>` string in `docs/tutorials/**` resolves to a real
+   contributed command title in the extension's `package.json` (inherited from
+   106 — it is the check that catches a reader typing a command that does not
+   exist).
+2. `bundle.json`'s `expectedProgramOutput` lines appear verbatim in
+   `hello-world.md`.
+3. `bundle.json`'s `expectedTestCount` and the before/after test tallies the
+   tutorial prints are consistent with it.
+4. Every sample file path the tutorial quotes exists in
+   `docs/templates/sample-project/files/` (with the `dot-` rendering rule
+   applied), and `programEntryPoint` / `sampleSetSlug` / `missingFunction`
+   appear as the tutorial's literals rather than as paraphrases.
+5. Every relative markdown link under `docs/tutorials/**` resolves on disk
+   (inherited from 106 — this is what a two-document split breaks first).
+6. The negative constraint is machine-checked: `hello-world.md` contains no
+   `git <subcommand>` invocation, no YAML fence, and none of the governance
+   vocabulary the spec forbids. **This is the assertion the analyst did not
+   propose and the one most specific to this set** — the deliverable is defined
+   by what is *absent*, and absence is exactly what a human re-reader stops
+   noticing after the third pass.
+
+### D — the step most likely to be done badly
+
+The analyst says step 6. I disagree: step 6 has a routed reviewer and an
+explicit table to check against. **The likelier failure is step 3**, the
+relocation — because it is the step that *looks* mechanical. "Unchanged in
+substance" is doing real work in that sentence: the old document opens by
+telling the reader this is their first contact with the product, and it is
+about to stop being that. A pure `git mv` leaves a document whose first
+paragraph is now false, and L-064-8 is the lesson that names this exact class
+(*a replacement doc inherits the retired doc's claims at its peril* — here in
+its mirror form: the **relocated** doc keeps framing that was true only in the
+position it just left). Mitigation: after the move, re-read `adopt-dabbler.md`'s
+framing paragraphs specifically for first-contact claims, and let the routed
+duplicate-procedure pass see both documents so it can catch the seam.
+
+### Next-orchestrator recommendation
+
+**openai / gpt-5-6, model `gpt-5.6`, effort high** — the analyst's engine, at a
+raised effort. S3 is a timed human walk plus the set-terminal close; a provider
+that authored neither S1's code nor S2's prose reads the tutorial the way a
+stranger does, which is the whole point of the walk. Second choice if the
+operator prefers continuity: claude / anthropic / claude-opus-5 / high. Either
+way S3's verification excludes whichever provider orchestrates it.
+
+Budget: S3's real cost is **operator time** (~45 minutes) plus the `DABBLER_*`
+keys for verification, the advisory path-aware critique and the Step 9 review.
+Zero Copilot seat capacity. The operator-supplied preconditions in the spec are
+the gating input — S3 stops and reschedules if any is missing.
+
+### Next-session-set recommendation
+
+The analyst recommends **the owed `adopt-dabbler.md` walk**, with Increment B
+as runner-up — inverting S1's ordering. Its argument is that this session
+leaves `adopt-dabbler.md` relocated but never walked, and that a known-stale
+user document should not be left standing while new features are added.
+
+That is a fair reading and it matches the standing debt already recorded (Set
+106 was cancelled with that walk never performed). But **the decision should
+not be made here.** S3's stopwatch produces the number that decides it: if the
+first run comes in at 15 minutes, the first-run problem is closed and the debt
+is the right next move; if it comes in at 40, remediating the first run
+outranks both candidates. Both S1 and this session therefore record the same
+thing — the ordering is the operator's, taken at the set-terminal close with
+S3's number in hand.
+
+Budget note for both candidates: `DABBLER_*` keys. The `adopt-dabbler.md` walk
+additionally costs **operator hours** and, because that document covers hosts
+and pull requests, is the one candidate that could touch Copilot seat capacity
+— name it explicitly when that set is authored.
+
+### Actuals (filled at close)
+
+- *(pending)*

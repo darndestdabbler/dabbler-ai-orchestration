@@ -1,6 +1,6 @@
 # Scene 2 — Create and clone the GitHub repository
 
-Covers [`hello-world.md`](../hello-world.md) **Part 2**.
+Covers [`adopt-dabbler.md`](../adopt-dabbler.md) **Part 2**.
 Alternate take: [`scene-2-alt-azure-devops.md`](scene-2-alt-azure-devops.md) replaces this
 whole scene for viewers on Azure DevOps.
 

@@ -4,7 +4,7 @@
 **Rejoin at:** [`scene-2-create-and-clone.md`](scene-2-create-and-clone.md) beat 1, unchanged.
 
 Covers the *direct provider API keys* variant callout in
-[`hello-world.md`](../hello-world.md) **Part 1**.
+[`adopt-dabbler.md`](../adopt-dabbler.md) **Part 1**.
 
 **Finished length:** ~5 minutes.
 

@@ -1,6 +1,6 @@
 # Scene 4 — Build and ship the first module
 
-Covers [`hello-world.md`](../hello-world.md) **Part 4**. This is the longest scene and the
+Covers [`adopt-dabbler.md`](../adopt-dabbler.md) **Part 4**. This is the longest scene and the
 heart of the video: three AI sessions, a worktree, CI, a pull request, and a merge.
 
 **Finished length:** ~18 minutes. **Recording time: 45–90 minutes** — the AI sessions run in

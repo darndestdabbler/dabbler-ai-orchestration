@@ -1,6 +1,6 @@
 # Scene 3 — Set up Dabbler and name your first module
 
-Covers [`hello-world.md`](../hello-world.md) **Part 3**.
+Covers [`adopt-dabbler.md`](../adopt-dabbler.md) **Part 3**.
 
 **Finished length:** ~8 minutes.
 

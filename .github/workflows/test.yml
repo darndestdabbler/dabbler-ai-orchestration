@@ -28,6 +28,19 @@ jobs:
       - name: Run tier-model / consumer-bootstrap drift guards
         run: python ai_router/scripts/drift_guard.py
 
+      # Set 107 S2: the tutorial-fidelity gate. Set 106 shipped an equivalent
+      # script inside its own session-set folder, where no job ever ran it.
+      # This one keeps docs/tutorials/ bound to the product (every
+      # `Dabbler: <Title>` resolves to a contributed command, every relative
+      # link resolves) and to the sample bundle (the 15-minute first run quotes
+      # bundle.json's real output, test count and paths), and enforces the
+      # negative constraint that makes hello-world.md a FIRST run: no git
+      # commands, no YAML, no host or governance vocabulary. Stdlib only, so it
+      # needs no install step. Also run by pytest
+      # (ai_router/tests/test_tutorial_gate.py).
+      - name: Run tutorial-fidelity gate
+        run: python ai_router/scripts/tutorial_gate.py
+
   guidance-ceiling:
     name: Preload guidance ceiling gate
     runs-on: ubuntu-latest

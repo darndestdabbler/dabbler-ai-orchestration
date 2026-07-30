@@ -1,6 +1,6 @@
 # Scene 5 — Add a teammate and a composing module
 
-Covers [`hello-world.md`](../hello-world.md) **Part 5**.
+Covers [`adopt-dabbler.md`](../adopt-dabbler.md) **Part 5**.
 
 **Finished length:** ~12 minutes. **Recording time: 40–75 minutes** — three more AI sessions.
 

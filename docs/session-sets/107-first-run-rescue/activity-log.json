@@ -1,7 +1,7 @@
 {
   "sessionSetName": "107-first-run-rescue",
   "createdDate": "2026-07-30T13:48:22.566357+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -12,6 +12,86 @@
       "status": "complete",
       "kind": "path_aware_critique",
       "choice": "advisory"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 0,
+      "stepKey": "register",
+      "dateTime": "2026-07-30T12:28:15.601981-04:00",
+      "description": "Registered S2 via start_session (claude/anthropic/claude-opus-5/high). Preload read: constitution, project-guidance, lessons-learned, CLAUDE.md. All three DABBLER_* keys present. No decision-review-queue entries.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "ai-assignment",
+      "dateTime": "2026-07-30T12:28:15.867934-04:00",
+      "description": "Step 3.5: routed analysis (analysis, excl. anthropic -> gemini-pro, $0.0168) written to s2-ai-assignment-analysis.json; S2 block appended to ai-assignment.md. Adopted the analyst's missing step (a desk check) with a narrowed shape so it cannot be mistaken for S3's acceptance walk; departed on step-2 authoring (route the prose, bind the literals mechanically) and on next-orchestrator effort. Recorded two scope corrections: the spec's step-5 inbound-link list undercounts, and Set 106's 'committed literal gate' is run by no CI or test.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "relocate",
+      "dateTime": "2026-07-30T12:56:31.211121-04:00",
+      "description": "Relocated docs/tutorials/hello-world.md -> adopt-dabbler.md and docs/tutorials/video/ -> adopt-dabbler-video/ (git mv, history preserved). Repaired the relocated document's framing: retitled, added a 'Start here? No' pointer to the new first run, repointed the video link, and added the one labelled note that it still carries the team workflow. Repointed all 8 scene scripts + the video README at adopt-dabbler.md, and stated in the README that Hello World's own scene is deferred.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "hello-world-authored",
+      "dateTime": "2026-07-30T12:56:31.463596-04:00",
+      "description": "Authored the new docs/tutorials/hello-world.md (144 lines, 4 steps). Prose routed (documentation, excl. anthropic -> gemini-pro, $0.0361, draft saved raw as s2-hello-world-draft.json); every literal then bound by the orchestrator from bundle.json and the shipped string constants rather than derived by the model. Desk-walked the real sample end to end on the PyPI-published router 0.34.0 first, so the document describes observed behavior: s2-desk-check.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "links-repaired",
+      "dateTime": "2026-07-30T12:56:31.726272-04:00",
+      "description": "Repaired every inbound link. SCOPE CORRECTION: the spec's step 5 said the shipped getting-started.md.template needed no change because the new doc keeps the old filename -- that confirmation FAILED, because both shipped templates describe the ADOPTION content by name, so a resolving link is not the test. Repointed getting-started.md.template and monorepo-ci.yml.template at adopt-dabbler.md, rebuilt dist/, regenerated both cold-start goldens (UPDATE_GOLDEN=1). Also repaired 4 sites the spec did not name: the module-team-hello-world.md tombstone, release-and-recovery.md, README.md and quick-start.md. Folded into the staged, unpublished 0.47.0 -- no new bump.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "no-duplicate-procedure",
+      "dateTime": "2026-07-30T12:56:46.711738-04:00",
+      "description": "Step 6 run as BOTH a mechanical overlap scan and a routed semantic review (analysis, excl. anthropic -> gemini-pro, $0.0232) -- a grep finds repeated strings, the ownership table is about repeated procedures, which paraphrase. Every cross-document string is shared UI vocabulary, not procedure. The routed pass returned 2 Majors; both adjudicated to Minor on consequence with reasons recorded in s2-duplicate-procedure-adjudication.md. Finding 2 is a real defect in the SPEC's ownership table (it assigns 'custom hosts' to release-and-recovery.md, which has no host content) -- escalated to Step 9 rather than fixed, since the spec's config is immutable at runtime. No document changed as a result.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "gate-extended",
+      "dateTime": "2026-07-30T12:56:46.962996-04:00",
+      "description": "SCOPE CORRECTION: Set 106's 'committed literal gate' (s3-check-literals.py) is referenced by no CI job, no pytest test and no npm script -- an artifact, not a gate. Authored its successor at repo level: ai_router/scripts/tutorial_gate.py (6 checks: command titles resolve, program output/test count/sample literals bound to bundle.json, relative links resolve, and the first-run negative constraint), ai_router/tests/test_tutorial_gate.py (34 tests), and a CI step beside drift_guard. FALSIFIED before trusting: 11 synthetic defects, all 11 fired. That falsification caught a real weakness -- the missingFunction presence check was satisfied by the slug 001-add-a-shout containing 'shout', the same coincidence-satisfies-presence-check class S1's third-provider opinion found; fixed with a standalone-token rule. The 106 script is left working and uninvalidated.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "suite-green",
+      "dateTime": "2026-07-30T12:56:47.269294-04:00",
+      "description": "Suites green. pytest 3100 passed / 6 skipped (was 3066/6 at S1 close; delta is exactly the 34 new gate tests). Extension unit 1821 passing. npx tsc --noEmit clean. drift_guard OK. tutorial_gate OK. Layer 3 not run locally -- known-broken harness on this box (S1 environment residual); this session touched no Explorer-rendering surface, state-file writer or fixture harness, so L-064-12's trigger does not fire and CI is the signal.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "verification",
+      "dateTime": "2026-07-30T13:34:17.261398-04:00",
+      "description": "Three phased rounds, anthropic excluded by construction. Round 1 discovery fan-out 2/2 (gpt-5-6 x2, $0.5246) -> ISSUES_FOUND, 4 blocking that de-duplicate to 2 real defects, both found independently by BOTH calls. Round 2 supplementary BEFORE remediation ($0.1956) -> 1 more blocking: git was an undeclared prerequisite, a true-cold-start miss. Round 3 remediation-review ($0.1064) -> VERIFIED, 0 findings, 2 fixes accepted + 1 accepted-with-modification, 2 Minors. Three distinct blockers total, all accepted, none disputed. Sidecar: s2-remediation-round-3.md. Round 3's 2 Minors were fixed post-verdict and NOT re-verified by a routed round -- one was a real contradiction (an agent 'already signed in to' vs 'you do not need an account anywhere'); the other asked the YAML detector to catch single-line blocks, which flagged the real document's own fences, so it was half-taken with negative tests recording the declined half.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "close",
+      "dateTime": "2026-07-30T13:34:17.512423-04:00",
+      "description": "Final suite on the finished tree: pytest 3133 passed / 6 skipped (delta from S1's 3066 is exactly the 67 gate tests). Extension unit 1821 passing; tsc clean; drift_guard OK; tutorial_gate OK. disposition.json authored; committing and pushing, then close_session.",
+      "status": "in-progress"
     }
   ]
 }

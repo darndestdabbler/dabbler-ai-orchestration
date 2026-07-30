@@ -185,8 +185,14 @@ actions** in the tree (and the Command Palette), one click from the
 module they belong to. The four-tier budget mapping is documented in
 [docs/ai-led-session-workflow.md → Cost-budgeted verification modes](docs/ai-led-session-workflow.md#cost-budgeted-verification-modes).
 
-New to the module-organized workflow? The hands-on tutorial
-[docs/tutorials/hello-world.md](docs/tutorials/hello-world.md) walks you
+Never used Dabbler before? Start with
+[docs/tutorials/hello-world.md](docs/tutorials/hello-world.md) — a 15-minute
+first run on a local sample project, with no git host, no existing repository,
+and no git commands for you to type. You watch an AI session change real code
+and prove it worked.
+
+Ready to put Dabbler into a repository you keep? The hands-on tutorial
+[docs/tutorials/adopt-dabbler.md](docs/tutorials/adopt-dabbler.md) walks you
 through the whole flow end to end — scaffold, modules, per-module plans and
 session sets, worktrees, CI, and a reviewed pull request — solo-first, with a
 second module and a teammate added at the end. Release, hotfix, and rollback

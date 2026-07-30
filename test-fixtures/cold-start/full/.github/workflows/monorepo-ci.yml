@@ -13,7 +13,7 @@
 # ZERO tests fails the build instead of hiding behind another module's passing
 # tests. Worked example — Python, two modules (`greeter`, and `app` declaring
 # `touches: [greeter]`):
-# https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/hello-world.md
+# https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/tutorials/adopt-dabbler.md
 #
 # As scaffolded this job only succeeds, so committing it before you adapt it
 # cannot break your builds. It logs a warning on every run, so the placeholder

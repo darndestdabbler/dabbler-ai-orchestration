@@ -301,8 +301,11 @@ and say:
 ## Where to go next
 
 - **Session procedure in full:** [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md) — Steps 0–10, rules, config flags. Use the quick-nav at the top to jump past the UAT reference material for simple sessions.
+- **Your very first run, in 15 minutes:** [Hello World](tutorials/hello-world.md)
+  — a local sample project, no git host and no git commands for you to type,
+  using whichever AI coding agent you already have open.
 - **Your first module (solo or as a small team):** the hands-on
-  [Hello World walkthrough](tutorials/hello-world.md) — GitHub + GitHub Copilot
+  [adoption walkthrough](tutorials/adopt-dabbler.md) — GitHub + GitHub Copilot
   CLI worked end to end, with Azure DevOps and direct-provider-API variants
   inline; concepts in the [primer](planning/module-organized-projects-primer.md).
 - **Releasing, hotfixing, rolling back:**

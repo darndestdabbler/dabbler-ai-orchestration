@@ -116,6 +116,22 @@
       "dateTime": "2026-07-30T14:18:25.940889-04:00",
       "description": "close_session SUCCEEDED on the third attempt. Backstop round 7 (gpt-5-6, anthropic excluded, $0.3283) returned VERIFIED against the pushed diff; all six gates PASS. Seven verification rounds total: discovery fan-out 2/2, supplementary, remediation-review x2, and three close-backstop rounds. Both loop bounds spent. Session 2 CLOSED VERIFIED.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 0,
+      "stepKey": "register",
+      "dateTime": "2026-07-30T15:20:37.451898-04:00",
+      "description": "Registered S3 via start_session (claude/anthropic/claude-opus-5/high). Preload read: constitution, project-guidance, lessons-learned, CLAUDE.md. All three DABBLER_* keys present. No decision-review-queue. Active set resolved from session-state.json status across all 107 sets.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "preconditions-prepared",
+      "dateTime": "2026-07-30T15:36:53.440802-04:00",
+      "description": "Pre-walk automation floor: pytest 3149 passed / 6 skipped; tutorial_gate.py OK; released 0.47.0 diffed against HEAD (only two consumer-bootstrap templates differ, neither on the walk path) so the Marketplace build is walk-valid. Routed step-3.5 analysis (gemini-pro, anthropic excluded, $0.019) saved as s3-ai-assignment-analysis.json. UAT checklist authored: routed draft (documentation, gemini-pro, $0.029) then every product literal re-bound from sampleProject.ts + trySampleProject.ts + bundle.json by a builder script; the binding caught the routed draft's wrong progress-stage labels and a wrong new-window claim.",
+      "status": "complete"
     }
   ]
 }

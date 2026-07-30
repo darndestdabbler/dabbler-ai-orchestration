@@ -346,3 +346,149 @@ and pull requests, is the one candidate that could touch Copilot seat capacity
 ### Actuals (filled at close)
 
 - *(pending)*
+
+---
+
+## Session 3 of 3 — the stopwatch walk, remediation, close-out
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked).
+  **S2's disposition recommended `openai / gpt-5-6`** on the reasoning that a
+  provider which authored neither S1's code nor S2's prose reads the tutorial
+  the way a stranger does. The operator launched Claude again. Recorded, not
+  re-argued — and the reasoning behind that recommendation is **discharged by
+  something better this session**: the stranger reading the tutorial is not an
+  orchestrator at all, it is **the operator, on a second machine, with a clean
+  profile and a clock**. That is the whole point of S3. The orchestrator's job
+  here is instrument-building and bookkeeping, not reading.
+- Routed step-3.5 analysis: `s3-ai-assignment-analysis.json` (route
+  `task_type=analysis`, excl. anthropic → gemini-pro, tier 2, $0.0190).
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` — **this session executes the walk that flag has been
+  pointing at since the spec was authored** — `requiresE2E true`,
+  `pathAwareCritique advisory` (set-terminal, runs here).
+- Budget note: **this session spends Copilot seat capacity**, and it is the
+  first in the set to do so. The operator chose GitHub Copilot as the walk's
+  agent over Claude Code, which costs nothing from that budget, on the grounds
+  that Copilot is what the staff who abandoned the old tutorial actually use —
+  a more representative walk is worth the seat time. One sample session's worth.
+  Everything else here draws on the `DABBLER_*` keys.
+
+### The release question, answered before the walk
+
+The operator asked whether to **push a new tag** before switching to the
+Copilot machine. **No** — and the reasoning is worth recording, because the
+instinct is a reasonable one:
+
+1. The walk exercises `Dabbler: Try a sample project` and the sample bundle.
+   Both shipped in **0.47.0, which is already published** to the Marketplace.
+2. `git diff vsix-v0.47.0..HEAD` over the shipped extension touches exactly two
+   files — `getting-started.md.template` and `monorepo-ci.yml.template`, whose
+   tutorial links S2 repointed. **Neither is on the walk path**: the tutorial
+   never scaffolds a repo, so no template is rendered at any point in it.
+3. `package.json` is still at `0.47.0`. A new tag therefore needs a version bump
+   first or the publish workflow's version check refuses it — so "just push a
+   tag" is not a formality, it is **cutting 0.48.0 for a link description**,
+   which is exactly the release the operator already declined on 2026-07-30 when
+   the CHANGELOG entry was moved to `[Unreleased]`.
+
+The walk machine needs the **Marketplace build and the repo's tutorial**, and
+both already exist at the versions the walk should measure.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Confirm preconditions; establish that the published 0.47.0 is walk-valid by diffing it against HEAD. | Orchestrator direct — a diff and a judgement about what the tutorial touches. |
+| 1b | Run the automation floor **before** the checklist reaches the human: pytest, `tutorial_gate.py`, Layer 3. | Orchestrator direct — the operator-set bar (*any step automation can verify must be verified before the checklist is offered*), not a reasoning task. |
+| 2a | Author the UAT checklist's prose. | **Routed** (`documentation`, anthropic excluded) — a measuring instrument written for a reader with zero context is exactly the authoring the delegation rule sends out, and a provider that did not write the tutorial is the right one to ask *what would a stranger need told*. |
+| 2b | Bind every product literal in the checklist to shipped source. | Orchestrator direct — mechanical substitution against a contract, by a builder script rather than by hand. **This caught two defects in the routed draft** (below). |
+| 3 | The walk. | **Human.** Not routed, not simulated, not desk-checked. |
+| 4 | Triage and remediate what the walk finds. | **Routed** where the fix needs judgement (`code-review` / `documentation`); direct for a wording change under ~50 lines. Scope rule below. |
+| 5 | UAT attestation, the four durations, the concept count. | Orchestrator direct — transcription of the operator's record. |
+| 6 | Verify; path-aware critique; `change-log.md`; Step 9. | **Routed** (`session-verification`, `analysis`, `documentation`); close-out direct. |
+
+### What the literal-binding caught in the routed draft
+
+The routed checklist read well and was wrong twice, both times about product
+behaviour it had no way to know:
+
+- It told the walker to expect **"a new VS Code window opens"**. The command
+  calls `vscode.openFolder` without `forceNewWindow`, so the **current window
+  reloads**. A walker told to expect a second window would have recorded a
+  defect that does not exist.
+- It quoted the progress notification's stages from prose rather than from the
+  code. The builder's first scoping was wrong too and **pulled
+  `SAMPLE_STEP_PHRASE`** — same keys, different strings, they are fragments of
+  the *resume* sentence — so the checklist briefly quoted five stage labels the
+  reader would never see. Same coincidence-satisfies-the-check class S1's
+  third-provider opinion and S2's gate each found; caught here only because the
+  builder **prints every bound literal** for inspection instead of trusting the
+  substitution.
+
+The builder additionally asserts each bound literal still appears in the
+tutorial (whitespace-normalised, because the product's own strings are reflowed
+across lines in the document — the false-negative S2's gate hit on the Full-tier
+sentence).
+
+### Departures from the routed analyst
+
+**Adopted:** its `C_pre_verification` list verbatim (pytest, the gate, Layer 3),
+its `E_failure_mode` — *evidence substitution*, the orchestrator quietly
+standing its own desk evidence in for the human's number — and its
+`F_missing_step`, a re-run of the gate and suite after any remediation.
+
+**Departed on the timing protocol (B).** The analyst wanted the walker to
+**stop the clock while the AI agent thinks** and restart it afterwards. Rejected
+on two grounds. Mechanically, it asks a person to operate a stopwatch at the
+exact moment their attention is on a chat window, which is where timing data
+goes to die. Substantively, it answers the wrong question: a developer who
+waited six minutes for their agent *waited six minutes*, and the criterion is
+about the developer's experience. The protocol here records **six clock times**
+and derives four durations, so agent time is a **visible subtotal inside** the
+headline number rather than silently subtracted from it — both readings remain
+computable afterwards, and nothing has to be decided mid-walk.
+
+**Departed on the walk's own setup.** The analyst's plan starts at the extension
+install. A clean profile carries **no extensions at all**, including the
+operator's AI agent — so the walk has a prerequisite cost the tutorial's reader
+does not pay. That is recorded as its own duration (P0→P1) and excluded, rather
+than being allowed to contaminate the install time or the interaction time.
+
+**Departed on one instruction the analyst's shape would have produced.** A
+checklist that asks the walker to confirm Git is present would have them type
+`git --version` — and the criterion this walk answers is partly *did the reader
+have to touch git*. The prerequisite item therefore forbids typing it and asks
+instead whether the document told them enough to know. **An acceptance test must
+not contaminate the thing it measures.**
+
+### The remediation scope rule (step 4)
+
+Sharper than the analyst's, because the analyst's boundary ("is the fix in the
+tutorial or the command") does not say what to do with the case that actually
+decides the set:
+
+- **Tutorial wording, ordering, or a missing expectation** → fixed here.
+  Re-run `tutorial_gate.py` and the suite after; a wording fix that breaks the
+  literal binding is a worse defect than the one it fixed.
+- **A defect inside `Dabbler: Try a sample project`** → fixed here, and it forces
+  a version bump whose **publish stays operator-gated**. A code fix means the
+  walk measured a build nobody can install, so the evidence must say which
+  parts of the walk predate it.
+- **Anything else** — another extension surface, the router, VS Code, Copilot —
+  → recorded, named for a follow-on set, **not fixed**.
+- **"Re-walk only the remediated items" may claim exactly one thing**: that the
+  remediated step now works. It may **not** re-claim the headline number. The
+  first walk's interaction time stands as the measurement; a second attempt is
+  reported as a second attempt.
+
+### Next-orchestrator / next-session-set recommendation
+
+Filled at close, with the walk's number in hand — both S1 and S2 recorded that
+the ordering between the owed `adopt-dabbler.md` walk and Increment B is decided
+by it, and the routed analyst agrees in both directions (≤15 min → Increment B,
+the first-run problem being closed; >15 min → remediating the first run
+outranks both).
+
+### Actuals (filled at close)
+
+- *(pending)*

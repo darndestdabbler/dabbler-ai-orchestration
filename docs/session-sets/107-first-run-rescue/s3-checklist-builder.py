@@ -14,14 +14,23 @@ Four items answer all three. The literal binding stays, because it costs the
 human nothing and it is the part that keeps the checklist honest.
 """
 import json
+import os
 import re
 from datetime import datetime
 
-REPO = "d:/Projects/dabbler-ai-orchestration"
-TS = f"{REPO}/tools/dabbler-ai-orchestration/src/utils/sampleProject.ts"
-BUNDLE = f"{REPO}/docs/templates/sample-project/bundle.json"
-OUT = (f"{REPO}/docs/session-sets/107-first-run-rescue/"
-       "107-first-run-rescue-uat-checklist.json")
+# Repo-relative, resolved from this file's own location: the script lives at
+# docs/session-sets/107-first-run-rescue/, so the repo root is three levels up.
+# (Round 1 of verification found this hardcoded to one machine's absolute path,
+# which made the one artifact whose whole job is to be re-runnable
+# un-re-runnable by anybody else.)
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+TS = os.path.join(REPO, "tools", "dabbler-ai-orchestration", "src", "utils",
+                  "sampleProject.ts")
+BUNDLE = os.path.join(REPO, "docs", "templates", "sample-project",
+                      "bundle.json")
+TUTORIAL_PATH = os.path.join(REPO, "docs", "tutorials", "hello-world.md")
+OUT = os.path.join(HERE, "107-first-run-rescue-uat-checklist.json")
 
 src = open(TS, encoding="utf-8").read()
 bundle = json.load(open(BUNDLE, encoding="utf-8"))
@@ -67,8 +76,7 @@ NIX_RUN = f".venv/bin/python {PROGRAM}"
 # checklist quoting a string the reader will never be shown. Compared on
 # collapsed whitespace because the product's strings are reflowed across lines
 # in the document (the false-negative S2's gate hit on the Full-tier sentence).
-tutorial_raw = open(f"{REPO}/docs/tutorials/hello-world.md",
-                    encoding="utf-8").read()
+tutorial_raw = open(TUTORIAL_PATH, encoding="utf-8").read()
 tutorial = re.sub(r"\s+", " ", re.sub(r"(?m)^\s*>\s?", "", tutorial_raw))
 for label, literal in [
     ("picker title", PICKER_TITLE), ("picker label", PICKER_LABEL),

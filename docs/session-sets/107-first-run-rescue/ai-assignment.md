@@ -404,8 +404,27 @@ both already exist at the versions the walk should measure.
 | 2b | Bind every product literal in the checklist to shipped source. | Orchestrator direct — mechanical substitution against a contract, by a builder script rather than by hand. **This caught two defects in the routed draft** (below). |
 | 3 | The walk. | **Human.** Not routed, not simulated, not desk-checked. |
 | 4 | Triage and remediate what the walk finds. | **Routed** where the fix needs judgement (`code-review` / `documentation`); direct for a wording change under ~50 lines. Scope rule below. |
-| 5 | UAT attestation, the four durations, the concept count. | Orchestrator direct — transcription of the operator's record. |
+| 5 | UAT attestation and the in-window time. | Orchestrator direct — transcription of the operator's record, with its provenance stated. |
 | 6 | Verify; path-aware critique; `change-log.md`; Step 9. | **Routed** (`session-verification`, `analysis`, `documentation`); close-out direct. |
+
+### The operator resized the instrument, and was right to
+
+Step 2a shipped **nine items**, and the operator's verdict was *"daunting and
+tedious"* — that UAT should confirm the most important things and leave the human
+free to volunteer what annoyed them, rather than carry a dedicated item for every
+cosmetic detail. Rebuilt to **four**: human-facing text 15,149 → 2,588
+characters, preamble 4,777 → 1,313, six clock marks → two.
+
+The failure was one of **altitude**, not of care. The nine items were answering
+questions nobody had asked — a separate item for reading the prerequisite list,
+one for the extension install, one for a failure path the walker was explicitly
+told not to trigger — and a `TUTORIAL-QUALITY CHECK` paragraph was bolted onto
+every one of them, interrogating the human where a single line in the preamble
+does the same job better.
+
+The standing UAT bar in `project-guidance.md` is about **ambiguity** (name the
+exact button, quote the exact string) and this checklist still obeys it. What the
+bar lacked was a companion rule about **volume**. Proposed for Step 9.
 
 ### What the literal-binding caught in the routed draft
 
@@ -437,22 +456,47 @@ its `E_failure_mode` — *evidence substitution*, the orchestrator quietly
 standing its own desk evidence in for the human's number — and its
 `F_missing_step`, a re-run of the gate and suite after any remediation.
 
-**Departed on the timing protocol (B).** The analyst wanted the walker to
-**stop the clock while the AI agent thinks** and restart it afterwards. Rejected
-on two grounds. Mechanically, it asks a person to operate a stopwatch at the
-exact moment their attention is on a chat window, which is where timing data
-goes to die. Substantively, it answers the wrong question: a developer who
-waited six minutes for their agent *waited six minutes*, and the criterion is
-about the developer's experience. The protocol here records **six clock times**
-and derives four durations, so agent time is a **visible subtotal inside** the
-headline number rather than silently subtracted from it — both readings remain
-computable afterwards, and nothing has to be decided mid-walk.
+**Departed on the timing protocol (B) — and then the protocol was overtaken by
+events. Read this whole entry before citing it.** The analyst wanted the walker
+to **stop the clock while the AI agent thinks** and restart it afterwards.
+Rejected on two grounds. Mechanically, it asks a person to operate a stopwatch at
+the exact moment their attention is on a chat window, which is where timing data
+goes to die. Substantively, it answers the wrong question: a developer who waited
+six minutes for their agent *waited six minutes*, and the criterion is about the
+developer's experience. The first checklist therefore recorded **six clock
+times** and derived four durations, so agent time was a visible subtotal inside
+the headline number rather than silently subtracted from it.
+
+**What actually happened, recorded here because the design above is not what
+produced the number.** The operator rejected that checklist as *"daunting and
+tedious"*, and the six-mark protocol was part of what made it so. It was cut to
+**two marks** — note the time at `Ctrl+Shift+P`, note it again at
+`HELLO, WORLD!` — with agent time and install time demoted to *"if you can"*.
+The walk was then performed **before even that version existed**, so **no clock
+mark was written down at all**; the recorded result is the operator's after-the-
+fact estimate of the in-window time, and it is labelled as an estimate
+everywhere it appears (`s3-walk-evidence.md`, every `Result` field, the
+disposition).
+
+**So: no six-mark protocol was ever executed, and none of the four derived
+durations exist.** The reasoning above is retained because the *rejection* of
+the stop-the-clock design still stands on its merits and a future set may face
+the same choice — but a reader must not infer from it that the "under 15
+minutes" figure carries six-mark precision. It does not. It carries the
+precision of a competent person's estimate, which is what was available, and the
+honest move was to say so rather than to manufacture a number or discard a real
+first run.
 
 **Departed on the walk's own setup.** The analyst's plan starts at the extension
 install. A clean profile carries **no extensions at all**, including the
 operator's AI agent — so the walk has a prerequisite cost the tutorial's reader
-does not pay. That is recorded as its own duration (P0→P1) and excluded, rather
-than being allowed to contaminate the install time or the interaction time.
+does not pay, and it must not be allowed to contaminate the measured window.
+The four-item checklist keeps the exclusion and drops the bookkeeping: setup is
+simply outside the two marks. **The walk proved the point emphatically** — the
+operator's dominant cost was a GHE-linked Windows account, a `runas` launch
+script and three separate logins, none of which the tutorial asks for and none
+of which the sample needs. Had that landed inside the number, the tutorial would
+have been blamed for an identity-onboarding problem.
 
 **Departed on one instruction the analyst's shape would have produced.** A
 checklist that asks the walker to confirm Git is present would have them type

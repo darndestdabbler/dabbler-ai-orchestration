@@ -1,0 +1,17 @@
+ISSUES FOUND
+
+One Major issue was identified in a key evidentiary artifact, which was not reported by the prior verification pass. The artifact conflates procedural instructions with post-facto results, degrading its quality as a record of the process.
+
+### Issue 1: UAT Checklist conflates procedural instructions with results
+
+-   **Category:** Correctness
+-   **Severity:** Major
+-   **Failure scenario:** A future orchestrator or auditor reviews the session's artifacts to understand the UAT process. They open `107-first-run-rescue-uat-checklist.json`, the canonical instrument for the test. They are confused by the `Notes` field, which contains both instructions for the person performing the test *and* a summary of that test's outcome. This makes it difficult to discern the original, unbiased test procedure from the final report, undermining the clarity and integrity of the evidence. A future orchestrator may incorrectly copy this flawed structure for a subsequent UAT, perpetuating the anti-pattern of a test instrument that contains its own results. This is probable for any careful reviewer of the artifacts.
+-   **Details:**
+    -   **Violation:** A procedural document should separate the procedure from the results. The `spec.md` states the session "Creates: walk evidence + attestation, the UAT checklist," implying the checklist is the instrument and the evidence is the result. The final artifact violates this principle by embedding a summary of the walk's outcome into the `Notes` field, which is intended to provide instructions to the tester.
+    -   **Impact:** This degrades the quality of the session's primary evidence artifact. It forces future readers to mentally parse the instructions apart from the summary, creating ambiguity and reducing the artifact's reusability. This bookkeeping defect would cause a reasonable reviewer to block the merge, requesting that the artifact be corrected to cleanly separate instructions from results, thereby preserving the integrity of the process record.
+    -   **Evidence:** The `Notes` field in `docs/session-sets/107-first-run-rescue/107-first-run-rescue-uat-checklist.json` begins with future-tense instructions for the walk ("This is the acceptance test for Set 107... Walk docs/tutorials/hello-world.md..."). It then switches to a past-tense, post-walk summary within the same text block ("WALKED 2026-07-30/31 by the operator... VERDICT: the criterion is met..."). This summary does not belong in the instructions field; its content is already correctly captured in `s3-walk-evidence.md` and the individual `Result` fields of the checklist. The summary paragraph should be removed from the `Notes` field to restore the checklist's function as a clean procedural instrument.
+
+#### NITS (optional, non-blocking)
+
+-   **Nit:** The claim of a nine-item initial checklist is unsubstantiated and creates a minor factual inconsistency. Both `s3-conventions.md` and the `s3-checklist-builder.py` docstring state that the checklist was cut down from nine items. However, the raw AI-generated draft (`s3-checklist-draft.json`), which serves as the audit trail for the starting point, contains only seven items. There is no evidence in the repository of a nine-item version, making the claim confusing for an auditor attempting to reconstruct the process history precisely.

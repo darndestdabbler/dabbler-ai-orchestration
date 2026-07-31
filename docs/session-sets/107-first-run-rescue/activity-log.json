@@ -140,6 +140,14 @@
       "dateTime": "2026-07-30T16:16:24.339786-04:00",
       "description": "Layer 3 investigated: 28/28 specs fail locally at Electron launch (before any assertion). Ruled out by experiment: ELECTRON_RUN_AS_NODE pollution (harness allowlist already defends; probe with scrubbed env fails identically), VS Code version (1.124.2 fails same), the sandboxed shell, and a stale bundle. CI green on this session's commit 7112b8c across macos/ubuntu/windows. Remaining unproven hypothesis: local Node 25.8.1 vs CI's pinned Node 20; no nvm available to falsify. Recorded in s3-pre-walk-floor.md; follow-on named, out of scope here.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "checklist-streamlined",
+      "dateTime": "2026-07-31T03:31:29.988012-04:00",
+      "description": "Operator rejected the first checklist as daunting and tedious: UAT should confirm the most important things and let the human volunteer annoyances, not carry a dedicated item per cosmetic detail. Rebuilt 9 items -> 4 (human-facing text 15,149 -> 2,588 chars; Notes 4,777 -> 1,313). The four map to the criterion's two questions plus 'did the loop work'. Literal binding kept -- it costs the human nothing. Durable guidance proposal queued for Step 9.",
+      "status": "complete"
     }
   ]
 }

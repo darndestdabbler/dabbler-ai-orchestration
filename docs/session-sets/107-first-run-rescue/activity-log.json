@@ -156,6 +156,14 @@
       "dateTime": "2026-07-31T06:36:07.178501-04:00",
       "description": "WALK DONE, CRITERION MET on both halves: under 15 minutes in-window (Ctrl+Shift+P to HELLO, WORLD!), four no's on git/YAML/host/settings. Operator's second machine (GHE-linked Windows account), fresh VS Code profile, published 0.47.0, GitHub Copilot as the agent. Two limits stated on the artifact: Results transcribed by the orchestrator from the operator's report, and the time is an estimate not a stopwatch reading (the walk predated the streamlined checklist). Finding: the dominant time cost was PREREQUISITE (GHE + runas + VS Code profile, three logins), not the tutorial -- correctly excluded from the number, triaged to a named follow-on set, NO tutorial or command change (host onboarding is a spec non-goal for hello-world.md).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "verified-and-set-terminal-artifacts",
+      "dateTime": "2026-07-31T06:48:12.540209-04:00",
+      "description": "Remediation-review VERIFIED (gemini-pro, 3 fixes accepted / 0 rejected / 0 accepted-with-modification, 0 findings). Set-terminal artifacts authored: change-log.md (whole-set record incl. the four owed follow-ons) and the final disposition.json (status completed, verdict VERIFIED, next_orchestrator null as the set's last session, 6 lessons cited). Verification cost this session: $0.145 across 4 routed rounds; step-3.5 analysis $0.019; checklist draft $0.029.",
+      "status": "complete"
     }
   ]
 }

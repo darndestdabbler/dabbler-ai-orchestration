@@ -164,6 +164,22 @@
       "dateTime": "2026-07-31T06:48:12.540209-04:00",
       "description": "Remediation-review VERIFIED (gemini-pro, 3 fixes accepted / 0 rejected / 0 accepted-with-modification, 0 findings). Set-terminal artifacts authored: change-log.md (whole-set record incl. the four owed follow-ons) and the final disposition.json (status completed, verdict VERIFIED, next_orchestrator null as the set's last session, 6 lessons cited). Verification cost this session: $0.145 across 4 routed rounds; step-3.5 analysis $0.019; checklist draft $0.029.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "path-aware-critique",
+      "dateTime": "2026-07-31T07:17:50.704475-04:00",
+      "description": "Path-aware critique (advisory, set-terminal): FAILED twice on 2026-07-30 -- ai_router.pull_critique, both non-anthropic providers HTTP 429, seven minutes apart, no artifact written (fabricating one to satisfy the gate is forbidden). RAN SUCCESSFULLY 2026-07-31 after the operator added provider credit: providers=['google','openai'], 2 critiques, path-aware-critique.json committed. One intervening failure worth keeping: the first re-run's OpenAI leg died on DeterministicServantViolation (grep tool result did not match raw ground truth) -- the pull verifier's integrity guard caught a critic altering tool output and refused the run; pinning openai:gpt-5.4 ran clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "path-aware-critique-adjudication",
+      "dateTime": "2026-07-31T07:17:50.705484-04:00",
+      "description": "SPLIT verdict (Set 065 010-vs-C3 pattern): gemini-2.5-pro VERIFIED / 0 findings; gpt-5.4 ISSUES_FOUND / 2 Major. Both findings ACCEPTED as factually correct. F-PAC-1: install time was never recorded separately though spec.md step 2 requires it -- fixed by disclosure in s3-walk-evidence.md, change-log.md and the disposition's post-close note; the stronger remedy (reopen the set as partial) DECLINED with reasons. F-PAC-2: the critique attempt was claimed in the disposition but not in the machine record -- discharged by this very run plus these log entries. Adjudication: s3-path-aware-critique-adjudication.md.",
+      "status": "complete"
     }
   ]
 }

@@ -88,7 +88,11 @@ template-link fix stays `[Unreleased]` by operator decision.
   git/YAML/host/settings. Recorded honestly as the **operator's estimate rather
   than a stopwatch reading** — the walk preceded the final checklist, so no
   clock mark was written down. A precise-looking number nobody measured would be
-  worse evidence than an honest approximate one.
+  worse evidence than an honest approximate one. **The spec also required
+  install time recorded separately, and that number was never taken** — a
+  requirement quietly unmet, surfaced by the post-close path-aware critique,
+  accepted, and disclosed rather than re-walked (the purpose it served is
+  covered by the prerequisite finding below).
 - **The finding that is not in the number.** The dominant cost of the sitting
   was **prerequisite, not tutorial**: getting VS Code running while logged into
   GitHub Enterprise the right way — a Windows account linked to GHE, a `runas`

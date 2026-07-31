@@ -32,6 +32,19 @@ it:
    marks were never written down. "Under 15 minutes" is recorded as an estimate
    deliberately — a precise-looking number nobody measured would be worse
    evidence than an honest approximate one.
+3. **Install time was never recorded separately, and the spec required it.**
+   `spec.md` step 2 says *"Record install time and interaction time
+   separately"*, and the success criterion repeats it. **No install-time figure
+   exists.** The first checklist carried a dedicated install-time pair; the
+   operator-directed resize demoted it to *"if you can"*; the walk then preceded
+   even that instrument. This is a **spec requirement quietly unmet** — surfaced
+   by the post-close path-aware critique (F-PAC-1), accepted, and recorded here
+   rather than re-walked. The requirement exists so a slow package index is not
+   mistaken for tutorial complexity, and that purpose was served with unusual
+   force below: the prerequisite cost dominated the sitting, sat entirely
+   outside the measured window, and is documented. The full adjudication,
+   including why re-walking was declined, is in
+   [`s3-path-aware-critique-adjudication.md`](s3-path-aware-critique-adjudication.md).
 
 What it **is**: a real first run, by a person who did not write the document, on
 a clean profile, on a released build, with a real AI agent, from an empty folder

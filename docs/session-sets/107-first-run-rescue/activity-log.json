@@ -148,6 +148,14 @@
       "dateTime": "2026-07-31T03:31:29.988012-04:00",
       "description": "Operator rejected the first checklist as daunting and tedious: UAT should confirm the most important things and let the human volunteer annoyances, not carry a dedicated item per cosmetic detail. Rebuilt 9 items -> 4 (human-facing text 15,149 -> 2,588 chars; Notes 4,777 -> 1,313). The four map to the criterion's two questions plus 'did the loop work'. Literal binding kept -- it costs the human nothing. Durable guidance proposal queued for Step 9.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "walk-timed-and-criterion-answered",
+      "dateTime": "2026-07-31T06:36:07.178501-04:00",
+      "description": "WALK DONE, CRITERION MET on both halves: under 15 minutes in-window (Ctrl+Shift+P to HELLO, WORLD!), four no's on git/YAML/host/settings. Operator's second machine (GHE-linked Windows account), fresh VS Code profile, published 0.47.0, GitHub Copilot as the agent. Two limits stated on the artifact: Results transcribed by the orchestrator from the operator's report, and the time is an estimate not a stopwatch reading (the walk predated the streamlined checklist). Finding: the dominant time cost was PREREQUISITE (GHE + runas + VS Code profile, three logins), not the tutorial -- correctly excluded from the number, triaged to a named follow-on set, NO tutorial or command change (host onboarding is a spec non-goal for hello-world.md).",
+      "status": "complete"
     }
   ]
 }

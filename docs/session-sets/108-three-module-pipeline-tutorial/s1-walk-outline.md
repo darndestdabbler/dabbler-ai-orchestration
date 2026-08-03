@@ -149,7 +149,7 @@ only the answer key is GitHub-specific, and it is linked, never cloned.
 > acted on in the wrong direction. The spec's ownership table is the authority and
 > it assigns **ownership routing across modules** to this tutorial.
 
-### R5 — Port allocation: two bands, no central allocation
+### R5 — Two port bands **and one database name per member**, none of it centrally allocated
 
 | Band | Who | Ports |
 | --- | --- | --- |
@@ -162,6 +162,70 @@ nothing to allocate and nothing to coordinate. Part D never moves your `watcher`
 
 **Proven live on 2026-08-03:** a second `converter` was started on `5201`
 alongside the one on `5101`; both answered `GET /health` at the same time.
+
+#### Each member's `persistence` needs its OWN database name
+
+**This is not optional and it is the one thing most likely to break Part D.**
+
+The reference solution's `persistence` ships this connection string:
+
+```
+Server=(localdb)\MSSQLLocalDB;Database=DabblerCsvPipeline;Trusted_Connection=True;TrustServerCertificate=True
+```
+
+— a **hardcoded database name** — and it applies **its own EF Core migrations at
+start-up** (`Persistence:MigrateOnStartup`, default `true`). Two members'
+`persistence` services, run on one machine with the defaults, therefore both
+migrate **the same database**. Their implementations are independently built, so
+their migration histories differ, and the second to start meets a
+`__EFMigrationsHistory` it did not write. `OrderBatches.SourceFile` is uniquely
+indexed and shared too, so a teammate's service reports the reader's
+already-loaded files as duplicates.
+
+That is a database error in the middle of Part D, and it would completely
+obscure the HTTP-contract lesson Part D exists to teach — the reader would be
+debugging EF Core, not learning about service boundaries.
+
+**So the rule is one line per member, alongside the port band:**
+
+| Member | Ports | Database |
+| --- | --- | --- |
+| yours | `5101` / `5102` / `5103` | `DabblerCsvPipeline_priya` |
+| the version you test against | `5201` / `5202` | `DabblerCsvPipeline_sam` |
+
+Same shape as the slug and the code root: **derived from the owner, allocated by
+nobody.** A solo reader needs only one and can leave the default.
+
+**The literal knob, so Session 2 does not have to go looking.** It is
+`ConnectionStrings:Orders` — in `appsettings.json`:
+
+```json
+"ConnectionStrings": {
+  "Orders": "Server=(localdb)\\MSSQLLocalDB;Database=DabblerCsvPipeline_priya;Trusted_Connection=True;TrustServerCertificate=True"
+}
+```
+
+or, to run a second version without editing its files, the environment override
+(double underscore is the .NET nesting separator):
+
+```powershell
+$env:ConnectionStrings__Orders = "Server=(localdb)\MSSQLLocalDB;Database=DabblerCsvPipeline_sam;Trusted_Connection=True;TrustServerCertificate=True"
+dotnet run --project modules/sam/persistence --urls http://localhost:5202
+```
+
+**The environment form is the one Part D wants**, and for the same reason Part D
+works at all: it changes no file in anyone's code root. `persistence` creates and
+migrates the named database on start-up, so nothing has to exist beforehand.
+
+> **Found by the operator-authorised third-provider opinion**
+> ([`s1-third-opinion.json`](s1-third-opinion.json)), after five verification
+> rounds missed it. It is worth recording *why* they missed it, because the
+> failure is instructive: this session **did** disclose the shared database — but
+> framed it only as a limitation on its own *proof* ("the run shows the watcher
+> reached `5202`, not that `5202` owned a separate store"). Every reviewer
+> accepted that framing and none asked the next question: **the reader inherits
+> the same configuration.** An honest disclosure aimed at the wrong audience hid
+> a defect as effectively as no disclosure would have.
 
 ### R6 — Part D is one machine, `localhost` throughout, two settings
 
@@ -200,12 +264,20 @@ Run 2 is the one that matters, and Session 2 should claim only what it supports:
 both dependencies were replaced, the originals were provably absent, and the
 reader changed two settings.
 
-> **One thing Run 2 does not isolate.** Both `persistence` instances used the
-> **same LocalDB database**, because the connection string is the same default.
-> That is also what a real reader on one machine gets, so it is the honest
-> configuration to teach — but it means the run proves *the watcher reached the
-> service on `5202`*, not *that service owned a separate store*. Session 2 should
-> not imply per-member databases; nothing in this tutorial sets one up.
+> **One thing Run 2 does not isolate — and the reader must NOT inherit it.** Both
+> `persistence` instances used the **same LocalDB database**, because the shipped
+> connection string hardcodes one name. So Run 2 proves *the watcher reached the
+> service on `5202`*, not *that service owned a separate store*.
+>
+> An earlier version of this note stopped there, and added that "Session 2 should
+> not imply per-member databases; nothing in this tutorial sets one up." **That
+> was the wrong conclusion drawn from the right observation.** It got away with it
+> for five verification rounds because it *reads* like a careful disclosure. What
+> it actually did was describe a defect and then instruct Session 2 to ship it:
+> two members' services both migrating one database is a start-up failure, not a
+> footnote. **R5 now requires a database name per member**, and Session 2 sets one
+> up. This run remains what it was — a proof of the repoint mechanism under the
+> old shared-database configuration — and R5's rule is what the reader follows.
 
 **What this does NOT prove.** Both instances were the *same build*. This proves
 the **repoint mechanism**, not **cross-implementation conformance**. A reader
@@ -607,6 +679,14 @@ Session 3's scope.
   stays in the appendix and is not claimed to be equivalent.
 - **Write the ownership-routing procedure in full** (R4). Do not link to
   `adopt-dabbler.md` Part 5; Session 3 deletes it.
+- **Set a per-member database name** (R5). Without it Part D dies in EF Core
+  migrations and the reader never reaches the lesson.
+- **Keep the two `400`s distinct.** A *well-formed but invalid* batch gets the
+  service's own validation envelope, and that envelope **is** contractual. A body
+  that is not JSON at all gets whatever the framework emits, and that is **not**.
+  The third-provider opinion named collapsing these two as the single biggest
+  risk to Session 2 — it is a distinction that already had to be found and fixed
+  once in this session, and it is easy to lose while writing prose.
 - Give Phase A the correct motivation.
 - Mark Part D's solo limitation and the appendix's unverified firewall step.
 - Link `https://github.com/darndestdabbler/dabbler-ai-orchestration-multimodule-demo`

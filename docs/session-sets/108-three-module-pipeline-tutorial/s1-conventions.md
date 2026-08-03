@@ -50,10 +50,10 @@ only these two documents, write the wrong tutorial?**
 5. **No product or router code.** `requiresE2E: false` — this set ships
    documents, so L-064-12 does not arm.
 
-## The one file outside the set directory, and why
+## The two files outside the set directory, and why
 
-`tools/dabbler-ai-orchestration/src/test/poc-nine-modules-ondisk.ts` — **added,
-nothing modified.**
+`tools/dabbler-ai-orchestration/src/test/poc-nine-modules-ondisk.ts` and
+`.../poc-nine-modules-dom.ts` — both **added, nothing modified.**
 
 The spec's Session 1 step 5 requires confirming the pre-set POC's four findings
 *"against the running product, not just the model functions."* The existing
@@ -63,24 +63,34 @@ end to end — `classifyModulesManifest` → `readSessionSets` →
 `computeVisibleModules` → `buildVisibleModulePayloads`, the payload the renderer
 has actually consumed since Set 092.
 
-It is a **peer of the existing POC and sits beside it**, outside
-`src/test/suite/**`, so it is deliberately not in `npm run test:unit`. That
-matches the existing POC's placement and is not an oversight. It is run
+`poc-nine-modules-dom.ts` carries the same payloads one stage further, into a
+real DOM: headless Chromium loads the shipping `media/session-sets-tree/client.js`
+verbatim and the assertions are made against the tree it actually builds
+(`role="treeitem"`, `aria-level`, document order). It was written between
+verification rounds 1 and 2, in response to the discovery round's finding that
+payload-level assertions do not establish claims about *rendered rows*.
+
+Both are **peers of the existing POC and sit beside it**, outside
+`src/test/suite/**`, so they are deliberately not in `npm run test:unit`. That
+matches the existing POC's placement and is not an oversight. They are run
 explicitly:
 
 ```
 npx mocha --require ts-node/register --require ./src/test/vscode-stub.js \
           --ui tdd --timeout 120000 src/test/poc-nine-modules-ondisk.ts
+npx mocha --require ts-node/register --require ./src/test/vscode-stub.js \
+          --ui tdd --timeout 180000 src/test/poc-nine-modules-dom.ts
 ```
 
-**5 passing.** No shipping code was touched, so no version bump and no release.
+**5 passing** and **4 passing** respectively. No shipping code was touched, so no
+version bump and no release.
 
 ## Suite baseline (this tree)
 
 | Suite | Result |
 | --- | --- |
 | Extension unit (`npm run test:unit`, vscode-stub path) | **1821 passing** |
-| `poc-nine-modules-dom.ts` (new, round-3 remediation) | **4 passing** — rendered-DOM assertions |
+| `poc-nine-modules-dom.ts` (new; authored between rounds 1 and 2 — see provenance note) | **4 passing** — rendered-DOM assertions |
 | `poc-nine-modules-ondisk.ts` (new) | **5 passing** |
 | `poc-nine-modules.ts` (pre-existing) | **4 passing**, re-run unchanged |
 | Reference solution `dotnet build` | **succeeded**, 0 warnings, SDK 10.0.201 |

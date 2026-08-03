@@ -170,7 +170,7 @@ Session 3's trim is a reason to raise (2): a document about to be cut down has
 still never been walked in its current form. Final ordering is the operator's,
 taken at the set-terminal close.
 
-### Actuals (interim — the session is SUSPENDED at the verification cap, not closed)
+### Actuals (filled at close)
 
 - **Orchestrator used:** claude / anthropic / claude-opus-5 / high (operator-invoked).
 - **Routing plan followed as recommended**, with the three method departures
@@ -182,32 +182,58 @@ taken at the set-terminal close.
      `delegation.decision_consensus.enabled` is `false` repo-wide, because the
      spec directs it and the category is whitelisted. The config flag was not
      touched.
-  2. One file was added outside the set directory
-     (`poc-nine-modules-ondisk.ts`), then a second during remediation
-     (`poc-nine-modules-dom.ts`). Both are peers of the existing POC, outside
-     `src/test/suite/**`, and modify nothing.
+  2. Two files were added outside the set directory —
+     `poc-nine-modules-ondisk.ts` (step 5) and `poc-nine-modules-dom.ts`
+     (written between verification rounds 1 and 2, in direct response to
+     discovery finding D5). Both are peers of the existing POC, outside
+     `src/test/suite/**`, and modify nothing. Committed at `d3da217`.
 - **Sub-decisions settled:** R1–R9. The load-bearing ones are owner-in-slug
   (version-in-slug needs central allocation), the day-one single-commit manifest
   bootstrap (R9), and behavioural finish lines (counts are observations).
-- **Verification:** four rounds — discovery (fan-out 2/2) → supplementary →
-  remediation-review ×2. **Nine distinct Major findings, all accepted, none
-  disputed.** Seven from the original draft; **two introduced by the remediation
-  itself** and caught by the fix-delta review.
-- **Three findings were closed by running something new**, not by editing prose:
-  the rendered-DOM harness, the both-services Part D run, and the platform check.
-- **The loop suspended at its 2-cycle bound** with the final blocking Major
-  fixed but its fix unreviewed. See `s1-remediation-round-5.md` for the
-  operator's options. **No third cycle was opened.**
-- **Cost: $1.1052 across 10 routed calls** (from `router-metrics.jsonl`, not
+- **Verification: six rounds, closing VERIFIED with 0 findings** — discovery
+  (fan-out 2/2) → supplementary → remediation-review ×4. Rounds 5 and 6 were
+  **operator-authorised** past the normal 2-cycle bound; the loop suspended at
+  the bound and did not re-open on its own authority.
+- **Eleven distinct Major findings, all accepted, none disputed.** Eight came
+  from the original draft; **three were introduced by the remediation itself**
+  and caught by the fix-delta review — which is that phase earning its cost.
+- **A third-provider opinion was taken** (gemini-2.5-pro, with **both**
+  anthropic and openai excluded — anthropic orchestrated, openai ran every
+  verification round). It adjudicated round 5 *"both partly right"*, judged the
+  loop **converging** rather than salience-churning, and **found a Major that
+  five rounds had missed**: two members' `persistence` services would share one
+  hardcoded LocalDB database and collide on EF migrations in the middle of
+  Part D.
+- **Four findings were closed by running something new**, not by editing prose:
+  the rendered-DOM harness, the both-services Part D run, the platform check, and
+  the reference-solution read that confirmed the shared-database mechanism before
+  the finding was accepted.
+- **The most instructive failure was a disclosure aimed at the wrong audience.**
+  The shared database *was* disclosed — as a limit on this session's proof — and
+  the note then told Session 2 that "nothing in this tutorial sets one up." It
+  read like care and functioned as shipping a defect. Recorded in R6 rather than
+  quietly deleted.
+- **Final round nits fixed before close:** stale round/finding counts here, the
+  "one file outside the set directory" heading in the conventions block (there
+  are two), and the literal `ConnectionStrings:Orders` key added to R5 so the new
+  safeguard is mechanical rather than conceptual.
+- **Cost: $1.3921 across 13 routed calls** (from `router-metrics.jsonl`, not
   estimated):
 
   | | |
   | --- | --- |
-  | Verification, four rounds | **$0.9407** (85%) |
+  | Verification, six rounds | **$1.1940** (86%) |
   | Two-engine decision consult | $0.0906 |
+  | Third-provider opinion | $0.0337 |
   | Outline ownership review | $0.0284 |
   | Step-3.5 analysis | $0.0238 |
   | **Wasted** — a first step-3.5 call whose result was lost | **$0.0215** |
+
+  Verification is 86% of spend and found **ten** distinct real defects, three of
+  them in its own fixes. The **$0.0337** third opinion found the **eleventh** —
+  one that six rounds of the other provider had passed over — which is far and
+  away the best value per dollar in the session, and the argument for taking a
+  different provider's read even when nothing is in dispute.
 
   The waste is recorded rather than netted out. The script computed a
   truncation flag *before* writing the paid response to disk, hit a

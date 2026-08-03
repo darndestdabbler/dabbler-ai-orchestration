@@ -116,6 +116,36 @@ The only stub is `acquireVsCodeApi`.
 **4 passing.** The payload-level suite is kept — it covers the parser and
 discovery half — so both now run.
 
+> **Provenance correction (round 5).** This section originally read as though the
+> DOM harness were authored *during round-3 remediation*. **It was not.** It was
+> written immediately after the discovery round raised D5 and **before** the
+> supplementary pass ran — so it is present in the round-2 baseline tree and is
+> therefore **absent from the round-3+ fix delta** by construction.
+>
+> Round 5's verifier caught exactly this and refused to take the prose for it:
+> *"the delta contains no addition for `poc-nine-modules-dom.ts` … the prose
+> assertions and '4 passing' count alone do not resolve the contradiction."*
+> **That is correct and the error was mine** — a mis-stated ordering in this
+> sidecar, not a missing artifact.
+>
+> Verifiable provenance, since a fix-delta reader cannot see the file:
+>
+> ```
+> $ git log --oneline --diff-filter=A -- tools/dabbler-ai-orchestration/src/test/poc-nine-modules-dom.ts
+> d3da217 Set 108 S1: settle the contracts by running them, not by reading them
+>
+> $ git ls-files -s tools/dabbler-ai-orchestration/src/test/poc-nine-modules-dom.ts
+> 100644 581e2bfa975dc09e40c11dc007a7cc9ecde64586 0  tools/.../poc-nine-modules-dom.ts
+>
+> $ git ls-tree -r <round-2 baseline tree> --name-only | grep -c poc-nine-modules-dom
+> 1          # present at the baseline — hence not in the fix delta
+> ```
+>
+> This is the L-064-9 class in a new place: **a diff-based evidence bundle omits
+> what the diff's own baseline already contains.** The lesson generalises beyond
+> untracked files — *anything already inside the baseline is invisible to a
+> delta reviewer, and prose is not a substitute for it.*
+
 **What this still is not:** Layer 3 (`@playwright/test` + Electron) remains the
 fuller harness and does not launch on this machine (a standing residual, Set 107).
 No VS Code, no extension host, no theming. Named in the test's own header so the

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 7,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The manifest-bootstrap remediation still tells readers to declare the converter a second time**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** Session 2 follows both settled instructions and writes a bootstrap that predeclares all nine modules, followed by Part A telling each reader to declare `{owner}-converter`. Because the detailed Part A sequence is the authority Session 2 writes from, this contradiction is likely to propagate. A reader then attempts to add an already-existing slug and is rejected at the first implementation step.\n  - **Details:**\n    - **Violation:** R9 requires: **“All nine entries land in `docs/modules.yaml` in a single commit, before anybody branches.”** But Part A still says: **“The reader declares `{owner}-converter`, sets its code root…”**\n    - **Location:** `s1-walk-outline.md` → R9 and Part A.\n    - **Impact:** The round-2 fix for concurrent manifest edits is incomplete. The tutorial can either duplicate a manifest entry—which R1 says the product rejects—or give Session 2 mutually incompatible instructions about when modules are declared. This would stall readers on the main path and changes the merge decision for the outline.\n    - **Evidence:** R9’s example already contains `priya-converter` with its title, `codeRoots`, and `planPath`; Part A then explicitly directs Priya to declare that same module and set the same code root.\n    - **Fix:** Change Part A to start work in the **already-declared** `{owner}-converter` module and create/start its plan or session set. Reserve all manifest declaration and code-root assignment exclusively for R9’s bootstrap step.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Session 2 follows both settled instructions and writes a bootstrap that predeclares all nine modules, followed by Part A telling each reader to declare `{owner}-converter`. Because the detailed Part A sequence is the authority Session 2 writes from, this contradiction is likely to propagate. A reader then attempts to add an already-existing slug and is rejected at the first implementation step."
+    }
+  ]
+}

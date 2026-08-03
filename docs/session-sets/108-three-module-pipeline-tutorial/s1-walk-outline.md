@@ -493,10 +493,20 @@ cleanly after Part A will not start Part B.
 | **Depends on** | nothing but the prerequisites |
 | **Stop here?** | Yes. Nothing later reaches back into Part A. |
 
-Opens with the contract, not with code. The reader declares
-`{owner}-converter`, sets its code root, and runs the plan → decomposition →
-implementation lifecycle — which `adopt-dabbler.md` owns and this tutorial
-**links**.
+Opens with the contract, not with code. The reader's `{owner}-converter` module
+and its code root **already exist** — R9's bootstrap declared all nine before
+anybody branched — so Part A starts by opening that module and running the
+plan → decomposition → implementation lifecycle, which `adopt-dabbler.md` owns
+and this tutorial **links**.
+
+> **All manifest declaration belongs to R9's bootstrap and nowhere else.** An
+> earlier draft of this part told the reader to *declare* `{owner}-converter` and
+> set its code root here — which R9 had already done. The product rejects a
+> duplicate slug, so a reader following both instructions stalls at the first
+> implementation step of the tutorial. Caught by the close backstop reviewing the
+> whole session diff rather than a fix delta; it is the L-065-1 class, a
+> consistency fix that was not carried into every echo. **Session 2 must not
+> reintroduce a declaration step in Parts A, B or C.**
 
 The teaching beat: the reader's AI session will not produce the answer key's
 code, and that is fine. The answer key is what "done" looks like, not what
@@ -666,6 +676,10 @@ Session 3's scope.
 - Use R1–R9 as settled. Do not re-derive the naming scheme or re-litigate ports.
 - **Never turn a number into a bar.** Finish lines are behavioural; the answer
   key's counts are observations. See the box at the top of §2.
+- **Declare modules in exactly one place: R9's bootstrap.** Parts A, B and C
+  open an *already-declared* module; none of them declares anything or sets a
+  code root. A second declaration is a duplicate slug, which the product
+  rejects — a hard stall at the reader's first implementation step.
 - **Write the day-one bootstrap step** (R9): agree the contracts, declare all
   nine modules in one commit, push — *then* everyone starts. Say plainly that
   this one step is shared and sequential and that everything after it is not.

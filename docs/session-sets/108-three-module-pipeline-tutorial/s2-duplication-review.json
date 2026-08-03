@@ -1,0 +1,38 @@
+```json
+{
+  "duplications": [
+    {
+      "severity": "Minor",
+      "where": "Day one — the one step everybody does together â†’ Step 3 — Declare every module, in one commit",
+      "quote": "Then open **`Dabbler: Open modules.yaml`** and add the code root to each entry by hand — no command does that for you:\n\n```yaml\nmodules:\n  - slug: priya-converter\n    title: \"Converter (Priya)\"\n    codeRoots:\n      - modules/priya/converter\n    planPath: docs/modules/priya-converter/project-plan.md\n```",
+      "why": "This re-explains the procedure for adding `codeRoots` to `modules.yaml`. This procedure is owned by `adopt-dabbler.md`, which covers it in Part 3.",
+      "fix": "Replace the quoted passage and its code block with a link: \"Then, add the `codeRoots` to each new module's entry as shown in [Adopt Dabbler](adopt-dabbler.md), Part 3.\""
+    }
+  ],
+  "broken_handoffs": [
+    {
+      "severity": "Minor",
+      "where": "Before you start â†’ Where you are standing (table)",
+      "quote": "[Adopt Dabbler](adopt-dabbler.md), Parts 1–2",
+      "why": "This link accompanies the prerequisite \"VS Code, the Dabbler extension, Python, and an AI agent installed\". This content is covered entirely in Part 1 of `adopt-dabbler.md`. Part 2 covers creating and cloning the repository, which is a separate prerequisite.",
+      "fix": "Change the link text to `[Adopt Dabbler](adopt-dabbler.md), Part 1`."
+    },
+    {
+      "severity": "Minor",
+      "where": "Before you start â†’ Where you are standing (table)",
+      "quote": "[Adopt Dabbler](adopt-dabbler.md), Part 3",
+      "why": "This link accompanies the prerequisite \"A repository created and cloned, with Dabbler set up and `main` protected\". This content is covered across Part 2 (repository creation/cloning) and Part 3 (Dabbler setup, `main` protection) of `adopt-dabbler.md`. The link omits the necessary reference to Part 2.",
+      "fix": "Change the link text to `[Adopt Dabbler](adopt-dabbler.md), Parts 2–3`."
+    }
+  ],
+  "s3_fragility": [
+    {
+      "severity": "Major",
+      "where": "Day one — the one step everybody does together â†’ No module here declares `touches:`",
+      "quote": "You will see `touches:` in [Adopt Dabbler](adopt-dabbler.md), where one module imports another's code. ... When a module *does* share code with another — as `app` and `greeter` do in [Adopt Dabbler](adopt-dabbler.md) — `touches:` is the right answer and you should use it.",
+      "why": "The example of `app` and `greeter` using `touches:` is located in Part 5 of `adopt-dabbler.md`. Session 3 will delete Part 5 entirely, meaning this reference will point to a document that no longer contains the specific example cited, confusing the reader and leaving a key architectural point unsupported.",
+      "fix": "Remove the specific reference to `app` and `greeter`, which will be deleted. Change the sentence to: \"When a module *does* share code with another, `touches:` is the right answer and you should use it. The single-module tutorial demonstrates this pattern.\""
+    }
+  ]
+}
+```

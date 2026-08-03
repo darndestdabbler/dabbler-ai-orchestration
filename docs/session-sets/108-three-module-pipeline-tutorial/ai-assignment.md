@@ -245,3 +245,119 @@ taken at the set-terminal close.
   `DABBLER_*` keys only; **zero Copilot seat capacity**, as forecast.
 - **Outcome:** not closed. `disposition.json` records `requires_review` with the
   suspension as its blocker.
+
+---
+
+## Session 2 of 4 — Write the tutorial
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked, and the
+  engine S1's close recommended for this session).
+- Routed step-3.5 analysis: `s2-ai-assignment-analysis.json` (route
+  `task_type=analysis`, excl. anthropic → gemini-2.5-pro, $0.0096).
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` (**S4** walks it; S2 neither runs nor authors the checklist),
+  `requiresE2E false`, `pathAwareCritique advisory` (set-terminal, in S4).
+- Budget: `DABBLER_*` provider keys only — one analysis, two reviews, and the
+  mandatory cross-provider verification. **Zero Copilot seat capacity.** Running the
+  reference solution locally costs nothing.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1–3 | Register; read S1's contracts and outline; confirm prerequisites. | Orchestrator direct — reconnaissance. |
+| 5 | Re-establish the quotable literals. | Orchestrator direct, and **executed rather than trusted** — see the departure below. |
+| 2–6 | Write `three-module-pipeline.md`. | Orchestrator direct — see *Why the drafting was not routed*. |
+| 7 | Grep the draft against the ownership table. | Orchestrator direct (mechanical phrase scan) **plus routed** semantic review — a grep cannot judge whether a passage *explains* an owned procedure. |
+| 8 | Documentation review + host-neutrality pass. | **Routed** (`documentation`, anthropic excluded), per the spec. |
+| Verify | Phased `verify_session`. | **Routed** — anthropic auto-excluded per the no-skip mandate. |
+| Close | `disposition.json`; commit + push; `close_session`; notify. | Orchestrator direct — mechanics. |
+
+### Why the drafting was not routed
+
+`documentation` is in `delegation.always_route_task_types`, so this is a departure
+and is recorded as one rather than left implicit.
+
+The spec's own step list routes the `documentation` task at **step 8, as a
+review** — not as the drafting call. And S1's close made the drafting assignment
+explicitly: its next-orchestrator entry chose `claude-opus-5 / high` **because**
+Session 2 "must hold every one of [R1–R9 plus two contracts' worth of literal
+captured strings] across a long document without paraphrasing," naming literal
+fidelity under length as the weakness of that session's own routed drafts. Routing
+the drafting would have re-introduced the exact failure the assignment was made to
+avoid.
+
+The delegation rule's stated purpose is to stop the orchestrator hoarding work a
+cheaper model would do just as well. That test fails here, and the mitigation is
+mechanical rather than a matter of taste: **every wire body and terminal line in the
+tutorial is checked against a provenance source by a script**, and both reviews were
+routed off-provider.
+
+### Where this departs from the routed analyst, and why
+
+**Adopted — its first risk, and it changed the deliverable.** The analyst named
+hallucinated command output as the top risk and prescribed executing the commands
+in-session rather than transcribing S1. Done: the reference solution's suite,
+`dotnet --list-sdks`, `sqllocaldb info` and the Phase A decision-table filter were
+all re-run today, and a checker was written that fails unless every wire-body and
+test-summary line in the tutorial appears verbatim in a provenance source.
+
+**It earned its cost immediately.** The checker caught a fabrication in the
+orchestrator's own first draft: a `Stored` transcript whose `fileName` had been
+edited to suit the surrounding prose while keeping the real `batchId`. Every literal
+around it was genuine, which is exactly what made it invisible to reading.
+
+**Adopted — its third risk.** Each part now opens with a *"Coming back to this?"*
+block naming what must be running to resume, which is what `partsIndependentlyStoppable`
+actually requires.
+
+**Adopted — its `missing_step`.** The plan's numbered steps never say "write the
+prerequisites section"; R8a and R8b require one. It is written, in both halves.
+
+**Rejected — its `next_orchestrator`, as unusable.** It named
+`claude-3-sonnet-20240229`, which is not in this repo's model catalogue
+(`router-config.yaml` carries `sonnet` → `claude-sonnet-4-6` and `claude-opus-5`).
+Recommendation restated below on its own merits.
+
+### Next-orchestrator recommendation
+
+**claude / anthropic / claude-opus-5 / high.**
+
+The analyst's *reasoning* for a cheaper tier was sound — Session 3 is precise
+editing, not greenfield authoring — but its conclusion under-weights what makes S3
+dangerous. S3 deletes `adopt-dabbler.md` Part 5 and nine video files and reconciles
+seven inbound linkers; a wrong deletion is the one class of mistake in this set that
+loses content permanently. It also inherits a **hard ordering constraint** from R4:
+it must confirm the ownership-routing procedure exists in `three-module-pipeline.md`
+**by reading it**, not by a link check, before removing Part 5.
+
+Provider-diversity second choice: **openai / gpt-5-6**, effort high. The fresh-eyes
+benefit is already supplied by mandatory cross-provider verification.
+
+Budget: `DABBLER_*` keys only; zero Copilot seat capacity.
+
+### Next-session-set recommendation
+
+The analyst proposes **automating the tutorial's UAT** — encoding S4's checklist as
+an executable suite so the tutorial cannot rot silently. Recorded as a genuinely new
+candidate, and it is well-aimed at a real risk: this tutorial's correctness depends
+on a reference solution in a *different repository* that nothing here watches.
+
+**Not endorsed as next**, for the same reason S1 declined the Java track: S4 has not
+walked it yet, and a checklist that does not exist cannot be automated. It should be
+re-raised at the set-terminal close, when there is a walk to automate.
+
+The standing candidates from Set 107, unchanged:
+
+1. **Increment B** — `Start work` / `Send for review`, plus one-form module creation.
+2. **The owed `adopt-dabbler.md` walk** — never performed, and **Session 3 edits that
+   document**, which makes the debt larger rather than smaller.
+
+### Actuals (filled at close)
+
+- **Orchestrator used:** claude / anthropic / claude-opus-5 / high.
+- **Note on Session 1's actuals above:** its last line reads *"Outcome: not
+  closed"*. That was true when written — S1 was suspended at the verification bound
+  — and was overtaken when the operator authorised rounds 5–8. **Session 1 closed
+  VERIFIED**, as `session-state.json` and `disposition.json` both record. Left
+  in place rather than rewritten, and raised at Step 9.

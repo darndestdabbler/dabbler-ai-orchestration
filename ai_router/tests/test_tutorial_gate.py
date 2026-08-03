@@ -215,6 +215,51 @@ def test_invented_command_title_is_flagged(repo: Path):
     assert _checks(tutorial_gate.run_all(repo), "command-titles")
 
 
+def test_command_title_containing_a_dot_is_captured_whole(repo: Path):
+    """`Dabbler: Open modules.yaml` is a real title; the dot is part of it.
+
+    Set 108 S3: the regex stopped at the dot, so the gate reported the correct
+    tutorial text as an invented command and CI went red on a true statement.
+    """
+    # Assert on the capture itself, not merely on the absence of a violation:
+    # a regex that stopped matching dotted titles ALTOGETHER would also emit no
+    # violation, so the no-violation assertion below is fail-open on its own.
+    captured = tutorial_gate._COMMAND_RE.findall(
+        "run **`Dabbler: Open modules.yaml`** and add the code root"
+    )
+    assert captured == ["Open modules.yaml"]
+
+    pkg = repo / "tools" / "dabbler-ai-orchestration" / "package.json"
+    data = json.loads(pkg.read_text(encoding="utf-8"))
+    data["contributes"]["commands"].append(
+        {
+            "command": "dabbler.openModulesYaml",
+            "category": "Dabbler",
+            "title": "Open modules.yaml",
+        }
+    )
+    pkg.write_text(json.dumps(data), encoding="utf-8")
+
+    _edit(
+        repo,
+        HELLO_WORLD,
+        "Dabbler: Try a sample project",
+        "Dabbler: Open modules.yaml",
+    )
+    assert _checks(tutorial_gate.run_all(repo), "command-titles") == []
+
+
+def test_sentence_final_period_is_not_swallowed_into_a_title(repo: Path):
+    """The dot-tolerant regex must still stop at the end of a sentence."""
+    _edit(
+        repo,
+        HELLO_WORLD,
+        "Dabbler: Try a sample project",
+        "Dabbler: Try a sample project. Then read on",
+    )
+    assert _checks(tutorial_gate.run_all(repo), "command-titles") == []
+
+
 # ---------------------------------------------------------------------------
 # Check 2 — program output is bound to bundle.json
 # ---------------------------------------------------------------------------

@@ -115,7 +115,14 @@ def _normalise(text: str) -> str:
 # Check 1 — command titles resolve to real contributed commands
 # ---------------------------------------------------------------------------
 
-_COMMAND_RE = re.compile(r"Dabbler: ([A-Z][A-Za-z0-9 \-]*[A-Za-z0-9])")
+# A dot is allowed only when a letter or digit follows it, so a title that
+# genuinely contains one (`Dabbler: Open modules.yaml`) is captured whole while
+# a sentence-final period stays outside the match ("Run Dabbler: New Module.").
+# Set 108 S3: without the lookahead this matched `Dabbler: Open modules` and
+# reported the repo's own correct tutorial text as a non-existent command.
+_COMMAND_RE = re.compile(
+    r"Dabbler: ([A-Z](?:[A-Za-z0-9 \-]|\.(?=[A-Za-z0-9]))*[A-Za-z0-9])"
+)
 
 
 def contributed_command_titles(repo_root: Path) -> set[str]:

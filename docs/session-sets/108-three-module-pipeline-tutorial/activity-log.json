@@ -204,6 +204,86 @@
       "dateTime": "2026-08-03T14:54:03.415895-04:00",
       "description": "Authored disposition.json for S2 (preserving the patched verification fields), committed and pushed, ran close_session, then fired the session-complete notification.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-03T15:04:46.512972-04:00",
+      "description": "Registered S3 via start_session (claude/anthropic/claude-opus-5/high). Read the preload, the spec, and the finished three-module-pipeline.md end to end.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "readCheckOwnershipRouting",
+      "dateTime": "2026-08-03T15:04:46.515044-04:00",
+      "description": "R4 PRECONDITION SATISFIED BY READING, not by a link check: ownership routing landed in three-module-pipeline.md Step 4 'Route reviews by ownership' (lines 653-686), carrying both the GitHub CODEOWNERS form and the Azure DevOps 'Automatically included reviewers' equivalent. Only then was adopt-dabbler.md Part 5 eligible for deletion.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "estateTrimApplied",
+      "dateTime": "2026-08-03T15:04:46.515612-04:00",
+      "description": "Trimmed adopt-dabbler.md to the single-module walk: deleted Part 5 (teammate + composing module) and Part 6 (review/merge/cleanup) entirely, 7461 chars; reframed the intro from 'two-module' to 'one person, one module' with a forward link; renumbered branch protection 'stage N of 3' -> 'of 2' (stage 3 lived in Part 5); repaired 'Parts 3-5' -> 'Parts 3-4' and the two prose forward-references to Part 5 inside Parts 2-3; rewrote the close as a five-item single-module check plus a 'Where to go next' section. 459 -> 333 lines.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "videoRetired",
+      "dateTime": "2026-08-03T15:04:46.515612-04:00",
+      "description": "git rm -r docs/tutorials/adopt-dabbler-video/ (9 files, operator-sanctioned in the spec). Its one live inbound link (adopt-dabbler.md:15, the 'On camera' bullet) was removed in the same pass, along with the 4 remaining *(scene N)* markers on the Part 1-4 headings; the Part 5/6 markers went with their parts. Set 107's activity log and change log mention the folder historically and were NOT touched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "linkersReconciled",
+      "dateTime": "2026-08-03T15:04:46.517406-04:00",
+      "description": "Reconciled the inbound linkers. EDITED 5: README.md (dropped the now-false 'with a second module and a teammate added at the end', added the three-module tutorial as the next rung), docs/quick-start.md ('solo or as a small team' -> 'one person, one module' + new list entry), docs/module-reorganization.md (repointed 'hands-on team setup' at the new tutorial), docs/tutorials/module-team-hello-world.md (tombstone now routes the team half onward), docs/tutorials/release-and-recovery.md (names both upstream tutorials). NOT EDITED, deliberately: docs/tutorials/hello-world.md -- it makes no two-module promise, and tutorial_gate's _BANNED_TERMS forbids 'pipeline', 'repository' and 'teammate' in the first-run doc, so naming 'Three modules, one pipeline' there would turn CI red. The ladder still chains hello-world -> adopt-dabbler -> three-module.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "deadLinkGrepClean",
+      "dateTime": "2026-08-03T15:04:46.518360-04:00",
+      "description": "Dead-link sweep: ZERO live references to adopt-dabbler-video/ outside session-set records; ZERO references to adopt-dabbler Parts 5/6; every surviving cross-doc citation (three-module-pipeline.md x6) targets Parts 1, 2-3 or 4, all of which survive. tutorial_gate.py's own links check passes.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "ciGateRepaired",
+      "dateTime": "2026-08-03T15:18:50.234144-04:00",
+      "description": "Repaired a CI gate that was ALREADY RED on master at session start (commit be4d3b8, S2's close): tutorial_gate.py's _COMMAND_RE had no '.' in its character class, so it captured 'Dabbler: Open modules' from the correct text 'Dabbler: Open modules.yaml' and reported the repo's own tutorial as naming a non-existent command. 'Open modules.yaml' IS a real contributed command title. Fixed by allowing a dot only when a letter or digit follows (lookahead), so a dotted title is captured whole while a sentence-final period is not swallowed. Added 2 regression tests per L-069-1. Gate now exits 0; test_tutorial_gate.py 83 -> 85 passed. DISCLOSED for adjudication: outside the spec's S3 Touches list.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "step3.5Assignment",
+      "dateTime": "2026-08-03T15:18:50.235269-04:00",
+      "description": "Appended the Session 3 block to ai-assignment.md; routed the next-orchestrator/next-set analysis via route(task_type='analysis', exclude anthropic) -> s3-ai-assignment-analysis.json. Rejected the analyst's engine 'bedrock' (not a repo engine; second consecutive session the analyst emitted an out-of-catalogue identifier). Adopted its structured walk-capture template for S4. Declined its Java-track next-set recommendation as premature by the spec's own non-goal ('after this one is walked'). Recommends claude/anthropic/claude-opus-5/high for S4, and the owed adopt-dabbler.md walk as the next set -- a debt this session materially enlarged.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "buildAndTest",
+      "dateTime": "2026-08-03T16:30:16.120072-04:00",
+      "description": "Suite GREEN: 3143 passed, 6 skipped, 8 deselected in 48m55s (pytest -m 'not e2e', the invocation pytest.ini names as pre-commit). tutorial_gate.py exit 0; test_tutorial_gate.py 85 passed. An earlier full run was stopped at 35 min on the mistaken read that it had stalled -- it had not; the suite is just slow on Windows from git subprocess spawn. The e2e mark drives start_session/close_session against real git repos in tmpdirs and is unrelated to the Copilot seat.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "verify",
+      "dateTime": "2026-08-03T16:30:16.120610-04:00",
+      "description": "verify_session --phase discovery: round 1, verdict VERIFIED, 0 blocking findings, two-way fan-out (both calls gpt-5-6; anthropic auto-excluded as the orchestrator's provider). Cost $0.4684. Eight nits across the two calls, none blocking. ACCEPTED AND FIXED post-round (both in text this session had touched): README's stale 'a reviewed pull request' promise -> 'a gated pull request' (the trimmed solo walk requires zero approvals), and the new regression test was fail-open -- it asserted only the absence of a violation, so it now asserts the capture equals 'Open modules.yaml' exactly. Gate + 85 tests re-run green after both. ADJUDICATED-MINOR, no change: the deleted video SCRIPT (never the tutorial) held the only active proof that a direct push to main is rejected -> re-homed to the owed adopt-dabbler walk; conventions block asserted results without pasting command output; 'creates nothing' meant product deliverables, not lifecycle machinery.",
+      "status": "complete"
     }
   ]
 }

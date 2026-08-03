@@ -5,8 +5,10 @@
 > you have an older repo that predates modules and want to adopt them. For
 > the concepts behind modules, read the
 > [Module-Organized Projects Primer](planning/module-organized-projects-primer.md);
-> for a hands-on team setup, the
-> [adoption walkthrough](tutorials/adopt-dabbler.md).
+> for declaring your first module hands-on, the
+> [adoption walkthrough](tutorials/adopt-dabbler.md), and for several modules
+> composed over a contract — including ownership routing across code roots —
+> [Three modules, one pipeline](tutorials/three-module-pipeline.md).
 
 A **module** is a unit of work owned by one developer at a time, declared
 in `docs/modules.yaml` (`slug`, `title`, `codeRoots`, `planPath`,

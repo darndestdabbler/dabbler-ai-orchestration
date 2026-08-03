@@ -1,0 +1,34 @@
+```json
+{
+  "next_orchestrator": {
+    "engine": "bedrock",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "rationale": "Session 4 is a set-terminal, high-synthesis task. It requires interpreting human walk-through feedback, fixing emergent code/documentation defects, authoring a precise UAT checklist, and producing a high-level critique and recommendations. Claude Opus excels at this blend of complex reasoning, nuanced interpretation, and precise artifact generation, making it the best choice to ensure high-quality set deliverables."
+  },
+  "second_choice": {
+    "provider": "openai",
+    "model": "gpt-5-6",
+    "rationale": "Provides a top-tier alternative with exceptional coding and logical deduction capabilities, making it highly suitable for the defect-fixing and checklist-authoring portions of the session. Its use would also fulfill the mandatory cross-provider verification requirement against the primary choice."
+  },
+  "top_risks": [
+    {
+      "risk": "The human tutorial walk-through surfaces complex, multi-system bugs not easily fixed by the orchestrator within the session scope (e.g., subtle .NET runtime issues, network configuration dependencies).",
+      "mitigation": "Instruct the orchestrator to perform root cause analysis and create a detailed defect report with a proposed fix for a follow-on session. The operator must be prepared to approve deferring the fix to maintain session velocity."
+    },
+    {
+      "risk": "The orchestrator generates a superficial or generic 'path-aware critique' that provides no actionable insights.",
+      "mitigation": "Prime the orchestrator with specific analytical vectors: 1. Assess tutorial resilience to minor tooling version changes. 2. Critique the clarity of inter-service contracts for a developer new to distributed systems. 3. Evaluate the debugging guidance for platform-specific (Windows vs. Unix) failure modes."
+    },
+    {
+      "risk": "Human feedback from the walk-through is ambiguous ('this felt confusing') and the orchestrator cannot translate it into a concrete change.",
+      "mitigation": "The operator must capture walk-through feedback using a structured template: {Part, Step, Action, Expected, Actual, Defect/Stall Description}. This provides the orchestrator with machine-parsable context for defect replication and repair."
+    }
+  ],
+  "next_session_set": {
+    "recommendation": "Implement the Java track for the three-module pipeline tutorial.",
+    "rationale": "This recommendation directly executes on a key expected output from S4. It leverages the freshly-verified .NET tutorial as a structural template, minimizing planning overhead. It addresses a known product gap and expands the tutorial's audience, representing a high-value, logical next step."
+  }
+}
+```

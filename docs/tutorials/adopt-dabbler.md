@@ -1,6 +1,6 @@
 # Adopt Dabbler: ship your first module in a real repository
 
-Build a tiny two-module Python program with AI-led sessions, on GitHub, behind a real
+Build a tiny Python module with AI-led sessions, in a repository you keep, behind a real
 pull-request gate. You finish with code on `main` that prints one line — and with the habits
 the framework is built around.
 
@@ -9,16 +9,12 @@ the framework is built around.
   after it, when you
   are putting Dabbler into a repository you actually keep.
 - **Audience:** you can commit and push with `git`. Nothing else is assumed.
-- **Time:** about two hours, most of it watching AI sessions work.
-- **Solo?** Parts 1–4 are a complete one-person walkthrough; Part 4 says where to stop.
-- **On camera:** the six parts map 1:1 to the six scenes of the
-  [video walkthrough](adopt-dabbler-video/).
-
-> **Note — this guide currently carries the team workflow too.** Parts 5 and 6 cover adding a
-> teammate, declaring a second module, routing reviews by ownership, and dependencies between
-> modules. That is team material living in an adoption guide as a deliberate intermediate
-> state; a later set extracts it into `team-workflow.md`. Nothing about it is wrong here — it
-> is just more than "adopt Dabbler" implies.
+- **Time:** about an hour and a half — an estimate, not a stopwatch reading — most of it
+  watching AI sessions work.
+- **Scope: one person, one module.** That is the whole guide, start to finish, and there is
+  no team half waiting at the end. Several modules built independently and composed over an
+  agreed contract — with teammates, or alone — is the next tutorial up:
+  [Three modules, one pipeline](three-module-pipeline.md).
 
 > ## Pick your host before you start: **GitHub** or **Azure DevOps**
 >
@@ -39,7 +35,7 @@ the framework is built around.
 > are ignored by Azure DevOps, so that step gives you a working `azure-pipelines.yml` to use
 > instead. Everything else is a setting with a different name.
 
-## Part 1 — Install and verify the tools *(scene 1)*
+## Part 1 — Install and verify the tools
 
 1. **Visual Studio Code** 1.85 or newer.
 2. The **Dabbler AI Orchestration** extension from the VS Code Marketplace.
@@ -77,7 +73,7 @@ the framework is built around.
 > need an AI agent inside VS Code — Claude Code, Codex, or Gemini Code Assist all work; paste the
 > starter lines into that agent's chat instead of the Copilot CLI.
 
-## Part 2 — Create and clone the repository *(scene 2)*
+## Part 2 — Create and clone the repository
 
 1. **Create an empty repository named `hello-modules`.**
 
@@ -85,7 +81,7 @@ the framework is built around.
    >
    > - **GitHub:** click **New repository**, name it `hello-modules`, set it **Public**, tick
    >   **Add a README file**, create it. Public matters: on GitHub Free, branch protection only
-   >   works on public repositories, and Parts 3–5 depend on it. On a paid plan, private is fine.
+   >   works on public repositories, and Parts 3–4 depend on it. On a paid plan, private is fine.
    > - **Azure DevOps:** create a project, then a Git repository named `hello-modules`, and add
    >   a README so there is something to clone. Visibility does not matter — ADO branch policies
    >   work on private projects, so the GitHub-Free caveat does not apply to you.
@@ -95,7 +91,7 @@ the framework is built around.
    the URL differs (`https://github.com/{you}/hello-modules.git` versus
    `https://dev.azure.com/{org}/{project}/_git/hello-modules`).
 
-## Part 3 — Set up Dabbler and name your first module *(scene 3)*
+## Part 3 — Set up Dabbler and name your first module
 
 1. Click the **Dabbler AI Orchestration** icon in the Activity Bar. The repo has no session
    sets yet, so the **Getting Started** form opens. In **Build project structure**, set
@@ -134,23 +130,26 @@ the framework is built around.
 4. Commit and push the setup: `git add -A`, then `git commit -m "chore: scaffold Dabbler
    and declare the greeter module"`, then `git push`.
 
-5. **Protect `main` (stage 1 of 3).** From here on, every change reaches `main` through a pull
+5. **Protect `main` (stage 1 of 2).** From here on, every change reaches `main` through a pull
    request — including your own.
 
    > **▸ Your host — do ONE of these.**
    >
    > - **GitHub:** **Settings** > **Branches**, add a rule for `main`, turn on **Require a pull
    >   request before merging**, and leave **Require approvals** **unticked** — that is zero
-   >   approvals, and you need it, because you are alone until Part 5 and nobody else can
+   >   approvals, and you need it, because you are working alone here and nobody else can
    >   approve you. If you are an admin, also enable the do-not-allow-bypass option so the rule
    >   binds you too.
    > - **Azure DevOps:** **Project Settings** > **Repositories** > your repo > **Policies** >
    >   **Branch Policies** on `main` > **Require a minimum number of reviewers**. Its minimum is
    >   1, not 0, so also tick **Allow requestors to approve their own changes** and cast your own
-   >   **Approve** vote on each solo pull request. Part 5 unticks that box, so Sam's approval
-   >   becomes the one that counts.
+   >   **Approve** vote on each solo pull request.
 
-## Part 4 — Build and ship the first module *(scene 4)*
+   > **When somebody joins you**, this is the setting that changes: raise **Require approvals**
+   > to 1 on GitHub, or untick **Allow requestors to approve their own changes** on Azure
+   > DevOps, so a second person's vote is the one that counts.
+
+## Part 4 — Build and ship the first module
 
 Every module follows the same lifecycle: a **plan** set writes the module's plan, a
 **decomposition** set turns that plan into implementation sets, and each implementation set
@@ -298,7 +297,7 @@ git switch -c authoring/greeter-lifecycle
    your local `main`, removes the worktree folder, deletes the session branch, and prunes stale
    remotes. The set now shows as **Complete**.
 
-9. **Protect `main` (stage 2 of 3).** A check that runs but blocks nothing is information, not
+9. **Protect `main` (stage 2 of 2).** A check that runs but blocks nothing is information, not
    a gate — make it required.
 
    > **▸ Your host — do ONE of these.**
@@ -312,148 +311,23 @@ git switch -c authoring/greeter-lifecycle
 10. Run it, from the repository root — `python -m services.greeter.greeter` prints
     `Hello, world!`.
 
-**Solo repositories can stop here.** You have a declared module, a plan, a completed AI-led set,
-a protected trunk, and a green required check — the whole loop. Part 5 adds a second person and
-a second module.
-
-## Part 5 — Add a teammate and a composing module *(scene 5)*
-
-| Person | Module | Code root | Notes |
-| --- | --- | --- | --- |
-| Priya (you) | `greeter` | `services/greeter/` | done in Part 4 |
-| Sam | `app` | `services/app/` | imports `greeter`, adds the time |
-
-1. **Invite Sam.** **Settings** > **Collaborators** > **Add people**, and add his handle.
-   > **▸ Your host — do ONE of these.**
-   >
-   > - **GitHub:** accepting the invitation is what gives him push access — a personal
-   >   repository has no role picker; on an organisation repository, choose **Write**.
-   > - **Azure DevOps:** add him to the project's **Contributors** group under **Project
-   >   Settings** > **Permissions**.
-
-   He then
-   clones the repo and does his own one-time setup: **all of Part 1** exactly as you did it —
-   including the Copilot CLI sign-in, or the provider API keys if that is the variant you
-   chose — plus **`Dabbler: Install ai-router`** once in his clone (the `.venv` is git-ignored,
-   so it exists only on your machine).
-
-2. **Declare the `app` module.** Run **`Dabbler: New Module`** with slug `app` and title `App`.
-   As in Part 3 it declares the module, writes a plan stub, and scaffolds `app`'s two lifecycle
-   sets — you commit all of it in step 5. Then edit its `docs/modules.yaml` entry to add the code
-   root **and** the dependency:
-
-   ```yaml
-     - slug: app
-       title: "App"
-       codeRoots:
-         - services/app
-       planPath: docs/modules/app/project-plan.md
-       touches:
-         - greeter
-   ```
-
-   `touches:` sanctions `app`'s sessions to read and change `greeter`'s code — and it is why
-   CI tests every module, not just the one that changed.
-
-3. **Route reviews by ownership.** Uncomment two lines in `.github/CODEOWNERS`, replacing
-   `@priya-gh`/`@sam-gh` with your and Sam's **real GitHub usernames** — GitHub silently declines
-   to route reviews to handles that do not exist:
-
-   ```text
-   /services/greeter/  @priya-gh
-   /services/app/      @sam-gh @priya-gh
-   ```
-
-   Once these are on `main`, GitHub requests the right reviewer by itself on any pull request
-   touching those paths — which is what happens to Sam in Part 6. Rules only route on pull
-   requests opened *after* they land, so this one, which adds them, still needs asking by hand.
-   > **▸ Your host — do ONE of these.**
-   >
-   > - **GitHub:** the two `CODEOWNERS` lines above.
-   > - **Azure DevOps:** `CODEOWNERS` is GitHub-only. The equivalent is **Automatically included
-   >   reviewers** under **Branch Policies** — one entry per module with a path filter, each
-   >   marked **Required**.
-
-4. **Protect `main` (stage 3 of 3).** Tick **Require approvals** on the `main` rule and set the
-   count to **1** — from now on somebody else has to say yes, including on the pull request in
-   the next step.
-
-   > **▸ Your host — do ONE of these.**
-   >
-   > - **GitHub:** tick **Require approvals** on the `main` rule and set the count to **1**.
-   > - **Azure DevOps:** keep the minimum at 1 and **untick** **Allow requestors to approve
-   >   their own changes**, so your own vote no longer counts.
-
-5. Land everything from steps 2–3 — the manifest edit, the plan stub, `app`'s two lifecycle
-   sets, and CODEOWNERS — as one small pull request. `main` is protected now, so it goes on a
-   branch:
-
-   ```bash
-   git switch -c authoring/app-module
-   git add -A
-   git commit -m "docs: declare the app module and route reviews"
-   ```
-
-   Then run **`Dabbler: Open PR for this set`** — it works from any non-trunk branch. **Ask Sam
-   to approve it**: you raised approvals to 1 a moment ago, and you cannot approve your own pull
-   request. Merge it, then `git switch main && git pull --ff-only && git branch -d
-   authoring/app-module`.
-
-6. **Sam pulls first** (`git pull --ff-only`), or `app` and its sets exist in neither his clone
-   nor his Work Explorer. `main` is protected for him too, so — exactly as in Part 4 — he starts
-   on an authoring branch and stays on it until the lifecycle output is landed:
-
-   ```bash
-   git switch -c authoring/app-lifecycle
-   ```
-
-   He then runs `app`'s lifecycle exactly as you ran `greeter`'s, in this order:
-   - **Plan set**, with the scope *`services/app/app.py` imports `greeter`'s `greet()`, appends
-     the current time, and prints `Hello, world! It is HH:MM.`; runnable from the repository
-     root with `python -m services.app.app`*
-   - **Decomposition set**, which writes `app`'s implementation set.
-   - **Then**, before landing anything, open that new set's `spec.md` and declare the dependency:
-
-     ```yaml
-     prerequisites:
-       - slug: 005-greeter-hello
-         condition: complete
-     ```
-
-     Because `greeter`'s set is already complete, nothing changes on screen. Were it not,
-     that row would carry a ⛓︎ marker naming what it is waiting for. **Commit that edit** —
-     the decomposition session committed the spec it generated, but this change is yours:
-     `git add -A && git commit -m "docs: app's implementation set depends on greeter's"`.
-   - **Land all of it on `main`** from that authoring branch with **`Dabbler: Open PR for this
-     set`**, exactly as in Part 4 step 3 — it pushes commits and opens the pull request, it does
-     not commit for you, which is why the step above ends in a commit. This one is all planning
-     files, so no CODEOWNERS rule matches and nobody is requested automatically — Sam asks
-     **you** to approve it, then merges, then `git switch main && git pull --ff-only`. The
-     prerequisite has to be on `main` before the worktree is cut, or the worktree gets a spec
-     without it.
-   - **Implementation set**, in a worktree, exactly as in Part 4.
-
-## Part 6 — Review, merge, and clean up *(scene 6)*
-
-1. From his worktree window, Sam runs **`Dabbler: Open PR for this set`**. This one changes
-   `services/app/`, so the ownership rules you landed in Part 5 request **Priya** for him —
-   `CODEOWNERS` on GitHub, **Automatically included reviewers** on Azure DevOps. Nobody has to
-   remember. She reads the composition: `touches:` is what let `app` reach into
-   `greeter`'s code, and the ownership rule is what puts that change in front of `greeter`'s
-   owner before it lands. The `test` check runs both modules.
-2. Priya approves, Sam merges, and Sam runs **`Dabbler: Finalize merged set`** from his main
-   checkout.
-3. Pull and run the composed program from the repository root — `git pull --ff-only`, then
-   `python -m services.app.app`. It prints one line of exactly this shape, with the current
-   time: `Hello, world! It is 14:32.`
+**That is the whole loop.** You have a declared module, a plan, a completed AI-led set, a
+protected trunk, and a green required check — on code you keep, in a repository you own.
 
 ### The five things to check
 
-- [ ] `docs/modules.yaml` declares `greeter` and `app` (with `touches: [greeter]`), and every set's `spec.md` carries the right `module:` stamp.
-- [ ] Both implementation sets sit in the **Complete** bucket, under their own modules.
-- [ ] `python -m services.app.app` on `main` prints the composed line.
+- [ ] `docs/modules.yaml` declares `greeter` with its code root, and every set's `spec.md` carries the right `module:` stamp.
+- [ ] `greeter`'s implementation set sits in the **Complete** bucket, under its own module.
+- [ ] `python -m services.greeter.greeter` on `main` prints `Hello, world!`.
 - [ ] The `test` check passed on the pull request, and a direct `git push` to `main` is rejected.
 - [ ] `.venv\Scripts\python.exe -m ai_router.worktree list` shows no session worktrees left open.
 
-**Next:** [Release and recovery operations](release-and-recovery.md) — tagging a
-release, hotfixing from a tag, and rolling back.
+## Where to go next
+
+- **Several modules, built independently and composed over an agreed contract** — the
+  dependency DAG, testing a module with none of its dependencies running, ownership routing
+  across code roots, and integrating with somebody else's implementation by changing
+  configuration: [Three modules, one pipeline](three-module-pipeline.md). It picks up exactly
+  where this guide stops, in the repository you just built.
+- **Tagging a release, hotfixing from a tag, rolling back, and raw git:**
+  [Release and recovery operations](release-and-recovery.md).

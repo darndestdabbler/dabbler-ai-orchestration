@@ -193,10 +193,15 @@ and prove it worked.
 
 Ready to put Dabbler into a repository you keep? The hands-on tutorial
 [docs/tutorials/adopt-dabbler.md](docs/tutorials/adopt-dabbler.md) walks you
-through the whole flow end to end — scaffold, modules, per-module plans and
-session sets, worktrees, CI, and a reviewed pull request — solo-first, with a
-second module and a teammate added at the end. Release, hotfix, and rollback
-operations live in
+through the whole flow end to end for **one person and one module** — scaffold,
+the module, its plan and session sets, worktrees, CI, and a gated pull request.
+
+Then [docs/tutorials/three-module-pipeline.md](docs/tutorials/three-module-pipeline.md)
+takes it to the shape the product was designed around: **three modules, built
+independently and composed over an agreed contract**. You build all three — solo
+or alongside teammates — and finish by repointing your service at somebody
+else's implementation with two configuration values and no code change. Release,
+hotfix, and rollback operations live in
 [docs/tutorials/release-and-recovery.md](docs/tutorials/release-and-recovery.md).
 
 Setting up without VS Code? See the manual-setup note in

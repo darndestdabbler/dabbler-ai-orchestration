@@ -1,6 +1,7 @@
 # Release and recovery operations
 
-Reference for after the [adoption walkthrough](adopt-dabbler.md): cutting a release
+Reference for after the [adoption walkthrough](adopt-dabbler.md) or
+[Three modules, one pipeline](three-module-pipeline.md): cutting a release
 tag, hotfixing from one, and rolling back. **What to release, when, and whether to
 roll back are human decisions** — these commands only remove the typing. Every one
 of them shows the exact shell commands it will run and waits for your click.

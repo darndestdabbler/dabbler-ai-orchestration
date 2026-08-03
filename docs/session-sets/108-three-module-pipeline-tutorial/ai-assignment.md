@@ -361,3 +361,115 @@ The standing candidates from Set 107, unchanged:
   — and was overtaken when the operator authorised rounds 5–8. **Session 1 closed
   VERIFIED**, as `session-state.json` and `disposition.json` both record. Left
   in place rather than rewritten, and raised at Step 9.
+
+---
+
+## Session 3 of 4 — Cut the estate to the ladder
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked, and the
+  engine S2's close recommended for this session — for the stated reason that a wrong
+  deletion is the one class of mistake in this set that loses content permanently).
+- Routed step-3.5 analysis: `s3-ai-assignment-analysis.json` (route
+  `task_type=analysis`, excl. anthropic).
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` (**S4** walks it), `requiresE2E false`, `pathAwareCritique
+  advisory` (set-terminal, in S4).
+- Budget: `DABBLER_*` provider keys only — one analysis plus the mandatory
+  cross-provider verification. **Zero Copilot seat capacity.**
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read the finished tutorial end to end. | Orchestrator direct — reconnaissance. |
+| 1b | **Discharge S2's blocking precondition**: confirm ownership routing exists in the new tutorial *by reading it*. | Orchestrator direct, and **deliberately not delegated** — the precondition's whole point is that a link check passes either way. |
+| 2–3 | Trim `adopt-dabbler.md`; retire the video. | Orchestrator direct — mechanical deletion and renumbering in one file, plus a sanctioned `git rm`. |
+| 4–5 | Reconcile the seven linkers; add the new tutorial to every surface. | Orchestrator direct — five one-to-three-line edits across five files. |
+| 6 | Dead-link grep. | Orchestrator direct (mechanical) **plus** `tutorial_gate.py`'s executable links check, which is the real falsifier. |
+| Verify | Phased `verify_session --phase discovery`. | **Routed** — anthropic auto-excluded per the no-skip mandate. |
+| Close | `disposition.json`; commit + push; `close_session`; notify. | Orchestrator direct — mechanics. |
+
+### Why the edits were not routed
+
+Every edit in this session is a deletion, a renumbering, or a one-to-three-line link
+repair in a single file — squarely inside the "mechanical, single-file, under ~50
+lines" carve-out. What was *not* mechanical was deciding **what may be deleted**, and
+that judgment was pinned in advance by S1's ruling R4 and S2's blocking precondition,
+then discharged by reading the target document rather than by routing an opinion
+about it.
+
+### Where this departs from the routed analyst, and why
+
+**Rejected — its `next_orchestrator.engine`, as unusable.** It named `bedrock`, which
+is not an engine in this repo (`claude` / `codex` / `gemini` / `copilot`). This is the
+second consecutive session in which the step-3.5 analyst has emitted an identifier
+outside the repo's catalogue — S2's named `claude-3-sonnet-20240229`. Its
+provider/model/effort (`anthropic` / `claude-opus-5` / `high`) are valid and its
+reasoning is sound; the recommendation is restated below on its own merits.
+
+**Adopted — its structured-feedback mitigation.** Its third risk is that a walker's
+"this felt confusing" cannot be turned into a concrete change, and it prescribes
+capturing the walk against a fixed template — `{Part, Step, Action, Expected, Actual,
+Defect}`. That is a real improvement on Set 107's freeform capture and is carried into
+the S4 recommendation.
+
+**Declined — its `next_session_set` (the Java track), as premature by the set's own
+rule.** The spec makes the Java track a **non-goal** with an explicit condition:
+*"Separate set, after this one is walked."* S4 is the walk. Recommending it as the
+next set pre-commits the outcome of a walk that has not happened; S4 records it as a
+follow-on, which is what the spec asks for.
+
+### Next-orchestrator recommendation
+
+**claude / anthropic / claude-opus-5 / high.**
+
+S4 is set-terminal and carries five distinct deliverables — the walk evidence, the
+defect fixes, the UAT checklist, `change-log.md`, the Step 9 guidance review, and the
+advisory path-aware critique. Two of those have repeatedly proven to be the hardest
+things in this repo to get right at any tier:
+
+1. **The UAT checklist is quality-gated on volume, not just wording.** The operator's
+   standing bar (Set 107 S3) is that **volume is a quality bar too** — 9 items /
+   15k chars was judged "daunting and tedious"; the target is ~4 items / ~2.6k chars,
+   derived from the acceptance criterion rather than the feature list. Writing *less*
+   while losing nothing is a high-effort task, not a cheap one.
+2. **The walk's defects must be fixed without re-opening settled design.** S1's
+   rulings R1–R9 closed VERIFIED across eight rounds. A cheaper tier that "fixes" a
+   stall by re-litigating owner-in-slug or the two distinct `400`s would undo the most
+   expensive session in the set.
+
+Provider-diversity second choice: **openai / gpt-5-6**, effort high. The fresh-eyes
+benefit is already supplied by mandatory cross-provider verification, so diversity is
+not itself a reason to switch — and switching costs the operator's constrained budget.
+
+**Carry into S4:** capture the walk against a fixed template — `{Part, Step, Action,
+Expected, Actual, Defect/Stall}` — rather than freeform notes. Per-part elapsed time
+is required by the spec and **must be labelled an estimate unless a stopwatch was
+really held** (Set 107's standing correction).
+
+Budget: `DABBLER_*` keys only; zero Copilot seat capacity.
+
+### Next-session-set recommendation
+
+**The owed `adopt-dabbler.md` walk — and this session made that debt materially
+larger.**
+
+It has been carried since Set 106 and has **never been performed**. It was already the
+standing #2 candidate at S2's close, whose own note read: *"Session 3 edits that
+document, which makes the debt larger rather than smaller."* That is now fact rather
+than forecast: this session removed a third of the document, renumbered its
+branch-protection stages, rewrote its opening and its close, and changed its stated
+completion time — **none of which any human has followed end to end.** Set 107's
+finding stands: a checklist written from a document rather than from a walk documents
+intent, not reality.
+
+The other standing candidates, unchanged:
+
+1. **Increment B** — `Start work` / `Send for review`, plus one-form module creation.
+2. **The Java track** — genuinely wanted, and correctly gated behind S4's walk by the
+   spec's own non-goal.
+
+### Actuals (filled at close)
+
+- **Orchestrator used:** claude / anthropic / claude-opus-5 / high.
+- **Routed calls:** one step-3.5 analysis; the mandatory cross-provider verification.

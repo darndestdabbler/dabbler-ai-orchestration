@@ -304,10 +304,15 @@ and say:
 - **Your very first run, in 15 minutes:** [Hello World](tutorials/hello-world.md)
   — a local sample project, no git host and no git commands for you to type,
   using whichever AI coding agent you already have open.
-- **Your first module (solo or as a small team):** the hands-on
+- **Your first module (one person, one module):** the hands-on
   [adoption walkthrough](tutorials/adopt-dabbler.md) — GitHub + GitHub Copilot
   CLI worked end to end, with Azure DevOps and direct-provider-API variants
   inline; concepts in the [primer](planning/module-organized-projects-primer.md).
+- **Several modules composed over a contract (solo or as a team):**
+  [Three modules, one pipeline](tutorials/three-module-pipeline.md) — the
+  dependency DAG, testing a module with none of its dependencies running,
+  ownership routing across code roots, and swapping in somebody else's
+  implementation by configuration alone.
 - **Releasing, hotfixing, rolling back:**
   [`docs/tutorials/release-and-recovery.md`](tutorials/release-and-recovery.md).
 - **Writing a spec:** [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md).

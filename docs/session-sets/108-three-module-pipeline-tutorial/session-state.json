@@ -1,15 +1,21 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "108-three-module-pipeline-tutorial",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-03T11:57:22.818681-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "effort": "high",
+        "identityProvenance": "direct"
+      },
       "verificationVerdict": null
     },
     {

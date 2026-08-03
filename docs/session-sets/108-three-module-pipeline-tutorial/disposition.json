@@ -1,0 +1,33 @@
+{
+  "status": "requires_review",
+  "summary": "Set 108 Session 1 of 4 settled everything Sessions 2-4 depend on, and its distinguishing choice was to establish facts by RUNNING things rather than by reading source. Both service contracts (`POST /convert`, `POST /batches`) were captured as literal wire bodies from real services started on this machine - status codes, envelopes, error bodies and the `Location` header are transcriptions, not descriptions. All four rows of watcher's decision table were forced live, including a deferred file retried and stored on a later tick. Part D was proven twice: once with a falsifier (the original converter killed while the watcher kept working), and once with BOTH dependencies moved to the 52xx band and 5101/5102 confirmed unreachable, the batch read back through the alternate persistence. The nine-module Work Explorer POC was re-confirmed against the running product at two levels: a new on-disk suite driving the product's own manifest parser, session-set discovery and grouping (5 passing), and a new rendered-DOM suite that loads the shipping client.js into headless Chromium and asserts on actual treeitem rows, levels and document order (4 passing). Deliverables: `s1-service-contracts.md` and `s1-walk-outline.md` (rulings R1-R9, four parts with independent finish lines, the ownership table, and the handover). Two rulings deliberately depart from the spec's prose and are flagged for the operator: R1 revises the POC's `converter-v1` naming (version-in-slug needs central allocation, contradicting 'nobody waits on anybody'; settled by a two-engine consult that converged), and R8b corrects the success criterion's 'nothing but the .NET 10 SDK' - the happy path needs Windows plus LocalDB, verified against this machine's installed-products registry. VERIFICATION SUSPENDED AT THE CAP: four rounds ran (discovery fan-out 2/2, supplementary, remediation-review x2) surfacing nine distinct Major findings. All nine were accepted; none was disputed. Seven came from the original draft; TWO were defects introduced by the remediation itself and caught by the fix-delta review. Three findings were closed by running something new rather than by editing prose. The final blocking finding - that the Windows correction had introduced an unverified non-Windows mainline - is FIXED, by deletion rather than addition per the removal-over-addition rule, but that fix has NOT been independently reviewed because the bounded 2-cycle total was reached. Per the constitution the loop suspends rather than opening a third cycle on the orchestrator's own authority. `s1-remediation-round-5.md` states the operator's three options.",
+  "verification_method": "api",
+  "verification_verdict": "ISSUES_FOUND",
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": [
+    "Verification loop suspended at its bounded 2-cycle total. The round-4 blocking Major (R8b had introduced an unverified non-Windows container path) is remediated by deletion, but the fix delta has not been reviewed. Operator adjudication required: accept the fix as-is, authorise one more remediation-review cycle, or take a third-provider opinion. Nothing is disputed - every finding was accepted - so there is no disagreement to adjudicate, only an unreviewed fix."
+  ],
+  "files_changed": [
+    "docs/session-sets/108-three-module-pipeline-tutorial/s1-service-contracts.md",
+    "docs/session-sets/108-three-module-pipeline-tutorial/s1-walk-outline.md",
+    "docs/session-sets/108-three-module-pipeline-tutorial/s1-conventions.md",
+    "docs/session-sets/108-three-module-pipeline-tutorial/ai-assignment.md",
+    "docs/session-sets/108-three-module-pipeline-tutorial/s1-ai-assignment-analysis.json",
+    "docs/session-sets/108-three-module-pipeline-tutorial/s1-layout-naming-consensus.json",
+    "docs/session-sets/108-three-module-pipeline-tutorial/s1-outline-ownership-review.json",
+    "docs/session-sets/108-three-module-pipeline-tutorial/s1-remediation-round-3.md",
+    "docs/session-sets/108-three-module-pipeline-tutorial/s1-remediation-round-5.md",
+    "docs/session-sets/108-three-module-pipeline-tutorial/activity-log.json",
+    "docs/session-sets/108-three-module-pipeline-tutorial/disposition.json",
+    "tools/dabbler-ai-orchestration/src/test/poc-nine-modules-ondisk.ts",
+    "tools/dabbler-ai-orchestration/src/test/poc-nine-modules-dom.ts"
+  ],
+  "lessons_cited": [
+    "L-064-8",
+    "L-064-9",
+    "L-065-1",
+    "L-079-1",
+    "L-095-1"
+  ]
+}

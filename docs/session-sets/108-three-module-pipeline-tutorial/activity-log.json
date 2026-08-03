@@ -1,0 +1,81 @@
+{
+  "sessionSetName": "108-three-module-pipeline-tutorial",
+  "createdDate": "2026-08-03T15:57:22.845619+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-03T15:57:22.846141+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-03T12:30:02.401769-04:00",
+      "description": "Registered S1 via start_session (claude/anthropic/claude-opus-5/high); read the preload, the spec, and the Session Set Configuration block. Confirmed the operator precondition: the published answer key resolved HEAD=2acc7b7 via git ls-remote, matching the local reference solution's master. No placeholder URL is inherited.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "serviceContracts",
+      "dateTime": "2026-08-03T12:30:02.404795-04:00",
+      "description": "Extracted both service contracts as LITERAL wire bodies from a real run rather than by reading source: started converter (:5101) and persistence (:5102) from the reference solution and captured POST /convert 200 + 400 (bad file, unknown schema), GET /schemas, POST /batches 201 + 200-duplicate + 400, and GET /batches/{id}. Recorded in s1-service-contracts.md with the capture recipe.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "partDMechanics",
+      "dateTime": "2026-08-03T12:30:02.404795-04:00",
+      "description": "Settled Part D by PROVING it, with a falsifier. Started a second converter on :5201 alongside :5101 (both healthy at once); repointed the watcher by configuration only (Watcher__Converter__BaseAddress), no code edited or rebuilt; processed a CSV end to end; then KILLED the converter on :5101 and confirmed the pipeline still worked. All four decision-table rows forced live (Stored / AlreadyStored / Rejected / Deferred), including a deferred file retried and stored on a later tick. Port allocation fixed at 51xx=yours, 52xx=the version you test against. Recorded that this proves the repoint MECHANISM, not cross-implementation conformance (same build on both ports).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "repoLayoutAndNaming",
+      "dateTime": "2026-08-03T12:30:02.404795-04:00",
+      "description": "Settled layout and naming via a two-engine decision consult (gpt-5-4 + gemini-pro, bias-cautions preamble, raw in s1-layout-naming-consensus.json). decision_consensus.enabled is false repo-wide; the consult was run per the spec's instruction without touching the config flag. Both engines converged on owner-in-slug, so the result was synthesized rather than escalated. Ruled: slug {owner}-{service}, title {Service} ({Owner}), code root modules/{owner}/{service}, member-major manifest order, one CODEOWNERS line per member. This REVISES the spec's POC recommendation (converter-v1): version-in-slug stays unique only with central version allocation, contradicting 'nobody waits on anybody'.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "pocConfirmation",
+      "dateTime": "2026-08-03T12:30:02.404795-04:00",
+      "description": "Confirmed the POC's four findings against the RUNNING PRODUCT, not just the model functions. Authored src/test/poc-nine-modules-ondisk.ts: writes a real nine-module workspace to disk and drives classifyModulesManifest -> readSessionSets -> computeVisibleModules -> buildVisibleModulePayloads (the payload the shipping renderer receives since Set 092). 5 passing: nine declared rows from the product's own parser and discovery; grouping exactly one level deep with no per-member tier; manifest order beats alphabetical (with a guard that the fixture actually distinguishes them); day-one nine-empty renders warning-free; and the version-slug collision condition pinned as an assertion. Re-ran the original poc-nine-modules.ts: 4 passing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "outlineReview",
+      "dateTime": "2026-08-03T12:30:02.404795-04:00",
+      "description": "Routed an analysis (task_type=analysis, excl. anthropic -> gemini-2.5-pro) of the draft outline against the concept-ownership table, adopt-dabbler.md and hello-world.md. Raw in s1-outline-ownership-review.json. One Critical accepted whole (the prerequisite list omitted the reader's entry state - they would stall on instruction one; R8 split into R8a entry state and R8b build installs). One Major accepted as a real hazard but REJECTED as a fix: it asked R4 to link to adopt-dabbler.md Part 5, which Session 3 deletes; R4 now records the transfer plus a hard S2-writes-before-S3-deletes ordering constraint.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "walkOutline",
+      "dateTime": "2026-08-03T12:30:02.404795-04:00",
+      "description": "Wrote s1-walk-outline.md: rulings R1-R8b, the four parts with independent finish lines, the single happy path, the ownership table, and the handover to Sessions 2/3/4. Also recorded R8b, a factual correction to the spec's prose: the success criterion's 'nothing but the .NET 10 SDK' is false - LocalDB is a separate MSI product (verified against this machine's installed-products registry) and there is no winget package for it alone. Flagged for the operator; the spec assigned this to Session 4, which is too late because Session 2 writes the prerequisite list.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "suites",
+      "dateTime": "2026-08-03T12:30:02.404795-04:00",
+      "description": "Build and test. Reference solution: dotnet build succeeded (SDK 10.0.201, pinned by global.json). Extension unit suite via the vscode-stub mocha path: 1821 passing. pytest: see the verification conventions block for the recorded baseline.",
+      "status": "complete"
+    }
+  ]
+}

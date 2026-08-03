@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The remediation incorrectly excludes service-defined validation-error envelopes from the contract**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** Session 2 follows the concluding normative statement that only success envelopes are contractual and teaches that a persistence implementation may return any body for a well-formed but invalid batch. A reader then builds an implementation that does not honor the documented validation-error envelope. This is probable because Session 2 is explicitly directed to treat this document as the settled contract, while the document now gives two contradictory rulings about that envelope.\n  - **Details:**\n    - **Violation:** The task requires the services’ request and response shapes to be settled. The malformed-JSON correction properly says its framework-generated body is non-contractual, but the new summary broadens that ruling to: **“Only the `4xx`/`5xx` split and the documented success envelopes are contractual.”**\n    - **Location:** `s1-service-contracts.md`, “What is NOT established here,” final added bullet.\n    - **Impact:** This excludes the service-defined validation-error envelope even though the same hunk says: **“The structured envelope above is what a well-formed batch that fails validation gets.”** The canonical contract is therefore internally inconsistent, leaving Session 2 unable to determine whether that documented response shape is required.\n    - **Evidence:** The malformed-body section distinguishes two cases: a well-formed request that fails service validation receives the structured envelope, while malformed JSON receives a framework artifact. The concluding bullet instead excludes every documented error envelope, not merely framework-generated malformed-body output.\n    - **Fix:** Limit the exclusion to framework-generated responses, for example: **“The documented service-defined success and validation envelopes are contractual; framework-generated malformed-body content types and bodies are not. The watcher contract depends only on the `4xx`/`5xx` status-class split.”**",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Session 2 follows the concluding normative statement that only success envelopes are contractual and teaches that a persistence implementation may return any body for a well-formed but invalid batch. A reader then builds an implementation that does not honor the documented validation-error envelope. This is probable because Session 2 is explicitly directed to treat this document as the settled contract, while the document now gives two contradictory rulings about that envelope."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 behavioural finish lines replace mandatory answer-key test counts",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 Windows-only happy path is disclosed before Part A",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 Part C now separates independently testable and integrated phases",
+      "verdict": "fix-accepted",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 rendered-DOM POC covers the four UI findings",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 one-owner bootstrap removes concurrent manifest edits",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 malformed-JSON response is demoted from contract behavior",
+      "verdict": "fix-rejected",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8 both service endpoints are exercised on the replacement ports",
+      "verdict": "fix-accepted",
+      "ledgerId": "L8"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+ISSUES FOUND
+
+### Issue 1: The “nobody waits” workflow still requires concurrent edits to one shared manifest
+
+- **Category:** Completeness
+- **Severity:** Major
+- **Failure scenario:** Three teammates follow the advertised independent workflow and each declares their own modules before beginning Part A. All three must edit `docs/modules.yaml`, commonly appending or inserting entries into the same YAML list. Their branches conflict during merge, so module declaration and session creation cannot proceed independently. This is probable because the tutorial explicitly targets several developers starting without waiting, while no single-owner bootstrap step is defined.
+- **Details:**
+  - **Violation:** R1 claims owner-based slugs require “no allocation step at all” and preserve the premise that “nobody waits on anybody”; R2 further claims “no path is shared.” The workflow nevertheless has one mandatory shared path, `docs/modules.yaml`, and never assigns responsibility for populating its nine entries.
+  - **Location:** `s1-walk-outline.md`, R1–R3 and Part A.
+  - **Impact:** Session 2 lacks a settled, collision-free day-one procedure and may publish a workflow that encounters coordination and merge conflicts on its first shared artifact. That materially contradicts the tutorial’s central independence objective.
+  - **Evidence:** R3 shows all nine declarations in one manifest. Part A says each reader declares `{owner}-converter`; subsequent parts imply they similarly declare persistence and watcher. R8a says teammates clone the shared repository, but does not say the repository creator predeclares all nine modules before parallel work begins.
+  - **Fix:** Settle an explicit bootstrap boundary: one repository initializer adds all nine complete manifest entries before teammates branch, after which work becomes independent. Alternatively, acknowledge and document a serialized manifest-merge step and narrow “nobody waits” to implementation after declaration. Include the complete per-module manifest convention, including unique `planPath` values.
+
+### Issue 2: The malformed-JSON exception dump is incorrectly promoted to contract behavior
+
+- **Category:** Correctness
+- **Severity:** Major
+- **Failure scenario:** A typical independently generated persistence service returns a standard Problem Details response, an empty `400`, or another framework-generated body for malformed JSON. Session 2, following the instruction that this exceptional body is part of the contract and should be shown, makes that valid implementation appear nonconforming—or encourages the reader to expose raw exception details to imitate the answer key. This is probable because malformed-body behavior varies with ASP.NET API style, environment, and exception-detail settings.
+- **Details:**
+  - **Violation:** The deliverable is supposed to define stable contracts that independently built modules can agree on. It instead says “One `400` is NOT this envelope, and Session 2 should say so,” then presents a framework-specific `Microsoft.AspNetCore.Http.BadHttpRequestException` dump as expected behavior.
+  - **Location:** `s1-service-contracts.md`, `persistence` → “Response — `400 Bad Request`.”
+  - **Impact:** An implementation/environment artifact becomes a false conformance requirement and teaches unsafe exception disclosure. It undermines the contract-first interchangeability objective even though `watcher` needs only the status class.
+  - **Evidence:** The document itself says the response was “captured accidentally” from an erroneous `curl` command, and the body names ASP.NET implementation types rather than a service-defined envelope. Nothing establishes that this body is stable across environments or independent implementations.
+  - **Fix:** Make only the `400` status normative for syntactically malformed JSON. Explicitly mark its content type and body as implementation/environment-specific and non-contractual, or omit the dump from the contract document.
+
+### Issue 3: Part D’s proof does not establish the required persistence-service repoint
+
+- **Category:** Completeness
+- **Severity:** Major
+- **Failure scenario:** Session 2 publishes Part D as a proven two-service swap. A typical reader reaches the payoff and discovers persistence-specific launch, configuration, or LocalDB behavior was never exercised on `5202`; the tutorial then fails at its central integration demonstration and is only corrected during Session 4. This is probable because every Part D reader must repoint both dependencies, while the recorded falsifier covers only `converter`.
+- **Details:**
+  - **Violation:** The task requires “a second version of the two services on different ports” and Part D’s finish line requires the watcher to drive someone else’s “`converter` and `persistence`.” The evidence claims the mechanism is proven but only demonstrates removal of the original converter.
+  - **Location:** `s1-walk-outline.md`, R5–R6 and §6 evidence table; `s1-conventions.md`, “Facts established by execution” item 3.
+  - **Impact:** Half of the mandatory two-service mechanism remains unsubstantiated, despite being presented to Session 2 as settled and proven.
+  - **Evidence:** R6’s execution sequence starts converters on `5101` and `5201`, repoints the watcher to `5201`, and kills the converter on `5101`. It never records starting persistence on `5202`, proving the watcher contacted it, or killing/bypassing persistence on `5102`. The conventions repeat only the converter falsifier.
+  - **Fix:** Start the alternate persistence service on `5202`, point the watcher at it, then stop or otherwise make `5102` unusable and capture a successful stored/read-back batch. Record the exact launch/configuration command and any LocalDB isolation assumptions.
+
+#### NITS
+
+- **Nit:** `s1-conventions.md` says there is “one file outside the set directory,” but the working tree now contains both `poc-nine-modules-ondisk.ts` and `poc-nine-modules-dom.ts`. Its suite table also omits the DOM POC’s result. Update the bookkeeping before close.

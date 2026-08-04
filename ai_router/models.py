@@ -115,6 +115,21 @@ def pick_model(
 
     # Check task-type overrides first — a preference, never an
     # exclusion override (Set 084 F2).
+    #
+    # Set 109 S2: a second branch used to sit here, returning the pinned
+    # model without ``_survives`` whenever no provider exclusion applied.
+    # Because ``_survives`` reduces to ``is_enabled`` when nothing is
+    # excluded, that branch did one thing only: bypass ``is_enabled`` for
+    # pinned task types. Session 1 established that ``is_enabled: false``
+    # entries are "identity registry only, never routed to" — the record of
+    # what an orchestrator IS — and a synthetic config confirmed the bypass
+    # returned exactly such an entry as a work destination. The branch is
+    # REMOVED rather than guarded: honouring the pin only when the registry
+    # says the model is routable is the whole rule, and one rule needs one
+    # code path. A pin on a disabled model now falls through to ordinary tier
+    # selection below, which is what "disabled" already meant everywhere else.
+    # Its sibling short-circuit on the tier assignment went the same way; see
+    # the note there.
     overrides = routing.get("task_type_overrides") or {}
     if task_type in overrides:
         override_model = overrides[task_type]
@@ -122,8 +137,6 @@ def pick_model(
             config["models"][override_model]["tier"] <= max_tier
             and _survives(override_model)
         ):
-            return override_model
-        if not exclude and config["models"][override_model]["tier"] <= max_tier:
             return override_model
 
     # Tier from complexity score
@@ -137,14 +150,22 @@ def pick_model(
     # Cap at max_tier
     tier = min(tier, max_tier)
 
+    # Set 109 S2: this read ``if not exclude or _survives(assigned)`` — the
+    # same ``is_enabled`` bypass as the pin branch above, four lines apart and
+    # governing every non-pinned call rather than only the pinned ones
+    # (L-069-1: fix the class, not the reported site). With nothing excluded,
+    # ``_survives`` reduces to ``is_enabled``, so the short-circuit did one
+    # thing: route work to a tier assignment the registry had disabled.
+    # Falling through instead lands on ``_cheapest_at``, which already picks
+    # the cheapest SURVIVING model at the tier and widens outward.
     assigned = routing["tier_assignments"][tier]
-    if not exclude or _survives(assigned):
+    if _survives(assigned):
         return assigned
 
-    # The tier assignment's provider is excluded: pick the cheapest
-    # surviving enabled model at the same tier, then widen outward
-    # (tier+1 first — a stronger verifier is the safe direction — then
-    # downward) within max_tier.
+    # The tier assignment did not survive — its provider is excluded, or the
+    # registry disables it: pick the cheapest surviving enabled model at the
+    # same tier, then widen outward (tier+1 first — a stronger verifier is the
+    # safe direction — then downward) within max_tier.
     def _cheapest_at(t: int) -> str | None:
         candidates = [
             (float(cfg.get("output_cost_per_1m") or 0.0), name)

@@ -1,7 +1,7 @@
 {
   "sessionSetName": "109-model-registry-and-pricing-truth",
   "createdDate": "2026-08-04T09:42:19.253338+00:00",
-  "totalSessions": 0,
+  "totalSessions": 4,
   "entries": [
     {
       "sessionNumber": 1,
@@ -211,6 +211,110 @@
       "stepKey": "operator-note-110",
       "dateTime": "2026-08-04T07:31:34.438536-04:00",
       "description": "Operator request captured out of band: authored docs/session-sets/110-work-explorer-native-treeview/operator-notes.md and added a spec pointer. Three asks -- a fourth tree level listing sessions per set, the operator's own media/*.svg icons for per-session status (which retires the 'session N in flight' description clause), and the done/total fraction moved into TreeItem.description. Recon found the data and icon vocabulary already exist (ProgressView.sessions, RowPayload.iconSlug/fraction/description), and flagged four wrinkles for S1: a FOURTH session status (cancelled, icon already present) the asks did not name; hardcoded icon fills that VS Code will not theme-recolor; 16mm-authored viewBoxes; and the fact that moving the fraction into description partially reverses Set 034's deliberate move OUT of description, forced by the native TreeView having no custom column. Routed to S1's densityTradeConfirmed mapping rather than applied.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-04T08:07:21.052585-04:00",
+      "description": "Registered Session 2 of 4 via start_session (claude / anthropic / claude-opus-5 / high). Preload read: session-constitution.md, project-guidance.md, lessons-learned.md, CLAUDE.md. All three DABBLER_* provider keys present. No decision-review-queue entries. S1 Creates confirmed on disk: ai_router/model_inventory.py, ai_router/model-inventory.lock, tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "assignment",
+      "dateTime": "2026-08-04T08:15:07.826304-04:00",
+      "description": "Step 3.5: routed assignment analysis (route task_type=analysis, excl. anthropic -> gemini-pro, $0.0172, truncation-clean) written to s2-ai-assignment-analysis.json. Adopted the contextvars call-boundary design and the narrow fix scope; departed on three points (copilot-cli sibling the analyst could not see, next-session-set recommendation contradicted by the already-authored Set 110, and instrumentation kept permanent rather than removed after the session because the spec's Ends-with asserts a call count).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "instrument",
+      "dateTime": "2026-08-04T08:21:36.924617-04:00",
+      "description": "Built ai_router/call_trace.py: a ContextVar-scoped trace of every provider HTTP POST, announced INSIDE each provider caller (below call_model's retry loop, so a retry counts as the separate request it is). Wired into _call_anthropic / _call_google / _call_openai; exported from ai_router. No-op outside a trace scope.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "reproduce",
+      "dateTime": "2026-08-04T08:21:37.400644-04:00",
+      "description": "HYPOTHESIS RESOLVED: a REAL second call, not a duplicated row. Live traced route(task_type=architecture, exclude_providers=[anthropic]): tier-2 case = 2 HTTP POSTs / 2 rows (google generator + openai verifier, no breach). Tier-3 case reproduces the spec's exact rows AND the breach: POST openai/gpt-5.4 then POST anthropic/claude-opus-4-8 despite the exclusion; verifier cost $0.0472 vs generator $0.0097 (4.9x). Evidence: repro3-prefix.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "exclusion-audit",
+      "dateTime": "2026-08-04T08:25:15.985985-04:00",
+      "description": "Audited every exclude_providers site. THREE sibling sites dropped the caller's exclusion on secondary calls (L-069-1 class): (1) route()->_run_verification (live, reproduced), (2) route()->_route_via_copilot_cli->_run_verification_via_copilot_cli->pick_copilot_cli_verifier (live on a Copilot seat; the routed analyst did not name this one), (3) route()->_tiebreaker_reroute (latent; hardcoded opus, no on_disagreement is re-route). VERIFICATION PATH: never affected -- verify_session and the close backstop both route session-verification, which is NOT in auto_verify_task_types, so neither entered the leaking branch. verify() is NOT a defect (no exclusion to drop; cross-provider by construction via pick_verifier_model rule 1).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "fix",
+      "dateTime": "2026-08-04T08:25:16.599284-04:00",
+      "description": "Fixed all three sites: _run_verification seeds the caller's exclusion into the accumulator the retry path already used; the copilot verifier resolution receives it; an excluded tiebreaker degrades into the pre-existing 'no tiebreaker available -> merge' branch (removal-first: a reachability gap closed, not a second selector added). Also REMOVED the pick_model branch that returned a task_type_overrides pin without _survives() when no exclusion applied -- an is_enabled bypass contradicting S1's identity-only contract, handed over by S1 and reproduced here. Post-fix live trace: 1 request, 0 to the excluded provider.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "tests",
+      "dateTime": "2026-08-04T08:29:17.749303-04:00",
+      "description": "Added ai_router/tests/test_routing_exclusion_integrity.py (22 tests): call_trace unit behaviour (retry counts separately, raising scope does not leak, nesting), the invariant end-to-end through the REAL registry with mocked sockets, each of the three sibling sites, both halves of the pick_model is_enabled class, and the verification-path statement. FALSIFIER CHECK: reverted __init__.py to HEAD -> 6 of these fail; restored -> all pass. Assertions target the invariant, never which model wins, so S4's registry edits cannot false-fail them. The 'one row per request' assertion was tried and FALSIFIED by the harness (escalation = 2 requests, 1 row); replaced with the directional invariant.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "consistency",
+      "dateTime": "2026-08-04T08:29:18.489450-04:00",
+      "description": "L-065-1 pass: three surfaces justified S1's 'treat a pinned entry as routable' rule by citing the pick_model bypass this session removed (pinned_model_names docstring, check_registry comment, S1 CHANGELOG entry). All three updated in one pass; the gate's behaviour deliberately unchanged (a named routing destination stays routable so the gate never under-reports). Authored s2-routing-transparency-findings.md and the S2 CHANGELOG entries under [Unreleased].",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "sibling-sweep",
+      "dateTime": "2026-08-04T08:35:51.027231-04:00",
+      "description": "L-069-1 sweep on the is_enabled bypass found a THIRD site S1 did not name and I had initially missed: utils.get_escalation_model returned the next tier's assignment without _survives() when no exclusion applied, so an escalation could land on a model the registry disables even though the initial pick could not -- escalation as a way around the registry. Removed; reproduced beforehand on a synthetic config. Swept 'if not exclude' across the package: three sites total (2 in models.py, 1 in utils.py), remaining hits in verify_session.py are diff pathspecs. Tests now 24; findings doc, conventions and CHANGELOG updated to say three.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "suite",
+      "dateTime": "2026-08-04T08:57:31.123605-04:00",
+      "description": "Full suite on the exact tree under review: 3254 passed, 6 skipped, 8 deselected, 0 failed (22m12s), pytest exit 0. Delta from S1's 3230 baseline is +24, exactly the new test file -- no existing test changed, removed or newly skipped. Gates: drift_guard OK, tutorial_gate OK, guidance_report OK (10,895/12,000), model_inventory --check still exits 1 on the gpt-5.6 specimen by design.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "verify-discovery",
+      "dateTime": "2026-08-04T09:10:23.825759-04:00",
+      "description": "Discovery round 1 (2-way fan-out, identical bundles, verifier gpt-5-6 both arms, anthropic excluded via model-registry): VERDICT VERIFIED, 0 blocking, 0 minor-classified findings, cost $0.3864. Seven NITS raised, three of them independently by BOTH arms. Non-blocking per the constitution -- no supplementary or remediation phase required.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "remediation-1",
+      "dateTime": "2026-08-04T09:10:24.285458-04:00",
+      "description": "Addressed all 7 nits rather than just recording them (s2-remediation-round-1.md). ONE REAL CODE GAP: _tiebreaker_reroute never consulted is_enabled at all -- a FOURTH site of that class, invisible to my pattern sweep because the sweep matched a defective check and this site had none. Fixed via a _tiebreaker_usable() predicate into the existing merge fallback. THE EXACT-COUNT NIT WAS RIGHT BUT ITS SUGGESTED ASSERTION WAS WRONG: correct count is tier-dependent (tier 2 = 2 requests/2 rows with a permitted verifier; tier 3 = 1/1, verification None), so the reproduction was split into both shapes, each asserting its own counts. Also found my mock was silently escalating (output_tokens 5 < min 30) -- escalation is now an explicit knob. Test counts corrected 20->27 and falsifier re-run properly with 'git checkout HEAD --' (the first attempt restored from the INDEX and proved nothing): 9 of 27 fail pre-fix.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 13,
+      "stepKey": "suite-final",
+      "dateTime": "2026-08-04T09:35:02.847132-04:00",
+      "description": "Full suite re-run after the nit fixes: 3257 passed, 6 skipped, 8 deselected, 0 failed (23m32s), pytest exit 0. The +3 over the pre-remediation 3254 is exactly the three tests added in remediation. Delta from S1's 3230 baseline is +27, the whole new test file.",
       "status": "complete"
     }
   ]

@@ -148,3 +148,110 @@ would legitimately emit a second, anthropic row. S2's spec is explicit that
 the two hypotheses are distinguished only by counting HTTP requests at the
 call boundary — this session did not count anything, and this note must not be
 mistaken for having done so.
+
+---
+
+## Session 2 of 4 — Routing transparency: what actually gets called
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked;
+  matches S1's routed recommendation and its recorded reason).
+- Routed step-3.5 analysis: `s2-ai-assignment-analysis.json` (route
+  `task_type=analysis`, excl. anthropic → gemini-2.5-pro, $0.0172,
+  truncation-clean, no auto-verification — `analysis` is not an
+  auto-verified task type).
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` (**S4** walks the price-confirmation flow — S2 neither
+  arms nor runs it), `requiresE2E false` (router-side Python only; no
+  Explorer-rendering surface, no state writer, no fixture harness, so
+  L-064-12 does not arm and pytest is the executable gate),
+  `pathAwareCritique advisory` (set-terminal, in S4). Not re-litigated
+  mid-session.
+- Budget note: this session draws on the **`DABBLER_*` provider keys** only —
+  one routed analysis, four live probe calls (two tier-2, one tier-3 pre-fix,
+  one tier-3 post-fix), and the mandatory cross-provider verification. It
+  spends **zero Copilot seat capacity**. The pre-fix tier-3 probe deliberately
+  paid for the barred Anthropic call ($0.0472) because that payment IS the
+  evidence.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read the preload; confirm keys; read the spec. | Orchestrator direct — bootstrapping. |
+| 3.5 | Assignment analysis + next-orchestrator / next-set recommendations. | **Routed** (`analysis`) — repo rule: never self-opine on model choice. |
+| 2 | Build `call_trace.py`; wire the three provider callers. | Orchestrator direct — implementation is deliberately not in `delegation.always_route_task_types`. |
+| 3 | Trace live `route()` calls; count requests; pair against rows. | Orchestrator direct — **execution, not reasoning**. The spec is explicit that the two hypotheses are settled by counting, and a model asked to describe the wire would substitute recall for evidence. |
+| 4 | Read every `exclude_providers` site; check the verification path. | Orchestrator direct — control-flow archaeology over a known grep surface, with the answer machine-checkable by test. |
+| 5–6 | Fix three sibling sites + the `is_enabled` pin bypass; write the tests. | Orchestrator direct — file edits are the orchestrator's mechanics. |
+| 6 | Falsifier check (revert the fix, confirm the tests fail) + full suite. | Orchestrator direct — deterministic gates. |
+| Verify | Phased `verify_session` for this set. | **Routed** — `session-verification`, anthropic auto-excluded per the no-skip mandate. |
+| Close | `disposition.json`; commit + push; `close_session`; notify. | Orchestrator direct — mechanics. |
+
+### Where this departs from the routed analyst, and why
+
+The analysis was adopted in substance — the ContextVar design, the narrow fix
+scope, the judgement that removing the auto-verify branch outright is too
+large a change for this evidence, and the assessment that the `verify_session`
+path is *likely* fine but must be **proven** rather than reasoned. Four
+departures:
+
+**Departure 1 — a third sibling site the analyst could not see.** Its
+`sibling_sites` list named only `_tiebreaker_reroute`, because its context did
+not include the copilot-cli profile. Grepping the sibling profile for the same
+shape found `_run_verification_via_copilot_cli`, which resolved its *generator*
+against the exclusion and its *verifier* against nothing. That site is **live
+on a Copilot seat**, not latent like the tiebreaker, so it was the more
+consequential of the two it did not name.
+
+**Departure 2 — the instrumentation is permanent, not scaffolding.** The design
+recommended contextvars partly because it is "easily removed after the
+session". The spec's Ends-with requires the call count to be **asserted**, and
+an assertion needs a seam that outlives the session. It ships as a module with
+its own tests.
+
+**Departure 3 — the `is_enabled` pin bypass was fixed, not deferred.** The
+analyst's `what_to_defer` framing would have left it alone as unrelated to the
+exclusion evidence, which is true as far as it goes: it is a different rule
+being bypassed. It was fixed anyway because S1's disposition handed it over
+explicitly, because it directly contradicts the identity-only contract S1
+established, and because it is a two-line **removal** in the very pins Session
+4 is about to rewrite. Reasoning recorded in
+`s2-routing-transparency-findings.md`.
+
+**Departure 4 — the next-session-set recommendation is not adopted.** The
+analyst proposed a new `110-cost-and-latency-optimization`. `110` already
+exists — `110-work-explorer-native-treeview`, authored, declaring this set as
+its prerequisite — so the recommendation rests on a repo fact the analyst did
+not have. The optimization idea itself is also premature: Sessions 3 and 4 have
+not yet made the prices true, and budget-aware routing built on the current
+figures would optimize against numbers this set exists to correct.
+
+### What the traces changed
+
+The analyst's assessment said verification integrity was "path-dependent and
+therefore compromised", and asked that the `verify_session` path be proven
+rather than assumed. Proving it inverted the emphasis: the leak is real and was
+live on two profiles, **and** the verification path never touched it, because
+`session-verification` is not an auto-verified task type. Both halves are now
+asserted by tests rather than argued.
+
+The traces also falsified an assertion this session tried to write — that
+requests and rows correspond one-to-one. They do not: an escalation issues two
+requests and records one row, by design. That is documented in the findings and
+pinned as a directional invariant instead.
+
+### Forward-looking recommendations (routed)
+
+- **Next orchestrator (Session 3).** The analyst recommends **openai /
+  gpt-5-4 / high**, on the reasoning that S3 designs a pricing schema, plans a
+  scrape over three published pages, and extracts structure from unstructured
+  HTML — parsing-heavy work with a strong falsifier (the fixtures either parse
+  or they do not). Recorded as the routed recommendation; the engine switch is
+  the operator's call. Two facts the operator should weigh alongside it: S3 is
+  the session whose deliverable is a *proposal* flow with a hard
+  human-confirmation rule, and this set's own evidence is that `gpt-5-4` is
+  reached under an Anthropic exclusion, so it is already the de-facto verifier
+  for this set's rounds.
+- **Next session set.** Not adopted as recommended (Departure 4).
+  `110-work-explorer-native-treeview` is already authored and declares this set
+  as its prerequisite; it remains the successor.

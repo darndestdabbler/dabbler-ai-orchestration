@@ -36,11 +36,13 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   fails for one provider keeps that provider's previous snapshot rather than
   downgrading it, and reports the failure with a non-zero exit.
 
-  "Routable" is deliberately **not** `is_enabled` alone: `models.pick_model`
-  honours a `task_type_overrides` pin without its `_survives()` check when no
-  provider exclusion applies, so a pinned entry reaches the wire even with
-  `is_enabled: false`. Any alias named in `task_type_overrides` or
-  `tier_assignments` is therefore treated as routable regardless of its flag.
+  "Routable" is deliberately **not** `is_enabled` alone: any alias named in
+  `task_type_overrides` or `tier_assignments` is a declared routing
+  destination and is treated as routable regardless of its flag, because this
+  gate must never under-report. (When S1 shipped, such an entry could also
+  literally reach the wire while disabled; **Set 109 S2 closed that** — see
+  below — and the conservative treatment was kept on the "declared
+  destination" ground rather than the reachability one.)
 
   The gate is **not yet wired into any automatic check**. The repository's own
   registry fails it today — `router-config.yaml` sends `model_id: gpt-5.6`, an
@@ -66,7 +68,95 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   them apart. The Copilot CLI transport lands its already-parsed echoed model
   on the same column.
 
+- **(Set 109 S2) `ai_router.call_trace` — a scoped count of real provider HTTP
+  requests.** `trace_provider_calls()` is a context manager collecting every
+  POST issued inside it, tagged with provider and the model id put **on the
+  wire**:
+
+  ```python
+  with trace_provider_calls() as calls:
+      route(..., exclude_providers=["anthropic"])
+  assert [c.provider for c in calls] == ["openai"]
+  ```
+
+  Requests are announced *inside* each provider caller rather than in
+  `call_model`, which wraps the retry loop — counting above it would
+  undercount exactly the requests most worth seeing. Outside a trace scope it
+  is a ContextVar read and a `None` test: no list, no lock, no accumulating
+  state on the production path. This exists because a metrics row is a claim
+  the recorder makes about itself, and nothing below the recorder could
+  distinguish "one `route()` made two requests" from "one request was written
+  down twice" — readings with opposite consequences.
+
+  Note that requests and rows are **not** one-to-one, by design: an escalation
+  issues a second request and records one row, and so does a retry. The
+  invariant the suite pins is directional — every provider a row names must be
+  one the router actually called.
+
 ### Fixed
+
+- **(Set 109 S2) An excluded provider could still receive a real request.**
+  `route()` enforced `exclude_providers` on its own model pick and then
+  dropped it when dispatching the **secondary** calls it makes on the caller's
+  behalf. Traced live, one `route(task_type="architecture",
+  exclude_providers=["anthropic"])` issued two HTTPS POSTs — the second to
+  `api.anthropic.com` for `claude-opus-4-8`, at 4.9× the cost of the call it
+  was verifying. Three sites, one shape:
+
+  - `route()` → `_run_verification` (no `exclude_providers` parameter at all);
+  - `_route_via_copilot_cli` → `_run_verification_via_copilot_cli` →
+    `pick_copilot_cli_verifier` (the seat profile resolved its *generator*
+    against the exclusion and its *verifier* against nothing);
+  - `route()` → `_tiebreaker_reroute` (read `settings.tiebreaker_model`,
+    default `opus`, with no exclusion check — latent, since no configured
+    `on_disagreement` is `re-route`).
+
+  Both verifier selectors already accepted and correctly applied an exclusion;
+  nothing was missing from the selection logic. The fixes thread the caller's
+  list through, seeding it into the accumulator `_run_verification`'s retry
+  path already used, so a *fallback* attempt cannot re-cross it either. An
+  excluded tiebreaker degrades into the branch that already existed for "the
+  configured tiebreaker is not in the registry" — merge the verifier's
+  feedback — rather than gaining a second candidate ladder.
+
+  **Behaviour change:** when the exclusion leaves no eligible verifier,
+  `_run_verification` returns `None` and `route()` proceeds unverified (the
+  contract it already had for "no eligible verifier"). On the current registry
+  a tier-3 generator with `anthropic` excluded has no surviving verifier at
+  all, so such calls now come back unverified rather than Anthropic-verified.
+  Declining is the safer outcome: the auto-verify pass is a courtesy on an
+  ordinary routed call.
+
+  **Verification was never affected.** `verify_session` and the `close_session`
+  backstop both route `task_type="session-verification"`, which is not in
+  `verification.auto_verify_task_types`, so neither ever entered the leaking
+  branch. Two tests now assert this rather than leaving it as a reading of the
+  config — including one that fails if `session-verification` is ever added to
+  that list.
+
+- **(Set 109 S2) Routing could send work to a model the registry disables.**
+  Four sites. Three were short-circuits returning a routing-table entry without
+  its `_survives()` check whenever no provider exclusion applied:
+  `models.pick_model`'s `task_type_overrides` branch (pinned task types),
+  `models.pick_model`'s `tier_assignments` branch four lines below (every
+  non-pinned call), and `utils.get_escalation_model`'s next-tier assignment
+  (every escalation). Since `_survives` reduces to `is_enabled` when nothing is
+  excluded, each did one thing: bypass `is_enabled`. The fourth,
+  `_tiebreaker_reroute`, never consulted the flag at all and now takes its
+  existing merge fallback when the configured tiebreaker is disabled.
+
+  That contradicts the meaning Set 109 S1 gave the flag — *identity registry
+  only*, the record of what an orchestrator **is**, never a destination for
+  work — and `claude-opus-5` / `claude-sonnet-5` sit in the registry on those
+  terms. The escalation site was the sharpest: the initial pick and the
+  escalation must agree about what the registry permits, or escalation becomes
+  a way around it.
+
+  The three short-circuits are **removed** rather than guarded: honouring a
+  routing table only when the registry says the model is routable is the whole
+  rule, and one rule needs one code path. A disabled entry now falls through to
+  the surviving-candidates search each site already had. No entry in the
+  shipping config is affected today.
 
 - **(Set 109 S1) The Google API key no longer travels in the query string.**
   Both `model_inventory.fetch_google` and `providers._call_google` built a

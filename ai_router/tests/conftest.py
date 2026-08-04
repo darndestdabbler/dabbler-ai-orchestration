@@ -65,11 +65,19 @@ if str(TESTS_DIR) not in sys.path:
 # it here leaves any references already taken pointing at the old
 # object. Fail fast in that case rather than silently producing the
 # split-module-identity bug this aliasing is supposed to prevent.
+#
+# Set 109 S2 added ``call_trace``, which holds a ContextVar recording the
+# provider requests issued inside a scope. It meets the same criterion for the
+# same reason: a test that opened the scope on the bare module while
+# ``providers`` announced requests on the package module would observe an
+# empty trace and read it as "no request was sent" — the precise false
+# negative the module exists to make impossible.
 _SHARED_MODULE_NAMES = (
     "runtime_mode",
     "spec_config",
     "suggestion_disposition",
     "migrate_lightweight_to_canonical_v4",
+    "call_trace",
 )
 for _name in _SHARED_MODULE_NAMES:
     _pkg = importlib.import_module(f"ai_router.{_name}")

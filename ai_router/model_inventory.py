@@ -461,14 +461,21 @@ class CheckResult:
 
 
 def pinned_model_names(config: dict) -> set:
-    """Aliases the routing table names DIRECTLY, bypassing ``is_enabled``.
+    """The aliases the routing tables name directly, as declared destinations.
 
-    ``models.pick_model`` returns a ``task_type_overrides`` pin without its
-    ``_survives()`` check whenever no provider exclusion is in play, so a
-    pinned entry reaches the wire even with ``is_enabled: false``. Verified
-    empirically during Set 109 S1. ``tier_assignments`` names models directly
-    too. An id in either table is therefore ROUTABLE regardless of its flag,
-    and a gate that trusted ``is_enabled`` alone would file it as a note.
+    Set 109 S1 found these tables could reach the wire even with
+    ``is_enabled: false``: ``models.pick_model`` short-circuited past its
+    ``_survives()`` check whenever no provider exclusion was in play, for both
+    ``task_type_overrides`` and ``tier_assignments``. **Set 109 S2 removed both
+    short-circuits**, so a disabled entry in either table is no longer routed
+    to.
+
+    This function is deliberately unchanged by that fix. Being named in a
+    routing table still makes an id a declared destination — an operator
+    flipping ``is_enabled`` back on is a config edit, not a code change — and
+    this gate's standing rule is that it must never UNDER-report. Treating a
+    named destination as routable keeps a drifted id an exit-1 failure rather
+    than a note, which is the conservative direction.
     """
     routing = config.get("routing") or {}
     names = set()
@@ -527,13 +534,15 @@ def check_registry(
             continue
         provider = entry.get("provider")
         model_id = entry.get("model_id")
-        # Routable = "this id can reach the wire", which is NOT `is_enabled`
-        # alone. Default TRUE for the flag, matching every other reader in the
-        # package (models.py, utils.py, verification.py) and the registry's own
-        # "omit to accept default" convention; then OR in the routing pins,
-        # because `pick_model` honours a `task_type_overrides` pin without
-        # checking the flag when no provider exclusion applies. Both defaults
-        # lean the same way on purpose: this gate must never UNDER-report.
+        # Routable = "this id is a declared routing destination", which is NOT
+        # `is_enabled` alone. Default TRUE for the flag, matching every other
+        # reader in the package (models.py, utils.py, verification.py) and the
+        # registry's own "omit to accept default" convention; then OR in the
+        # routing pins, because an id a routing table names is a destination
+        # the config declares. (Set 109 S2 closed the `pick_model` paths that
+        # made a pinned-but-disabled entry reach the wire; the OR stays for the
+        # reason in `pinned_model_names`.) Both defaults lean the same way on
+        # purpose: this gate must never UNDER-report.
         routable = bool(entry.get("is_enabled", True)) or alias in pinned
         if not provider or not model_id:
             result.fatal.append(

@@ -81,7 +81,8 @@ def get_escalation_model(
     ``pick_model`` honors — an escalation must never land on an
     excluded provider (the short-response escalation heuristic was one
     of the paths that could silently cross back onto the orchestrator's
-    own provider). When the next tier's assignment is excluded, the
+    own provider). When the next tier's assignment does not survive —
+    its provider is excluded, or the registry disables it — the
     cheapest surviving enabled model at that tier is used instead;
     when nothing at that tier survives, escalation stops (``None``).
     """
@@ -100,8 +101,15 @@ def get_escalation_model(
         str(p).strip().lower() for p in (exclude_providers or []) if p
     }
     candidate = assignments[next_tier]
-    if not exclude:
-        return candidate
+
+    # Set 109 S2: an ``if not exclude: return candidate`` short-circuit sat
+    # here — the third instance of the ``is_enabled`` bypass fixed in
+    # models.py's two ``pick_model`` branches (L-069-1: fix the class). With
+    # nothing excluded it returned the next tier's assignment without the
+    # ``_survives`` check below, so an escalation could land on a model the
+    # registry disables even though the initial pick could not. Removed;
+    # ``_survives(candidate)`` now decides in every case, and a disabled
+    # assignment falls through to the surviving-candidates search.
 
     def _provider_of(name: str) -> str:
         entry = (config.get("models") or {}).get(name) or {}

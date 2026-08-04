@@ -1,0 +1,9 @@
+VERIFIED — I checked the exclusion propagation across API verification, Copilot CLI verification, tiebreaker rerouting, metrics assertions, and provider-boundary tracing. The core defect is fixed and covered; only non-blocking completeness and documentation issues remain.
+
+#### NITS
+
+- **Nit:** The exact post-fix request count for the two required `architecture` reproductions is documented but not asserted. → **Location:** `TestExcludedProviderNeverCalled.test_no_excluded_provider_in_trace_or_rows` only asserts that calls exist and none are Anthropic; two OpenAI/Google calls would still pass. → **Fix:** In both `complexity_hint` cases, assert the expected exact call and row counts, currently `len(calls) == 1` and `len(rows) == 1`.
+
+- **Nit:** The new broad `is_enabled: false` routing contract still has a latent bypass in the tiebreaker path. → **Location:** `ai_router.__init__._tiebreaker_reroute` checks whether the configured model exists and whether its provider is excluded, but never checks `model_config.get("is_enabled", True)`. If `on_disagreement` is changed to `re-route` while its configured tiebreaker is disabled, that model is still called. → **Fix:** Treat a disabled tiebreaker like a missing or excluded one and take the existing merge fallback.
+
+- **Nit:** Test-count reporting is internally inconsistent. → **Location:** `s2-routing-transparency-findings.md` says the new file contains 20 tests and reports “6 ... fail ... 20 pass after,” while the file contains 24 collected cases and `s2-conventions.md` reports 24 passing. → **Fix:** Update the findings document to report 24 tests and clarify the falsifier result.

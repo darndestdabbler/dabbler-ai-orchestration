@@ -64,6 +64,7 @@ __version__ = "0.34.0"
 from .config import load_config, resolve_generation_params
 from .models import estimate_complexity, pick_model
 from .providers import call_model
+from .call_trace import HttpCall, trace_provider_calls, record_http_request
 from .secret_resolver import resolve_secret, register_backend
 from .prompting import build_prompt
 from .session_log import SessionLog
@@ -832,6 +833,11 @@ def _route_via_copilot_cli(
             generator_provider=provider,
             session_set=session_set,
             session_number=session_number,
+            # Set 109 S2 (L-069-1): the seat transport's auto-verify dropped
+            # the caller's exclusion exactly as the api profile's did. The
+            # generator resolution above already honours `exclusion`; the
+            # verifier resolution below did not.
+            exclude_providers=exclusion,
         )
         route_result.verification = verification
         # cost_usd is always 0.0 for this profile (honest non-accounting) —
@@ -850,8 +856,17 @@ def _run_verification_via_copilot_cli(
     generator_provider: str,
     session_set: Optional[str],
     session_number: Optional[int],
+    exclude_providers: frozenset = frozenset(),
 ) -> "VerificationResult":
     """verify()'s / route()'s auto-verify copilot-cli-profile body.
+
+    Set 109 S2: *exclude_providers* is the caller's hard constraint,
+    unioned by :func:`pick_copilot_cli_verifier` with the generator's own
+    provider. When nothing survives, this returns the existing
+    "verification unavailable" stub rather than a same-provider or
+    barred-provider pairing — the fail-closed contract this function
+    already had for an unresolvable verifier, now reachable from an
+    exclusion as well as from provenance.
 
     Resolves the verifier role via :func:`pick_copilot_cli_verifier`
     (provenance fail-closed to "verification unavailable" — Critique-2 M3);
@@ -879,6 +894,9 @@ def _run_verification_via_copilot_cli(
         generator_provider=generator_provider,
         config=_config,
         catalog=_copilot_catalog,
+        exclude_providers=frozenset(
+            str(p).strip().lower() for p in (exclude_providers or ()) if p
+        ),
     )
     if isinstance(selection, ProvenanceUnavailable):
         return _build_verification_unavailable_stub(
@@ -1304,6 +1322,10 @@ def route(
             task_type=task_type,
             session_set=session_set,
             session_number=session_number,
+            # Set 109 S2: the auto-verify branch inherits the caller's hard
+            # constraint. Omitting it here is what put a real request on the
+            # excluded provider.
+            exclude_providers=exclude_providers,
         )
         if verification:
             route_result.verification = verification
@@ -1334,6 +1356,7 @@ def route(
                     verification, v_config,
                     session_set=session_set,
                     session_number=session_number,
+                    exclude_providers=exclude_providers,
                 )
 
     if task_type == "session-verification":
@@ -1523,6 +1546,7 @@ def _run_verification(
     task_type: str,
     session_set: Optional[str] = None,
     session_number: Optional[int] = None,
+    exclude_providers: Optional[list] = None,
 ) -> Optional[VerificationResult]:
     """Internal: execute a verification call.
 
@@ -1531,12 +1555,33 @@ def _run_verification(
     verifier fails, re-picks with the failed provider excluded and
     tries once more. Two attempts total; returns None if both fail
     or no eligible verifier exists.
+
+    Set 109 S2: *exclude_providers* is the CALLER's hard constraint —
+    route()'s ``exclude_providers``, which before this session stopped
+    at route()'s own model pick and was dropped here. That gap was not
+    theoretical: a traced ``route(task_type="architecture",
+    exclude_providers=["anthropic"])`` issued a real HTTPS POST to
+    ``api.anthropic.com`` for ``claude-opus-4-8``, costing nearly five
+    times the generator call it was verifying. The list is seeded into the
+    same ``excluded_providers`` accumulator the retry path already
+    used, so the caller's exclusion and a failed-provider exclusion are
+    one mechanism rather than two — and a fallback attempt cannot
+    re-cross the caller's constraint either.
+
+    A caller exclusion that leaves no eligible verifier returns None,
+    which route() already handles as "no verification happened". That
+    is deliberately NOT an error: the verification here is a courtesy
+    pass on an ordinary routed call, and declining to run it is
+    strictly safer than running it against the one provider the caller
+    barred.
     """
     v_config = _config.get("verification", {})
     settings = v_config.get("settings", {})
 
     v_template = _config.get("_verification_template", "")
-    excluded_providers: list[str] = []
+    excluded_providers: list[str] = sorted(
+        {str(p).strip().lower() for p in (exclude_providers or []) if p}
+    )
     first_attempt_provider: Optional[str] = None
 
     # Up to 2 attempts: initial selection, then one fallback with the
@@ -1713,13 +1758,48 @@ def _tiebreaker_reroute(
     v_config: dict,
     session_set: Optional[str] = None,
     session_number: Optional[int] = None,
+    exclude_providers: Optional[list] = None,
 ) -> RouteResult:
-    """When generator and verifier disagree, send to a Tier 3 tiebreaker."""
+    """When generator and verifier disagree, send to a Tier 3 tiebreaker.
+
+    Set 109 S2 (L-069-1 sibling of the ``_run_verification`` fix): the
+    tiebreaker is a THIRD provider call issued under the same route(), and
+    it read its model straight from ``settings.tiebreaker_model`` — which
+    defaults to ``opus``, an Anthropic model — with no exclusion check at
+    all. Reached under a caller exclusion it would have put a request on
+    the barred provider for the same reason the verifier call did.
+
+    An unusable tiebreaker is routed into the branch that already existed
+    for "the configured tiebreaker is not in the registry": fall back to
+    merging the verifier's feedback. No new selection logic and no second
+    candidate ladder — the safe degradation was already written, it just
+    was not reachable from these conditions.
+
+    "Unusable" covers three cases, and the third was added after this
+    session's own verification round flagged it on both fan-out arms: the
+    model is absent from the registry, its provider is excluded, or the
+    registry **disables** it. The last one is the same ``is_enabled``
+    contract enforced in ``pick_model`` and ``get_escalation_model``; this
+    dispatch never consulted the flag at all, so a sweep for their
+    short-circuit pattern did not reach it.
+    """
     tiebreaker_name = v_config.get("settings", {}).get(
         "tiebreaker_model", "opus"
     )
-    if tiebreaker_name not in _config["models"]:
-        # No tiebreaker available — fall back to merge
+    exclusion = {
+        str(p).strip().lower() for p in (exclude_providers or []) if p
+    }
+
+    def _tiebreaker_usable() -> bool:
+        cfg = _config["models"].get(tiebreaker_name)
+        if not isinstance(cfg, dict):
+            return False
+        if not cfg.get("is_enabled", True):
+            return False
+        return str(cfg.get("provider") or "").strip().lower() not in exclusion
+
+    if not _tiebreaker_usable():
+        # No usable tiebreaker — fall back to merge
         route_result.content = _merge_with_verification(
             route_result.content, verification
         )

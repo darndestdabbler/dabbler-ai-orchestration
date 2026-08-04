@@ -28,8 +28,10 @@ from dataclasses import dataclass
 
 try:
     from .secret_resolver import resolve_secret  # package context
+    from .call_trace import record_http_request  # package context
 except ImportError:
     from secret_resolver import resolve_secret  # type: ignore[import-not-found]  # test context
+    from call_trace import record_http_request  # type: ignore[import-not-found]  # test context
 
 
 @dataclass
@@ -149,6 +151,10 @@ def _call_anthropic(model_id, system_prompt, user_message,
             headers["anthropic-beta"] = str(betas)
 
     with httpx.Client(timeout=config["timeout_seconds"]) as client:
+        # Set 109 S2: announce the request INSIDE the caller, so a retry
+        # (call_model's loop wraps this function) counts as the separate
+        # request it is.
+        record_http_request("anthropic", model_id)
         resp = client.post(
             config.get("base_url", "https://api.anthropic.com/v1/messages"),
             headers=headers,
@@ -212,6 +218,7 @@ def _call_google(model_id, system_prompt, user_message,
     }
 
     with httpx.Client(timeout=config["timeout_seconds"]) as client:
+        record_http_request("google", model_id)
         resp = client.post(url, headers={"x-goog-api-key": api_key}, json=body)
         resp.raise_for_status()
         data = resp.json()
@@ -277,6 +284,7 @@ def _call_openai(model_id, system_prompt, user_message,
     }
 
     with httpx.Client(timeout=config["timeout_seconds"]) as client:
+        record_http_request("openai", model_id)
         resp = client.post(url, headers=headers, json=body)
         resp.raise_for_status()
         data = resp.json()

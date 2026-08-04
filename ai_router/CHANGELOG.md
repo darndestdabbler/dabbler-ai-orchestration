@@ -21,9 +21,12 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   model-list endpoints and writes `ai_router/model-inventory.lock`, a snapshot
   of the ids each provider offers plus a per-provider probe timestamp.
   `--check` compares every `model_id` in `router-config.yaml` against that
-  snapshot and fails loud (exit 1) on any **routable** entry naming an id the
-  provider does not offer; identity-only entries (`is_enabled: false`) are
-  reported as notes and can be promoted to failures with `--strict`.
+  snapshot and fails loud (exit 1) on **any** entry naming an id the provider
+  does not offer — there is no carve-out, because an exit 0 that tolerated a
+  known miss would certify an invariant that does not hold. The report still
+  separates a *routable* miss (an id that can be put on the wire) from an
+  *identity-only* one (`is_enabled: false`, a record of what an orchestrator
+  IS), since they differ in urgency; they do not differ in the exit code.
 
   `--check` reads only local files — it never probes — so it adds no
   session-start latency and is deterministic in CI. A provider that has never

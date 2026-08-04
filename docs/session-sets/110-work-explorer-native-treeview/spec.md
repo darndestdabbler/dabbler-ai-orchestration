@@ -17,6 +17,12 @@
 > **Prerequisite:** Set 109 — see *Prerequisites*, and it is a real gate, not a courtesy.
 > **Session Set:** `docs/session-sets/110-work-explorer-native-treeview/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
+> **Operator notes:** [`operator-notes.md`](operator-notes.md) — read it at
+> Session 1. The 2026-08-04 entry adds a **fourth tree level (sessions within
+> a set)**, moves per-session status onto the operator's own icons, and moves
+> the done/total fraction into `TreeItem.description`. All three are density
+> decisions, so they belong in S1's confirmed mapping; the third also changes
+> Session 2's stated `module → bucket → session set` shape.
 
 ---
 

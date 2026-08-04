@@ -499,15 +499,19 @@ def test_pinned_model_names_tolerates_a_missing_routing_block():
     assert model_inventory.pinned_model_names({}) == set()
 
 
-def test_identity_only_miss_is_reported_but_does_not_fail():
+def test_an_identity_only_miss_fails_too_but_is_classified_separately():
+    # No carve-out: the invariant is "every configured model_id is offered by
+    # its provider". The routable/identity-only split says how URGENT a miss
+    # is; it never says whether the gate passes.
     cfg = _registry(**{"gemini-3-pro": {
         "provider": "google", "model_id": "gemini-3-pro", "is_enabled": False,
     }})
     result = model_inventory.check_registry(
         cfg, _lock(google=["gemini-3-pro-preview"]), now=NOW,
     )
-    assert result.ok
+    assert not result.ok
     assert [f.alias for f in result.identity_drift] == ["gemini-3-pro"]
+    assert result.routable_drift == []
 
 
 def test_identity_only_entry_that_is_offered_reports_nothing():
@@ -622,24 +626,37 @@ def test_render_is_ascii_only():
         cfg, _lock(now=old, openai=["gpt-5.6-sol"], google=["gemini-3-pro-preview"]),
         now=NOW,
     )
-    text = "\n".join(model_inventory.render_check(result, strict=False))
+    text = "\n".join(model_inventory.render_check(result))
     text.encode("cp1252")  # raises UnicodeEncodeError if a glyph is unsafe
     assert "gpt-5-6" in text and "gemini-3-pro" in text
 
 
-def test_render_labels_identity_drift_as_a_failure_under_strict():
-    cfg = _registry(**{"gemini-3-pro": {
-        "provider": "google", "model_id": "gemini-3-pro", "is_enabled": False,
-    }})
-    result = model_inventory.check_registry(
-        cfg, _lock(google=["gemini-3-pro-preview"]), now=NOW,
+def test_render_reports_both_drift_kinds_as_failures_and_names_the_kind():
+    cfg = _registry(
+        **{
+            "gpt-5-6": {"provider": "openai", "model_id": "gpt-5.6",
+                        "is_enabled": True},
+            "gemini-3-pro": {"provider": "google", "model_id": "gemini-3-pro",
+                             "is_enabled": False},
+        }
     )
-    lenient = "\n".join(model_inventory.render_check(result, strict=False))
-    strict = "\n".join(model_inventory.render_check(result, strict=True))
-    assert "[~] NOTE" in lenient and "[x] DRIFT" in strict
-    # The summary line must agree with the exit code the same flag produces:
-    # under --strict this run FAILS, so it must not also report OK.
-    assert "[ ] OK" in lenient and "[ ] OK" not in strict
+    result = model_inventory.check_registry(
+        cfg, _lock(openai=["gpt-5.6-sol"], google=["gemini-3-pro-preview"]),
+        now=NOW,
+    )
+    text = "\n".join(model_inventory.render_check(result))
+    assert text.count("[x] DRIFT") == 2
+    assert "(routable," in text and "(identity-only," in text
+    # The report must never claim success on a run that exits non-zero.
+    assert "[ ] OK" not in text
+
+
+def test_render_reports_ok_only_when_nothing_drifted():
+    cfg = _registry(**{"gpt-5-4": {
+        "provider": "openai", "model_id": "gpt-5.4", "is_enabled": True,
+    }})
+    result = model_inventory.check_registry(cfg, _lock(openai=["gpt-5.4"]), now=NOW)
+    assert "[ ] OK" in "\n".join(model_inventory.render_check(result))
 
 
 # ---------------------------------------------------------------------------
@@ -686,13 +703,23 @@ def test_cli_check_exits_2_when_the_lockfile_is_missing(cli, capsys):
     assert "--refresh" in capsys.readouterr().err
 
 
-def test_cli_strict_promotes_identity_drift_to_a_failure(cli):
+def test_cli_check_exits_1_on_identity_only_drift_with_no_flag_needed(cli, capsys):
+    # The regression the close backstop caught: once Session 4 corrects the
+    # routable gpt-5.6 specimen, a lenient default would exit 0 on a registry
+    # that still names an id its provider does not offer.
     cfg = _registry(**{"gemini-3-pro": {
         "provider": "google", "model_id": "gemini-3-pro", "is_enabled": False,
     }})
-    lock = _lock(google=["gemini-3-pro-preview"])
-    assert cli(cfg, lock, "--check") == model_inventory.EXIT_OK
-    assert cli(cfg, lock, "--check", "--strict") == model_inventory.EXIT_DRIFT
+    code = cli(cfg, _lock(google=["gemini-3-pro-preview"]), "--check")
+    assert code == model_inventory.EXIT_DRIFT
+    assert "gemini-3-pro" in capsys.readouterr().err
+
+
+def test_cli_rejects_the_retired_strict_flag(cli):
+    # --strict is gone: leniency was the defect, so there is no lenient mode
+    # left for a flag to escape from.
+    with pytest.raises(SystemExit):
+        model_inventory.main(["--check", "--strict"])
 
 
 def test_check_never_touches_the_network(cli, monkeypatch):

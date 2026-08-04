@@ -349,12 +349,15 @@ models:
     is_enabled_as_verifier: false
     notes: "Identity registry only: Gemini Code Assist orchestrator
       sessions (the Set 084 S2 ai-assignment recommendation).
-      Set 109 S1: `model_inventory --check` reports this id as identity-only
-      drift — the Gemini API lists gemini-3-pro-preview, not a bare
-      gemini-3-pro. That is a NOTE, not a failure: nothing routes here, and an
-      orchestrator's identity is what the Code Assist surface calls itself,
-      which need not be an id the generative API sells. Reported on every run
-      rather than exempted by a flag, so it cannot go quiet."
+      Set 109 S1: `model_inventory --check` FAILS on this id — the Gemini API
+      lists gemini-3-pro-preview, not a bare gemini-3-pro. It is classified
+      identity-only (nothing routes here, so it is not urgent) but it still
+      fails, because a gate that tolerated a known miss would certify an
+      invariant it does not hold. OWED TO SESSION 4: either correct the id to
+      whatever the Code Assist surface actually reports, or move identity
+      records out of the model registry entirely — an orchestrator's identity
+      need not be an id the generative API sells, which is an argument for a
+      different home, not for an exemption."
   claude-opus-5:
     provider: anthropic
     model_id: claude-opus-5

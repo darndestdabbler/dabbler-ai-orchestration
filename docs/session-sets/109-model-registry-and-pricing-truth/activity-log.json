@@ -180,6 +180,38 @@
       "dateTime": "2026-08-04T06:59:49.697947-04:00",
       "description": "Authored disposition.json: status completed, verification_method api, verification_verdict VERIFIED, next_orchestrator claude-code/anthropic/claude-opus-5/high (continue-current-trajectory), lessons_cited L-069-1 / L-064-9 / L-095-1. Recorded the models.pick_model is_enabled bypass as a NAMED DEFERRAL to S2 rather than a silent residual.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 21,
+      "stepKey": "close-backstop",
+      "dateTime": "2026-08-04T07:05:36.981693-04:00",
+      "description": "close_session REFUSED the close: its in-process backstop (round 4, gpt-5-6, anthropic excluded, diff base ecb2e07) returned one blocking Major -- 'the default drift gate knowingly passes configured model IDs absent from provider enumeration'. Correct, and it identifies a unilateral spec relaxation: the plan says every model_id must appear in its provider's enumeration with no exception, but CheckResult.ok ignored identity_drift, so once S4 corrects gpt-5.6 the documented --check would exit 0 on a registry still violating the invariant.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 22,
+      "stepKey": "remediation-2",
+      "dateTime": "2026-08-04T07:05:37.480892-04:00",
+      "description": "Fixed: CheckResult.ok is now 'not (routable_drift or identity_drift or fatal)' -- every miss fails. REMOVED --strict entirely rather than inverting it (leniency was the defect, and prefer-removal-over-addition says delete the surface, not add its opposite). The routable/identity-only split survives in the REPORT (how urgent) and is gone from the exit code (where it told automation a falsehood). Propagated the correction to the module docstring, CHANGELOG, and router-config's gemini-3-pro note, which now records an explicit item OWED TO S4: correct the id or move identity records out of the model registry. Sidecar s1-remediation-round-2.md. 87 tests pass; --check still fails loud naming gpt-5-6, so the Ends-with is unaffected.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 23,
+      "stepKey": "verify-remediation-review-2",
+      "dateTime": "2026-08-04T07:31:34.037968-04:00",
+      "description": "Re-verify on the backstop fix delta (round 5, remediation-review): VERIFIED, 0 blocking, 0 minor, 4 fix-accepted / 0 rejected. Final suite: 3230 passed, 6 skipped, 8 deselected, 0 failed (23m49s).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 24,
+      "stepKey": "operator-note-110",
+      "dateTime": "2026-08-04T07:31:34.438536-04:00",
+      "description": "Operator request captured out of band: authored docs/session-sets/110-work-explorer-native-treeview/operator-notes.md and added a spec pointer. Three asks -- a fourth tree level listing sessions per set, the operator's own media/*.svg icons for per-session status (which retires the 'session N in flight' description clause), and the done/total fraction moved into TreeItem.description. Recon found the data and icon vocabulary already exist (ProgressView.sessions, RowPayload.iconSlug/fraction/description), and flagged four wrinkles for S1: a FOURTH session status (cancelled, icon already present) the asks did not name; hardcoded icon fills that VS Code will not theme-recolor; 16mm-authored viewBoxes; and the fact that moving the fraction into description partially reverses Set 034's deliberate move OUT of description, forced by the native TreeView having no custom column. Routed to S1's densityTradeConfirmed mapping rather than applied.",
+      "status": "complete"
     }
   ]
 }

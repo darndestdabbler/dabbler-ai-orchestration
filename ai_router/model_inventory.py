@@ -13,9 +13,17 @@ is the falsifier for that entire class:
   writes :data:`DEFAULT_LOCKFILE_PATH`, a per-provider snapshot of the ids on
   offer plus the timestamp each was probed at.
 - :func:`check_registry` compares every configured ``model_id`` against that
-  snapshot and reports drift. It reads two local files and **never touches the
-  network** — session start must not pay three round-trips, and CI must be
-  deterministic.
+  snapshot and **fails on any miss, with no carve-out**. It reads two local
+  files and **never touches the network** — session start must not pay three
+  round-trips, and CI must be deterministic.
+
+The report separates a *routable* miss (an id that can be put on the wire) from
+an *identity-only* one (a record of what an orchestrator IS, never routed to),
+because they differ in urgency. They do not differ in the exit code. An earlier
+draft let an identity-only miss pass with a note; the close backstop was right
+that this makes exit 0 certify something untrue the moment the routable
+specimen is corrected, and a known-tolerated miss is precisely the silent hole
+this module exists to close.
 
 The lockfile is JSON rather than the restricted-TOML subset
 ``copilot_catalog.py`` hand-rolls. That module's format exists to avoid adding
@@ -410,9 +418,9 @@ def refresh_inventory(
 # The drift check
 # ---------------------------------------------------------------------------
 
-#: A configured entry that is not offered by its provider. ``routable`` mirrors
-#: the entry's ``is_enabled`` — a routable miss is a hard failure, an
-#: identity-only miss is reported but does not fail (see :func:`check_registry`).
+#: A configured entry that is not offered by its provider. EVERY miss fails;
+#: ``routable`` only says which KIND it is, so the operator can tell a live
+#: routing defect from a stale identity record at a glance.
 @dataclass(frozen=True)
 class DriftFinding:
     alias: str
@@ -422,18 +430,17 @@ class DriftFinding:
     reason: str
 
     def render(self) -> str:
-        marker = "[x]" if self.routable else "[~]"
         kind = "routable" if self.routable else "identity-only"
         return (
-            f"  {marker} {self.alias} ({kind}, provider={self.provider}, "
+            f"  [x] {self.alias} ({kind}, provider={self.provider}, "
             f"model_id={self.model_id!r}): {self.reason}"
         )
 
 
 @dataclass
 class CheckResult:
-    """Outcome of :func:`check_registry`. Never raises on drift — the caller
-    decides what an identity-only miss is worth (see ``--strict``)."""
+    """Outcome of :func:`check_registry`. Never raises — the CLI turns this
+    into an exit code."""
 
     checked: int = 0
     routable_drift: list = field(default_factory=list)
@@ -443,7 +450,14 @@ class CheckResult:
 
     @property
     def ok(self) -> bool:
-        return not self.routable_drift and not self.fatal
+        # An identity-only miss fails too. The invariant this gate exists to
+        # certify is "every configured model_id is offered by its provider" --
+        # with no carve-out -- so an exit 0 that tolerated a known miss would
+        # be certifying something untrue. The routable/identity-only split
+        # survives in the REPORT, where it tells the operator how urgent the
+        # miss is; it no longer survives in the exit code, where it would tell
+        # automation a falsehood.
+        return not (self.routable_drift or self.identity_drift or self.fatal)
 
 
 def pinned_model_names(config: dict) -> set:
@@ -568,7 +582,7 @@ def check_registry(
     return result
 
 
-def render_check(result: CheckResult, *, strict: bool) -> list[str]:
+def render_check(result: CheckResult) -> list[str]:
     """Operator-facing report lines. ASCII-only (Windows cp1252 consoles)."""
     lines: list[str] = []
     for message in result.fatal:
@@ -578,30 +592,24 @@ def render_check(result: CheckResult, *, strict: bool) -> list[str]:
     if result.routable_drift:
         lines.append(
             f"[x] DRIFT: {len(result.routable_drift)} routable registry "
-            "entry/entries name a model_id the provider does not offer:"
+            "entry/entries name a model_id the provider does not offer -- "
+            "these ids can be put on the wire:"
         )
         lines.extend(f.render() for f in result.routable_drift)
     if result.identity_drift:
-        label = "DRIFT" if strict else "NOTE"
-        marker = "[x]" if strict else "[~]"
         lines.append(
-            f"{marker} {label}: {len(result.identity_drift)} identity-only "
-            "entry/entries name a model_id the provider does not offer "
-            "(these are never routed to; ids may come from another surface):"
+            f"[x] DRIFT: {len(result.identity_drift)} identity-only "
+            "entry/entries name a model_id the provider does not offer. "
+            "Nothing routes to these, so they are not urgent -- but the id is "
+            "still wrong, or the record belongs somewhere other than the "
+            "model registry. Correct it or move it; it does not get to sit "
+            "here indefinitely:"
         )
         lines.extend(f.render() for f in result.identity_drift)
-    # Under --strict an identity-only miss IS a failure, so the summary must
-    # not also claim success — the report and the exit code have to agree.
-    succeeded = result.ok and not (strict and result.identity_drift)
-    if succeeded and not result.identity_drift:
+    if result.ok:
         lines.append(
             f"[ ] OK: all {result.checked} configured model_id(s) are offered "
             "by their provider."
-        )
-    elif succeeded:
-        lines.append(
-            f"[ ] OK: all {result.checked} routable model_id(s) are offered by "
-            "their provider."
         )
     return lines
 
@@ -641,15 +649,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--config", default=None,
         help="Explicit router-config.yaml path (default: normal resolution).",
     )
-    parser.add_argument(
-        "--strict", action="store_true",
-        help=(
-            "Promote identity-only drift from a reported note to a failure. "
-            "Off by default: identity-only entries record what an orchestrator "
-            "IS, and those ids can legitimately come from a surface other than "
-            "the provider's own API."
-        ),
-    )
     args = parser.parse_args(argv)
 
     try:
@@ -688,13 +687,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return EXIT_FATAL
 
     result = check_registry(config, lockfile)
-    failed = (not result.ok) or (args.strict and result.identity_drift)
-    stream = sys.stderr if failed else sys.stdout
-    for line in render_check(result, strict=args.strict):
+    stream = sys.stdout if result.ok else sys.stderr
+    for line in render_check(result):
         print(line, file=stream)
     if result.fatal:
         return EXIT_FATAL
-    return EXIT_DRIFT if failed else EXIT_OK
+    return EXIT_OK if result.ok else EXIT_DRIFT
 
 
 if __name__ == "__main__":

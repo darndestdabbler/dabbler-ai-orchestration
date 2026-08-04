@@ -1,0 +1,91 @@
+{
+  "name": "dabbler-treeview-spike",
+  "displayName": "Dabbler TreeView Spike (Set 110 S1)",
+  "description": "Throwaway spike: does contributes.submenus give a real hierarchical context menu, and does group:inline render module actions acceptably?",
+  "version": "0.0.1",
+  "publisher": "dabbler-spike",
+  "private": true,
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "spikeContainer",
+          "title": "TreeView Spike",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "spikeContainer": [
+        { "id": "spikeTree", "name": "Spike Tree" }
+      ]
+    },
+    "commands": [
+      { "command": "spike.newSession", "title": "New Session", "icon": "$(add)" },
+      { "command": "spike.openSpec", "title": "Open Spec", "icon": "$(go-to-file)" },
+      { "command": "spike.rename", "title": "Rename Module..." },
+      { "command": "spike.delete", "title": "Delete Module..." },
+      { "command": "spike.planCreate", "title": "Create Plan" },
+      { "command": "spike.planImport", "title": "Import Plan" },
+      { "command": "spike.planRegen", "title": "Regenerate Plan" },
+      { "command": "spike.verifyRun", "title": "Run Verification" },
+      { "command": "spike.verifyMode", "title": "Change Verification Mode" },
+      { "command": "spike.probe", "title": "Spike: Write Probe Report" }
+    ],
+    "submenus": [
+      { "id": "spike.moduleMenu.plan", "label": "Plan" },
+      { "id": "spike.moduleMenu.verify", "label": "Verification" },
+      { "id": "spike.nested.deep", "label": "Deeper Still" }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "spike.newSession",
+          "when": "view == spikeTree && viewItem =~ /^module/",
+          "group": "inline@1"
+        },
+        {
+          "command": "spike.openSpec",
+          "when": "view == spikeTree && viewItem =~ /^module/",
+          "group": "inline@2"
+        },
+        {
+          "submenu": "spike.moduleMenu.plan",
+          "when": "view == spikeTree && viewItem == module-normal",
+          "group": "1_actions@1"
+        },
+        {
+          "submenu": "spike.moduleMenu.verify",
+          "when": "view == spikeTree && viewItem =~ /^module/",
+          "group": "1_actions@2"
+        },
+        {
+          "command": "spike.rename",
+          "when": "view == spikeTree && viewItem == module-normal",
+          "group": "2_lifecycle@1"
+        },
+        {
+          "command": "spike.delete",
+          "when": "view == spikeTree && viewItem == module-normal",
+          "group": "2_lifecycle@2"
+        }
+      ],
+      "spike.moduleMenu.plan": [
+        { "command": "spike.planCreate", "group": "1@1" },
+        { "command": "spike.planImport", "group": "1@2" },
+        { "submenu": "spike.nested.deep", "group": "2@1" }
+      ],
+      "spike.moduleMenu.verify": [
+        { "command": "spike.verifyRun", "group": "1@1" },
+        { "command": "spike.verifyMode", "group": "1@2" }
+      ],
+      "spike.nested.deep": [
+        { "command": "spike.planRegen", "group": "1@1" }
+      ]
+    }
+  }
+}

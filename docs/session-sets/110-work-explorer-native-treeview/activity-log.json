@@ -1,0 +1,89 @@
+{
+  "sessionSetName": "110-work-explorer-native-treeview",
+  "createdDate": "2026-08-04T21:44:46.601470+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-04T21:44:46.602015+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/register",
+      "dateTime": "2026-08-04T18:25:33.068456-04:00",
+      "description": "Registered session 1; confirmed prerequisite 109 complete (S1/S2 VERIFIED, S3/S4 WAIVED); read the four-file preload; all three DABBLER_* keys present.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "session-001/ai-assignment",
+      "dateTime": "2026-08-04T18:25:33.068997-04:00",
+      "description": "Routed step-3.5 analysis (analysis, excl. anthropic -> gemini-2.5-pro, $0.0091); authored ai-assignment.md with routing plan, per-source budget note, and departures.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "session-001/panel-rerun",
+      "dateTime": "2026-08-04T18:25:33.068997-04:00",
+      "description": "Re-ran the architecture panel on the 109-corrected registry: Opus 5 direct (operator ruling, $0), Sonnet 5 routed ($0.0367), GPT-5.6 Sol routed ($0.1056). All three GO; unanimous that the perf case is false and the density trade is the operators call.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "session-001/measure-startup",
+      "dateTime": "2026-08-04T18:25:33.069505-04:00",
+      "description": "Built scripts/perf-harness.ts; measured at 0/10/100/500 synthetic sets plus the real repo. Empty tree = ~102ms host work, 0.3ms of it scanning; the rest is a synchronous git worktree list subprocess in discoverRootsWithFamilies(). Fixed a double-counting attribution bug in the harness before recording any number.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "session-001/spike-api",
+      "dateTime": "2026-08-04T18:25:33.069505-04:00",
+      "description": "Built and ran a throwaway extension in a real Extension Development Host (VS Code 1.131.0): contributes.submenus gives a hierarchical menu two levels deep; group:inline renders platform icons that do not overlap the label; getChildren is lazy per level and not called at all until the view is visible.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "session-001/spike-density",
+      "dateTime": "2026-08-04T18:25:33.070028-04:00",
+      "description": "Rendered the worst-case row at default and wide panel widths. Found that TreeItem.description is dropped entirely when the label truncates, so the 3/5 fraction is invisible at working width for every real set name.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "session-001/spike-icons",
+      "dateTime": "2026-08-04T18:25:33.070028-04:00",
+      "description": "Eyeballed the operator status SVGs in both themes (operator-notes wrinkle 2). All four carry #ffffff/#000000 beyond the documented green/grey; not-started.svg is nearly invisible on a light theme and in-progress.svg loses its ring. 16mm authoring scales fine (wrinkle 3).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "session-001/operator-decision",
+      "dateTime": "2026-08-04T18:25:33.070028-04:00",
+      "description": "Put the density trade to the operator with rendered evidence. Decisions: drop the fraction from set rows entirely (progress read from session glyphs); keep four sessions and sequence S3 internally (tests green before deletion).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "session-001/decision-doc",
+      "dateTime": "2026-08-04T18:25:33.070567-04:00",
+      "description": "Wrote s1-migration-decision.md: panel verdict, measurements, four spike answers, the operator-confirmed mapping table, plan adjustments, and an explicit GO with the performance claim withdrawn.",
+      "status": "complete"
+    }
+  ]
+}

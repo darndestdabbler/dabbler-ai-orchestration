@@ -1,0 +1,47 @@
+{
+  "stages": [
+    {
+      "stage": "after activation, view never opened",
+      "callsSoFar": [
+        "getChildren(root)"
+      ]
+    },
+    {
+      "stage": "after view made visible (root only)",
+      "callsSoFar": [
+        "getChildren(root)"
+      ]
+    },
+    {
+      "stage": "after expanding module 1",
+      "callsSoFar": [
+        "getChildren(root)",
+        "getChildren(root)",
+        "getChildren(module)"
+      ]
+    },
+    {
+      "stage": "after expanding bucket 1",
+      "callsSoFar": [
+        "getChildren(root)",
+        "getChildren(root)",
+        "getChildren(module)",
+        "getChildren(module)",
+        "getChildren(bucket)"
+      ]
+    },
+    {
+      "stage": "after expanding set 1 (fourth level)",
+      "callsSoFar": [
+        "getChildren(root)",
+        "getChildren(root)",
+        "getChildren(module)",
+        "getChildren(module)",
+        "getChildren(bucket)",
+        "getChildren(bucket)",
+        "getChildren(set) -- FOURTH LEVEL"
+      ]
+    }
+  ],
+  "totalCalls": 7
+}

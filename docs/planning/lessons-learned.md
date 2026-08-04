@@ -97,7 +97,7 @@ full text in `lessons-archive.md`:
 | L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="108" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="109" status="active" scope="portable" -->
 
 - Prose carried over from a superseded doc was true (or tolerated) in the
   old context and reads authoritative in the new one — a defect class of

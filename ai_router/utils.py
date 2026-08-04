@@ -38,6 +38,7 @@ import threading
 import time
 
 from .providers import APIResult
+from .pricing import worst_case_output_cost_per_1m
 
 
 # ======================================================================
@@ -124,7 +125,7 @@ def get_escalation_model(
     if _survives(candidate):
         return candidate
     survivors = [
-        (float(cfg.get("output_cost_per_1m") or 0.0), name)
+        (worst_case_output_cost_per_1m(cfg), name)
         for name, cfg in (config.get("models") or {}).items()
         if isinstance(cfg, dict)
         and cfg.get("tier") == next_tier

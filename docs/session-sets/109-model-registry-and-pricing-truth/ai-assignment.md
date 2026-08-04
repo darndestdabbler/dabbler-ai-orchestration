@@ -255,3 +255,138 @@ pinned as a directional invariant instead.
 - **Next session set.** Not adopted as recommended (Departure 4).
   `110-work-explorer-native-treeview` is already authored and declares this set
   as its prerequisite; it remains the successor.
+
+---
+
+## Session 3 of 4 — A pricing schema that can be true, and scrape-to-propose
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked).
+  This **departs from S2's routed recommendation** of openai / gpt-5-4, and the
+  reason is the one S2's own analyst flagged without being able to weigh:
+  `gpt-5-4` is what this set's Anthropic-excluded verification rounds fall
+  through to, so orchestrating from it would have collapsed the cross-provider
+  independence the set's verdicts rest on. The engine choice is the operator's
+  call and the operator kept Claude.
+- Routed step-3.5 analysis: `s3-ai-assignment-analysis.json` (route
+  `task_type=analysis`, excl. anthropic → gemini-2.5-pro, $0.0410,
+  truncation-clean).
+- Routed design decisions, **split into two**: `s3-pricing-schema-design.json`
+  (`architecture`, excl. anthropic+google → gpt-5-4-mini, $0.0606) and
+  `s3-scraper-design.json` (`architecture`, excl. anthropic+openai →
+  gemini-2.5-pro, $0.0188). Both truncation-clean, run concurrently on
+  different providers so the two halves are independently sourced.
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` (**S4** walks the price-confirmation flow — S3 builds it
+  and neither arms nor runs the walk), `requiresE2E false` (router-side Python
+  only; no Explorer-rendering surface, no state writer, no fixture harness, so
+  L-064-12 does not arm and pytest is the executable gate),
+  `pathAwareCritique advisory` (set-terminal, in S4). Not re-litigated
+  mid-session.
+- Budget note: this session draws on the **`DABBLER_*` provider keys** only —
+  one routed analysis, two routed architecture decisions, two abandoned
+  timed-out attempts (below), and the mandatory cross-provider verification.
+  It spends **zero Copilot seat capacity**. The three pricing-page fetches are
+  unmetered.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read the preload; confirm keys; read the spec. | Orchestrator direct — bootstrapping. |
+| 3.5 | Assignment analysis + next-orchestrator / next-set recommendations. | **Routed** (`analysis`) — repo rule: never self-opine on model choice. |
+| 2a | Fetch the three pricing pages and read their real markup. | Orchestrator direct — **execution, not reasoning**. The spec says the pages are "parseable"; it does not say what SHAPE, and a model asked to describe them would substitute recall for evidence. |
+| 2b | Settle the schema shape (6 questions) and the scraper/acceptance design (7 questions). | **Routed** (`architecture` ×2) — the highest solution-variance decision in the set, and it binds S4 and every consumer repo. |
+| 3–5 | Write `pricing.py`, `pricing_proposal.py`, wire the six consumers, write the fixtures and tests, document the schema in the YAML. | Orchestrator direct — implementation is deliberately not in `delegation.always_route_task_types`. |
+| 6 | Live `--fetch` run; full suite. | Orchestrator direct — deterministic gates. |
+| Verify | Phased `verify_session` for this set. | **Routed** — `session-verification`, anthropic auto-excluded per the no-skip mandate. |
+| Close | `disposition.json`; commit + push; `close_session`; notify. | Orchestrator direct — mechanics. |
+
+### A routing failure worth recording
+
+The combined design prompt (~9k tokens, thirteen questions) **timed out on
+both providers** — three attempts × 300s on gemini-pro, then the same again on
+gpt-5-4 — because `providers.<name>.timeout_seconds` is 300 and a frontier
+model reasoning hard over a dense prompt exceeds it. Two paid-for calls
+returned nothing. Splitting the prompt in half fixed it immediately.
+
+The lesson is not "raise the timeout": it is that a routed *design* prompt has
+a size past which the transport gives out before the model does, and the
+failure is expensive and reads like an outage (`RuntimeError: API call failed
+after 3 attempts: The read operation timed out`). The two smaller questions
+also got sharper answers. Recorded because the next orchestrator to write a
+thirteen-question architecture prompt will otherwise pay the same toll.
+
+### Where this departs from the routed designs, and why
+
+Both were adopted in substance — a flat rate-row list rather than nested
+periods, permanent coexistence of the flat fields, the worst-case sort scalar,
+all-or-nothing across providers, a deliberately narrow parse scope, and
+verbatim-subsetted page fixtures. Five departures:
+
+**Departure 1 — one inclusive upper bound per row, not a `min`/`max` pair.**
+The schema design proposed `min_input_tokens: 200001` beside
+`max_input_tokens: 200000`. Two fields that must agree at an off-by-one
+boundary is a bug waiting to be written; one inclusive `max_input_tokens` per
+row, with the previous row's bound implying the floor, expresses the same
+thing and matches how the providers state it ("prompts <= 200k tokens").
+
+**Departure 2 — flat and structured are mutually exclusive, not reconciled.**
+The design said to allow both on one entry and reject them when they disagree.
+That still leaves two numbers a careless edit can push apart, and the
+"they must match" check is itself a thing that can go quiet. An entry declares
+its rates one way or the other, full stop.
+
+**Departure 3 — the acceptance mechanism is a file, not a prompt and not a
+printout.** The scraper design chose print-only with the human hand-editing
+the YAML; the assignment analysis chose an interactive `[y/N]` CLI. Print-only
+cannot satisfy the spec's "only acceptance writes the value and stamps
+`confirmed_on`" — there is no acceptance step to hang the stamp on. The
+interactive CLI needs a TTY, so it could only ever be exercised by the
+operator walking it, which is the one place this set cannot afford an
+unexercised path. Marking a decision in the proposal file satisfies the spec,
+still forces the human to open every change, and is testable end to end.
+
+**Departure 4 — `metadata.pricing_reviewed` is KEPT.** The spec says the
+per-model `confirmed_on` replaces it. Grepping before deleting found the VS
+Code extension's Cost Dashboard renders its staleness banner from that exact
+field — and "no Explorer or extension work" is an explicit non-goal of this
+set. Removing it would have broken a shipped surface this session is not
+allowed to touch. It survives as a rollup (the oldest per-model stamp)
+maintained by `--apply`, so it cannot drift from the stamps it summarises.
+Flagged for Step 9 as a spec line that could not be followed as written.
+
+**Departure 5 — OpenAI's long-context rates are read but never proposed.**
+Both designs assumed the parser would either take the highest price or encode
+the tier. The page publishes both rate columns and never states where the
+boundary falls, so proposing a tier would mean manufacturing the one number
+the page does not state. It is reported as an observation instead.
+
+### What the live run changed
+
+The tool found a defect the spec did not name: `gpt-5-5` is understated 2× for
+a completely different reason than `gpt-5-6` (a real id whose rates were copied
+from `gpt-5.4` at authoring time, so Session 1's drift gate passes it). It also
+showed the spec's reconciliation figure is an order of magnitude too small —
+245 `gpt-5-6` rows totalling $48.95 reported across the whole ledger, not one
+session's $0.5916. Both are written up in `s3-live-proposal-evidence.md` and
+owed to S4.
+
+The first draft of that write-up overstated the `gpt-5-5` impact. Counting the
+ledger before publishing the claim reduced it to one call at $0.0003.
+
+### Forward-looking recommendations (routed)
+
+- **Next orchestrator (Session 4).** The analyst returned
+  `"Claude 3 Opus" / claude-3-opus-20240229` — a model id that exists in
+  neither this registry nor at the provider. It is read as **claude-opus-5 /
+  high**, which is also the right call on the merits: S4 walks a human
+  confirmation flow, adjudicates model pins, and authors the UAT checklist.
+  This is the **third consecutive session** in which the step-3.5 analyst has
+  emitted a non-existent model id, so the routed recommendation this repo
+  relies on in order not to self-opine is itself unvalidated. A `route()`-side
+  fix — validate a recommended model id against the registry before returning
+  it — is owed, and is now cheap, because `model_inventory` already knows what
+  every provider offers.
+- **Next session set.** `110-work-explorer-native-treeview` is already authored
+  and declares this set as its prerequisite; it remains the successor. Session
+  3 raises no competing candidate.

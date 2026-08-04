@@ -47,6 +47,17 @@ from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 try:  # package vs bare-import (mirrors the rest of ai_router)
+    from .pricing import (
+        worst_case_input_cost_per_1m,
+        worst_case_output_cost_per_1m,
+    )
+except ImportError:  # pragma: no cover - test/bare context
+    from pricing import (  # type: ignore[import-not-found]
+        worst_case_input_cost_per_1m,
+        worst_case_output_cost_per_1m,
+    )
+
+try:  # package vs bare-import (mirrors the rest of ai_router)
     from .evidence_protocol import (
         ENTRYPOINT_PUBLIC_API,
         ENTRYPOINT_TEST,
@@ -2366,13 +2377,23 @@ def _resolve_model(
 
 
 def _pricing_for(model: str, config: Optional[dict]) -> Tuple[float, float]:
-    """Return ``(input_per_1m, output_per_1m)`` for cost accounting."""
+    """Return ``(input_per_1m, output_per_1m)`` for cost accounting.
+
+    Set 109 S3: the pair is resolved ONCE, before the loop runs and therefore
+    before any token count exists, then applied to every turn's actual usage.
+    With context-tiered rates in the registry there is no single true answer at
+    that moment, so this takes the WORST case across the entry's rows. These
+    numbers feed a cost CAP; under-reading a tier would raise the cap above
+    what the operator asked for, which is the one direction that must not
+    happen. (:mod:`ai_router.pricing` carries the same reasoning for the
+    model-selection tiebreak.)
+    """
     if config is not None:
         for mcfg in config.get("models", {}).values():
             if mcfg.get("model_id") == model:
                 return (
-                    float(mcfg.get("input_cost_per_1m", 0.0)),
-                    float(mcfg.get("output_cost_per_1m", 0.0)),
+                    worst_case_input_cost_per_1m(mcfg),
+                    worst_case_output_cost_per_1m(mcfg),
                 )
     return _FALLBACK_PRICING.get(model, (0.0, 0.0))
 

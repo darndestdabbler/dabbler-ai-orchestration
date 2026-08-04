@@ -2,6 +2,11 @@
 
 import re
 
+try:  # package vs bare-import (mirrors the rest of ai_router)
+    from .pricing import worst_case_output_cost_per_1m
+except ImportError:  # pragma: no cover - test/bare context
+    from pricing import worst_case_output_cost_per_1m  # type: ignore[import-not-found]
+
 
 def estimate_complexity(
     text: str,
@@ -168,7 +173,7 @@ def pick_model(
     # safe direction — then downward) within max_tier.
     def _cheapest_at(t: int) -> str | None:
         candidates = [
-            (float(cfg.get("output_cost_per_1m") or 0.0), name)
+            (worst_case_output_cost_per_1m(cfg), name)
             for name, cfg in (config.get("models") or {}).items()
             if isinstance(cfg, dict)
             and cfg.get("tier") == t

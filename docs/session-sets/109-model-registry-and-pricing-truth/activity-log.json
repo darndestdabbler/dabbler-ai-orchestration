@@ -324,6 +324,62 @@
       "dateTime": "2026-08-04T09:39:21.345254-04:00",
       "description": "close_session succeeded: all 6 gates PASS (working_tree_clean, pushed_to_remote, activity_log_entry, next_orchestrator_present, change_log_fresh, verification_integrity). The close BACKSTOP independently re-verified the fix delta in-process: round 2, verifier gpt-5-6, anthropic excluded, diff base ea5cd87, VERDICT VERIFIED, $0.2044 -- this is the review the fix delta got, since round 1 was non-blocking and never armed the remediation loop. Backstop raised ONE nit, and it was right: the findings evidence table cited scratchpad files not present in the repo. Fixed by committing all three live traces as s2-trace-evidence.json and rewriting the table to name them with their results.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-04T10:19:01.168119-04:00",
+      "description": "Registered session 3 via start_session (claude / anthropic / claude-opus-5 / high). Read the four preload files (session-constitution, project-guidance, lessons-learned, CLAUDE.md); all three DABBLER_* provider keys confirmed present. No decision-review-queue.jsonl exists in the repo, so no triage was owed. Confirmed S1 and S2 Creates on disk: ai_router/model_inventory.py + ai_router/model-inventory.lock, ai_router/call_trace.py, s2-routing-transparency-findings.md, s2-trace-evidence.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "probe-pricing-pages",
+      "dateTime": "2026-08-04T10:19:01.921113-04:00",
+      "description": "Probed the three published pricing pages LIVE (execution, not reasoning) before designing the parser, because the spec's claim that they are 'parseable' does not say WHAT SHAPE. All three returned 200. OpenAI: one table, api id in col 0, two-level header with Short-context / Long-context column groups -- so OpenAI's >272k surcharge is IN the table, not just the prose comment on the gpt-5-4 entry. Anthropic: one table keyed by DISPLAY NAME, prices as '$5 / MTok', and Sonnet 5's introductory price is encoded as TWO ROWS whose name cells read 'Claude Sonnet 5 through August 31, 2026' and '... starting September 1, 2026' -- the effective date is English prose inside a table cell. Google: NOT one table; ~100 model sections, each an h2 display name followed by the api id as loose text, then FOUR sibling tables (Standard / Batch / Flex / Priority) -- Batch is half price, so picking the wrong section understates by 2x, which is precisely this set's origin defect. Gemini 2.5 Pro's tier boundary is inline cell text ('$1.25, prompts <= 200k tokens  $2.50, prompts > 200k tokens'). Trap recorded: a naive '<[^>]+>' tag-strip EATS the '<= 200k tokens' boundary text as if it were an open tag.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "routed-design",
+      "dateTime": "2026-08-04T10:44:48.304405-04:00",
+      "description": "Step 3.5 + design. Routed analysis s3-ai-assignment-analysis.json (analysis, excl anthropic -> gemini-pro, $0.0410, truncation-clean). Its next_orchestrator field returned 'Claude 3 Opus / claude-3-opus-20240229' -- a model id that does not exist in this registry or at the provider; this is the third session in a row the step-3.5 analyst has emitted a non-existent id, and it is read as claude-opus-5 / high. Two routed ARCHITECTURE decisions, deliberately split after the combined 9k-token prompt timed out on BOTH gemini-pro and gpt-5-4 (3 attempts x 300s each, twice -- the provider timeout_seconds is 300 and dynamic/high reasoning exceeded it). Split into s3-pricing-schema-design.json (excl anthropic+google -> gpt-5-4-mini, $0.0606) and s3-scraper-design.json (excl anthropic+openai -> gemini-pro, $0.0188), run concurrently on different providers so the two halves are independently sourced. Both truncation-clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "pricing-schema",
+      "dateTime": "2026-08-04T10:59:02.402909-04:00",
+      "description": "Built ai_router/pricing.py: rate resolution (context tier by input_tokens, effective period by date), the selection-path sort scalar, load-time validation, and per-model confirmed_on staleness. Schema decision: an entry declares rates EITHER as the two flat scalars OR as a `pricing:` list of rows carrying optional max_input_tokens (inclusive) and effective_from -- never both on one entry, because two declarations that can drift apart is the origin defect in a new costume. Departed from BOTH routed designs on nesting: the analyst proposed periods-containing-tiers (two levels) and the architecture call proposed min+max token pairs; a FLAT list with one inclusive upper bound expresses all four cases (neither/tiered/dated/both) with no nesting and no off-by-one, and rows sharing an effective_from simply form a period. Every validator rule fails CLOSED -- notably a period with no unbounded row is REJECTED rather than letting a large prompt fall through to no rate at all. Wired all six consumers: _calculate_cost resolves per-call (five call sites unchanged -- each already passes input_tokens, which is exactly what selects the tier); verification.py / models.py / utils.py sort on worst_case_output_cost_per_1m; pull_verifier._pricing_for and report._opus_pricing take the worst case too, because both resolve a rate BEFORE token counts exist and a cost cap must not read low.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "scrape-to-propose",
+      "dateTime": "2026-08-04T10:59:02.890354-04:00",
+      "description": "Built ai_router/pricing_proposal.py: --fetch parses the three published pages and writes pricing-proposal.json with every change marked \"pending\"; --apply REFUSES while any change is pending and writes only what a human marked \"accept\", stamping confirmed_on on exactly those entries. Chose the edit-a-file acceptance mechanism over both routed proposals: the architecture call said print-only (which cannot satisfy the spec's 'only acceptance writes the value and stamps confirmed_on') and the analyst said an interactive y/N CLI (which needs a TTY and so could only ever be exercised by the operator who walks it). Marking a decision in a file is testable end-to-end AND still requires the human to open every change. ruamel.yaml is lazily required at --apply only, mirroring migrate_router_config's existing pattern, so the comment-preserving dep stays in the optional extra it already lives in. Parsers are stdlib html.parser, not regex: the Google page emits UNESCAPED '<= 200k tokens' inside cells and a '<[^>]+>' strip silently eats the tier boundary, leaving a plausible single price. Parse scope is deliberately narrow -- standard per-token input/output only, never cache/batch/flex/priority columns; on Google that exclusion is load-bearing because Batch is exactly half Standard, so reading the wrong section would understate by 2x, the same shape as this set's origin defect.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "live-proposal-run",
+      "dateTime": "2026-08-04T11:01:55.200951-04:00",
+      "description": "First end-to-end live run of --fetch against all three pages (exit 1, changes proposed, config untouched). Evidence in s3-live-proposal-evidence.md. It found a defect the spec never named: gpt-5-5 records $2.50/$15.00 and OpenAI publishes $5.00/$30.00 -- a SECOND 2x understatement, with a different cause from gpt-5-6's (gpt-5.5 is a real id, so S1's drift gate passes it; its rates were copied from gpt-5.4 when the entry was added, and its own note says PLACEHOLDER in as many words). Counted the ledger before claiming impact and CORRECTED my own first draft: gpt-5-5 has exactly ONE metrics row at $0.0003, so the spend impact is negligible -- it was briefly the pinned session-verification verifier but the pin moved before it saw use. While counting, found the spec's gpt-5-6 reconciliation figure is far too small: it cites Set 108 S4's slice ($0.5916 -> $1.18), but the whole ledger holds 245 gpt-5-6 rows totalling $48.95 reported, so the true figure is ~$97.90 and lifetime routed spend is understated by ~$49. Both owed to S4. Also confirmed gpt-5-4's $2.50/$15.00 IS correct against the page, so its 466 rows need no correction.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "suite",
+      "dateTime": "2026-08-04T11:22:57.729708-04:00",
+      "description": "Full suite: 3368 passed, 6 skipped, 8 deselected, 0 failed (23m14s), pytest exit 0. S2's closing baseline was 3257 passed / 6 skipped / 8 deselected, so the delta is +111 -- exactly the two new test files (50 schema + 61 proposal) and nothing else. One regression was caught and fixed mid-session before this run: config.py is imported BARE by 33 test modules, so a plain `from .pricing import` broke collection across all of them; fixed with the try/except package-vs-bare pattern config.py already used for secret_resolver.",
+      "status": "complete"
     }
   ]
 }

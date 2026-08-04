@@ -139,6 +139,69 @@ transports:
 # local files, so it adds no session-start latency and is safe in CI.
 # It is NOT wired into any automatic gate yet, deliberately: this registry
 # FAILS it today (see the gpt-5-6 entry) and Set 109 S4 is what fixes it.
+#
+# Set 109 S3 — HOW RATES ARE DECLARED.
+#
+# An entry states its rates ONE of two ways, never both (`ai_router/pricing.py`
+# rejects an entry that tries, because two declarations on one entry can drift
+# apart silently — which is the exact defect this set exists to end):
+#
+#   1. FLAT — two scalars. Right for a single-rate model, which is most of
+#      them. Nothing about this changed.
+#
+#        input_cost_per_1m: 0.75
+#        output_cost_per_1m: 4.50
+#
+#   2. `pricing:` — a list of rate rows, for a model whose real billing is
+#      context-tiered, effective-dated, or both. Two optional keys per row:
+#
+#        max_input_tokens: N   the row applies when input_tokens <= N.
+#                              Exactly one row per period omits it, and that
+#                              row prices everything above the largest bound.
+#        effective_from: DATE  the first day the row applies. Rows sharing a
+#                              date form one period; rows with no date are the
+#                              base period. A future date is invisible until
+#                              its day, which is the point of recording it
+#                              early.
+#
+#      Gemini 2.5 Pro, as Google publishes it:
+#
+#        pricing:
+#          - max_input_tokens: 200000
+#            input_cost_per_1m: 1.25
+#            output_cost_per_1m: 10.00
+#          - input_cost_per_1m: 2.50
+#            output_cost_per_1m: 15.00
+#
+#      Claude Sonnet 5, whose introductory rate lapses on 2026-09-01:
+#
+#        pricing:
+#          - input_cost_per_1m: 2.00
+#            output_cost_per_1m: 10.00
+#          - effective_from: "2026-09-01"
+#            input_cost_per_1m: 3.00
+#            output_cost_per_1m: 15.00
+#
+# Per-call cost resolves the row from the call's own input_tokens and today's
+# date. The model-SELECTION paths (verifier tiebreak, escalation fallback) rank
+# models by the WORST declared output rate instead: they choose before the
+# output length or a future billing date is known, and a candidate that looks
+# cheaper than it can bill is how a "cheapest" choice becomes the expensive one.
+#
+# `confirmed_on: "YYYY-MM-DD"` records the day a HUMAN last confirmed that
+# entry's rates against the provider's published page. Its ABSENCE is honest
+# and is the state of every entry below: nothing here has been confirmed under
+# this regime yet, and Set 109 S4 is the session that confirms them. To see
+# what the providers publish today:
+#
+#     python -m ai_router.pricing_proposal --fetch    # proposes, never writes
+#     # ...mark each change accept/reject in pricing-proposal.json...
+#     python -m ai_router.pricing_proposal --apply    # writes only what you accepted
+#
+# No rate below was edited by Session 3, deliberately. This set's own rule is
+# that a human confirms every rate change, and the flow that makes that
+# possible only exists as of this session — so correcting the rates is S4's
+# job, walked through the confirmation flow rather than hand-typed.
 models:
   gemini-flash:
     provider: google

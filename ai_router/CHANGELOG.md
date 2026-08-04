@@ -93,6 +93,114 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   invariant the suite pins is directional — every provider a row names must be
   one the router actually called.
 
+- **(Set 109 S3) `ai_router.pricing` — rates that can express what providers
+  actually charge.** A model entry declares its rates **either** as the two
+  flat `input_cost_per_1m` / `output_cost_per_1m` scalars (unchanged, and
+  still right for the single-rate majority) **or** as a `pricing:` list of
+  rate rows — never both on one entry, because two declarations that can drift
+  apart is the original defect wearing a new hat. A row carries two optional
+  keys: `max_input_tokens` (inclusive upper bound; the row applies when the
+  call's input token count is at or below it) and `effective_from` (the first
+  day it applies). Rows sharing an `effective_from` form a period, so tiers
+  and dates compose without nesting:
+
+  ```yaml
+  gemini-pro:                       #  $1.25/$10.00 at <=200k, $2.50/$15.00 above
+    pricing:
+      - max_input_tokens: 200000
+        input_cost_per_1m: 1.25
+        output_cost_per_1m: 10.00
+      - input_cost_per_1m: 2.50
+        output_cost_per_1m: 15.00
+  ```
+
+  Validation runs at **config load** and fails closed. Notably a period with
+  no unbounded row is rejected outright: without one, a prompt larger than the
+  largest bound would have no rate at all and cost nothing, which is the exact
+  class of silent under-reporting this set exists to end. `true` is rejected
+  as a rate (`True == 1` in Python), unknown row keys are rejected rather than
+  ignored (a typo'd `max_input_token` would silently widen a tier), and each
+  period is checked independently.
+
+  Per-call cost now resolves the row from the call's own `input_tokens` and
+  today's date — all five `_calculate_cost` call sites already passed
+  `input_tokens`, so no signature changed. The model-**selection** paths
+  (verifier tiebreak in `verification.py`, escalation fallback in `models.py`
+  and `utils.py`) instead rank candidates by `worst_case_output_cost_per_1m`:
+  they choose before the output length or a future billing date is known, and
+  "cheapest available" would make a tiered model look cheaper than it can
+  bill while "the rate in force today" would silently reorder the candidate
+  list on a calendar boundary with no code change.
+  `pull_verifier._pricing_for` and `report._opus_pricing` take the worst case
+  for the same reason — both resolve one rate pair before any token count
+  exists, and a cost **cap** that reads low is the one direction that must not
+  happen.
+
+- **(Set 109 S3) Per-model `confirmed_on`, replacing a global date that could
+  not say what it had checked.** `confirmed_on: "YYYY-MM-DD"` records the day
+  a human last confirmed **that entry's** rates against the provider's page.
+  Its absence is the honest state for a rate nobody has checked, so absence is
+  never an error — it is what the load-time warning names. That warning is now
+  one line listing the unconfirmed and stale entries by name rather than a
+  count, because a count tells an operator something is wrong without telling
+  them where to look.
+
+  `metadata.pricing_reviewed` is deliberately **kept**: the VS Code extension's
+  Cost Dashboard renders its own staleness banner from that field, and
+  extension work is an explicit non-goal of this set — deleting it would have
+  broken a shipped surface this work is not allowed to touch. It is now a
+  maintained rollup (the oldest per-model stamp) written by `--apply`, so it
+  cannot drift away from the stamps it summarises.
+
+- **(Set 109 S3) `ai_router.pricing_proposal` — scrape to PROPOSE, never to
+  write.** `--fetch` fetches all three published pricing pages, parses them,
+  diffs against `router-config.yaml`, and writes `pricing-proposal.json` with
+  every change marked `"decision": "pending"`. The YAML is not touched.
+  `--apply` reads the proposal back, **refuses while any change is still
+  pending**, writes only the ones marked `accept`, and stamps `confirmed_on`
+  on exactly those entries. Accepting is an edit to the proposal file, which
+  needs no TTY — so both halves of the flow are exercised by the hermetic
+  suite rather than only by the operator who walks them. `ruamel.yaml` is
+  lazily required at `--apply` only (mirroring `migrate_router_config`), since
+  `router-config.yaml`'s comments are load-bearing documentation a plain
+  round-trip would delete; fetching, parsing, diffing, and reporting all work
+  without it.
+
+  **All or nothing across providers.** If one page fails to fetch or parse,
+  no proposal is written at all — a proposal covering two of three providers
+  reads as "prices checked" while the third silently rots. A page whose
+  *structure* changed is therefore fatal (exit 2), while a page whose *price*
+  changed is the success case (exit 1, a proposal; exit 0 when nothing
+  differs). The structural assertions are deliberately narrow — the header and
+  row-label text the extraction depends on, and nothing else; row counts and
+  CSS class names are not asserted, because an assertion that fires on
+  harmless churn trains an operator to ignore it.
+
+  Parsing is stdlib `html.parser`, adding no dependency. That is not a
+  stylistic choice: Google emits **unescaped** `<= 200k tokens` inside table
+  cells, and the obvious `<[^>]+>` strip swallows the tier boundary as though
+  it were an open tag — leaving a plausible-looking single price. Scope is
+  narrow by design: standard per-token input and output rates only, never the
+  cached-input, cache-write, batch, flex, or priority columns. On Google that
+  exclusion is load-bearing rather than cosmetic — the Batch section is
+  exactly half the Standard rate, so reading the wrong one would understate by
+  2×, the same magnitude and shape as the defect that started this.
+
+  Identity binds without fuzzy matching: by `model_id` where the page prints
+  an api id (OpenAI's first column, the `<code>` span under each Google
+  heading), and for Anthropic — whose table prints only display names — by a
+  derivation rule (`claude-sonnet-4-6` → `Claude Sonnet 4.6`) rather than a
+  hand-kept lookup table, since a second registry mapping ids to names is one
+  more thing to drift. A configured model the page never mentions is reported
+  loudly as **not checked** rather than skipped silently; page rows no entry
+  claims are listed too, which is how the tool surfaces a model worth adding.
+
+  One rate the page states is deliberately **not** proposed: OpenAI publishes
+  short- and long-context columns but never says where the boundary falls, so
+  the long-context pair is carried as an observation for a human to encode
+  with an explicit `max_input_tokens`. Manufacturing that number would be
+  inventing the one thing the page does not state.
+
 ### Fixed
 
 - **(Set 109 S2) An excluded provider could still receive a real request.**

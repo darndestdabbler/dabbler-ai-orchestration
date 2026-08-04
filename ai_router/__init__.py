@@ -65,6 +65,7 @@ from .config import load_config, resolve_generation_params
 from .models import estimate_complexity, pick_model
 from .providers import call_model
 from .call_trace import HttpCall, trace_provider_calls, record_http_request
+from .pricing import resolve_rates, worst_case_output_cost_per_1m
 from .secret_resolver import resolve_secret, register_backend
 from .prompting import build_prompt
 from .session_log import SessionLog
@@ -2193,9 +2194,14 @@ def print_session_set_status(base_dir: str = "docs/session-sets") -> None:
 
 
 def _calculate_cost(input_tokens, output_tokens, model_cfg):
+    # Set 109 S3: the rate is resolved from the entry rather than read off two
+    # fixed fields, so a context tier or an effective date is honoured without
+    # touching any of this function's five call sites — each already passes
+    # input_tokens, which is exactly what selects the tier.
+    input_rate, output_rate = resolve_rates(model_cfg, input_tokens)
     return (
-        (input_tokens / 1_000_000) * model_cfg["input_cost_per_1m"]
-        + (output_tokens / 1_000_000) * model_cfg["output_cost_per_1m"]
+        (input_tokens / 1_000_000) * input_rate
+        + (output_tokens / 1_000_000) * output_rate
     )
 
 

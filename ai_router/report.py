@@ -41,6 +41,11 @@ from typing import Any, Iterable, Optional
 
 from .config import load_config
 from .metrics import load_metrics
+from .pricing import (
+    PRICING_KEY,
+    worst_case_input_cost_per_1m,
+    worst_case_output_cost_per_1m,
+)
 
 
 # --- Constants ------------------------------------------------------------
@@ -112,11 +117,18 @@ def _opus_pricing(config: dict) -> tuple[float, float]:
     in the report."""
     models = config.get("models", {}) or {}
     opus = models.get(_OPUS_MODEL_KEY, {}) or {}
-    inp = opus.get("input_cost_per_1m")
-    out = opus.get("output_cost_per_1m")
-    if inp is None or out is None:
+    # Set 109 S3: read through the rate resolver so a tiered or dated Opus
+    # entry still yields a baseline. This is a REPORTING baseline covering a
+    # whole date range of historical rows rather than one call, so it takes
+    # the worst case for the same reason the selection tiebreak does: it must
+    # not quietly understate the yardstick every saving is measured against.
+    if not (opus.get(PRICING_KEY) or "input_cost_per_1m" in opus
+            or "output_cost_per_1m" in opus):
         return 15.00, 75.00
-    return float(inp), float(out)
+    return (
+        worst_case_input_cost_per_1m(opus),
+        worst_case_output_cost_per_1m(opus),
+    )
 
 
 # --- Aggregation ----------------------------------------------------------

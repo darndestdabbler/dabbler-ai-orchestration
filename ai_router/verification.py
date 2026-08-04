@@ -28,6 +28,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Iterable, Optional
 
+try:  # package vs bare-import (mirrors the rest of ai_router)
+    from .pricing import worst_case_output_cost_per_1m
+except ImportError:  # pragma: no cover - test/bare context
+    from pricing import worst_case_output_cost_per_1m  # type: ignore[import-not-found]
+
 
 @dataclass
 class VerifierSelection:
@@ -109,7 +114,7 @@ def pick_verifier_model(
         # Sort key: closest tier first, then cheapest output cost.
         # Falls back to input cost then name for deterministic ordering
         # when costs are missing or tied.
-        out_cost = float(cfg.get("output_cost_per_1m") or 0.0)
+        out_cost = worst_case_output_cost_per_1m(cfg)
         candidates.append((tier_distance, out_cost, name))
 
     if not candidates:

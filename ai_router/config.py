@@ -14,9 +14,14 @@ import yaml
 from pathlib import Path
 
 try:
-    from .secret_resolver import resolve_secret  # package context
-except ImportError:
-    from secret_resolver import resolve_secret  # type: ignore[import-not-found]  # test context
+    from .pricing import unconfirmed_and_stale, validate_model_rates  # package context
+    from .secret_resolver import resolve_secret
+except ImportError:  # test context — this module is also imported bare
+    from pricing import (  # type: ignore[import-not-found]
+        unconfirmed_and_stale,
+        validate_model_rates,
+    )
+    from secret_resolver import resolve_secret  # type: ignore[import-not-found]
 
 # Default config location is router-config.yaml in the same directory as
 # this file. Keeps the default working regardless of where Python is
@@ -174,6 +179,11 @@ def load_config(path: str | None = None) -> dict:
                 f"'{model_provider}'. "
                 f"Available providers: {sorted(provider_names)}"
             )
+        # Set 109 S3: rates may be flat or a `pricing:` list of tiered /
+        # effective-dated rows. Validated at LOAD so a malformed entry fails
+        # at startup rather than resolving to zero mid-call.
+        if isinstance(model_cfg, dict):
+            validate_model_rates(model_name, model_cfg)
 
     # Validate tier_assignments reference known models
     for tier, model_name in config["routing"]["tier_assignments"].items():
@@ -486,22 +496,52 @@ def _validate_transport(config: dict) -> None:
 
 
 def _check_pricing_staleness(config: dict) -> None:
-    """Print a warning to stderr if router-config.yaml's pricing has
-    not been reviewed recently.
+    """Print a warning to stderr when model prices have not been confirmed
+    recently.
 
-    Controlled by two fields under the top-level `metadata` block:
-        pricing_reviewed:    ISO date string, e.g. "2026-04-20"
+    Set 109 S3 moved the authority for this from one global
+    ``metadata.pricing_reviewed`` date to a per-model ``confirmed_on`` stamp,
+    because a single global date says "somebody reviewed something" and cannot
+    say WHICH model's rate a human actually checked — and the rate that was
+    wrong for months sat under a global date that looked fresh.
+
+    ``metadata.pricing_reviewed`` is deliberately still read as a fallback.
+    The VS Code extension's Cost Dashboard renders its own staleness banner
+    from that field, and extension work is an explicit non-goal of this set;
+    deleting the field here would have broken a shipped surface this session
+    is not allowed to touch. The sanctioned writer
+    (``ai_router.pricing_proposal --apply``) maintains both, so the rollup
+    cannot drift away from the stamps it summarises.
+
+    Controlled by, under the top-level ``metadata`` block:
         review_frequency_days: integer, default 30
+        pricing_reviewed:      ISO date, the fallback rollup
 
-    Soft warning only. Does not raise.
+    ONE warning line at most. Soft warning only; does not raise.
     """
     metadata = config.get("metadata", {}) or {}
-    reviewed_raw = metadata.get("pricing_reviewed")
     threshold_days = int(metadata.get("review_frequency_days", 30))
+    never, stale = unconfirmed_and_stale(config)
 
+    if never or stale:
+        # Names, not just counts — a count tells an operator that something is
+        # unconfirmed without telling them what to go and look at. Capped so
+        # one line stays one line on a large registry.
+        flagged = sorted(set(never) | set(stale))
+        shown = ", ".join(flagged[:6])
+        if len(flagged) > 6:
+            shown += f", +{len(flagged) - 6} more"
+        print(
+            f"WARNING: {len(never)} model(s) have no confirmed_on stamp and "
+            f"{len(stale)} are older than {threshold_days} days: {shown}. "
+            "Run `python -m ai_router.pricing_proposal --fetch` to see what "
+            "the providers publish today.",
+            file=sys.stderr,
+        )
+        return
+
+    reviewed_raw = metadata.get("pricing_reviewed")
     if not reviewed_raw:
-        print("WARNING: router-config.yaml has no metadata.pricing_reviewed "
-              "date — pricing has never been reviewed.", file=sys.stderr)
         return
 
     try:

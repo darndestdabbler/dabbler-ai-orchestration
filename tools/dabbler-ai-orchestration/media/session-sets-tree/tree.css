@@ -213,6 +213,41 @@ html, body {
   outline-offset: 1px;
 }
 
+/* Operator-reported (2026-08-04): in a NARROW panel the two-column grid
+ * fails. The strip's `auto` column needs ~240px for its four buttons, so the
+ * header column is squeezed until the module title wraps to two lines — and
+ * the vertically-centred strip then sits on top of the first line, hiding the
+ * very name the operator is hovering to identify. Wide panels are unaffected
+ * and keep the quiet single-line affordance.
+ *
+ * Below the threshold, stack the strip UNDER the title instead: one column,
+ * three rows. The title keeps the full width and is never overlaid.
+ *
+ * The accepted trade-off: revealing a stacked strip on hover pushes the
+ * module body down, so a narrow panel gets a small layout shift the wide one
+ * does not. That is deliberate — a momentary shift costs less than a name
+ * that cannot be read at all, and the alternative (truncating the title to
+ * an ellipsis) would hide the same information permanently rather than
+ * momentarily. */
+@media (max-width: 400px) {
+  .module {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "header"
+      "strip"
+      "body";
+  }
+  /* Align the stacked strip with the header text rather than the chevron,
+   * so it reads as belonging to the module above it. */
+  .module-action-strip {
+    align-self: start;
+    flex-wrap: wrap;
+    row-gap: 3px;
+    padding-left: 24px;
+    padding-bottom: 5px;
+  }
+}
+
 /* Set 100 S1: the 093-era persistent Plan / Session sets child-node
  * styles retired with the nodes themselves. Buckets sit directly under
  * the module header again (the Set 092 three-level indent). */

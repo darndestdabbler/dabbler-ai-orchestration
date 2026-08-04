@@ -96,6 +96,58 @@ the two are not mutually exclusive.
    expand; otherwise the level that was supposed to be free is paid on every
    refresh, which is the failure mode the whole set exists to remove.
 
+### Follow-up ask, same day — the activity-bar icon
+
+> *"Since we are eliminating the fractions, I think that we should update the
+> activity bar icon. I created a new one —
+> `tools/dabbler-ai-orchestration/media/dabbler-ai-orchestration-icon-2.svg`."*
+
+**In scope for this set.** The rationale is coherent: the shipping mark is a
+single path whose motif reads as a fraction, and the new one is a circled
+checkmark — a completion motif that matches a tree whose status now lives in
+icons rather than in a numeric column.
+
+**One blocking defect to fix before it can ship.** The current icon is a
+single path with `style="fill:currentColor"` — the theme-safe idiom, which is
+why it follows the activity bar's active/inactive foreground. The new icon
+does not:
+
+```xml
+style="...fill:#ffffff;stroke:#000000;stroke-width:2.1822;..."   <!-- outer ring -->
+style="fill:none;stroke:#000000;stroke-width:5.29167;..."        <!-- checkmark -->
+```
+
+Hardcoded `#ffffff` fill and `#000000` strokes will not track the theme, and a
+white disc is wrong in at least one of light/dark. **Convert both paths to
+`currentColor`** (or flatten to a single filled path with
+`fill:currentColor`), then look at it in both themes and in the active and
+inactive activity-bar states. Two smaller cleanups while it is open: the file
+still carries Inkscape `sodipodi:namedview` editor cruft, and it should be
+confirmed to read cleanly at the activity bar's render size rather than only
+at its authored 128px.
+
+**Every reference to update** — there are exactly three, verified by grep:
+`package.json` (`contributes.viewsContainers.activitybar[0].icon`),
+`media/marketplace-work-explorer-mock.html`, and the extension `CHANGELOG.md`
+mention. `media/darndest-dabbler-icon.png` is the *marketplace* icon and is a
+different asset — do not confuse the two. `media/activity-bar-snapshot.png`
+is a screenshot of the old mark and goes stale the moment this lands; retake
+it or retire it (L-064-8 — a doc that inherits a retired claim).
+
+**Where it belongs in the plan.** This is a shipping-asset swap with no
+dependency on the `TreeDataProvider`, so it fits Session 3 ("switch over"),
+which is already the session that retires the surfaces this replaces. It is
+too small to justify its own session and too visible to leave uncommitted.
+
+> **Open question for the operator, and it changes what S1 builds.** This ask
+> says *"eliminating the fractions"*, but ask 3 above **keeps** the fraction —
+> moved from its dedicated column into `TreeItem.description`. Both cannot be
+> true. Either (a) the fraction survives as dimmed description text and only
+> the bespoke *column* is eliminated, or (b) the fraction leaves the tree
+> entirely, ask 3 is withdrawn, and `description` is free for something else
+> (or nothing). S1 must settle this before the density mapping is confirmed;
+> it is recorded here unresolved rather than guessed.
+
 ### Why this belongs to S1 rather than being applied directly
 
 S1's job is the go/no-go and the **operator-confirmed density mapping** — the

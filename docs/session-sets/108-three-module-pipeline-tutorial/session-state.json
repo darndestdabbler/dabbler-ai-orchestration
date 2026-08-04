@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "108-three-module-pipeline-tutorial",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -51,9 +51,9 @@
     {
       "number": 4,
       "title": "Session 4",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-03T16:36:06.638782-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-03T23:48:22.147826-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -61,7 +61,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "WAIVED"
     }
   ]
 }

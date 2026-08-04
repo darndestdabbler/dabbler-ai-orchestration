@@ -16,54 +16,34 @@ rather than proposed.
 
 ---
 
-## Recommendation 1 — ACCEPT/REJECT NEEDED: sharpen L-069-1 to name the *local* sibling
+## Recommendation 1 — WITHDRAWN by operator guidance: no guidance change
 
-**Why.** L-069-1 is promoted into `project-guidance.md` as *"A bug is a bug
-CLASS — fix every sibling site, not just the reported one"*, and its
-instruction is to **"grep the whole codebase for the pattern."** That framing
-points **outward**, at siblings in other modules — which is where its
-originating defects lived (Sets 068/069/072, across parallel readers and
-validators).
+**What it would have been.** L-069-1's promoted rule says to *"grep the whole
+codebase for the pattern"* — which points **outward**, at siblings in other
+modules. This session missed a sibling **four lines away in the same
+function**, while citing L-069-1 in the same hour: I fixed a fail-open exit
+code for `not_comparable_entries` and left the identical fact reached through
+the adjacent branch (`unmatched_config_entries`) untouched, and cross-provider
+verification caught it as a Major. The proposal was a ~45-token clause naming
+the local sibling, paid for by removing a clause the remediation-review phase
+now covers as an executable gate.
 
-This session missed a sibling **four lines away in the same function**, while
-citing L-069-1 in the same hour.
+**Withdrawn, on operator guidance (2026-08-04):**
 
-Concretely: `pricing_proposal.main()` decided its exit code from
-`proposal["changes"]`. I noticed that a *held* entry
-(`not_comparable_entries`) let `--fetch` exit 0 while printing an all-clear,
-and fixed it. `unmatched_config_entries` — the identical "this rate was not
-checked" fact, reached through the adjacent branch — still exited 0, and
-cross-provider verification caught it as a Major. Grepping the codebase would
-not have helped; the sibling was inside the function I was editing.
+> *"We are making things more and more complicated. My staff have expressed
+> concerns that the orchestrator is too complicated and they might just set it
+> aside and do their own thing. So, whatever we decide here, let's err on the
+> side of simplicity. Let's not add any more than is necessary for this to be
+> functional."*
 
-**The gap is real and one clause wide.** "Grep the codebase" reads as an
-instruction about *distance*, and a reviewer who has just satisfied it feels
-finished. The failure mode is the opposite: fixing the reported symptom rather
-than the *predicate*, with the co-located branch untouched.
+The rule already exists, in the right file, and says the right thing. The gap
+was **my application of it**, not its wording — and a guidance file at 100% of
+its ceiling is exactly where a well-meant clarifying clause becomes the
+accretion the operator is describing. Editing prose to prevent a mistake the
+prose already covers buys nothing and costs a reader's attention on every
+future session.
 
-### The proposed text
-
-In `project-guidance.md` → Conventions → Code Style, in the L-069-1 bullet,
-after *"grep the whole codebase for the pattern"*, insert:
-
-> — **and read the branches beside the one you just changed.** The sibling is
-> often local, not distant: the same predicate reached through the adjacent
-> `if`, in the function already open. Grepping outward feels like completion
-> and does not touch it.
-
-**Cost: ~45 tokens against a file at 100% of ceiling.** Proposed removal to pay
-for it — the same bullet's closing clause *"where practical ship a probe /
-falsifier that drives the public entrypoint with the bad input, so the class
-both reproduces and cannot silently re-open"* (~40 tokens). That advice is
-sound but is now **executable-gate-covered**: `verify_session`'s
-remediation-review phase reviews the fix delta and issues per-finding
-fix-verdicts, which is the mechanism that would catch a non-reproducing fix.
-The admission test demotes rules with an executable-gate equivalent.
-
-**Operator decides.** I have not edited either file — editing guidance and
-paying a ceiling are both operator-sanctioned acts.
-
----
+Recorded here so the miss is on the record without the corpus growing.
 
 ## Recommendation 2 — RECORD ONLY: a deferral's stated reason can expire
 
@@ -149,6 +129,7 @@ but to surface a wrong one here.
 
 ## Outcome
 
-**One recommendation requiring an accept/reject** (Recommendation 1, with its
-ceiling payment named). Three recorded observations requiring no change.
-Neither guidance file was edited by this session.
+**No changes recommended** — the constitution's explicitly valid outcome.
+The one candidate was withdrawn under the operator's simplicity guidance; the
+other three were recorded rather than proposed. **Neither guidance file was
+edited, and neither grew.**

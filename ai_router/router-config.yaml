@@ -44,7 +44,14 @@ providers:
     rate_limit:
       requests_per_minute: 60
       tokens_per_minute: 100000
-    timeout_seconds: 300
+    # Set 109 S3: raised 300 -> 900. Anthropic has always been 600; these two
+    # were half that, and a tier-3 model reasoning at high effort over a large
+    # evidence bundle exceeds 300s routinely. It cost this session two routed
+    # architecture calls and TWO WHOLE VERIFICATION ROUNDS -- 3 attempts x 300s
+    # each, paid for, returning nothing but "The read operation timed out".
+    # That is a mandatory gate the transport could not complete, which makes
+    # this a correctness knob rather than a comfort one.
+    timeout_seconds: 900
     retry:
       max_retries: 2
       backoff_base_seconds: 2
@@ -57,7 +64,7 @@ providers:
     rate_limit:
       requests_per_minute: 60
       tokens_per_minute: 100000
-    timeout_seconds: 300
+    timeout_seconds: 900     # Set 109 S3 -- see the note on google above.
     retry:
       max_retries: 2
       backoff_base_seconds: 2

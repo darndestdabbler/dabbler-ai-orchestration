@@ -169,6 +169,29 @@ both owed to Session 4:
   cites Set 108 S4's slice ($0.5916 → ~$1.18); the whole ledger holds **245**
   `gpt-5-6` rows totalling **$48.95** reported, so the true figure is ~$97.90.
 
+## What was excluded from the evidence diff, and why
+
+Declared rather than done quietly. Four files are held out of the bundle **on
+top of** the framework's default exclusions. Everything held out is either
+verbatim third-party markup or raw model output; **no code, no test, and no
+prose this session authored is excluded.**
+
+- `ai_router/tests/pricing_page_fixtures.py` — 41 KB of provider HTML captured
+  byte-for-byte, most of it inline CSS. Reviewing it means reviewing OpenAI's
+  stylesheet. Its docstring (which *is* worth reading, and states exactly which
+  rows were dropped from each page) is quoted in item 6 above and in the
+  module's own header. The tests that consume it are fully in the diff.
+- `s3-ai-assignment-analysis.json`, `s3-pricing-schema-design.json`,
+  `s3-scraper-design.json` — the three routed advisory artifacts, each a single
+  enormous JSON line of raw model output. They are records of what was
+  recommended, not deliverables; where they were adopted or overridden is
+  written in prose in `ai-assignment.md`, which **is** in the diff.
+
+The first attempt at this round included all four and the routed call **timed
+out** (3 × 300s), returning nothing — the same transport ceiling that cost this
+session two design calls earlier. Removing them cut the bundle from 243,419 to
+175,802 characters.
+
 ## Severity rubric for this round (L-095-1)
 
 Grade by **consequence**: probability the stated failure scenario materialises

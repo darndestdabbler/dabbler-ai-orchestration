@@ -595,6 +595,21 @@ def _resolve_copilot_generator(
     )
 
 
+def _copilot_echoed_model(result) -> Optional[str]:
+    """The model id the Copilot CLI echoed back, or None.
+
+    ``transport_metadata`` is an open diagnostic dict, so the value is
+    shape-checked here for the same reason ``copilot_catalog`` coerces
+    ``premium_requests`` at its own boundary: a non-string must not cross into
+    the metrics row and must not be able to break a call that already ran.
+    """
+    metadata = getattr(result, "transport_metadata", None) or {}
+    echoed = metadata.get("echoed_model")
+    if isinstance(echoed, str) and echoed.strip():
+        return echoed
+    return None
+
+
 def _copilot_provider_of(model_id: str) -> Optional[str]:
     """Look up ``model_id``'s provider from the seat catalog's CONFIRMED
     entries only. Returns ``None`` when the model isn't there.
@@ -799,6 +814,11 @@ def _route_via_copilot_cli(
         local_invocations=_copilot_invocation_count,
         attempts=1,
         billed_usage_unavailable=True,
+        # Set 109 S1 (L-069-1 sibling parity): the seat transport already reads
+        # the CLI's echoed model; land it on the same column as the api
+        # profile's served id so "what actually answered" is one query, not two.
+        requested_model_id=model_id,
+        served_model_id=_copilot_echoed_model(result),
         stamp=completed_stamp,
     )
 
@@ -943,6 +963,8 @@ def _run_verification_via_copilot_cli(
         local_invocations=_copilot_invocation_count,
         attempts=1,
         billed_usage_unavailable=True,
+        requested_model_id=selection.model_id,
+        served_model_id=_copilot_echoed_model(result),
     )
 
     return VerificationResult(
@@ -1263,6 +1285,10 @@ def route(
         stop_reason=result.stop_reason,
         session_set=session_set,
         session_number=session_number,
+        # Set 109 S1: the alias in ``model`` above is local; these two say what
+        # was actually asked for and what the provider actually served.
+        requested_model_id=_config["models"][current_model_name]["model_id"],
+        served_model_id=result.served_model_id,
         stamp=completed_stamp,
     )
 
@@ -1385,6 +1411,8 @@ def query(
         stop_reason=result.stop_reason,
         session_set=session_set,
         session_number=session_number,
+        requested_model_id=model_cfg["model_id"],
+        served_model_id=result.served_model_id,
     )
 
     return RouteResult(
@@ -1632,6 +1660,8 @@ def _run_verification(
             verifier_fallback=(attempt > 0),
             fallback_from_provider=first_attempt_provider,
             preferred_verifier_skipped=preferred_skipped,
+            requested_model_id=verifier_cfg["model_id"],
+            served_model_id=v_result.served_model_id,
         )
 
         # Build and return verification result
@@ -1758,6 +1788,8 @@ def _tiebreaker_reroute(
         stop_reason=tb_result.stop_reason,
         session_set=session_set,
         session_number=session_number,
+        requested_model_id=tb_cfg["model_id"],
+        served_model_id=tb_result.served_model_id,
     )
 
     route_result.content = tb_result.content

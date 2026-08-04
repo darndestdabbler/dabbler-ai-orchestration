@@ -1,0 +1,42 @@
+{
+  "status": "completed",
+  "summary": "Set 109 Session 1 of 4, \"Enumeration, the drift gate, and served-model truth\". THE FALSIFIER NOW EXISTS AND FIRES: `python -m ai_router.model_inventory --check` exits 1 and names `gpt-5-6 / model_id='gpt-5.6'` -- the id OpenAI does not list, which silently resolved to `gpt-5.6-sol` at twice the recorded price and made every cost this repo reported for that entry half the truth. `--refresh` probes OpenAI's, Anthropic's, and Google's model-list endpoints and writes `ai_router/model-inventory.lock` (193 ids across the three providers, per-provider probe timestamp); `--check` reads only local files, so it adds no session-start latency -- the operator's open complaint about startup cost -- and is deterministic in CI. THE ENUMERATION FOUND A SECOND DRIFTING ENTRY THE SPEC DID NOT NAME: `gemini-3-pro` (identity-only) is absent from Google's list too, which offers `gemini-3-pro-preview`; it is reported as a note on every run rather than exempted by a flag, because an exemption is precisely the mechanism that goes quiet. THE GATE IS DELIBERATELY UNWIRED from any automatic check: this repository's own registry fails it today, that failure IS the specimen, and Session 4 is what corrects the registry -- wiring it into `drift_guard.py`, whose test asserts the real repo passes every check, would turn the committed suite red for a defect already scheduled to be fixed. SERVED-MODEL TRUTH: `APIResult` gains `served_model_id` (Anthropic/OpenAI `model`, Google `modelVersion`, `None` -- never `\"\"` -- when unreported), and metrics rows gain `requested_model_id`, `served_model_id`, and a tri-state `served_model_mismatch`, all null on the 1,196 historical rows. Two columns rather than one because the row's existing `model` field holds the local ALIAS (`gpt-5-6`), not the wire id (`gpt-5.6`), so a requested-vs-served comparison would otherwise have needed a version of `router-config.yaml` that Session 4 is about to edit. LIVE PROBES CHANGED THE DELIVERABLE: the spec forbade re-deriving its OpenAI evidence, so the probes went after the response SHAPES instead, and OpenAI served a plain `gpt-5.4-mini` request as `gpt-5.4-mini-2026-03-17` -- a dated snapshot. Substitution is the NORM on that provider, not the exception the spec caught, which is why the mismatch flag is documented as a pointer (a snapshot pin is routine; a change of model FAMILY is what changes the price) rather than an alarm. VERIFICATION: discovery round 1 (2-way fan-out, gpt-5-6, anthropic excluded) returned 5 blocking findings that were 3 distinct issues, the fan-out having independently duplicated two; the supplementary completeness-critic pass returned VERIFIED with 0 new; all three were fixed in one pass and remediation-review returned VERIFIED, 3 fix-accepted, 0 rejected, 0 new. THE SECURITY FINDING WAS REAL: `fetch_google` passed the API key as a `?key=` query parameter, httpx renders the request URL into `HTTPStatusError`, and `--refresh` prints that to stderr -- so a routine 401/429/5xx would have put a live credential into terminal history and CI logs. Fixed via the `x-goog-api-key` header, `redact_secret()` over every httpx error, and `raise ... from None` so a chained traceback cannot leak what the message no longer prints; the PRE-EXISTING SIBLING in `providers._call_google`, which neither fan-out call named, was fixed in the same pass under L-069-1. ONE FINDING WAS PARTLY REJECTED, AND CHECKING IT FOUND SOMETHING BETTER: the claim that an `is_enabled: false` + `is_enabled_as_verifier: true` entry would be routed to as a verifier is false -- `verification.py` applies the `is_enabled` rule BEFORE the verifier rule, so the proposed fix would have manufactured a false hard-failure. But checking it surfaced a real bypass the verifier did not name: `models.pick_model` returns a `task_type_overrides` pin WITHOUT its `_survives()` check whenever no provider exclusion applies, proved empirically on a synthetic config. Routability is therefore `is_enabled` OR named in `task_type_overrides`/`tier_assignments`, and both defaults lean toward reporting so the gate cannot under-report. THREE FURTHER DEFECTS WERE CAUGHT BY THE ORCHESTRATOR'S OWN RE-READ before verification ever ran: `is_enabled` defaulted to False where every other reader in the package defaults it True; a `--strict` run printed an \"OK\" summary while exiting 1; and a snapshot with no `probed_at` could never be judged stale and so would have passed forever. SUITE: 3228 passed, 6 skipped, 8 deselected, 0 failed (23m36s), up from a 3143-test pre-session baseline. Router-side only, [Unreleased] in the changelog -- no version bump, no publish, no extension work.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "The routed step-3.5 analyst recommended claude/claude-opus-5/high for Session 2 and the reasoning holds independently: S2 instruments the provider-call boundary and must reason about route()'s escalation loop, the auto-verification branch, and the exclude_providers path across a 2,100-line module -- control-flow archaeology, not greenfield work. This session also hands S2 two concrete leads it should not have to rediscover: route() ends in an auto-verification branch whose _run_verification does its own model selection (a candidate explanation for the two-metrics-row anomaly, offered as a lead and NOT as a finding -- nothing was counted at the HTTP boundary here), and models.pick_model honours a task_type_overrides pin without its _survives() check when exclude_providers is empty, which is a live is_enabled bypass in model selection and squarely inside S2's subject."
+    }
+  },
+  "blockers": [],
+  "files_changed": [
+    "ai_router/model_inventory.py",
+    "ai_router/model-inventory.lock",
+    "ai_router/providers.py",
+    "ai_router/metrics.py",
+    "ai_router/__init__.py",
+    "ai_router/router-config.yaml",
+    "ai_router/CHANGELOG.md",
+    "ai_router/tests/model_inventory_fixtures.py",
+    "ai_router/tests/test_model_inventory.py",
+    "ai_router/tests/test_served_model_recording.py",
+    "docs/session-sets/109-model-registry-and-pricing-truth/ai-assignment.md",
+    "docs/session-sets/109-model-registry-and-pricing-truth/s1-conventions.md",
+    "docs/session-sets/109-model-registry-and-pricing-truth/s1-ai-assignment-analysis.json",
+    "docs/session-sets/109-model-registry-and-pricing-truth/s1-enumeration-design.json",
+    "docs/session-sets/109-model-registry-and-pricing-truth/s1-remediation-round-1.md",
+    "docs/session-sets/109-model-registry-and-pricing-truth/activity-log.json"
+  ],
+  "lessons_cited": [
+    "L-069-1",
+    "L-064-9",
+    "L-079-1",
+    "L-095-1"
+  ]
+}

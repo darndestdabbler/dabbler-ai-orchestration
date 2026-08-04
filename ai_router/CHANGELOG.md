@@ -9,12 +9,73 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
-## [Unreleased] (Sets 105, 107 — router-side fixes awaiting a publish)
+## [Unreleased] (Sets 105, 107, 109 — router-side changes awaiting a publish)
 
 > Router-side, not yet published. A version bump / PyPI publish is
 > operator-gated and recorded at release time.
 
+### Added
+
+- **(Set 109 S1) `ai_router.model_inventory` — provider model enumeration and a
+  registry drift gate.** `--refresh` probes OpenAI's, Anthropic's, and Google's
+  model-list endpoints and writes `ai_router/model-inventory.lock`, a snapshot
+  of the ids each provider offers plus a per-provider probe timestamp.
+  `--check` compares every `model_id` in `router-config.yaml` against that
+  snapshot and fails loud (exit 1) on any **routable** entry naming an id the
+  provider does not offer; identity-only entries (`is_enabled: false`) are
+  reported as notes and can be promoted to failures with `--strict`.
+
+  `--check` reads only local files — it never probes — so it adds no
+  session-start latency and is deterministic in CI. A provider that has never
+  been enumerated is a **fatal** condition (exit 2), not drift: "we could not
+  ask" and "the provider does not offer it" are different facts, and conflating
+  them would report every model of that provider as missing. A `--refresh` that
+  fails for one provider keeps that provider's previous snapshot rather than
+  downgrading it, and reports the failure with a non-zero exit.
+
+  "Routable" is deliberately **not** `is_enabled` alone: `models.pick_model`
+  honours a `task_type_overrides` pin without its `_survives()` check when no
+  provider exclusion applies, so a pinned entry reaches the wire even with
+  `is_enabled: false`. Any alias named in `task_type_overrides` or
+  `tier_assignments` is therefore treated as routable regardless of its flag.
+
+  The gate is **not yet wired into any automatic check**. The repository's own
+  registry fails it today — `router-config.yaml` sends `model_id: gpt-5.6`, an
+  id OpenAI does not list — and Set 109 S4 is what corrects the registry.
+
+- **(Set 109 S1) Metrics rows now record the model the provider actually
+  served, and flag a substitution.** `router-metrics.jsonl` gains three
+  additive columns: `requested_model_id` (the string sent on the wire),
+  `served_model_id` (the id in the response body — Anthropic/OpenAI `model`,
+  Google `modelVersion`), and `served_model_mismatch`. The pre-existing
+  `model` column holds the local registry *alias*, so neither the substitution
+  nor the comparison was recoverable from a row before this. The flag is
+  tri-state: `true`/`false` when both ids are present, and `null` — not
+  `false` — when either is absent, since an uncaptured id does not establish
+  that the provider served what was asked for. All three are `null` on
+  historical rows and on any caller that does not supply the ids.
+  `print_metrics_report` gained a *Requested vs served model* section that
+  groups substitutions by `requested -> served` with counts. Read the flag as
+  a pointer rather than an alarm: OpenAI routinely pins a dated snapshot
+  (`gpt-5.4-mini` → `gpt-5.4-mini-2026-03-17`), which is a true mismatch and
+  entirely ordinary; the costly kind is a change of model *family*
+  (`gpt-5.6` → `gpt-5.6-sol`), and the two ids beside the flag are what tell
+  them apart. The Copilot CLI transport lands its already-parsed echoed model
+  on the same column.
+
 ### Fixed
+
+- **(Set 109 S1) The Google API key no longer travels in the query string.**
+  Both `model_inventory.fetch_google` and `providers._call_google` built a
+  `?key=<API_KEY>` URL, and `httpx` renders the full request URL into
+  `HTTPStatusError` — which `model_inventory`'s `--refresh` prints to stderr
+  and `providers`' retry loop re-raises. A routine 401/429/5xx therefore put a
+  live credential into terminal history and CI logs. Both now send
+  `x-goog-api-key` as a header (L-069-1: the reported site and its sibling
+  fixed in one pass). `model_inventory` additionally redacts the secret value
+  and any credential-shaped query parameter out of its failure messages, and
+  suppresses the exception cause so a chained traceback cannot leak what the
+  message no longer prints.
 
 - **(Set 107 S1) `close_session` no longer exits with a raw traceback when
   stdin has no tty.** The `external-verification.md` soft gate (Set 048 §3.5)

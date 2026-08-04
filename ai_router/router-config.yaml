@@ -128,6 +128,17 @@ transports:
 # The two flags exist so adding a cheap new model does not silently
 # enroll it in verifier duty. See docs/planning/project-guidance.md
 # (workflow-expectations) for the promotion criterion.
+#
+# Set 109 S1 — every model_id below is checkable against what the provider
+# actually offers:
+#
+#     python -m ai_router.model_inventory --refresh   # probe + write the lock
+#     python -m ai_router.model_inventory --check     # compare, fail loud
+#
+# The snapshot lives in ai_router/model-inventory.lock. `--check` reads only
+# local files, so it adds no session-start latency and is safe in CI.
+# It is NOT wired into any automatic gate yet, deliberately: this registry
+# FAILS it today (see the gpt-5-6 entry) and Set 109 S4 is what fixes it.
 models:
   gemini-flash:
     provider: google
@@ -287,7 +298,14 @@ models:
     system_prompt_file: prompt-templates/system-prompts.md
     notes: "Frontier OpenAI model GPT-5.6, codename 'Sol' (operator, 2026-07-10).
       PLACEHOLDER pricing/limits mirror gpt-5.4/5.5 — confirm against OpenAI's
-      published GPT-5.6 rates and the exact model_id before trusting."
+      published GPT-5.6 rates and the exact model_id before trusting.
+      KNOWN DRIFT (Set 109 S1, probed 2026-08-04): OpenAI does NOT list a bare
+      'gpt-5.6'. It offers gpt-5.6-luna / -sol / -terra, and this id silently
+      resolves to -sol at $5.00/$30.00 — twice the rates recorded above, so
+      every cost reported for this entry is half the truth. Left in place
+      deliberately as the live specimen `model_inventory --check` fails on;
+      Set 109 S4 splits this entry into the three real variants and retires
+      the bare alias. Do not 'fix' the id here without S4's price work."
     generation_params:
       reasoning_effort: high
 
@@ -330,7 +348,13 @@ models:
     is_enabled: false
     is_enabled_as_verifier: false
     notes: "Identity registry only: Gemini Code Assist orchestrator
-      sessions (the Set 084 S2 ai-assignment recommendation)."
+      sessions (the Set 084 S2 ai-assignment recommendation).
+      Set 109 S1: `model_inventory --check` reports this id as identity-only
+      drift — the Gemini API lists gemini-3-pro-preview, not a bare
+      gemini-3-pro. That is a NOTE, not a failure: nothing routes here, and an
+      orchestrator's identity is what the Code Assist surface calls itself,
+      which need not be an id the generative API sells. Reported on every run
+      rather than exempted by a flag, so it cannot go quiet."
   claude-opus-5:
     provider: anthropic
     model_id: claude-opus-5

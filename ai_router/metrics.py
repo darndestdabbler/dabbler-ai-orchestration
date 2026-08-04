@@ -13,8 +13,32 @@ Schema per line:
     "session_number":   int or null
     "call_type":        "route" | "verify" | "tiebreaker" | "adjudication"
     "task_type":        str
-    "model":            str  (the generator or verifier)
+    "model":            str  (the generator or verifier — the registry ALIAS,
+                              e.g. "gpt-5-6", not the id put on the wire)
     "provider":         "anthropic" | "google" | "openai"
+    # Set 109 S1 — requested-vs-served model truth. Both null on every
+    # historical row and on any caller that does not supply them.
+    "requested_model_id": str or null
+         the registry entry's model_id, i.e. the string actually sent to the
+         provider ("gpt-5.6"). Recorded because "model" above is the local
+         alias: without this column a row cannot be compared to what the
+         provider served except by joining against a version of
+         router-config.yaml that has since been edited.
+    "served_model_id":  str or null
+         the id the provider says it served, from the response body
+         (Anthropic/OpenAI "model", Google "modelVersion"). null means the
+         provider did not report one — distinct from "served something else".
+    "served_model_mismatch": bool or null
+         true when the two ids above are both present and differ — the
+         provider served something other than what was asked for. null (not
+         false) when either id is absent, because "we did not capture it" is
+         not "they matched". Computed at write time from the two columns, so
+         a reader never has to know the comparison rule. Read it as a
+         POINTER, not an alarm: OpenAI pins a dated snapshot on ordinary
+         calls ("gpt-5.4-mini" -> "gpt-5.4-mini-2026-03-17"), which is a true
+         mismatch and entirely routine. The costly kind is a change of
+         FAMILY ("gpt-5.6" -> "gpt-5.6-sol"), which this column surfaces for
+         inspection alongside the ids that let you tell the two apart.
     "tier":             int
     "complexity_score": int or null
     "effort":           str or null   (Anthropic effort or OpenAI reasoning.effort)
@@ -175,6 +199,12 @@ def record_call(
     local_invocations: Optional[int] = None,
     attempts: Optional[int] = None,
     billed_usage_unavailable: Optional[bool] = None,
+    # Set 109 S1 additions — requested-vs-served model truth. Additive and
+    # optional: every historical row and every caller that omits them records
+    # null, which is correct ("we did not capture this"), never a false
+    # equality claim.
+    requested_model_id: Optional[str] = None,
+    served_model_id: Optional[str] = None,
     # Set 084 S2 (F3) -- the verification-evidence stamp, passed as one
     # dict by the sanctioned producers via route(verification_stamp=...).
     # None (every other caller) leaves every stamp field null, keeping
@@ -215,6 +245,16 @@ def record_call(
         "call_type": call_type,
         "task_type": task_type,
         "model": model,
+        "requested_model_id": requested_model_id,
+        "served_model_id": served_model_id,
+        # Tri-state on purpose: True/False only when BOTH ids are known, else
+        # null. A false here would claim the provider served what we asked
+        # for, which an absent id does not establish.
+        "served_model_mismatch": (
+            (requested_model_id != served_model_id)
+            if (requested_model_id and served_model_id)
+            else None
+        ),
         "provider": provider,
         "tier": tier,
         "complexity_score": complexity_score,
@@ -402,6 +442,50 @@ def load_metrics(config: dict) -> list[dict]:
     return records
 
 
+def served_model_mismatches(records: list) -> dict:
+    """Group rows where the provider served something other than what was
+    asked for, keyed by ``"<requested> -> <served>"`` with the call count.
+
+    Rows predating Set 109 S1 carry neither id and are simply absent from the
+    result: an uncaptured pair is not evidence of a match.
+    """
+    grouped: dict = {}
+    for record in records:
+        if not record.get("served_model_mismatch"):
+            continue
+        key = (
+            f"{record.get('requested_model_id')} -> "
+            f"{record.get('served_model_id')}"
+        )
+        grouped[key] = grouped.get(key, 0) + 1
+    return grouped
+
+
+def print_served_model_mismatches(records: list) -> None:
+    """Operator-visible surface for the mismatch flag. ASCII-only."""
+    observed = sum(
+        1 for r in records if r.get("served_model_mismatch") is not None
+    )
+    if not observed:
+        return
+    grouped = served_model_mismatches(records)
+    print("\n--- Requested vs served model ---")
+    if not grouped:
+        print(f"  [ ] {observed} call(s) recorded both ids; none mismatched.")
+        return
+    total = sum(grouped.values())
+    print(
+        f"  [~] {total} of {observed} call(s) with both ids recorded were "
+        "served a DIFFERENT model id than requested."
+    )
+    print(
+        "      A dated-snapshot pin is routine; a change of model FAMILY is "
+        "the one that changes the price."
+    )
+    for key, count in sorted(grouped.items(), key=lambda kv: -kv[1]):
+        print(f"      {count:>5}x  {key}")
+
+
 def print_metrics_report(config: dict) -> None:
     """Print a human-readable summary of the metrics log to stdout."""
     records = load_metrics(config)
@@ -422,6 +506,8 @@ def print_metrics_report(config: dict) -> None:
     print(f"Total cost:           ${total_cost:.4f}")
     print(f"Total input tokens:   {total_input:,}")
     print(f"Total output tokens:  {total_output:,}")
+
+    print_served_model_mismatches(records)
 
     # By model: call count, total cost, escalation rate
     print("\n--- By model ---")

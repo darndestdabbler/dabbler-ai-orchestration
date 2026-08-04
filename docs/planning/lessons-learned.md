@@ -71,7 +71,7 @@ whose trigger moment is situational, moved full-text to
 | L-079-2 | spec-authoring rule — see the authoring guide (gate flags live in the config block, prose cannot arm a gate) |
 
 ## Windows cp1252 Is A Standing Bug Class — Bytes At Subprocess Boundaries, Persist Before Printing
-<!-- lesson: id="L-079-1" added-set="079" last-used-set="108" status="active" scope="portable" -->
+<!-- lesson: id="L-079-1" added-set="079" last-used-set="109" status="active" scope="portable" -->
 
 - The child Python's stdout text layer defaults to `cp1252` on Windows,
   so any non-ASCII payload crossing a pipe *as text* is a latent crash in
@@ -107,7 +107,7 @@ full text in `lessons-archive.md`:
   verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="108" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="109" status="active" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and
@@ -138,7 +138,7 @@ full text in `lessons-archive.md`:
   the resolved installed version at close, not just the declared floor.
 
 ## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
-<!-- lesson: id="L-095-1" added-set="095" last-used-set="108" status="active" scope="portable" -->
+<!-- lesson: id="L-095-1" added-set="095" last-used-set="109" status="active" scope="portable" -->
 
 - Reviewers are salience-limited, not context-limited: each pass returns
   the most salient handful of technically-real findings, and fixing them

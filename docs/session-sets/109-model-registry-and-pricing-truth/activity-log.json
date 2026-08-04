@@ -1,0 +1,185 @@
+{
+  "sessionSetName": "109-model-registry-and-pricing-truth",
+  "createdDate": "2026-08-04T09:42:19.253338+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-04T09:42:19.254105+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-04T05:45:35.814501-04:00",
+      "description": "Registered S1 via start_session (claude/anthropic/claude-opus-5/high); read the preload (constitution, project-guidance, lessons-learned, CLAUDE.md); confirmed the three DABBLER_* provider keys are present; no decision-review-queue entries.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "read-spec",
+      "dateTime": "2026-08-04T05:45:36.170513-04:00",
+      "description": "Read spec.md and cached the Session Set Configuration block: tier=full, requiresUAT=true (S4 walks it), requiresE2E=false, uatStyle=ad-hoc, uatScope=per-set, pathAwareCritique=advisory (set-terminal, S4). Cached S1's plan: Creates=enumeration module + lockfile + tests; Touches=router-config.yaml metadata only; progress keys enumerationBuilt/lockfileWritten/driftGateFailsLoudOnGpt56/servedModelRecorded.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "prerequisites",
+      "dateTime": "2026-08-04T05:45:36.579632-04:00",
+      "description": "Prerequisites: spec declares none (Set 109 is the head of its chain; Set 110 declares 109 as ITS prerequisite). Confirmed 109 and 110 are the only non-complete sets, and 110 is not-started.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "routed-assignment-analysis",
+      "dateTime": "2026-08-04T05:45:36.983420-04:00",
+      "description": "Step 3.5: routed analysis (task_type=analysis, exclude_providers=[anthropic]) -> gemini-pro/gemini-2.5-pro, $0.0153, truncation-clean. Saved raw as s1-ai-assignment-analysis.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "live-endpoint-probe",
+      "dateTime": "2026-08-04T05:50:20.057428-04:00",
+      "description": "Probed all three enumeration endpoints live: OpenAI GET /v1/models (124 ids, 'gpt-5.6' ABSENT while gpt-5.6-luna/-sol/-terra are present -> the gate's live specimen confirmed); Anthropic GET /v1/models (11 ids, cursor-paginated via has_more/last_id); Google GET /v1beta/models (58 ids, 'models/' name prefix, nextPageToken). Second finding: registry entry gemini-3-pro (identity-only) is ALSO absent -- Google lists only gemini-3-pro-preview. Also probed the served-model field on completion calls: Anthropic data['model']='claude-sonnet-4-6' (exact echo), Google data['modelVersion']='gemini-2.5-pro' (bare id), OpenAI data['model'] for requested 'gpt-5.4-mini' = 'gpt-5.4-mini-2026-03-17' (DATED SNAPSHOT -- so OpenAI mismatches on every call, not only on the gpt-5.6 alias).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "routed-architecture",
+      "dateTime": "2026-08-04T05:50:20.431599-04:00",
+      "description": "Routed the six-question enumeration/gate design (task_type=architecture, exclude_providers=[anthropic]) -> gemini-pro/gemini-2.5-pro (opus excluded by the no-skip anthropic exclusion), $0.0798 incl. auto-verification, truncation-clean. Saved raw as s1-enumeration-design.json. Adopted JSON lockfile, --refresh/--check split, check-never-probes, missing-lock fatal, served_model_id on APIResult, no runtime action on mismatch. Departed on five points (recorded in ai-assignment.md).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "build-enumeration",
+      "dateTime": "2026-08-04T06:00:39.908829-04:00",
+      "description": "Wrote ai_router/model_inventory.py: per-provider list-endpoint resolution derived from the existing providers.<name>.base_url (no new config keys), three pure page parsers that fail loud on a reshaped envelope, cursor/pageToken pagination with a repeated-cursor loop guard, injectable httpx.Client, and probe_provider() that refuses an empty model list. Ran --refresh: anthropic 11, google 58, openai 124 ids -> ai_router/model-inventory.lock (per-provider probed_at).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "drift-gate",
+      "dateTime": "2026-08-04T06:00:40.298456-04:00",
+      "description": "Shipped the drift gate. --check reads two local files and never probes. Routable miss = exit 1 fail-loud naming the entry; identity-only miss = reported note, exit 0 (--strict promotes it); provider never enumerated = exit 2 fatal, deliberately NOT drift; per-provider staleness warns at 30 days (matches metadata.review_frequency_days). ENDS-WITH HALF 1 PROVEN: 'python -m ai_router.model_inventory --check' exits 1 naming gpt-5-6 / model_id='gpt-5.6'. Gate deliberately UNWIRED from drift_guard.py (its test asserts the real repo passes; S4 fixes the registry, then it can be wired).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "served-model",
+      "dateTime": "2026-08-04T06:00:40.670466-04:00",
+      "description": "Recorded the served model. APIResult gains served_model_id (None when unreported) via one shared defensive extractor; anthropic data['model'], google data['modelVersion'], openai data['model']. metrics.record_call gains requested_model_id + served_model_id (additive, null on all 1196 historical rows); all six record_call sites pass them, including both copilot-cli sites via the transport's already-parsed echoed_model (L-069-1 sibling parity). ENDS-WITH HALF 2 PROVEN live: three routed calls recorded requested vs served, and gpt-5.4-mini came back served as gpt-5.4-mini-2026-03-17.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "tests",
+      "dateTime": "2026-08-04T06:00:41.152677-04:00",
+      "description": "Added ai_router/tests/test_model_inventory.py (46 tests), test_served_model_recording.py (18 tests), and model_inventory_fixtures.py (verbatim subsets of the 2026-08-04 live captures). All 64 pass; none opens a socket (httpx.MockTransport throughout, plus an explicit test that --check cannot construct an HTTP client).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "config-metadata",
+      "dateTime": "2026-08-04T06:00:41.721279-04:00",
+      "description": "Touched router-config.yaml (metadata only, no price edits, per the spec): registry-header block documenting the --refresh/--check CLI and why the gate is unwired; a KNOWN DRIFT note on gpt-5-6 naming the sol resolution and the 2x understatement and telling S4 not to point-fix the id without the price work; a note on gemini-3-pro explaining the identity-only NOTE line. Added the Set 109 S1 entries to ai_router/CHANGELOG.md [Unreleased].",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 12,
+      "stepKey": "self-review",
+      "dateTime": "2026-08-04T06:21:35.706504-04:00",
+      "description": "Re-read the new module before verification and fixed three real defects: is_enabled defaulted to False where every other reader in the package defaults it True (would demote a routable entry omitting the flag to a note); --strict printed an OK summary while exiting 1; a snapshot missing probed_at could never be judged stale and would pass forever (now fatal). Each has a regression test.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 13,
+      "stepKey": "suite",
+      "dateTime": "2026-08-04T06:21:36.454714-04:00",
+      "description": "Full pass: pytest -m 'not e2e' -> 3207 passed, 6 skipped, 8 deselected, 0 failed (21m46s). drift_guard OK, tutorial_gate OK, guidance_report --check OK (10,895/12,000 tokens). No TypeScript/extension/webview/state-writer/fixture surface touched, so Layers 2-3 do not arm (requiresE2E false). Confirming full re-run started after the three post-run fixes.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 14,
+      "stepKey": "verify-discovery",
+      "dateTime": "2026-08-04T06:29:15.608798-04:00",
+      "description": "Phased discovery round 1: verifier gpt-5-6 (openai; anthropic excluded via the orchestrator's registry-resolved provider), 2/2 fan-out on identical bundles, $0.4443. Verdict ISSUES_FOUND, blocking: 5 findings = 3 distinct issues (the fan-out independently duplicated two). A: verifier-only entries can bypass the gate (Major). B: requested-vs-served mismatch recorded but never FLAGGED, against the spec's literal 'flag any mismatch' (Major, found by both calls). C: the Google API key is passed as a URL query param, so an httpx HTTPStatusError renders it into InventoryError and the CLI prints it to stderr (Major, security, found by both calls).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 15,
+      "stepKey": "finding-a-triage",
+      "dateTime": "2026-08-04T06:29:16.041693-04:00",
+      "description": "Checked finding A's premise before remediating. Its stated mechanism is FALSE: verification.py's candidate loop applies rule 2 (is_enabled) BEFORE rule 3 (is_enabled_as_verifier), so an is_enabled:false + is_enabled_as_verifier:true entry can never be selected as a verifier, and the proposed fix would have manufactured a false hard-failure. But checking it found a REAL and different bypass: models.pick_model returns a task_type_overrides pin WITHOUT the _survives() check whenever exclude_providers is empty. Proved empirically on a synthetic config: a pinned is_enabled:false model is returned with no exclusion, and only the exclusion path filters it. So 'is_enabled alone' is NOT the right routability test, and the finding's substance stands via a mechanism the verifier did not name.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 15,
+      "stepKey": "finding-a-triage",
+      "dateTime": "2026-08-04T06:35:50.527332-04:00",
+      "description": "Checked finding A's premise before remediating. Its stated mechanism is FALSE: verification.py applies rule 2 (is_enabled) BEFORE rule 3 (is_enabled_as_verifier), so that config can never be selected as a verifier and the proposed fix would have manufactured a false hard-failure. But checking it found a REAL, different bypass: models.pick_model returns a task_type_overrides pin WITHOUT the _survives() check when exclude_providers is empty -- proved empirically on a synthetic config. So routability is is_enabled OR named in task_type_overrides/tier_assignments.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 16,
+      "stepKey": "verify-supplementary",
+      "dateTime": "2026-08-04T06:35:51.118896-04:00",
+      "description": "Supplementary completeness-critic pass (round 2, same evidence, pre-remediation) -> VERIFIED, 0 findings, $0.1785. Nothing added to the harvest; the discovery blockers stand until remediated.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 17,
+      "stepKey": "remediation",
+      "dateTime": "2026-08-04T06:35:51.743083-04:00",
+      "description": "Fixed all three distinct blockers in one pass; sidecar s1-remediation-round-1.md. (A) routability now = is_enabled OR pinned in task_type_overrides/tier_assignments, with the pick_model bypass itself recorded as a NAMED DEFERRAL for S2 (changing model selection is outside S1's Touches). (B) served_model_mismatch added as a TRI-STATE column (null when either id is absent, not false) plus served_model_mismatches()/print_served_model_mismatches() wired into print_metrics_report -- a column nothing reports is not a flag. (C) SECURITY: Google key moved from the query string to the x-goog-api-key header in BOTH model_inventory.fetch_google and the pre-existing sibling providers._call_google (L-069-1), plus redact_secret() over every httpx error and 'raise from None' so a chained traceback cannot leak it. 85 tests pass (19 added). Proved live: --refresh re-probed google over header auth (58 ids) and a live gemini-flash query returned normally.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 18,
+      "stepKey": "verify-remediation-review",
+      "dateTime": "2026-08-04T06:59:48.886815-04:00",
+      "description": "Remediation-review (round 3) on the fix delta against the round-1 baseline tree: VERIFIED, 0 blocking, 0 minor, 3 fix-accepted / 0 rejected / 0 accepted-with-modification, $0.0713. The verifier independently identified findings 4 and 5 as duplicates of 3 and 2. Loop closed non-blocking in 3 rounds; total verification cost $0.6941.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 19,
+      "stepKey": "suite-final",
+      "dateTime": "2026-08-04T06:59:49.275685-04:00",
+      "description": "Post-remediation full pass: pytest -m 'not e2e' -> 3228 passed, 6 skipped, 8 deselected, 0 failed (23m36s), up from the 3143-test pre-session baseline (+85 new). drift_guard OK, tutorial_gate OK, guidance_report --check OK (10,895/12,000).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 20,
+      "stepKey": "disposition",
+      "dateTime": "2026-08-04T06:59:49.697947-04:00",
+      "description": "Authored disposition.json: status completed, verification_method api, verification_verdict VERIFIED, next_orchestrator claude-code/anthropic/claude-opus-5/high (continue-current-trajectory), lessons_cited L-069-1 / L-064-9 / L-095-1. Recorded the models.pick_model is_enabled bypass as a NAMED DEFERRAL to S2 rather than a silent residual.",
+      "status": "complete"
+    }
+  ]
+}

@@ -38,6 +38,30 @@ class APIResult:
     input_tokens: int
     output_tokens: int
     stop_reason: str
+    # Set 109 S1: the model id the PROVIDER says it served, read from the
+    # response body — Anthropic/OpenAI expose it as `model`, Google as
+    # `modelVersion`. It is not always the id we asked for: OpenAI resolved a
+    # bare `gpt-5.6` to `gpt-5.6-sol` (twice the recorded price) with nothing in
+    # the router able to see it, and pins a dated snapshot on ordinary calls
+    # too (`gpt-5.4-mini` -> `gpt-5.4-mini-2026-03-17`). ``None`` — never `""` —
+    # means the provider did not tell us, which is a different fact from
+    # "served something unnamed" and must stay distinguishable in the metrics.
+    served_model_id: str | None = None
+
+
+def _served_model_id(data: dict, key: str) -> str | None:
+    """Read the served-model id out of a response body, defensively.
+
+    One shared helper for all three callers so the "provider omitted it" and
+    "provider sent something that is not a string" cases resolve identically
+    everywhere (L-069-1: a robustness gap is a class, not a site). Recording a
+    served model must never be able to break a call that already succeeded and
+    was already paid for.
+    """
+    value = data.get(key)
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
 
 
 def call_model(
@@ -141,6 +165,7 @@ def _call_anthropic(model_id, system_prompt, user_message,
             input_tokens=data["usage"]["input_tokens"],
             output_tokens=data["usage"]["output_tokens"],
             stop_reason=data.get("stop_reason", "unknown"),
+            served_model_id=_served_model_id(data, "model"),
         )
 
 
@@ -155,7 +180,12 @@ def _call_google(model_id, system_prompt, user_message,
         "base_url",
         "https://generativelanguage.googleapis.com/v1beta"
     )
-    url = f"{base}/models/{model_id}:generateContent?key={api_key}"
+    # Set 109 S1 (L-069-1 sibling of the model_inventory fix): the key travels
+    # in the ``x-goog-api-key`` header, never the query string. httpx renders
+    # the full request URL into HTTPStatusError, and this call is inside a
+    # retry loop whose final failure is re-raised into operator-visible output
+    # -- a `?key=` URL put a live credential wherever that landed.
+    url = f"{base}/models/{model_id}:generateContent"
 
     generation_config: dict = {"maxOutputTokens": max_tokens}
 
@@ -182,7 +212,7 @@ def _call_google(model_id, system_prompt, user_message,
     }
 
     with httpx.Client(timeout=config["timeout_seconds"]) as client:
-        resp = client.post(url, json=body)
+        resp = client.post(url, headers={"x-goog-api-key": api_key}, json=body)
         resp.raise_for_status()
         data = resp.json()
 
@@ -202,6 +232,7 @@ def _call_google(model_id, system_prompt, user_message,
             input_tokens=usage.get("promptTokenCount", 0),
             output_tokens=usage.get("candidatesTokenCount", 0),
             stop_reason=stop_reason,
+            served_model_id=_served_model_id(data, "modelVersion"),
         )
 
 
@@ -293,6 +324,7 @@ def _call_openai(model_id, system_prompt, user_message,
             input_tokens=int(input_tokens),
             output_tokens=int(output_tokens),
             stop_reason=stop_reason,
+            served_model_id=_served_model_id(data, "model"),
         )
 
 

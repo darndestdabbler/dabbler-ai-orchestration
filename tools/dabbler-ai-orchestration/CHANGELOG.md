@@ -3,15 +3,49 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [0.48.0] — 2026-08-04 (staged; publish operator-gated)
 
-> **Not in `0.47.0`.** The entry below was written into `0.47.0`'s section
-> while that version was still staged, and then `0.47.0` published from a
-> commit that predates it. It is moved here rather than left where it was: a
-> CHANGELOG entry under a published version is a claim about bytes a user can
-> install, and this change is not in those bytes. (Set 107 S1 fixed the same
-> class in the other direction — a `0.47.0` entry claiming a router fix the
-> VSIX cannot deliver.)
+> **A narrow-panel readability fix, plus the template link fix `0.47.0` missed.**
+> The Work Explorer's module action strip could paint over the module name in a
+> horizontally condensed panel — operator-reported while walking Set 108's new
+> three-module tutorial with seven modules declared. This release also delivers
+> the two template link corrections that were written for `0.47.0` but published
+> out from under it, per the operator decision recorded below to fold them into
+> the next release rather than cut a version for them alone.
+>
+> **Not yet published.** No tag, no publish run: the artifact is built and the
+> gates are green, and the Marketplace step is the operator's. This section
+> gets its publish record when that happens — until then it describes bytes
+> that exist only in the repository.
+
+### Fixed
+
+- **(Operator report, 2026-08-04) The module action strip no longer covers the
+  module name in a narrow Work Explorer panel.** Hovering a module row reveals
+  an `Open Plan` / `Add` / `Rename…` / `Delete…` strip. Its buttons are
+  `white-space: nowrap`, so the strip's `auto` grid column cannot shrink below
+  ~225px: as the panel narrowed, the title column was squeezed until the name
+  wrapped to a second line, and below ~300px the strip overflowed its own
+  column and painted **on top of the title**. The name is now clipped with an
+  ellipsis instead of being overrun, and the full name is always visible when
+  the row is not hovered, because the strip is hidden until then and the header
+  reclaims the whole width.
+
+  **Two other designs were built, measured and rejected — recorded so they are
+  not retried.** (1) A width media query: the breakpoint depends on the
+  *title's* length, which a fixed threshold cannot know; measured over five
+  title lengths × seven panel widths it stacked `Converter (Sam)` at 380px
+  where it fitted comfortably, while still letting a long title wrap to three
+  lines at 450px. (2) Wrapping the strip onto its own line, which was
+  content-driven and looked right — **but the Layer 3 Playwright suite caught a
+  real regression it introduced.** A wrapped strip occupies a line *above* the
+  module body, so showing or hiding it moves every bucket and row beneath it.
+  Losing focus on `mousedown` hid the strip mid-click, the bucket header moved
+  ~23px between `mousedown` and `mouseup`, and the browser therefore fired no
+  `click` at all — silently swallowing bucket collapse. The shipped fix keeps
+  the strip on the header's line, so revealing it can never move anything
+  vertically: measured **zero** layout shift across all 40 title × width
+  combinations.
 
 ### Changed
 
@@ -29,14 +63,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `adopt-dabbler.md`; `getting-started.md.template` additionally points a
   first-time reader at `hello-world.md`.
 
-  **User-visible consequence while this is unreleased:** a developer who
-  scaffolds a repo with `0.47.0` and follows the `getting-started.md` link
-  lands on the 15-minute first run while the sentence promises the teammate /
-  CODEOWNERS / CI walkthrough. The link resolves and the document exists, so
-  this is a wrong-destination defect rather than a broken one — and the same
-  mismatch was already live in `0.46.0`, so it is an incompletely-delivered
-  fix, not a regression. Operator decision 2026-07-30: **fold into the next
-  release rather than cut `0.48.0` for it.**
+  **What this closes.** A developer who scaffolded with `0.46.0` or `0.47.0`
+  and followed the `getting-started.md` link landed on the 15-minute first run
+  while the sentence promised the teammate / CODEOWNERS / CI walkthrough — a
+  wrong-destination defect rather than a broken one, and live since `0.46.0`,
+  so an incompletely-delivered fix rather than a regression. It was written for
+  `0.47.0`, but that version published from a commit predating it, so the entry
+  sat under `[Unreleased]` rather than being left as a claim about bytes users
+  could not install. Operator decision 2026-07-30 was to **fold it into the next
+  release rather than cut a version for it alone**; this is that release.
 
 ## [0.47.0] — 2026-07-30 (PUBLISHED 2026-07-30)
 

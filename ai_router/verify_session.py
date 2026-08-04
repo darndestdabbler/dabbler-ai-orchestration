@@ -260,6 +260,40 @@ def load_discovery_phase_config(
     return fan_out, diversity
 
 
+def load_discovery_model(config: Optional[dict] = None) -> Optional[str]:
+    """The registry alias the discovery fan-out prefers, or ``None``.
+
+    ``verification.discovery.model`` (Set 109 S4). Discovery runs K calls with
+    IDENTICAL prompts and is bought for BREADTH of findings — a second
+    independent read is worth more there than a marginally better single one,
+    and everything it raises is adjudicated downstream by the pinned verifier.
+    So it is the one verification surface where the cheap variant is the right
+    tool rather than a saving: ``gpt-5.6-luna`` bills $0.20/$1.20 against
+    ``-sol``'s $5.00/$30.00.
+
+    Fail-open to ``None`` exactly like its siblings above, and ``None`` means
+    "use the ``session-verification`` pin" — the pre-Set-109 behaviour. The
+    value is only ever a PREFERENCE: ``pick_model`` drops it when the alias is
+    unknown, disabled, above ``max_tier``, or from an excluded provider, so a
+    typo here degrades to the pinned verifier rather than to no verification.
+    """
+    try:
+        if config is None:
+            try:
+                from config import load_config  # type: ignore[import-not-found]
+            except ImportError:
+                from .config import load_config  # type: ignore[no-redef]
+            config = load_config()
+        raw = (
+            (config.get("verification") or {}).get("discovery") or {}
+        ).get("model")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    except Exception:
+        pass
+    return None
+
+
 def load_discovery_min_output_tokens(config: Optional[dict] = None) -> int:
     """The discovery output-budget floor from
     ``verification.discovery.min_output_tokens`` (fail-open to the
@@ -1974,7 +2008,8 @@ def _resolve_metrics_path() -> Optional[Path]:
 def _default_route(prompt: str, session_set: str, session_number: int,
                    complexity_hint: int, max_tier: Optional[int],
                    exclude_providers: Optional[List[str]] = None,
-                   verification_stamp: Optional[dict] = None):
+                   verification_stamp: Optional[dict] = None,
+                   prefer_model: Optional[str] = None):
     """Production route() invocation (injectable seam for tests)."""
     from ai_router import route  # lazy: keeps --dry-run and tests hermetic
 
@@ -1985,6 +2020,11 @@ def _default_route(prompt: str, session_set: str, session_number: int,
         session_set=session_set,
         session_number=session_number,
     )
+    if prefer_model is not None:
+        # Set 109 S4: the discovery fan-out's cheap-model preference. Note
+        # the task_type is UNCHANGED — this is why the preference exists as
+        # a route() argument rather than as its own task type.
+        kwargs["prefer_model"] = prefer_model
     if max_tier is not None:
         kwargs["max_tier"] = max_tier
     if exclude_providers is not None:
@@ -2470,6 +2510,14 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                 file=sys.stderr,
             )
 
+    # Set 109 S4: the cheap-model preference applies to the DISCOVERY fan-out
+    # only. The supplementary and remediation-review passes adjudicate — they
+    # decide whether a finding is real and whether a fix landed — and that is
+    # the wrong place to economise, so they keep the pinned verifier.
+    discovery_preference = (
+        load_discovery_model() if phase == PHASE_DISCOVERY else None
+    )
+
     def _route_once(stamp_k: dict, exclusions: List[str]):
         return route_fn(
             prompt,
@@ -2479,6 +2527,7 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             args.max_tier,
             exclusions,
             stamp_k,
+            discovery_preference,
         )
 
     # -- The call loop: one call classically, K identical calls on a

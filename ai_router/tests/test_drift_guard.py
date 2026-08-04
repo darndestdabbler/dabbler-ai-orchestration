@@ -389,3 +389,121 @@ def test_real_repo_passes_all_drift_checks():
     assert violations == [], "drift_guard found violations in the real repo:\n" + "\n".join(
         v.render() for v in violations
     )
+
+
+# ---------------------------------------------------------------------------
+# Set 109 S4 — the model-registry drift check, now wired into this guard.
+#
+# Round-1 verification finding: the set built `model_inventory --check` and
+# left it unwired, because the repo's own registry failed it. S4 corrected the
+# registry, so the one stated reason expired -- and a gate nothing invokes
+# catches nothing, which is the same invisibility the set exists to end.
+#
+# The check reads only router-config.yaml and the committed lockfile. It never
+# probes, so it goes red on a COMMIT and never on a provider's release
+# schedule.
+# ---------------------------------------------------------------------------
+
+
+def _registry_repo(tmp_path: Path, *, model_id: str, offered: list[str]) -> Path:
+    (tmp_path / "ai_router").mkdir(parents=True, exist_ok=True)
+    _write(tmp_path / "ai_router" / "router-config.yaml", f"""\
+metadata:
+  pricing_reviewed: "2026-08-04"
+  review_frequency_days: 30
+providers:
+  openai:
+    display_label: OpenAI
+    enabled: true
+    api_key_env: DABBLER_OPENAI_API_KEY
+    base_url: https://api.openai.com/v1
+models:
+  probe-target:
+    provider: openai
+    model_id: {model_id}
+    tier: 3
+    is_enabled: true
+    is_enabled_as_verifier: true
+    input_cost_per_1m: 5.00
+    output_cost_per_1m: 30.00
+routing:
+  tier1_max_complexity: 30
+  tier2_max_complexity: 65
+  tier_assignments:
+    1: probe-target
+    2: probe-target
+    3: probe-target
+  task_type_overrides: {{}}
+""")
+    _write(
+        tmp_path / "ai_router" / "model-inventory.lock",
+        json.dumps({
+            "schemaVersion": 1,
+            "providers": {
+                "openai": {
+                    "probed_at": "2099-01-01T00:00:00Z",
+                    "models": offered,
+                },
+            },
+        }),
+    )
+    return tmp_path
+
+
+def test_model_registry_drift_flags_an_id_the_provider_does_not_offer(tmp_path):
+    """The original defect, as a test: `gpt-5.6` is not an id OpenAI lists."""
+    repo = _registry_repo(
+        tmp_path, model_id="gpt-5.6", offered=["gpt-5.6-sol", "gpt-5.6-luna"]
+    )
+    violations = drift_guard.check_model_registry_matches_providers(repo)
+    assert len(violations) == 1
+    assert violations[0].check == "model-registry-drift"
+    assert "gpt-5.6" in violations[0].detail
+    assert "probe-target" in violations[0].location
+
+
+def test_model_registry_drift_passes_on_a_real_id(tmp_path):
+    repo = _registry_repo(
+        tmp_path, model_id="gpt-5.6-sol", offered=["gpt-5.6-sol", "gpt-5.6-luna"]
+    )
+    assert drift_guard.check_model_registry_matches_providers(repo) == []
+
+
+def test_model_registry_drift_is_silent_without_the_inputs(tmp_path):
+    """A checkout carrying neither file has nothing to certify. Absent inputs
+    are not a violation -- this guard also runs in consumer repos."""
+    assert drift_guard.check_model_registry_matches_providers(tmp_path) == []
+
+
+def test_the_check_is_registered_so_it_actually_runs(tmp_path):
+    """The finding was not "the check is wrong", it was "nothing calls it".
+    Asserting registration is what makes that unable to regress."""
+    assert "model-registry-drift" in dict(drift_guard.ALL_CHECKS)
+
+
+def test_the_real_repository_passes_the_model_registry_check():
+    """The property this session delivered, asserted against the real tree:
+    every configured model_id is one its provider offers. This assertion
+    could not have been written before Set 109 S4."""
+    repo_root = Path(drift_guard.__file__).resolve().parent.parent.parent
+    assert drift_guard.check_model_registry_matches_providers(repo_root) == []
+
+
+def test_a_missing_lockfile_alone_is_a_violation(tmp_path):
+    """Round-3 nit. An `or` meant deleting model-inventory.lock turned this
+    gate green -- a fail-open inside the check added to close a fail-open. A
+    registry with no snapshot to check against is unverifiable, and
+    unverifiable is not passing."""
+    repo = _registry_repo(tmp_path, model_id="gpt-5.6-sol", offered=["gpt-5.6-sol"])
+    (repo / "ai_router" / "model-inventory.lock").unlink()
+    violations = drift_guard.check_model_registry_matches_providers(repo)
+    assert len(violations) == 1
+    assert "model-inventory.lock" in violations[0].location
+
+
+def test_a_missing_config_alone_is_a_violation(tmp_path):
+    repo = _registry_repo(tmp_path, model_id="gpt-5.6-sol", offered=["gpt-5.6-sol"])
+    (repo / "ai_router" / "router-config.yaml").unlink()
+    violations = drift_guard.check_model_registry_matches_providers(repo)
+    assert len(violations) == 1
+    assert "router-config.yaml" in violations[0].location

@@ -628,3 +628,127 @@ class TestIntegration:
         parsed = json.loads(buf.getvalue())
         assert parsed["sessions_completed"] == 0  # no review files
         assert parsed["sessions_remaining"] == 4
+
+
+# ---------------------------------------------------------------------------
+# Set 109 S4 — the historical rate correction is disclosed, not applied.
+#
+# The metrics rows are a ledger: a record of what was believed at the time is
+# worth more than one silently improved afterwards. So the rows stand and the
+# report says what is wrong with them.
+# ---------------------------------------------------------------------------
+
+
+def test_an_affected_model_earns_a_disclosure_line():
+    notes = cost_report.historical_correction_notes(
+        {"gpt-5-6": {"calls": 254, "cost": 51.0383,
+                    "uncorrected_cost": 51.0383}}
+    )
+    assert len(notes) == 1
+    assert "UNDERSTATED" in notes[0]
+    assert "all of it shown here" in notes[0]
+    assert "~$102.0766" in notes[0]
+
+
+def test_only_the_pre_correction_portion_is_disclosed():
+    """Round-2 finding. An earlier draft multiplied the WHOLE aggregate, so a
+    call made after the registry was fixed -- priced from a confirmed rate --
+    was still reported as understated 2x. The note said "rows dated before
+    <date>" while the arithmetic used every row."""
+    notes = cost_report.historical_correction_notes(
+        {"gpt-5-5": {"calls": 10, "cost": 10.0, "uncorrected_cost": 2.0}}
+    )
+    assert len(notes) == 1
+    assert "$2.0000 of the $10.0000" in notes[0]
+    # 2.003x on the $2.00 that predates the fix, NOT on the $10.00 total.
+    assert "~$4.0060" in notes[0]
+    assert "$20." not in notes[0]
+
+
+def test_a_model_with_only_post_correction_rows_earns_no_note():
+    """The case that made this a Major: `gpt-5-5` and `gemini-3-1-pro` are
+    still live aliases. Once their rows are all post-fix, a caveat claiming
+    they are understated would be the same defect it discloses, reversed."""
+    assert cost_report.historical_correction_notes(
+        {"gpt-5-5": {"calls": 3, "cost": 9.99, "uncorrected_cost": 0.0}}
+    ) == []
+
+
+def test_an_undated_row_counts_as_pre_correction():
+    """Fail toward disclosing: the ledger's uncorrected rows are the OLD ones,
+    so an unparseable stamp is far likelier to predate the fix than follow it,
+    and over-disclosing a cent beats silently dropping a correction."""
+    assert cost_report._uncorrected_cost(
+        {"cost_usd": 1.0}, "gpt-5-6") == 1.0
+    assert cost_report._uncorrected_cost(
+        {"cost_usd": 1.0, "timestamp": "not-a-date"}, "gpt-5-6") == 1.0
+    assert cost_report._uncorrected_cost(
+        {"cost_usd": 1.0, "timestamp": "2026-07-10T19:44:22Z"}, "gpt-5-6") == 1.0
+    # The cutoff is an INSTANT. The registry was corrected mid-afternoon, so
+    # a same-day morning row is still pre-correction -- a date-granular
+    # comparison dropped the disclosure for 254 rows.
+    assert cost_report._uncorrected_cost(
+        {"cost_usd": 1.0, "timestamp": "2026-08-04T09:00:00+00:00"},
+        "gpt-5-6") == 1.0
+    assert cost_report._uncorrected_cost(
+        {"cost_usd": 1.0, "timestamp": "2026-08-04T19:28:41.098770+00:00"},
+        "gpt-5-6") == 1.0
+    assert cost_report._uncorrected_cost(
+        {"cost_usd": 1.0, "timestamp": "2026-08-04T22:00:00+00:00"},
+        "gpt-5-6") == 0.0
+    # A model with no recorded correction never contributes.
+    assert cost_report._uncorrected_cost(
+        {"cost_usd": 1.0, "timestamp": "2020-01-01T00:00:00Z"}, "gpt-5-4") == 0.0
+    # A naive stamp is read as UTC rather than crashing the report.
+    assert cost_report._uncorrected_cost(
+        {"cost_usd": 1.0, "timestamp": "2026-07-01T00:00:00"}, "gpt-5-6") == 1.0
+
+
+def test_a_report_with_no_affected_model_carries_no_caveat():
+    """A clean report must stay clean, or the notice becomes wallpaper."""
+    assert cost_report.historical_correction_notes(
+        {"gpt-5-4": {"calls": 466, "cost": 95.4614},
+         "gemini-flash": {"calls": 3, "cost": 0.0001}}
+    ) == []
+
+
+def test_every_correction_names_a_date_a_factor_and_a_reason():
+    for model, correction in cost_report.HISTORICAL_RATE_CORRECTIONS.items():
+        assert correction["corrected_on"] == "2026-08-04", model
+        assert correction["factor"] > 1.0, model
+        # A bare multiplier invites "is this still true?"; the reason is what
+        # lets a reader decide whether it applies to their rows.
+        assert len(correction["reason"]) > 40, model
+
+
+def test_gemini_pro_is_NOT_listed():
+    """It was mispriced in shape -- the >200k tier was unrepresentable -- but
+    not one call in the ledger ever exceeded 200k input tokens, so no row is
+    wrong. Listing it would caveat 366 correct rows and teach an operator to
+    scroll past the notice."""
+    assert "gemini-pro" not in cost_report.HISTORICAL_RATE_CORRECTIONS
+
+
+def test_the_note_names_the_cutoff_INSTANT_not_just_the_date():
+    """Round-3 nit. The note said "rows dated before 2026-08-04" while the
+    arithmetic used 20:00 UTC on that date, so same-day morning rows were
+    counted by a sentence that excluded them -- prose disagreeing with the
+    computation beside it, which is the defect the disclosure exists to
+    correct."""
+    notes = cost_report.historical_correction_notes(
+        {"gpt-5-6": {"calls": 1, "cost": 1.0, "uncorrected_cost": 1.0}}
+    )
+    assert "2026-08-04T20:00:00 UTC" in notes[0]
+    assert "rows dated before 2026-08-04 are" not in notes[0]
+
+
+def test_the_json_report_carries_the_same_disclosure(tmp_path, monkeypatch):
+    """A programmatic consumer must not read a corrected-away total as clean."""
+    summary = {
+        "routed_canonical": {"by_model": {"gpt-5-6": {
+            "calls": 1, "cost": 1.0, "uncorrected_cost": 1.0}}},
+    }
+    notes = cost_report.historical_correction_notes(
+        summary["routed_canonical"]["by_model"]
+    )
+    assert notes and "gpt-5-6" in notes[0]

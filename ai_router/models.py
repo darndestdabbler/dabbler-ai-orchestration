@@ -92,6 +92,7 @@ def pick_model(
     task_type: str,
     config: dict,
     exclude_providers=None,
+    prefer_model: str | None = None,
 ) -> str | None:
     """Pick the best model for this complexity score.
 
@@ -135,6 +136,31 @@ def pick_model(
     # selection below, which is what "disabled" already meant everywhere else.
     # Its sibling short-circuit on the tier assignment went the same way; see
     # the note there.
+    # Set 109 S4: a CALL-level preference, consulted before the task-type pin
+    # and under the identical guard, so it outranks the pin without outranking
+    # anything that matters. It exists so the verification discovery fan-out
+    # can run on a cheap model while the adjudicating calls keep the pinned
+    # one, WITHOUT inventing a second task_type -- the dynamic orchestrator
+    # exclusion, the verification_stamp check and the session-verification
+    # metrics event are all gated on task_type == "session-verification", so a
+    # discovery-specific task type would have silently dropped the exclusion
+    # that is the only thing guaranteeing a session is not verified by its own
+    # provider. Every way this preference can be wrong -- unknown alias,
+    # disabled entry, excluded provider, tier above max_tier -- falls through
+    # to the pin, which is the pre-Set-109 behaviour.
+    if prefer_model:
+        preferred = (config.get("models") or {}).get(prefer_model)
+        tier = preferred.get("tier") if isinstance(preferred, dict) else None
+        if (
+            # bools are ints in Python; `tier: true` is a config error, not
+            # the number 1 (project-guidance.md, validator-parity convention).
+            isinstance(tier, int)
+            and not isinstance(tier, bool)
+            and tier <= max_tier
+            and _survives(prefer_model)
+        ):
+            return prefer_model
+
     overrides = routing.get("task_type_overrides") or {}
     if task_type in overrides:
         override_model = overrides[task_type]

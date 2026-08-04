@@ -25,6 +25,7 @@ synchronous per-call cost summary.
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 from typing import Any, Optional
@@ -41,6 +42,142 @@ _COST_DISCREPANCY_THRESHOLD_USD = 0.01
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_METRICS_PATH = os.path.join(_THIS_DIR, "router-metrics.jsonl")
+
+
+#: Models whose HISTORICAL metrics rows were costed at a rate the provider was
+#: not charging (Set 109 S4). The rows themselves are a ledger and are never
+#: rewritten — a record of what was believed at the time is worth more than a
+#: record silently improved after the fact — so the correction is published
+#: here instead, and any report containing an affected model says so.
+#:
+#: ``factor`` is measured, not assumed: it is the ratio of true to reported
+#: cost recomputed row by row from each row's own token counts under the rates
+#: confirmed on 2026-08-04. It stops applying once a row is written under the
+#: corrected registry, which is why each entry carries the moment the rate was
+#: fixed — a row after it is already right.
+#:
+#: ``corrected_at`` is an INSTANT, not a date, and that is load-bearing: the
+#: registry was corrected in the middle of 2026-08-04, so a date-granular
+#: cutoff silently reclassified that morning's wrong-rate rows as already
+#: fixed and dropped the disclosure for 254 of them. The instant is bounded by
+#: the ledger itself — the last ``gpt-5-6`` row is 19:28:41Z and the first
+#: ``gpt-5-6-luna`` row (an alias that could not exist before the fix) is
+#: 20:17:23Z — so 20:00Z sits inside the gap and misclassifies nothing.
+#: ``corrected_on`` remains the human-facing date shown in the note.
+HISTORICAL_RATE_CORRECTIONS: dict[str, dict[str, Any]] = {
+    "gpt-5-6": {
+        "corrected_on": "2026-08-04",
+        "corrected_at": "2026-08-04T20:00:00+00:00",
+        "factor": 2.000,
+        "reason": (
+            "model_id 'gpt-5.6' is not an id OpenAI lists; it was served by "
+            "gpt-5.6-sol at $5.00/$30.00 while the registry recorded "
+            "$2.50/$15.00. The alias is retired and the entry is now "
+            "gpt-5-6-sol."
+        ),
+    },
+    "gpt-5-5": {
+        "corrected_on": "2026-08-04",
+        "corrected_at": "2026-08-04T20:00:00+00:00",
+        "factor": 2.003,
+        "reason": (
+            "rates were copied from gpt-5.4 when the entry was added and "
+            "never confirmed; OpenAI publishes $5.00/$30.00. One row exists, "
+            "so the ledger impact is sub-cent."
+        ),
+    },
+    "gemini-3-1-pro": {
+        "corrected_on": "2026-08-04",
+        "corrected_at": "2026-08-04T20:00:00+00:00",
+        "factor": 1.503,
+        "reason": (
+            "rates were placeholders mirroring gemini-2.5-pro; Google "
+            "publishes $2.00/$12.00 at <=200k and $4.00/$18.00 above."
+        ),
+    },
+}
+
+
+def _uncorrected_cost(rec: dict, model: str) -> float:
+    """The part of *rec*'s cost that predates *model*'s rate correction.
+
+    Set 109 S4, round-2 finding: an earlier draft multiplied a model's WHOLE
+    aggregate by its factor, so a `gpt-5-5` call made after the registry was
+    fixed — priced correctly, from a confirmed rate — was still reported as
+    understated 2x. The note claimed "rows dated before <date>" while the
+    arithmetic used every row, and `gpt-5-5` / `gemini-3-1-pro` are live
+    aliases that will keep accruing correct rows. A disclosure that overstates
+    is the same defect as the one it discloses, pointing the other way.
+
+    The comparison is against an INSTANT, not a date. The registry was
+    corrected mid-afternoon, so a date-granular cutoff classified that
+    morning's 254 wrong-rate ``gpt-5-6`` rows as already fixed and dropped
+    their disclosure entirely — the same overstate/understate error one step
+    to the left.
+
+    A row with no readable timestamp counts as pre-correction: the ledger's
+    uncorrected rows are the ones that predate this machinery, so an
+    unparseable stamp is far likelier to be old than new, and over-disclosing
+    a cent is better than silently dropping a correction.
+    """
+    correction = HISTORICAL_RATE_CORRECTIONS.get(model)
+    if not correction:
+        return 0.0
+    cost = float(rec.get("cost_usd") or 0.0)
+    raw = rec.get("timestamp")
+    if not isinstance(raw, str):
+        return cost
+    try:
+        stamped = datetime.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return cost
+    cutoff = datetime.datetime.fromisoformat(correction["corrected_at"])
+    if stamped.tzinfo is None:
+        # A naive stamp cannot be ordered against an aware cutoff. Reading it
+        # as UTC matches how every writer in this repo records time, and the
+        # fallback if that is ever wrong is to over-disclose, not to hide.
+        stamped = stamped.replace(tzinfo=datetime.timezone.utc)
+    return cost if stamped < cutoff else 0.0
+
+
+def historical_correction_notes(by_model: dict) -> list:
+    """Disclosure lines for every affected model present in *by_model*.
+
+    Empty when a report contains none of them, and empty for a model whose
+    rows are ALL post-correction — so a report that needs no caveat carries
+    none, and a caveat that appears is about money that is actually
+    misreported.
+    """
+    notes = []
+    for model, correction in sorted(HISTORICAL_RATE_CORRECTIONS.items()):
+        data = by_model.get(model)
+        if not data:
+            continue
+        reported = float(data.get("cost") or 0.0)
+        affected = float(data.get("uncorrected_cost") or 0.0)
+        if affected <= 0.0:
+            # The model appears, but every row here was priced from the
+            # corrected registry. Nothing to disclose.
+            continue
+        scope = (
+            "all of it"
+            if abs(affected - reported) < 1e-9
+            else f"${affected:.4f} of the ${reported:.4f}"
+        )
+        # Round-3 nit: this said "rows dated before <date>" while the
+        # arithmetic used an instant partway through that date, so same-day
+        # morning rows were counted by a sentence that excluded them. Naming
+        # the instant is the fix -- prose disagreeing with the computation
+        # beside it is the defect this whole disclosure exists to correct.
+        cutoff = correction["corrected_at"].replace("+00:00", " UTC")
+        notes.append(
+            f"{model}: rows recorded before the {cutoff} correction are "
+            f"UNDERSTATED by about {correction['factor']:.3g}x -- {scope} "
+            f"shown here, so ~${affected * correction['factor']:.4f} rather "
+            f"than ${affected:.4f} for that portion. "
+            f"{correction['reason']}"
+        )
+    return notes
 
 
 def _canonicalize_session_set_path(value: Optional[str]) -> Optional[str]:
@@ -168,10 +305,17 @@ def _load_routed_metrics_for_session_set(session_set_dir: str) -> dict:
                     total_cost += cost
                     total_calls += 1
                     slot = by_model.setdefault(
-                        model, {"calls": 0, "cost": 0.0}
+                        model, {"calls": 0, "cost": 0.0,
+                                "uncorrected_cost": 0.0}
                     )
                     slot["calls"] += 1
                     slot["cost"] += cost
+                    # Set 109 S4: carried per model so the disclosure can
+                    # scope itself to the rows it actually applies to. Zero
+                    # for every model with no recorded rate correction.
+                    slot["uncorrected_cost"] = slot.get(
+                        "uncorrected_cost", 0.0
+                    ) + _uncorrected_cost(rec, model)
                     if rec.get("transport") == "copilot-cli":
                         local_invocation_calls += 1
                     if rec.get("billed_usage_unavailable"):
@@ -256,6 +400,11 @@ def _build_json_output(session_set_dir: str, summary: dict) -> dict:
     routed = summary["routed_canonical"]
     activity = summary["activity_supplemental"]
     return {
+        # Set 109 S4: the same disclosure the text report prints, so a
+        # programmatic consumer cannot read a corrected-away total as clean.
+        "historical_rate_corrections": historical_correction_notes(
+            summary["routed_canonical"]["by_model"]
+        ),
         "session_set": session_set_dir,
         "sessions_completed": summary["sessions_completed"],
         "sessions_remaining": summary["sessions_remaining"],
@@ -343,6 +492,19 @@ def print_cost_report(session_set_dir: str, format: str = "text") -> None:
         for model, data in routed["by_model"].items():
             print(f"    {model:20s}  {data['calls']:3d} calls"
                   f"  ${data['cost']:.4f}")
+    corrections = historical_correction_notes(routed["by_model"])
+    if corrections:
+        print()
+        print("  [!] HISTORICAL RATE CORRECTION (Set 109) -- the figures "
+              "above are as recorded,")
+        print("      and for these models what was recorded was wrong:")
+        for line in corrections:
+            print(f"      {line}")
+        print("      The raw rows are a ledger and were deliberately not "
+              "rewritten. Full")
+        print("      reconciliation: docs/session-sets/"
+              "109-model-registry-and-pricing-truth/")
+        print("      s4-cost-reconciliation.md")
     if routed.get("local_invocation_calls"):
         # Set 078 S3: never fold these into "total cost" as if $0.00 meant
         # free — they are unbilled because the copilot-cli transport has no

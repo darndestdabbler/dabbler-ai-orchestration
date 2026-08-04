@@ -476,6 +476,112 @@ def check_sample_bundle_in_sync(repo_root: Path) -> list[Violation]:
     )
 
 
+def check_model_registry_matches_providers(repo_root: Path) -> list[Violation]:
+    """Every ``model_id`` in ``router-config.yaml`` is one its provider offers.
+
+    Set 109 S4. The set that built ``ai_router/model_inventory`` deliberately
+    left it unwired, for one stated reason: the repository's own registry
+    failed it — ``router-config.yaml`` sent ``model_id: gpt-5.6``, which OpenAI
+    does not list and silently served from ``gpt-5.6-sol`` at twice the
+    recorded rate — so arming it would have turned this very suite red on the
+    day it landed. Session 4 corrected the registry, ``--check`` passes, and
+    that reason expired. A gate nothing invokes catches nothing: the whole
+    point of the set is that the drift was invisible for months, and an
+    unwired check is invisible too.
+
+    It reads only local files — ``router-config.yaml`` and the committed
+    ``ai_router/model-inventory.lock`` — and never probes a provider. So this
+    is deterministic in CI and goes red on a **commit**, never on a provider's
+    release schedule. Refreshing the lock (``--refresh``) is the deliberate,
+    network-touching act that can change the answer.
+
+    A lockfile that has never been written is reported as a violation rather
+    than skipped: "we could not ask" and "the provider does not offer it" are
+    different facts, but neither one is a passing gate.
+    """
+    config_path = repo_root / "ai_router" / "router-config.yaml"
+    lock_path = repo_root / "ai_router" / "model-inventory.lock"
+    have_config, have_lock = config_path.is_file(), lock_path.is_file()
+    if not have_config and not have_lock:
+        # A consumer checkout may legitimately carry neither. Nothing to
+        # certify is not a violation.
+        return []
+    if not have_lock:
+        # Round-3 nit: an `or` here meant deleting the lockfile turned this
+        # gate green -- a fail-open in the check added to close a fail-open.
+        # A registry with no snapshot to check against is unverifiable, and
+        # unverifiable is not passing.
+        return [Violation(
+            check="model-registry-drift",
+            location="ai_router/model-inventory.lock",
+            detail=(
+                "the registry exists but its provider snapshot does not, so "
+                "no model_id can be checked. Run `python -m "
+                "ai_router.model_inventory --refresh` to write it."
+            ),
+        )]
+    if not have_config:
+        return [Violation(
+            check="model-registry-drift",
+            location="ai_router/router-config.yaml",
+            detail=(
+                "a provider snapshot exists but router-config.yaml does not, "
+                "so this checkout is in a state the guard cannot interpret."
+            ),
+        )]
+
+    try:
+        from ai_router.model_inventory import (  # type: ignore
+            check_registry, load_lockfile,
+        )
+        from ai_router.config import load_config  # type: ignore
+    except Exception as exc:  # pragma: no cover - import-environment dependent
+        return [Violation(
+            check="model-registry-drift",
+            location="ai_router/model_inventory.py",
+            detail=(
+                f"could not import the model-inventory check ({exc}). The "
+                "gate cannot certify the registry, so it fails rather than "
+                "passing silently."
+            ),
+        )]
+
+    try:
+        result = check_registry(
+            load_config(str(config_path)), load_lockfile(lock_path)
+        )
+    except Exception as exc:
+        return [Violation(
+            check="model-registry-drift",
+            location="ai_router/model-inventory.lock",
+            detail=(
+                f"the model-inventory check could not run ({exc}). Run "
+                "`python -m ai_router.model_inventory --refresh` to write the "
+                "snapshot, then re-run this guard."
+            ),
+        )]
+
+    violations: list[Violation] = []
+    for message in result.fatal:
+        violations.append(Violation(
+            check="model-registry-drift",
+            location="ai_router/model-inventory.lock",
+            detail=str(message),
+        ))
+    for finding in list(result.routable_drift) + list(result.identity_drift):
+        violations.append(Violation(
+            check="model-registry-drift",
+            location=f"router-config.yaml -> models.{finding.alias}",
+            detail=(
+                f"model_id {finding.model_id!r} is not offered by "
+                f"{finding.provider}. Correct the id, or move the record out "
+                "of the model registry. Run `python -m "
+                "ai_router.model_inventory --check` for the full report."
+            ),
+        ))
+    return violations
+
+
 # ---------------------------------------------------------------------------
 # Aggregate + CLI
 # ---------------------------------------------------------------------------
@@ -485,6 +591,7 @@ ALL_CHECKS = (
     ("one-active-set", check_one_active_set),
     ("dist-in-sync", check_dist_bundle_in_sync),
     ("sample-dist-in-sync", check_sample_bundle_in_sync),
+    ("model-registry-drift", check_model_registry_matches_providers),
 )
 
 

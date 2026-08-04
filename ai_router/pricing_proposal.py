@@ -53,6 +53,16 @@ is load-bearing rather than cosmetic: the Batch section is exactly half the
 Standard rate, so reading the wrong section would understate by 2x, the same
 magnitude and shape as the defect this whole effort exists to end.
 
+**An entry the page cannot describe is held, not diffed** (Set 109 S4). OpenAI
+prints a Short and a Long context rate for every model and states the boundary
+between them nowhere on the page, so the long pair is reported and never
+proposed. Once an operator acts on that report and encodes the tier with an
+explicit ``max_input_tokens``, the entry says more than the page does — and
+diffing the two would propose replacing their schedule with the one tier this
+parser can see, deleting the expensive half. Such an entry goes to
+``not_comparable_entries``: both rate sets are printed for the operator to
+compare by eye, no change is generated, and ``--apply`` has nothing to write.
+
 CLI usage::
 
     python -m ai_router.pricing_proposal --fetch     # writes the proposal
@@ -869,6 +879,23 @@ def _proposed_declaration(rows: list[dict]) -> dict:
     return {PRICING_KEY: rows}
 
 
+def _declares_a_context_tier(declaration: dict) -> bool:
+    """True when the entry prices by prompt size, not just by date."""
+    return any(
+        "max_input_tokens" in row for row in declaration.get(PRICING_KEY) or []
+    )
+
+
+def _page_sees_one_unbounded_rate(declaration: dict) -> bool:
+    """True when the page yielded a single rate that claims no size bound.
+
+    ``_proposed_declaration`` renders exactly that case as a flat pair, so a
+    proposal with no ``pricing:`` key is a page that said one rate for all
+    prompt sizes.
+    """
+    return PRICING_KEY not in declaration
+
+
 def _normalized(declaration: dict) -> Any:
     """A comparison form that ignores key order and int/float spelling."""
     def _num(value):
@@ -892,6 +919,7 @@ def build_proposal(
     generated_on = generated_on or datetime.date.today()
     changes: list[dict] = []
     unmatched_config: list[dict] = []
+    not_comparable: list[dict] = []
     claimed: dict[str, set] = {p: set() for p in page_rates}
     never, stale = unconfirmed_and_stale(config, today=generated_on)
     needs_stamp = set(never) | set(stale)
@@ -935,13 +963,71 @@ def build_proposal(
             # over a hole.
             unmatched_config.append(
                 {"alias": alias, "provider": provider, "model_id": model_id,
-                 "looked_for": key, "reason": "it is not listed there"}
+                 "looked_for": key, "reason": "it is not listed there",
+                 # Set 109 S4 round 2: an entry that is neither routable nor
+                 # priced has no rate to check, so its absence from a pricing
+                 # page is a fact and not a miss -- `gemini-3-pro-preview` is
+                 # a real id the provider offers and simply does not price,
+                 # because published pricing pages list GA models. Recording
+                 # WHICH kind of absence this is keeps the exit code honest
+                 # without making an identity record nag forever.
+                 "blocking": bool(
+                     entry.get("is_enabled", True)
+                     or entry.get(PRICING_KEY)
+                     or "input_cost_per_1m" in entry
+                 )}
             )
             continue
         claimed[provider].add(key)
 
         current = _current_declaration(entry)
         proposed = _proposed_declaration(found.rows)
+
+        if _declares_a_context_tier(current) and _page_sees_one_unbounded_rate(
+            proposed
+        ):
+            # The entry prices by prompt size; the page published one rate and
+            # no boundary. Diffing them would propose replacing a schedule the
+            # operator hand-encoded with the single tier this parser can see --
+            # silently deleting the expensive tier and under-reporting cost by
+            # exactly the margin between them. That is the defect this module
+            # exists to prevent, arriving through its own front door (Set 109
+            # S3 close, the residual Major this session inherited).
+            #
+            # OpenAI is where it bites today: the page prints Short and Long
+            # context rates for every model and states the boundary nowhere on
+            # the page, so `parse_openai` proposes the short pair and carries
+            # the long pair as an observation. Once a human encodes the tier
+            # with an explicit max_input_tokens, the next --fetch would undo it.
+            #
+            # The condition is written on the DATA, not on the provider, so a
+            # page that stops publishing bounds is covered without an edit, and
+            # no per-entry "operator-curated" marker exists to be forgotten.
+            #
+            # Report, never propose. Preserving the entry while writing the
+            # page's rate into its lowest-bounded row was the richer option and
+            # is deliberately not taken: it assumes the page's unbounded rate
+            # maps to that row, and a wrong write here is precisely the
+            # plausible-wrong-number failure the refusal is protecting.
+            not_comparable.append(
+                {
+                    "alias": alias,
+                    "provider": provider,
+                    "model_id": model_id,
+                    "page_key": key,
+                    "source_url": PRICING_PAGES[provider],
+                    "current": current,
+                    "page_says": proposed,
+                    "observations": found.observations,
+                    "reason": (
+                        "the entry prices by prompt size and the page states "
+                        "one rate with no size boundary, so the two cannot be "
+                        "compared without inventing the boundary"
+                    ),
+                }
+            )
+            continue
+
         unchanged = bool(current) and _normalized(current) == _normalized(proposed)
         if unchanged and alias not in needs_stamp:
             continue
@@ -986,6 +1072,10 @@ def build_proposal(
         ),
         "changes": changes,
         "unmatched_config_entries": unmatched_config,
+        # Entries the page cannot be diffed against. Deliberately NOT in
+        # `changes`: nothing here carries a decision, so nothing here can be
+        # accepted, and --apply cannot write a rate for one of them.
+        "not_comparable_entries": not_comparable,
         "unclaimed_page_models": unclaimed,
     }
 
@@ -1030,18 +1120,29 @@ def _render_declaration(declaration: dict) -> list[str]:
             f"      in ${declaration.get('input_cost_per_1m')} / "
             f"out ${declaration.get('output_cost_per_1m')} per 1M"
         ]
+    rows = declaration[PRICING_KEY]
+    # "all other prompts" is only meaningful when some OTHER row in the same
+    # period claims a prompt-size range. On a purely effective-dated model it
+    # said "all other prompts" beside a rate that covers every prompt there
+    # is, which reads as a size tier the operator cannot find -- on the one
+    # screen whose whole job is that a human understands a price before
+    # accepting it (Set 109 S4 walk).
+    tiered_periods = {
+        row.get("effective_from") for row in rows if "max_input_tokens" in row
+    }
     lines = []
-    for row in declaration[PRICING_KEY]:
+    for row in rows:
         bits = []
         if "effective_from" in row:
             bits.append(f"from {row['effective_from']}")
         if "max_input_tokens" in row:
             bits.append(f"prompts <= {row['max_input_tokens']:,}")
-        else:
+        elif row.get("effective_from") in tiered_periods:
             bits.append("all other prompts")
         lines.append(
             f"      in ${row['input_cost_per_1m']} / "
-            f"out ${row['output_cost_per_1m']} per 1M  ({', '.join(bits)})"
+            f"out ${row['output_cost_per_1m']} per 1M"
+            + (f"  ({', '.join(bits)})" if bits else "")
         )
     return lines
 
@@ -1050,8 +1151,24 @@ def render_proposal(proposal: dict) -> list[str]:
     """Operator-facing report. ASCII-only (Windows cp1252 consoles)."""
     lines: list[str] = []
     changes = proposal.get("changes") or []
+    held = proposal.get("not_comparable_entries") or []
+    unchecked = [
+        e for e in proposal.get("unmatched_config_entries") or []
+        if e.get("blocking", True)
+    ]
     if not changes:
-        lines.append("[ ] OK: every configured rate matches what its provider publishes.")
+        # The all-clear is conditional on nothing being held OR unchecked.
+        # Either way a configured rate was never compared, and announcing that
+        # every rate matches while one sits unexamined is the false-clean
+        # report this whole module exists to avoid.
+        skipped = len(held) + len(unchecked)
+        lines.append(
+            "[ ] OK: every configured rate matches what its provider publishes."
+            if not skipped else
+            f"[x] NOT a clean result: {skipped} configured entry/entries were "
+            "NOT checked against their page (listed below). Every OTHER "
+            "configured rate matches what its provider publishes."
+        )
     for change in changes:
         if change.get("change_type") == "confirm":
             lines.append(
@@ -1088,6 +1205,30 @@ def render_proposal(proposal: dict) -> list[str]:
             )
             if observation.get("note"):
                 lines.append(f"      {observation['note']}")
+
+    for held in proposal.get("not_comparable_entries") or []:
+        lines.append(
+            f"[x] NOT COMPARABLE: {held['alias']} ({held['provider']} / "
+            f"{held['model_id']}) -- {held['source_url']}"
+        )
+        lines.append("    you have encoded:")
+        lines.extend(_render_declaration(held["current"]))
+        lines.append("    the page states one rate, with no size boundary:")
+        lines.extend(_render_declaration(held["page_says"]))
+        for observation in held.get("observations") or []:
+            if "label" not in observation:
+                continue
+            lines.append(
+                f"    also on the page -- {observation['label']}: "
+                f"in ${observation['input_cost_per_1m']} / "
+                f"out ${observation['output_cost_per_1m']} per 1M"
+            )
+        lines.append(
+            f"    {held['reason']}. NOTHING is proposed for this entry and "
+            "--apply cannot touch it, so your tier is safe. Compare the rates "
+            "above by eye; if they still match, hand-edit this entry's "
+            f"{CONFIRMED_ON_KEY}."
+        )
 
     for miss in proposal.get("unmatched_config_entries") or []:
         lines.append(
@@ -1206,6 +1347,13 @@ def apply_changes(
     yaml_rt = YAML()
     yaml_rt.preserve_quotes = True
     yaml_rt.width = 4096
+    # Match router-config.yaml's hand-written block-sequence style. ruamel's
+    # default emits `- item` flush with its parent key; the file indents it.
+    # Without this, changing two rates rewrites the indentation of every list
+    # in a 1,100-line file, and a diff that large on the one file every
+    # consumer reads is a diff nobody reviews closely (Set 109 S4 walk: the
+    # first --apply produced 524 changed lines for ~200 lines of real change).
+    yaml_rt.indent(mapping=2, sequence=4, offset=2)
 
     path = Path(config_path)
     with path.open("r", encoding="utf-8") as handle:
@@ -1382,7 +1530,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         for line in render_proposal(proposal):
             print(line)
         print(f"\nWrote {proposal_path}")
-        return EXIT_CHANGES if proposal["changes"] else EXIT_NO_CHANGES
+        # Neither a held entry nor an unchecked one is "no changes": in both
+        # cases a configured rate was never compared, and exiting 0 would let a
+        # CI job or a cron wrapper record the registry as verified against the
+        # pages when part of it was skipped.
+        #
+        # Round 2 caught the second half of this. An earlier draft counted only
+        # `not_comparable_entries` and ignored `unmatched_config_entries` --
+        # the SAME "this rate was not checked" fact, reached through a
+        # different branch four lines away, exactly the sibling-site class
+        # L-069-1 exists for. A provider dropping one pricing row would have
+        # exited 0 with the row rendered `[x] NOT CHECKED` above it.
+        #
+        # An identity-only entry that is neither routable nor priced is
+        # informational, not blocking: nothing routes to it and it has no rate
+        # to check, so blocking on it would make the command exit non-zero
+        # forever and teach an operator to ignore the exit code.
+        unchecked = [
+            e for e in proposal.get("unmatched_config_entries") or []
+            if e.get("blocking", True)
+        ]
+        needs_attention = bool(
+            proposal["changes"]
+            or proposal.get("not_comparable_entries")
+            or unchecked
+        )
+        return EXIT_CHANGES if needs_attention else EXIT_NO_CHANGES
 
     try:
         proposal = load_proposal(proposal_path)

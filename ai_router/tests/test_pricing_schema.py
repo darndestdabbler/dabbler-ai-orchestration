@@ -280,7 +280,15 @@ def test_bad_max_input_tokens_is_rejected(bad):
 
 
 def test_valid_shapes_all_pass():
-    for entry in (FLAT, TIERED, DATED, BOTH, {"provider": "google"}):
+    # Set 109 S4 narrowed the last case. `{"provider": "google"}` -- an entry
+    # declaring no rates at all -- used to pass unconditionally, on the
+    # reasoning that identity-only records have no price to confirm. That is
+    # true of identity-only records and false of routable ones, where a
+    # missing rate reads as 0.00 and wins every cheapest-candidate tiebreak.
+    # The rate-less shape is still valid; it now has to say nothing routes
+    # to it.
+    for entry in (FLAT, TIERED, DATED, BOTH,
+                  {"provider": "google", "is_enabled": False}):
         validate_model_rates("x", entry)
 
 
@@ -373,3 +381,124 @@ def test_config_load_rejects_an_unresolvable_rate_declaration(tmp_path):
     with pytest.raises(PricingError, match="no unbounded row"):
         for alias, entry in bad["models"].items():
             config_mod.validate_model_rates(alias, entry)
+
+
+# ---------------------------------------------------------------------------
+# Set 109 S4 — a routable entry must declare rates.
+#
+# "No rates" resolves to 0.00, and selection RANKS by that scalar, so a
+# routable rate-less entry does not merely under-report: it wins the verifier
+# tiebreak while billing an unknown amount. Absence stays valid for the
+# identity-only records it was introduced for.
+# ---------------------------------------------------------------------------
+
+
+def test_a_routable_entry_with_no_rates_is_rejected():
+    with pytest.raises(PricingError, match="declares no rates"):
+        validate_model_rates("gpt-5-6-luna", {
+            "provider": "openai", "model_id": "gpt-5.6-luna",
+            "is_enabled": True,
+        })
+
+
+def test_the_default_for_a_missing_is_enabled_is_routable():
+    """`is_enabled` defaults to true when omitted, per the registry's own
+    documented contract -- so an omitted flag must not become a way to keep a
+    rate-less entry in the selection pool."""
+    with pytest.raises(PricingError, match="declares no rates"):
+        validate_model_rates("mystery", {"provider": "openai"})
+
+
+def test_an_identity_only_entry_still_needs_no_rates():
+    """The case absence was introduced for, and which must keep working:
+    a record of what an orchestrator IS, that nothing routes to."""
+    validate_model_rates("claude-opus-5", {
+        "provider": "anthropic", "model_id": "claude-opus-5",
+        "is_enabled": False, "is_enabled_as_verifier": False,
+    })
+
+
+def test_the_error_names_both_ways_out():
+    """An operator hitting this at load needs to know it is either a missing
+    price or a missing is_enabled: false, and which command fills it in."""
+    with pytest.raises(PricingError) as exc:
+        validate_model_rates("x", {"provider": "openai", "is_enabled": True})
+    message = str(exc.value)
+    assert "is_enabled: false" in message
+    assert "pricing_proposal --fetch" in message
+
+
+def test_a_routable_entry_with_a_pricing_list_passes():
+    validate_model_rates("gemini-pro", {
+        "provider": "google", "is_enabled": True,
+        "pricing": [
+            {"max_input_tokens": 200000,
+             "input_cost_per_1m": 1.25, "output_cost_per_1m": 10.00},
+            {"input_cost_per_1m": 2.50, "output_cost_per_1m": 15.00},
+        ],
+    })
+
+
+def test_the_live_registry_declares_a_rate_for_everything_routable():
+    """The property, asserted against the shipped config. Before this session
+    two enabled entries carried no rates at all."""
+    from ai_router.config import load_config
+
+    for alias, entry in (load_config().get("models") or {}).items():
+        if not entry.get("is_enabled", True):
+            continue
+        assert entry.get("pricing") or "input_cost_per_1m" in entry, (
+            f"{alias} is routable but declares no rates"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Path-aware-critique finding (Set 109 S4, openai/gpt-5.6-sol): `pricing: null`
+# walked straight through the fail-closed guard.
+#
+# The guard originally tested `not rows`, was changed to `PRICING_KEY not in
+# entry` so that a malformed `pricing: []` could keep its sharper error -- and
+# that change opened this hole. `pricing:` with nothing after it is ordinary
+# YAML for "no value", and it is exactly what an operator writes when they mean
+# to fill the rates in later.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("declaration", [
+    {"pricing": None},          # `pricing:` with nothing after it
+    {},                         # key absent entirely
+])
+def test_a_routable_entry_with_no_usable_rates_is_rejected(declaration):
+    with pytest.raises(PricingError, match="declares no rates"):
+        validate_model_rates("sneaky", {
+            "provider": "openai", "is_enabled": True, **declaration,
+        })
+
+
+def test_a_null_pricing_key_does_not_slip_past_as_a_declaration():
+    """The specific failure: it loaded clean, and then resolve_rates read it as
+    $0.00 while the selection paths ranked it cheapest -- an unknown-price model
+    winning every tiebreak, which is the defect the guard exists to close."""
+    entry = {"provider": "openai", "is_enabled": True, "pricing": None}
+    with pytest.raises(PricingError):
+        validate_model_rates("sneaky", entry)
+    # ...and the reason it mattered, pinned so the stakes stay visible.
+    assert resolve_rates(entry) == (0.0, 0.0)
+    assert worst_case_output_cost_per_1m(entry) == 0.0
+
+
+def test_an_identity_only_entry_may_still_write_pricing_null():
+    """Nothing routes to it, so there is no rate to demand."""
+    validate_model_rates("identity", {
+        "provider": "anthropic", "is_enabled": False, "pricing": None,
+    })
+
+
+def test_an_empty_pricing_list_keeps_its_own_sharper_error():
+    """The distinction the guard was rewritten for in the first place: a
+    present-but-empty list is MALFORMED, not absent, and must not be
+    reported as 'declares no rates'."""
+    with pytest.raises(PricingError, match="non-empty list"):
+        validate_model_rates("x", {
+            "provider": "openai", "is_enabled": True, "pricing": [],
+        })

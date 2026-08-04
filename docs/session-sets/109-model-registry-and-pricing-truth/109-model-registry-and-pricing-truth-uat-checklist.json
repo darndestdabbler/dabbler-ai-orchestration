@@ -1,0 +1,61 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "ai_router [Unreleased] -- Set 109 'Model Registry and Pricing Truth', Session 4 of 4: the price-confirmation walk",
+  "DocumentDate": "08/04/2026, 04:55:00 PM",
+  "Notes": "This set exists because router-config.yaml recorded $2.50/$15.00 for a model that bills $5.00/$30.00, and nothing said so for four months and $51 of unreported spend. The fix is not a better scraper -- it is that a HUMAN now confirms every rate before it is written.\n\nSo the thing under test is the confirmation screen. If you cannot read a proposed price change and decide about it, the whole design fails open and we get another silent placeholder with better manners. Four items, because that criterion has four halves: can you READ it, does REJECT really not write, does ACCEPT really write, and can you be tricked into writing something you did not read.\n\nEVERYTHING BELOW RUNS ON A THROWAWAY COPY. Step 1 copies router-config.yaml to your temp folder and every later command points at the copy with --config. The real registry is never touched, so you can get any of this wrong with no consequence. That is deliberate: a walk you are afraid of is a walk that gets rushed.\n\nYou need: a terminal in the repo root, the venv, and about ten minutes. The commands are literal -- copy and paste them.\n\nQUALITY BAR, said once so it is not repeated per item: judge these screens as if you had never seen this codebase. If a line made you re-read it, guess, or go looking for something that was not there, that is a defect and it goes in Feedback -- even if you worked out the right answer in the end. Working it out is exactly what the operator on a Friday afternoon will not do.\n\nPasses: false means NOT YET WALKED, not \"failed\".",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Read the diff",
+      "Subarea": "A proposed price change is legible to a human",
+      "ItemLabel": "You can say what each proposed change means, and spot the planted wrong rate, without help",
+      "HumanAction": "Where you are: a terminal at the repo root. Nothing has been run yet.\n\n1. Make the throwaway copy and plant one obviously wrong rate in it:\n\n     copy ai_router\\router-config.yaml %TEMP%\\uat-config.yaml\n\n   Open %TEMP%\\uat-config.yaml in an editor, find the block that starts with\n     gpt-5-4:\n   and change its input_cost_per_1m from 2.50 to 99.00. Save.\n\n2. Ask the tool what the providers publish today:\n\n     .venv\\Scripts\\python.exe -m ai_router.pricing_proposal --fetch --config %TEMP%\\uat-config.yaml --proposal %TEMP%\\uat-proposal.json\n\n3. Read the output on screen. Do not open the JSON yet.",
+      "Expectation": "The run ends with this line:\n  3 rate change(s) and 0 confirmation(s) to review. Nothing has been written. Set each \"decision\" to \"accept\" or \"reject\" in the proposal file, then run --apply.\n\nOne of the three is the rate you planted, and it reads:\n  [~] gpt-5-4 (openai / gpt-5.4) -- https://developers.openai.com/api/docs/pricing\n      currently recorded:\n        in $99.0 / out $15.0 per 1M\n      the page says:\n        in $2.5 / out $15.0 per 1M\n\nWithout looking anything up, you should be able to answer: which number is yours, which is OpenAI's, and which way the change goes.",
+      "ProgrammaticVerification": "ai_router/tests/test_pricing_proposal.py -- the render is pinned by 'test_the_report_shows_both_rates_so_a_human_can_compare', 'test_a_dated_row_is_not_labelled_as_a_size_tier' and 'test_a_size_tiered_row_still_says_all_other_prompts'. The orchestrator ran this exact command sequence on 2026-08-04 and it produced the output quoted above.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "Reject",
+      "Subarea": "A change you refuse is not written",
+      "ItemLabel": "Rejecting every change leaves the config byte-for-byte alone",
+      "HumanAction": "Where you are: %TEMP%\\uat-proposal.json exists and every change in it says \"decision\": \"pending\".\n\n1. Open %TEMP%\\uat-proposal.json in an editor.\n2. Find all three occurrences of\n     \"decision\": \"pending\"\n   and change each to\n     \"decision\": \"reject\"\n   Save.\n3. Apply:\n\n     .venv\\Scripts\\python.exe -m ai_router.pricing_proposal --apply --config %TEMP%\\uat-config.yaml --proposal %TEMP%\\uat-proposal.json\n\n4. Check the planted rate is still wrong -- that is the point:\n\n     findstr \"99.00\" %TEMP%\\uat-config.yaml",
+      "Expectation": "Step 3 prints exactly:\n  [ ] Nothing accepted; router-config.yaml is unchanged.\n\nStep 4 still finds the planted line:\n      input_cost_per_1m: 99.00\n\nThe tool knew the right answer, said so on screen, and did not write it. That refusal is the entire safety property.",
+      "ProgrammaticVerification": "ai_router/tests/test_pricing_proposal.py::test_apply_with_nothing_accepted_leaves_the_config_alone and ::test_fetch_never_writes_the_config. Walked by the orchestrator on 2026-08-04 with the output quoted above.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "Accept",
+      "Subarea": "A change you approve is written, and dated",
+      "ItemLabel": "Accepting one change writes that rate and stamps it, and leaves the other two alone",
+      "HumanAction": "Where you are: everything is still marked reject and nothing has been written.\n\n1. Open %TEMP%\\uat-proposal.json again. Find the change whose \"alias\" is\n     gpt-5-4\n   and change ONLY that one back to\n     \"decision\": \"accept\"\n   Leave the other two on \"reject\". Save.\n2. Apply:\n\n     .venv\\Scripts\\python.exe -m ai_router.pricing_proposal --apply --config %TEMP%\\uat-config.yaml --proposal %TEMP%\\uat-proposal.json\n\n3. Look at what it wrote:\n\n     findstr /C:\"input_cost_per_1m: 2.5\" /C:\"confirmed_on\" /C:\"99.00\" %TEMP%\\uat-config.yaml",
+      "Expectation": "Step 2 prints exactly two lines:\n  [x] wrote gpt-5-4 and stamped confirmed_on\n  Updated %TEMP%\\uat-config.yaml\n\nStep 3 shows the corrected rate and a stamp carrying today's date:\n      input_cost_per_1m: 2.5\n      confirmed_on: '2026-08-04'\n\nand finds NO remaining 99.00 -- the planted rate is gone.\n\nThe two you left on reject were not written: the tool reported one alias, not three.",
+      "ProgrammaticVerification": "ai_router/tests/test_pricing_proposal.py::test_a_confirmation_stamps_without_touching_the_rate, ::test_apply_preserves_the_config_comments and ::test_apply_refuses_when_the_alias_now_points_at_a_different_model. Walked by the orchestrator on 2026-08-04.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "Half-read",
+      "Subarea": "You cannot apply a proposal you did not finish reading",
+      "ItemLabel": "One undecided change refuses the whole apply, naming what is undecided",
+      "HumanAction": "Where you are: the previous item wrote one rate. This one checks the guard that stops a skim.\n\n1. Start over with a fresh proposal:\n\n     .venv\\Scripts\\python.exe -m ai_router.pricing_proposal --fetch --config %TEMP%\\uat-config.yaml --proposal %TEMP%\\uat-proposal.json\n\n2. Open %TEMP%\\uat-proposal.json. Mark ONE change \"accept\" and leave the rest on \"pending\" -- exactly what someone does when they read the first entry and get interrupted.\n3. Try to apply:\n\n     .venv\\Scripts\\python.exe -m ai_router.pricing_proposal --apply --config %TEMP%\\uat-config.yaml --proposal %TEMP%\\uat-proposal.json\n\n4. When you are done, delete the throwaway files:\n\n     del %TEMP%\\uat-config.yaml %TEMP%\\uat-proposal.json",
+      "Expectation": "Step 3 refuses, names every undecided entry, and writes nothing:\n  [x] REFUSED: 2 change(s) are still 'pending': claude-opus-5, claude-sonnet-5. Every change must be marked 'accept' or 'reject' before any of them is written.\n\nThe one you marked \"accept\" was NOT written either. That is the intended behaviour: applying the parts someone read and skipping the parts they did not is how a machine ends up writing a price no human weighed.\n\n(The two names may differ if the registry has changed since 2026-08-04. What must hold is that it refuses, names them, and writes nothing.)",
+      "ProgrammaticVerification": "ai_router/tests/test_pricing_proposal.py::test_apply_refuses_and_writes_nothing_while_a_change_is_pending and ::test_a_proposal_from_another_schema_version_is_refused. Walked by the orchestrator on 2026-08-04 with the message quoted above.",
+      "Result": "",
+      "Feedback": "",
+      "Passes": false
+    }
+  ]
+}

@@ -329,7 +329,10 @@ def test_a_configured_model_the_page_omits_is_reported_loudly():
     assert proposal["unmatched_config_entries"] == [
         {"alias": "gpt-5-6", "provider": "openai", "model_id": "gpt-5.6",
          "looked_for": "gpt-5.6",
-         "reason": "it is not listed there"}
+         "reason": "it is not listed there",
+         # Set 109 S4 round 2: routable and priced, so this absence is a miss
+         # that must hold the exit code non-zero -- not merely a printed line.
+         "blocking": True}
     ]
     rendered = "\n".join(pp.render_proposal(proposal))
     assert "NOT CHECKED" in rendered
@@ -1195,3 +1198,293 @@ def test_a_google_section_with_no_price_rows_is_still_irrelevant():
     assert pp._google_section_rates(
         pp.Table(rows=[["Image price", "Free", "$0.04 / image"]]), "imagen-4"
     ) is None
+
+
+# ---------------------------------------------------------------------------
+# Set 109 S4 — the residual Session 3 closed WAIVED over.
+#
+# `parse_openai` proposes the SHORT-context rate and reports the long-context
+# pair as an observation, because the page never states where the boundary
+# falls. That is right. The consequence nobody had closed: once an operator
+# hand-encodes the tier with an explicit `max_input_tokens`, the next --fetch
+# diffs its flat short-context rate against that schedule and proposes
+# REPLACING it -- silently deleting the expensive tier and under-reporting
+# every long prompt by the margin between them.
+# ---------------------------------------------------------------------------
+
+
+def _openai_entry_with_a_hand_encoded_tier():
+    """What an operator gets after following the observation's own advice."""
+    return {
+        "provider": "openai",
+        "model_id": "gpt-5.4",
+        "pricing": [
+            {"max_input_tokens": 272000,
+             "input_cost_per_1m": 2.50, "output_cost_per_1m": 15.00},
+            {"input_cost_per_1m": 5.00, "output_cost_per_1m": 22.50},
+        ],
+    }
+
+
+def test_a_hand_encoded_tier_is_never_proposed_away():
+    """The defect, stated as the property that must hold: an entry that
+    prices by prompt size produces NO change when the page states one rate
+    and no boundary."""
+    config = _config(**{"gpt-5-4": _openai_entry_with_a_hand_encoded_tier()})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    assert proposal["changes"] == []
+    held = proposal["not_comparable_entries"]
+    assert [h["alias"] for h in held] == ["gpt-5-4"]
+    # The operator's schedule is carried through intact, both rows.
+    assert held[0]["current"]["pricing"] == config["models"]["gpt-5-4"]["pricing"]
+
+
+def test_a_not_comparable_entry_cannot_be_accepted():
+    """Nothing in this bucket carries a decision, so --apply has no route to
+    write a rate for it. That is the guarantee, not the rendering."""
+    config = _config(**{"gpt-5-4": _openai_entry_with_a_hand_encoded_tier()})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    held = proposal["not_comparable_entries"][0]
+    assert "decision" not in held
+    assert pp.accepted_changes(proposal) == []
+
+
+def test_the_report_shows_both_rates_so_a_human_can_compare():
+    """Refusing to propose is only safe if the operator can still see the
+    numbers; a silent hold would be a hole with better manners."""
+    config = _config(**{"gpt-5-4": _openai_entry_with_a_hand_encoded_tier()})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    report = "\n".join(pp.render_proposal(proposal))
+    assert "NOT COMPARABLE: gpt-5-4" in report
+    assert "you have encoded:" in report
+    assert "prompts <= 272,000" in report          # their bounded row
+    assert "in $5.0 / out $22.5 per 1M" in report  # their unbounded row
+    assert "in $2.5 / out $15.0 per 1M" in report  # what the page states
+    assert "--apply cannot touch it" in report
+
+
+def test_an_effective_dated_entry_is_still_comparable():
+    """The hold is about SIZE tiers, not about `pricing:` lists. Anthropic
+    publishes its dated rows, so a dated entry is fully visible to the page
+    and must keep diffing normally -- otherwise this fix would quietly stop
+    checking Sonnet 5, the other model whose rate is scheduled to move."""
+    config = _config(**{"sonnet": {
+        "provider": "anthropic", "model_id": "claude-sonnet-5",
+        "pricing": [
+            {"input_cost_per_1m": 2.00, "output_cost_per_1m": 10.00},
+            {"effective_from": "2026-09-01",
+             "input_cost_per_1m": 3.00, "output_cost_per_1m": 15.00},
+        ],
+    }})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    assert proposal["not_comparable_entries"] == []
+    assert [c["alias"] for c in proposal["changes"]] == ["sonnet"]
+    assert proposal["changes"][0]["change_type"] == "confirm"
+
+
+def test_a_flat_entry_against_a_flat_page_still_proposes():
+    """The contrast that keeps the fix narrow. The hold must not swallow the
+    ordinary case -- gpt-5-5's 2x understatement is a flat-vs-flat diff and
+    has to keep proposing."""
+    config = _config(**{"gpt-5-5": {
+        "provider": "openai", "model_id": "gpt-5.5",
+        "input_cost_per_1m": 2.50, "output_cost_per_1m": 15.00,
+    }})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    assert proposal["not_comparable_entries"] == []
+    assert proposal["changes"][0]["change_type"] == "update"
+
+
+def test_a_size_tiered_entry_against_a_size_tiered_page_still_proposes():
+    """And the other contrast: Google DOES publish its boundary, so a tiered
+    Gemini entry stays comparable. The condition is written on what the page
+    returned, not on which provider it came from."""
+    config = _config(**{"gemini-pro": {
+        "provider": "google", "model_id": "gemini-2.5-pro",
+        "pricing": [
+            {"max_input_tokens": 200000,
+             "input_cost_per_1m": 1.25, "output_cost_per_1m": 10.00},
+            {"input_cost_per_1m": 99.00, "output_cost_per_1m": 99.00},
+        ],
+    }})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    assert proposal["not_comparable_entries"] == []
+    assert proposal["changes"][0]["change_type"] == "update"
+
+
+def test_a_dated_row_is_not_labelled_as_a_size_tier():
+    """Walk finding (Set 109 S4). Sonnet 5 is dated, not size-tiered, and the
+    report said "all other prompts" next to a rate that covers every prompt
+    there is -- inviting an operator to hunt for a tier that does not exist,
+    on the one screen whose job is that they understand the price."""
+    rendered = "\n".join(pp._render_declaration({"pricing": [
+        {"input_cost_per_1m": 2.00, "output_cost_per_1m": 10.00},
+        {"effective_from": "2026-09-01",
+         "input_cost_per_1m": 3.00, "output_cost_per_1m": 15.00},
+    ]}))
+    assert "all other prompts" not in rendered
+    assert "in $2.0 / out $10.0 per 1M" in rendered
+    assert "(from 2026-09-01)" in rendered
+
+
+def test_a_size_tiered_row_still_says_all_other_prompts():
+    """The contrast: where a bound genuinely exists, the unbounded row must
+    still say what it covers, or a tiered model reads as two flat prices."""
+    rendered = "\n".join(pp._render_declaration({"pricing": [
+        {"max_input_tokens": 200000,
+         "input_cost_per_1m": 1.25, "output_cost_per_1m": 10.00},
+        {"input_cost_per_1m": 2.50, "output_cost_per_1m": 15.00},
+    ]}))
+    assert "(prompts <= 200,000)" in rendered
+    assert "(all other prompts)" in rendered
+
+
+#: The real config indents block sequences under their key. ruamel's default
+#: does not, so a round-trip rewrites every list in the file.
+_CONFIG_WITH_LISTS = """\
+metadata:
+  pricing_reviewed: "2026-07-03"
+  review_frequency_days: 30
+
+models:
+  gpt-5-5:
+    provider: openai
+    model_id: gpt-5.5
+    input_cost_per_1m: 2.50
+    output_cost_per_1m: 15.00
+
+delegation:
+  always_route_task_types:
+    - code-review
+    - architecture
+    - analysis
+"""
+
+
+def test_apply_does_not_reindent_unrelated_lists(tmp_path):
+    """Walk finding (Set 109 S4). Writing two rates rewrote the indentation of
+    every list in the config -- 524 changed lines for ~200 lines of real
+    change, on the one file every consumer reads. A diff that large is a diff
+    nobody reads closely, which is a poor property for the file that decides
+    what every call costs."""
+    path = tmp_path / "router-config.yaml"
+    path.write_text(_CONFIG_WITH_LISTS, encoding="utf-8")
+
+    pp.apply_changes(path, [{
+        "alias": "gpt-5-5", "model_id": "gpt-5.5", "change_type": "update",
+        "proposed": {"input_cost_per_1m": 5.00, "output_cost_per_1m": 30.00},
+    }], confirmed_on=TODAY)
+
+    after = path.read_text(encoding="utf-8")
+    assert "    - code-review\n" in after
+    assert "    - architecture\n" in after
+    assert "    - analysis\n" in after
+    # ...and the rate it was asked to write did land.
+    assert "input_cost_per_1m: 5.0" in after
+    assert "confirmed_on:" in after
+
+
+def test_a_held_entry_denies_the_all_clear():
+    """Self-review finding (Set 109 S4). With everything else matching, the
+    report printed "every configured rate matches what its provider
+    publishes" while an entry sat unexamined beside it -- the false-clean
+    report this module exists to avoid, reached through its own safety
+    valve."""
+    proposal = {
+        "changes": [],
+        "not_comparable_entries": [{
+            "alias": "gpt-5-4", "provider": "openai", "model_id": "gpt-5.4",
+            "source_url": "u", "reason": "r",
+            "current": {"pricing": [
+                {"max_input_tokens": 272000,
+                 "input_cost_per_1m": 2.50, "output_cost_per_1m": 15.00},
+                {"input_cost_per_1m": 5.00, "output_cost_per_1m": 22.50},
+            ]},
+            "page_says": {"input_cost_per_1m": 2.50,
+                          "output_cost_per_1m": 15.00},
+            "observations": [],
+        }],
+    }
+    report = "\n".join(pp.render_proposal(proposal))
+    assert "OK: every configured rate matches" not in report
+    assert "NOT a clean result" in report
+    assert "were NOT checked" in report
+
+
+def test_the_all_clear_still_appears_when_nothing_is_held():
+    """The contrast. A genuinely clean run must still say so plainly, or the
+    caveat becomes the only thing anyone ever reads."""
+    report = "\n".join(pp.render_proposal(
+        {"changes": [], "not_comparable_entries": []}
+    ))
+    assert "OK: every configured rate matches" in report
+
+
+# ---------------------------------------------------------------------------
+# Round-2 finding: an UNCHECKED entry must hold the exit code non-zero.
+#
+# The first draft counted only `not_comparable_entries` and ignored
+# `unmatched_config_entries` -- the same "this rate was not checked" fact,
+# reached through a different branch four lines away. A provider dropping one
+# pricing row would have exited 0 with `[x] NOT CHECKED` printed above it, and
+# a cron wrapper would have recorded the registry as verified.
+# ---------------------------------------------------------------------------
+
+
+def _unmatched(alias, **entry):
+    return {"models": {alias: {"provider": "openai", **entry}}}
+
+
+def test_a_routable_unchecked_entry_is_marked_blocking():
+    config = _config(**{"gpt-5-6": {
+        "provider": "openai", "model_id": "gpt-5.6", "is_enabled": True,
+        "input_cost_per_1m": 2.50, "output_cost_per_1m": 15.00,
+    }})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    assert proposal["unmatched_config_entries"][0]["blocking"] is True
+
+
+def test_an_identity_only_unchecked_entry_is_NOT_blocking():
+    """`gemini-3-pro-preview` is an id Google DOES offer and does not price --
+    published pricing pages list GA models. Nothing routes to the entry and it
+    has no rate to check, so blocking on it would hold the exit code non-zero
+    forever and teach an operator to ignore it."""
+    config = _config(**{"gemini-3-pro": {
+        "provider": "google", "model_id": "gemini-3-pro-preview",
+        "is_enabled": False,
+    }})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    entry = proposal["unmatched_config_entries"][0]
+    assert entry["alias"] == "gemini-3-pro"
+    assert entry["blocking"] is False
+
+
+def test_the_all_clear_is_denied_by_an_unchecked_entry():
+    report = "\n".join(pp.render_proposal({
+        "changes": [],
+        "not_comparable_entries": [],
+        "unmatched_config_entries": [{
+            "alias": "gpt-5-6", "provider": "openai", "model_id": "gpt-5.6",
+            "looked_for": "gpt-5.6", "reason": "it is not listed there",
+            "blocking": True,
+        }],
+    }))
+    assert "OK: every configured rate matches" not in report
+    assert "NOT a clean result" in report
+
+
+def test_a_non_blocking_unchecked_entry_still_allows_the_all_clear():
+    """The contrast, so the caveat stays meaningful."""
+    report = "\n".join(pp.render_proposal({
+        "changes": [],
+        "not_comparable_entries": [],
+        "unmatched_config_entries": [{
+            "alias": "gemini-3-pro", "provider": "google",
+            "model_id": "gemini-3-pro-preview",
+            "looked_for": "gemini-3-pro-preview",
+            "reason": "it is not listed there", "blocking": False,
+        }],
+    }))
+    assert "OK: every configured rate matches" in report
+    # ...but it is still REPORTED, so nothing is hidden.
+    assert "NOT CHECKED: gemini-3-pro" in report

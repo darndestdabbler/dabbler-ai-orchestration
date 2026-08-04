@@ -17,7 +17,7 @@
 #                         this, config.py prints a warning at load
 #                         time (does not block execution).
 metadata:
-  pricing_reviewed: "2026-07-03"
+  pricing_reviewed: "2026-08-04"
   review_frequency_days: 30
 
 # --- Provider Configuration ---
@@ -144,8 +144,13 @@ transports:
 #
 # The snapshot lives in ai_router/model-inventory.lock. `--check` reads only
 # local files, so it adds no session-start latency and is safe in CI.
-# It is NOT wired into any automatic gate yet, deliberately: this registry
-# FAILS it today (see the gpt-5-6 entry) and Set 109 S4 is what fixes it.
+# Set 109 S4 corrected the registry, `--check` now PASSES — all 15 model_ids
+# are offered by their provider — and the check is WIRED into
+# `ai_router/scripts/drift_guard.py`, which CI runs. So a commit that
+# reintroduces an id no provider offers goes red without anyone remembering to
+# look. It stayed unwired until S4 only because the repo could not have gone
+# green; that reason expired, and its own verification round pointed out that
+# a gate nothing invokes catches nothing.
 #
 # Set 109 S3 — HOW RATES ARE DECLARED.
 #
@@ -230,66 +235,82 @@ models:
     generation_params:
       thinking_budget: 0          # Flash tier: thinking off by default
 
+    confirmed_on: '2026-08-04'
   gemini-pro:
     provider: google
     model_id: gemini-2.5-pro
     tier: 2
     is_enabled: true
     is_enabled_as_verifier: true
-    input_cost_per_1m: 1.25
-    output_cost_per_1m: 10.00
     max_context_tokens: 1048576
     max_output_tokens: 65536
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Good for medium-complexity analysis, documentation, code review"
+    notes: "Good for medium-complexity analysis, documentation, code review. Set 109 S4 RE-CHECKED this pin and PROPOSES LEAVING IT (operator's call, deliberately not taken here). The question was whether to move the tier-2 assignment to Gemini 3.x now that it exists. Three reasons not to, on today's confirmed numbers: (1) 3.1 Pro costs MORE, not less -- $2.00/$12.00 against this entry's $1.25/$10.00 at the same <=200k tier, so the swap is a ~60% input-cost rise on the busiest routed slot in the registry (366 ledger rows); (2) the only 3.x entry available is `gemini-3.1-pro-preview`, a PREVIEW id that the provider may change at GA, and this alias is the tier-2 assignment AND an enabled verifier -- the two roles a preview id is least suited to; (3) the registry's own convention is that a new model is calibrated as a generator before it is trusted to verify, and `gemini-3-1-pro` still carries is_enabled_as_verifier: false for exactly that reason. Nothing about 2.5 Pro is wrong -- its rate is confirmed and its >200k tier is now representable, which is what this session fixed. Switch it when 3.x reaches a GA id and has verifier calibration behind it, not because it is newer."
     generation_params:
       thinking_budget: -1         # dynamic; Gemini picks how deep to think
 
+    pricing:
+      - input_cost_per_1m: 1.25
+        output_cost_per_1m: 10.0
+        max_input_tokens: 200000
+      - input_cost_per_1m: 2.5
+        output_cost_per_1m: 15.0
+    confirmed_on: '2026-08-04'
   gemini-3-1-pro:
     provider: google
     model_id: gemini-3.1-pro-preview
     tier: 2
     is_enabled: true
     is_enabled_as_verifier: false   # new model: generator + explicit-call only until calibrated (registry convention, lines 120-130); promote later
-    input_cost_per_1m: 1.25
-    output_cost_per_1m: 10.00
     max_context_tokens: 1048576
     max_output_tokens: 65536
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier Google Pro (preview id gemini-3.1-pro-preview).
-      Cross-provider verifier + consensus engine. PLACEHOLDER pricing/limits
-      mirror gemini-2.5-pro — confirm against Google's published 3.1 Pro rates
-      before trusting cost reports; the preview model_id may change at GA."
+    notes: "Frontier Google Pro (preview id gemini-3.1-pro-preview). Cross-provider verifier + consensus engine. PLACEHOLDER pricing/limits mirror gemini-2.5-pro — confirm against Google's published 3.1 Pro rates before trusting cost reports; the preview model_id may change at GA."
     # Gemini 3.x uses thinking_level (MINIMAL|LOW|MEDIUM|HIGH), not the
     # 2.5-era integer thinking_budget.
     generation_params:
       thinking_level: HIGH
 
+    pricing:
+      - input_cost_per_1m: 2.0
+        output_cost_per_1m: 12.0
+        max_input_tokens: 200000
+      - input_cost_per_1m: 4.0
+        output_cost_per_1m: 18.0
+    confirmed_on: '2026-08-04'
   sonnet:
     provider: anthropic
-    model_id: claude-sonnet-4-6
+    model_id: claude-sonnet-5
     tier: 2
     is_enabled: true
     is_enabled_as_verifier: true
-    input_cost_per_1m: 3.00
-    output_cost_per_1m: 15.00
     max_context_tokens: 200000
     max_output_tokens: 16000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Use when Anthropic quality needed but Opus overkill"
-    # Sonnet 4.6 defaults to effort=high internally if effort is unset,
-    # which burns tokens on every call. Explicitly setting effort here
-    # avoids that. Adaptive thinking is opt-in; when disabled, the model
-    # responds without thinking blocks (fastest, cheapest).
+    notes: "Use when Anthropic quality needed but Opus overkill. Set 109 S4: RE-POINTED from claude-sonnet-4-6. Sonnet 5 is newer AND currently cheaper -- $2.00/$10.00 against 4.6's $3.00/$15.00 -- so staying on 4.6 was paying more for the older model. The introductory rate lapses on 2026-08-31, which is why this entry carries a dated pricing: schedule rather than two scalars: on 2026-09-01 it becomes $3.00/$15.00, exactly what 4.6 costs, and nothing has to be edited for the cost record to stay true. max_context_tokens / max_output_tokens are UNCHANGED and unconfirmed -- this session confirmed rates, not limits."
+    # effort is set explicitly rather than left unset. The reason recorded
+    # when this alias served Sonnet 4.6 was that an unset effort defaulted to
+    # high internally and burned tokens on every call; whether Sonnet 5
+    # behaves the same way was NOT confirmed by Set 109 S4, which confirmed
+    # rates and not model behaviour. Stating it explicitly is correct either
+    # way. Adaptive thinking is opt-in; when disabled, the model responds
+    # without thinking blocks (fastest, cheapest).
     generation_params:
       effort: medium              # low|medium|high|xhigh
       thinking:
         enabled: false            # set true to send thinking:{type:adaptive}
         type: adaptive
 
+    pricing:
+      - input_cost_per_1m: 2.0
+        output_cost_per_1m: 10.0
+      - input_cost_per_1m: 3.0
+        output_cost_per_1m: 15.0
+        effective_from: '2026-09-01'
+    confirmed_on: '2026-08-04'
   opus:
     provider: anthropic
-    model_id: claude-opus-4-8
+    model_id: claude-opus-5
     tier: 3
     is_enabled: true
     is_enabled_as_verifier: true
@@ -298,7 +319,7 @@ models:
     max_context_tokens: 200000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Reserved for complex architectural reasoning"
+    notes: "Reserved for complex architectural reasoning. Set 109 S4: RE-POINTED from claude-opus-4-8. Opus 5 bills the SAME $5.00/$25.00 as 4.8, so this is a newer model at no extra cost -- the rate is unchanged and was confirmed against Anthropic's published page, not merely carried over. max_context_tokens / max_output_tokens are UNCHANGED and unconfirmed."
     # Opus is only invoked for tier-3 tasks (architecture, security review,
     # session verification). Adaptive thinking is on by default because
     # those tasks benefit from deep reasoning. Override per task type below
@@ -308,16 +329,33 @@ models:
       thinking:
         enabled: true
         type: adaptive
-    # NOTE: model_id is claude-opus-4-8 (latest Opus). Opus 4.8 supports
-    # task_budget (beta) — a token budget that spans the full agentic
-    # loop. If you raise the per-call ceiling, bump max_output_tokens
-    # toward 64000; left at 32000 here for cost control on tier-3 calls.
+    # NOTE: model_id is claude-opus-5 as of Set 109 S4. The previous note here
+    # described claude-opus-4-8 and its task_budget (beta) support; it was
+    # left behind by the re-point and is removed rather than carried over,
+    # because nothing in this session confirmed what Opus 5 supports and a
+    # claim inherited from a superseded entry reads as current (L-064-8).
+    # max_output_tokens stays at 32000 for cost control on tier-3 calls.
+
+    confirmed_on: '2026-08-04'
+  fable:
+    provider: anthropic
+    model_id: claude-fable-5
+    tier: 3
+    is_enabled: false               # Registered and priced, not routed. At $10.00/$50.00 it is twice Opus 5 on input and twice on output, and nothing in this repo has established what that buys. Turning it on is an operator decision with a cost attached, not a default.
+    is_enabled_as_verifier: false
+    max_context_tokens: 200000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Claude Fable 5. Set 109 S4 added it: the registry had NO entry at all (grep count 0), so a Fable-5 orchestrator could not even record its own identity, and its price was nowhere on file. Present now, priced from Anthropic's published page, and deliberately disabled. max_context_tokens / max_output_tokens are UNCONFIRMED -- this session confirmed rates, not limits."
 
   # --- OpenAI GPT-5.x family -----------------------------------------------
   # Added as verification models initially. Used by the cross-provider map
   # to independently review work from Anthropic and Google models. Once you
   # have data on how well they verify, consider promoting them to generator
   # slots in tier_assignments.
+    input_cost_per_1m: 10.0
+    output_cost_per_1m: 50.0
+    confirmed_on: '2026-08-04'
   gpt-5-4:
     provider: openai
     model_id: gpt-5.4
@@ -329,56 +367,88 @@ models:
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier OpenAI model. Used to verify Opus output (cross-provider)
-      and as a cheaper frontier alternative for session verification of
-      implementation-heavy work. Opus-class quality at ~60% of Opus cost."
+    notes: "Frontier OpenAI model. Used to verify Opus output (cross-provider) and as a cheaper frontier alternative for session verification of implementation-heavy work. Opus-class quality at ~60% of Opus cost."
     generation_params:
       reasoning_effort: high
     # NOTE: Prompts over 272K input tokens trigger 2x input + 1.5x output
     # pricing for the full session. The router caps input at 80% of
     # max_context_tokens, which keeps you under that ceiling by default.
 
+    confirmed_on: '2026-08-04'
   gpt-5-5:
     provider: openai
     model_id: gpt-5.5
     tier: 3
     is_enabled: true
     is_enabled_as_verifier: true    # Set 090 follow-up: PROMOTED to verifier (repinned session-verification below) to cut gpt-5-4's false positives on small meta-work sets. Deliberately overrides the calibrate-as-generator-first convention, on the operator's call. (Newer sibling frontier model: gpt-5-6 "Sol".)
-    input_cost_per_1m: 2.50
-    output_cost_per_1m: 15.00
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier +
-      consensus engine. PLACEHOLDER pricing/limits mirror gpt-5.4 — confirm
-      against OpenAI's published GPT-5.5 rates before trusting cost reports."
+    notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier + consensus engine. PLACEHOLDER pricing/limits mirror gpt-5.4 — confirm against OpenAI's published GPT-5.5 rates before trusting cost reports."
     generation_params:
       reasoning_effort: high
 
-  gpt-5-6:
+  # --- The GPT-5.6 family, split (Set 109 S4) -------------------------------
+  # There used to be ONE entry here, `gpt-5-6`, sending `model_id: gpt-5.6`.
+  # OpenAI does not list that id. It served the request from `gpt-5.6-sol` at
+  # $5.00/$30.00 while this file recorded $2.50/$15.00, so every cost this repo
+  # reported for it was exactly half the truth, for 245 calls and ~$49. The
+  # alias is RETIRED rather than corrected: three explicit entries mean the
+  # variant is a deliberate choice at every call site, and `model_inventory
+  # --check` now fails loud on any id a provider does not offer, so the class
+  # cannot silently reopen. Rates below were written by
+  # `pricing_proposal --apply` from OpenAI's published page, never hand-typed.
+    input_cost_per_1m: 5.0
+    output_cost_per_1m: 30.0
+    confirmed_on: '2026-08-04'
+  gpt-5-6-sol:
     provider: openai
-    model_id: gpt-5.6
+    model_id: gpt-5.6-sol
     tier: 3
     is_enabled: true
-    is_enabled_as_verifier: true    # PINNED as the session-verification verifier (operator, 2026-07-10) — the newest frontier model, to minimize the false-positive Majors gpt-5-4 produced on small meta-work sets. model_id PROBED live.
-    input_cost_per_1m: 2.50
-    output_cost_per_1m: 15.00
+    is_enabled_as_verifier: true    # PINNED as the session-verification verifier (operator, 2026-07-10) — the newest frontier model, to minimize the false-positive Majors gpt-5-4 produced on small meta-work sets. Set 109 S4: the pin now names this id explicitly; it is what the bare alias was silently reaching all along, so the verifier is UNCHANGED in behaviour and only honest about its price.
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier OpenAI model GPT-5.6, codename 'Sol' (operator, 2026-07-10).
-      PLACEHOLDER pricing/limits mirror gpt-5.4/5.5 — confirm against OpenAI's
-      published GPT-5.6 rates and the exact model_id before trusting.
-      KNOWN DRIFT (Set 109 S1, probed 2026-08-04): OpenAI does NOT list a bare
-      'gpt-5.6'. It offers gpt-5.6-luna / -sol / -terra, and this id silently
-      resolves to -sol at $5.00/$30.00 — twice the rates recorded above, so
-      every cost reported for this entry is half the truth. Left in place
-      deliberately as the live specimen `model_inventory --check` fails on;
-      Set 109 S4 splits this entry into the three real variants and retires
-      the bare alias. Do not 'fix' the id here without S4's price work."
+    notes: "Frontier OpenAI model GPT-5.6 'Sol' — the most capable and most expensive of the three 5.6 variants. Deliberately kept on the adjudicating verification calls: a verifier's job is to be right about whether work ships, and that is the wrong place to economise. The cheap variant goes on the discovery fan-out instead (see gpt-5-6-luna)."
     generation_params:
       reasoning_effort: high
 
+    input_cost_per_1m: 5.0
+    output_cost_per_1m: 30.0
+    confirmed_on: '2026-08-04'
+  gpt-5-6-luna:
+    provider: openai
+    model_id: gpt-5.6-luna
+    tier: 3
+    is_enabled: true
+    is_enabled_as_verifier: false   # NOT a general verifier. Enabled so the discovery fan-out can prefer it by name; left out of the verifier pool so it can never win a cheapest-survivor tiebreak for an ADJUDICATING round, where being right matters more than the 25x.
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "GPT-5.6 'Luna' — $0.20/$1.20, one twenty-fifth of Sol. It is the INTENDED occupant of verification.discovery.model (K identical prompts whose value is BREADTH of findings, every one adjudicated downstream by a stronger model), but that pin ships UNSET: Set 109 S4 armed it on price, its own verification round caught that the spec requires evidence of finding QUALITY first, and the pin was withdrawn. See the commented block under verification.discovery for what would arm it. Nothing routes here today. max_context_tokens / max_output_tokens mirror the family and are UNCONFIRMED; this session confirmed rates, not limits."
+    generation_params:
+      reasoning_effort: high
+
+    input_cost_per_1m: 0.2
+    output_cost_per_1m: 1.2
+    confirmed_on: '2026-08-04'
+  gpt-5-6-terra:
+    provider: openai
+    model_id: gpt-5.6-terra
+    tier: 3
+    is_enabled: false               # Registered, not routed. It has no assigned role, and an enabled tier-3 entry with no role is a candidate that can win a cheapest-survivor tiebreak nobody reasoned about.
+    is_enabled_as_verifier: false
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "GPT-5.6 'Terra' — $2.00/$12.00, the middle variant. Recorded so the family is completely enumerated and its price is on the record; nothing routes here today. Enable it deliberately if a mid-priced frontier slot is ever wanted, rather than letting selection discover it by accident."
+    generation_params:
+      reasoning_effort: high
+
+    input_cost_per_1m: 2.0
+    output_cost_per_1m: 12.0
+    confirmed_on: '2026-08-04'
   gpt-5-4-mini:
     provider: openai
     model_id: gpt-5.4-mini
@@ -390,9 +460,7 @@ models:
     max_context_tokens: 400000
     max_output_tokens: 16000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Small OpenAI model. Used to verify Gemini Pro output
-      (cross-provider). Cheaper than Sonnet ($3/$15) and Claude Haiku
-      ($1/$5) with a larger context window."
+    notes: "Small OpenAI model. Used to verify Gemini Pro output (cross-provider). Cheaper than Sonnet ($3/$15) and Claude Haiku ($1/$5) with a larger context window."
     generation_params:
       reasoning_effort: medium
 
@@ -406,36 +474,25 @@ models:
   # skip disabled entries. Add a sibling entry here whenever a new
   # orchestrator model appears that neither the routed pool nor the Copilot
   # CLI's documented model universe covers.
+    confirmed_on: '2026-08-04'
   claude-sonnet-5:
     provider: anthropic
     model_id: claude-sonnet-5
     is_enabled: false
     is_enabled_as_verifier: false
-    notes: "Identity registry only: Claude Code orchestrator sessions."
+    notes: "Identity registry only: Claude Code orchestrator sessions. Set 109 S4: now REDUNDANT — `sonnet` above carries this same model_id, and identity resolution matches on model_id as well as on the key, so an orchestrator recording claude-sonnet-5 resolves through `sonnet` whether or not this entry exists. It is kept rather than deleted because removing a registry key is a change consumer repos could be pinned to, which wants an operator's sanction and not a passing edit; it is flagged for retirement. It carries NO rates on purpose: the 2026-08-04 pricing walk proposed rates for it and they were REJECTED, because a second priced surface for one model is two numbers that can drift apart — the exact defect this set exists to end. The price of claude-sonnet-5 lives on `sonnet`, once."
   gemini-3-pro:
     provider: google
-    model_id: gemini-3-pro
+    model_id: gemini-3-pro-preview
     is_enabled: false
     is_enabled_as_verifier: false
-    notes: "Identity registry only: Gemini Code Assist orchestrator
-      sessions (the Set 084 S2 ai-assignment recommendation).
-      Set 109 S1: `model_inventory --check` FAILS on this id — the Gemini API
-      lists gemini-3-pro-preview, not a bare gemini-3-pro. It is classified
-      identity-only (nothing routes here, so it is not urgent) but it still
-      fails, because a gate that tolerated a known miss would certify an
-      invariant it does not hold. OWED TO SESSION 4: either correct the id to
-      whatever the Code Assist surface actually reports, or move identity
-      records out of the model registry entirely — an orchestrator's identity
-      need not be an id the generative API sells, which is an argument for a
-      different home, not for an exemption."
+    notes: "Identity registry only: Gemini Code Assist orchestrator sessions (the Set 084 S2 ai-assignment recommendation). Set 109 S4: model_id CORRECTED from the bare `gemini-3-pro`, which the Gemini API does not list, to `gemini-3-pro-preview`, which it does. S1 offered two remedies — correct the id, or move identity records out of the model registry entirely. The id is corrected here because the second is a real design question (an orchestrator's identity need not be an id the generative API sells) that deserves its own session rather than being decided in passing while closing a gate. The gate now passes on fact, not on exemption."
   claude-opus-5:
     provider: anthropic
     model_id: claude-opus-5
     is_enabled: false
     is_enabled_as_verifier: false
-    notes: "Identity registry only: Claude Code orchestrator sessions
-      (Set 106 S1 was the first; recording claude-opus-4-8 would have
-      been a false identity)."
+    notes: "Identity registry only: Claude Code orchestrator sessions (Set 106 S1 was the first; recording claude-opus-4-8 would have been a false identity). Set 109 S4: now REDUNDANT for the same reason as claude-sonnet-5 above — `opus` carries this model_id since the re-point. Kept, flagged for retirement, and deliberately unpriced: its rate proposal was REJECTED in the 2026-08-04 walk so that claude-opus-5 has exactly one price in this file."
 
 # --- Routing Thresholds ---
 # Complexity score 1-100 mapped to tiers.
@@ -489,7 +546,12 @@ routing:
     # ONLY; the dynamic orchestrator exclusion is unchanged, so on a Claude-
     # orchestrator session gpt-5-6 (openai) survives the anthropic exclusion
     # and is used.
-    session-verification: gpt-5-6
+    # Set 109 S4: was `gpt-5-6`, an alias OpenAI does not list and which it
+    # served from `gpt-5.6-sol`. The pin now names -sol explicitly. The
+    # verifier this repo has actually been using does not change; only the
+    # price it reports does (it was understated 2x). The DISCOVERY fan-out
+    # deliberately does not use this pin — see verification.discovery.model.
+    session-verification: gpt-5-6-sol
     # Fresh close-out turn. The orchestrator routes a new turn with
     # task_type=session-close-out after disposition.json reports
     # status=completed AND verification has terminated. The work is
@@ -583,98 +645,98 @@ delegation:
 task_type_params:
   # Cheap, mechanical tasks: no thinking, low effort.
   formatting:
-    sonnet:     { effort: low, thinking: { enabled: false } }
-    opus:       { effort: low, thinking: { enabled: false } }
-    gemini-flash: { thinking_budget: 0 }
-    gemini-pro: { thinking_budget: 0 }
-    gpt-5-4-mini: { reasoning_effort: none }
-    gpt-5-4:    { reasoning_effort: none }
+    sonnet: {effort: low, thinking: {enabled: false}}
+    opus: {effort: low, thinking: {enabled: false}}
+    gemini-flash: {thinking_budget: 0}
+    gemini-pro: {thinking_budget: 0}
+    gpt-5-4-mini: {reasoning_effort: none}
+    gpt-5-4: {reasoning_effort: none}
   summarization:
-    sonnet:     { effort: low, thinking: { enabled: false } }
-    opus:       { effort: low, thinking: { enabled: false } }
-    gemini-flash: { thinking_budget: 0 }
-    gemini-pro: { thinking_budget: 0 }
-    gpt-5-4-mini: { reasoning_effort: none }
-    gpt-5-4:    { reasoning_effort: low }
+    sonnet: {effort: low, thinking: {enabled: false}}
+    opus: {effort: low, thinking: {enabled: false}}
+    gemini-flash: {thinking_budget: 0}
+    gemini-pro: {thinking_budget: 0}
+    gpt-5-4-mini: {reasoning_effort: none}
+    gpt-5-4: {reasoning_effort: low}
   documentation:
-    sonnet:     { effort: low, thinking: { enabled: false } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4-mini: { reasoning_effort: low }
+    sonnet: {effort: low, thinking: {enabled: false}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: low}
   # Close-out turn. The work is reading a doc and running a CLI;
   # thinking is unhelpful and just burns tokens.
   session-close-out:
-    sonnet:     { effort: low, thinking: { enabled: false } }
-    gemini-pro: { thinking_budget: 0 }
-    gpt-5-4-mini: { reasoning_effort: none }
+    sonnet: {effort: low, thinking: {enabled: false}}
+    gemini-pro: {thinking_budget: 0}
+    gpt-5-4-mini: {reasoning_effort: none}
   # Set 030 Session 1: spec-title-extraction is a short structured
   # extract; thinking off everywhere for speed + cost. Defaults are
   # provided for every model in the pool so a tier-bump or override
   # never lands on an un-tuned config.
   spec-title-extraction:
-    gemini-flash: { thinking_budget: 0 }
-    gemini-pro:   { thinking_budget: 0 }
-    sonnet:       { effort: low, thinking: { enabled: false } }
-    opus:         { effort: low, thinking: { enabled: false } }
-    gpt-5-4-mini: { reasoning_effort: none }
-    gpt-5-4:      { reasoning_effort: none }
+    gemini-flash: {thinking_budget: 0}
+    gemini-pro: {thinking_budget: 0}
+    sonnet: {effort: low, thinking: {enabled: false}}
+    opus: {effort: low, thinking: {enabled: false}}
+    gpt-5-4-mini: {reasoning_effort: none}
+    gpt-5-4: {reasoning_effort: none}
 
   # Medium tasks: adaptive thinking, medium effort.
   test-generation:
-    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4-mini: { reasoning_effort: medium }
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: medium}
   code-review:
-    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4-mini: { reasoning_effort: medium }
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: medium}
   analysis:
-    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4-mini: { reasoning_effort: medium }
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: medium}
   refactoring:
-    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4-mini: { reasoning_effort: medium }
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: medium}
 
   # Heavy tasks: high effort, deep thinking. These are the places
   # where you actually want the model to spend tokens.
   session-verification:
-    sonnet:     { effort: high, thinking: { enabled: true, type: adaptive } }
-    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4:    { reasoning_effort: high }
-    gpt-5-4-mini: { reasoning_effort: high }
+    sonnet: {effort: high, thinking: {enabled: true, type: adaptive}}
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
+    gpt-5-4-mini: {reasoning_effort: high}
   security-review:
-    sonnet:     { effort: high, thinking: { enabled: true, type: adaptive } }
-    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4:    { reasoning_effort: high }
+    sonnet: {effort: high, thinking: {enabled: true, type: adaptive}}
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
   architecture:
-    opus:       { effort: max, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4:    { reasoning_effort: xhigh }
+    opus: {effort: max, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: xhigh}
   planning:
-    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4:    { reasoning_effort: high }
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
   uat-plan-generation:
-    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4:    { reasoning_effort: high }
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
   uat-coverage-review:
-    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4:    { reasoning_effort: high }
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
 
   # Verification task type used by the internal verify() path. Kept
   # separate from 'session-verification' so per-task-type overrides
   # won't bleed across them. Default is medium reasoning for the verifier.
   verification:
-    sonnet:     { effort: medium, thinking: { enabled: true, type: adaptive } }
-    opus:       { effort: high, thinking: { enabled: true, type: adaptive } }
-    gemini-pro: { thinking_budget: -1 }
-    gpt-5-4:    { reasoning_effort: high }
-    gpt-5-4-mini: { reasoning_effort: medium }
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
+    gpt-5-4-mini: {reasoning_effort: medium}
 
 # --- Complexity Estimation Weights ---
 # These weights control how the complexity score is calculated.
@@ -697,11 +759,11 @@ complexity:
 
   # Context length breakpoints → sub-scores
   context_length_scores:
-    - { max_chars: 500, score: 10 }
-    - { max_chars: 2000, score: 25 }
-    - { max_chars: 5000, score: 45 }
-    - { max_chars: 10000, score: 65 }
-    - { max_chars: 999999, score: 85 }
+    - {max_chars: 500, score: 10}
+    - {max_chars: 2000, score: 25}
+    - {max_chars: 5000, score: 45}
+    - {max_chars: 10000, score: 65}
+    - {max_chars: 999999, score: 85}
 
   # Task type base scores
   task_type_scores:
@@ -809,6 +871,51 @@ verification:
   # values are operator-tunable; verify_session clamps fan_out to [1, 4]
   # and falls back to these defaults on a malformed value.
   discovery:
+    # Set 109 S4 — the cheap variant, put where it pays. Discovery is K calls
+    # with IDENTICAL prompts, bought for BREADTH of findings: the Set 096 S1
+    # experiment measured pairwise finding overlap at Jaccard 0.13-0.31, so
+    # the value is a second independent read, not a marginally better single
+    # one. Everything discovery raises is adjudicated downstream by the pinned
+    # session-verification verifier, so a false positive here costs a
+    # paragraph rather than a wrong ship decision. gpt-5.6-luna bills
+    # $0.20/$1.20 against -sol's $5.00/$30.00 — one twenty-fifth — which buys
+    # the fan-out outright at a fraction of what one -sol call used to cost.
+    #
+    # This is a PREFERENCE, not a pin. It is consulted before the
+    # task_type_overrides pin and under the identical guard, so the dynamic
+    # orchestrator-provider exclusion still overrides it, and an alias that is
+    # unknown, disabled, or above max_tier falls through to the pinned
+    # verifier. Deleting this line restores the pre-Set-109 behaviour exactly.
+    #
+    # It deliberately does NOT apply to the supplementary or
+    # remediation-review passes: those adjudicate, and a verifier deciding
+    # whether work ships is the wrong place to economise.
+    #
+    # ---- LEFT UNSET, DELIBERATELY (Set 109 S4) --------------------------
+    # The mechanism ships; the pin does not. The spec's own risk register
+    # says: "Moving the fan-out to a cheaper variant may change finding
+    # quality; that is an empirical question, and the pin should move only
+    # with evidence, not with the price list." S4 armed it on price, its own
+    # verification caught that, and the pin was withdrawn.
+    #
+    # What little evidence exists points the WRONG way. In S4's own rounds,
+    # on the same session's diff:
+    #   - Luna, 2 discovery calls, $0.046 total -> 1 Major.
+    #   - Sol,  1 supplementary call, $0.520    -> 3 further Majors, two of
+    #     them ordinary correctness bugs (a wrong exit code, a cost
+    #     disclosure that overstated) that a discovery pass should catch.
+    # The framings differ -- supplementary is a completeness critic by
+    # design -- so this is a data point and not an experiment. It is not
+    # grounds for arming the pin, and it is the first thing an experiment
+    # should try to overturn.
+    #
+    # To arm it: run both variants over several past sessions' bundles with
+    # KNOWN findings, compare recall and material false negatives, write down
+    # an acceptance threshold BEFORE looking, and set the line below only if
+    # Luna meets it. Uncomment to enable; the code path is shipped, tested,
+    # and inert while this stays commented.
+    #
+    #   model: gpt-5-6-luna
     fan_out: 2                       # K same-model discovery calls, identical bundles
     min_output_tokens: 32000         # discovery output-budget FLOOR (spec: "raised
                                      #   output budget"). Every routed call already runs
@@ -914,16 +1021,16 @@ verification:
     # orchestrator to adjudicate under the Step 7 human-decision
     # procedure.
     on_disagreement_by_task_type:
-      code-review:      merge
-      security-review:  merge
-      test-generation:  merge
-      documentation:    merge
-      formatting:       merge
-      summarization:    merge
-      analysis:         flag
-      planning:         flag
-      architecture:     flag
-      refactoring:      flag
+      code-review: merge
+      security-review: merge
+      test-generation: merge
+      documentation: merge
+      formatting: merge
+      summarization: merge
+      analysis: flag
+      planning: flag
+      architecture: flag
+      refactoring: flag
 
     # Tier 3 tiebreaker model (used when on_disagreement = "re-route")
     tiebreaker_model: opus

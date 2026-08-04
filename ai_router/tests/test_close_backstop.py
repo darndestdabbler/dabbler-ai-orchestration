@@ -197,7 +197,7 @@ class FakeBackstopRoute:
 
     def __call__(self, prompt, session_set, session_number,
                  complexity_hint, max_tier, exclude_providers=None,
-                 verification_stamp=None):
+                 verification_stamp=None, prefer_model=None):
         self.calls.append({
             "prompt": prompt,
             "session_set": session_set,

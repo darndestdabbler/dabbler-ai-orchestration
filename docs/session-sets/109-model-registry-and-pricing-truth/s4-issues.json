@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The provider model drift check remains unwired.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** After a provider retires or renames a model ID—the exact class of failure this set is intended to prevent—CI and the repository’s normal drift gate continue to pass because they never invoke `model_inventory --check`. A stale registry ID can therefore merge and reach routing before anyone manually runs the check.\n  - **Details:**\n    - **Violation:** The end-of-set deliverables require “a drift gate that fails loud on an id the provider does not offer.”\n    - **Impact:** The registry correction is not continuously enforced. The same silent model-ID drift that caused the `gpt-5.6` defect can recur, defeating a central objective of the set and changing the merge decision.\n    - **Evidence:** `ai_router/model_inventory.py`, `router-config.yaml`, and the changelog explicitly state that “Nothing calls `--check` automatically” and that arming it in `drift_guard.py` or CI is deferred. The reported `drift_guard.py — OK` therefore does not prove the model inventory gate is active.\n    - **Correct answer:** Invoke `python -m ai_router.model_inventory --check` from the repository’s automatic drift/CI gate, with tests proving that a mismatched provider ID fails that gate.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "After a provider retires or renames a model ID—the exact class of failure this set is intended to prevent—CI and the repository’s normal drift gate continue to pass because they never invoke `model_inventory --check`. A stale registry ID can therefore merge and reach routing before anyone manually runs the check.",
+      "discoveryCall": 1
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "81f4ba505bf29637eaf61df352ba5641aafb6adc"
+}

@@ -436,6 +436,110 @@
       "dateTime": "2026-08-04T14:58:18.313626-04:00",
       "description": "close_session REFUSED: its in-process backstop verification (Set 084, gpt-5-6, $0.3743) independently found 2 blocking Majors. BOTH ACCEPTED, and the first is a REGRESSION IN ROUND 6'S OWN FIX -- which is exactly what an independent backstop is for. (B1) round 6 recorded an unreadable Anthropic row with out.setdefault(display, _unreadable(...)) while a readable row used out.setdefault(display, PageRates()).rows.append(entry); setdefault NEVER REPLACES, so for a model published across several rows -- precisely how Anthropic expresses an effective date -- an unreadable first row created the entry and its readable sibling appended into that same object, making rows non-empty and bypassing the fatal check with a tier missing. Both directions are bad: lose Sonnet 5's FUTURE row and the introductory $2/$10 becomes permanent past 2026-09-01; lose its INTRODUCTORY row and resolve_rates' earliest-period fallback applies the future price TODAY. The backstop also spotted render_proposal assuming every observation carries label+rates, so an unreadable observation would KeyError AFTER the proposal file was already written. Fixed: readability is now a property of the GROUP, any unreadable row poisons its whole model, and the renderer skips non-rate observations. (B2) two dictionary-miss paths survived round 6's sweep: parse_openai skipped rows whose cell count was not exactly 9 (now unreadable), and a FOOTNOTE on an OpenAI label changed the dictionary KEY so recording 'under its own name' did not help (markers now stripped -- a footnote decorates a label, it does not rename a model). Residual documented, not fixed: _google_section_rates still returns None when a section's price ROW LABELS are absent, indistinguishable from a per-model rename -- kept because that return is what makes ~100 image/video/TTS sections ignorable, and a GLOBAL rename is already fatal via _require. Suite 3402 passed / 6 skipped / 0 failed (21m59s). Live re-run stable across all seven rounds: 10 entries, 2 unchecked, exit 1.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-04T16:01:59.963121-04:00",
+      "description": "Registered session 4 (start_session); read the preload, the spec's configuration block, and the S1-S3 hand-offs including S3's WAIVED residual.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "assignment",
+      "dateTime": "2026-08-04T16:01:59.963121-04:00",
+      "description": "Step 3.5: routed assignment analysis (analysis -> gemini-2.5-pro, $0.0124) and a routed architecture review of the discovery-pin design (excl. anthropic -> gemini-2.5-pro, $0.0114). Appended the S4 block to ai-assignment.md.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "residualFixed",
+      "dateTime": "2026-08-04T16:01:59.963121-04:00",
+      "description": "Fixed the Major Session 3 closed WAIVED over: --fetch would propose replacing a hand-encoded long-context tier with the page's flat short-context rate. Entries the page cannot describe now go to not_comparable_entries: reported, never proposed, unreachable by --apply. 6 tests; falsifier confirmed 3 fail without the guard.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "aliasesRepointed",
+      "dateTime": "2026-08-04T16:01:59.967520-04:00",
+      "description": "opus -> claude-opus-5 (same price as 4.8); sonnet -> claude-sonnet-5 (cheaper than 4.6, with the 2026-09-01 lapse as a dated row). Reasons recorded in each entry.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "fiveSixSplit",
+      "dateTime": "2026-08-04T16:01:59.967520-04:00",
+      "description": "Retired the bare gpt-5.6 alias. Split into gpt-5-6-sol (pinned verifier), gpt-5-6-luna (discovery fan-out) and gpt-5-6-terra (registered, disabled). session-verification pin re-pointed to gpt-5-6-sol.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "fable5Added",
+      "dateTime": "2026-08-04T16:01:59.967520-04:00",
+      "description": "Added Fable 5 (claude-fable-5), absent from the registry entirely. Registered and priced, deliberately is_enabled: false.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "driftGateGreen",
+      "dateTime": "2026-08-04T16:01:59.967520-04:00",
+      "description": "Corrected the identity-only gemini-3-pro id to gemini-3-pro-preview. model_inventory --check now exits 0 for the first time: all 15 configured model_ids are offered by their provider.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "uatWalk",
+      "dateTime": "2026-08-04T16:01:59.967520-04:00",
+      "description": "Walked the confirmation flow live against the three pricing pages: --fetch (14 items), accept 12 / reject 2, --apply, re-fetch. Rejected the identity-only entries' rate proposals so no model has two priced surfaces. Found and fixed two readability defects in the diff.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "confirmedOnStamped",
+      "dateTime": "2026-08-04T16:01:59.972895-04:00",
+      "description": "Every routable entry now carries confirmed_on 2026-08-04, written by --apply and never hand-typed. The load-time unstamped-model warning is gone.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 10,
+      "stepKey": "lunaOnFanOut",
+      "dateTime": "2026-08-04T16:01:59.974509-04:00",
+      "description": "Added route(prefer_model=...) and verification.discovery.model: gpt-5-6-luna. Deliberately NOT a new task_type, which would have escaped the dynamic orchestrator exclusion. 17 tests covering all four degradation paths.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 11,
+      "stepKey": "ratesGuard",
+      "dateTime": "2026-08-04T16:01:59.975564-04:00",
+      "description": "A routable entry declaring no rates now fails config load: an absent rate reads as 0.00 and selection RANKS by that scalar, so it would win every cheapest-candidate tiebreak while billing an unknown amount.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 12,
+      "stepKey": "costRecordReconciled",
+      "dateTime": "2026-08-04T16:01:59.976623-04:00",
+      "description": "Reconciled the ledger row by row: $177.4150 reported vs $228.5689 true, understated $51.1539 (28.8%). gpt-5-6 is 99.8% of it at exactly 2.000x. gemini-pro's missing tier cost nothing (no call ever exceeded 200k). Disclosed in cost_report.py, the JSON report, and s4-cost-reconciliation.md. Raw ledger NOT rewritten.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 13,
+      "stepKey": "uatChecklist",
+      "dateTime": "2026-08-04T16:01:59.977674-04:00",
+      "description": "Authored the 4-item UAT checklist from the walk, on a throwaway config copy, every command executed by the orchestrator first. Plus s4-walk-evidence.md.",
+      "status": "completed"
     }
   ]
 }

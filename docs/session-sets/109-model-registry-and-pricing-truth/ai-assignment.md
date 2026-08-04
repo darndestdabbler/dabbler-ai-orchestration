@@ -390,3 +390,145 @@ ledger before publishing the claim reduced it to one call at $0.0003.
 - **Next session set.** `110-work-explorer-native-treeview` is already authored
   and declares this set as its prerequisite; it remains the successor. Session
   3 raises no competing candidate.
+
+---
+
+## Session 4 of 4 — Correct the registry, put the cheap model where it pays, walk it
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked).
+  Consistent with S3's routed recommendation, which read the analyst's
+  non-existent `claude-3-opus-20240229` as **claude-opus-5 / high**. The same
+  independence constraint S3 recorded still binds: `gpt-5-4` and `gpt-5-6-sol`
+  are what this set's Anthropic-excluded verification falls through to, so
+  orchestrating from OpenAI would collapse the cross-provider independence
+  every verdict in this set rests on.
+- Routed step-3.5 analysis: `s4-ai-assignment-analysis.json` (route
+  `task_type=analysis` → gemini-2.5-pro, $0.0124, truncation-clean).
+- Routed design decision: the discovery-pin design (below), routed as
+  `architecture` with **anthropic excluded** → gemini-2.5-pro, $0.0114,
+  truncation-clean. Its verdict is reproduced below.
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` (**this session** walks the price-confirmation flow and
+  authors the checklist), `requiresE2E false`, `pathAwareCritique advisory`
+  (set-terminal, runs here). Not re-litigated mid-session.
+- Budget note: **`DABBLER_*` provider keys only**; zero Copilot seat capacity.
+  Two routed calls above (~$0.024 combined) plus the mandatory cross-provider
+  verification. The pricing-page fetches and the enumeration lockfile read are
+  unmetered.
+
+### The step-3.5 analyst did NOT invent a model id this time
+
+S1, S2 and S3 each recorded the same failure: the routed analyst recommended a
+next-orchestrator model that exists in neither this registry nor at the
+provider (S3's was `claude-3-opus-20240229`). Three sessions running, on the
+one call this repo makes specifically so it does not self-opine about models.
+
+This session's call **enumerated the registry inside the prompt** — the exact
+list of routable and identity-only aliases, with "if you name something not on
+this list your recommendation is discarded" — and asked for no
+next-orchestrator at all, since S4 is set-terminal. The returned
+`next_session_set` names a slug rather than a model, and nothing invented
+appeared.
+
+That is one observation, not a fix, and it is **not** evidence the underlying
+problem is solved: constraining a prompt is weaker than validating a response.
+The owed `route()`-side fix — validate a recommended model id against the
+registry before returning it — is **still owed and still not in this session's
+authored plan**. It is now cheaper than when S3 named it, because
+`model_inventory` already knows every id each provider offers.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; read the preload; confirm keys; read the spec and the S1–S3 hand-offs. | Orchestrator direct — bootstrapping. |
+| 3.5 | Assignment analysis + next-set recommendation. | **Routed** (`analysis`) — repo rule: never self-opine on model choice. |
+| 4a | How to route the discovery fan-out to a cheap model without losing the orchestrator exclusion. | **Routed** (`architecture`, excl. anthropic) — the one genuine design fork in the session, and it sits directly on the cross-provider guarantee. |
+| 4b | Fix the S3 residual; re-point aliases; split the 5.6 family; add Fable 5; correct the `gemini-3-pro` id. | Orchestrator direct — the decisions were already made by the spec and by S1's live probes; this is transcription, and the rates are written by the tool rather than typed. |
+| 4c | Walk `--fetch` / accept / reject / `--apply`. | Orchestrator direct — **this is the UAT item being dogfooded**, and a routed model cannot walk a confirmation flow. |
+| 4d | Reconcile the cost record from the ledger. | Orchestrator direct — arithmetic over a local file; a model asked to total 1,237 rows would estimate. |
+| 4e | UAT checklist, walk evidence, cost reconciliation, change-log. | Orchestrator direct — authored from what this session actually observed. Routing them would produce plausible prose about a walk the writer did not take. |
+| 6 | Verification, adjudication, path-aware critique. | **Routed** — mandatory, cross-provider, never self-verified. |
+
+### Where this departs from the routed analyst, and why
+
+**Departure 1 — most of the routing plan.** The analyst marked six of eight
+steps `routed`, including "update model registry, aliases and pinning" and
+"author UAT checklist". Both are declined. The registry edits are fully
+determined by the spec plus Session 1's live probe table — there is no
+solution-variance left to spend a panel on, and the *rates* are written by
+`pricing_proposal --apply` rather than by anyone's judgement, which is the
+whole design. The UAT checklist is authored from a walk this orchestrator
+performed; a model that did not perform it would write plausible steps, which
+is precisely the failure `project-guidance.md` bans ("untested instructions are
+not known to be followable").
+
+**Departure 2 — its `task_type` values are not this repo's.** It returned
+`code_generation` and `session_verification`; the registry's types are
+`code-review`, `architecture`, `documentation`, `analysis`,
+`session-verification`. Read as intent, not as literal routing.
+
+**Departure 3 — the next-set recommendation is declined on fact.** It proposed
+`110-cost-observability-and-controls`. A set numbered 110 already exists —
+`110-work-explorer-native-treeview` — and it declares *this* set as its
+prerequisite. The analyst had no way to know that. Recorded below as a
+candidate theme for a later number rather than as the successor.
+
+### The routed design decision, and what it prevented
+
+The question: how does the discovery fan-out run on `gpt-5-6-luna` while the
+adjudicating calls keep `gpt-5-6-sol`?
+
+The obvious answer — a `session-verification-discovery` task type with its own
+`task_type_overrides` pin — is **wrong in a way no previously-passing test
+would have caught**. `route()` gates the dynamic orchestrator exclusion on
+`task_type == "session-verification"`; that exclusion is the only thing
+guaranteeing a session is not verified by its own provider. A new task type
+silently escapes it, along with the `verification_stamp` legality check and the
+`session_verification_started` metrics event.
+
+The independent reviewer (google / gemini-2.5-pro, anthropic excluded) reached
+the same conclusion unprompted and named the consequence in the same terms:
+*"Introducing `session-verification-discovery` bypasses this check, allowing a
+session to be 'verified' by its own provider."* It also enumerated the four
+degradation cases the implementation now has a test for each of, and — asked to
+argue both sides of an unrelated question — concluded that a routable registry
+entry with no declared rates should **fail config load**, which is what shipped.
+
+Shipped design: `route(prefer_model=...)`, consulted before the task-type pin
+under the identical guard, with `task_type` unchanged. Every failure mode
+degrades to the pinned verifier.
+
+### What the walk changed
+
+Two defects in the confirmation screen, both found by reading the diff as an
+operator rather than by a test:
+
+1. A purely **date-tiered** rate was labelled `(all other prompts)` — the label
+   for the unbounded row of a *size-tiered* model — inviting the reader to hunt
+   for a boundary that does not exist, on the one screen whose job is that a
+   human understands a price.
+2. The S3 residual, reproduced: `--fetch` proposed **deleting a hand-encoded
+   long-context tier**. Now held in `not_comparable_entries`, reported and
+   never proposed.
+
+And one decision the walk forced into the open: the identity-only
+`claude-opus-5` / `claude-sonnet-5` entries became **redundant** the moment the
+aliases were re-pointed, and the tool offered to give each of them a second
+copy of a price that now lives on `opus` / `sonnet`. Both rejected. Two priced
+surfaces for one model is this set's origin defect wearing a different hat.
+
+### Forward-looking recommendations (routed)
+
+- **Next session set.** `110-work-explorer-native-treeview` is already authored
+  and declares this set as its prerequisite; it remains the successor. The
+  analyst's `110-cost-observability-and-controls` is a reasonable *theme* for a
+  later number and is recorded as a candidate, not adopted — this set already
+  ships the cost-truth half of it.
+- **Owed, and named rather than quietly carried:** the `route()`-side model-id
+  validation (three sessions running); retiring the two redundant identity
+  entries; `pull_verifier.models`' pins are a model-id surface
+  `model_inventory --check` does not cover; and `pull_verifier._pricing_for`
+  falls back to `(0.0, 0.0)` on an unknown id, which is the same fail-open
+  class this session closed in the registry. All four are recorded in
+  `disposition.json` and `change-log.md`.

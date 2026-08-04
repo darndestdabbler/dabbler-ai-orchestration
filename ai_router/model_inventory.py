@@ -34,12 +34,23 @@ would be cost without benefit. It is deliberately NOT listed in
 which ids an account is offered is account-scoped, and shipping one operator's
 snapshot in the wheel would hand consumers stale data that looks authoritative.
 
-**The gate is deliberately unwired.** Nothing calls ``--check`` automatically.
-The repository's own registry FAILS it today (that is the point — the failing
-entry is the specimen), and Session 4 of Set 109 is what fixes the registry.
-Wiring it into ``ai_router/scripts/drift_guard.py`` — whose test suite asserts
-the real repository passes every check — would turn the committed suite red on
-the day this lands. It is wired after S4, not before.
+**The gate is WIRED as of Set 109 S4.**
+``ai_router/scripts/drift_guard.py`` runs this check (``model-registry-drift``)
+alongside its others, so CI goes red on a commit that names an id no provider
+offers.
+
+It was deliberately unwired when S1 shipped it, for one reason: the
+repository's own registry FAILED it — that was the point, the failing entry was
+the specimen — so arming it would have turned the committed suite red on the
+day it landed. S4 corrected the registry, ``--check`` passes, and that reason
+expired. S4's own verification round is what caught that the deferral had
+outlived its cause: a gate nothing invokes catches nothing, which is the same
+invisibility this module exists to end.
+
+Wiring it costs nothing at runtime and cannot flap. ``--check`` reads only
+``router-config.yaml`` and the committed lockfile and never probes, so the
+answer changes on a **commit**, never on a provider's release schedule.
+``--refresh`` is the deliberate, network-touching act that can change it.
 
 CLI usage::
 

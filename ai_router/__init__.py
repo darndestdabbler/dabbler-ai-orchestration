@@ -1013,6 +1013,7 @@ def route(
     session_number: Optional[int] = None,
     exclude_providers: Optional[list] = None,
     verification_stamp: Optional[dict] = None,
+    prefer_model: Optional[str] = None,
 ) -> RouteResult:
     """
     Route a task to the best model based on complexity estimation.
@@ -1046,6 +1047,18 @@ def route(
                      :class:`IdentityResolutionError` (fails closed);
                      an exclusion that leaves no eligible candidate
                      raises :class:`VerificationUnavailableError`.
+        prefer_model: Set 109 S4 — a registry alias this call would
+                     rather use, consulted before the
+                     ``task_type_overrides`` pin and under the same
+                     guard. It is a PREFERENCE in exactly the sense the
+                     pin is: ``exclude_providers`` still overrides it,
+                     a disabled or unknown alias is ignored, and a tier
+                     above *max_tier* is ignored — each case falling
+                     through to the pin. It exists so the verification
+                     discovery fan-out can run on a cheap model without
+                     a second task_type, which would have escaped the
+                     ``session-verification`` gates above (the dynamic
+                     orchestrator exclusion most of all).
         verification_stamp: Set 084 S2 (F3) — the producer-side
                      evidence stamp built by
                      ``verification_stamp.build_stamp`` (only the
@@ -1156,6 +1169,7 @@ def route(
     model_name = pick_model(
         score, max_tier, task_type, _config,
         exclude_providers=exclude_providers,
+        prefer_model=prefer_model,
     )
     if model_name is None:
         raise VerificationUnavailableError(

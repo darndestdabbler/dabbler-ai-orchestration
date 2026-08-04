@@ -114,9 +114,52 @@ def validate_model_rates(alias: str, entry: dict) -> None:
     Silence means every ``(date, input_tokens)`` pair resolves to exactly one
     row. Identity-only entries — which carry no rates at all because nothing
     routes to them — pass: absence is a valid declaration, disagreement is not.
+    Set 109 S4 narrowed that to what it always meant: absence is valid for an
+    entry marked ``is_enabled: false``, and a defect for a routable one.
     """
     has_flat = _INPUT_KEY in entry or _OUTPUT_KEY in entry
     rows = entry.get(PRICING_KEY)
+
+    # "Declared" means the key is present AND carries a value. Three cases,
+    # deliberately distinguished:
+    #
+    #   pricing: null   -> NOT declared. `pricing:` with nothing after it is
+    #                      ordinary YAML for "no value", and it is what an
+    #                      operator writes when they mean to fill it in later.
+    #   pricing: []     -> declared and MALFORMED; keeps its own sharper
+    #                      "non-empty list" error below.
+    #   (key absent)    -> NOT declared.
+    #
+    # The null case is a hole this session opened and its own path-aware
+    # critique caught: an earlier draft tested `PRICING_KEY not in entry`, so
+    # `pricing: null` skipped this guard, fell through the `rows is None`
+    # branch with nothing to check, and loaded clean — leaving a routable entry
+    # that `resolve_rates` reads as $0.00 and the selection paths rank as the
+    # cheapest candidate. That is the exact defect the guard exists to close,
+    # reachable by typing one word.
+    declared = entry.get(PRICING_KEY) is not None
+    if not declared and not has_flat and entry.get("is_enabled", True):
+        # Set 109 S4. Absence of rates is honest for an identity-only record,
+        # and a lie for a routable one. `resolve_rates` reads a missing rate as
+        # 0.0 and `worst_case_output_cost_per_1m` returns 0.0, which does not
+        # merely under-report: selection ranks candidates by that scalar, so a
+        # routable entry with no rates sorts CHEAPEST and wins the verifier
+        # tiebreak outright — a free-looking model that bills whatever it bills.
+        # That is this set's origin defect (a price nobody could see was wrong)
+        # in its most complete form, so it fails at load rather than at
+        # reconciliation time. Identity-only entries are unaffected: they carry
+        # is_enabled: false, which is what "nothing routes here" already means.
+        raise PricingError(
+            f"model {alias!r} is routable (is_enabled is not false) but "
+            f"declares no rates. Add {_INPUT_KEY}/{_OUTPUT_KEY} or a "
+            f"{PRICING_KEY}: list — an absent rate is read as 0.00, which "
+            "would make this the cheapest candidate in every selection "
+            "tiebreak while billing an unknown amount. If nothing should "
+            "route here, set is_enabled: false and it becomes an "
+            "identity-only record, which needs no rates. To fill it in from "
+            "the provider's published page: python -m "
+            "ai_router.pricing_proposal --fetch"
+        )
 
     if rows is not None and has_flat:
         raise PricingError(

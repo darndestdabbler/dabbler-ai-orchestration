@@ -44,9 +44,12 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   below — and the conservative treatment was kept on the "declared
   destination" ground rather than the reachability one.)
 
-  The gate is **not yet wired into any automatic check**. The repository's own
-  registry fails it today — `router-config.yaml` sends `model_id: gpt-5.6`, an
-  id OpenAI does not list — and Set 109 S4 is what corrects the registry.
+  When S1 shipped it the gate was **deliberately unwired**, for one reason: the
+  repository's own registry failed it — `router-config.yaml` sent
+  `model_id: gpt-5.6`, an id OpenAI does not list — so arming it would have
+  turned the committed suite red on the day it landed. **Set 109 S4 corrected
+  the registry and wired the check into `ai_router/scripts/drift_guard.py`**
+  (see below).
 
 - **(Set 109 S1) Metrics rows now record the model the provider actually
   served, and flag a substitution.** `router-metrics.jsonl` gains three
@@ -223,6 +226,116 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   three parsers now record a row they could not read rather than skipping past
   it, so "absent" means absent.
 
+
+- **(Set 109 S4) `route(prefer_model=...)` — a call-level model preference, so
+  the verification discovery fan-out can run on a cheap model.** Consulted by
+  `pick_model` **before** the `task_type_overrides` pin and under the identical
+  guard, which makes it a preference in exactly the sense the pin is: an
+  excluded provider still overrides it, and an alias that is unknown, disabled,
+  or above `max_tier` is ignored — each case falling through to the pin.
+
+  It exists as an argument rather than as a new task type on purpose, and the
+  reason is load-bearing. `route()` gates the **dynamic orchestrator
+  exclusion** on `task_type == "session-verification"`, and that exclusion is
+  the only thing guaranteeing a session is not verified by its own provider. A
+  `session-verification-discovery` task type would have looked correct, passed
+  every existing test, and silently dropped it — along with the
+  `verification_stamp` legality check and the `session_verification_started`
+  metrics event. An independently routed design review (Anthropic excluded)
+  reached the same conclusion unprompted.
+
+  `verification.discovery.model` wires it: `verify_session` passes the
+  preference on **discovery** calls only. The supplementary and
+  remediation-review passes adjudicate — they decide whether a finding is real
+  and whether a fix landed — and that is the wrong place to economise, so they
+  keep the pinned verifier.
+
+  > **The mechanism ships; the pin does not.** `verification.discovery.model`
+  > is committed **unset**. S4 armed it on price alone, and its own
+  > verification round caught that the set's risk register requires evidence
+  > of finding *quality* before the fan-out moves to a cheaper variant — *"the
+  > pin should move only with evidence, not with the price list."* No such
+  > evidence exists, and what little S4 produced points the other way: on the
+  > same session diff, Luna's two discovery calls returned one Major while
+  > Sol's single supplementary call returned three more, two of them ordinary
+  > correctness bugs. The framings differ, so that is a data point rather than
+  > an experiment — but it is not grounds for arming the pin. The code path is
+  > shipped, tested, and inert; uncommenting one line enables it.
+
+- **(Set 109 S4) The model-registry drift check is wired into
+  `ai_router/scripts/drift_guard.py`.** A commit naming a `model_id` no
+  provider offers now turns CI red, instead of waiting for someone to remember
+  `model_inventory --check`. The check reads only `router-config.yaml` and the
+  committed lockfile and never probes, so it is deterministic and goes red on a
+  commit rather than on a provider's release schedule; a checkout carrying
+  neither file reports nothing rather than failing.
+
+- **(Set 109 S4) `cost_report.HISTORICAL_RATE_CORRECTIONS` and the disclosure
+  it drives.** `print_cost_report` prints a `[!] HISTORICAL RATE CORRECTION`
+  block naming only the affected models **present in that report**, with the
+  correction date, the measured factor, and the reason; the JSON report carries
+  the same lines under `historical_rate_corrections`, so a programmatic
+  consumer cannot read a total as clean. A report containing no affected model
+  carries no caveat, because a notice that fires on every report is one an
+  operator learns to scroll past.
+
+### Changed
+
+- **(Set 109 S4) The model registry now matches what the providers actually
+  offer, and every routable rate is confirmed rather than assumed.**
+  `python -m ai_router.model_inventory --check` **passes for the first time**:
+  all 15 configured `model_id`s are offered by their provider.
+
+  - The bare `gpt-5.6` alias is **retired**. OpenAI never listed it and served
+    it from `gpt-5.6-sol` at twice the recorded rate. It is replaced by three
+    explicit entries — `gpt-5-6-sol` (the pinned `session-verification`
+    verifier, unchanged in behaviour and now honest about its price),
+    `gpt-5-6-luna` (the discovery fan-out, $0.20/$1.20), and `gpt-5-6-terra`
+    (registered, priced, `is_enabled: false` — it has no assigned role, and an
+    enabled tier-3 entry with no role can win a tiebreak nobody reasoned
+    about).
+  - `opus` → `claude-opus-5` (bills the same $5.00/$25.00 as 4.8: a newer model
+    at no extra cost) and `sonnet` → `claude-sonnet-5` ($2.00/$10.00 against
+    4.6's $3.00/$15.00, with the 2026-08-31 lapse recorded as a dated row so
+    the calendar boundary needs no future edit).
+  - **Fable 5 added** (`claude-fable-5`), which the registry did not contain at
+    all. Registered and priced, `is_enabled: false`.
+  - `gpt-5-5` corrected from $2.50/$15.00 to **$5.00/$30.00** — understated 2×
+    for a different reason than `gpt-5-6`: a real id whose rates were copied
+    from `gpt-5.4` at authoring time, so the drift gate passes it.
+  - `gemini-3-1-pro` corrected to **$2.00/$12.00 ≤200k, $4.00/$18.00 above**;
+    `gemini-pro` gains its previously-unrepresentable **>200k tier**.
+  - The identity-only `gemini-3-pro` id corrected to `gemini-3-pro-preview`.
+  - `gemini-pro`'s pin to 2.5 Pro was **re-checked and deliberately left**, with
+    the reasoning recorded in the entry: 3.1 Pro costs *more*, the only 3.x id
+    available is a preview, and the registry's own convention calibrates a new
+    model as a generator before trusting it to verify. A proposal, not a switch.
+
+  **Every rate was written by `pricing_proposal --apply` from the providers'
+  published pages. None was hand-typed** — 12 changes accepted, 2 rejected, and
+  each accepted entry carries `confirmed_on: "2026-08-04"`.
+
+- **(Set 109 S4) A routable model entry that declares no rates now fails config
+  load.** Absence of rates stays valid for an identity-only record
+  (`is_enabled: false`) and is a defect for a routable one. `resolve_rates`
+  reads a missing rate as `0.0` and `worst_case_output_cost_per_1m` returns
+  `0.0` — and the selection paths **rank candidates by that scalar**, so a
+  rate-less routable entry does not merely under-report: it sorts cheapest and
+  wins the verifier tiebreak outright while billing an unknown amount. The
+  error names both ways out (add rates, or mark it `is_enabled: false`) and the
+  command that fills them in.
+
+  > **Migration — this is the one breaking change in the set.** Consumer repos
+  > run their own `router-config.yaml`, and a config that loaded before will
+  > now raise `PricingError` at load if any entry is routable
+  > (`is_enabled` absent or true) and declares neither the flat scalars nor a
+  > `pricing:` list. Note that `is_enabled` **defaults to true when omitted**,
+  > so an entry that never set the flag counts as routable. The fix is one of
+  > two lines per entry — real rates, or `is_enabled: false` — and
+  > `python -m ai_router.pricing_proposal --fetch` proposes the rates from the
+  > provider's published page. This repo's own registry needed both kinds of
+  > fix during Set 109 S4 and is the worked example.
+
 ### Fixed
 
 - **(Set 109 S3) The Google, OpenAI, and Anthropic request timeouts could not
@@ -354,6 +467,103 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   reclassified; the tracked diff is untouched. Mirrors Set 089's
   evidence-layer approach. New `TestFrameworkBookkeepingReclassification`
   covers the three buckets against a real-git fixture.
+
+
+- **(Set 109 S4) `pricing_proposal --fetch` no longer proposes deleting a
+  hand-encoded context tier.** This is the Major that Session 3 closed
+  **WAIVED** over.
+
+  OpenAI publishes a Short and a Long context rate for every model and states
+  the boundary between them nowhere on the page, so `parse_openai` proposes the
+  short pair and reports the long pair as an observation advising the operator
+  to *"add a `pricing:` row with an explicit `max_input_tokens`"*. An operator
+  who took that advice then had an entry saying more than the page does — and
+  the next `--fetch` diffed its flat short-context rate against their two-row
+  schedule, found them different, and proposed **replacing** it, silently
+  deleting the expensive tier and under-reporting every long prompt by the
+  margin between them.
+
+  Such an entry is now held in `not_comparable_entries`: both rate sets are
+  printed side by side for the operator to compare by eye, no change is
+  generated, and `--apply` has nothing it could write. The condition is written
+  on the **data** — the entry prices by prompt size and the page states one
+  rate with no size boundary — not on the provider name, so a page that stops
+  publishing bounds is covered without an edit and there is no per-entry
+  "operator-curated" flag anyone can forget to set. Preserving the schedule
+  while writing the page's rate into its lowest-bounded row was the richer
+  option and was deliberately not taken: it assumes that row corresponds to the
+  page's unbounded rate, and a wrong write there is the plausible-wrong-number
+  failure the refusal exists to prevent.
+
+- **(Set 109 S4) A purely date-tiered rate is no longer labelled as a size
+  tier.** `_render_declaration` printed `(all other prompts)` — the label for
+  the unbounded row of a *context-tiered* model — beside every unbounded row,
+  including on a model whose rows differ only by date. On the one screen whose
+  job is that a human understands a price before accepting it, that invited the
+  reader to hunt for a boundary that does not exist. It now says it only when
+  some other row in the same period actually claims a size range.
+
+### Disclosed
+
+- **(Set 109 S4) The historical cost record is understated by $51.15 (28.8%),
+  and the raw ledger was deliberately not rewritten.** Recomputed row by row
+  from each row's own token counts under the confirmed rates: the ledger
+  reports **$177.4150** against a true **$228.5689** across 1,237 rows.
+
+  `gpt-5-6` is **99.8% of it** — 254 rows, $51.0383 reported, ~$102.0766 true,
+  at a factor of exactly 2.000. `gpt-5-5` (1 row) and `gemini-3-1-pro` (7 rows)
+  account for twelve cents between them. **`gemini-pro` cost nothing**: its
+  missing >200k tier was a real schema defect, but not one of its 366 rows ever
+  exceeded 200,000 input tokens, so it is deliberately absent from the
+  disclosure rather than caveating 366 correct rows.
+
+  The figure is a **floor**, not an estimate: OpenAI short-context rates are
+  used throughout because a long-context row cannot be identified from the
+  ledger. The spec cited a much smaller number — Set 108 S4's single-session
+  slice, "$0.5916 reported, ~$1.18 true" — which was correct for that session
+  and roughly eighty-five times too small as a characterisation of the problem.
+
+  Full reconciliation, including the reproduction snippet:
+  `docs/session-sets/109-model-registry-and-pricing-truth/s4-cost-reconciliation.md`.
+
+### Known residuals (Set 109 S4, named rather than quietly carried)
+
+- `pull_verifier._pricing_for` falls back to `(0.0, 0.0)` for a `model_id`
+  absent from the registry — the same fail-open class this session closed in
+  the registry, on a cost **cap** rather than a cost report. Not reached today:
+  the registry lookup precedes it and covers every id in use. Deferred as
+  out-of-plan (the pull verifier is an agentic seam, not a routed model), and
+  recorded here so the residual is a decision rather than an oversight.
+- `pull_verifier.models`' per-provider pins are a `model_id` surface that
+  `model_inventory --check` does not cover. All three pins name ids the
+  providers do offer, so there is no live drift.
+- `route()` still does not validate a recommended model id against the registry
+  before returning it — owed since Session 1 and named in three consecutive
+  sessions' `ai-assignment.md`.
+- The identity-only `claude-opus-5` and `claude-sonnet-5` entries are redundant
+  now that `opus` / `sonnet` carry those `model_id`s. Kept and flagged for
+  retirement rather than deleted: removing a registry key is a change a
+  consumer repo could be pinned to.
+- `--apply` appends rate keys at the end of an entry's mapping, leaving a blank
+  line and separating the rates from the fields above them. Cosmetic; the write
+  path was left alone rather than re-engineered for field ordering on the one
+  file every consumer reads. (The whole-file list re-indentation the same
+  round-trip caused **was** treated as a defect and is fixed.)
+- **`pull_critique` builds its prompt from `disposition.json`, so running it
+  before the disposition is authored critiques the PREVIOUS session's claims.**
+  Set 109 S4 hit this: both critics returned VERIFIED against Session 3's
+  summary, and one "confirmed" that no registry entry used the `pricing:` key —
+  true of S3, false of the tree it was reading. The artifact looks equally valid
+  either way. Ordering the disposition before the critique fixes it; nothing in
+  `docs/ai-led-session-workflow.md` currently says so.
+- **A critic that declines to review still satisfies the path-aware-critique
+  artifact validator.** On one run `openai/gpt-5.4` returned a Major reading
+  *"unable to complete a grounded review ... conflicting developer
+  instructions"* — a non-review — and that is content-non-trivial by the
+  validator's rule (a finding with a description), so it counts toward the
+  `>= 2 distinct providers` property a `required` set gates on. The multi-provider
+  guarantee is therefore shape-checked, not substance-checked. Out of plan for
+  this set and recorded rather than fixed.
 
 ## [0.34.0] — 2026-07-15 (Set 104 — Copilot CLI large-prompt file handoff)
 

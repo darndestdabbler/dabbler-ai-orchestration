@@ -103,19 +103,25 @@ html, body {
  * foreground; the same chevron + click-to-collapse affordance. */
 .module {
   margin-bottom: 6px;
-  /* Set 093 S2: a two-column grid so the action strip occupies its OWN
-   * right-hand column (never overlapping the header's collapse-click
-   * target) with the body spanning both columns below. The strip column is
-   * `auto`, and the strip is display:none until revealed, so it collapses to
-   * zero width and the header takes the full row when the strip is hidden. */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "header strip"
-    "body   body";
+  /* Set 093 S2 shipped a two-column grid so the action strip occupied its OWN
+   * right-hand column, never overlapping the header's collapse-click target.
+   * That held only while the strip fitted: a `nowrap` strip in an `auto`
+   * column cannot shrink, so a narrow panel pushed it over the title (see the
+   * note by .module-action-strip below).
+   *
+   * Now a WRAPPING FLEX ROW, which keeps the same intent — the strip never
+   * overlaps the header — and additionally self-corrects at any width and any
+   * title length: header and strip share a line while both fit, and the strip
+   * drops to its own line when they do not. The strip is display:none until
+   * revealed, so a non-hovered module is a single header line exactly as
+   * before. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
 }
 .module-header {
-  grid-area: header;
+  /* Grows to fill the line, so the strip sits hard right when inline. */
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -146,7 +152,8 @@ html, body {
   flex-shrink: 0;
 }
 .module-body {
-  grid-area: body;
+  /* Always its own full-width line, whether or not the strip wrapped. */
+  flex: 1 0 100%;
 }
 .module[aria-expanded="false"] .module-body {
   display: none;
@@ -176,11 +183,23 @@ html, body {
  * the tree content. The buttons are NOT treeitems (excluded from
  * the tree name + arrow nav); the strip is a Tab-reached toolbar. */
 .module-action-strip {
-  grid-area: strip;
+  /* Never shrinks (the buttons are `nowrap`); it wraps to its own line
+   * instead, and THAT is what stops it from ever covering the title.
+   * `margin-left: auto` right-aligns it both when it shares the header's line
+   * and when it wraps below — so the buttons hold the same column on every
+   * row whether or not they wrapped, which reads quieter than left-aligning
+   * them under the text. `flex-wrap` lets the buttons themselves wrap rather
+   * than overflow in an extremely narrow panel. */
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
   align-self: center;
   align-items: center;
   gap: 2px;
+  row-gap: 3px;
   padding-right: 6px;
+  padding-bottom: 4px;
   /* Hidden (and zero-width) until the header/strip is hovered or the module
    * row / a strip button holds focus — revealed via display, so the header
    * reclaims the full row width when the strip is not shown. */
@@ -213,40 +232,24 @@ html, body {
   outline-offset: 1px;
 }
 
-/* Operator-reported (2026-08-04): in a NARROW panel the two-column grid
- * fails. The strip's `auto` column needs ~240px for its four buttons, so the
- * header column is squeezed until the module title wraps to two lines — and
- * the vertically-centred strip then sits on top of the first line, hiding the
- * very name the operator is hovering to identify. Wide panels are unaffected
- * and keep the quiet single-line affordance.
+/* Operator-reported (2026-08-04): in a narrow panel the strip covered the
+ * module title. The strip's four buttons are `white-space: nowrap` and need
+ * ~225px, so under the old two-column grid the `auto` strip column could not
+ * shrink: below ~300px it overflowed leftward ON TOP of the title, and above
+ * that it squeezed the title column until the name wrapped to two or three
+ * lines.
  *
- * Below the threshold, stack the strip UNDER the title instead: one column,
- * three rows. The title keeps the full width and is never overlaid.
+ * A width media query was tried first and REJECTED, because the operator
+ * pointed out the flaw: the breakpoint depends on the TITLE's length, which a
+ * fixed threshold cannot know. Measured, a 400px breakpoint stacked
+ * `Converter (Sam)` at 380px where it would have fitted inline (5 such cases),
+ * while `Payment Reconciliation (Priyanka)` still wrapped to two lines at
+ * 450px and a 66-character title to three.
  *
- * The accepted trade-off: revealing a stacked strip on hover pushes the
- * module body down, so a narrow panel gets a small layout shift the wide one
- * does not. That is deliberate — a momentary shift costs less than a name
- * that cannot be read at all, and the alternative (truncating the title to
- * an ellipsis) would hide the same information permanently rather than
- * momentarily. */
-@media (max-width: 400px) {
-  .module {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "header"
-      "strip"
-      "body";
-  }
-  /* Align the stacked strip with the header text rather than the chevron,
-   * so it reads as belonging to the module above it. */
-  .module-action-strip {
-    align-self: start;
-    flex-wrap: wrap;
-    row-gap: 3px;
-    padding-left: 24px;
-    padding-bottom: 5px;
-  }
-}
+ * So the wrap is CONTENT-DRIVEN instead, with no magic number: `.module` is a
+ * wrapping flex row. The strip drops to its own line exactly when the title's
+ * natural width plus the strip's own width no longer fit — which is the real
+ * condition, evaluated by the layout engine per module and per panel width. */
 
 /* Set 100 S1: the 093-era persistent Plan / Session sets child-node
  * styles retired with the nodes themselves. Buckets sit directly under
